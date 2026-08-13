@@ -1,0 +1,20 @@
+# .NET build artifacts
+bin/
+obj/
+*.user
+.vs/
+*.suo
+
+# Configuración local / secretos — NUNCA se versionan
+appsettings.*.local.json
+.env
+.env.*
+!.env.example
+
+# Logs y temporales
+*.log
+*.tmp
+
+# OS
+Thumbs.db
+.DS_Store

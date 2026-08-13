@@ -1,0 +1,61 @@
+using System.ComponentModel.DataAnnotations;
+
+namespace CabinaFletes.Api.Dtos;
+
+// DTOs de ENTRADA del API: la validación HTTP (DataAnnotations, [ApiController])
+// vive aquí. El controller los mapea 1:1 a un Command de Application.
+
+public class CrearCotizacionRequest
+{
+    [Required]
+    public Guid SolicitudId { get; set; }
+}
+
+public class AgregarLineaCotizacionRequest
+{
+    public Guid? LineaSolicitudId { get; set; }
+
+    [Range(typeof(decimal), "0", "9999999999999.99", ParseLimitsInInvariantCulture = true)]
+    public decimal ValorFlete { get; set; }
+
+    /// <summary>Devolución del contenedor vacío (línea 6 exclusiva); suma al total como concepto aparte.</summary>
+    [Range(typeof(decimal), "0", "9999999999999.99", ParseLimitsInInvariantCulture = true)]
+    public decimal? ValorRetornoContenedor { get; set; }
+
+    [Required]
+    [RegularExpression("(?i)^(sicetac|historica|manual|tarifario)$",
+        ErrorMessage = "Fuente debe ser 'sicetac', 'historica', 'manual' o 'tarifario'.")]
+    public string Fuente { get; set; } = null!;
+}
+
+public class AgregarConexosRequest
+{
+    [Required, MinLength(1, ErrorMessage = "Debe incluir al menos un servicio conexo.")]
+    public List<ConexoItemRequest> Items { get; set; } = new();
+}
+
+public class ConexoItemRequest
+{
+    [Required]
+    public Guid ServicioConexoId { get; set; }
+
+    [Range(typeof(decimal), "0.01", "999999.99", ParseLimitsInInvariantCulture = true)]
+    public decimal Cantidad { get; set; } = 1;
+
+    /// <summary>Si no se envía, se calcula como ValorBase * Cantidad del servicio.</summary>
+    [Range(typeof(decimal), "0", "9999999999999.99", ParseLimitsInInvariantCulture = true)]
+    public decimal? ValorAplicado { get; set; }
+}
+
+public class MarcarResultadoRequest
+{
+    [Required]
+    [RegularExpression("(?i)^(ganada|perdida)$", ErrorMessage = "Resultado debe ser 'ganada' o 'perdida'.")]
+    public string Resultado { get; set; } = null!;
+
+    [MaxLength(100)]
+    public string? Motivo { get; set; }
+
+    [MaxLength(500)]
+    public string? Comentario { get; set; }
+}

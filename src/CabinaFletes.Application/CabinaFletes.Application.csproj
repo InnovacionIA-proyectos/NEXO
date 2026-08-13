@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Capa Application (Clean Architecture): casos de uso (Handlers de Commands/Queries),
+    puertos (interfaces) hacia Infrastructure, DTOs de entrada/salida de los casos de uso
+    y Unit of Work. No conoce ASP.NET Core ni Entity Framework: solo Domain.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>CabinaFletes.Application</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CabinaFletes.Domain\CabinaFletes.Domain.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      Solo las ABSTRACCIONES de DI (IServiceCollection, IServiceScopeFactory,
+      IServiceProvider): las usan los métodos AddXUseCases() de cada módulo para
+      registrarse, y CapturarSolicitudCommand para el auto-costeo diferido de
+      cargues masivos (necesita un scope propio porque la petición HTTP ya
+      terminó). Son interfaces puras de Microsoft.Extensions, sin ASP.NET Core
+      ni Entity Framework: no rompen la regla "Application no conoce Infrastructure
+      ni frameworks web", que sigue intacta.
+    -->
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.0" />
+  </ItemGroup>
+
+</Project>

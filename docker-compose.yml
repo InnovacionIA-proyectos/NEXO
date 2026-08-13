@@ -1,0 +1,129 @@
+# ============================================================================
+# CabinaFletes (Clean Architecture) — despliegue con Docker Compose
+#
+#   - Este repositorio es SOLO BACKEND (no incluye frontend): la migración
+#     a Clean Architecture se acotó explícitamente a src/ del proyecto
+#     original. La API queda publicada en el puerto del host (API_PORT,
+#     por defecto 8080) para que cualquier frontend (el original NEXO/frontend
+#     u otro) la consuma directamente — no hay proxy Nginx aquí.
+#   - Cubicación 3D / Plan de Cargue NO están migrados a propósito: el plan
+#     es un microservicio Python aparte (ver PENDIENTES.md, "Fuera de
+#     alcance"). Se deja un servicio de ejemplo COMENTADO más abajo para
+#     cuando ese microservicio exista: hoy la API no lo llama (no hay
+#     ningún adapter cableado a CUBICADOR3D_BASE_URL todavía).
+#
+# Uso:
+#   1) cp .env.example .env   y completar los valores (mínimo MSSQL_SA_PASSWORD).
+#   2) docker compose up -d --build
+#   3) La API queda en http://localhost:${API_PORT:-8080} (health en /health).
+#   4) Sembrar datos demo (opcional, alternativa a MIGRATE_ON_STARTUP=true):
+#        docker compose --profile seed run --rm seed
+# ============================================================================
+
+services:
+  db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD}
+      MSSQL_PID: ${MSSQL_PID:-Developer}
+    volumes:
+      - mssql-data:/var/opt/mssql
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -Q 'SELECT 1' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: src/CabinaFletes.Api/Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "${API_PORT:-8080}:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
+      ConnectionStrings__CabinaFletes: "Server=db,1433;Database=CabinaFletes;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True;Encrypt=True;"
+      Database__MigrateOnStartup: ${MIGRATE_ON_STARTUP:-true}
+      # Siembra datos de demostración al arrancar si la BD está vacía (idempotente).
+      # Poner en "false" en producción real una vez cargados los datos definitivos.
+      Database__SeedOnStartup: ${SEED_ON_STARTUP:-true}
+      Cors__FrontendOrigin: ${FRONTEND_ORIGIN:-http://localhost:5173}
+      AzureAd__Instance: ${AzureAd__Instance:-https://login.microsoftonline.com/}
+      AzureAd__TenantId: ${AzureAd__TenantId:-}
+      AzureAd__ClientId: ${AzureAd__ClientId:-}
+      AzureAd__ClientSecret: ${AzureAd__ClientSecret:-}
+      AzureAd__Domain: ${AzureAd__Domain:-boterosoto.com.co}
+      # Data Warehouse corporativo (SOLO LECTURA). Opcionales: si van vacías,
+      # los módulos que las usan (Biblioteca/SICE-TAC/histórico/clientes DW)
+      # se degradan solos (503 accionable o Configurado=false), no rompen.
+      ConnectionStrings__DwSice: ${ConnectionStrings__DwSice:-}
+      ConnectionStrings__DwCubos: ${ConnectionStrings__DwCubos:-}
+      ConnectionStrings__DwCubosSap: ${ConnectionStrings__DwCubosSap:-}
+      ConnectionStrings__DbSolucionesTi: ${ConnectionStrings__DbSolucionesTi:-}
+      # SMTP corporativo (envío de cotizaciones). Opcional: sin Host/Remitente no
+      # envía. Nombres en español: SmtpCorreoAdapter lee Smtp:Puerto/Remitente/
+      # Usuario/Clave (no Port/From/User/Password).
+      Smtp__Host: ${Smtp__Host:-}
+      Smtp__Puerto: ${Smtp__Puerto:-}
+      Smtp__Ssl: ${Smtp__Ssl:-}
+      Smtp__Remitente: ${Smtp__Remitente:-}
+      Smtp__Usuario: ${Smtp__Usuario:-}
+      Smtp__Clave: ${Smtp__Clave:-}
+      # Cubicador 3D (microservicio Python, FUERA DE ALCANCE — no cableado
+      # todavía a ningún puerto/adapter). Reservadas para cuando exista.
+      Cubicador3D__BaseUrl: ${CUBICADOR3D_BASE_URL:-}
+      Cubicador3D__ApiKey: ${CUBICADOR3D_API_KEY:-}
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    restart: unless-stopped
+
+  # One-shot opcional de seed:  docker compose --profile seed run --rm seed
+  seed:
+    profiles: ["seed"]
+    build:
+      context: .
+      dockerfile: src/CabinaFletes.Api/Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
+      ConnectionStrings__CabinaFletes: "Server=db,1433;Database=CabinaFletes;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True;Encrypt=True;"
+    entrypoint: ["dotnet", "CabinaFletes.Api.dll", "seed"]
+    networks:
+      - internal
+    restart: "no"
+
+  # ---------------------------------------------------------------------
+  # Cubicador 3D — microservicio Python (PENDIENTE, no implementado).
+  # Descomentar y ajustar cuando el servicio exista; hoy la API NO lo llama.
+  # ---------------------------------------------------------------------
+  # cubicador3d:
+  #   build:
+  #     context: ../cubicador3d          # repositorio/carpeta del microservicio Python
+  #     dockerfile: Dockerfile
+  #   environment:
+  #     API_KEY: ${CUBICADOR3D_API_KEY:-}
+  #   networks:
+  #     - internal
+  #   restart: unless-stopped
+
+networks:
+  internal:
+
+volumes:
+  mssql-data:

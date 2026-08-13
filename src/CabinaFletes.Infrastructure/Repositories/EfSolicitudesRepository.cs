@@ -1,0 +1,18 @@
+using CabinaFletes.Application.Cotizaciones.Ports;
+using CabinaFletes.Domain.Entities;
+using CabinaFletes.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
+
+namespace CabinaFletes.Infrastructure.Repositories;
+
+public sealed class EfSolicitudesRepository(CabinaFletesDbContext db) : ISolicitudesPort
+{
+    public Task<Solicitud?> ObtenerBasicoAsync(Guid id, CancellationToken ct) =>
+        db.Solicitudes.AsNoTracking().FirstOrDefaultAsync(s => s.Id == id, ct);
+
+    public Task<Solicitud?> ObtenerConClienteAsync(Guid id, CancellationToken ct) =>
+        db.Solicitudes.Include(s => s.Cliente).FirstOrDefaultAsync(s => s.Id == id, ct);
+
+    public Task<int> ContarLineasAsync(Guid solicitudId, CancellationToken ct) =>
+        db.LineasSolicitud.CountAsync(l => l.SolicitudId == solicitudId, ct);
+}

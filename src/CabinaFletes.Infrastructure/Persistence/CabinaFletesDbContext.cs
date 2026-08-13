@@ -1,0 +1,345 @@
+using CabinaFletes.Domain.Entities;
+using CabinaFletes.Domain.Enums;
+using Microsoft.EntityFrameworkCore;
+
+namespace CabinaFletes.Infrastructure.Persistence;
+
+public class CabinaFletesDbContext : DbContext
+{
+    /// <summary>Usuario de sistema (placeholder) hasta que se cablee Azure AD; satisface las FK de autoría.</summary>
+    public static readonly Guid UsuarioSistemaId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+
+    public CabinaFletesDbContext(DbContextOptions<CabinaFletesDbContext> options) : base(options) { }
+
+    public DbSet<Usuario> Usuarios => Set<Usuario>();
+    public DbSet<Cliente> Clientes => Set<Cliente>();
+    public DbSet<Solicitud> Solicitudes => Set<Solicitud>();
+    public DbSet<LineaSolicitud> LineasSolicitud => Set<LineaSolicitud>();
+    public DbSet<Ruta> Rutas => Set<Ruta>();
+    public DbSet<ConfiguracionVehiculo> ConfiguracionesVehiculo => Set<ConfiguracionVehiculo>();
+    public DbSet<TarifaSicetac> TarifasSicetac => Set<TarifaSicetac>();
+    public DbSet<TarifaHistorica> TarifasHistoricas => Set<TarifaHistorica>();
+    public DbSet<ServicioConexo> ServiciosConexos => Set<ServicioConexo>();
+    public DbSet<Cotizacion> Cotizaciones => Set<Cotizacion>();
+    public DbSet<CotizacionLinea> CotizacionLineas => Set<CotizacionLinea>();
+    public DbSet<CotizacionConexo> CotizacionConexos => Set<CotizacionConexo>();
+    public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<ParametrosScore> ParametrosScore => Set<ParametrosScore>();
+    public DbSet<AjusteVigenciaPlaza> AjustesVigenciaPlaza => Set<AjusteVigenciaPlaza>();
+    public DbSet<ReglaSoloSicetac> ReglasSoloSicetac => Set<ReglaSoloSicetac>();
+    public DbSet<VehiculoCubicacion> VehiculosCubicacion => Set<VehiculoCubicacion>();
+    public DbSet<PlanCargue> PlanesCargue => Set<PlanCargue>();
+    public DbSet<ItemPlanCargue> ItemsPlanCargue => Set<ItemPlanCargue>();
+    public DbSet<ColocacionCargue> ColocacionesCargue => Set<ColocacionCargue>();
+
+    protected override void OnModelCreating(ModelBuilder b)
+    {
+        base.OnModelCreating(b);
+
+        b.Entity<Usuario>(e =>
+        {
+            e.ToTable("usuarios");
+            e.HasIndex(x => x.Email).IsUnique();
+            e.Property(x => x.Rol).HasConversion<string>().HasMaxLength(40);
+            e.Property(x => x.Activo).HasDefaultValue(true);
+            // Único pero permitiendo múltiples NULL (usuarios aún sin vincular a AD).
+            e.HasIndex(x => x.AdObjectId).IsUnique().HasFilter("[AdObjectId] IS NOT NULL");
+            // Usuario de sistema (placeholder) para integridad referencial mientras no hay auth.
+            e.HasData(new Usuario
+            {
+                Id = UsuarioSistemaId,
+                Nombre = "Sistema (placeholder)",
+                Email = "system@boterosoto.com.co",
+                Rol = RolUsuario.Admin,
+                Activo = true,
+                CreatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
+                UpdatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero)
+            });
+        });
+
+        b.Entity<Cliente>(e =>
+        {
+            e.ToTable("clientes");
+            e.HasIndex(x => x.Nit).IsUnique();
+        });
+
+        b.Entity<Solicitud>(e =>
+        {
+            e.ToTable("solicitudes");
+            e.Property(x => x.Tipo).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.Modalidad).HasConversion<string>().HasMaxLength(30);
+            e.Property(x => x.Estado).HasConversion<string>().HasMaxLength(20)
+             .HasDefaultValue(EstadoSolicitud.Pendiente);
+            e.Property(x => x.ValorEstimado).HasColumnType("decimal(18,2)");
+            e.Property(x => x.ProbabilidadCierre).HasColumnType("decimal(9,4)");
+            e.Property(x => x.ScorePrioridad).HasColumnType("decimal(6,2)").HasDefaultValue(0m);
+            e.Property(x => x.RowVersion).IsRowVersion();
+            // Índice que sirve la Bandeja Priorizada ordenada por score.
+            e.HasIndex(x => new { x.Estado, x.ScorePrioridad });
+            // Índice por deadline para tableros de SLA / cumplimiento (PRD §8).
+            e.HasIndex(x => x.Deadline);
+            e.HasOne(x => x.Cliente)
+             .WithMany(c => c.Solicitudes)
+             .HasForeignKey(x => x.ClienteId)
+             .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Creador)
+             .WithMany()
+             .HasForeignKey(x => x.CreadoPor)
+             .OnDelete(DeleteBehavior.Restrict);
+            e.HasMany(x => x.Cotizaciones)
+             .WithOne(c => c.Solicitud)
+             .HasForeignKey(c => c.SolicitudId)
+             .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        b.Entity<LineaSolicitud>(e =>
+        {
+            e.ToTable("lineas_solicitud");
+            e.Property(x => x.Tipologia).HasConversion<string>().HasMaxLength(30);
+            e.Property(x => x.LineaNegocio).HasConversion<string>().HasMaxLength(30);
+            e.Property(x => x.ClaseViaje).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.ClaseContenedor).HasMaxLength(20);
+            e.Property(x => x.Exclusivo).HasDefaultValue(false);
+            e.Property(x => x.LevanteContenedorDiferente).HasDefaultValue(false);
+            e.Property(x => x.EstadoLinea).HasConversion<string>().HasMaxLength(20)
+             .HasDefaultValue(EstadoLinea.PorCostear);
+            e.Property(x => x.Peso).HasColumnType("decimal(18,2)");
+            e.Property(x => x.ValorMercancia).HasColumnType("decimal(18,2)");
+            e.Property(x => x.ValorAprovisionamiento).HasColumnType("decimal(18,2)");
+            e.HasOne(x => x.Solicitud)
+             .WithMany(s => s.Lineas)
+             .HasForeignKey(x => x.SolicitudId)
+             .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.Ruta)
+             .WithMany()
+             .HasForeignKey(x => x.RutaId)
+             .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.ConfiguracionVehiculo)
+             .WithMany()
+             .HasForeignKey(x => x.ConfigVehiculoId)
+             .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        b.Entity<Ruta>(e =>
+        {
+            e.ToTable("rutas");
+            e.HasIndex(x => new { x.Origen, x.Destino }).IsUnique();
+        });
+
+        b.Entity<ConfiguracionVehiculo>(e => e.ToTable("configuraciones_vehiculo"));
+
+        b.Entity<TarifaSicetac>(e =>
+        {
+            e.ToTable("tarifas_sicetac");
+            e.Property(x => x.CondicionCarga).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.ValorPiso).HasColumnType("decimal(18,2)");
+            e.Property(x => x.ValorHora).HasColumnType("decimal(18,2)");
+            e.Property(x => x.ValorSiceHora).HasColumnType("decimal(18,2)");
+            e.Property(x => x.HorasPactadas).HasColumnType("decimal(9,2)");
+            e.Property(x => x.HorasRecorrido).HasColumnType("decimal(9,2)");
+            // Llave natural del piso (resolución al abrir una línea).
+            e.HasIndex(x => new
+            {
+                x.Periodo, x.OrigenDane, x.DestinoDane, x.Configuracion,
+                x.TipoCarga, x.UnidadTransporte, x.CondicionCarga
+            }).IsUnique();
+            e.HasOne(x => x.Ruta)
+             .WithMany()
+             .HasForeignKey(x => x.RutaId)
+             .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        b.Entity<TarifaHistorica>(e =>
+        {
+            e.ToTable("tarifas_historicas");
+            e.Property(x => x.Tipologia).HasConversion<string>().HasMaxLength(30);
+            e.Property(x => x.Valor).HasColumnType("decimal(18,2)");
+            e.HasIndex(x => new { x.RutaId, x.ConfigVehiculoId, x.Tipologia });
+            e.HasOne(x => x.Ruta)
+             .WithMany()
+             .HasForeignKey(x => x.RutaId)
+             .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.ConfiguracionVehiculo)
+             .WithMany()
+             .HasForeignKey(x => x.ConfigVehiculoId)
+             .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Cotizacion)
+             .WithMany()
+             .HasForeignKey(x => x.CotizacionId)
+             .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        b.Entity<ServicioConexo>(e =>
+        {
+            e.ToTable("servicios_conexos");
+            e.Property(x => x.ValorBase).HasColumnType("decimal(18,2)");
+            e.Property(x => x.Activo).HasDefaultValue(true);
+            e.Property(x => x.RowVersion).IsRowVersion();
+            e.HasOne(x => x.ActualizadoPorUsuario)
+             .WithMany()
+             .HasForeignKey(x => x.ActualizadoPor)
+             .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        b.Entity<Cotizacion>(e =>
+        {
+            e.ToTable("cotizaciones");
+            e.Property(x => x.Estado).HasConversion<string>().HasMaxLength(20)
+             .HasDefaultValue(EstadoCotizacion.Borrador);
+            e.Property(x => x.Resultado).HasConversion<string>().HasMaxLength(20)
+             .HasDefaultValue(ResultadoCotizacion.SinDefinir);
+            e.Property(x => x.Total).HasColumnType("decimal(18,2)").HasDefaultValue(0m);
+            e.Property(x => x.RowVersion).IsRowVersion();
+            e.HasMany(x => x.Lineas).WithOne().HasForeignKey(x => x.CotizacionId).OnDelete(DeleteBehavior.Cascade);
+            e.HasMany(x => x.Conexos).WithOne().HasForeignKey(x => x.CotizacionId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.EntregadaPorUsuario)
+             .WithMany()
+             .HasForeignKey(x => x.EntregadaPor)
+             .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        b.Entity<CotizacionLinea>(e =>
+        {
+            e.ToTable("cotizacion_lineas");
+            e.Property(x => x.Fuente).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.ValorFlete).HasColumnType("decimal(18,2)");
+            e.Property(x => x.ValorAprovisionamiento).HasColumnType("decimal(18,2)");
+            e.Property(x => x.ValorRetornoContenedor).HasColumnType("decimal(18,2)");
+            e.HasOne(x => x.LineaSolicitud)
+             .WithMany()
+             .HasForeignKey(x => x.LineaSolicitudId)
+             .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        b.Entity<CotizacionConexo>(e =>
+        {
+            e.ToTable("cotizacion_conexos");
+            e.Property(x => x.Cantidad).HasColumnType("decimal(12,2)");
+            e.Property(x => x.ValorAplicado).HasColumnType("decimal(18,2)");
+            e.HasOne(x => x.ServicioConexo)
+             .WithMany()
+             .HasForeignKey(x => x.ServicioConexoId)
+             .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        b.Entity<AuditLog>(e =>
+        {
+            e.ToTable("audit_log");
+            e.HasIndex(x => new { x.Entidad, x.EntidadId });
+            e.HasOne(x => x.Usuario)
+             .WithMany()
+             .HasForeignKey(x => x.UsuarioId)
+             .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // ------------------------------------------------------------- Cubicador 3D
+        b.Entity<VehiculoCubicacion>(e =>
+        {
+            e.ToTable("vehiculos_cubicacion");
+            foreach (var p in new[] { "LargoInternoMm", "AnchoInternoMm", "AltoInternoMm", "CapacidadKg", "TaraKg",
+                                       "PuertaAnchoMm", "PuertaAltoMm", "ToleranciaParedesMm", "ToleranciaEntreUnidadesMm" })
+                e.Property(p).HasColumnType("decimal(12,2)");
+        });
+
+        b.Entity<PlanCargue>(e =>
+        {
+            e.ToTable("planes_cargue");
+            e.Property(x => x.PesoTotalKg).HasColumnType("decimal(12,2)");
+            e.Property(x => x.VolumenUtilizadoM3).HasColumnType("decimal(12,3)");
+            e.Property(x => x.UtilizacionVolumen).HasColumnType("decimal(6,2)");
+            e.Property(x => x.UtilizacionPiso).HasColumnType("decimal(6,2)");
+            e.Property(x => x.Puntaje).HasColumnType("decimal(6,2)");
+            e.HasOne(x => x.Vehiculo).WithMany().HasForeignKey(x => x.VehiculoId).OnDelete(DeleteBehavior.Restrict);
+            e.HasIndex(x => x.LineaSolicitudId);
+            e.HasMany(x => x.Items).WithOne().HasForeignKey(x => x.PlanCargueId).OnDelete(DeleteBehavior.Cascade);
+            e.HasMany(x => x.Colocaciones).WithOne().HasForeignKey(x => x.PlanCargueId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<ItemPlanCargue>(e =>
+        {
+            e.ToTable("items_plan_cargue");
+            foreach (var p in new[] { "LargoMm", "AnchoMm", "AltoMm", "PesoKg", "MaxPesoEncimaKg" })
+                e.Property(p).HasColumnType("decimal(12,2)");
+        });
+
+        b.Entity<ColocacionCargue>(e =>
+        {
+            e.ToTable("colocaciones_cargue");
+            foreach (var p in new[] { "X", "Y", "Z", "LargoColocadoMm", "AnchoColocadoMm", "AltoColocadoMm",
+                                       "PorcentajeSoporte", "PesoEncimaKg" })
+                e.Property(p).HasColumnType("decimal(12,2)");
+            e.HasOne(x => x.Item).WithMany().HasForeignKey(x => x.ItemPlanCargueId).OnDelete(DeleteBehavior.Restrict);
+            e.HasIndex(x => new { x.PlanCargueId, x.Cargada });
+        });
+
+        b.Entity<AjusteVigenciaPlaza>(e =>
+        {
+            e.ToTable("ajustes_vigencia_plaza");
+            // Un ajuste por tarifa de plaza (override): clave natural única.
+            e.HasIndex(x => x.TarifaPlazaId).IsUnique();
+            e.Property(x => x.Motivo).HasMaxLength(300);
+        });
+
+        b.Entity<ReglaSoloSicetac>(e =>
+        {
+            e.ToTable("reglas_solo_sicetac");
+            // Clave natural única: no repetir la misma ruta + tipo de vehículo.
+            e.HasIndex(x => new { x.Origen, x.Destino, x.TipoVehiculo }).IsUnique();
+        });
+
+        b.Entity<ParametrosScore>(e =>
+        {
+            e.ToTable("parametros_score");
+            e.Property(x => x.ValorReferencia).HasColumnType("decimal(18,2)");
+            e.Property(x => x.RowVersion).IsRowVersion();
+            // Fila única (singleton) con los valores por defecto del algoritmo.
+            e.HasData(new ParametrosScore
+            {
+                Id = 1,
+                CreatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
+                UpdatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero)
+            });
+        });
+
+        // Default a nivel de BD para los timestamps de toda tabla auditable.
+        foreach (var entity in b.Model.GetEntityTypes()
+                     .Where(t => typeof(IAuditable).IsAssignableFrom(t.ClrType)))
+        {
+            b.Entity(entity.ClrType).Property(nameof(IAuditable.CreatedAt))
+                .HasDefaultValueSql("SYSDATETIMEOFFSET()");
+            b.Entity(entity.ClrType).Property(nameof(IAuditable.UpdatedAt))
+                .HasDefaultValueSql("SYSDATETIMEOFFSET()");
+        }
+    }
+
+    public override int SaveChanges()
+    {
+        StampTimestamps();
+        return base.SaveChanges();
+    }
+
+    public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        StampTimestamps();
+        return base.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>Estampa CreatedAt al insertar y UpdatedAt al insertar/actualizar.</summary>
+    private void StampTimestamps()
+    {
+        var now = DateTimeOffset.UtcNow;
+        foreach (var entry in ChangeTracker.Entries<IAuditable>())
+        {
+            if (entry.State == EntityState.Added)
+            {
+                entry.Entity.CreatedAt = now;
+                entry.Entity.UpdatedAt = now;
+            }
+            else if (entry.State == EntityState.Modified)
+            {
+                entry.Entity.UpdatedAt = now;
+                entry.Property(e => e.CreatedAt).IsModified = false;
+            }
+        }
+    }
+}
