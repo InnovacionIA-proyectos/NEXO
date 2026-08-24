@@ -47,21 +47,29 @@ podría introducir imprecisión (igual que el original usaba `Math.Round` ahí
 mismo) — verificado: las 31 reglas pasan sin ajustes contra la implementación
 en `float`.
 
-## 3. Sin paridad automatizada cross-motor (por ahora)
+## 3. Sin comparación automatizada EN VIVO cross-motor (por ahora)
 
-**Decisión**: no se construye una suite de 26 casos dorados comparando este
-motor Python contra el motor C# original.
+**Decisión**: no se construye un arnés que corra el motor Python y el motor
+C# original lado a lado con el mismo input y compare la salida en tiempo de
+ejecución.
 
-**Por qué**: el motor va a cambiar de diseño más adelante (cuando se decida
-cómo se construye el "nuevo" motor de verdad); invertir en un arnés de
-paridad contra una versión que se sabe temporal no es buen uso del tiempo.
+**Por qué**: el motor original va a dejar de existir (este servicio lo
+reemplaza); invertir en un arnés de comparación en vivo contra una versión
+que se sabe temporal no es buen uso del tiempo.
 
 **Lo que SÍ se hizo en su lugar**: portar las 31 reglas de negocio como tests
-unitarios de este mismo motor (no de paridad contra otro) — ver
-`testDocumentation/REGLAS_DE_NEGOCIO.md`, verificadas con pytest (33 casos, incluye un test
-parametrizado con 3 variantes). Falta la pasada de humo manual (crear demo,
-optimizar, ajustar) contra el entorno real antes de apagar la versión de NEXO
-— la pasada automatizada equivalente ya existe en `tests/api/test_smoke.py`.
+unitarios de este mismo motor — ver `testDocumentation/REGLAS_DE_NEGOCIO.md`,
+verificadas con pytest (33 casos, incluye un test parametrizado con 3
+variantes). **Actualización (validación contra S2-HU-072)**: de esas 31, las
+26 que vienen de `cabinaFletes/src/CabinaFletes.Tests/MotorCubicacion3DTests.cs`
+(el criterio de cierre "paridad con los 26 casos dorados") están portadas
+**1:1** — mismo nombre, mismo orden, mismo escenario — confirmado comparando
+ambos archivos método por método. La sustancia del requisito de paridad SÍ
+está cubierta; lo que no existe es la comparación cruzada en vivo descrita
+arriba, que es un mecanismo distinto y no era lo que hacía falta. La pasada
+de humo end-to-end (crear plan, optimizar, ajustar) contra el entorno real
+está en `tests/api/test_smoke.py` + verificación manual/CI contra Docker
+real (ver `testDocumentation/PRUEBAS_DE_INTEGRACION.md`).
 
 ## 4. Contrato REST: mismas rutas, mismos DTOs, mismos códigos
 
@@ -171,9 +179,15 @@ mensaje en vez de dentro de `solicitud`) — corregido.
 
 ## 9. Infraestructura y RabbitMQ
 
-**Decisión**: repo propio, `docker-compose.yml` propio (api + worker +
-rabbitmq + base de datos) — sin red Docker compartida con NEXO. RabbitMQ es
-un **contenedor propio** dentro de este compose (no embebido en el
+**Actualización**: este servicio se movió de ser un repo Git standalone a
+vivir como carpeta (`cubicador/`) dentro del repo de NEXO — pero la decisión
+de abajo sigue vigente tal cual: `docker-compose.yml` propio, sin red Docker
+compartida con el backend C#. Compartir repo no significa compartir
+despliegue ni red.
+
+**Decisión**: `docker-compose.yml` propio (api + worker + rabbitmq + base de
+datos) — sin red Docker compartida con NEXO. RabbitMQ es un **contenedor
+propio** dentro de este compose (no embebido en el
 contenedor de la API), con su puerto AMQP expuesto al host; NEXO se conecta
 por connection string/credenciales (`Cubicador3D__RabbitMqUrl=amqp://...`),
 igual que NEXO ya conecta a sus Data Warehouses externos.

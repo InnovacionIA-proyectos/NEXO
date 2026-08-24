@@ -1,11 +1,15 @@
 # Reglas de negocio del motor (portadas como pytest — ✅ verificadas)
 
 Estas 31 reglas estaban codificadas como tests xUnit en
-`cabinaFletes/src/CabinaFletes.Tests/{MotorCubicacion3DTests.cs,ApilamientoMultiSoporteTests.cs}`.
-No son "casos dorados de paridad entre dos motores" (eso se descartó, ver
-DECISIONES_TECNICAS.md #3) — son las reglas geométricas/de negocio que
-codifican CÓMO debe comportarse el motor. Como se trajo el cubicador completo
-de cabinaFletes, estas reglas viajaron con él: cada una es hoy un test en
+`cabinaFletes/src/CabinaFletes.Tests/{MotorCubicacion3DTests.cs,ApilamientoMultiSoporteTests.cs}`
+— las 26 de `MotorCubicacion3DTests.cs` son, método por método, los "26
+casos dorados" que pide el criterio de cierre de S2-HU-072; las otras 5 (de
+`ApilamientoMultiSoporteTests.cs`) cubren apilamiento multi-soporte. No son
+una comparación EN VIVO entre dos motores corriendo lado a lado (eso sí se
+descartó, ver DECISIONES_TECNICAS.md #3) — son las reglas geométricas/de
+negocio que codifican CÓMO debe comportarse el motor, ahora verificadas
+contra la implementación Python. Como se trajo el cubicador completo de
+cabinaFletes, estas reglas viajaron con él: cada una es hoy un test en
 `tests/domain/` contra la implementación portada de `domain/motor/*`.
 
 **Estado: las 33 pruebas pasan** (`pytest tests/domain -v` → 33 passed; una
