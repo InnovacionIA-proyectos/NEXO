@@ -1,0 +1,22 @@
+# ============================================================================
+# Arnés de integración continua de NEXO.
+#
+# No levanta la aplicación: compila. Para correr la API con su SQL Server está
+# el docker-compose.yml de la raíz, que es otra cosa y se usa en otro momento.
+#
+#   docker compose -f docker-compose.ci.yml build
+#   docker compose -f docker-compose.ci.yml run --rm build
+#
+# El código de salida del contenedor es el del compilador: 0 compila, distinto
+# de 0 no. Eso es lo que va a leer el workflow de GitHub Actions (issue #4).
+# ============================================================================
+name: nexo-ci
+
+services:
+  # Compila las 4 capas y los 3 proyectos de test en Release.
+  build:
+    build:
+      context: .
+      dockerfile: build/Dockerfile.ci
+    image: nexo-ci:local
+    command: ["dotnet", "build", "CabinaFletes.Clean.sln", "-c", "Release", "--no-restore"]
