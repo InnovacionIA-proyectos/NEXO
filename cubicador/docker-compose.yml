@@ -1,0 +1,76 @@
+# Ver DECISIONES_TECNICAS.md #9: repo propio, sin red Docker compartida con
+# NEXO. RabbitMQ expone su puerto AMQP al host; NEXO se conecta por
+# connection string (Cubicador3D__RabbitMqUrl), no por esta red de compose.
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: cubicador
+      POSTGRES_USER: cubicador
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?definir en .env}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"  # puerto distinto de 5432 por si corre junto a otro Postgres local
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cubicador -d cubicador"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:?definir en .env}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:?definir en .env}
+    ports:
+      - "5672:5672"    # AMQP - NEXO se conecta aqui
+      - "15672:15672"  # UI de administracion
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgresql+asyncpg://cubicador:${POSTGRES_PASSWORD}@db:5432/cubicador
+      CUBICADOR_API_KEY: ${CUBICADOR_API_KEY:?definir en .env}
+      CUBICADOR_RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672/
+      NEXO_BASE_URL: ${NEXO_BASE_URL:?definir en .env}
+      NEXO_CALLBACK_API_KEY: ${NEXO_CALLBACK_API_KEY:?definir en .env}
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    environment:
+      DATABASE_URL: postgresql+asyncpg://cubicador:${POSTGRES_PASSWORD}@db:5432/cubicador
+      CUBICADOR_RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672/
+      NEXO_BASE_URL: ${NEXO_BASE_URL:?definir en .env}
+      NEXO_CALLBACK_API_KEY: ${NEXO_CALLBACK_API_KEY:?definir en .env}
+    depends_on:
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+volumes:
+  db_data:

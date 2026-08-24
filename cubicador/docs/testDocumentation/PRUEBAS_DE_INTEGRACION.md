@@ -1,0 +1,297 @@
+# Pruebas de integración y verificación de infraestructura
+
+Complementa a [`REGLAS_DE_NEGOCIO.md`](./REGLAS_DE_NEGOCIO.md) (que documenta
+las 33 pruebas unitarias del motor). Este documento cubre tres niveles más:
+las 6 pruebas de integración automatizadas (`tests/api/test_smoke.py` +
+`tests/worker/test_ejecutar_solicitud.py`), el smoke test de CI contra
+Docker Compose real (`.github/workflows/ci.yml` + `scripts/ci_docker_smoke.py`,
+automatiza las secciones 2.2-2.4 de abajo en cada push/PR), y la
+verificación manual contra infraestructura real (Docker Compose completo con
+worker parado a propósito, y el repo NEXO real) que sigue sin automatizarse
+pero se ejecutó y se registra aquí con su resultado exacto.
+
+## 1. `tests/api/test_smoke.py` — 4 pruebas automatizadas (`pytest`)
+
+Ejercitan la pila completa **api → application → infrastructure → domain**
+contra una base de datos SQLite real (no mocks), usando `httpx.AsyncClient`
+con `ASGITransport` para hablarle a la app de FastAPI directamente en
+memoria, sin necesidad de un servidor corriendo.
+
+| Test | Qué verifica |
+|---|---|
+| `test_health` | `GET /health` responde 200. |
+| `test_flujo_completo_crear_optimizar` | El flujo de negocio completo: listar vehículos (dispara la siembra de los 9 presets) → crear plan → agregar 3 unidades de un ítem que sabemos que cabe → `POST /optimizar` (verifica 202 + `estado: "procesando"` + que quedó publicado en el `_PublisherFalso`) → simula al worker llamando `optimizar_plan` directo contra la misma base → `GET /resultado` (verifica que las 3 unidades quedaron cargadas y el estado pasó a `optimizado`) → ajustar manualmente una colocación (bloquearla, verifica que el estado pase a `ajustado`). |
+| `test_cubicacion_rapida` | `POST /api/cubicacion` evalúa contra las 9 unidades del catálogo y devuelve una sugerencia. |
+| `test_sin_api_key_es_rechazado` | Una petición sin `Authorization: Bearer` recibe 401. |
+
+**Detalle técnico que vale la pena recordar** si estos tests empiezan a fallar
+de forma rara: `httpx.ASGITransport` **no dispara el `lifespan` de FastAPI**
+(donde vive `crear_tablas()` y la conexión del publisher de RabbitMQ), así
+que el fixture `client` en `test_smoke.py` llama a `crear_tablas()`
+explícitamente antes de instanciar el cliente, y sobreescribe la dependencia
+`obtener_eventos_publisher` con un `_PublisherFalso` (que solo registra lo
+publicado, sin conectarse a ningún broker) vía
+`app.dependency_overrides` — sin eso, cualquier request a `/optimizar` o
+`/desde-linea` fallaría con `RuntimeError: El publisher de RabbitMQ no se ha
+inicializado`. Y SQLite en modo `:memory:` crea una base nueva por cada
+conexión — sin `poolclass=StaticPool` en `infrastructure/persistence/db.py`
+(aplicado solo cuando la URL contiene `:memory:`), cada request (o la sesión
+nueva que abre `_simular_worker_optimizar`) vería una base vacía distinta.
+Estos detalles ya están resueltos en el código; se documentan aquí porque son
+la causa más probable si alguien "rompe" esto sin querer al tocar `db.py` o
+`dependencias.py`.
+
+## 1.1 `tests/worker/test_ejecutar_solicitud.py` — 2 pruebas automatizadas (`pytest`)
+
+Guarda de regresión del bug real encontrado en la sección 2.6: llaman a
+`worker.main._ejecutar_solicitud(cuerpo, planes, vehiculos)` con `cuerpo`
+armado exactamente como lo arma `RabbitMqEventosPublisher._publicar` (tipo,
+planId, correlationId, **solicitud anidada** — no a mano, para que un cambio
+de forma futuro en cualquiera de los dos lados rompa el test en vez de
+descubrirse solo contra un broker real).
+
+| Test | Qué verifica |
+|---|---|
+| `test_ejecutar_solicitud_optimizar_desempaca_solicitud_anidada` | El camino `optimizar` (que nunca tuvo el bug) sigue leyendo `cuerpo["solicitud"]` correctamente. |
+| `test_ejecutar_solicitud_crear_desde_linea_desempaca_solicitud_anidada` | El camino `crear_desde_linea` (el que SÍ tenía el bug) lee `cuerpo["solicitud"]["lineaSolicitudId"]`, no `cuerpo["lineaSolicitudId"]`. Usa un `NexoLineaSolicitudClient` falso (vía `monkeypatch.setattr(worker_main, "NexoLineaSolicitudClient", ...)`) para no depender de NEXO real. |
+
+### Cómo correrlas
+
+```bash
+pip install -r requirements.txt   # incluye pytest + pytest-asyncio
+pytest tests/api -v
+```
+
+## 2. Verificación manual contra Docker Compose real
+
+**No está automatizada** (no hay un test de CI que levante contenedores
+todavía) — se ejecutó una vez, a mano, contra el stack completo
+(`db` = Postgres 16, `rabbitmq` = RabbitMQ 3, `api`, `worker`) y se registra
+aquí el resultado exacto para que quede como referencia de qué se probó y
+cuándo.
+
+### 2.1 Los 4 contenedores arrancan sanos
+
+```bash
+cp .env.example .env   # completar los valores
+docker compose up -d --build
+docker compose ps
+```
+
+Resultado esperado: `db` y `rabbitmq` en estado `healthy` (tienen
+`healthcheck` definido en `docker-compose.yml`); `api` y `worker` `Up` sin
+reinicios. **Si `api`/`worker` se caen con `ConnectionRefusedError` apenas
+arrancan**: es porque no están esperando a que Postgres/RabbitMQ pasen su
+healthcheck — sería una regresión de la configuración `depends_on:
+condition: service_healthy` que ya está en `docker-compose.yml` (Postgres
+tarda ~15s en su ciclo de init/restart interno la primera vez; sin el
+healthcheck, `api`/`worker` intentan conectarse antes de que esté listo).
+
+**Otro bug encontrado al reconstruir el stack tras conectar los routers a
+RabbitMQ**: `api` fallaba al arrancar con `AMQPConnectionError: [Errno 111]
+Connection refused` — le faltaba la variable `CUBICADOR_RABBITMQ_URL` en su
+bloque `environment` de `docker-compose.yml` (solo `worker` la tenía), así
+que `api` intentaba conectarse al default `localhost:5672` **dentro de su
+propio contenedor**, donde no hay ningún RabbitMQ escuchando. Corregido
+agregando la misma variable (apuntando a `rabbitmq:5672`, el nombre del
+servicio en la red de compose) al bloque de `api`.
+
+### 2.2 Flujo REST completo contra Postgres real
+
+Se ejecutó, contra `http://localhost:8000` con el stack de arriba levantado:
+
+1. `GET /api/planes-cargue/vehiculos` → sembró y devolvió los 9 presets.
+2. `POST /api/planes-cargue` con el furgón de 13,6 m → plan en estado `borrador`.
+3. `POST /api/planes-cargue/{id}/items` con un pallet 1200×1000×1000mm, 500kg, cantidad 3.
+4. `POST /api/planes-cargue/{id}/optimizar` → las 3 unidades quedaron `cargada: true`, estado `optimizado`, puntaje `75.1`.
+5. `PATCH /api/planes-cargue/{id}/colocaciones/{colocacionId}` con `{"bloqueada": true}` → estado pasó a `ajustado`.
+6. `POST /api/cubicacion` con 5 cajas de 100³cm/50kg → evaluó las 9 unidades y sugirió "Turbo con estacas".
+
+**Bug real encontrado en este paso** (no lo detectó ni el motor ni el smoke
+test): `metricas.puntaje` en la respuesta de `optimizar`/`GET /resultado`
+daba siempre `0`, aunque `plan.puntaje` sí traía el valor correcto (`75.1`).
+Causa: `obtener_resultado()` no copiaba `plan.puntaje` al objeto
+`ResultadoCubicacion` reconstruido antes de pedirle las métricas al motor —
+el original en NEXO sí lo hace explícito
+(`resultado.Puntaje = plan.Puntaje` en `ResultadoPlanReader`), porque
+`Metricas()` copia `r.Puntaje`/`r.PuntajesParciales` tal cual a la salida.
+Corregido en `application/plan_cargue/resultado.py`; reverificado con el
+mismo plan y confirmado `metricas.puntaje == plan.puntaje == 75.1`.
+
+### 2.3 Flujo asíncrono end-to-end contra RabbitMQ real
+
+Se publicó un mensaje real en el exchange `cubicador.eventos` (routing key
+`cubicacion.solicitada`) usando un script desechable con `aio-pika`,
+apuntando al RabbitMQ del `docker-compose` (puerto `5672` expuesto al host):
+
+```json
+{
+  "tipo": "optimizar",
+  "planId": "<uuid de un plan con items sin optimizar>",
+  "correlationId": "<mismo uuid>",
+  "solicitud": {"estrategia": "Combinada", "algoritmo": "bfd"}
+}
+```
+
+Resultado observado:
+1. El `worker` (contenedor separado, corriendo `python -m worker.main`) consumió el mensaje de la cola `cubicador.optimizar`.
+2. Ejecutó `optimizar_plan` contra la base de datos Postgres compartida con `api`.
+3. Publicó de vuelta un evento `plan-de-cargue.generado` con el resultado (`{"estado": "optimizado", "puntaje": 75.1, "colocaciones": 2}`), recibido por una cola de prueba suscrita a esa routing key.
+4. Se confirmó por HTTP (`GET /api/planes-cargue/{id}`) que el plan quedó **persistido** como `optimizado` en la base de datos — no que el worker solo "dijo" que lo hizo.
+
+Esto prueba que el camino asíncrono (worker + RabbitMQ + Postgres compartido)
+funciona de punta a punta a nivel de mensajería. La sección 2.4 repite la
+misma verificación pero disparada desde el router HTTP real (`POST
+/optimizar`), que es como se usa en producción.
+
+### 2.4 Routers HTTP async, reintentos, Dead-Letter Queue y timeout de vigilancia
+
+Verificación ejecutada tras conectar `POST /{id}/optimizar` y `POST
+/desde-linea/{id}` a `publicar_cubicacion_solicitada` (ver
+`docs/DECISIONES_TECNICAS.md` #5 y #10), contra el mismo stack de Docker
+Compose reconstruido (`docker compose up -d --build api worker`):
+
+**a) Flujo 202 → worker → resultado, disparado por HTTP real (no un script
+que publica directo al exchange):**
+
+1. `POST /api/planes-cargue/{id}/optimizar` con un plan recién creado →
+   respondió `202` de inmediato con el plan en `"estado": "procesando"`.
+2. Sin ninguna otra acción manual, el `worker` consumió el mensaje de
+   `cubicador.optimizar` (confirmado por las colas de RabbitMQ: `messages: 0`
+   en `cubicador.optimizar` segundos después) y corrió `optimizar_plan`.
+3. `GET /{id}/resultado` mostró `estado: "optimizado"`, `puntaje: 75.1` — el
+   mismo resultado que la verificación 2.2, pero esta vez todo el camino
+   (encolar + consumir + persistir) pasó por HTTP + RabbitMQ real, no por un
+   script de prueba publicando directo al exchange.
+
+**b) Reintentos y Dead-Letter Queue**, publicando mensajes directo al
+exchange (para forzar los dos casos que el router normal no produce):
+
+- Un mensaje con `"planId": "no-existe-123"` (dispara `NotFoundException`,
+  un `AppException` de negocio) se procesó **una sola vez** y no apareció en
+  `cubicacion.dlq` — confirma que los errores de negocio no entran al ciclo
+  de reintentos (reintentar daría el mismo resultado siempre).
+- Un mensaje con `"tipo": "tipo_invalido_para_forzar_error"` (dispara
+  `ValueError`, un error inesperado) se reintentó exactamente 3 veces — los
+  logs del worker muestran `Fallo procesando mensaje (intento 1/3)`,
+  `(intento 2/3)`, `(intento 3/3)` — y al agotar los intentos apareció en
+  `cubicacion.dlq` (`messages: 1`, confirmado vía la API de administración
+  de RabbitMQ, `GET /api/queues`). Purgado manualmente después de confirmar.
+
+**c) Vigilante de timeout**, forzando el escenario sin esperar los 5 minutos
+reales configurados (`TIMEOUT_PROCESANDO_MINUTOS`):
+
+1. Se detuvo el contenedor `worker` (`docker compose stop worker`).
+2. Se creó un plan y se llamó `POST /optimizar` — quedó en `procesando` sin
+   nadie que lo consuma (worker apagado).
+3. Se invocó `SqlPlanCargueRepository.marcar_error_por_timeout(limite=ahora)`
+   directamente (dentro del contenedor `api`, contra el Postgres real, con
+   `limite` = el instante actual en vez de "ahora menos 5 minutos", para no
+   tener que esperar) → devolvió `marcados: 1`.
+4. `GET /{id}` confirmó `estado: "error"` en el plan.
+5. Se reinició el `worker` (`docker compose start worker`) y se confirmó en
+   sus logs que retomó el consumo normalmente.
+
+Con esto, los 3 mecanismos de resiliencia diseñados en
+`docs/DECISIONES_TECNICAS.md` #10 quedaron verificados contra infraestructura
+real, no solo revisados por lectura de código.
+
+### 2.5 Puente hacia NEXO (`GET /api/lineas-solicitud/{id}/cubicacion`)
+
+El endpoint que NEXO debía exponer (ver `docs/DECISIONES_TECNICAS.md` #8) ya
+se implementó ahí (rama `cubicador` del repo NEXO,
+`LineasSolicitudController`/`ObtenerCubicacionLineaQuery`). Se verificó
+ejecutando `infrastructure/clientes/nexo_client.py` de este repo, de verdad,
+contra la API de NEXO levantada con `docker compose up -d` (SQL Server real
+con datos sembrados):
+
+1. `NexoLineaSolicitudClient.obtener(<id de una línea sembrada con ruta>)` →
+   devolvió `LineaParaCubicacion` con `origen`/`destino` correctos y
+   `posiciones=[]` (la línea sembrada no tenía `Dimensiones` capturadas —
+   confirma el camino de lista vacía, no solo el camino feliz).
+2. Se actualizó manualmente `Dimensiones` de esa línea a un JSON de una
+   posición (`{"descripcion":"Bulto de prueba","cantidad":4,"largoCm":120,"anchoCm":100,"altoCm":90,"pesoKg":250}`)
+   y se repitió la llamada → `PosicionCarga` con los 6 campos mapeados
+   exactamente (confirma que el camelCase de NEXO y los nombres de campo que
+   espera `nexo_client.py` coinciden sin ajustes).
+3. `NexoLineaSolicitudClient.obtener(<guid inexistente>)` → devolvió `None`
+   (NEXO respondió 404; este cliente solo mira el status code, no el cuerpo).
+4. Se revirtió el dato de prueba (`Dimensiones = NULL`) para no dejar
+   contaminado el seed de NEXO.
+
+### 2.6 `crear_plan_desde_linea` de punta a punta (los dos stacks de Docker a la vez)
+
+Con NEXO (SQL Server real, datos sembrados, línea con `Dimensiones` de
+prueba) y Cubicador (Postgres + RabbitMQ) corriendo simultáneamente,
+apuntando `NEXO_BASE_URL` del `.env` de Cubicador a
+`http://host.docker.internal:8080` (el puerto publicado por el compose de
+NEXO):
+
+1. `POST /api/planes-cargue/desde-linea/{lineaSolicitudId}` en Cubicador →
+   `202` con `SolicitudEncoladaDto`.
+2. **Bug real encontrado**: el worker moría con `KeyError:
+   'lineaSolicitudId'` en cada intento (3 veces, terminó en
+   `cubicacion.dlq`). Causa: `api/routers/planes_cargue.py::crear_desde_linea`
+   publica `{"lineaSolicitudId": ...}` como el `solicitud` del mensaje
+   (`publicar_cubicacion_solicitada(linea_id, "crear_desde_linea",
+   {"lineaSolicitudId": linea_id})`), que `RabbitMqEventosPublisher` anida
+   bajo la clave `"solicitud"` del cuerpo publicado — pero
+   `worker/main.py::_ejecutar_solicitud` leía `cuerpo["lineaSolicitudId"]`
+   (nivel raíz) en vez de `cuerpo["solicitud"]["lineaSolicitudId"]`. El
+   camino `optimizar` no lo tenía porque sí desempaca `cuerpo["solicitud"]`
+   correctamente; nadie había probado `crear_desde_linea` disparado por HTTP
+   real hasta este momento (la verificación de la sección 2.3 solo probó
+   `optimizar`). Corregido en `worker/main.py`.
+3. Repetido tras el fix: el worker llamó a
+   `GET http://host.docker.internal:8080/api/lineas-solicitud/{id}/cubicacion`
+   (confirmado en sus logs), creó el plan, y `GET
+   /api/planes-cargue/por-linea/{lineaSolicitudId}` mostró la flota
+   resultante (1 vehículo, 2/2 unidades cargadas). `GET /{id}/resultado`
+   confirmó `estado: "optimizado"`, `puntaje: 76.4`, 2 colocaciones.
+4. Se revirtieron los datos de prueba en NEXO (`Dimensiones = NULL`) y la
+   variable `NEXO_BASE_URL` de Cubicador a su valor original
+   (`http://host.docker.internal:5080`, para cuando NEXO corre con `dotnet
+   run` en vez de en Docker).
+
+### Cómo repetir esta verificación
+
+```bash
+docker compose up -d --build
+docker compose ps                       # los 4 deben quedar "healthy"/"Up"
+curl http://localhost:8000/health
+
+# Para el flujo async, con el venv local activado:
+python -c "
+import asyncio, json, aio_pika
+async def main():
+    conn = await aio_pika.connect_robust('amqp://<usuario>:<clave>@localhost:5672/')
+    async with conn:
+        canal = await conn.channel()
+        ex = await canal.declare_exchange('cubicador.eventos', aio_pika.ExchangeType.TOPIC, durable=True)
+        await ex.publish(
+            aio_pika.Message(json.dumps({'tipo':'optimizar','planId':'<id>','correlationId':'<id>','solicitud':{}}).encode()),
+            routing_key='cubicacion.solicitada',
+        )
+asyncio.run(main())
+"
+docker compose logs worker --tail 20   # deberia mostrar el mensaje procesado
+```
+
+## 3. Qué falta cubrir (honesto, no se ha hecho todavía)
+
+**Actualización**: el ítem que estaba aquí ("tests de integración
+automatizados contra Docker") ya se cerró — ver `.github/workflows/ci.yml` +
+`scripts/ci_docker_smoke.py`, que automatizan las secciones 2.2-2.4 en cada
+push/PR. Lo que sigue sin automatizar, porque requiere infraestructura que
+el runner de CI no tiene o una topología más compleja de simular:
+
+- **El vigilante de timeout** (sección 2.4, punto c): requiere detener el
+  contenedor `worker` a mitad de un mensaje y llamar a
+  `marcar_error_por_timeout` directo contra la base — sigue siendo manual.
+- **`crear_plan_desde_linea` de punta a punta contra NEXO real** (sección
+  2.6): el runner de CI no levanta el repo NEXO aparte — el bug real que
+  encontró esta prueba (el `KeyError` de `lineaSolicitudId`) NO lo habría
+  atrapado el smoke test de CI actual, precisamente porque ese camino
+  (`crear_desde_linea`) no se ejercita ahí. Si se automatiza NEXO en CI más
+  adelante (job aparte con su propio SQL Server), esta sección sería la
+  candidata a migrar.
