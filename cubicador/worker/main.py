@@ -35,7 +35,7 @@ from application.plan_cargue.optimizar import ParametrosOptimizacionInput, optim
 from application.plan_cargue.resultado import obtener_resultado
 from domain.motor.dominio import PonderacionesCombinada
 from infrastructure.clientes.nexo_client import NexoLineaSolicitudClient
-from infrastructure.mensajeria.rabbitmq import EXCHANGE, RabbitMqEventosPublisher
+from infrastructure.mensajeria.rabbitmq import EXCHANGE, RabbitMqEventosPublisher, conectar_con_reintentos
 from infrastructure.persistence.db import SessionLocal, crear_tablas
 from infrastructure.persistence.repositorios.plan_cargue_repo import SqlPlanCargueRepository
 from infrastructure.persistence.repositorios.vehiculo_repo import SqlVehiculoCubicacionRepository
@@ -148,7 +148,7 @@ async def main() -> None:
     publisher = RabbitMqEventosPublisher(RABBITMQ_URL)
     await publisher.conectar()
 
-    conexion = await aio_pika.connect_robust(RABBITMQ_URL)
+    conexion = await conectar_con_reintentos(RABBITMQ_URL)
     async with conexion:
         canal = await conexion.channel()
         await canal.set_qos(prefetch_count=2)  # ver docs/DECISIONES_TECNICAS.md #10: prefetch bajo

@@ -10,12 +10,35 @@ mas el camino de reintentos/DLQ via `publicar_crudo`.
 
 from __future__ import annotations
 
+import asyncio
 import json
+import logging
 from typing import Any
 
 import aio_pika
 
 EXCHANGE = "cubicador.eventos"
+logger = logging.getLogger("cubicador.rabbitmq")
+
+
+async def conectar_con_reintentos(url: str, intentos: int = 5, espera_s: float = 2.0) -> aio_pika.RobustConnection:
+    """Reintenta la conexion INICIAL a RabbitMQ. Cubre una carrera real de
+    arranque en Docker Compose: el healthcheck de RabbitMQ puede dar 'sano'
+    un instante antes de que el puerto AMQP acepte conexiones, y sin
+    reintento aqui eso tumbaba el contenedor completo (`connect_robust` solo
+    reintenta reconexiones DESPUES de conectar una vez, no el primer
+    intento) - ver docs/testDocumentation/PRUEBAS_DE_INTEGRACION.md."""
+    ultimo_error: Exception | None = None
+    for intento in range(1, intentos + 1):
+        try:
+            return await aio_pika.connect_robust(url)
+        except Exception as exc:  # noqa: BLE001 - cualquier fallo de conexion inicial se reintenta igual
+            ultimo_error = exc
+            if intento < intentos:
+                logger.warning("No se pudo conectar a RabbitMQ (intento %d/%d): %s", intento, intentos, exc)
+                await asyncio.sleep(espera_s)
+    assert ultimo_error is not None
+    raise ultimo_error
 
 
 class RabbitMqEventosPublisher:
@@ -25,7 +48,7 @@ class RabbitMqEventosPublisher:
         self._exchange: aio_pika.Exchange | None = None
 
     async def conectar(self) -> None:
-        self._connection = await aio_pika.connect_robust(self._url)
+        self._connection = await conectar_con_reintentos(self._url)
         canal = await self._connection.channel()
         self._exchange = await canal.declare_exchange(EXCHANGE, aio_pika.ExchangeType.TOPIC, durable=True)
 
