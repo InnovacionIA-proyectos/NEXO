@@ -1,6 +1,7 @@
 using CabinaFletes.Application.AjustesVigenciaPlaza.Ports;
 using CabinaFletes.Infrastructure.External;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace CabinaFletes.Infrastructure.Adapters;
 
