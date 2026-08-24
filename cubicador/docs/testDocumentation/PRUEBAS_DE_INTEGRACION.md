@@ -64,8 +64,8 @@ pytest tests/api -v
 
 ## 2. Verificación manual contra Docker Compose real
 
-**No está automatizada** (no hay un test de CI que levante contenedores
-todavía) — se ejecutó una vez, a mano, contra el stack completo
+**No toda está automatizada** (el smoke test de CI, sección 2.4, cubre parte
+de esto en cada push/PR) — el resto se ejecutó a mano contra el stack completo
 (`db` = Postgres 16, `rabbitmq` = RabbitMQ 3, `api`, `worker`) y se registra
 aquí el resultado exacto para que quede como referencia de qué se probó y
 cuándo.
@@ -95,6 +95,25 @@ que `api` intentaba conectarse al default `localhost:5672` **dentro de su
 propio contenedor**, donde no hay ningún RabbitMQ escuchando. Corregido
 agregando la misma variable (apuntando a `rabbitmq:5672`, el nombre del
 servicio en la red de compose) al bloque de `api`.
+
+**Un tercer bug de arranque, encontrado ya con el Cubicador movido a
+`NEXO/cubicador/`**: incluso con el `depends_on: rabbitmq: condition:
+service_healthy` correcto, `api`/`worker` a veces se caían en un arranque en
+frío (`docker compose down -v` + `up`) con `AMQPConnectionError: [Errno 111]
+Connection refused` al conectar el publisher. Causa: el healthcheck de
+RabbitMQ (`rabbitmq-diagnostics -q ping`) puede dar "sano" un instante antes
+de que el puerto AMQP (5672) esté realmente aceptando conexiones — una
+carrera real, no una condición de `depends_on` mal puesta. `aio_pika.
+connect_robust` solo reintenta reconexiones DESPUÉS de conectar una vez, no
+el primer intento, así que ese primer fallo tumbaba el contenedor completo
+(`ERROR: Application startup failed. Exiting.`) y había que reiniciarlo a
+mano (`docker compose up -d api worker`). Corregido agregando
+`conectar_con_reintentos()` en `infrastructure/mensajeria/rabbitmq.py` (5
+intentos, 2s de espera entre cada uno) — usado tanto por
+`RabbitMqEventosPublisher.conectar()` como por la conexión propia del
+worker en `worker/main.py::main()`. Reproducido de nuevo a propósito
+(`down -v` + `up`, sin `--wait`) para confirmar: esta vez los logs muestran
+3 intentos fallidos seguidos de uno exitoso, y ningún contenedor se cayó.
 
 ### 2.2 Flujo REST completo contra Postgres real
 
