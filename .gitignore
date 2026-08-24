@@ -5,6 +5,13 @@ obj/
 .vs/
 *.suo
 
+# Python (cubicador/) build artifacts
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+*.egg-info/
+
 # Configuración local / secretos — NUNCA se versionan
 appsettings.*.local.json
 .env
