@@ -6,7 +6,8 @@ from __future__ import annotations
 import os
 from collections.abc import AsyncIterator
 
-from fastapi import Depends, Header, HTTPException
+from fastapi import Depends, HTTPException, Security
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from application.ports.externos import ILineaSolicitudPort
@@ -46,11 +47,21 @@ def obtener_eventos_publisher() -> RabbitMqEventosPublisher:
     return _publisher
 
 
-async def verificar_api_key(authorization: str = Header(default="")) -> None:
+_bearer_scheme = HTTPBearer(auto_error=False)
+
+
+async def verificar_api_key(credenciales: HTTPAuthorizationCredentials | None = Security(_bearer_scheme)) -> None:
     """Bearer estatico de servicio-a-servicio (ver docs/CONTRATOS.md seccion D) -
-    no identifica un usuario, solo autoriza al backend llamante."""
-    esperado = f"Bearer {CUBICADOR_API_KEY}"
-    if not CUBICADOR_API_KEY or authorization != esperado:
+    no identifica un usuario, solo autoriza al backend llamante.
+
+    Usa HTTPBearer (esquema de seguridad real) en vez de un Header() crudo:
+    un parametro de header llamado literalmente "authorization" sin esquema
+    de seguridad asociado no siempre queda editable en Swagger UI (le da un
+    tratamiento especial a ese nombre) - con HTTPBearer aparece el boton
+    "Authorize" real y funciona en todos los endpoints de una sola vez.
+    `auto_error=False` para mantener el mismo cuerpo de error 401 propio en
+    vez del generico que HTTPBearer devolveria solo."""
+    if not CUBICADOR_API_KEY or credenciales is None or credenciales.credentials != CUBICADOR_API_KEY:
         raise HTTPException(status_code=401, detail={"codigo": "NO_AUTORIZADO", "mensaje": "Bearer invalido o ausente."})
 
 
