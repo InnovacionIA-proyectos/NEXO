@@ -1,0 +1,17 @@
+{
+  "caso": "balance_de_ejes_carga_entre_ejes_reparto_inverso_a_la_distancia",
+  "tipo": "estimar_peso_por_eje",
+  "casos": [
+    {
+      "input": {
+        "itemXMm": 5250
+      },
+      "esperado": {
+        "porEjeRedondeado": [
+          5000,
+          5000
+        ]
+      }
+    }
+  ]
+}

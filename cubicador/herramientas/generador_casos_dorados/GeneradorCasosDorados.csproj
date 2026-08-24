@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>GeneradorCasosDorados</RootNamespace>
+    <!-- Ruta al csproj REAL del motor en cabinaFletes. Default: clonado como
+         carpeta hermana de NEXO (Documents/cabinaFletes + Documents/NEXO,
+         igual que en la maquina donde se escribio esto). Si tu clon vive en
+         otro lado, sobreescribe con:
+           dotnet run -p:CabinaFletesApiProj="C:\ruta\a\CabinaFletes.Api.csproj"
+         Ver README.md de esta carpeta. -->
+    <CabinaFletesApiProj Condition="'$(CabinaFletesApiProj)' == ''">$(MSBuildThisFileDirectory)..\..\..\..\cabinaFletes\src\CabinaFletes.Api\CabinaFletes.Api.csproj</CabinaFletesApiProj>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(CabinaFletesApiProj)" />
+  </ItemGroup>
+
+</Project>

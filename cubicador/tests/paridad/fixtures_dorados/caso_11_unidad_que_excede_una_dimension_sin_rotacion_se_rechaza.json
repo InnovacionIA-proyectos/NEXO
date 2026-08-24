@@ -1,0 +1,57 @@
+{
+  "caso": "unidad_que_excede_una_dimension_sin_rotacion_se_rechaza",
+  "tipo": "optimizar",
+  "casos": [
+    {
+      "input": {
+        "largoMm": 14000,
+        "anchoMm": 2000,
+        "altoMm": 2000
+      },
+      "esperado": {
+        "colocaciones": [],
+        "rechazos": [
+          {
+            "itemId": "a",
+            "codigoRazon": "SIN_ESPACIO"
+          }
+        ],
+        "incidenciasCodigos": []
+      }
+    },
+    {
+      "input": {
+        "largoMm": 2000,
+        "anchoMm": 14000,
+        "altoMm": 2000
+      },
+      "esperado": {
+        "colocaciones": [],
+        "rechazos": [
+          {
+            "itemId": "a",
+            "codigoRazon": "PUERTA"
+          }
+        ],
+        "incidenciasCodigos": []
+      }
+    },
+    {
+      "input": {
+        "largoMm": 2000,
+        "anchoMm": 2000,
+        "altoMm": 3000
+      },
+      "esperado": {
+        "colocaciones": [],
+        "rechazos": [
+          {
+            "itemId": "a",
+            "codigoRazon": "PUERTA"
+          }
+        ],
+        "incidenciasCodigos": []
+      }
+    }
+  ]
+}

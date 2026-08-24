@@ -1,0 +1,14 @@
+{
+  "caso": "balance_de_ejes_carga_centrada_estimacion_repartida",
+  "tipo": "estimar_peso_por_eje_tras_optimizar",
+  "casos": [
+    {
+      "input": {
+        "item": "a_2000x2000x1000_10000kg"
+      },
+      "esperado": {
+        "sumaRedondeada": 10000
+      }
+    }
+  ]
+}

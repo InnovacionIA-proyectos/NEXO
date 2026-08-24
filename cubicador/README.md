@@ -4,10 +4,13 @@ Microservicio propio y contenerizado que vive dentro de este mismo repo
 (`NEXO/cubicador/`), como carpeta separada — no es parte de la solución
 .NET (`CabinaFletes.Clean.sln`), ni comparte proceso ni base de datos con el
 backend C#. Construido para S2-HU-072 ("portar el motor de cubicación a
-Python, servicio contenerizado"): trae **completo** el cubicador que
+Python, servicio contenerizado") y S2-HU-07.3 ("paridad automatizada con
+los 26 casos dorados en CI"): trae **completo** el cubicador que
 originalmente vivía en `cabinaFletes` (C#) — el cubicador rápido (evaluador
 SICCE por criterios/veto) y el motor de bin-packing 3D (planes de cargue,
-optimización, ajuste manual) — con su propia persistencia.
+optimización, ajuste manual) — con su propia persistencia, y una suite que
+prueba en cada build que el port sigue produciendo exactamente lo mismo que
+el motor C# original.
 
 No es un servicio de cómputo sin estado: es dueño de todo el dominio
 Cubicación — vehículos, planes de cargue, ítems, colocaciones y parámetros —
@@ -39,7 +42,7 @@ Ver:
 - **FastAPI** — API síncrona (`/api/cubicacion`, `/api/planes-cargue`)
 - **SQLAlchemy 2.0 (async)** — persistencia propia; `DATABASE_URL` apunta a SQLite en desarrollo o PostgreSQL en producción (mismo código, solo cambia la URL)
 - **aio-pika (RabbitMQ)** — worker consumidor separado, para `optimizar` y `crear-desde-línea`
-- **pytest** — 41 pruebas: 33 de reglas de negocio del motor (26 casos dorados de `MotorCubicacion3DTests.cs` + 5 de apilamiento multi-soporte) + 4 de humo end-to-end de la API + 2 de regresión del worker (desempaque del mensaje de RabbitMQ) + 2 del registro de algoritmos intercambiables
+- **pytest** — 68 pruebas: 33 de reglas de negocio del motor (26 casos dorados de `MotorCubicacion3DTests.cs` + 5 de apilamiento multi-soporte) + **27 de paridad cross-motor** (los mismos 26 casos, comparados contra la salida real del motor C#, no contra un valor transcrito a mano) + 4 de humo end-to-end de la API + 2 de regresión del worker + 2 del registro de algoritmos intercambiables
 
 ## Estado actual (léelo antes de asumir que algo funciona)
 
@@ -131,13 +134,25 @@ Ver:
   Network tab). Cambiado a `fastapi.security.HTTPBearer` — ahora Swagger
   muestra el botón "Authorize" real.
 
+**Paridad automatizada contra el motor C# real (S2-HU-07.3, hotspot H5):**
+- `herramientas/generador_casos_dorados/` — harness .NET que referencia el
+  `.csproj` real de `cabinaFletes` (sin modificarlo) y corre los 26 casos de
+  `MotorCubicacion3DTests.cs` contra el motor C# de verdad, grabando su
+  salida en `tests/paridad/fixtures_dorados/*.json`.
+- `tests/paridad/test_paridad_casos_dorados.py` — compara el motor Python
+  contra esos 26 JSON en cada `pytest` (CI incluido). **Resultado: 26/26
+  coinciden exacto**, sin haber tenido que ajustar el port. Falla el build
+  con el esperado/obtenido exactos si algún caso deja de coincidir — ver
+  `docs/DECISIONES_TECNICAS.md` #3 (la decisión de no construir esto se
+  revirtió cuando la HU lo pidió explícitamente).
+
 ## CI
 
 `.github/workflows/cubicador-ci.yml` (raíz del repo NEXO, con
 `paths: ['cubicador/**']` para no disparar en cambios del backend C#), dos
 jobs en cada push/PR a `main`:
 
-- **`unit-tests`** — instala dependencias y corre `pytest` (41 pruebas contra
+- **`unit-tests`** — instala dependencias y corre `pytest` (68 pruebas contra
   SQLite en memoria, sin infraestructura externa).
 - **`docker-smoke`** — levanta el stack real (`docker compose up -d --build
   --wait`: Postgres + RabbitMQ + api + worker) y corre
@@ -198,14 +213,11 @@ pytest
 
 ## Alcance explícitamente fuera de esta primera versión
 
-- **Paridad automatizada cross-motor (comparar en vivo contra el motor C#
-  original)** — no se construyó, y sigue sin construirse: el motor original
-  va a dejar de existir, así que un arnés de comparación contra una versión
-  temporal no da valor duradero (ver `docs/DECISIONES_TECNICAS.md` #3). Ojo:
-  esto es distinto de "los 26 casos dorados no están cubiertos" — sí lo
-  están, como pruebas propias y equivalentes en `tests/domain/test_motor.py`
-  (ver más arriba). Lo que no existe es una comparación automatizada byte a
-  byte entre los dos motores.
+- **Actualización**: la paridad automatizada cross-motor que decía "no se
+  construye" ya se construyó — ver la sección "Estado actual" más arriba y
+  `tests/paridad/`. `docs/DECISIONES_TECNICAS.md` #3 documenta por qué se
+  revirtió esa decisión (S2-HU-07.3 la pidió explícitamente como criterio de
+  liberación).
 - `POST /api/cubicacion/costear` (cubicar + estimar flete) — no se migró en
   NEXO tampoco: depende de un método de Biblioteca (`EstimarFleteAsync`) que
   nunca se migró a su puerto. Gap pre-existente, ajeno al Cubicador.

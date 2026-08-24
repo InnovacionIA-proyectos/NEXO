@@ -1,0 +1,29 @@
+{
+  "caso": "orientaciones_mantener_vertical_solo_rotacion_horizontal",
+  "tipo": "orientaciones",
+  "casos": [
+    {
+      "input": {
+        "largoMm": 100,
+        "anchoMm": 200,
+        "altoMm": 300,
+        "rotable": true,
+        "mantenerVertical": true
+      },
+      "esperado": {
+        "orientaciones": [
+          {
+            "largoMm": 100,
+            "anchoMm": 200,
+            "altoMm": 300
+          },
+          {
+            "largoMm": 200,
+            "anchoMm": 100,
+            "altoMm": 300
+          }
+        ]
+      }
+    }
+  ]
+}

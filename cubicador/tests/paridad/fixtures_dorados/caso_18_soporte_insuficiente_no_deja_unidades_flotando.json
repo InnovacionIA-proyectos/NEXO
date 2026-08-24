@@ -1,0 +1,38 @@
+{
+  "caso": "soporte_insuficiente_no_deja_unidades_flotando",
+  "tipo": "optimizar",
+  "casos": [
+    {
+      "input": {
+        "items": "peq_y_grande"
+      },
+      "esperado": {
+        "colocaciones": [
+          {
+            "itemId": "peq",
+            "x": 0,
+            "y": 0,
+            "z": 0,
+            "orientacion": {
+              "indice": 0,
+              "largoMm": 1100,
+              "anchoMm": 1200,
+              "altoMm": 1000
+            },
+            "soporteId": null,
+            "porcentajeSoporte": 1,
+            "estadoEstabilidad": "estable",
+            "accesibilidad": "accesible"
+          }
+        ],
+        "rechazos": [
+          {
+            "itemId": "grande",
+            "codigoRazon": "SIN_ESPACIO"
+          }
+        ],
+        "incidenciasCodigos": []
+      }
+    }
+  ]
+}
