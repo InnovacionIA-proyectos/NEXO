@@ -40,7 +40,11 @@ services:
     restart: unless-stopped
 
   rabbit:
-    image: rabbitmq:3.13-management-alpine
+    # Imagen propia: el plugin de retardo que MassTransit necesita para los timeouts
+    # de saga no viene en la oficial. Ver build/Dockerfile.rabbit.
+    build:
+      context: .
+      dockerfile: build/Dockerfile.rabbit
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-nexo}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}

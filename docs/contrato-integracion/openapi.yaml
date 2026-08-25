@@ -9,7 +9,7 @@ openapi: 3.0.3
 
 info:
   title: Nexo (Cabina de Fletes) — contrato de integración con el portal
-  version: 1.0.0
+  version: 1.1.0
   description: |
     Nexo no tiene inicio de sesión propio. La identidad la aporta la sesión del
     portal de la Administración; el backend resuelve los permisos contra la tabla
@@ -122,7 +122,17 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ApiError' }
         '404':
-          description: No existe un trabajo con ese identificador
+          description: |
+            No existe un trabajo con ese identificador.
+
+            OJO: hay una ventana breve, justo después del 202, en la que este endpoint
+            responde 404 para un identificador que SÍ es válido. El 202 entrega el
+            identificador dentro de la transacción, pero el trabajo se crea cuando el
+            mensaje se consume, y eso ocurre después del commit.
+
+            El frontend debe tratar un 404 en los primeros segundos como "aceptado, aún
+            no arranca", no como identificador inválido. Está anotado para cerrarse
+            persistiendo el trabajo en la misma transacción del 202.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ApiError' }
@@ -184,8 +194,16 @@ components:
     EstadoTrabajoValor:
       type: string
       description: |
-        Parcial no es un error: es un pliego donde algunas líneas quedaron
-        pendientes con su motivo mientras el resto avanzó.
+        Parcial no es un error: es un pliego donde algunas líneas quedaron pendientes
+        con su motivo mientras el resto avanzó. Es el desenlace normal cuando alguna
+        línea necesita que una persona agregue la tarifa.
+
+        Completado significa que el servicio resolvió TODO por su cuenta. Fallido queda
+        reservado para cuando se rompe el servicio mismo, no para cuando simplemente no
+        había tarifa.
+
+        Pendiente es lo que informa el 202: el trabajo fue aceptado pero todavía no
+        arrancó. VER LA NOTA DEL 404 en el endpoint de consulta.
       enum: [Pendiente, Procesando, Completado, Parcial, Fallido]
 
     TrabajoAceptado:
@@ -204,10 +222,32 @@ components:
 
     AvanceTrabajo:
       type: object
+      description: |
+        Los pendientes vienen desglosados porque son dos cosas con ciclos de vida
+        opuestos, y la pantalla dice cosas distintas con cada una.
+
+        `pendientesTecnicas` se reintenta y se resuelve solo. `requierenTarifaManual`
+        espera al Administrador de Tarifas y NO se reintenta: nada va a cambiar hasta
+        que esa persona actúe. Ahí no hay reloj, porque puede tener otros pliegos
+        delante y eso no es algo que un timeout deba resolver.
+
+        `pendientes` es la suma, para quien solo quiera un número.
       properties:
-        total: { type: integer, example: 300 }
+        total:
+          type: integer
+          nullable: true
+          description: Nulo hasta que el pliego se reparte; antes no se sabe cuántas líneas hay.
+          example: 300
         resueltas: { type: integer, example: 187 }
         pendientes: { type: integer, example: 3 }
+        pendientesTecnicas:
+          type: integer
+          description: Una fuente falló. Se reintenta.
+          example: 1
+        requierenTarifaManual:
+          type: integer
+          description: No hay tarifa válida. Espera al Administrador de Tarifas.
+          example: 2
 
     EstadoTrabajo:
       type: object

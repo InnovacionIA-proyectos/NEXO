@@ -1,6 +1,13 @@
 using CabinaFletes.Application.Common.Mensajeria;
 using CabinaFletes.Application.Common.Ports;
 using CabinaFletes.Mensajes;
+using CabinaFletes.Application.CasosDeUso.Solicitudes.Interfaces;
+using CabinaFletes.Infrastructure.Common.Mensajeria.Saga;
+using CabinaFletes.Infrastructure.Solicitudes.Adaptadores;
+using CabinaFletes.Application.CasosDeUso.Trabajos.Interfaces;
+using CabinaFletes.Infrastructure.Solicitudes.Repositorios;
+using CabinaFletes.Infrastructure.Trabajos.Repositorios;
+using CabinaFletes.Mensajes.Costeo;
 using CabinaFletes.Mensajes.Solicitudes;
 using CabinaFletes.Infrastructure.Persistence;
 using MassTransit;
@@ -22,6 +29,27 @@ public static class MensajeriaDependencyInjection
 
         services.AddMassTransit(x =>
         {
+            // Los timeouts de saga se programan por el broker, no con un temporizador
+            // en memoria: así el reloj sobrevive a un reinicio del proceso. Necesita el
+            // plugin de retardo, de ahí la imagen propia de RabbitMQ.
+            x.AddDelayedMessageScheduler();
+
+            // Reparte el pliego en un mensaje por línea. Existe para que la saga no
+            // tenga que leer la base y siga siendo pura.
+            x.AddConsumer<RepartidorDeLineasConsumer>();
+
+            // La saga se persiste en la misma base que los datos del negocio. Su estado
+            // ES la respuesta al cliente que preguntó por su trabajo, así que un
+            // reinicio no puede borrarlo.
+            x.AddSagaStateMachine<AutoCosteoSaga, EstadoAutoCosteo>()
+                .EntityFrameworkRepository(r =>
+                {
+                    r.ExistingDbContext<CabinaFletesDbContext>();
+                    // Bloqueo pesimista: dos resultados de línea del mismo pliego pueden
+                    // llegar a la vez, y con optimista se perderían contadores.
+                    r.ConcurrencyMode = MassTransit.ConcurrencyMode.Pessimistic;
+                });
+
             // El Outbox es lo que hace que esto sea confiable y no solo asíncrono.
             // Escribe el mensaje en la MISMA transacción que los datos del caso de uso.
             x.AddEntityFrameworkOutbox<CabinaFletesDbContext>(o =>
@@ -42,6 +70,12 @@ public static class MensajeriaDependencyInjection
                 if (!string.IsNullOrWhiteSpace(host))
                     cfg.Host(new Uri(host));
 
+                // Registrar el planificador NO basta: el bus tiene que usarlo en su
+                // tubería. Sin esta línea la actividad Schedule de la saga falla con
+                // "MessageSchedulerContext payload not found" — se descubrió en las
+                // pruebas de la saga, no desplegado.
+                cfg.UseDelayedMessageScheduler();
+
                 // Reintentos escalonados: un fallo transitorio del broker o de una
                 // fuente externa no debe tumbar el mensaje al primer intento. Agotados
                 // los intentos, MassTransit lo lleva a la cola de error (DLQ), que es
@@ -60,6 +94,8 @@ public static class MensajeriaDependencyInjection
         // MassTransit. Quien pida IPublicadorDeMensajes recibe SIEMPRE el validado —
         // el adaptador crudo no se expone bajo el puerto, justamente para que no haya
         // forma de saltarse la validación pidiendo la otra implementación.
+        services.AddScoped<ILineasDePliegoPort, EfLineasDePliegoRepository>();
+        services.AddScoped<IEstadoDeTrabajoPort, EfEstadoDeTrabajoRepository>();
         services.AddScoped<MassTransitPublicador>();
         services.AddScoped<IPublicadorDeMensajes>(sp =>
             new PublicadorValidado(sp.GetRequiredService<MassTransitPublicador>(), sp));
@@ -69,6 +105,12 @@ public static class MensajeriaDependencyInjection
         // viaja al broker. Si alguien agrega un mensaje y olvida esta línea, el
         // decorador falla cerrado y la prueba lo detecta.
         services.AddScoped<IValidadorDeMensaje<AutoCosteoSolicitado>, AutoCosteoSolicitadoValidador>();
+        services.AddScoped<IValidadorDeMensaje<RepartirLineasDeCosteo>, RepartirLineasDeCosteoValidador>();
+        services.AddScoped<IValidadorDeMensaje<PliegoRepartido>, PliegoRepartidoValidador>();
+        services.AddScoped<IValidadorDeMensaje<CostearLineaSolicitada>, CostearLineaSolicitadaValidador>();
+        services.AddScoped<IValidadorDeMensaje<LineaCosteada>, LineaCosteadaValidador>();
+        services.AddScoped<IValidadorDeMensaje<LineaFalloTecnico>, LineaFalloTecnicoValidador>();
+        services.AddScoped<IValidadorDeMensaje<LineaRequiereTarifaManual>, LineaRequiereTarifaManualValidador>();
 
         return services;
     }

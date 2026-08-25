@@ -1247,6 +1247,52 @@ namespace CabinaFletes.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("CabinaFletes.Infrastructure.Common.Mensajeria.Saga.EstadoAutoCosteo", b =>
+                {
+                    b.Property<Guid>("CorrelationId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CurrentState")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<int>("PendientesTecnicas")
+                        .HasColumnType("int");
+
+                    b.Property<int>("RequierenManual")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Resueltas")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset>("SolicitadoEn")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("SolicitadoPor")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("SolicitudId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("TerminadoEn")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("TokenExpiracion")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int?>("TotalLineas")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("int");
+
+                    b.HasKey("CorrelationId");
+
+                    b.ToTable("trabajos_auto_costeo", (string)null);
+                });
+
             modelBuilder.Entity("MassTransit.EntityFrameworkCoreIntegration.InboxState", b =>
                 {
                     b.Property<long>("Id")

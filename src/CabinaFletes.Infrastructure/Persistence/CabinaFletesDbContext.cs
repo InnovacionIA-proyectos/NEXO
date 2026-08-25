@@ -9,6 +9,7 @@ using CabinaFletes.Domain.PlanDeCargue.Entidades;
 using CabinaFletes.Domain.Priorizacion.Entidades;
 using CabinaFletes.Domain.Solicitudes.Entidades;
 using CabinaFletes.Domain.Usuarios.Entidades;
+using CabinaFletes.Infrastructure.Common.Mensajeria.Saga;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
 
@@ -52,6 +53,20 @@ public class CabinaFletesDbContext : DbContext
         b.AddInboxStateEntity();
         b.AddOutboxMessageEntity();
         b.AddOutboxStateEntity();
+
+        // Estado de la saga del auto-costeo. Se persiste aquí y no en otra base porque
+        // ES la respuesta al cliente que preguntó por su trabajo: si un reinicio lo
+        // borrara, quedaría preguntando por algo que ya nadie recuerda.
+        b.Entity<EstadoAutoCosteo>(e =>
+        {
+            e.ToTable("trabajos_auto_costeo");
+            e.HasKey(x => x.CorrelationId);
+            e.Property(x => x.CurrentState).HasMaxLength(64).IsRequired();
+            // Derivadas del estado, no columnas.
+            e.Ignore(x => x.ConDesenlace);
+            e.Ignore(x => x.TodasConDesenlace);
+            e.Ignore(x => x.TodoResueltoPorElServicio);
+        });
 
         b.Entity<Usuario>(e =>
         {
