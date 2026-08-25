@@ -1,0 +1,50 @@
+# ============================================================================
+# CabinaFletes (Clean Architecture) — arnés de compilación y pruebas
+#
+# Este archivo NO produce la imagen que va a producción: de eso se encarga
+# src/CabinaFletes.Api/Dockerfile, que publica únicamente el proyecto Api.
+#
+# Aquí se compila la SOLUCIÓN COMPLETA — las 4 capas más los 3 proyectos de
+# test — para que el criterio de cierre de la issue #1 ("dotnet build termina
+# sin errores") sea verificable por cualquiera del equipo sin depender del SDK
+# instalado en su máquina.
+#
+# Contexto de build esperado: la RAÍZ del repositorio.
+#   docker compose -f docker-compose.ci.yml build
+#   docker compose -f docker-compose.ci.yml run --rm build
+# ============================================================================
+
+FROM mcr.microsoft.com/dotnet/sdk:10.0
+
+ENV DOTNET_CLI_TELEMETRY_OPTOUT=1 \
+    DOTNET_NOLOGO=1 \
+    DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1
+
+WORKDIR /src
+
+# La solución y los 7 .csproj van primero: mientras solo cambie código, Docker
+# reutiliza la capa del restore y no vuelve a bajar los paquetes de NuGet.
+COPY ["CabinaFletes.Clean.sln", "./"]
+COPY ["src/CabinaFletes.Domain/CabinaFletes.Domain.csproj",                         "src/CabinaFletes.Domain/"]
+COPY ["src/CabinaFletes.Application/CabinaFletes.Application.csproj",               "src/CabinaFletes.Application/"]
+COPY ["src/CabinaFletes.Infrastructure/CabinaFletes.Infrastructure.csproj",         "src/CabinaFletes.Infrastructure/"]
+COPY ["src/CabinaFletes.Api/CabinaFletes.Api.csproj",                               "src/CabinaFletes.Api/"]
+COPY ["tests/CabinaFletes.Domain.Tests/CabinaFletes.Domain.Tests.csproj",           "tests/CabinaFletes.Domain.Tests/"]
+COPY ["tests/CabinaFletes.Application.Tests/CabinaFletes.Application.Tests.csproj", "tests/CabinaFletes.Application.Tests/"]
+COPY ["tests/CabinaFletes.Api.Tests/CabinaFletes.Api.Tests.csproj",                 "tests/CabinaFletes.Api.Tests/"]
+
+RUN dotnet restore "CabinaFletes.Clean.sln"
+
+# El código fuente. El restore ya quedó resuelto en la capa anterior.
+COPY src/   src/
+COPY tests/ tests/
+
+# El build va como comando del contenedor y no como RUN a propósito. Si fuera
+# parte de la construcción de la imagen, un error de compilación abortaría el
+# `docker build` y el log del compilador saldría mezclado con la salida de
+# Docker. Como comando, el log sale limpio por stdout y el código de salida del
+# contenedor es el del compilador — que es justo lo que un CI necesita leer.
+#
+# El comando se puede sobrescribir para correr otra cosa con el mismo entorno:
+#   docker compose -f docker-compose.ci.yml run --rm build dotnet test ...
+CMD ["dotnet", "build", "CabinaFletes.Clean.sln", "-c", "Release", "--no-restore"]

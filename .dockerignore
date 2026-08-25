@@ -1,0 +1,26 @@
+# Qué NO entra al contexto de build de Docker.
+# Aplica a las dos imágenes del repo: la de la API y la del arnés de CI.
+
+# Artefactos de compilación. Se generan dentro del contenedor; copiarlos desde
+# el host pisaría el resultado del restore de la imagen y mezclaría binarios de
+# Windows con un build de Linux.
+**/bin/
+**/obj/
+
+# La historia de git. Ningún build la necesita y pesa más que el código.
+.git/
+.gitignore
+.gitattributes
+
+# Configuración local y secretos. Nunca entran a una imagen.
+.env
+.env.*
+!.env.example
+**/appsettings.*.local.json
+
+# Documentación y tooling del repositorio.
+*.md
+.github/
+.vs/
+**/*.user
+**/*.suo
