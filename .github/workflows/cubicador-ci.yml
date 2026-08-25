@@ -2,10 +2,10 @@ name: Cubicador CI
 
 on:
   push:
-    branches: [main]
+    branches: [QA, main]
     paths: ["cubicador/**"]
   pull_request:
-    branches: [main]
+    branches: [QA, main]
     paths: ["cubicador/**"]
 
 defaults:
