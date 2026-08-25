@@ -1,6 +1,6 @@
 # Contrato de integración — Nexo (Cabina de Fletes) ↔ Portal de la Administración
 
-**Versión 1.1.0** · Sprint 2 · Issues #7 y #15
+**Versión 1.2.0** · Sprint 2 · Issues #7 y #15
 
 Este documento manda. El módulo `cabina-fletes` del portal está en desarrollo y no
 es la referencia: lo que hoy tenga construido se adapta a lo que diga aquí, no al
@@ -270,9 +270,20 @@ GET /api/trabajos/{trabajoId}
     "requierenTarifaManual": 2
   },
   "solicitadoEn": "2026-08-25T12:00:00Z",
-  "terminadoEn": null
+  "terminadoEn": null,
+  "esperandoTarifa": [
+    {
+      "lineaId": "7c1e...",
+      "motivo": "No hay tarifa de plaza vigente para la ruta.",
+      "esperandoDesde": "2026-08-25T12:00:04Z"
+    }
+  ]
 }
 ```
+
+`esperandoTarifa` es lo que hace útil el aviso. El contador dice cuántas; esto dice
+**cuáles y qué les falta**, y con eso el comercial sabe a quién ir a buscar y el
+Administrador de Tarifas sabe qué cargar.
 
 `total` es nulo hasta que el pliego se reparte: antes de eso nadie sabe cuántas
 líneas hay.

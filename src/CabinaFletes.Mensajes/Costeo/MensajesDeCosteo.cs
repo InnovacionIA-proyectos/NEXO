@@ -51,4 +51,4 @@ public sealed record LineaFalloTecnico(Guid TrabajoId, Guid LineaId, string Moti
 /// Tarifas, donde no hay reloj: esa persona puede tener otros pliegos delante y eso
 /// no es algo que un timeout deba resolver.
 /// </summary>
-public sealed record LineaRequiereTarifaManual(Guid TrabajoId, Guid LineaId, string Motivo);
+public sealed record LineaRequiereTarifaManual(Guid TrabajoId, Guid SolicitudId, Guid LineaId, string Motivo);

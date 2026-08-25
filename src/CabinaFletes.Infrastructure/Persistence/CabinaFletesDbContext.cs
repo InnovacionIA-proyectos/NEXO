@@ -54,6 +54,17 @@ public class CabinaFletesDbContext : DbContext
         b.AddOutboxMessageEntity();
         b.AddOutboxStateEntity();
 
+        // Líneas que esperan a que el Administrador de Tarifas agregue la tarifa.
+        // Índice filtrado por las que siguen esperando: es la consulta que hace la
+        // pantalla y no tiene sentido indexar las ya resueltas.
+        b.Entity<LineaEsperandoTarifa>(e =>
+        {
+            e.ToTable("lineas_esperando_tarifa");
+            e.Property(x => x.Motivo).HasMaxLength(500).IsRequired();
+            e.HasIndex(x => new { x.TrabajoId, x.LineaSolicitudId });
+            e.HasIndex(x => x.SolicitudId).HasFilter("[ResueltaEn] IS NULL");
+        });
+
         // Estado de la saga del auto-costeo. Se persiste aquí y no en otra base porque
         // ES la respuesta al cliente que preguntó por su trabajo: si un reinicio lo
         // borrara, quedaría preguntando por algo que ya nadie recuerda.

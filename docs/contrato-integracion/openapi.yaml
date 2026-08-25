@@ -9,7 +9,7 @@ openapi: 3.0.3
 
 info:
   title: Nexo (Cabina de Fletes) — contrato de integración con el portal
-  version: 1.1.0
+  version: 1.2.0
   description: |
     Nexo no tiene inicio de sesión propio. La identidad la aporta la sesión del
     portal de la Administración; el backend resuelve los permisos contra la tabla
@@ -249,6 +249,24 @@ components:
           description: No hay tarifa válida. Espera al Administrador de Tarifas.
           example: 2
 
+    EsperaDeTarifa:
+      type: object
+      description: |
+        Una línea concreta que espera a que el Administrador de Tarifas actúe.
+
+        Es lo que hace útil el aviso. Un contador dice "3 pendientes" y nadie sabe qué
+        hacer; esto dice qué línea y qué le falta, con lo que el comercial sabe a quién
+        ir a buscar y el administrador sabe qué cargar.
+
+        No lleva vencimiento a propósito: esta espera depende de una persona.
+      required: [lineaId, motivo, esperandoDesde]
+      properties:
+        lineaId: { type: string, format: uuid }
+        motivo:
+          type: string
+          example: No hay tarifa de plaza vigente para la ruta.
+        esperandoDesde: { type: string, format: date-time }
+
     EstadoTrabajo:
       type: object
       required: [trabajoId, estado]
@@ -260,9 +278,17 @@ components:
           $ref: '#/components/schemas/EstadoTrabajoValor'
         avance:
           $ref: '#/components/schemas/AvanceTrabajo'
-        resultado:
+        solicitadoEn: { type: string, format: date-time }
+        terminadoEn:
+          type: string
+          format: date-time
           nullable: true
-          description: Presente solo cuando el estado es Completado o Parcial.
+        esperandoTarifa:
+          type: array
+          description: |
+            Las líneas que esperan intervención humana, con su motivo. Vacío cuando no
+            hay ninguna.
+          items: { $ref: '#/components/schemas/EsperaDeTarifa' }
 
     ApiError:
       type: object

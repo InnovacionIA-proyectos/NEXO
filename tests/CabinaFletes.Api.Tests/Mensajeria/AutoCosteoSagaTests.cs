@@ -110,7 +110,7 @@ public class AutoCosteoSagaTests : IAsyncLifetime
         await _bus.Bus.Publish(new LineaCosteada(trabajoId, Guid.NewGuid(), 1_200_000m, "Sicetac"));
         await _bus.Bus.Publish(new LineaCosteada(trabajoId, Guid.NewGuid(), 800_000m, "Sicetac"));
         await _bus.Bus.Publish(new LineaRequiereTarifaManual(
-            trabajoId, Guid.NewGuid(), "No hay tarifa de plaza vigente para la ruta."));
+            trabajoId, Guid.NewGuid(), Guid.NewGuid(), "No hay tarifa de plaza vigente para la ruta."));
 
         var estado = await EsperarEstado(trabajoId, e => e.ConDesenlace == 3);
         Assert.Equal(2, estado.Resueltas);
@@ -126,7 +126,7 @@ public class AutoCosteoSagaTests : IAsyncLifetime
 
         await _bus.Bus.Publish(new LineaCosteada(trabajoId, Guid.NewGuid(), 1_000_000m, "Sicetac"));
         await _bus.Bus.Publish(new LineaFalloTecnico(trabajoId, Guid.NewGuid(), "DwSice no respondió."));
-        await _bus.Bus.Publish(new LineaRequiereTarifaManual(trabajoId, Guid.NewGuid(), "Tarifa de plaza vencida."));
+        await _bus.Bus.Publish(new LineaRequiereTarifaManual(trabajoId, Guid.NewGuid(), Guid.NewGuid(), "Tarifa de plaza vencida."));
 
         var estado = await EsperarEstado(trabajoId, e => e.ConDesenlace == 3);
 

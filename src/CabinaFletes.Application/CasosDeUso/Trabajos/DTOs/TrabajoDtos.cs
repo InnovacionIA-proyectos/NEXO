@@ -17,6 +17,15 @@ public record AvanceTrabajoDto(
     int RequierenTarifaManual);
 
 /// <summary>
+/// Una línea concreta que espera a que el Administrador de Tarifas actúe.
+///
+/// Esto es lo que hace útil el aviso. Un contador dice "3 pendientes" y nadie sabe qué
+/// hacer; esto dice qué línea y qué le falta, y con eso el comercial sabe a quién ir a
+/// buscar y el administrador sabe qué cargar.
+/// </summary>
+public record EsperaDeTarifaDto(Guid LineaId, string Motivo, DateTimeOffset EsperandoDesde);
+
+/// <summary>
 /// Estado consultable de un trabajo. Es la consulta de respaldo del contrato: quien se
 /// reconecta reconstruye todo con esta sola llamada, sin haber recibido ningún aviso.
 /// </summary>
@@ -25,4 +34,5 @@ public record EstadoTrabajoDto(
     string Estado,
     AvanceTrabajoDto Avance,
     DateTimeOffset SolicitadoEn,
-    DateTimeOffset? TerminadoEn);
+    DateTimeOffset? TerminadoEn,
+    IReadOnlyList<EsperaDeTarifaDto> EsperandoTarifa);

@@ -62,7 +62,7 @@ public sealed class LineaRequiereTarifaManualValidador : IValidadorDeMensaje<Lin
 {
     public IReadOnlyList<string> Validar(LineaRequiereTarifaManual m)
     {
-        var motivos = Motivos.De(("TrabajoId", m.TrabajoId), ("LineaId", m.LineaId));
+        var motivos = Motivos.De(("TrabajoId", m.TrabajoId), ("SolicitudId", m.SolicitudId), ("LineaId", m.LineaId));
         if (string.IsNullOrWhiteSpace(m.Motivo))
             motivos.Add("Motivo es obligatorio: el Administrador de Tarifas necesita saber QUÉ falta para poder resolverlo.");
         return motivos;

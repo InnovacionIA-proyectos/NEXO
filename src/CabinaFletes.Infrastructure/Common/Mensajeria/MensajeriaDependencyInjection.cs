@@ -38,6 +38,11 @@ public static class MensajeriaDependencyInjection
             // tenga que leer la base y siga siendo pura.
             x.AddConsumer<RepartidorDeLineasConsumer>();
 
+            // Guarda CUÁLES líneas esperan y qué les falta. La saga cuenta cuántas; sin
+            // esto la pantalla solo podría mostrar un número, y un número no permite
+            // actuar.
+            x.AddConsumer<RegistrarEsperaDeTarifaConsumer>();
+
             // La saga se persiste en la misma base que los datos del negocio. Su estado
             // ES la respuesta al cliente que preguntó por su trabajo, así que un
             // reinicio no puede borrarlo.
@@ -96,6 +101,8 @@ public static class MensajeriaDependencyInjection
         // forma de saltarse la validación pidiendo la otra implementación.
         services.AddScoped<ILineasDePliegoPort, EfLineasDePliegoRepository>();
         services.AddScoped<IEstadoDeTrabajoPort, EfEstadoDeTrabajoRepository>();
+        services.AddScoped<IRegistroDeTrabajos, EfRegistroDeTrabajos>();
+        services.AddScoped<IEsperasDeTarifaPort, EfEsperasDeTarifaRepository>();
         services.AddScoped<MassTransitPublicador>();
         services.AddScoped<IPublicadorDeMensajes>(sp =>
             new PublicadorValidado(sp.GetRequiredService<MassTransitPublicador>(), sp));

@@ -1015,6 +1015,49 @@ namespace CabinaFletes.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("CabinaFletes.Domain.Solicitudes.Entidades.LineaEsperandoTarifa", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetimeoffset")
+                        .HasDefaultValueSql("SYSDATETIMEOFFSET()");
+
+                    b.Property<Guid>("LineaSolicitudId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Motivo")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTimeOffset?>("ResueltaEn")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("SolicitudId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("TrabajoId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetimeoffset")
+                        .HasDefaultValueSql("SYSDATETIMEOFFSET()");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SolicitudId")
+                        .HasFilter("[ResueltaEn] IS NULL");
+
+                    b.HasIndex("TrabajoId", "LineaSolicitudId");
+
+                    b.ToTable("lineas_esperando_tarifa", (string)null);
+                });
+
             modelBuilder.Entity("CabinaFletes.Domain.Solicitudes.Entidades.LineaSolicitud", b =>
                 {
                     b.Property<Guid>("Id")
