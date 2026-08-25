@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using CabinaFletes.Application.Common;
 using CabinaFletes.Application.Common.Abstractions;
 using CabinaFletes.Application.Common.Dtos;
 using CabinaFletes.Application.Common.Exceptions;
