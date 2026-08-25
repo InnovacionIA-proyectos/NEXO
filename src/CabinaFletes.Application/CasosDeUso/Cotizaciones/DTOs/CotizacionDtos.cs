@@ -41,22 +41,3 @@ public record EntregarCotizacionResultDto(
 
 /// <summary>Archivo binario de salida (usado por la exportación a Excel).</summary>
 public record ArchivoDto(byte[] Contenido, string NombreArchivo, string ContentType);
-
-/// <summary>Mapeadores entidad -> DTO. Único punto donde se decide qué se serializa.</summary>
-public static class CotizacionDtoMappers
-{
-    public static CotizacionDto ToDto(this Cotizacion c) =>
-        new(
-            c.Id,
-            c.SolicitudId,
-            c.Estado,
-            c.Resultado,
-            c.Total,
-            c.EntregadaAt,
-            c.Lineas.Select(l => new CotizacionLineaDto(
-                l.Id, l.LineaSolicitudId, l.ValorFlete, l.Fuente,
-                l.ValorAprovisionamiento, l.ValorRetornoContenedor)).ToList(),
-            c.Conexos.Select(x => new CotizacionConexoDto(
-                x.Id, x.ServicioConexoId, x.ServicioConexo?.Nombre,
-                x.ServicioConexo?.Categoria ?? "logistico", x.Cantidad, x.ValorAplicado)).ToList());
-}

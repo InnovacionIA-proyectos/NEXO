@@ -1,5 +1,6 @@
 using CabinaFletes.Application.CasosDeUso.Solicitudes.DTOs;
 using CabinaFletes.Application.CasosDeUso.Solicitudes.Interfaces;
+using CabinaFletes.Application.CasosDeUso.Solicitudes.Mappers;
 using CabinaFletes.Application.Common.Abstractions;
 using CabinaFletes.Application.Common.Dtos;
 using CabinaFletes.Application.Common.Exceptions;

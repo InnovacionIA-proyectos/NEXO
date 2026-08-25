@@ -1,6 +1,7 @@
 using CabinaFletes.Application.CasosDeUso.Cotizaciones.DTOs;
 using CabinaFletes.Application.CasosDeUso.Cotizaciones.Excepciones;
 using CabinaFletes.Application.CasosDeUso.Cotizaciones.Interfaces;
+using CabinaFletes.Application.CasosDeUso.Cotizaciones.Mappers;
 using CabinaFletes.Application.Common.Abstractions;
 using CabinaFletes.Application.Common.Exceptions;
 using CabinaFletes.Application.Common.Ports;

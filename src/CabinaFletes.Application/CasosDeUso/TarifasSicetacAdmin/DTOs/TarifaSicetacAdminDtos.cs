@@ -28,13 +28,6 @@ public record TarifaSicetacDto(
     decimal? ValorHora,
     decimal? HorasPactadas);
 
-public static class TarifaSicetacDtoMappers
-{
-    public static TarifaSicetacDto ToDto(this TarifaSicetac t) =>
-        new(t.Id, t.Periodo, t.OrigenDane, t.DestinoDane, t.NombreRuta, t.Configuracion,
-            t.TipoCarga, t.UnidadTransporte, t.CondicionCarga, t.ValorPiso, t.ValorHora, t.HorasPactadas);
-}
-
 /// <summary>Resumen del resultado de importar un Excel SICE-TAC.</summary>
 public record ImportResumenDto(
     int Procesadas,

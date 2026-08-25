@@ -2,6 +2,7 @@ using System.Text.Json;
 using CabinaFletes.Application.CasosDeUso.Cotizaciones.DTOs;
 using CabinaFletes.Application.CasosDeUso.Cotizaciones.Excepciones;
 using CabinaFletes.Application.CasosDeUso.Cotizaciones.Interfaces;
+using CabinaFletes.Application.CasosDeUso.Cotizaciones.Mappers;
 using CabinaFletes.Application.CasosDeUso.Cotizaciones.Validadores;
 using CabinaFletes.Application.Common.Abstractions;
 using CabinaFletes.Application.Common.Dtos;

@@ -1,8 +1,8 @@
 using System.Text.Json.Serialization;
-using CabinaFletes.Api.Auth;
-using CabinaFletes.Api.BackgroundServices;
-using CabinaFletes.Api.Errors;
-using CabinaFletes.Api.Middleware;
+using CabinaFletes.Api.Common.Auth;
+using CabinaFletes.Api.Common.Errors;
+using CabinaFletes.Api.Common.Middleware;
+using CabinaFletes.Api.Solicitudes;
 using CabinaFletes.Application.CasosDeUso.AjustesVigenciaPlaza;
 using CabinaFletes.Application.CasosDeUso.Biblioteca;
 using CabinaFletes.Application.CasosDeUso.BibliotecaSapHistorico;

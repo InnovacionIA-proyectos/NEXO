@@ -18,16 +18,6 @@ public record SolicitudDto(
     DateTimeOffset? Deadline, decimal? ProbabilidadCierre, decimal? ValorEstimado, decimal ScorePrioridad,
     EstadoSolicitud Estado, DateTimeOffset CreatedAt, IReadOnlyList<LineaSolicitudDto> Lineas);
 
-public static class SolicitudDtoMappers
-{
-    public static LineaSolicitudDto ToDto(this LineaSolicitud l) =>
-        new(l.Id, l.RutaId, l.ConfigVehiculoId, l.Tipologia, l.Peso, l.ValorMercancia, l.EstadoLinea);
-
-    public static SolicitudDto ToDto(this Solicitud s) =>
-        new(s.Id, s.ClienteId, s.Cliente?.Nombre, s.Tipo, s.Modalidad, s.Deadline, s.ProbabilidadCierre,
-            s.ValorEstimado, s.ScorePrioridad, s.Estado, s.CreatedAt, s.Lineas.Select(l => l.ToDto()).ToList());
-}
-
 /// <summary>Fila de la Bandeja Priorizada (anti-FIFO).</summary>
 public record BandejaItemDto(
     Guid Id, string Cliente, string Tipo, string Estado, DateTimeOffset? Deadline, decimal? ValorEstimado,
