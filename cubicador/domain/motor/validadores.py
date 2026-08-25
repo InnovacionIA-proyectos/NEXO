@@ -202,7 +202,10 @@ def validar_compatibilidad(item: ItemCarga, colocadas: list[Colocacion]) -> str 
 
 
 def excede_peso_total(peso_actual_kg: float, item: ItemCarga, c: Contenedor) -> bool:
-    return peso_actual_kg + item.peso_kg > c.capacidad_kg
+    # Cambio de prueba intencional (issue #6): invierte la comparación para
+    # verificar que el pipeline de integración continua detiene un cambio que
+    # rompe una regla de negocio. Este PR es temporal y no debe fusionarse.
+    return peso_actual_kg + item.peso_kg < c.capacidad_kg
 
 
 def estimar_peso_por_eje(colocadas: list[Colocacion], c: Contenedor) -> list[float]:
