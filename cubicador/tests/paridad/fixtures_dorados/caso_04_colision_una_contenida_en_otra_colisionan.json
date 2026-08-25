@@ -1,0 +1,26 @@
+{
+  "caso": "colision_una_contenida_en_otra_colisionan",
+  "tipo": "colisiona",
+  "casos": [
+    {
+      "input": {
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "al": 500,
+        "aw": 500,
+        "ah": 500,
+        "bx": 100,
+        "by": 100,
+        "bz": 100,
+        "bl": 50,
+        "bw": 50,
+        "bh": 50,
+        "tolerancia": 0
+      },
+      "esperado": {
+        "resultado": true
+      }
+    }
+  ]
+}

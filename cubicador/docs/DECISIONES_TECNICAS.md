@@ -47,29 +47,55 @@ podría introducir imprecisión (igual que el original usaba `Math.Round` ahí
 mismo) — verificado: las 31 reglas pasan sin ajustes contra la implementación
 en `float`.
 
-## 3. Sin comparación automatizada EN VIVO cross-motor (por ahora)
+## 3. Comparación automatizada cross-motor (revertido — ver S2-HU-07.3)
 
-**Decisión**: no se construye un arnés que corra el motor Python y el motor
-C# original lado a lado con el mismo input y compare la salida en tiempo de
-ejecución.
+**Decisión ORIGINAL (ya no vigente)**: no se construía un arnés que corriera
+el motor Python y el motor C# original lado a lado con el mismo input y
+comparara la salida en tiempo de ejecución. Razón entonces: el motor
+original iba a dejar de existir, y no parecía buen uso del tiempo invertir
+en comparar contra una versión temporal.
 
-**Por qué**: el motor original va a dejar de existir (este servicio lo
-reemplaza); invertir en un arnés de comparación en vivo contra una versión
-que se sabe temporal no es buen uso del tiempo.
+**Por qué se revirtió**: una HU posterior (S2-HU-07.3) pidió exactamente
+eso como criterio de liberación del motor nuevo (hotspot H5) — "verde solo
+con 26/26", con reporte de diferencias por caso y evidencia repetible. La
+razón original (no vale la pena comparar contra algo temporal) sigue siendo
+válida como argumento, pero el negocio decidió que la evidencia de paridad
+en sí es lo que importa para liberar, no si el motor viejo sigue vivo
+después.
 
-**Lo que SÍ se hizo en su lugar**: portar las 31 reglas de negocio como tests
-unitarios de este mismo motor — ver `testDocumentation/REGLAS_DE_NEGOCIO.md`,
-verificadas con pytest (33 casos, incluye un test parametrizado con 3
-variantes). **Actualización (validación contra S2-HU-072)**: de esas 31, las
-26 que vienen de `cabinaFletes/src/CabinaFletes.Tests/MotorCubicacion3DTests.cs`
-(el criterio de cierre "paridad con los 26 casos dorados") están portadas
-**1:1** — mismo nombre, mismo orden, mismo escenario — confirmado comparando
-ambos archivos método por método. La sustancia del requisito de paridad SÍ
-está cubierta; lo que no existe es la comparación cruzada en vivo descrita
-arriba, que es un mecanismo distinto y no era lo que hacía falta. La pasada
-de humo end-to-end (crear plan, optimizar, ajustar) contra el entorno real
-está en `tests/api/test_smoke.py` + verificación manual/CI contra Docker
-real (ver `testDocumentation/PRUEBAS_DE_INTEGRACION.md`).
+**Lo que se construyó** (S2-HU-07.3): `herramientas/generador_casos_dorados/`
+— un harness .NET que referencia el `.csproj` REAL de `cabinaFletes` (sin
+tocarlo, solo lo compila/ejecuta) y corre cada uno de los 26 casos de
+`MotorCubicacion3DTests.cs` contra el motor C# de verdad, grabando su salida
+en `tests/paridad/fixtures_dorados/*.json`. `tests/paridad/
+test_paridad_casos_dorados.py` corre en cada `pytest` (incluido el CI) y
+compara el motor Python contra esos 26 JSON — no contra un valor
+transcrito a mano. Falla el build si algún caso no coincide, con el
+esperado/obtenido exactos en el mensaje de error. Ver el README de esa
+carpeta para regenerar los fixtures si el motor C# cambiara alguna vez (no
+debería).
+
+**Resultado de la primera corrida**: 26/26 coinciden exacto contra el motor
+C# real — sin necesidad de ajustar el port, confirmando lo que ya se sabía
+por la vía informal (ver más abajo).
+
+**Lo que ya existía antes del harness**: portar las 31 reglas de negocio
+como tests unitarios de este mismo motor — ver
+`testDocumentation/REGLAS_DE_NEGOCIO.md`, verificadas con pytest (33 casos,
+incluye un test parametrizado con 3 variantes). De esas 31, las 26 que
+vienen de `MotorCubicacion3DTests.cs` ya estaban portadas **1:1** — mismo
+nombre, mismo orden, mismo escenario — confirmado comparando ambos archivos
+método por método antes de construir el harness. Esa cobertura por lectura
+ya daba confianza informal de que el port era fiel; el harness + la suite
+de `tests/paridad/` (arriba) la reemplazan por evidencia formal y
+automatizada — exactamente lo que S2-HU-07.3 pedía y que antes,
+correctamente, no existía.
+
+La pasada de humo end-to-end (crear plan, optimizar, ajustar) contra el
+entorno real está en `tests/api/test_smoke.py` + verificación manual/CI
+contra Docker real (ver `testDocumentation/PRUEBAS_DE_INTEGRACION.md`) — es
+un nivel distinto (flujo completo vía HTTP/RabbitMQ/Postgres), no paridad
+del motor.
 
 ## 4. Contrato REST: mismas rutas, mismos DTOs, mismos códigos
 

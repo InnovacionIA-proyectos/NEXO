@@ -1,0 +1,24 @@
+{
+  "caso": "orientaciones_cubo_sin_duplicadas_es_una",
+  "tipo": "orientaciones",
+  "casos": [
+    {
+      "input": {
+        "largoMm": 100,
+        "anchoMm": 100,
+        "altoMm": 100,
+        "rotable": true,
+        "mantenerVertical": false
+      },
+      "esperado": {
+        "orientaciones": [
+          {
+            "largoMm": 100,
+            "anchoMm": 100,
+            "altoMm": 100
+          }
+        ]
+      }
+    }
+  ]
+}

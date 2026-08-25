@@ -1,0 +1,26 @@
+{
+  "caso": "colision_unidades_adyacentes_contacto_exacto_no_colisionan",
+  "tipo": "colisiona",
+  "casos": [
+    {
+      "input": {
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "al": 100,
+        "aw": 100,
+        "ah": 100,
+        "bx": 100,
+        "by": 0,
+        "bz": 0,
+        "bl": 100,
+        "bw": 100,
+        "bh": 100,
+        "tolerancia": 0
+      },
+      "esperado": {
+        "resultado": false
+      }
+    }
+  ]
+}

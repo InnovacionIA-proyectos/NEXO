@@ -1,0 +1,21 @@
+{
+  "caso": "unidad_que_no_pasa_por_la_puerta_se_rechaza",
+  "tipo": "optimizar",
+  "casos": [
+    {
+      "input": {
+        "item": "a_1000x2420x2500_no_rotable"
+      },
+      "esperado": {
+        "colocaciones": [],
+        "rechazos": [
+          {
+            "itemId": "a",
+            "codigoRazon": "PUERTA"
+          }
+        ],
+        "incidenciasCodigos": []
+      }
+    }
+  ]
+}

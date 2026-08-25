@@ -1,0 +1,49 @@
+{
+  "caso": "apilamiento_valido_segunda_encima_de_la_primera",
+  "tipo": "optimizar",
+  "casos": [
+    {
+      "input": {
+        "items": "base_y_arriba_1200x1000x1000"
+      },
+      "esperado": {
+        "colocaciones": [
+          {
+            "itemId": "base",
+            "x": 0,
+            "y": 0,
+            "z": 0,
+            "orientacion": {
+              "indice": 0,
+              "largoMm": 1200,
+              "anchoMm": 1000,
+              "altoMm": 1000
+            },
+            "soporteId": null,
+            "porcentajeSoporte": 1,
+            "estadoEstabilidad": "estable",
+            "accesibilidad": "accesible"
+          },
+          {
+            "itemId": "arriba",
+            "x": 0,
+            "y": 0,
+            "z": 1000,
+            "orientacion": {
+              "indice": 0,
+              "largoMm": 1200,
+              "anchoMm": 1000,
+              "altoMm": 1000
+            },
+            "soporteId": "base",
+            "porcentajeSoporte": 1,
+            "estadoEstabilidad": "estable",
+            "accesibilidad": "accesible"
+          }
+        ],
+        "rechazos": [],
+        "incidenciasCodigos": []
+      }
+    }
+  ]
+}

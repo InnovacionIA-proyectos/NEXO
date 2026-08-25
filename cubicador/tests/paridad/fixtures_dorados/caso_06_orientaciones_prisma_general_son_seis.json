@@ -1,0 +1,49 @@
+{
+  "caso": "orientaciones_prisma_general_son_seis",
+  "tipo": "orientaciones",
+  "casos": [
+    {
+      "input": {
+        "largoMm": 100,
+        "anchoMm": 200,
+        "altoMm": 300,
+        "rotable": true,
+        "mantenerVertical": false
+      },
+      "esperado": {
+        "orientaciones": [
+          {
+            "largoMm": 100,
+            "anchoMm": 200,
+            "altoMm": 300
+          },
+          {
+            "largoMm": 100,
+            "anchoMm": 300,
+            "altoMm": 200
+          },
+          {
+            "largoMm": 200,
+            "anchoMm": 100,
+            "altoMm": 300
+          },
+          {
+            "largoMm": 200,
+            "anchoMm": 300,
+            "altoMm": 100
+          },
+          {
+            "largoMm": 300,
+            "anchoMm": 100,
+            "altoMm": 200
+          },
+          {
+            "largoMm": 300,
+            "anchoMm": 200,
+            "altoMm": 100
+          }
+        ]
+      }
+    }
+  ]
+}

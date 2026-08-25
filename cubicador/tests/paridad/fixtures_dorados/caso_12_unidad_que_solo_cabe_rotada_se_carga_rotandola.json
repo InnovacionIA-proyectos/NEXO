@@ -1,0 +1,33 @@
+{
+  "caso": "unidad_que_solo_cabe_rotada_se_carga_rotandola",
+  "tipo": "optimizar",
+  "casos": [
+    {
+      "input": {
+        "item": "a_1000x2600x1000_rotable"
+      },
+      "esperado": {
+        "colocaciones": [
+          {
+            "itemId": "a",
+            "x": 0,
+            "y": 0,
+            "z": 0,
+            "orientacion": {
+              "indice": 2,
+              "largoMm": 2600,
+              "anchoMm": 1000,
+              "altoMm": 1000
+            },
+            "soporteId": null,
+            "porcentajeSoporte": 1,
+            "estadoEstabilidad": "estable",
+            "accesibilidad": "accesible"
+          }
+        ],
+        "rechazos": [],
+        "incidenciasCodigos": []
+      }
+    }
+  ]
+}

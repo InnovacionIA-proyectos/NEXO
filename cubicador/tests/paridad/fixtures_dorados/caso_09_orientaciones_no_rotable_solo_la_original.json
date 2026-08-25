@@ -1,0 +1,24 @@
+{
+  "caso": "orientaciones_no_rotable_solo_la_original",
+  "tipo": "orientaciones",
+  "casos": [
+    {
+      "input": {
+        "largoMm": 100,
+        "anchoMm": 200,
+        "altoMm": 300,
+        "rotable": false,
+        "mantenerVertical": false
+      },
+      "esperado": {
+        "orientaciones": [
+          {
+            "largoMm": 100,
+            "anchoMm": 200,
+            "altoMm": 300
+          }
+        ]
+      }
+    }
+  ]
+}
