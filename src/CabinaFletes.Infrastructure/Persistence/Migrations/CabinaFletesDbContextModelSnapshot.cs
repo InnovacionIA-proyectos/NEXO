@@ -1015,7 +1015,7 @@ namespace CabinaFletes.Infrastructure.Migrations
                         });
                 });
 
-            modelBuilder.Entity("CabinaFletes.Domain.Solicitudes.Entidades.LineaEsperandoTarifa", b =>
+            modelBuilder.Entity("CabinaFletes.Domain.Solicitudes.Entidades.LineaPendienteDeCosteo", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -1040,6 +1040,11 @@ namespace CabinaFletes.Infrastructure.Migrations
                     b.Property<Guid>("SolicitudId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("Tipo")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
                     b.Property<Guid>("TrabajoId")
                         .HasColumnType("uniqueidentifier");
 
@@ -1053,9 +1058,9 @@ namespace CabinaFletes.Infrastructure.Migrations
                     b.HasIndex("SolicitudId")
                         .HasFilter("[ResueltaEn] IS NULL");
 
-                    b.HasIndex("TrabajoId", "LineaSolicitudId");
+                    b.HasIndex("TrabajoId", "LineaSolicitudId", "Tipo");
 
-                    b.ToTable("lineas_esperando_tarifa", (string)null);
+                    b.ToTable("lineas_pendientes_de_costeo", (string)null);
                 });
 
             modelBuilder.Entity("CabinaFletes.Domain.Solicitudes.Entidades.LineaSolicitud", b =>

@@ -12,7 +12,7 @@ namespace CabinaFletes.Infrastructure.Trabajos.Repositorios;
 /// Este es el único punto del sistema que sabe que "un trabajo" es una saga de
 /// MassTransit. Application ve un DTO y nada más.
 /// </summary>
-public sealed class EfEstadoDeTrabajoRepository(CabinaFletesDbContext db, IEsperasDeTarifaPort esperas) : IEstadoDeTrabajoPort
+public sealed class EfEstadoDeTrabajoRepository(CabinaFletesDbContext db, IPendientesDeCosteoPort pendientes) : IEstadoDeTrabajoPort
 {
     public async Task<EstadoTrabajoDto?> ObtenerAsync(Guid trabajoId, CancellationToken ct = default)
     {
@@ -25,9 +25,9 @@ public sealed class EfEstadoDeTrabajoRepository(CabinaFletesDbContext db, IEsper
         // cliente ve "Pendiente", que es lo que el contrato promete y lo que significa.
         var estado = saga.CurrentState == EfRegistroDeTrabajos.EstadoInicial ? "Pendiente" : saga.CurrentState;
 
-        // El desglose de las que esperan a una persona: qué línea y qué le falta. Es la
-        // diferencia entre "3 pendientes" y algo con lo que alguien puede actuar.
-        var esperando = await esperas.PendientesDeTrabajoAsync(trabajoId, ct);
+        // El desglose: qué línea, qué pasó y si se resuelve sola o necesita a alguien.
+        // Es la diferencia entre "3 pendientes" y algo con lo que se puede actuar.
+        var pendientesDelTrabajo = await pendientes.DeTrabajoAsync(trabajoId, ct);
 
         return new EstadoTrabajoDto(
             saga.CorrelationId,
@@ -40,6 +40,6 @@ public sealed class EfEstadoDeTrabajoRepository(CabinaFletesDbContext db, IEsper
                 saga.RequierenManual),
             saga.SolicitadoEn,
             saga.TerminadoEn,
-            esperando);
+            pendientesDelTrabajo);
     }
 }

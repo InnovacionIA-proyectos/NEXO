@@ -1,0 +1,13 @@
+using CabinaFletes.Application.Common.Abstractions;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace CabinaFletes.Application.CasosDeUso.Costeo;
+
+public static class DependencyInjection
+{
+    public static IServiceCollection AddCosteoUseCases(this IServiceCollection services)
+    {
+        services.AddScoped<ICommandHandler<CostearLineaCommand, Unit>, CostearLineaCommandHandler>();
+        return services;
+    }
+}

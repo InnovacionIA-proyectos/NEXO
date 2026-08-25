@@ -2,7 +2,10 @@ using CabinaFletes.Application.Common.Mensajeria;
 using CabinaFletes.Application.Common.Ports;
 using CabinaFletes.Mensajes;
 using CabinaFletes.Application.CasosDeUso.Solicitudes.Interfaces;
+using CabinaFletes.Application.CasosDeUso.Costeo.Interfaces;
 using CabinaFletes.Infrastructure.Common.Mensajeria.Saga;
+using CabinaFletes.Infrastructure.Costeo.Adaptadores;
+using CabinaFletes.Infrastructure.Costeo.Repositorios;
 using CabinaFletes.Infrastructure.Solicitudes.Adaptadores;
 using CabinaFletes.Application.CasosDeUso.Trabajos.Interfaces;
 using CabinaFletes.Infrastructure.Solicitudes.Repositorios;
@@ -38,10 +41,15 @@ public static class MensajeriaDependencyInjection
             // tenga que leer la base y siga siendo pura.
             x.AddConsumer<RepartidorDeLineasConsumer>();
 
-            // Guarda CUÁLES líneas esperan y qué les falta. La saga cuenta cuántas; sin
-            // esto la pantalla solo podría mostrar un número, y un número no permite
-            // actuar.
-            x.AddConsumer<RegistrarEsperaDeTarifaConsumer>();
+            // Costea una línea. Los reintentos son suyos: si una fuente falla, la
+            // excepción sube y la política escalonada del bus se encarga.
+            x.AddConsumer<CostearLineaConsumer>();
+
+            // Y cuando esos reintentos se agotan, esto convierte el fallo en un
+            // desenlace que la saga puede contar. Sin él, el pliego esperaría esa línea
+            // hasta el timeout sin que nadie supiera que había fallado.
+            x.AddConsumer<FalloDeCosteoConsumer>();
+
 
             // La saga se persiste en la misma base que los datos del negocio. Su estado
             // ES la respuesta al cliente que preguntó por su trabajo, así que un
@@ -102,7 +110,10 @@ public static class MensajeriaDependencyInjection
         services.AddScoped<ILineasDePliegoPort, EfLineasDePliegoRepository>();
         services.AddScoped<IEstadoDeTrabajoPort, EfEstadoDeTrabajoRepository>();
         services.AddScoped<IRegistroDeTrabajos, EfRegistroDeTrabajos>();
-        services.AddScoped<IEsperasDeTarifaPort, EfEsperasDeTarifaRepository>();
+        services.AddScoped<IPendientesDeCosteoPort, EfPendientesDeCosteoRepository>();
+        services.AddScoped<ILineasCosteadasPort, EfLineasCosteadasRepository>();
+        services.AddScoped<IPropuestaDeLineaPort>(sp => sp.GetRequiredService<IPropuestaTarifaPort>() as IPropuestaDeLineaPort
+            ?? throw new InvalidOperationException("El adaptador de propuesta debe implementar IPropuestaDeLineaPort."));
         services.AddScoped<MassTransitPublicador>();
         services.AddScoped<IPublicadorDeMensajes>(sp =>
             new PublicadorValidado(sp.GetRequiredService<MassTransitPublicador>(), sp));

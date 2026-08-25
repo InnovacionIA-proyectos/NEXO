@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using CabinaFletes.Application.CasosDeUso.AjustesVigenciaPlaza.Interfaces;
+using CabinaFletes.Application.CasosDeUso.Costeo.Interfaces;
 using CabinaFletes.Application.CasosDeUso.Biblioteca.DTOs;
 using CabinaFletes.Application.CasosDeUso.Biblioteca.Interfaces;
 using CabinaFletes.Application.CasosDeUso.ReglasSoloSicetac.Interfaces;
@@ -32,7 +33,7 @@ namespace CabinaFletes.Infrastructure.Biblioteca.Adaptadores;
 /// Los cargues masivos se procesan en PARALELO con scope propio de DbContext por
 /// trabajador (los contextos no son thread-safe), concurrencia limitada.
 /// </summary>
-public sealed class PropuestaTarifaAdapter : IPropuestaTarifaPort
+public sealed class PropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuestaDeLineaPort
 {
     private const int Concurrencia = 10;
     private const int MaxFilasFuente = 500;
@@ -60,6 +61,34 @@ public sealed class PropuestaTarifaAdapter : IPropuestaTarifaPort
         _clock = clock;
         _ajustes = ajustes;
         _reglas = reglas;
+    }
+
+    /// <summary>
+    /// Propuesta de UNA línea. Es el camino que usa el auto-costeo asíncrono.
+    ///
+    /// Reusa la misma maquinaria que el camino por solicitud —las mismas fuentes, la
+    /// misma caché, la misma regla— pero carga una sola línea. Con eso una excepción
+    /// consultando una fuente queda contenida en esa línea en vez de llevarse las 300,
+    /// que es lo que exige la regla inviolable 6.
+    /// </summary>
+    public async Task<ResultadoDeCosteo> ProponerParaLineaAsync(Guid lineaId, CancellationToken ct = default)
+    {
+        var linea = await _db.LineasSolicitud.AsNoTracking()
+            .Include(l => l.Ruta)
+            .Include(l => l.ConfiguracionVehiculo)
+            .FirstOrDefaultAsync(l => l.Id == lineaId, ct)
+            ?? throw new NotFoundException("LINEA_NO_ENCONTRADA", "Línea de solicitud no encontrada.");
+
+        var ajustes = await _ajustes.MapaAsync(ct);
+        var soloSice = await _reglas.ClavesRutaAsync(ct);
+
+        using var scope = _scopes.CreateScope();
+        var dw = _dwConfigurado ? scope.ServiceProvider.GetService<DwSiceDbContext>() : null;
+        var dc = _dcConfigurado ? scope.ServiceProvider.GetService<DbSolucionesTiDbContext>() : null;
+        var tarifario = scope.ServiceProvider.GetRequiredService<ITarifarioSapPort>();
+
+        var dto = await ProponerLineaAsync(dw, dc, tarifario, linea, ajustes, soloSice, ct);
+        return new ResultadoDeCosteo(dto.ValorPropuesto, dto.FuentePropuesta, dto.Justificacion);
     }
 
     public async Task<PropuestaSolicitudDto> ProponerAsync(Guid solicitudId, CancellationToken ct = default)

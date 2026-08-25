@@ -54,14 +54,17 @@ public class CabinaFletesDbContext : DbContext
         b.AddOutboxMessageEntity();
         b.AddOutboxStateEntity();
 
-        // Líneas que esperan a que el Administrador de Tarifas agregue la tarifa.
-        // Índice filtrado por las que siguen esperando: es la consulta que hace la
-        // pantalla y no tiene sentido indexar las ya resueltas.
-        b.Entity<LineaEsperandoTarifa>(e =>
+        // Líneas que quedaron sin costear, con su tipo y su motivo. Un solo sitio para
+        // las dos razones: dos sitios contando lo mismo acaban contradiciéndose.
+        //
+        // El índice va filtrado por las que siguen pendientes, que es la consulta que
+        // hace la pantalla; indexar las ya resueltas no aporta y la tabla crece.
+        b.Entity<LineaPendienteDeCosteo>(e =>
         {
-            e.ToTable("lineas_esperando_tarifa");
+            e.ToTable("lineas_pendientes_de_costeo");
             e.Property(x => x.Motivo).HasMaxLength(500).IsRequired();
-            e.HasIndex(x => new { x.TrabajoId, x.LineaSolicitudId });
+            e.Property(x => x.Tipo).HasConversion<string>().HasMaxLength(20);
+            e.HasIndex(x => new { x.TrabajoId, x.LineaSolicitudId, x.Tipo });
             e.HasIndex(x => x.SolicitudId).HasFilter("[ResueltaEn] IS NULL");
         });
 

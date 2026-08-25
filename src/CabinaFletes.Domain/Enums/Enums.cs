@@ -26,6 +26,18 @@ public enum ClaseViaje { Contenedor, Cupo, CargaSuelta, Extradimensionado }
 
 public enum EstadoLinea { PorCostear, AutoResuelta, Revisada }
 
+/// <summary>
+/// Por qué una línea quedó sin costear. Los dos tipos tienen ciclos de vida OPUESTOS y
+/// por eso se distinguen:
+///
+///   Tecnica — una fuente falló. Se reintenta y se resuelve sola. Tiene reloj.
+///   Manual  — no hay tarifa válida. Espera al Administrador de Tarifas. NO se
+///             reintenta y NO tiene reloj: esa persona puede tener otros pliegos
+///             delante, y ponerle vencimiento marcaría como fallido algo que estaba
+///             esperando bien.
+/// </summary>
+public enum TipoPendienteDeCosteo { Tecnica, Manual }
+
 public enum CondicionCarga { Cargado, Vacio }
 
 public enum FuenteFlete { Sicetac, Historica, Manual, Tarifario }

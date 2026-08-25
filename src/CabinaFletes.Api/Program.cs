@@ -1,3 +1,4 @@
+using CabinaFletes.Application.CasosDeUso.Costeo;
 using CabinaFletes.Application.CasosDeUso.Trabajos;
 using CabinaFletes.Infrastructure.Common.Mensajeria;
 using System.Text.Json.Serialization;
@@ -53,6 +54,7 @@ builder.Logging.AddSimpleConsole(o =>
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddMensajeria(builder.Configuration);
 builder.Services.AddTrabajosUseCases();
+builder.Services.AddCosteoUseCases();
 builder.Services.AddCotizacionesUseCases();
 builder.Services.AddReglasSoloSicetacUseCases();
 builder.Services.AddAjustesVigenciaPlazaUseCases();

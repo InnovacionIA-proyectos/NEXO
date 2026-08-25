@@ -1,3 +1,5 @@
+using CabinaFletes.Domain.Enums;
+
 namespace CabinaFletes.Application.CasosDeUso.Trabajos.DTOs;
 
 /// <summary>
@@ -17,13 +19,14 @@ public record AvanceTrabajoDto(
     int RequierenTarifaManual);
 
 /// <summary>
-/// Una línea concreta que espera a que el Administrador de Tarifas actúe.
+/// Una línea concreta que quedó sin costear, con su tipo y su porqué.
 ///
 /// Esto es lo que hace útil el aviso. Un contador dice "3 pendientes" y nadie sabe qué
-/// hacer; esto dice qué línea y qué le falta, y con eso el comercial sabe a quién ir a
-/// buscar y el administrador sabe qué cargar.
+/// hacer; esto dice qué línea, qué pasó y si se va a resolver sola o si hace falta que
+/// alguien actúe.
 /// </summary>
-public record EsperaDeTarifaDto(Guid LineaId, string Motivo, DateTimeOffset EsperandoDesde);
+public record PendienteDeCosteoDto(
+    Guid LineaId, TipoPendienteDeCosteo Tipo, string Motivo, DateTimeOffset PendienteDesde);
 
 /// <summary>
 /// Estado consultable de un trabajo. Es la consulta de respaldo del contrato: quien se
@@ -35,4 +38,4 @@ public record EstadoTrabajoDto(
     AvanceTrabajoDto Avance,
     DateTimeOffset SolicitadoEn,
     DateTimeOffset? TerminadoEn,
-    IReadOnlyList<EsperaDeTarifaDto> EsperandoTarifa);
+    IReadOnlyList<PendienteDeCosteoDto> Pendientes);
