@@ -1,0 +1,170 @@
+# language: es
+#
+# Escenarios del contrato de integración con el portal de la Administración.
+#
+# No son documentación: son los criterios de aceptación que implementan las issues
+# #9 (validar la sesión en cada petición), #10 (los 6 roles y la auditoría) y #11
+# (retiro del esquema X-Rol). Cada escenario debería terminar como una prueba.
+#
+# Las etiquetas dicen a qué issue pertenece cada uno.
+
+Característica: Identidad e integración con el portal de la Administración
+
+  Antecedentes:
+    Dado que Nexo no tiene inicio de sesión propio
+    Y que la identidad la aporta la sesión del portal
+    Y que los permisos se leen de la tabla de la administración, nunca del navegador
+
+  # ---------------------------------------------------------------- identidad
+
+  @issue-9 @identidad
+  Escenario: Una persona con sesión válida entra al módulo
+    Dado un usuario con identificador 10123 en la tabla de la administración
+    Y que tiene permiso sobre Cabina de Fletes
+    Cuando consulta la sesión actual enviando su identificador
+    Entonces recibe 200
+    Y el rol viene resuelto desde la tabla
+    Y la respuesta incluye las capacidades de ese rol
+
+  @issue-9 @identidad
+  Escenario: Un identificador que no está en la tabla no entra
+    Dado un identificador 99999 que no existe en la tabla de la administración
+    Cuando consulta la sesión actual
+    Entonces recibe 401
+    Y el cuerpo trae la forma estándar de error con su código
+    Y no se le asigna ningún rol por defecto
+
+  @issue-9 @identidad
+  Escenario: Una persona real sin permiso sobre Cabina de Fletes no entra
+    Dado un usuario que sí existe en la tabla
+    Pero que no tiene permiso sobre Cabina de Fletes
+    Cuando consulta la sesión actual
+    Entonces recibe 403
+    Y el mensaje explica que le falta el permiso, no que no exista
+
+  @issue-9 @identidad
+  Escenario: Una petición sin identidad no pasa
+    Dado que la petición llega sin el encabezado de identidad del portal
+    Cuando alcanza cualquier endpoint del API
+    Entonces recibe 401
+    Y no se ejecuta nada de la operación pedida
+
+  @issue-9 @identidad
+  Escenario: La sesión se valida en cada petición, no una vez
+    Dado un usuario que entró correctamente al módulo
+    Cuando se le retira el permiso en la tabla de la administración
+    Y hace la siguiente petición
+    Entonces recibe 403
+    Y no hay sesión guardada en Nexo que lo mantenga dentro
+
+  # ------------------------------------------------- lo que la auditoría exige
+
+  @issue-11 @seguridad @auditoria-qa
+  Escenario: Falsificar el rol desde el navegador no sirve de nada
+    Dado un usuario cuyo rol en la tabla es Comercial
+    Cuando manipula el navegador para afirmar que su rol es AdminTarifas
+    Y llama a una operación reservada a AdminTarifas
+    Entonces recibe 403
+    Y el rol usado para decidir es el que dice la tabla, no el que dice el navegador
+
+  @issue-11 @seguridad
+  Escenario: El encabezado de rol del prototipo ya no existe
+    Dado que el esquema de desarrollo con encabezado de rol fue retirado
+    Cuando una petición intenta declarar su propio rol por encabezado
+    Entonces el encabezado se ignora por completo
+    Y el rol se resuelve únicamente contra la tabla
+
+  @issue-11 @seguridad @fail-closed
+  Escenario: Sin fuente de identidad configurada, la API no arranca en Producción
+    Dado un despliegue en Producción sin la fuente de identidad configurada
+    Cuando la API intenta arrancar
+    Entonces el arranque falla con un mensaje accionable
+    Y no queda expuesto ningún endpoint
+
+  @riesgo-aceptado @adr-001
+  Escenario: Suplantar a otra persona hoy funciona, y está declarado
+    Dado que la identidad viaja sin firma ni vencimiento
+    Cuando alguien cambia el identificador por el de otra persona
+    Entonces obtiene los permisos de esa otra persona
+    Y la auditoría registra a esa otra persona como autora
+    # Este escenario documenta un riesgo aceptado a conciencia, no un defecto por
+    # corregir en este sprint. Ver ADR-001. Se cierra cuando el portal emita un
+    # token verificable, y entonces este escenario se invierte.
+
+  # ----------------------------------------------------------------- roles
+
+  @issue-10 @roles
+  Escenario: Un rol del portal se traduce a su equivalente en Nexo
+    Dado un usuario cuyo permiso en la administración corresponde a tarifas comerciales
+    Cuando consulta la sesión actual
+    Entonces su rol en Nexo es Comercial
+    Y la traducción ocurre en el servidor
+
+  @issue-10 @roles @pendiente-P3
+  Escenario: Con varios roles a la vez gana el de mayor precedencia
+    Dado un usuario con permisos de tarifas comerciales y de administración de tarifas
+    Cuando consulta la sesión actual
+    Entonces recibe un único rol efectivo
+    Y es el de mayor precedencia según el orden acordado
+    # Depende del pendiente P2/P3: la equivalencia y el orden los confirma negocio.
+
+  @issue-10 @roles
+  Escenario: Un permiso sin equivalencia en Nexo no abre la puerta
+    Dado un usuario cuyos permisos no corresponden a ninguno de los 6 roles de Nexo
+    Cuando consulta la sesión actual
+    Entonces recibe 403
+    Y no se le asigna el rol menos privilegiado como consuelo
+
+  @issue-10 @auditoria
+  Escenario: Todo ajuste queda con autor real
+    Dado un usuario autenticado que ajusta una tarifa
+    Cuando la operación se completa
+    Entonces la auditoría guarda su identificador y su nombre reales
+    Y no un usuario de sistema genérico
+
+  # -------------------------------------------------------- autorización
+
+  @issue-10 @autorizacion
+  Esquema del escenario: Cada operación exige los roles que declara el contrato
+    Dado un usuario con rol <rol>
+    Cuando intenta <operacion>
+    Entonces el resultado es <resultado>
+
+    Ejemplos:
+      | rol                 | operacion                        | resultado |
+      | Comercial           | capturar una solicitud           | permitido |
+      | AdminTarifas        | capturar una solicitud           | 403       |
+      | CoordinadorFletes   | cargar líneas de un pliego       | permitido |
+      | Comercial           | cargar líneas de un pliego       | 403       |
+      | ServiciosLogisticos | crear un servicio conexo         | permitido |
+      | Comercial           | crear un servicio conexo         | 403       |
+      | AdminTarifas        | editar reglas solo SICE-TAC      | permitido |
+      | LiderProceso        | editar reglas solo SICE-TAC      | 403       |
+      | LiderProceso        | ver métricas de cumplimiento     | permitido |
+      | Comercial           | ver métricas de cumplimiento     | 403       |
+
+  # ---------------------------------------------------- trabajos pesados
+
+  @hu-04 @asincrono
+  Escenario: Cargar un pliego responde de inmediato
+    Dado un pliego de 300 líneas
+    Cuando se carga
+    Entonces la respuesta es 202 antes de costear nada
+    Y trae un identificador de trabajo
+    Y trae la ruta donde consultar su estado
+
+  @hu-04 @asincrono
+  Escenario: El estado se puede reconstruir sin haber recibido ningún aviso
+    Dado un trabajo en curso
+    Y un cliente que nunca se conectó al canal de avisos
+    Cuando consulta el trabajo por su identificador
+    Entonces obtiene el estado completo y el avance
+    Y no necesitó ningún aviso para saberlo
+
+  @hu-04 @asincrono
+  Escenario: Un pliego con líneas sin resolver termina en estado parcial
+    Dado un pliego donde una fuente externa falla para 3 líneas
+    Cuando el trabajo termina
+    Entonces el estado es Parcial y no Fallido
+    Y las 297 líneas restantes quedan costeadas
+    Y cada línea pendiente conserva su motivo
