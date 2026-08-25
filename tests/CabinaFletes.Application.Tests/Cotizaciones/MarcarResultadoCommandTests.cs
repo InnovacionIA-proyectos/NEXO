@@ -90,6 +90,9 @@ public class MarcarResultadoCommandTests
         var cotizacionId = Guid.NewGuid();
         var lineaSolicitud = new LineaSolicitud { RutaId = Guid.NewGuid(), ConfigVehiculoId = Guid.NewGuid(), Tipologia = TipologiaCarga.CargaSeca };
         var c = Entregada(Guid.NewGuid());
+        // El handler consulta ExistenParaCotizacionAsync por c.Id, no por el id del
+        // comando: sin igualarlos el mock nunca coincide y devuelve false por defecto.
+        c.Id = cotizacionId;
         c.Lineas =
         [
             new CotizacionLinea { ValorFlete = 100_000m, LineaSolicitud = lineaSolicitud },
@@ -110,6 +113,7 @@ public class MarcarResultadoCommandTests
     {
         var cotizacionId = Guid.NewGuid();
         var c = Entregada(Guid.NewGuid());
+        c.Id = cotizacionId;
         c.Lineas = [new CotizacionLinea { ValorFlete = 100_000m, LineaSolicitud = new LineaSolicitud() }];
         _cotizaciones.Setup(r => r.ObtenerParaMarcarResultadoAsync(cotizacionId, default)).ReturnsAsync(c);
         _solicitudes.Setup(s => s.ObtenerConClienteAsync(c.SolicitudId, default)).ReturnsAsync((Solicitud?)null);
