@@ -1,6 +1,7 @@
 using CabinaFletes.Application.Common.Abstractions;
 using CabinaFletes.Application.ReglasSoloSicetac.Dtos;
 using CabinaFletes.Application.ReglasSoloSicetac.Ports;
+using CabinaFletes.Domain.Costeo.Entidades;
 
 namespace CabinaFletes.Application.ReglasSoloSicetac.Commands;
 
@@ -20,7 +21,7 @@ public sealed class ImportarReglasSoloSicetacExcelCommandHandler(
         var yaVistas = new HashSet<string>(claves);
 
         int leidas = 0, creadas = 0, duplicadas = 0, invalidas = 0;
-        var nuevas = new List<Domain.Entities.ReglaSoloSicetac>();
+        var nuevas = new List<Domain.Costeo.Entidades.ReglaSoloSicetac>();
 
         foreach (var fila in filas)
         {
@@ -31,7 +32,7 @@ public sealed class ImportarReglasSoloSicetacExcelCommandHandler(
             leidas++;
             if (o.Length == 0 || d.Length == 0 || v.Length == 0) { invalidas++; continue; }
             if (!yaVistas.Add($"{o}|{d}|{v}")) { duplicadas++; continue; }
-            nuevas.Add(new Domain.Entities.ReglaSoloSicetac { Origen = o, Destino = d, TipoVehiculo = v });
+            nuevas.Add(new Domain.Costeo.Entidades.ReglaSoloSicetac { Origen = o, Destino = d, TipoVehiculo = v });
             creadas++;
         }
 

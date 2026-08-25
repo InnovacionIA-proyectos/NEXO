@@ -1,6 +1,6 @@
+using CabinaFletes.Application.AjustesVigenciaPlaza.Ports;
 using CabinaFletes.Application.Common.Abstractions;
 using CabinaFletes.Application.Common.Ports;
-using CabinaFletes.Application.AjustesVigenciaPlaza.Ports;
 
 namespace CabinaFletes.Application.AjustesVigenciaPlaza.Commands;
 

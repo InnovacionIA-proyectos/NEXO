@@ -1,7 +1,9 @@
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
+using CabinaFletes.Domain.Common;
+using CabinaFletes.Domain.Usuarios.Entidades;
 
-namespace CabinaFletes.Domain.Entities;
+namespace CabinaFletes.Domain.Auditoria.Entidades;
 
 /// <summary>Registro de auditoría append-only: quién hizo qué y cuándo. No implementa IAuditable
 /// (no se actualiza); solo lleva CreatedAt.</summary>

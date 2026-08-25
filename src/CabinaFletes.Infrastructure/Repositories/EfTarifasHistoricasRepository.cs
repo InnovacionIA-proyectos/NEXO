@@ -1,7 +1,8 @@
 using CabinaFletes.Application.Cotizaciones.Ports;
 using CabinaFletes.Application.TarifasGanadas.Dtos;
 using CabinaFletes.Application.TarifasGanadas.Ports;
-using CabinaFletes.Domain.Entities;
+using CabinaFletes.Domain.BibliotecaTarifas.Entidades;
+using CabinaFletes.Domain.Catalogos.Entidades;
 using CabinaFletes.Domain.Enums;
 using CabinaFletes.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;

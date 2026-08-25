@@ -1,4 +1,4 @@
-namespace CabinaFletes.Domain.Scoring;
+namespace CabinaFletes.Domain.Priorizacion.Reglas;
 
 /// <summary>
 /// Resultado del cálculo de prioridad. Además del total (0–100), expone el desglose

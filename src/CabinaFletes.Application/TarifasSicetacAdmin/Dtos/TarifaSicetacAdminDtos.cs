@@ -1,5 +1,6 @@
-using CabinaFletes.Domain.Entities;
+using CabinaFletes.Domain.BibliotecaTarifas.Entidades;
 using CabinaFletes.Domain.Enums;
+using CabinaFletes.Domain.Usuarios.Entidades;
 
 namespace CabinaFletes.Application.TarifasSicetacAdmin.Dtos;
 

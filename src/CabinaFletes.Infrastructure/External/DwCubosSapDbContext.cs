@@ -1,3 +1,4 @@
+using CabinaFletes.Domain.Catalogos.Entidades;
 using Microsoft.EntityFrameworkCore;
 
 namespace CabinaFletes.Infrastructure.External;

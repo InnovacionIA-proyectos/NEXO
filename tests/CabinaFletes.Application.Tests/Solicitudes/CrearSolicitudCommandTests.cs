@@ -4,7 +4,8 @@ using CabinaFletes.Application.Common.Exceptions;
 using CabinaFletes.Application.Common.Ports;
 using CabinaFletes.Application.Solicitudes.Commands;
 using CabinaFletes.Application.Solicitudes.Ports;
-using CabinaFletes.Domain.Entities;
+using CabinaFletes.Domain.Priorizacion.Entidades;
+using CabinaFletes.Domain.Solicitudes.Entidades;
 using Moq;
 
 namespace CabinaFletes.Application.Tests.Solicitudes;

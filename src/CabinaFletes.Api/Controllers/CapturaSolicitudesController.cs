@@ -7,6 +7,7 @@ using CabinaFletes.Application.Common.Ports;
 using CabinaFletes.Application.Solicitudes.Commands;
 using CabinaFletes.Application.Solicitudes.Dtos;
 using CabinaFletes.Application.Solicitudes.Queries;
+using CabinaFletes.Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 

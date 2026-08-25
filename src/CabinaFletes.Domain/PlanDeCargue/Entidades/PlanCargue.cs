@@ -1,7 +1,9 @@
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
+using CabinaFletes.Domain.Catalogos.Entidades;
+using CabinaFletes.Domain.Common;
 
-namespace CabinaFletes.Domain.Entities;
+namespace CabinaFletes.Domain.PlanDeCargue.Entidades;
 
 // ---------------------------------------------------------------------------
 // Cubicador 3D — plan de cargue con posiciones calculadas por el motor de bin

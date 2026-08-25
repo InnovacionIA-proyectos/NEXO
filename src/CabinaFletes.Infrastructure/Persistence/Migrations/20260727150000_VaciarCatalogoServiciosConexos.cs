@@ -1,3 +1,4 @@
+using CabinaFletes.Domain.Cotizaciones.Entidades;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable

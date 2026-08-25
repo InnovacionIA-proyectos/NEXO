@@ -1,6 +1,7 @@
 using CabinaFletes.Application.Biblioteca.Dtos;
 using CabinaFletes.Application.Biblioteca.Ports;
 using CabinaFletes.Application.Common.Abstractions;
+using CabinaFletes.Domain.Enums;
 
 namespace CabinaFletes.Application.Biblioteca.Queries;
 

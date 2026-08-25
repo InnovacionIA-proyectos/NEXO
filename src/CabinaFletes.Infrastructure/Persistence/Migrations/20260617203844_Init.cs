@@ -1,4 +1,5 @@
 ﻿using System;
+using CabinaFletes.Domain.Enums;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable

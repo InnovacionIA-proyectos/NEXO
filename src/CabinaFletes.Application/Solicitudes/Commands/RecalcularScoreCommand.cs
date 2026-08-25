@@ -2,7 +2,8 @@ using CabinaFletes.Application.Common.Abstractions;
 using CabinaFletes.Application.Common.Exceptions;
 using CabinaFletes.Application.Solicitudes.Dtos;
 using CabinaFletes.Application.Solicitudes.Ports;
-using CabinaFletes.Domain.Scoring;
+using CabinaFletes.Domain.Priorizacion.Reglas;
+using CabinaFletes.Domain.Solicitudes.Entidades;
 
 namespace CabinaFletes.Application.Solicitudes.Commands;
 

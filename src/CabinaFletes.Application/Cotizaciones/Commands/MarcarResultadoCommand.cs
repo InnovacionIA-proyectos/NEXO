@@ -5,9 +5,10 @@ using CabinaFletes.Application.Common.Exceptions;
 using CabinaFletes.Application.Common.Ports;
 using CabinaFletes.Application.Cotizaciones.Dtos;
 using CabinaFletes.Application.Cotizaciones.Ports;
-using CabinaFletes.Domain.Entities;
+using CabinaFletes.Domain.BibliotecaTarifas.Entidades;
 using CabinaFletes.Domain.Enums;
-using CabinaFletes.Domain.Workflow;
+using CabinaFletes.Domain.Reglas;
+using CabinaFletes.Domain.Solicitudes.Entidades;
 
 namespace CabinaFletes.Application.Cotizaciones.Commands;
 

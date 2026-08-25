@@ -1,5 +1,5 @@
 using CabinaFletes.Application.Solicitudes.Ports;
-using CabinaFletes.Domain.Entities;
+using CabinaFletes.Domain.Catalogos.Entidades;
 using CabinaFletes.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 

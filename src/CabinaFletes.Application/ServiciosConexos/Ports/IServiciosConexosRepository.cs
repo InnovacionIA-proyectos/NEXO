@@ -1,5 +1,5 @@
 using CabinaFletes.Application.ServiciosConexos.Dtos;
-using CabinaFletes.Domain.Entities;
+using CabinaFletes.Domain.Catalogos.Entidades;
 
 namespace CabinaFletes.Application.ServiciosConexos.Ports;
 

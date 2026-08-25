@@ -3,7 +3,9 @@ using CabinaFletes.Application.Common.Dtos;
 using CabinaFletes.Application.Common.Exceptions;
 using CabinaFletes.Application.Solicitudes.Dtos;
 using CabinaFletes.Application.Solicitudes.Ports;
+using CabinaFletes.Domain.Catalogos.Entidades;
 using CabinaFletes.Domain.Enums;
+using CabinaFletes.Domain.Solicitudes.Entidades;
 
 namespace CabinaFletes.Application.Solicitudes.Queries;
 

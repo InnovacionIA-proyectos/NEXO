@@ -1,9 +1,10 @@
 using CabinaFletes.Application.Common.Abstractions;
 using CabinaFletes.Application.Solicitudes.Dtos;
 using CabinaFletes.Application.Solicitudes.Ports;
-using CabinaFletes.Domain.Entities;
+using CabinaFletes.Domain.Catalogos.Entidades;
 using CabinaFletes.Domain.Enums;
-using CabinaFletes.Domain.Scoring;
+using CabinaFletes.Domain.Priorizacion.Reglas;
+using CabinaFletes.Domain.Solicitudes.Entidades;
 
 namespace CabinaFletes.Application.Solicitudes.Queries;
 

@@ -1,9 +1,9 @@
-using CabinaFletes.Application.Common.Abstractions;
 using CabinaFletes.Application.Common;
+using CabinaFletes.Application.Common.Abstractions;
 using CabinaFletes.Application.Common.Exceptions;
 using CabinaFletes.Application.ServiciosConexos.Dtos;
 using CabinaFletes.Application.ServiciosConexos.Ports;
-using CabinaFletes.Domain.Entities;
+using CabinaFletes.Domain.Catalogos.Entidades;
 
 namespace CabinaFletes.Application.ServiciosConexos.Commands;
 

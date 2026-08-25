@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
+using CabinaFletes.Domain.Common;
 
-namespace CabinaFletes.Domain.Entities;
+namespace CabinaFletes.Domain.Priorizacion.Entidades;
 
 /// <summary>
 /// Parámetros configurables del score de priorización (fila única, editable por el Admin).

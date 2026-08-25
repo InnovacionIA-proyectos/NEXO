@@ -1,6 +1,9 @@
 using CabinaFletes.Application.Solicitudes.Ports;
-using CabinaFletes.Domain.Entities;
+using CabinaFletes.Domain.Catalogos.Entidades;
+using CabinaFletes.Domain.Cotizaciones.Entidades;
 using CabinaFletes.Domain.Enums;
+using CabinaFletes.Domain.Priorizacion.Entidades;
+using CabinaFletes.Domain.Solicitudes.Entidades;
 using CabinaFletes.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -10,7 +13,7 @@ namespace CabinaFletes.Infrastructure.Repositories;
 /// Persistencia del módulo Solicitudes/Captura. Portado de las consultas EF que
 /// vivían en CabinaFletes.Api/Services/SolicitudService.cs del proyecto original
 /// (ObtenerBandejaAsync en particular: la proyección se queda aquí; el cálculo del
-/// score con Domain.Scoring se movió a Application, donde pertenece).
+/// score con Domain.Priorizacion.Reglas se movió a Application, donde pertenece).
 /// </summary>
 public sealed class EfSolicitudesCatalogoRepository(CabinaFletesDbContext db) : ISolicitudesRepository
 {

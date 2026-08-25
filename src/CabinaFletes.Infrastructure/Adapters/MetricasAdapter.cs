@@ -1,6 +1,7 @@
 using CabinaFletes.Application.Metricas.Dtos;
 using CabinaFletes.Application.Metricas.Ports;
 using CabinaFletes.Domain.Enums;
+using CabinaFletes.Domain.Solicitudes.Entidades;
 using CabinaFletes.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 

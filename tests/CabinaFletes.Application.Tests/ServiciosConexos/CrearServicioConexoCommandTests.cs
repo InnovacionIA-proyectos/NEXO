@@ -3,6 +3,7 @@ using CabinaFletes.Application.Common.Abstractions;
 using CabinaFletes.Application.Common.Exceptions;
 using CabinaFletes.Application.ServiciosConexos.Commands;
 using CabinaFletes.Application.ServiciosConexos.Ports;
+using CabinaFletes.Domain.Catalogos.Entidades;
 using Moq;
 
 namespace CabinaFletes.Application.Tests.ServiciosConexos;
@@ -23,7 +24,7 @@ public class CrearServicioConexoCommandTests
         await Assert.ThrowsAsync<ConflictException>(() =>
             Handler().Handle(new CrearServicioConexoCommand("Flete adicional", null, null, null, null, true)));
 
-        _repo.Verify(r => r.Agregar(It.IsAny<Domain.Entities.ServicioConexo>()), Times.Never);
+        _repo.Verify(r => r.Agregar(It.IsAny<Domain.Catalogos.Entidades.ServicioConexo>()), Times.Never);
     }
 
     [Theory]
@@ -35,9 +36,9 @@ public class CrearServicioConexoCommandTests
     public async Task Categoria_se_normaliza_o_usa_el_valor_por_defecto(string? entrada, string esperada)
     {
         _repo.Setup(r => r.ExisteNombreAsync(It.IsAny<string>(), default)).ReturnsAsync(false);
-        Domain.Entities.ServicioConexo? guardado = null;
-        _repo.Setup(r => r.Agregar(It.IsAny<Domain.Entities.ServicioConexo>()))
-            .Callback<Domain.Entities.ServicioConexo>(s => guardado = s);
+        Domain.Catalogos.Entidades.ServicioConexo? guardado = null;
+        _repo.Setup(r => r.Agregar(It.IsAny<Domain.Catalogos.Entidades.ServicioConexo>()))
+            .Callback<Domain.Catalogos.Entidades.ServicioConexo>(s => guardado = s);
 
         await Handler().Handle(new CrearServicioConexoCommand("Servicio X", entrada, null, null, null, true));
 
@@ -63,7 +64,7 @@ public class CrearServicioConexoCommandTests
         var dto = await Handler().Handle(new CrearServicioConexoCommand("  Servicio Y  ", "adicional", null, 5000m, null, true));
 
         Assert.Equal("Servicio Y", dto.Nombre); // se recorta
-        _repo.Verify(r => r.Agregar(It.IsAny<Domain.Entities.ServicioConexo>()), Times.Once);
+        _repo.Verify(r => r.Agregar(It.IsAny<Domain.Catalogos.Entidades.ServicioConexo>()), Times.Once);
         _uow.Verify(u => u.SaveChangesAsync(default), Times.Once);
     }
 }

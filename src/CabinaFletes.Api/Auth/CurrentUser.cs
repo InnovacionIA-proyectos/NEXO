@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using CabinaFletes.Application.Common;
 using CabinaFletes.Domain.Enums;
+using CabinaFletes.Domain.Usuarios.Entidades;
 using CabinaFletes.Infrastructure.Persistence;
 
 namespace CabinaFletes.Api.Auth;

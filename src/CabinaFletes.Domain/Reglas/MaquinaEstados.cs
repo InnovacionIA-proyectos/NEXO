@@ -1,6 +1,7 @@
 using CabinaFletes.Domain.Enums;
+using CabinaFletes.Domain.Solicitudes.Entidades;
 
-namespace CabinaFletes.Domain.Workflow;
+namespace CabinaFletes.Domain.Reglas;
 
 /// <summary>
 /// Máquina de estados del flujo de cotización. Concentra en un solo lugar (puro y

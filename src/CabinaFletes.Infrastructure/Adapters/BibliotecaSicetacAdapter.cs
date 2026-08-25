@@ -1,6 +1,7 @@
 using CabinaFletes.Application.Biblioteca.Dtos;
 using CabinaFletes.Application.Biblioteca.Ports;
 using CabinaFletes.Application.Common.Exceptions;
+using CabinaFletes.Domain.Enums;
 using CabinaFletes.Infrastructure.External;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;

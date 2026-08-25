@@ -1,4 +1,4 @@
-using CabinaFletes.Domain.Entities;
+using CabinaFletes.Domain.Catalogos.Entidades;
 
 namespace CabinaFletes.Application.Solicitudes.Ports;
 

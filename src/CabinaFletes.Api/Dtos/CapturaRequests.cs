@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using CabinaFletes.Domain.Enums;
 
 namespace CabinaFletes.Api.Dtos;
 

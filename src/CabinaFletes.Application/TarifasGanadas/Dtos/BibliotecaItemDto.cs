@@ -1,3 +1,4 @@
+using CabinaFletes.Domain.Catalogos.Entidades;
 using CabinaFletes.Domain.Enums;
 
 namespace CabinaFletes.Application.TarifasGanadas.Dtos;

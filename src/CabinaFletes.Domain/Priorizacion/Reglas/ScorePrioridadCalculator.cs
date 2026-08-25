@@ -1,7 +1,8 @@
-using CabinaFletes.Domain.Entities;
 using CabinaFletes.Domain.Enums;
+using CabinaFletes.Domain.Priorizacion.Entidades;
+using CabinaFletes.Domain.Solicitudes.Entidades;
 
-namespace CabinaFletes.Domain.Scoring;
+namespace CabinaFletes.Domain.Priorizacion.Reglas;
 
 /// <summary>
 /// Calcula el score de priorización (0–100) que reemplaza el FIFO.

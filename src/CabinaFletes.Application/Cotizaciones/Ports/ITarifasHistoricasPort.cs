@@ -1,4 +1,4 @@
-using CabinaFletes.Domain.Entities;
+using CabinaFletes.Domain.BibliotecaTarifas.Entidades;
 using CabinaFletes.Domain.Enums;
 
 namespace CabinaFletes.Application.Cotizaciones.Ports;

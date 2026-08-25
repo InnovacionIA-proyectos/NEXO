@@ -3,7 +3,7 @@ using CabinaFletes.Application.Common.Exceptions;
 using CabinaFletes.Application.Common.Ports;
 using CabinaFletes.Application.Cotizaciones.Dtos;
 using CabinaFletes.Application.Cotizaciones.Ports;
-using CabinaFletes.Domain.Entities;
+using CabinaFletes.Domain.Cotizaciones.Entidades;
 using CabinaFletes.Domain.Enums;
 
 namespace CabinaFletes.Application.Cotizaciones.Commands;

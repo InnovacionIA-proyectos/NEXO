@@ -1,8 +1,11 @@
 using CabinaFletes.Application.TarifasSicetacAdmin.Dtos;
 using CabinaFletes.Application.TarifasSicetacAdmin.Ports;
+using CabinaFletes.Domain.Auditoria.Entidades;
+using CabinaFletes.Domain.BibliotecaTarifas.Entidades;
+using CabinaFletes.Domain.Catalogos.Entidades;
 using CabinaFletes.Domain.Common;
-using CabinaFletes.Domain.Entities;
 using CabinaFletes.Domain.Enums;
+using CabinaFletes.Domain.Usuarios.Entidades;
 using CabinaFletes.Infrastructure.Persistence;
 using ClosedXML.Excel;
 using Microsoft.EntityFrameworkCore;

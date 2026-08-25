@@ -1,8 +1,12 @@
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
+using CabinaFletes.Domain.Catalogos.Entidades;
+using CabinaFletes.Domain.Common;
+using CabinaFletes.Domain.Cotizaciones.Entidades;
 using CabinaFletes.Domain.Enums;
+using CabinaFletes.Domain.Usuarios.Entidades;
 
-namespace CabinaFletes.Domain.Entities;
+namespace CabinaFletes.Domain.Solicitudes.Entidades;
 
 /// <summary>Cabecera de una solicitud de cotización (spot o licitación).</summary>
 public class Solicitud : IAuditable

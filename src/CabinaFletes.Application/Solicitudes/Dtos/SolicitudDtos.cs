@@ -1,6 +1,7 @@
 using CabinaFletes.Application.Common.Dtos;
-using CabinaFletes.Domain.Entities;
+using CabinaFletes.Domain.Catalogos.Entidades;
 using CabinaFletes.Domain.Enums;
+using CabinaFletes.Domain.Solicitudes.Entidades;
 
 namespace CabinaFletes.Application.Solicitudes.Dtos;
 

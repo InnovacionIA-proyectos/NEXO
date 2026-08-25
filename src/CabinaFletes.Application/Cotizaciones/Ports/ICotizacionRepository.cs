@@ -1,5 +1,7 @@
 using System.Linq.Expressions;
-using CabinaFletes.Domain.Entities;
+using CabinaFletes.Domain.Catalogos.Entidades;
+using CabinaFletes.Domain.Cotizaciones.Entidades;
+using CabinaFletes.Domain.Solicitudes.Entidades;
 
 namespace CabinaFletes.Application.Cotizaciones.Ports;
 

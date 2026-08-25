@@ -1,8 +1,9 @@
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
+using CabinaFletes.Domain.Common;
 using CabinaFletes.Domain.Enums;
 
-namespace CabinaFletes.Domain.Entities;
+namespace CabinaFletes.Domain.Usuarios.Entidades;
 
 public class Usuario : IAuditable
 {

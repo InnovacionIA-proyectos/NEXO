@@ -2,6 +2,7 @@ using CabinaFletes.Application.Common.Abstractions;
 using CabinaFletes.Application.Solicitudes.Commands;
 using CabinaFletes.Application.Solicitudes.Dtos;
 using CabinaFletes.Application.Solicitudes.Queries;
+using CabinaFletes.Domain.Solicitudes.Entidades;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace CabinaFletes.Application.Solicitudes;

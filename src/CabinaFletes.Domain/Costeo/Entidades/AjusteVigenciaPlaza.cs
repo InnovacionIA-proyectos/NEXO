@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
+using CabinaFletes.Domain.Common;
 
-namespace CabinaFletes.Domain.Entities;
+namespace CabinaFletes.Domain.Costeo.Entidades;
 
 /// <summary>
 /// Ajuste LOCAL de la fecha de vigencia de una tarifa de plaza de SAP TM. La fuente

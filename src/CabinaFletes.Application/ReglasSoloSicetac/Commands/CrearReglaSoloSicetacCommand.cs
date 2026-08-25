@@ -3,6 +3,7 @@ using CabinaFletes.Application.Common.Exceptions;
 using CabinaFletes.Application.Common.Ports;
 using CabinaFletes.Application.ReglasSoloSicetac.Dtos;
 using CabinaFletes.Application.ReglasSoloSicetac.Ports;
+using CabinaFletes.Domain.Costeo.Entidades;
 
 namespace CabinaFletes.Application.ReglasSoloSicetac.Commands;
 
@@ -24,7 +25,7 @@ public sealed class CrearReglaSoloSicetacCommandHandler(
         if (await reglas.ExisteAsync(origen, destino, vehiculo, ct))
             throw new ConflictException("REGLA_DUPLICADA", "Ya existe una regla 'solo SICE' para esa ruta y tipo de vehículo.");
 
-        var regla = new Domain.Entities.ReglaSoloSicetac { Origen = origen, Destino = destino, TipoVehiculo = vehiculo };
+        var regla = new Domain.Costeo.Entidades.ReglaSoloSicetac { Origen = origen, Destino = destino, TipoVehiculo = vehiculo };
         reglas.Agregar(regla);
         await uow.SaveChangesAsync(ct);
         return new ReglaSoloSicetacDto(regla.Id, regla.Origen, regla.Destino, regla.TipoVehiculo, regla.CreatedAt);

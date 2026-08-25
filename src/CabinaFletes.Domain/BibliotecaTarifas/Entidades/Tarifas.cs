@@ -1,8 +1,11 @@
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
+using CabinaFletes.Domain.Catalogos.Entidades;
+using CabinaFletes.Domain.Common;
+using CabinaFletes.Domain.Cotizaciones.Entidades;
 using CabinaFletes.Domain.Enums;
 
-namespace CabinaFletes.Domain.Entities;
+namespace CabinaFletes.Domain.BibliotecaTarifas.Entidades;
 
 /// <summary>Caché del piso regulatorio SICE-TAC, importada desde el Excel exportado de la fuente.</summary>
 public class TarifaSicetac : IAuditable

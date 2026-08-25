@@ -1,6 +1,7 @@
-using CabinaFletes.Domain.Entities;
 using CabinaFletes.Domain.Enums;
-using CabinaFletes.Domain.Scoring;
+using CabinaFletes.Domain.Priorizacion.Entidades;
+using CabinaFletes.Domain.Priorizacion.Reglas;
+using CabinaFletes.Domain.Solicitudes.Entidades;
 
 namespace CabinaFletes.Domain.Tests;
 

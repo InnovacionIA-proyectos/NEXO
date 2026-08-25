@@ -1,4 +1,4 @@
-using CabinaFletes.Domain.Entities;
+using CabinaFletes.Domain.Costeo.Entidades;
 
 namespace CabinaFletes.Application.AjustesVigenciaPlaza.Ports;
 
@@ -11,14 +11,14 @@ public interface IAjustesVigenciaPlazaRepository
 {
     Task<IReadOnlyDictionary<int, DateTime>> MapaAsync(CancellationToken ct);
 
-    Task<Domain.Entities.AjusteVigenciaPlaza?> ObtenerPorTarifaAsync(int tarifaPlazaId, CancellationToken ct);
+    Task<Domain.Costeo.Entidades.AjusteVigenciaPlaza?> ObtenerPorTarifaAsync(int tarifaPlazaId, CancellationToken ct);
 
-    Task<IReadOnlyDictionary<int, Domain.Entities.AjusteVigenciaPlaza>> ObtenerPorTarifasAsync(
+    Task<IReadOnlyDictionary<int, Domain.Costeo.Entidades.AjusteVigenciaPlaza>> ObtenerPorTarifasAsync(
         IReadOnlyCollection<int> tarifaPlazaIds, CancellationToken ct);
 
-    void Agregar(Domain.Entities.AjusteVigenciaPlaza ajuste);
+    void Agregar(Domain.Costeo.Entidades.AjusteVigenciaPlaza ajuste);
 
-    void Eliminar(Domain.Entities.AjusteVigenciaPlaza ajuste);
+    void Eliminar(Domain.Costeo.Entidades.AjusteVigenciaPlaza ajuste);
 
     /// <summary>Invalida el caché del mapa — llamar DESPUÉS de confirmar los cambios (SaveChangesAsync).</summary>
     void InvalidarCache();

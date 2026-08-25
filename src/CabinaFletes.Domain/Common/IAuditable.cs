@@ -1,4 +1,4 @@
-namespace CabinaFletes.Domain.Entities;
+namespace CabinaFletes.Domain.Common;
 
 /// <summary>
 /// Entidad con timestamps de auditoría. El DbContext estampa CreatedAt al insertar

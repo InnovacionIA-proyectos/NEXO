@@ -1,5 +1,5 @@
 using CabinaFletes.Application.Common.Ports;
-using CabinaFletes.Domain.Entities;
+using CabinaFletes.Domain.Auditoria.Entidades;
 using CabinaFletes.Infrastructure.Persistence;
 
 namespace CabinaFletes.Infrastructure.Repositories;

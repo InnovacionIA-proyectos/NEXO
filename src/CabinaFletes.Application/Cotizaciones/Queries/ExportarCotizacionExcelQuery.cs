@@ -2,7 +2,6 @@ using CabinaFletes.Application.Common.Abstractions;
 using CabinaFletes.Application.Common.Exceptions;
 using CabinaFletes.Application.Cotizaciones.Dtos;
 using CabinaFletes.Application.Cotizaciones.Ports;
-using CabinaFletes.Domain.Entities;
 using CabinaFletes.Domain.Enums;
 
 namespace CabinaFletes.Application.Cotizaciones.Queries;

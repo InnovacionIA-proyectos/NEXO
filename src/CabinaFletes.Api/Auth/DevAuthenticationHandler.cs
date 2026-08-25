@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using System.Text.Encodings.Web;
+using CabinaFletes.Domain.Enums;
 using CabinaFletes.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Options;

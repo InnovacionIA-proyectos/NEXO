@@ -1,6 +1,6 @@
 using CabinaFletes.Application.Common.Abstractions;
 using CabinaFletes.Application.Solicitudes.Ports;
-using CabinaFletes.Domain.Scoring;
+using CabinaFletes.Domain.Priorizacion.Reglas;
 
 namespace CabinaFletes.Api.BackgroundServices;
 
@@ -13,7 +13,7 @@ namespace CabinaFletes.Api.BackgroundServices;
 ///
 /// Vive en Api (no en Application) porque <see cref="BackgroundService"/> es un tipo de
 /// hosting de ASP.NET Core: Application no debe depender de él. La lógica de negocio
-/// (el cálculo del score) sigue siendo Domain.Scoring puro; este servicio solo orquesta
+/// (el cálculo del score) sigue siendo Domain.Priorizacion.Reglas puro; este servicio solo orquesta
 /// el ciclo periódico a través de los puertos de Application (ISolicitudesRepository/IUnitOfWork).
 /// </summary>
 public class RecalculoScoreHostedService : BackgroundService

@@ -1,6 +1,7 @@
+using CabinaFletes.Application.AjustesVigenciaPlaza.Ports;
 using CabinaFletes.Application.Common.Abstractions;
 using CabinaFletes.Application.Common.Ports;
-using CabinaFletes.Application.AjustesVigenciaPlaza.Ports;
+using CabinaFletes.Domain.Costeo.Entidades;
 
 namespace CabinaFletes.Application.AjustesVigenciaPlaza.Commands;
 
@@ -32,7 +33,7 @@ public sealed class AjustarVigenciaPlazaCommandHandler(
         }
         else
         {
-            ajustes.Agregar(new Domain.Entities.AjusteVigenciaPlaza
+            ajustes.Agregar(new Domain.Costeo.Entidades.AjusteVigenciaPlaza
             {
                 TarifaPlazaId = command.TarifaPlazaId,
                 VigenciaAjustada = command.NuevaVigencia.Date,

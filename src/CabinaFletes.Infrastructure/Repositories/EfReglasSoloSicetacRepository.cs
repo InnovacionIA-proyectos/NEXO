@@ -1,5 +1,5 @@
 using CabinaFletes.Application.ReglasSoloSicetac.Ports;
-using CabinaFletes.Domain.Entities;
+using CabinaFletes.Domain.Costeo.Entidades;
 using CabinaFletes.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;

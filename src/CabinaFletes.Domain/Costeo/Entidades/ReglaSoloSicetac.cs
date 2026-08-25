@@ -1,6 +1,8 @@
 using System.ComponentModel.DataAnnotations;
+using CabinaFletes.Domain.Catalogos.Entidades;
+using CabinaFletes.Domain.Common;
 
-namespace CabinaFletes.Domain.Entities;
+namespace CabinaFletes.Domain.Costeo.Entidades;
 
 /// <summary>
 /// Regla "solo SICE-TAC" demarcada por el Administrador de Fletes: para una combinación

@@ -1,6 +1,7 @@
 using CabinaFletes.Application.BibliotecaSapHistorico.Dtos;
 using CabinaFletes.Application.BibliotecaSapHistorico.Ports;
 using CabinaFletes.Application.Common.Abstractions;
+using CabinaFletes.Domain.Enums;
 
 namespace CabinaFletes.Application.BibliotecaSapHistorico.Queries;
 

@@ -1,4 +1,5 @@
 ﻿using System;
+using CabinaFletes.Domain.Catalogos.Entidades;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable

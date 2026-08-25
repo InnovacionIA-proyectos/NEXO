@@ -1,7 +1,9 @@
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
+using CabinaFletes.Domain.Common;
+using CabinaFletes.Domain.Usuarios.Entidades;
 
-namespace CabinaFletes.Domain.Entities;
+namespace CabinaFletes.Domain.Catalogos.Entidades;
 
 public class Ruta : IAuditable
 {

@@ -1,9 +1,12 @@
-using CabinaFletes.Domain.Entities;
+using CabinaFletes.Domain.Catalogos.Entidades;
+using CabinaFletes.Domain.Cotizaciones.Entidades;
 using CabinaFletes.Domain.Enums;
+using CabinaFletes.Domain.Priorizacion.Entidades;
+using CabinaFletes.Domain.Solicitudes.Entidades;
 
 namespace CabinaFletes.Application.Solicitudes.Ports;
 
-/// <summary>Fila cruda de la Bandeja Priorizada: la proyección EF, sin el score (se calcula en Application con Domain.Scoring).</summary>
+/// <summary>Fila cruda de la Bandeja Priorizada: la proyección EF, sin el score (se calcula en Application con Domain.Priorizacion.Reglas).</summary>
 public sealed record BandejaFilaRaw(
     Guid Id, string Cliente, TipoSolicitud Tipo, EstadoSolicitud Estado, DateTimeOffset? Deadline,
     decimal? ValorEstimado, decimal? ProbabilidadCierre, DateTimeOffset CreatedAt, int Lineas,

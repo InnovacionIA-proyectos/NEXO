@@ -1,8 +1,12 @@
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
+using CabinaFletes.Domain.Catalogos.Entidades;
+using CabinaFletes.Domain.Common;
 using CabinaFletes.Domain.Enums;
+using CabinaFletes.Domain.Solicitudes.Entidades;
+using CabinaFletes.Domain.Usuarios.Entidades;
 
-namespace CabinaFletes.Domain.Entities;
+namespace CabinaFletes.Domain.Cotizaciones.Entidades;
 
 /// <summary>Cotización integral consolidada (flete + servicios conexos).</summary>
 public class Cotizacion : IAuditable

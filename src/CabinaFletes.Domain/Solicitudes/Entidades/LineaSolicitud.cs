@@ -1,8 +1,10 @@
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
+using CabinaFletes.Domain.Catalogos.Entidades;
+using CabinaFletes.Domain.Common;
 using CabinaFletes.Domain.Enums;
 
-namespace CabinaFletes.Domain.Entities;
+namespace CabinaFletes.Domain.Solicitudes.Entidades;
 
 /// <summary>Cada combinación a costear: 1 para spot, ~500 para un pliego de licitación.</summary>
 public class LineaSolicitud : IAuditable

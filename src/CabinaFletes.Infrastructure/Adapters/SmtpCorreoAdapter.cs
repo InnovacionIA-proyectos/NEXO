@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Mail;
 using CabinaFletes.Application.Cotizaciones.Ports;
+using CabinaFletes.Domain.Usuarios.Entidades;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
