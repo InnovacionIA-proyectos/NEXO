@@ -1,5 +1,14 @@
-using CabinaFletes.Domain.Entities;
+using CabinaFletes.Domain.Auditoria.Entidades;
+using CabinaFletes.Domain.BibliotecaTarifas.Entidades;
+using CabinaFletes.Domain.Catalogos.Entidades;
+using CabinaFletes.Domain.Common;
+using CabinaFletes.Domain.Costeo.Entidades;
+using CabinaFletes.Domain.Cotizaciones.Entidades;
 using CabinaFletes.Domain.Enums;
+using CabinaFletes.Domain.PlanDeCargue.Entidades;
+using CabinaFletes.Domain.Priorizacion.Entidades;
+using CabinaFletes.Domain.Solicitudes.Entidades;
+using CabinaFletes.Domain.Usuarios.Entidades;
 using Microsoft.EntityFrameworkCore;
 
 namespace CabinaFletes.Infrastructure.Persistence;

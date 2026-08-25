@@ -1,0 +1,93 @@
+using CabinaFletes.Application.Common.Dtos;
+using CabinaFletes.Domain.Catalogos.Entidades;
+using CabinaFletes.Domain.Enums;
+using CabinaFletes.Domain.Solicitudes.Entidades;
+
+namespace CabinaFletes.Application.CasosDeUso.Solicitudes.DTOs;
+
+// DTOs de salida del módulo Solicitudes/Captura. Portados de
+// CabinaFletes.Api/Dtos/{Responses.cs,SolicitudDtos.cs,CosteoDtos.cs,CapturaDtos.cs}
+// del proyecto original.
+
+public record LineaSolicitudDto(
+    Guid Id, Guid? RutaId, Guid? ConfigVehiculoId, TipologiaCarga? Tipologia,
+    decimal? Peso, decimal? ValorMercancia, EstadoLinea EstadoLinea);
+
+public record SolicitudDto(
+    Guid Id, Guid ClienteId, string? ClienteNombre, TipoSolicitud Tipo, ModalidadSolicitud? Modalidad,
+    DateTimeOffset? Deadline, decimal? ProbabilidadCierre, decimal? ValorEstimado, decimal ScorePrioridad,
+    EstadoSolicitud Estado, DateTimeOffset CreatedAt, IReadOnlyList<LineaSolicitudDto> Lineas);
+
+/// <summary>Fila de la Bandeja Priorizada (anti-FIFO).</summary>
+public record BandejaItemDto(
+    Guid Id, string Cliente, string Tipo, string Estado, DateTimeOffset? Deadline, decimal? ValorEstimado,
+    decimal ScorePrioridad, int Lineas, decimal? FleteTotal, int LineasSinFlete, DateTimeOffset FechaCaptura,
+    string Atencion, string Vigencia);
+
+/// <summary>Filtros de la Bandeja: estado, atención, vigencia y rango de fecha de captura.</summary>
+public record BandejaFiltro(
+    string? Estado, string? Atencion, DateTimeOffset? Desde, DateTimeOffset? Hasta, string? Vigencia = null);
+
+public record DesgloseScoreDto(double Total, double Urgencia, double Valor, double Probabilidad, double Tipo);
+
+/// <summary>Piso SICE-TAC resuelto para una línea, con su semáforo de vigencia.</summary>
+public record PisoSicetacDto(
+    Guid Id, decimal ValorPiso, decimal? ValorHora, decimal? HorasPactadas, int Periodo, string Vigencia,
+    string Configuracion, string TipoCarga, string UnidadTransporte, string CondicionCarga);
+
+public record HistoricaSugeridaDto(Guid Id, decimal Valor, DateOnly Fecha, TipologiaCarga? Tipologia, string Vigencia);
+
+/// <summary>
+/// Posición (pieza/bulto) de la mercancía con dimensiones en cm. Formato JSON
+/// persistido en LineaSolicitud.Dimensiones: lo escribe la captura, lo lee el costeo.
+/// </summary>
+public record PosicionCargaDto(
+    string? Descripcion, int Cantidad, decimal LargoCm, decimal AnchoCm, decimal AltoCm, decimal? PesoKg)
+{
+    public static readonly System.Text.Json.JsonSerializerOptions Json = new()
+    {
+        PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase,
+        PropertyNameCaseInsensitive = true,
+    };
+
+    public static IReadOnlyList<PosicionCargaDto> Desde(string? dimensionesJson)
+    {
+        if (string.IsNullOrWhiteSpace(dimensionesJson)) return [];
+        try
+        {
+            return System.Text.Json.JsonSerializer.Deserialize<List<PosicionCargaDto>>(dimensionesJson, Json) ?? [];
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return [];
+        }
+    }
+}
+
+public record LineaCosteoDto(
+    Guid LineaId, Guid? RutaId, string? Ruta, TipologiaCarga? Tipologia, decimal? Peso,
+    string? TipoVehiculo, string? Carroceria, IReadOnlyList<PosicionCargaDto> Posiciones,
+    PisoSicetacDto? PisoSicetac, IReadOnlyList<HistoricaSugeridaDto> Historicas);
+
+public record SolicitudCosteoDto(SolicitudDto Solicitud, TiemposLogisticosDto Tiempos, IReadOnlyList<LineaCosteoDto> Lineas);
+
+/// <summary>Resultado de la captura, incluido el auto-costeo con la Biblioteca.</summary>
+public record CapturaResultDto(
+    Guid Id, int Lineas, int RutasCreadas, int VehiculosCreados, decimal ScorePrioridad,
+    int FletesCalculados, int LineasPorCostear, bool CosteoEnProceso);
+
+/// <summary>Contenido tabular de una hoja de Excel, listo para que el usuario mapee columnas.</summary>
+public record HojaExcelDto(
+    string Nombre, int FilaEncabezado, IReadOnlyList<string> Encabezados,
+    IReadOnlyList<IReadOnlyList<string>> Filas, int TotalFilas);
+
+public record AnalisisExcelDto(string Archivo, IReadOnlyList<HojaExcelDto> Hojas);
+
+/// <summary>
+/// Cliente para el formulario de captura. Los reales del DW traen Bp (ClienteId nulo
+/// hasta que se use en una solicitud); los locales traen ClienteId.
+/// </summary>
+public record ClienteBusquedaDto(Guid? ClienteId, string? Bp, string Nit, string Nombre);
+
+/// <summary>Estimación del aprovisionamiento del contenedor (viaje vacío levante → origen).</summary>
+public record AprovisionamientoDto(CandidatoTarifaDto? Candidato);

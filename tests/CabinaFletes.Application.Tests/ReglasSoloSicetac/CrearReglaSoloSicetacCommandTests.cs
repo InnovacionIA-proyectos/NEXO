@@ -1,8 +1,8 @@
+using CabinaFletes.Application.CasosDeUso.ReglasSoloSicetac;
+using CabinaFletes.Application.CasosDeUso.ReglasSoloSicetac.Interfaces;
 using CabinaFletes.Application.Common.Abstractions;
 using CabinaFletes.Application.Common.Exceptions;
-using CabinaFletes.Application.ReglasSoloSicetac.Commands;
-using CabinaFletes.Application.ReglasSoloSicetac.Ports;
-using CabinaFletes.Domain.Entities;
+using CabinaFletes.Domain.Costeo.Entidades;
 using Moq;
 
 namespace CabinaFletes.Application.Tests.ReglasSoloSicetac;
