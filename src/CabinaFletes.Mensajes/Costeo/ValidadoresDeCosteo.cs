@@ -69,6 +69,25 @@ public sealed class LineaRequiereTarifaManualValidador : IValidadorDeMensaje<Lin
     }
 }
 
+public sealed class TarifasActualizadasValidador : IValidadorDeMensaje<TarifasActualizadas>
+{
+    public IReadOnlyList<string> Validar(TarifasActualizadas m)
+    {
+        var motivos = new List<string>();
+        if (string.IsNullOrWhiteSpace(m.Motivo))
+            motivos.Add("Motivo es obligatorio: sin él no se puede auditar qué disparó un recosteo masivo.");
+        if (m.OcurridoEn == default)
+            motivos.Add("OcurridoEn no puede ser la fecha por defecto.");
+        return motivos;
+    }
+}
+
+public sealed class RecostearLineaSolicitadaValidador : IValidadorDeMensaje<RecostearLineaSolicitada>
+{
+    public IReadOnlyList<string> Validar(RecostearLineaSolicitada m) =>
+        Motivos.De(("TrabajoId", m.TrabajoId), ("SolicitudId", m.SolicitudId), ("LineaId", m.LineaId));
+}
+
 /// <summary>Los identificadores vacíos son el motivo que se repite en todos los mensajes.</summary>
 internal static class Motivos
 {

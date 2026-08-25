@@ -5,6 +5,7 @@ using CabinaFletes.Application.Common.Abstractions;
 using CabinaFletes.Application.Common.Exceptions;
 using CabinaFletes.Application.Common.Ports;
 using CabinaFletes.Domain.Costeo.Entidades;
+using CabinaFletes.Mensajes.Costeo;
 using Moq;
 
 namespace CabinaFletes.Application.Tests.AjustesVigenciaPlaza;
@@ -15,10 +16,13 @@ public class AjustarVigenciaPlazaCommandTests
     private readonly Mock<IVigenciaSapPlazaPort> _vigenciaSap = new();
     private readonly Mock<IAuditoriaPort> _auditoria = new();
     private readonly Mock<ICurrentUserPort> _usuarioActual = new();
+    private readonly Mock<IPublicadorDeMensajes> _publicador = new();
+    private readonly FakeTimeProvider _clock = new();
     private readonly Mock<IUnitOfWork> _uow = new();
 
     private AjustarVigenciaPlazaCommandHandler Handler() => new(
-        _ajustes.Object, _vigenciaSap.Object, _auditoria.Object, _usuarioActual.Object, _uow.Object);
+        _ajustes.Object, _vigenciaSap.Object, _auditoria.Object, _usuarioActual.Object,
+        _publicador.Object, _clock, _uow.Object);
 
     [Fact]
     public async Task Ajuste_nuevo_consulta_SAP_para_guardar_la_vigencia_original_de_referencia()
@@ -82,8 +86,12 @@ public class AjustarVigenciaPlazaMasivoCommandTests
             .ReturnsAsync(new Dictionary<int, DateTime>());
     }
 
+    private readonly Mock<IPublicadorDeMensajes> _publicador = new();
+    private readonly FakeTimeProvider _clock = new();
+
     private AjustarVigenciaPlazaMasivoCommandHandler Handler() => new(
-        _ajustes.Object, _vigenciaSap.Object, _auditoria.Object, _usuarioActual.Object, _uow.Object);
+        _ajustes.Object, _vigenciaSap.Object, _auditoria.Object, _usuarioActual.Object,
+        _publicador.Object, _clock, _uow.Object);
 
     [Fact]
     public async Task Modo_fecha_sin_nueva_vigencia_lanza_ValidationFailedException()

@@ -52,3 +52,32 @@ public sealed record LineaFalloTecnico(Guid TrabajoId, Guid LineaId, string Moti
 /// no es algo que un timeout deba resolver.
 /// </summary>
 public sealed record LineaRequiereTarifaManual(Guid TrabajoId, Guid SolicitudId, Guid LineaId, string Motivo);
+
+// ============================================================================
+// Recosteo: cuando aparece una tarifa que antes no existía.
+// ============================================================================
+
+/// <summary>
+/// El Administrador de Tarifas cargó o extendió tarifas. Las líneas que estaban
+/// esperando pueden ser resolubles ahora.
+///
+/// No dice QUÉ tarifa cambió a propósito. Saber que la línea X esperaba exactamente esa
+/// tarifa exigiría replicar la cascada de búsqueda del piso —tipo de carga, unidad de
+/// transporte, vía estándar, periodo—, y una réplica que se desvíe produce falsos
+/// negativos: líneas que se quedan esperando para siempre porque el emparejamiento dijo
+/// que no era su tarifa.
+///
+/// En vez de adivinar, se le vuelve a preguntar a la regla. Cuesta algún recosteo de
+/// más; a cambio no hay línea que se quede olvidada.
+/// </summary>
+public sealed record TarifasActualizadas(string Motivo, DateTimeOffset OcurridoEn);
+
+/// <summary>
+/// Reintentar el costeo de una línea que había quedado esperando una tarifa.
+///
+/// Va por su propio mensaje y NO por CostearLineaSolicitada porque no debe llegar a la
+/// saga: ese trabajo ya cerró, y cerró en Parcial con razón — en ese momento lo estaba.
+/// Reabrirlo falsearía el histórico. Lo que el recosteo resuelve es la línea y su
+/// pendiente, no el trabajo de entonces.
+/// </summary>
+public sealed record RecostearLineaSolicitada(Guid TrabajoId, Guid SolicitudId, Guid LineaId);

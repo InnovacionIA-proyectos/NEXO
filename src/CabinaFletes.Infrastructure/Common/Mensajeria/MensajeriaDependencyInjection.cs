@@ -50,6 +50,12 @@ public static class MensajeriaDependencyInjection
             // hasta el timeout sin que nadie supiera que había fallado.
             x.AddConsumer<FalloDeCosteoConsumer>();
 
+            // Recosteo: cuando el Administrador de Tarifas carga o extiende tarifas, las
+            // líneas que estaban esperando vuelven a la cola. No van por la saga: ese
+            // trabajo ya cerró, y cerró en Parcial con razón.
+            x.AddConsumer<RecosteoPorTarifasConsumer>();
+            x.AddConsumer<RecostearLineaConsumer>();
+
 
             // La saga se persiste en la misma base que los datos del negocio. Su estado
             // ES la respuesta al cliente que preguntó por su trabajo, así que un
@@ -129,6 +135,8 @@ public static class MensajeriaDependencyInjection
         services.AddScoped<IValidadorDeMensaje<LineaCosteada>, LineaCosteadaValidador>();
         services.AddScoped<IValidadorDeMensaje<LineaFalloTecnico>, LineaFalloTecnicoValidador>();
         services.AddScoped<IValidadorDeMensaje<LineaRequiereTarifaManual>, LineaRequiereTarifaManualValidador>();
+        services.AddScoped<IValidadorDeMensaje<TarifasActualizadas>, TarifasActualizadasValidador>();
+        services.AddScoped<IValidadorDeMensaje<RecostearLineaSolicitada>, RecostearLineaSolicitadaValidador>();
 
         return services;
     }

@@ -33,6 +33,26 @@ public sealed class EfPendientesDeCosteoRepository(CabinaFletesDbContext db) : I
         });
     }
 
+    public async Task<IReadOnlyList<LineaPendienteRef>> ManualesAbiertasAsync(CancellationToken ct = default) =>
+        await db.Set<LineaPendienteDeCosteo>().AsNoTracking()
+            .Where(p => p.Tipo == TipoPendienteDeCosteo.Manual && p.ResueltaEn == null)
+            .OrderBy(p => p.CreatedAt)
+            .Select(p => new LineaPendienteRef(p.TrabajoId, p.SolicitudId, p.LineaSolicitudId))
+            .ToListAsync(ct);
+
+    public async Task MarcarResueltoAsync(Guid trabajoId, Guid lineaId, TipoPendienteDeCosteo tipo, CancellationToken ct = default)
+    {
+        // Se marca en vez de borrar: queda el rastro de cuánto tardó, que para el tipo
+        // Manual es cuánto tardó la intervención de una persona. Ese dato es el que
+        // permite saber si la cola del Administrador de Tarifas es un cuello de botella.
+        var abiertos = await db.Set<LineaPendienteDeCosteo>()
+            .Where(p => p.TrabajoId == trabajoId && p.LineaSolicitudId == lineaId
+                     && p.Tipo == tipo && p.ResueltaEn == null)
+            .ToListAsync(ct);
+
+        foreach (var p in abiertos) p.ResueltaEn = DateTimeOffset.UtcNow;
+    }
+
     public async Task<IReadOnlyList<PendienteDeCosteoDto>> DeTrabajoAsync(Guid trabajoId, CancellationToken ct = default) =>
         await db.Set<LineaPendienteDeCosteo>().AsNoTracking()
             .Where(p => p.TrabajoId == trabajoId && p.ResueltaEn == null)
