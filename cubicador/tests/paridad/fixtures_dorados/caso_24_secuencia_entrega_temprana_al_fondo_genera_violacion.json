@@ -1,0 +1,15 @@
+{
+  "caso": "secuencia_entrega_temprana_al_fondo_genera_violacion",
+  "tipo": "validar",
+  "casos": [
+    {
+      "input": {
+        "items": "a_secuencia1_en_x0_b_secuencia2_en_x1000"
+      },
+      "esperado": {
+        "tieneSecuenciaBloqueada": true,
+        "accesibilidadPrimeraColocacion": "bloqueada"
+      }
+    }
+  ]
+}

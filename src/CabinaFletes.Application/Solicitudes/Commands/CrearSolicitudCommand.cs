@@ -1,3 +1,4 @@
+using CabinaFletes.Application.Common;
 using CabinaFletes.Application.Common.Abstractions;
 using CabinaFletes.Application.Common.Exceptions;
 using CabinaFletes.Application.Common.Ports;

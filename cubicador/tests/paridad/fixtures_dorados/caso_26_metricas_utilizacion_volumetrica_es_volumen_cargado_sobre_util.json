@@ -1,0 +1,17 @@
+{
+  "caso": "metricas_utilizacion_volumetrica_es_volumen_cargado_sobre_util",
+  "tipo": "metricas",
+  "casos": [
+    {
+      "input": {
+        "contenedor": "2000x1000x1000",
+        "item": "a_1000x1000x1000_no_rotable"
+      },
+      "esperado": {
+        "porcentajeVolumen": 50.0,
+        "unidadesCargadas": 1,
+        "pesoCargadoKg": 100
+      }
+    }
+  ]
+}

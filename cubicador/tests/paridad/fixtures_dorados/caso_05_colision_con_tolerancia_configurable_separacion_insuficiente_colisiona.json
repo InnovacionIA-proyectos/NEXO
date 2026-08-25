@@ -1,0 +1,46 @@
+{
+  "caso": "colision_con_tolerancia_configurable_separacion_insuficiente_colisiona",
+  "tipo": "colisiona",
+  "casos": [
+    {
+      "input": {
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "al": 100,
+        "aw": 100,
+        "ah": 100,
+        "bx": 110,
+        "by": 0,
+        "bz": 0,
+        "bl": 100,
+        "bw": 100,
+        "bh": 100,
+        "tolerancia": 20
+      },
+      "esperado": {
+        "resultado": true
+      }
+    },
+    {
+      "input": {
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "al": 100,
+        "aw": 100,
+        "ah": 100,
+        "bx": 130,
+        "by": 0,
+        "bz": 0,
+        "bl": 100,
+        "bw": 100,
+        "bh": 100,
+        "tolerancia": 20
+      },
+      "esperado": {
+        "resultado": false
+      }
+    }
+  ]
+}

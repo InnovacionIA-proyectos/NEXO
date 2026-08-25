@@ -1,0 +1,16 @@
+{
+  "caso": "secuencia_con_estrategia_de_secuencia_entrega_temprana_queda_cerca_de_la_puerta",
+  "tipo": "optimizar_estrategia",
+  "casos": [
+    {
+      "input": {
+        "estrategia": "PriorizarSecuenciaEntrega",
+        "items": "primera_secuencia1_ultima_secuencia3"
+      },
+      "esperado": {
+        "distanciaPrimeraMenorQueUltima": true,
+        "tieneSecuenciaBloqueada": false
+      }
+    }
+  ]
+}

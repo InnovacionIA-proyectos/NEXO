@@ -46,7 +46,7 @@ public class CrearReglaSoloSicetacCommandTests
         var dto = await Handler().Handle(new CrearReglaSoloSicetacCommand("  bogotá   d.c.  ", "cali", "turbo con estacas"));
 
         Assert.NotNull(guardada);
-        Assert.Equal("BOGOTÁ D.C.", guardada!.Origen);
+        Assert.Equal("BOGOTA D.C.", guardada!.Origen);
         Assert.Equal("CALI", guardada.Destino);
         Assert.Equal("TURBO CON ESTACAS", guardada.TipoVehiculo);
         Assert.Equal(guardada.Id, dto.Id);

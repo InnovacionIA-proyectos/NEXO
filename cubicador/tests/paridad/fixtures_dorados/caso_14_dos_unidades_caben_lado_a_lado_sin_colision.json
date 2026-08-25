@@ -1,0 +1,49 @@
+{
+  "caso": "dos_unidades_caben_lado_a_lado_sin_colision",
+  "tipo": "optimizar",
+  "casos": [
+    {
+      "input": {
+        "items": "a_y_b_1200x1000x1000_no_rotables"
+      },
+      "esperado": {
+        "colocaciones": [
+          {
+            "itemId": "a",
+            "x": 0,
+            "y": 0,
+            "z": 0,
+            "orientacion": {
+              "indice": 0,
+              "largoMm": 1200,
+              "anchoMm": 1000,
+              "altoMm": 1000
+            },
+            "soporteId": null,
+            "porcentajeSoporte": 1,
+            "estadoEstabilidad": "estable",
+            "accesibilidad": "parcialmente_bloqueada"
+          },
+          {
+            "itemId": "b",
+            "x": 1200,
+            "y": 0,
+            "z": 0,
+            "orientacion": {
+              "indice": 0,
+              "largoMm": 1200,
+              "anchoMm": 1000,
+              "altoMm": 1000
+            },
+            "soporteId": null,
+            "porcentajeSoporte": 1,
+            "estadoEstabilidad": "estable",
+            "accesibilidad": "accesible"
+          }
+        ],
+        "rechazos": [],
+        "incidenciasCodigos": []
+      }
+    }
+  ]
+}

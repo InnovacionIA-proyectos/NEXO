@@ -97,7 +97,7 @@ public class MarcarResultadoCommandTests
         ];
         _cotizaciones.Setup(r => r.ObtenerParaMarcarResultadoAsync(cotizacionId, default)).ReturnsAsync(c);
         _solicitudes.Setup(s => s.ObtenerConClienteAsync(c.SolicitudId, default)).ReturnsAsync((Solicitud?)null);
-        _tarifasHistoricas.Setup(t => t.ExistenParaCotizacionAsync(cotizacionId, default)).ReturnsAsync(false);
+        _tarifasHistoricas.Setup(t => t.ExistenParaCotizacionAsync(c.Id, default)).ReturnsAsync(false);
 
         await Handler().Handle(new MarcarResultadoCommand(cotizacionId, "ganada", null, null));
 
@@ -113,7 +113,7 @@ public class MarcarResultadoCommandTests
         c.Lineas = [new CotizacionLinea { ValorFlete = 100_000m, LineaSolicitud = new LineaSolicitud() }];
         _cotizaciones.Setup(r => r.ObtenerParaMarcarResultadoAsync(cotizacionId, default)).ReturnsAsync(c);
         _solicitudes.Setup(s => s.ObtenerConClienteAsync(c.SolicitudId, default)).ReturnsAsync((Solicitud?)null);
-        _tarifasHistoricas.Setup(t => t.ExistenParaCotizacionAsync(cotizacionId, default)).ReturnsAsync(true);
+        _tarifasHistoricas.Setup(t => t.ExistenParaCotizacionAsync(c.Id, default)).ReturnsAsync(true);
 
         await Handler().Handle(new MarcarResultadoCommand(cotizacionId, "ganada", null, null));
 
