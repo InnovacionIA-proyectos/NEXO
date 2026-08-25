@@ -1,4 +1,7 @@
+using CabinaFletes.Application.Common.Mensajeria;
 using CabinaFletes.Application.Common.Ports;
+using CabinaFletes.Mensajes;
+using CabinaFletes.Mensajes.Solicitudes;
 using CabinaFletes.Infrastructure.Persistence;
 using MassTransit;
 using Microsoft.Extensions.Configuration;
@@ -53,7 +56,20 @@ public static class MensajeriaDependencyInjection
             });
         });
 
-        services.AddScoped<IPublicadorDeMensajes, MassTransitPublicador>();
+        // Cadena de publicación: el decorador de validación envuelve al adaptador de
+        // MassTransit. Quien pida IPublicadorDeMensajes recibe SIEMPRE el validado —
+        // el adaptador crudo no se expone bajo el puerto, justamente para que no haya
+        // forma de saltarse la validación pidiendo la otra implementación.
+        services.AddScoped<MassTransitPublicador>();
+        services.AddScoped<IPublicadorDeMensajes>(sp =>
+            new PublicadorValidado(sp.GetRequiredService<MassTransitPublicador>(), sp));
+
+        // Los validadores de cada mensaje. Se registran explícitamente en vez de
+        // escanear el ensamblado: es una línea por mensaje y se lee de un vistazo qué
+        // viaja al broker. Si alguien agrega un mensaje y olvida esta línea, el
+        // decorador falla cerrado y la prueba lo detecta.
+        services.AddScoped<IValidadorDeMensaje<AutoCosteoSolicitado>, AutoCosteoSolicitadoValidador>();
+
         return services;
     }
 }
