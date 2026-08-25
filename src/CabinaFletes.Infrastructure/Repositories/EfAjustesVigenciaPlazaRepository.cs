@@ -1,4 +1,4 @@
-using CabinaFletes.Application.AjustesVigenciaPlaza.Ports;
+using CabinaFletes.Application.CasosDeUso.AjustesVigenciaPlaza.Interfaces;
 using CabinaFletes.Domain.Costeo.Entidades;
 using CabinaFletes.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;

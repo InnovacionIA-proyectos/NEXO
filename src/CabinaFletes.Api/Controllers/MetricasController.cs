@@ -1,6 +1,6 @@
+using CabinaFletes.Application.CasosDeUso.Metricas;
+using CabinaFletes.Application.CasosDeUso.Metricas.DTOs;
 using CabinaFletes.Application.Common.Abstractions;
-using CabinaFletes.Application.Metricas.Dtos;
-using CabinaFletes.Application.Metricas.Queries;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 

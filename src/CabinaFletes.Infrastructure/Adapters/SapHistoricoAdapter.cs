@@ -1,6 +1,6 @@
-using CabinaFletes.Application.AjustesVigenciaPlaza.Ports;
-using CabinaFletes.Application.BibliotecaSapHistorico.Dtos;
-using CabinaFletes.Application.BibliotecaSapHistorico.Ports;
+using CabinaFletes.Application.CasosDeUso.AjustesVigenciaPlaza.Interfaces;
+using CabinaFletes.Application.CasosDeUso.BibliotecaSapHistorico.DTOs;
+using CabinaFletes.Application.CasosDeUso.BibliotecaSapHistorico.Interfaces;
 using CabinaFletes.Domain.Common;
 using CabinaFletes.Domain.Enums;
 using CabinaFletes.Infrastructure.External;

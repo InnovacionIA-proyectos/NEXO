@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
-using CabinaFletes.Application.BibliotecaSapHistorico.Dtos;
-using CabinaFletes.Application.BibliotecaSapHistorico.Queries;
+using CabinaFletes.Application.CasosDeUso.BibliotecaSapHistorico;
+using CabinaFletes.Application.CasosDeUso.BibliotecaSapHistorico.DTOs;
 using CabinaFletes.Application.Common.Abstractions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;

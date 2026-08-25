@@ -1,8 +1,7 @@
 using CabinaFletes.Api.Dtos;
+using CabinaFletes.Application.CasosDeUso.Solicitudes;
+using CabinaFletes.Application.CasosDeUso.Solicitudes.DTOs;
 using CabinaFletes.Application.Common.Abstractions;
-using CabinaFletes.Application.Solicitudes.Commands;
-using CabinaFletes.Application.Solicitudes.Dtos;
-using CabinaFletes.Application.Solicitudes.Queries;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 

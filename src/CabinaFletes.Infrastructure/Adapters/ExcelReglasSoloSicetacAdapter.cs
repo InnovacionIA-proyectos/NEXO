@@ -1,6 +1,6 @@
+using CabinaFletes.Application.CasosDeUso.ReglasSoloSicetac.DTOs;
+using CabinaFletes.Application.CasosDeUso.ReglasSoloSicetac.Interfaces;
 using CabinaFletes.Application.Common.Exceptions;
-using CabinaFletes.Application.ReglasSoloSicetac.Dtos;
-using CabinaFletes.Application.ReglasSoloSicetac.Ports;
 using ClosedXML.Excel;
 
 namespace CabinaFletes.Infrastructure.Adapters;

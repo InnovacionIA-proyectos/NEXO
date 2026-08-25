@@ -1,5 +1,5 @@
-using CabinaFletes.Application.Biblioteca.Dtos;
-using CabinaFletes.Application.Biblioteca.Ports;
+using CabinaFletes.Application.CasosDeUso.Biblioteca.DTOs;
+using CabinaFletes.Application.CasosDeUso.Biblioteca.Interfaces;
 using CabinaFletes.Application.Common.Exceptions;
 
 namespace CabinaFletes.Infrastructure.Adapters;

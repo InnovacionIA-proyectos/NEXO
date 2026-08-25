@@ -1,9 +1,8 @@
 using CabinaFletes.Api.Dtos;
 using CabinaFletes.Api.Errors;
+using CabinaFletes.Application.CasosDeUso.ReglasSoloSicetac;
+using CabinaFletes.Application.CasosDeUso.ReglasSoloSicetac.DTOs;
 using CabinaFletes.Application.Common.Abstractions;
-using CabinaFletes.Application.ReglasSoloSicetac.Commands;
-using CabinaFletes.Application.ReglasSoloSicetac.Dtos;
-using CabinaFletes.Application.ReglasSoloSicetac.Queries;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 

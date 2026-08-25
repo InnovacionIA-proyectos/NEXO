@@ -1,6 +1,6 @@
+using CabinaFletes.Application.CasosDeUso.TarifasGanadas;
+using CabinaFletes.Application.CasosDeUso.TarifasGanadas.DTOs;
 using CabinaFletes.Application.Common.Abstractions;
-using CabinaFletes.Application.TarifasGanadas.Dtos;
-using CabinaFletes.Application.TarifasGanadas.Queries;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 

@@ -1,4 +1,4 @@
-using CabinaFletes.Application.Cotizaciones.Ports;
+using CabinaFletes.Application.CasosDeUso.Cotizaciones.Interfaces;
 using CabinaFletes.Infrastructure.External;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;

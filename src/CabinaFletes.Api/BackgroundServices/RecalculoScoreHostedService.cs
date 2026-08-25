@@ -1,5 +1,5 @@
+using CabinaFletes.Application.CasosDeUso.Solicitudes.Interfaces;
 using CabinaFletes.Application.Common.Abstractions;
-using CabinaFletes.Application.Solicitudes.Ports;
 using CabinaFletes.Domain.Priorizacion.Reglas;
 
 namespace CabinaFletes.Api.BackgroundServices;

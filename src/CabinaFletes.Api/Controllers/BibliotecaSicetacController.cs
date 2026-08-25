@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
-using CabinaFletes.Application.Biblioteca.Dtos;
-using CabinaFletes.Application.Biblioteca.Queries;
+using CabinaFletes.Application.CasosDeUso.Biblioteca;
+using CabinaFletes.Application.CasosDeUso.Biblioteca.DTOs;
 using CabinaFletes.Application.Common.Abstractions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;

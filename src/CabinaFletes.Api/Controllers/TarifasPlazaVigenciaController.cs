@@ -1,6 +1,6 @@
 using CabinaFletes.Api.Dtos;
-using CabinaFletes.Application.AjustesVigenciaPlaza.Commands;
-using CabinaFletes.Application.AjustesVigenciaPlaza.Dtos;
+using CabinaFletes.Application.CasosDeUso.AjustesVigenciaPlaza;
+using CabinaFletes.Application.CasosDeUso.AjustesVigenciaPlaza.DTOs;
 using CabinaFletes.Application.Common.Abstractions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;

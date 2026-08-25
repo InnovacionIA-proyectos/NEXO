@@ -1,4 +1,4 @@
-using CabinaFletes.Application.Solicitudes.Ports;
+using CabinaFletes.Application.CasosDeUso.Solicitudes.Interfaces;
 using CabinaFletes.Domain.Catalogos.Entidades;
 using CabinaFletes.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;

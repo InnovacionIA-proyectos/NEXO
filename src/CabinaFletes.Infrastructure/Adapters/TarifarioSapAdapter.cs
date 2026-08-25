@@ -1,8 +1,8 @@
 using System.Globalization;
 using System.Text;
-using CabinaFletes.Application.AjustesVigenciaPlaza.Ports;
-using CabinaFletes.Application.Biblioteca.Dtos;
-using CabinaFletes.Application.Biblioteca.Ports;
+using CabinaFletes.Application.CasosDeUso.AjustesVigenciaPlaza.Interfaces;
+using CabinaFletes.Application.CasosDeUso.Biblioteca.DTOs;
+using CabinaFletes.Application.CasosDeUso.Biblioteca.Interfaces;
 using CabinaFletes.Application.Common.Dtos;
 using CabinaFletes.Domain.Common;
 using CabinaFletes.Domain.Enums;

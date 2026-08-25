@@ -1,5 +1,5 @@
-using CabinaFletes.Application.Metricas.Dtos;
-using CabinaFletes.Application.Metricas.Ports;
+using CabinaFletes.Application.CasosDeUso.Metricas.DTOs;
+using CabinaFletes.Application.CasosDeUso.Metricas.Interfaces;
 using CabinaFletes.Domain.Enums;
 using CabinaFletes.Domain.Solicitudes.Entidades;
 using CabinaFletes.Infrastructure.Persistence;

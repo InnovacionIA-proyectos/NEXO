@@ -1,12 +1,11 @@
 using CabinaFletes.Api.Dtos;
 using CabinaFletes.Api.Errors;
+using CabinaFletes.Application.CasosDeUso.Solicitudes;
+using CabinaFletes.Application.CasosDeUso.Solicitudes.DTOs;
 using CabinaFletes.Application.Common.Abstractions;
 using CabinaFletes.Application.Common.Dtos;
 using CabinaFletes.Application.Common.Exceptions;
 using CabinaFletes.Application.Common.Ports;
-using CabinaFletes.Application.Solicitudes.Commands;
-using CabinaFletes.Application.Solicitudes.Dtos;
-using CabinaFletes.Application.Solicitudes.Queries;
 using CabinaFletes.Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;

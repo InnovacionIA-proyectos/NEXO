@@ -1,12 +1,12 @@
 using System.Globalization;
 using System.Text;
-using CabinaFletes.Application.AjustesVigenciaPlaza.Ports;
-using CabinaFletes.Application.Biblioteca.Dtos;
-using CabinaFletes.Application.Biblioteca.Ports;
+using CabinaFletes.Application.CasosDeUso.AjustesVigenciaPlaza.Interfaces;
+using CabinaFletes.Application.CasosDeUso.Biblioteca.DTOs;
+using CabinaFletes.Application.CasosDeUso.Biblioteca.Interfaces;
+using CabinaFletes.Application.CasosDeUso.ReglasSoloSicetac.Interfaces;
 using CabinaFletes.Application.Common.Dtos;
 using CabinaFletes.Application.Common.Exceptions;
 using CabinaFletes.Application.Common.Ports;
-using CabinaFletes.Application.ReglasSoloSicetac.Ports;
 using CabinaFletes.Domain.Catalogos.Entidades;
 using CabinaFletes.Domain.Common;
 using CabinaFletes.Domain.Enums;

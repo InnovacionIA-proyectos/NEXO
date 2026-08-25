@@ -1,9 +1,9 @@
+using CabinaFletes.Application.CasosDeUso.Cotizaciones;
+using CabinaFletes.Application.CasosDeUso.Cotizaciones.Interfaces;
 using CabinaFletes.Application.Common;
 using CabinaFletes.Application.Common.Abstractions;
 using CabinaFletes.Application.Common.Exceptions;
 using CabinaFletes.Application.Common.Ports;
-using CabinaFletes.Application.Cotizaciones.Commands;
-using CabinaFletes.Application.Cotizaciones.Ports;
 using CabinaFletes.Domain.Cotizaciones.Entidades;
 using CabinaFletes.Domain.Enums;
 using CabinaFletes.Domain.Solicitudes.Entidades;

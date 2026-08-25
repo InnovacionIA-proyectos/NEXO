@@ -1,5 +1,5 @@
-using CabinaFletes.Application.TarifasSicetacAdmin.Dtos;
-using CabinaFletes.Application.TarifasSicetacAdmin.Ports;
+using CabinaFletes.Application.CasosDeUso.TarifasSicetacAdmin.DTOs;
+using CabinaFletes.Application.CasosDeUso.TarifasSicetacAdmin.Interfaces;
 using CabinaFletes.Domain.Auditoria.Entidades;
 using CabinaFletes.Domain.BibliotecaTarifas.Entidades;
 using CabinaFletes.Domain.Catalogos.Entidades;

@@ -1,8 +1,8 @@
 using System.Globalization;
-using CabinaFletes.Application.Cotizaciones.Ports;
-using CabinaFletes.Application.ServiciosConexos;
-using CabinaFletes.Application.ServiciosConexos.Dtos;
-using CabinaFletes.Application.ServiciosConexos.Ports;
+using CabinaFletes.Application.CasosDeUso.Cotizaciones.Interfaces;
+using CabinaFletes.Application.CasosDeUso.ServiciosConexos;
+using CabinaFletes.Application.CasosDeUso.ServiciosConexos.DTOs;
+using CabinaFletes.Application.CasosDeUso.ServiciosConexos.Interfaces;
 using CabinaFletes.Domain.Auditoria.Entidades;
 using CabinaFletes.Domain.Catalogos.Entidades;
 using CabinaFletes.Domain.Common;

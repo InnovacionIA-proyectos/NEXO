@@ -1,5 +1,5 @@
-using CabinaFletes.Application.AjustesVigenciaPlaza.Commands;
-using CabinaFletes.Application.AjustesVigenciaPlaza.Ports;
+using CabinaFletes.Application.CasosDeUso.AjustesVigenciaPlaza;
+using CabinaFletes.Application.CasosDeUso.AjustesVigenciaPlaza.Interfaces;
 using CabinaFletes.Application.Common;
 using CabinaFletes.Application.Common.Abstractions;
 using CabinaFletes.Application.Common.Exceptions;

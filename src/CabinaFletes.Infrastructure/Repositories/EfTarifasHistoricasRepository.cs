@@ -1,6 +1,6 @@
-using CabinaFletes.Application.Cotizaciones.Ports;
-using CabinaFletes.Application.TarifasGanadas.Dtos;
-using CabinaFletes.Application.TarifasGanadas.Ports;
+using CabinaFletes.Application.CasosDeUso.Cotizaciones.Interfaces;
+using CabinaFletes.Application.CasosDeUso.TarifasGanadas.DTOs;
+using CabinaFletes.Application.CasosDeUso.TarifasGanadas.Interfaces;
 using CabinaFletes.Domain.BibliotecaTarifas.Entidades;
 using CabinaFletes.Domain.Catalogos.Entidades;
 using CabinaFletes.Domain.Enums;

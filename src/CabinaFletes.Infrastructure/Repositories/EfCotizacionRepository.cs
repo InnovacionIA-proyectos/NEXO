@@ -1,5 +1,5 @@
 using System.Linq.Expressions;
-using CabinaFletes.Application.Cotizaciones.Ports;
+using CabinaFletes.Application.CasosDeUso.Cotizaciones.Interfaces;
 using CabinaFletes.Domain.Catalogos.Entidades;
 using CabinaFletes.Domain.Cotizaciones.Entidades;
 using CabinaFletes.Domain.Enums;

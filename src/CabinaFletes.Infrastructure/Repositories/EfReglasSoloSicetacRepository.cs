@@ -1,4 +1,4 @@
-using CabinaFletes.Application.ReglasSoloSicetac.Ports;
+using CabinaFletes.Application.CasosDeUso.ReglasSoloSicetac.Interfaces;
 using CabinaFletes.Domain.Costeo.Entidades;
 using CabinaFletes.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;

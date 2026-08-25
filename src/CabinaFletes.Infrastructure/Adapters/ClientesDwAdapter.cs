@@ -1,6 +1,6 @@
 using System.Globalization;
 using System.Text;
-using CabinaFletes.Application.Solicitudes.Ports;
+using CabinaFletes.Application.CasosDeUso.Solicitudes.Interfaces;
 using CabinaFletes.Infrastructure.External;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;

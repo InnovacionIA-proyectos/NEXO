@@ -1,8 +1,8 @@
+using CabinaFletes.Application.CasosDeUso.ServiciosConexos;
+using CabinaFletes.Application.CasosDeUso.ServiciosConexos.Interfaces;
 using CabinaFletes.Application.Common;
 using CabinaFletes.Application.Common.Abstractions;
 using CabinaFletes.Application.Common.Exceptions;
-using CabinaFletes.Application.ServiciosConexos.Commands;
-using CabinaFletes.Application.ServiciosConexos.Ports;
 using CabinaFletes.Domain.Catalogos.Entidades;
 using Moq;
 

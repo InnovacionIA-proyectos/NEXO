@@ -1,10 +1,9 @@
 using System.ComponentModel.DataAnnotations;
 using CabinaFletes.Api.Dtos;
 using CabinaFletes.Api.Errors;
+using CabinaFletes.Application.CasosDeUso.ServiciosConexos;
+using CabinaFletes.Application.CasosDeUso.ServiciosConexos.DTOs;
 using CabinaFletes.Application.Common.Abstractions;
-using CabinaFletes.Application.ServiciosConexos.Commands;
-using CabinaFletes.Application.ServiciosConexos.Dtos;
-using CabinaFletes.Application.ServiciosConexos.Queries;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 

@@ -1,6 +1,6 @@
+using CabinaFletes.Application.CasosDeUso.Solicitudes.DTOs;
+using CabinaFletes.Application.CasosDeUso.Solicitudes.Interfaces;
 using CabinaFletes.Application.Common.Exceptions;
-using CabinaFletes.Application.Solicitudes.Dtos;
-using CabinaFletes.Application.Solicitudes.Ports;
 using ClosedXML.Excel;
 
 namespace CabinaFletes.Infrastructure.Adapters;

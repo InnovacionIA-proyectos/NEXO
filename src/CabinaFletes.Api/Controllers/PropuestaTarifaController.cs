@@ -1,4 +1,4 @@
-using CabinaFletes.Application.Biblioteca.Queries;
+using CabinaFletes.Application.CasosDeUso.Biblioteca;
 using CabinaFletes.Application.Common.Abstractions;
 using CabinaFletes.Application.Common.Dtos;
 using Microsoft.AspNetCore.Authorization;

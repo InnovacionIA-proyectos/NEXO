@@ -1,5 +1,5 @@
-using CabinaFletes.Application.Solicitudes.Dtos;
-using CabinaFletes.Application.Solicitudes.Ports;
+using CabinaFletes.Application.CasosDeUso.Solicitudes.DTOs;
+using CabinaFletes.Application.CasosDeUso.Solicitudes.Interfaces;
 using CabinaFletes.Domain.Enums;
 using CabinaFletes.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;

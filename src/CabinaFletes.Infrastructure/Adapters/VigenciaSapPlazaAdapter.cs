@@ -1,4 +1,4 @@
-using CabinaFletes.Application.AjustesVigenciaPlaza.Ports;
+using CabinaFletes.Application.CasosDeUso.AjustesVigenciaPlaza.Interfaces;
 using CabinaFletes.Infrastructure.External;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;

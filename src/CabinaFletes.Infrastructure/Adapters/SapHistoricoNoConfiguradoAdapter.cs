@@ -1,5 +1,5 @@
-using CabinaFletes.Application.BibliotecaSapHistorico.Dtos;
-using CabinaFletes.Application.BibliotecaSapHistorico.Ports;
+using CabinaFletes.Application.CasosDeUso.BibliotecaSapHistorico.DTOs;
+using CabinaFletes.Application.CasosDeUso.BibliotecaSapHistorico.Interfaces;
 using CabinaFletes.Application.Common.Exceptions;
 
 namespace CabinaFletes.Infrastructure.Adapters;
