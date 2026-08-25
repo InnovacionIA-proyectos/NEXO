@@ -9,6 +9,7 @@ using CabinaFletes.Application.Common.Exceptions;
 using CabinaFletes.Application.Common.Ports;
 using CabinaFletes.Domain.Catalogos.Entidades;
 using CabinaFletes.Domain.Common;
+using CabinaFletes.Domain.Costeo.Reglas;
 using CabinaFletes.Domain.Enums;
 using CabinaFletes.Domain.Solicitudes.Entidades;
 using CabinaFletes.Infrastructure.External;
@@ -165,7 +166,9 @@ public sealed class PropuestaTarifaAdapter : IPropuestaTarifaPort
         }
         var historico = dc is null ? null : await CandidatoSapAsync(dc, dc.TarifasLogSap, "historico_sap", origen, destino, vehiculo, linea.Peso, soloVigentes: false, ajustesVigencia, ct);
 
-        var (valor, fuente, justificacion) = DecidirConTarifario(sicetac, plaza, historico, vencida);
+        var decision = ReglaDeCosteo.DecidirConTarifario(
+            ADominio(sicetac), ADominio(plaza), ADominio(historico), vencida);
+        var (valor, fuente, justificacion) = (decision.Valor, decision.Fuente, decision.Justificacion);
 
         if (oficial?.Retorno is { } retorno)
             justificacion += $" Retorno del contenedor a {linea.CiudadDevolucionContenedor}: {retorno.Valor:C0} (línea devolución, exclusivo).";
@@ -182,48 +185,12 @@ public sealed class PropuestaTarifaAdapter : IPropuestaTarifaPort
             oficial?.Retorno);
     }
 
-    // ------------------------------------------------------------- decisión
+    // La decisión vive en Domain (Costeo/Reglas/ReglaDeCosteo): son invariantes del
+    // negocio, no de este adaptador. Aquí solo se traen los candidatos y se traducen
+    // los DTO de aplicación a los objetos de valor del dominio.
 
-    internal static (decimal?, string?, string) Decidir(
-        CandidatoTarifaDto? sicetac, CandidatoTarifaDto? plaza, CandidatoTarifaDto? historico)
-    {
-        if (plaza is not null && sicetac is not null)
-        {
-            var mayor = plaza.Valor >= sicetac.Valor ? plaza : sicetac;
-            var diff = Math.Abs(plaza.Valor - sicetac.Valor);
-            var pct = sicetac.Valor > 0 ? Math.Round(diff / sicetac.Valor * 100, 1) : 0;
-            var comparacion = plaza.Valor >= sicetac.Valor
-                ? $"El flete de plaza ({plaza.Valor:C0}) supera el piso SICE-TAC ({sicetac.Valor:C0}) en {pct}%: se propone plaza."
-                : $"El piso SICE-TAC ({sicetac.Valor:C0}) supera el flete de plaza ({plaza.Valor:C0}) en {pct}%: se propone SICE-TAC para no cotizar bajo el piso.";
-            return (mayor.Valor, mayor.Fuente, comparacion);
-        }
-        if (plaza is not null)
-            return (plaza.Valor, plaza.Fuente, "Solo se encontró flete de plaza; sin piso SICE-TAC comparable para la ruta.");
-        if (sicetac is not null)
-            return (sicetac.Valor, sicetac.Fuente, "Solo se encontró piso SICE-TAC; sin tarifa de plaza vigente para la ruta.");
-
-        var referencia = historico is not null
-            ? $" Referencia disponible: histórico SAP {historico.Valor:C0} (el Administrador de Fletes decide manualmente)."
-            : string.Empty;
-        return (null, null,
-            "Sin flete de plaza ni piso SICE-TAC para la ruta: la línea requiere atención manual del " +
-            "Administrador de Fletes en la bandeja de entrada, según las reglas de priorización." + referencia);
-    }
-
-    internal static (decimal?, string?, string) DecidirConTarifario(
-        CandidatoTarifaDto? sicetac, CandidatoTarifaDto? plaza, CandidatoTarifaDto? historico, bool tarifarioVencido)
-    {
-        if (!tarifarioVencido)
-            return Decidir(sicetac, plaza, historico);
-
-        var (valor, fuente, _) = Decidir(sicetac, plaza: null, historico);
-        var justificacion = sicetac is not null
-            ? $"El tarifario está INACTIVO (vigencia vencida): se propone el piso SICE-TAC vigente ({sicetac.Valor:C0}); " +
-              "nunca cotiza por debajo del piso legal. El tarifario vencido queda solo como referencia."
-            : "La tarifa del tarifario está INACTIVA (vigencia vencida) y no hay piso SICE-TAC vigente para la ruta: " +
-              "requiere revisión manual del Administrador de Fletes.";
-        return (valor, fuente, justificacion);
-    }
+    private static CandidatoDeTarifa? ADominio(CandidatoTarifaDto? c) =>
+        c is null ? null : new CandidatoDeTarifa(c.Fuente, c.Valor);
 
     // ------------------------------------------------------------- SICE-TAC (DWSice)
 
