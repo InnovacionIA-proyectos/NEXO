@@ -5,17 +5,30 @@ using CabinaFletes.Application.Common.Exceptions;
 using CabinaFletes.Application.Common.Ports;
 using CabinaFletes.Domain.Enums;
 using CabinaFletes.Domain.Solicitudes.Entidades;
+using CabinaFletes.Mensajes.Solicitudes;
 
 namespace CabinaFletes.Application.CasosDeUso.Solicitudes;
 
-/// <summary>Carga masiva de líneas de un pliego de licitación.</summary>
-public sealed record CargarLineasBulkCommand(Guid SolicitudId, IReadOnlyList<CrearLineaInput> Lineas) : ICommand<int>;
+/// <summary>
+/// Carga masiva de líneas de un pliego de licitación.
+///
+/// Guarda las líneas y encola el auto-costeo; NO cuesta nada aquí. Devuelve el
+/// identificador del trabajo, que es con lo que el cliente pregunta después por su
+/// avance. Insertar 300 filas es rápido; costearlas no, y por eso lo segundo se va
+/// a la cola.
+/// </summary>
+public sealed record CargarLineasBulkCommand(Guid SolicitudId, IReadOnlyList<CrearLineaInput> Lineas) : ICommand<Guid>;
 
 public sealed class CargarLineasBulkCommandHandler(
-    ISolicitudesRepository solicitudes, IAuditoriaPort auditoria, ICurrentUserPort usuarioActual, IUnitOfWork uow)
-    : ICommandHandler<CargarLineasBulkCommand, int>
+    ISolicitudesRepository solicitudes,
+    IAuditoriaPort auditoria,
+    ICurrentUserPort usuarioActual,
+    IPublicadorDeMensajes publicador,
+    TimeProvider clock,
+    IUnitOfWork uow)
+    : ICommandHandler<CargarLineasBulkCommand, Guid>
 {
-    public async Task<int> Handle(CargarLineasBulkCommand command, CancellationToken ct = default)
+    public async Task<Guid> Handle(CargarLineasBulkCommand command, CancellationToken ct = default)
     {
         var s = await solicitudes.ObtenerBasicoAsync(command.SolicitudId, ct)
             ?? throw new NotFoundException("SOLICITUD_NO_ENCONTRADA", "Solicitud no encontrada.");
@@ -35,7 +48,15 @@ public sealed class CargarLineasBulkCommandHandler(
 
         solicitudes.AgregarLineas(nuevas);
         auditoria.Registrar(usuarioActual.Id, "solicitudes", s.Id, "cargar_lineas_bulk", $"{{\"lineas\":{nuevas.Count}}}");
+
+        // El orden importa y es la razón de ser del Outbox: publicar ANTES de confirmar
+        // mete el mensaje en la misma transacción que las líneas. Si el commit falla, no
+        // queda un trabajo encolado apuntando a líneas que nunca se guardaron.
+        var trabajoId = Guid.NewGuid();
+        await publicador.PublicarAsync(
+            new AutoCosteoSolicitado(trabajoId, s.Id, nuevas.Count, usuarioActual.Id, clock.GetUtcNow()), ct);
+
         await uow.SaveChangesAsync(ct);
-        return nuevas.Count;
+        return trabajoId;
     }
 }

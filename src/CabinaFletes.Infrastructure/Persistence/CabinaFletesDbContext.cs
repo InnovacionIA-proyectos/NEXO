@@ -9,6 +9,7 @@ using CabinaFletes.Domain.PlanDeCargue.Entidades;
 using CabinaFletes.Domain.Priorizacion.Entidades;
 using CabinaFletes.Domain.Solicitudes.Entidades;
 using CabinaFletes.Domain.Usuarios.Entidades;
+using MassTransit;
 using Microsoft.EntityFrameworkCore;
 
 namespace CabinaFletes.Infrastructure.Persistence;
@@ -44,6 +45,13 @@ public class CabinaFletesDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder b)
     {
         base.OnModelCreating(b);
+
+        // Tablas del Transactional Outbox de MassTransit. Viven en ESTA base a
+        // propósito: la garantía de atomicidad depende de que el mensaje y los datos
+        // del caso de uso se guarden en la misma transacción.
+        b.AddInboxStateEntity();
+        b.AddOutboxMessageEntity();
+        b.AddOutboxStateEntity();
 
         b.Entity<Usuario>(e =>
         {

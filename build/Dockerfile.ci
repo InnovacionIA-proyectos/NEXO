@@ -26,6 +26,7 @@ WORKDIR /src
 # reutiliza la capa del restore y no vuelve a bajar los paquetes de NuGet.
 COPY ["CabinaFletes.Clean.sln", "./"]
 COPY ["src/CabinaFletes.Domain/CabinaFletes.Domain.csproj",                         "src/CabinaFletes.Domain/"]
+COPY ["src/CabinaFletes.Mensajes/CabinaFletes.Mensajes.csproj",                     "src/CabinaFletes.Mensajes/"]
 COPY ["src/CabinaFletes.Application/CabinaFletes.Application.csproj",               "src/CabinaFletes.Application/"]
 COPY ["src/CabinaFletes.Infrastructure/CabinaFletes.Infrastructure.csproj",         "src/CabinaFletes.Infrastructure/"]
 COPY ["src/CabinaFletes.Api/CabinaFletes.Api.csproj",                               "src/CabinaFletes.Api/"]
