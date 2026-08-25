@@ -1,3 +1,4 @@
+using CabinaFletes.Api.Errors;
 using CabinaFletes.Application.Common.Abstractions;
 using CabinaFletes.Application.TarifasSicetacAdmin.Commands;
 using CabinaFletes.Application.TarifasSicetacAdmin.Dtos;
