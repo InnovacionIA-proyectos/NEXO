@@ -398,47 +398,99 @@ Antes de desplegar a producción, de todas formas:
 
 ## 9. Estructura del proyecto
 
+Las cuatro capas se organizan **por responsabilidad de negocio**, no por tipo
+técnico. La carpeta de primer nivel dice de qué trata el sistema, no con qué
+está construido.
+
 ```
-NEXO-Clean/
+NEXO/
   CabinaFletes.Clean.sln
-  .env.example              # Variables de entorno documentadas (backend + Docker Compose)
-  .gitignore
-  docker-compose.yml         # db + api (+ perfil seed); sin frontend, fuera de alcance
-  MIGRACION.md               # Historial detallado de cada pasada de la migración
-  PENDIENTES.md              # Trabajo pendiente y exclusiones explícitas
-  README.md                  # Este documento
+  .env.example                 # Variables de entorno (backend + Docker Compose)
+  .dockerignore                # Qué NO entra al contexto de build
+  docker-compose.yml           # db + api (+ perfil seed)
+  docker-compose.ci.yml        # Arnés: compila la solución completa en contenedor
+  build/Dockerfile.ci          # Imagen del arnés (las 4 capas + los 3 proyectos de test)
+  docs/contrato-integracion/   # Contrato con el portal, OpenAPI, Gherkin y ADR
+  MIGRACION.md · PENDIENTES.md · README.md
+
   src/
-    CabinaFletes.Domain/            # Entidades, Enums, Scoring, Common (Texto, ImporteParser)
-    CabinaFletes.Application/       # Un subdirectorio por módulo de negocio:
-      Common/                       #   Abstractions (ICommand/IQuery/IUnitOfWork/Unit),
-      Cotizaciones/                 #   Ports/Dtos compartidos entre módulos (IAuditoriaPort,
-      Solicitudes/                  #   IPropuestaTarifaPort), ICurrentUserPort
-      Biblioteca/                   #
-      ReglasSoloSicetac/            #   Cada módulo: Commands/, Queries/, Dtos/, Ports/,
-      AjustesVigenciaPlaza/         #   DependencyInjection.cs (AddXUseCases())
-      ServiciosConexos/             #
-      TarifasGanadas/               #
-      TarifasSicetacAdmin/          #
-      Metricas/                    #
+    CabinaFletes.Domain/              # Por AGREGADO del event storming
+      Solicitudes/Entidades/          #   Solicitud, LineaSolicitud
+      Cotizaciones/Entidades/         #   Cotizacion, CotizacionLinea, CotizacionConexo
+      PlanDeCargue/Entidades/         #   PlanCargue, ItemPlanCargue, ColocacionCargue
+      BibliotecaTarifas/Entidades/    #   TarifaSicetac, TarifaHistorica
+      Costeo/Entidades/               #   ReglaSoloSicetac, AjusteVigenciaPlaza
+      Priorizacion/{Entidades,Reglas} #   ParametrosScore, ScorePrioridadCalculator
+      Catalogos/Entidades/            #   Ruta, ConfiguracionVehiculo, ServicioConexo, Cliente
+      Usuarios/ · Auditoria/          #   Usuario · AuditLog
+      Reglas/                         #   MaquinaEstados (cruza agregados)
+      Enums/ · Common/                #   Enums compartidos · IAuditable, Texto, ImporteParser
+
+    CabinaFletes.Application/
+      CasosDeUso/<Contexto>/          # Los casos de uso, directos bajo su contexto
+        DTOs/                         #   Entrada y salida de esos casos de uso
+        Interfaces/                   #   Los puertos que el contexto define
+        Mappers/                      #   Entidad -> DTO de salida
+        Validadores/                  #   Forma de la entrada
+        Excepciones/                  #   Solo cuando el contexto necesita una propia
+      Common/                         # Abstractions, Ports y Dtos genuinamente transversales
+
     CabinaFletes.Infrastructure/
-      Persistence/                  # CabinaFletesDbContext, Migrations, DataSeeder
-      External/                    # DbContexts de los DW corporativos (opcionales)
-      Repositories/                 # Implementaciones EF Core de los Ports de escritura/lectura
-      Adapters/                     # SMTP, Excel, integraciones que no son solo EF Core
-      Excel/                        # Exportación a Excel (ClosedXML)
-      DependencyInjection.cs         # AddInfrastructure(): composition root de Infrastructure
+      <Contexto>/Adaptadores/         # SMTP, Excel, SAP, DW: lo que no es solo EF Core
+      <Contexto>/Repositorios/        # Implementaciones EF Core de los puertos
+      Common/                         # EfAuditoriaRepository, EfUnitOfWork
+      Persistence/ · External/        # DbContext y migraciones · DbContexts de los DW
+      DependencyInjection.cs
+
     CabinaFletes.Api/
-      Controllers/                  # Un controller por módulo, delegan en Handlers
-      Dtos/                         # Request DTOs (con DataAnnotations)
-      BackgroundServices/            # RecalculoScoreHostedService
-      Middleware/                    # ErrorHandlingMiddleware
-      Auth/                          # DevAuthenticationHandler, ICurrentUser
-      Errors/                        # ApiError, ExcelUpload
+      <Contexto>/                     # Controlador y DTOs de entrada de ese contexto
+      Common/{Auth,Errors,Middleware} # Transversal
+      Program.cs                      # Composition root
       Dockerfile
-      Program.cs                     # Composition root: AddInfrastructure() + AddXUseCases()
+
   tests/
-    CabinaFletes.Domain.Tests/        # Unitarios puros (Score, Texto, ImporteParser)
-    CabinaFletes.Application.Tests/   # Unitarios con Moq, un subdirectorio por módulo
-    CabinaFletes.Api.Tests/           # Integración con WebApplicationFactory + SQL Server real
-      Infra/                          # ApiFixture, TestAuthHandler, Http (helpers de test)
+    CabinaFletes.Domain.Tests/        # Unitarios puros
+    CabinaFletes.Application.Tests/   # Unitarios con Moq
+    CabinaFletes.Api.Tests/           # Integración contra SQL Server
 ```
+
+### Reglas de frontera
+
+El encarpetado sin estas reglas es cosmético: a los dos meses el desorden vuelve
+por otro lado. Estas cuatro son las que hay que hacer respetar en revisión.
+
+**`Validadores` valida la forma de la entrada, no el negocio.** Campos
+obligatorios, formatos, rangos, enums que parseen. Las reglas inviolables del
+costeo — nunca por debajo del piso SICE-TAC, la regla del mayor, la tarifa
+vencida no se propone — viven en Domain. Si acaban en un validador, Domain se
+vuelve anémico y esas reglas dejan de poder probarse solas.
+
+Corolario: si una comprobación necesita consultar un repositorio, **no es
+validación de entrada**. Es una precondición del caso de uso y se queda en el
+handler. Sacarla obligaría a inyectarle repositorios al validador y tendríamos
+la misma lógica en dos sitios.
+
+**`Interfaces` son fronteras, no cualquier interfaz.** Aquí solo va lo que
+Application define y que Infrastructure o Api implementan. Eso es la inversión
+de dependencias, que es el corazón de Clean. Una interfaz auxiliar interna no
+pertenece a esta carpeta.
+
+**`Mappers` mapea de entidad de dominio al DTO de salida del caso de uso.** Nada
+de formas HTTP, que son de Api, ni de formas de persistencia, que son de
+Infrastructure.
+
+**Las excepciones se reparten según de quién es la falla.** Violación de
+invariante de negocio en Domain; falla de caso de uso en Application. Las de
+contexto **heredan de las cuatro base** de `Common/Exceptions` — por eso esas
+cuatro no son `sealed`. El middleware de Api traduce por tipo, así que una
+excepción que herede de `AppException` a secas caería en el catch genérico y
+respondería 500 en vez de su código.
+
+No se crea una excepción por cada código de error: el código de texto ya lo
+identifica y el frontend ya ramifica con él. Se crea cuando el contexto la
+necesita de verdad, como `CotizacionSinFleteException`, que es una regla del
+negocio presente en dos casos de uso.
+
+**Y la que las gobierna a todas:** Domain no importa ninguna capa. Application
+no importa Infrastructure ni Api. Si un `using` cruza hacia afuera, es un
+defecto, no una excepción justificada.
