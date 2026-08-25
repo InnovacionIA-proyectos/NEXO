@@ -124,9 +124,11 @@ public sealed class PropuestaTarifaAdapter : IPropuestaTarifaPort
         var destino = Normalizar(linea.Ruta.Destino);
         var vehiculo = linea.ConfiguracionVehiculo?.TipoVehiculo;
 
-        // Clave "ORIGEN|DESTINO" sin normalizar: debe coincidir exactamente con
-        // IClavesSoloSicetacPort.ClavesRutaAsync (Infrastructure/Repositories/EfReglasSoloSicetacRepository).
-        if (soloSice.Contains($"{linea.Ruta.Origen}|{linea.Ruta.Destino}"))
+        // Clave canónica de Domain, la MISMA que usan quien guarda la regla y el
+        // repositorio que las lee. Antes se comparaban los valores crudos de la ruta
+        // contra claves ya normalizadas, y la regla no se aplicaba en silencio: ver
+        // ClaveDeRutaTests en Domain.Tests y el comentario de cierre de la issue #16.
+        if (soloSice.Contains(Texto.ClaveRuta(linea.Ruta.Origen, linea.Ruta.Destino)))
         {
             var sice = dw is null ? null : await CandidatoSicetacAsync(dw, origen, destino, vehiculo, linea.Tipologia, linea.ConfiguracionVehiculo?.Carroceria, ct);
             var justif = sice is not null

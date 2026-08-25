@@ -1,6 +1,7 @@
 using CabinaFletes.Application.CasosDeUso.ReglasSoloSicetac.Interfaces;
 using CabinaFletes.Domain.Costeo.Entidades;
 using CabinaFletes.Infrastructure.Persistence;
+using CabinaFletes.Domain.Common;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 
@@ -41,12 +42,19 @@ public sealed class EfReglasSoloSicetacRepository(CabinaFletesDbContext db, IMem
         return borradas;
     }
 
-    /// <summary>Claves por RUTA ("ORIGEN|DESTINO", sin el vehículo) — puerto de lectura para Biblioteca.</summary>
+    /// <summary>
+    /// Claves por RUTA (sin el vehículo) en la forma canónica de Domain — puerto de
+    /// lectura para Biblioteca.
+    ///
+    /// Se reconstruye con Texto.ClaveRuta en vez de concatenar lo almacenado: aunque hoy
+    /// se guarda ya normalizado, reconstruirla hace la coincidencia inmune a una fila
+    /// vieja o cargada por otra vía.
+    /// </summary>
     public async Task<IReadOnlySet<string>> ClavesRutaAsync(CancellationToken ct = default) =>
         (await cache.GetOrCreateAsync(CacheKeyClaves, async e =>
         {
             e.AbsoluteExpirationRelativeToNow = CacheTtl;
             var filas = await db.ReglasSoloSicetac.AsNoTracking().Select(r => new { r.Origen, r.Destino }).ToListAsync(ct);
-            return (IReadOnlySet<string>)filas.Select(r => $"{r.Origen}|{r.Destino}").ToHashSet();
+            return (IReadOnlySet<string>)filas.Select(r => Texto.ClaveRuta(r.Origen, r.Destino)).ToHashSet();
         }))!;
 }
