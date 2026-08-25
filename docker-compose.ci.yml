@@ -4,8 +4,13 @@
 # No levanta la aplicación: compila. Para correr la API con su SQL Server está
 # el docker-compose.yml de la raíz, que es otra cosa y se usa en otro momento.
 #
-#   docker compose -f docker-compose.ci.yml build
+#   docker compose -f docker-compose.ci.yml build && \
 #   docker compose -f docker-compose.ci.yml run --rm build
+#
+# El `&&` NO es opcional. Si la construcción de la imagen falla —por ejemplo con
+# un .sln mal formado, que rompe el restore— `run` arranca igual con la imagen
+# ANTERIOR y compila código viejo. El resultado es un verde falso, que es peor
+# que un rojo. Encadenar los dos comandos lo hace imposible.
 #
 # El código de salida del contenedor es el del compilador: 0 compila, distinto
 # de 0 no. Eso es lo que va a leer el workflow de GitHub Actions (issue #4).

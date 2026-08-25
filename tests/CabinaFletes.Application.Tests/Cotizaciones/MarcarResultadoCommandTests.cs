@@ -127,10 +127,3 @@ public class MarcarResultadoCommandTests
         _tarifasHistoricas.Verify(t => t.Agregar(It.IsAny<TarifaHistorica>()), Times.Never);
     }
 }
-
-/// <summary>TimeProvider fijo y determinístico para pruebas.</summary>
-public sealed class FakeTimeProvider : TimeProvider
-{
-    public DateTimeOffset Fijo { get; set; } = new(2026, 6, 17, 12, 0, 0, TimeSpan.Zero);
-    public override DateTimeOffset GetUtcNow() => Fijo;
-}

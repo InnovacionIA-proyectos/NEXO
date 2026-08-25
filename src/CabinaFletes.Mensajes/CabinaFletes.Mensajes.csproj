@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Contratos de mensajería: el lenguaje compartido entre quien publica y quien
+    consume. Es un proyecto aparte, y SIN NINGUNA REFERENCIA, a propósito.
+
+    Un worker que solo quiera consumir mensajes referencia esto y nada más: no
+    tiene que arrastrar la capa de casos de uso para leer tres registros. Tampoco
+    depende de MassTransit — los mensajes son POCOs y el transporte es un detalle
+    de Infrastructure.
+
+    Si algún día aparece aquí un using de Application, de EF Core o de MassTransit,
+    el proyecto dejó de cumplir su función.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>CabinaFletes.Mensajes</RootNamespace>
+  </PropertyGroup>
+
+</Project>

@@ -1,3 +1,4 @@
+using CabinaFletes.Infrastructure.Common.Mensajeria;
 using System.Text.Json.Serialization;
 using CabinaFletes.Api.Common.Auth;
 using CabinaFletes.Api.Common.Errors;
@@ -49,6 +50,7 @@ builder.Logging.AddSimpleConsole(o =>
 
 // --------------------------------------------------------------- Infraestructura + Application (Cotizaciones)
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddMensajeria(builder.Configuration);
 builder.Services.AddCotizacionesUseCases();
 builder.Services.AddReglasSoloSicetacUseCases();
 builder.Services.AddAjustesVigenciaPlazaUseCases();

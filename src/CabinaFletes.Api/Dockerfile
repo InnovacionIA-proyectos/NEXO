@@ -13,6 +13,7 @@ WORKDIR /src
 # Copia primero los .csproj (las 4 capas) para aprovechar la cache de capas
 # de Docker en el restore: si solo cambia código, no se repite el restore.
 COPY ["src/CabinaFletes.Domain/CabinaFletes.Domain.csproj", "src/CabinaFletes.Domain/"]
+COPY ["src/CabinaFletes.Mensajes/CabinaFletes.Mensajes.csproj", "src/CabinaFletes.Mensajes/"]
 COPY ["src/CabinaFletes.Application/CabinaFletes.Application.csproj", "src/CabinaFletes.Application/"]
 COPY ["src/CabinaFletes.Infrastructure/CabinaFletes.Infrastructure.csproj", "src/CabinaFletes.Infrastructure/"]
 COPY ["src/CabinaFletes.Api/CabinaFletes.Api.csproj", "src/CabinaFletes.Api/"]

@@ -13,7 +13,7 @@ public class SolicitudesController(
     IQueryHandler<ObtenerBandejaQuery, IReadOnlyList<BandejaItemDto>> bandeja,
     IQueryHandler<ObtenerCosteoQuery, SolicitudCosteoDto> costeo,
     ICommandHandler<CrearSolicitudCommand, Guid> crear,
-    ICommandHandler<CargarLineasBulkCommand, int> cargarLineas,
+    ICommandHandler<CargarLineasBulkCommand, Guid> cargarLineas,
     ICommandHandler<RechazarSolicitudCommand, Unit> rechazar,
     ICommandHandler<RecalcularScoreCommand, DesgloseScoreDto> recalcular)
     : ControllerBase
@@ -46,14 +46,27 @@ public class SolicitudesController(
         return Created($"/api/solicitudes/{id}", new { id });
     }
 
-    /// <summary>Carga masiva de líneas de un pliego de licitación.</summary>
+    /// <summary>
+    /// Carga masiva de líneas de un pliego de licitación.
+    ///
+    /// Responde 202 con el identificador del trabajo, no con el resultado: las líneas
+    /// quedan guardadas y el costeo se hace en segundo plano. El avance se consulta
+    /// con ese identificador (issue #15). Contrato en docs/contrato-integracion.
+    /// </summary>
     [HttpPost("{id:guid}/lineas:bulk")]
     [Authorize(Roles = "CoordinadorFletes,Admin")]
+    [ProducesResponseType(StatusCodes.Status202Accepted)]
     public async Task<ActionResult> CargarLineas(Guid id, [FromBody] CargarLineasBulkRequest req, CancellationToken ct = default)
     {
         var lineas = req.Lineas.Select(lr => new CrearLineaInput(lr.RutaId, lr.ConfigVehiculoId, lr.Tipologia, lr.Peso, lr.ValorMercancia)).ToList();
-        var n = await cargarLineas.Handle(new CargarLineasBulkCommand(id, lineas), ct);
-        return Ok(new { agregadas = n });
+        var trabajoId = await cargarLineas.Handle(new CargarLineasBulkCommand(id, lineas), ct);
+
+        return Accepted(new
+        {
+            trabajoId,
+            estado = "Pendiente",
+            consultarEn = $"/api/trabajos/{trabajoId}",
+        });
     }
 
     /// <summary>Rechazo del comercial: descarta la solicitud registrando el motivo.</summary>

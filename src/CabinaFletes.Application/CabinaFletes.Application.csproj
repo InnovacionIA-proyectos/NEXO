@@ -14,6 +14,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\CabinaFletes.Domain\CabinaFletes.Domain.csproj" />
+    <ProjectReference Include="..\CabinaFletes.Mensajes\CabinaFletes.Mensajes.csproj" />
   </ItemGroup>
 
   <ItemGroup>
