@@ -294,4 +294,4 @@ Por separado, se resolvió la limpieza pendiente de los 4 archivos marcadores
 ("SUPERADO"/"movido a...") que el puente al dispositivo no podía borrar con
 `rm`: se movieron a `src/_to_delete/` (fuera de los `.csproj`, ya no forman
 parte del árbol de código compilable). El borrado físico definitivo de esa
-carpeta queda pendiente para hacerse manualmente desde Windows.
+carpeta quedó pendiente en su momento; se hizo después, en la issue #2.
