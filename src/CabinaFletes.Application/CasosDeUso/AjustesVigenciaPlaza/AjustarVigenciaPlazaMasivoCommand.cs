@@ -1,5 +1,6 @@
 using CabinaFletes.Application.CasosDeUso.AjustesVigenciaPlaza.DTOs;
 using CabinaFletes.Application.CasosDeUso.AjustesVigenciaPlaza.Interfaces;
+using CabinaFletes.Application.CasosDeUso.AjustesVigenciaPlaza.Validadores;
 using CabinaFletes.Application.Common.Abstractions;
 using CabinaFletes.Application.Common.Exceptions;
 using CabinaFletes.Application.Common.Ports;
@@ -26,18 +27,10 @@ public sealed class AjustarVigenciaPlazaMasivoCommandHandler(
 {
     public async Task<AjusteVigenciaResultDto> Handle(AjustarVigenciaPlazaMasivoCommand command, CancellationToken ct = default)
     {
+        AjustarVigenciaPlazaMasivoValidador.Validar(command);
+
         var ids = command.TarifaIds.Distinct().ToList();
         var modo = command.Modo.Trim().ToLowerInvariant();
-
-        if (modo == "fecha" && command.NuevaVigencia is null)
-            throw new ValidationFailedException("FECHA_REQUERIDA", "En modo 'fecha' debe indicar la nueva vigencia.");
-        if (modo == "extender")
-        {
-            if (command.Cantidad is not > 0)
-                throw new ValidationFailedException("CANTIDAD_INVALIDA", "En modo 'extender' la cantidad debe ser mayor a 0.");
-            if (string.IsNullOrWhiteSpace(command.Unidad))
-                throw new ValidationFailedException("UNIDAD_REQUERIDA", "En modo 'extender' debe indicar la unidad (dias|meses).");
-        }
 
         var existentes = await ajustes.ObtenerPorTarifasAsync(ids, ct);
         var porId = existentes.ToDictionary(kv => kv.Key, kv => kv.Value);

@@ -1,5 +1,6 @@
 using CabinaFletes.Application.CasosDeUso.ReglasSoloSicetac.DTOs;
 using CabinaFletes.Application.CasosDeUso.ReglasSoloSicetac.Interfaces;
+using CabinaFletes.Application.CasosDeUso.ReglasSoloSicetac.Validadores;
 using CabinaFletes.Application.Common.Abstractions;
 using CabinaFletes.Application.Common.Exceptions;
 using CabinaFletes.Application.Common.Ports;
@@ -16,11 +17,11 @@ public sealed class CrearReglaSoloSicetacCommandHandler(
 {
     public async Task<ReglaSoloSicetacDto> Handle(CrearReglaSoloSicetacCommand command, CancellationToken ct = default)
     {
+        CrearReglaSoloSicetacValidador.Validar(command);
+
         var origen = ReglaSoloSicetacTexto.Normalizar(command.Origen);
         var destino = ReglaSoloSicetacTexto.Normalizar(command.Destino);
         var vehiculo = ReglaSoloSicetacTexto.Normalizar(command.TipoVehiculo);
-        if (origen.Length == 0 || destino.Length == 0 || vehiculo.Length == 0)
-            throw new ValidationFailedException("REGLA_INVALIDA", "Origen, destino y tipo de vehículo son obligatorios.");
 
         if (await reglas.ExisteAsync(origen, destino, vehiculo, ct))
             throw new ConflictException("REGLA_DUPLICADA", "Ya existe una regla 'solo SICE' para esa ruta y tipo de vehículo.");

@@ -1,4 +1,5 @@
 using CabinaFletes.Application.CasosDeUso.Cotizaciones.DTOs;
+using CabinaFletes.Application.CasosDeUso.Cotizaciones.Excepciones;
 using CabinaFletes.Application.CasosDeUso.Cotizaciones.Interfaces;
 using CabinaFletes.Application.Common.Abstractions;
 using CabinaFletes.Application.Common.Exceptions;
@@ -36,7 +37,7 @@ public sealed class EntregarCotizacionCommandHandler(
         if (c.Estado == EstadoCotizacion.Entregada)
             throw new ConflictException("COTIZACION_YA_ENTREGADA", "La cotización ya fue entregada.");
         if (c.Lineas.Count == 0)
-            throw new ValidationFailedException("COTIZACION_SIN_FLETE", "No se puede entregar una cotización sin líneas de flete.");
+            throw new CotizacionSinFleteException("entregar");
 
         CotizacionCalculos.Recalcular(c);
         c.Estado = EstadoCotizacion.Entregada;

@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text;
 using CabinaFletes.Application.CasosDeUso.Solicitudes.DTOs;
 using CabinaFletes.Application.CasosDeUso.Solicitudes.Interfaces;
+using CabinaFletes.Application.CasosDeUso.Solicitudes.Validadores;
 using CabinaFletes.Application.Common;
 using CabinaFletes.Application.Common.Abstractions;
 using CabinaFletes.Application.Common.Dtos;
@@ -53,6 +54,8 @@ public sealed class CapturarSolicitudCommandHandler(
 
     public async Task<CapturaResultDto> Handle(CapturarSolicitudCommand command, CancellationToken ct = default)
     {
+        CapturarSolicitudValidador.Validar(command);
+
         var clienteId = await ResolverClienteAsync(command, ct);
 
         var rutas = await rutasCatalogo.ListarAsync(ct);
@@ -80,10 +83,7 @@ public sealed class CapturarSolicitudCommandHandler(
         foreach (var lr in command.Lineas)
         {
             numeroLinea++;
-            if (string.IsNullOrWhiteSpace(lr.Origen) || string.IsNullOrWhiteSpace(lr.Destino))
-                throw new ValidationFailedException("LINEA_INCOMPLETA", "Cada línea debe traer origen y destino.");
-
-            var peso = ValidarYResolverPeso(lr, numeroLinea);
+            var peso = CapturarSolicitudValidador.PesoResuelto(lr);
 
             var claveRuta = ClaveRuta(lr.Origen, lr.Destino);
             if (!rutasPorClave.TryGetValue(claveRuta, out var ruta))
@@ -268,13 +268,12 @@ public sealed class CapturarSolicitudCommandHandler(
             return id;
         }
 
-        if (string.IsNullOrWhiteSpace(command.ClienteBp))
-            throw new ValidationFailedException("CLIENTE_REQUERIDO", "Indica el cliente (clienteId o clienteBp).");
         if (!clientesDw.Configurado)
             throw new ValidationFailedException("DWCUBOS_NO_CONFIGURADO",
                 "La conexión a los clientes reales no está configurada (ConnectionStrings:DwCubos).");
 
-        var bp = command.ClienteBp.Trim();
+        // No nulo: CapturarSolicitudValidador ya exigió ClienteId o ClienteBp.
+        var bp = command.ClienteBp!.Trim();
         var real = (await clientesDw.ListarAsync(ct)).FirstOrDefault(c => c.Bp == bp)
             ?? throw new ValidationFailedException("CLIENTE_BP_INVALIDO", $"El BP '{bp}' no existe en el catálogo de clientes.");
 
@@ -288,22 +287,6 @@ public sealed class CapturarSolicitudCommandHandler(
 
     // ------------------------------------------------------------- helpers
 
-    private static decimal ValidarYResolverPeso(CapturaLineaInput lr, int numeroLinea)
-    {
-        var sumaPosiciones = lr.Posiciones?.Where(p => p.PesoKg is > 0).Sum(p => p.Cantidad * p.PesoKg!.Value) ?? 0;
-        var peso = lr.Peso ?? (sumaPosiciones > 0 ? sumaPosiciones : (decimal?)null);
-
-        if (peso is null or <= 0)
-            throw new ValidationFailedException("PESO_REQUERIDO",
-                $"La línea {numeroLinea} ({lr.Origen} → {lr.Destino}) debe traer el peso total en kg (o posiciones con peso).");
-
-        if (sumaPosiciones > 0 && Math.Abs(peso.Value - sumaPosiciones) / peso.Value > 0.01m)
-            throw new ValidationFailedException("PESO_INCONSISTENTE",
-                $"En la línea {numeroLinea} ({lr.Origen} → {lr.Destino}) el peso total ({peso:0.##} kg) " +
-                $"no coincide con la suma de las posiciones ({sumaPosiciones:0.##} kg).");
-
-        return peso.Value;
-    }
 
     private static string SerializarCondiciones(CapturarSolicitudCommand command)
     {
@@ -326,12 +309,9 @@ public sealed class CapturarSolicitudCommandHandler(
 
     private static string ClaveVehiculo(string tipo, string? carroceria) => $"{Normalizar(tipo)}|{Normalizar(carroceria)}";
 
+    // El validador ya garantizó que parsea; aquí solo se convierte.
     private static ModalidadSolicitud? ParseModalidad(string? valor) =>
-        string.IsNullOrWhiteSpace(valor)
-            ? null
-            : Enum.TryParse<ModalidadSolicitud>(valor, ignoreCase: true, out var m)
-                ? m
-                : throw new ValidationFailedException("ENUM_INVALIDO", $"Valor inválido para 'modalidad': '{valor}'.");
+        string.IsNullOrWhiteSpace(valor) ? null : Enum.Parse<ModalidadSolicitud>(valor, ignoreCase: true);
 
     private static TipologiaCarga? ParseTipologia(string? valor)
     {

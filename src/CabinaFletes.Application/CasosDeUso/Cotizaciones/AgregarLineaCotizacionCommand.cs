@@ -1,5 +1,6 @@
 using CabinaFletes.Application.CasosDeUso.Cotizaciones.DTOs;
 using CabinaFletes.Application.CasosDeUso.Cotizaciones.Interfaces;
+using CabinaFletes.Application.CasosDeUso.Cotizaciones.Validadores;
 using CabinaFletes.Application.Common.Abstractions;
 using CabinaFletes.Application.Common.Exceptions;
 using CabinaFletes.Application.Common.Ports;
@@ -29,6 +30,8 @@ public sealed class AgregarLineaCotizacionCommandHandler(
 {
     public async Task<CotizacionDto> Handle(AgregarLineaCotizacionCommand command, CancellationToken ct = default)
     {
+        AgregarLineaCotizacionValidador.Validar(command);
+
         var c = await CargarEditableAsync(command.CotizacionId, ct);
 
         LineaSolicitud? lineaSol = null;
@@ -41,9 +44,7 @@ public sealed class AgregarLineaCotizacionCommandHandler(
             lineaSol.EstadoLinea = EstadoLinea.Revisada;
         }
 
-        var fuente = Enum.TryParse<FuenteFlete>(command.Fuente, ignoreCase: true, out var f) && Enum.IsDefined(f)
-            ? f
-            : throw new ValidationFailedException("FUENTE_INVALIDA", $"Fuente de flete inválida: '{command.Fuente}'.");
+        var fuente = Enum.Parse<FuenteFlete>(command.Fuente, ignoreCase: true);
 
         // Bloqueo: una tarifa histórica solo se reutiliza si hay al menos una VIGENTE
         // (≤ 1 semana) para la ruta/tipología. Si todas están vencidas, se exige una

@@ -1,3 +1,4 @@
+using CabinaFletes.Application.CasosDeUso.Cotizaciones.Excepciones;
 using CabinaFletes.Application.CasosDeUso.Cotizaciones;
 using CabinaFletes.Application.CasosDeUso.Cotizaciones.Interfaces;
 using CabinaFletes.Application.Common;
@@ -82,7 +83,7 @@ public class MarcarResultadoCommandTests
         var c = new Cotizacion { SolicitudId = Guid.NewGuid(), Estado = EstadoCotizacion.Borrador, Lineas = [] };
         _cotizaciones.Setup(r => r.ObtenerParaMarcarResultadoAsync(cotizacionId, default)).ReturnsAsync(c);
 
-        await Assert.ThrowsAsync<ValidationFailedException>(() =>
+        await Assert.ThrowsAsync<CotizacionSinFleteException>(() =>
             Handler().Handle(new MarcarResultadoCommand(cotizacionId, "ganada", null, null)));
     }
 

@@ -1,6 +1,8 @@
 using System.Text.Json;
 using CabinaFletes.Application.CasosDeUso.Cotizaciones.DTOs;
+using CabinaFletes.Application.CasosDeUso.Cotizaciones.Excepciones;
 using CabinaFletes.Application.CasosDeUso.Cotizaciones.Interfaces;
+using CabinaFletes.Application.CasosDeUso.Cotizaciones.Validadores;
 using CabinaFletes.Application.Common.Abstractions;
 using CabinaFletes.Application.Common.Dtos;
 using CabinaFletes.Application.Common.Exceptions;
@@ -28,12 +30,8 @@ public sealed class MarcarResultadoCommandHandler(
 {
     public async Task<CotizacionDto> Handle(MarcarResultadoCommand command, CancellationToken ct = default)
     {
-        // Validación defensiva del enum (además de la validación HTTP en Api): nunca se
-        // persiste un ResultadoCotizacion fuera de rango.
-        if (!Enum.TryParse<ResultadoCotizacion>(command.Resultado, ignoreCase: true, out var resultado)
-            || !Enum.IsDefined(resultado)
-            || resultado == ResultadoCotizacion.SinDefinir)
-            throw new ValidationFailedException("RESULTADO_INVALIDO", "El resultado debe ser 'ganada' o 'perdida'.");
+        MarcarResultadoValidador.Validar(command);
+        var resultado = Enum.Parse<ResultadoCotizacion>(command.Resultado, ignoreCase: true);
 
         var c = await cotizaciones.ObtenerParaMarcarResultadoAsync(command.CotizacionId, ct)
             ?? throw new NotFoundException("COTIZACION_NO_ENCONTRADA", "Cotización no encontrada.");
@@ -54,7 +52,7 @@ public sealed class MarcarResultadoCommandHandler(
         if (c.Estado == EstadoCotizacion.Borrador)
         {
             if (c.Lineas.Count == 0)
-                throw new ValidationFailedException("COTIZACION_SIN_FLETE", "No se puede marcar el resultado de una cotización sin líneas de flete.");
+                throw new CotizacionSinFleteException("marcar el resultado de");
             CotizacionCalculos.Recalcular(c);
             c.Estado = EstadoCotizacion.Entregada;
             c.EntregadaPor = usuarioActual.Id;
