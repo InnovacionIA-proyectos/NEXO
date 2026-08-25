@@ -1,0 +1,39 @@
+{
+  "caso": "exceso_de_peso_total_se_rechaza_con_razon",
+  "tipo": "optimizar",
+  "casos": [
+    {
+      "input": {
+        "capacidadKg": 500,
+        "items": "a_400kg_y_b_300kg"
+      },
+      "esperado": {
+        "colocaciones": [
+          {
+            "itemId": "a",
+            "x": 0,
+            "y": 0,
+            "z": 0,
+            "orientacion": {
+              "indice": 0,
+              "largoMm": 1000,
+              "anchoMm": 1000,
+              "altoMm": 1000
+            },
+            "soporteId": null,
+            "porcentajeSoporte": 1,
+            "estadoEstabilidad": "estable",
+            "accesibilidad": "accesible"
+          }
+        ],
+        "rechazos": [
+          {
+            "itemId": "b",
+            "codigoRazon": "PESO_TOTAL"
+          }
+        ],
+        "incidenciasCodigos": []
+      }
+    }
+  ]
+}

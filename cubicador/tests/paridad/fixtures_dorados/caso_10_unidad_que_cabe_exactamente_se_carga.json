@@ -1,0 +1,34 @@
+{
+  "caso": "unidad_que_cabe_exactamente_se_carga",
+  "tipo": "optimizar",
+  "casos": [
+    {
+      "input": {
+        "contenedor": "seccion_completa_13600x2450x2700",
+        "item": "a_13600x2450x2700_no_rotable"
+      },
+      "esperado": {
+        "colocaciones": [
+          {
+            "itemId": "a",
+            "x": 0,
+            "y": 0,
+            "z": 0,
+            "orientacion": {
+              "indice": 0,
+              "largoMm": 13600,
+              "anchoMm": 2450,
+              "altoMm": 2700
+            },
+            "soporteId": null,
+            "porcentajeSoporte": 1,
+            "estadoEstabilidad": "estable",
+            "accesibilidad": "accesible"
+          }
+        ],
+        "rechazos": [],
+        "incidenciasCodigos": []
+      }
+    }
+  ]
+}

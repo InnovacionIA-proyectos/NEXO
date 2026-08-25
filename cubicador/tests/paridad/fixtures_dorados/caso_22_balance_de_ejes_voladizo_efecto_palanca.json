@@ -1,0 +1,17 @@
+{
+  "caso": "balance_de_ejes_voladizo_efecto_palanca",
+  "tipo": "estimar_peso_por_eje",
+  "casos": [
+    {
+      "input": {
+        "itemXMm": 0
+      },
+      "esperado": {
+        "porEjeRedondeado": [
+          10526,
+          -526
+        ]
+      }
+    }
+  ]
+}

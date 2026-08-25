@@ -1,0 +1,38 @@
+{
+  "caso": "apilamiento_excede_peso_soportado_se_rechaza",
+  "tipo": "optimizar",
+  "casos": [
+    {
+      "input": {
+        "items": "base_max_peso_encima_50_y_arriba"
+      },
+      "esperado": {
+        "colocaciones": [
+          {
+            "itemId": "base",
+            "x": 0,
+            "y": 0,
+            "z": 0,
+            "orientacion": {
+              "indice": 0,
+              "largoMm": 1200,
+              "anchoMm": 1000,
+              "altoMm": 1000
+            },
+            "soporteId": null,
+            "porcentajeSoporte": 1,
+            "estadoEstabilidad": "estable",
+            "accesibilidad": "accesible"
+          }
+        ],
+        "rechazos": [
+          {
+            "itemId": "arriba",
+            "codigoRazon": "SIN_ESPACIO"
+          }
+        ],
+        "incidenciasCodigos": []
+      }
+    }
+  ]
+}

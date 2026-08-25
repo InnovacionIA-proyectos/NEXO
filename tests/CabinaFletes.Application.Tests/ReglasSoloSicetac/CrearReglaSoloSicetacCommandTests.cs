@@ -30,9 +30,7 @@ public class CrearReglaSoloSicetacCommandTests
     [Fact]
     public async Task Regla_duplicada_lanza_ConflictException()
     {
-        // Normalizar() pasa a mayúsculas y colapsa espacios, pero NO quita tildes:
-        // "Bogotá" queda "BOGOTÁ". Con "BOGOTA" el mock no coincide y devuelve false.
-        _reglas.Setup(r => r.ExisteAsync("BOGOTÁ", "CALI", "TURBO", default)).ReturnsAsync(true);
+        _reglas.Setup(r => r.ExisteAsync("BOGOTA", "CALI", "TURBO", default)).ReturnsAsync(true);
 
         await Assert.ThrowsAsync<ConflictException>(() =>
             Handler().Handle(new CrearReglaSoloSicetacCommand("Bogotá", "Cali", "Turbo")));
@@ -48,7 +46,7 @@ public class CrearReglaSoloSicetacCommandTests
         var dto = await Handler().Handle(new CrearReglaSoloSicetacCommand("  bogotá   d.c.  ", "cali", "turbo con estacas"));
 
         Assert.NotNull(guardada);
-        Assert.Equal("BOGOTÁ D.C.", guardada!.Origen);
+        Assert.Equal("BOGOTA D.C.", guardada!.Origen);
         Assert.Equal("CALI", guardada.Destino);
         Assert.Equal("TURBO CON ESTACAS", guardada.TipoVehiculo);
         Assert.Equal(guardada.Id, dto.Id);

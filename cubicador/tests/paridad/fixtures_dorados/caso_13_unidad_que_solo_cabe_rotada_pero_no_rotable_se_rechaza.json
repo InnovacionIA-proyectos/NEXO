@@ -1,0 +1,21 @@
+{
+  "caso": "unidad_que_solo_cabe_rotada_pero_no_rotable_se_rechaza",
+  "tipo": "optimizar",
+  "casos": [
+    {
+      "input": {
+        "item": "a_1000x2600x1000_no_rotable"
+      },
+      "esperado": {
+        "colocaciones": [],
+        "rechazos": [
+          {
+            "itemId": "a",
+            "codigoRazon": "PUERTA"
+          }
+        ],
+        "incidenciasCodigos": []
+      }
+    }
+  ]
+}
