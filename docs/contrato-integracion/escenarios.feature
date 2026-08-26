@@ -182,3 +182,40 @@ Característica: Identidad e integración con el portal de la Administración
     Cuando consulta el trabajo por su identificador
     Entonces obtiene el estado actual y su secuencia
     Y desde ahí descarta los avisos con secuencia menor o igual
+
+  @hu-051 @priorizacion
+  Escenario: La bandeja se reordena al recalcular el puntaje por paso del tiempo
+    Dado un trabajo de recálculo programado en el broker
+    Cuando vence el plazo
+    Entonces se pide refrescar el puntaje de las solicitudes activas
+    Y el plazo siguiente queda programado
+
+  @hu-051 @priorizacion
+  Escenario: La bandeja se reordena al recalcular el puntaje por cambio de parámetros
+    Dado un Admin que cambia el horizonte de urgencia de 240 a 4000 horas
+    Cuando guarda el cambio
+    Entonces la respuesta es inmediata y no espera el recálculo
+    Y se pide refrescar el puntaje sin esperar el plazo
+    Y una solicitud a 30 días de su deadline pasa de 0 a 82
+
+  @hu-051 @priorizacion
+  Escenario: Cambiar un peso no mueve ningún puntaje
+    Dado que el total del puntaje es solo la urgencia por deadline
+    Cuando el Admin cambia el peso de urgencia de 0.40 a 0.60
+    Entonces se revisan todas las solicitudes activas
+    Y no se actualiza ninguna
+
+  @hu-051 @priorizacion
+  Escenario: Pesos que no suman uno se rechazan
+    Dado un Admin que envía pesos que suman 1.3
+    Cuando guarda el cambio
+    Entonces la respuesta es 400 PARAMETROS_SCORE_INVALIDOS
+    Y los parámetros guardados no cambiaron
+
+  @hu-051 @priorizacion
+  Escenario: El recálculo falla sin afectar mi trabajo
+    Dado un recálculo del puntaje que falla
+    Cuando se agotan sus reintentos
+    Entonces el mensaje queda en la cola de error para alertar al equipo
+    Y el API sigue atendiendo con normalidad
+    Y el plazo siguiente sigue programado

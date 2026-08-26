@@ -1,6 +1,6 @@
 # Contrato de integración — Nexo (Cabina de Fletes) ↔ Portal de la Administración
 
-**Versión 1.3.0** · Sprint 2 · Issues #7, #15, #16 y #17
+**Versión 1.4.0** · Sprint 2 · Issues #7, #15, #16, #17 y #19
 
 Este documento manda. El módulo `cabina-fletes` del portal está en desarrollo y no
 es la referencia: lo que hoy tenga construido se adapta a lo que diga aquí, no al
@@ -186,6 +186,7 @@ decide qué mostrar.
 | Servicios conexos: crear, editar, importar | `ServiciosLogisticos`, `AdminTarifas`, `Admin` |
 | Reglas solo SICE-TAC (todo) | `AdminTarifas`, `Admin` |
 | Métricas de cumplimiento | `LiderProceso`, `AdminTarifas`, `Admin` |
+| `GET` y `PUT /api/priorizacion/parametros` | `Admin` |
 | Lecturas de biblioteca, solicitudes, cotizaciones, conexos | Cualquier rol autenticado |
 
 Cuando esta tabla y el código no coincidan, es un defecto y se corrige el código.
@@ -364,6 +365,67 @@ sería mentir.
 
 Quien construya la pantalla asumiendo que los avisos llegan siempre va a tener un
 error que solo aparece con mala red y que es muy difícil de reproducir.
+
+---
+
+## 5.1 Recalibrar la priorización
+
+```http
+GET  /api/priorizacion/parametros
+PUT  /api/priorizacion/parametros
+```
+
+Solo `Admin`. Cambiar estos pesos reordena la bandeja de TODO el mundo: le cambia el
+trabajo a los coordinadores sin que ellos hayan tocado nada. No es una preferencia de
+pantalla, es política de operación.
+
+```json
+{
+  "pesoUrgencia": 0.40,
+  "pesoValor": 0.30,
+  "pesoProbabilidad": 0.20,
+  "pesoTipo": 0.10,
+  "horizonteHoras": 240,
+  "valorReferencia": 100000000,
+  "puntajeLicitacion": 100,
+  "puntajeSpot": 50,
+  "valorPorDefectoSinValor": 30,
+  "probabilidadPorDefecto": 50
+}
+```
+
+### Cuidado: hoy solo `horizonteHoras` mueve el puntaje
+
+Esto hay que saberlo antes de construir la pantalla, porque si no el Admin va a mover un
+peso, no va a pasar nada, y va a reportar un defecto que no existe.
+
+Por decisión de negocio, el puntaje total es **exclusivamente la urgencia por deadline**.
+Los otros tres componentes se calculan y se muestran en el desglose, pero no se ponderan
+en el total. Consecuencia directa:
+
+| Parámetro | ¿Mueve el puntaje? |
+|---|---|
+| `horizonteHoras` | **Sí.** Es la rampa: vencido = 100, fuera del horizonte = 0 |
+| `pesoUrgencia`, `pesoValor`, `pesoProbabilidad`, `pesoTipo` | No. Configuración dormida |
+| `valorReferencia`, `puntajeLicitacion`, `puntajeSpot`, y los dos por defecto | No en el total; sí en el desglose de una solicitud |
+
+Medido contra el backend corriendo: subir `pesoUrgencia` de 0.40 a 0.60 recalculó las 12
+solicitudes activas y actualizó **cero**. Subir `horizonteHoras` de 240 a 4000 llevó una
+solicitud a 30 días de su deadline de **0.00 a 82.00**.
+
+**Los cuatro pesos deben sumar 1.0** de todas formas, y la respuesta es
+`400 PARAMETROS_SCORE_INVALIDOS` si no. No porque hoy importen, sino para que el día que
+el total vuelva a ser una suma ponderada no arranque con una configuración torcida.
+
+**El `PUT` responde de inmediato y no espera el recálculo.** Guardar los pesos y refrescar
+el score de todas las solicitudes activas son dos cosas: la segunda corre aparte, con sus
+reintentos. Así recalibrar no deja al Admin esperando, y un fallo del refresco no le
+devuelve un error por un cambio que sí se guardó.
+
+Ese refresco es del valor PERSISTIDO, el que leen métricas y tableros. **La bandeja no lo
+necesita**: recalcula el score al leerlo, porque la urgencia depende del ahora y una
+licitación tiene que subir sola a medida que se acerca su deadline. Por eso el orden que se
+ve en pantalla ya está al día antes de recalibrar nada.
 
 ---
 

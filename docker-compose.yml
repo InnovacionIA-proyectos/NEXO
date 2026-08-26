@@ -85,6 +85,13 @@ services:
       # Poner en "false" en producción real una vez cargados los datos definitivos.
       Database__SeedOnStartup: ${SEED_ON_STARTUP:-true}
       Cors__FrontendOrigin: ${FRONTEND_ORIGIN:-http://localhost:5173}
+      # Recálculo del score persistido (#19). El reloj vive en el broker, no en este
+      # proceso, así que cambiar el intervalo solo afecta cada cuánto suena: no hay
+      # temporizador en memoria que se duplique con las réplicas.
+      Score__IntervaloRecalculoMinutos: ${SCORE_INTERVALO_MINUTOS:-15}
+      # Cuántas solicitudes por lote. Existe para no dejar una transacción larga
+      # bloqueando filas que la bandeja está leyendo.
+      Score__TamanoDeLoteRecalculo: ${SCORE_TAMANO_LOTE:-200}
       AzureAd__Instance: ${AzureAd__Instance:-https://login.microsoftonline.com/}
       AzureAd__TenantId: ${AzureAd__TenantId:-}
       AzureAd__ClientId: ${AzureAd__ClientId:-}
