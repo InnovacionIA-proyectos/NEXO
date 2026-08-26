@@ -39,3 +39,29 @@ public record EstadoTrabajoDto(
     DateTimeOffset SolicitadoEn,
     DateTimeOffset? TerminadoEn,
     IReadOnlyList<PendienteDeCosteoDto> Pendientes);
+
+/// <summary>
+/// Lo que viaja por el canal de avisos cuando un trabajo cambia.
+///
+/// Es el estado SIN la lista de pendientes, y se construye desde <see cref="EstadoTrabajoDto"/>
+/// para que los campos compartidos no puedan divergir. La equivalencia que pide el
+/// contrato no se consigue escribiendo dos cosas parecidas: se consigue derivando una
+/// de la otra.
+///
+/// POR QUÉ NO LLEVA LOS PENDIENTES. Un pliego de 300 líneas con 50 pendientes pesa
+/// entre 12 y 25 KB —cada motivo admite 500 caracteres— y se avisa 300 veces: son
+/// varios megabytes por pliego y por cliente conectado. Solo con los contadores el
+/// aviso pesa unos 200 bytes.
+///
+/// El reparto es ese: el aviso mueve la barra de progreso, la consulta trae el detalle
+/// cuando alguien lo necesita — al terminar, o al abrir el panel de pendientes.
+/// </summary>
+public record AvisoDeTrabajo(
+    Guid TrabajoId,
+    string Estado,
+    AvanceTrabajoDto Avance,
+    DateTimeOffset? TerminadoEn)
+{
+    public static AvisoDeTrabajo Desde(EstadoTrabajoDto estado) =>
+        new(estado.TrabajoId, estado.Estado, estado.Avance, estado.TerminadoEn);
+}

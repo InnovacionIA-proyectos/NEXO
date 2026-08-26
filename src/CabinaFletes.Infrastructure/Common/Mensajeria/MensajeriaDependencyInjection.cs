@@ -9,6 +9,7 @@ using CabinaFletes.Infrastructure.Costeo.Repositorios;
 using CabinaFletes.Infrastructure.Solicitudes.Adaptadores;
 using CabinaFletes.Application.CasosDeUso.Trabajos.Interfaces;
 using CabinaFletes.Infrastructure.Solicitudes.Repositorios;
+using CabinaFletes.Infrastructure.Trabajos.Adaptadores;
 using CabinaFletes.Infrastructure.Trabajos.Repositorios;
 using CabinaFletes.Mensajes.Costeo;
 using CabinaFletes.Mensajes.Solicitudes;
@@ -55,6 +56,11 @@ public static class MensajeriaDependencyInjection
             // trabajo ya cerró, y cerró en Parcial con razón.
             x.AddConsumer<RecosteoPorTarifasConsumer>();
             x.AddConsumer<RecostearLineaConsumer>();
+
+            // Empuja el avance a quien esté mirando el trabajo. Lee el estado en vez de
+            // confiar en el mensaje: así el aviso y la consulta de respaldo salen de la
+            // misma fuente y no pueden decir cosas distintas.
+            x.AddConsumer<AvisarTrabajoConsumer>();
 
 
             // La saga se persiste en la misma base que los datos del negocio. Su estado
@@ -137,6 +143,7 @@ public static class MensajeriaDependencyInjection
         services.AddScoped<IValidadorDeMensaje<LineaRequiereTarifaManual>, LineaRequiereTarifaManualValidador>();
         services.AddScoped<IValidadorDeMensaje<TarifasActualizadas>, TarifasActualizadasValidador>();
         services.AddScoped<IValidadorDeMensaje<RecostearLineaSolicitada>, RecostearLineaSolicitadaValidador>();
+        services.AddScoped<IValidadorDeMensaje<TrabajoActualizado>, TrabajoActualizadoValidador>();
 
         return services;
     }

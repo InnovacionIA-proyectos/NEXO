@@ -1,3 +1,5 @@
+using CabinaFletes.Api.Trabajos;
+using CabinaFletes.Application.CasosDeUso.Trabajos.Interfaces;
 using CabinaFletes.Application.CasosDeUso.Costeo;
 using CabinaFletes.Application.CasosDeUso.Trabajos;
 using CabinaFletes.Infrastructure.Common.Mensajeria;
@@ -55,6 +57,11 @@ builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddMensajeria(builder.Configuration);
 builder.Services.AddTrabajosUseCases();
 builder.Services.AddCosteoUseCases();
+
+// Canal de avisos. El adaptador vive aquí porque SignalR es ASP.NET Core; el
+// consumidor de Infrastructure solo conoce el puerto.
+builder.Services.AddSignalR();
+builder.Services.AddScoped<INotificadorDeTrabajos, NotificadorSignalR>();
 builder.Services.AddCotizacionesUseCases();
 builder.Services.AddReglasSoloSicetacUseCases();
 builder.Services.AddAjustesVigenciaPlazaUseCases();
@@ -181,6 +188,10 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+
+// El canal de avisos del avance de trabajos. La ruta es parte del contrato con el
+// frontend: es a donde se conecta el cliente para suscribirse a un trabajo.
+app.MapHub<TrabajosHub>("/hubs/trabajos");
 app.MapHealthChecks("/health").AllowAnonymous();
 
 app.Run();

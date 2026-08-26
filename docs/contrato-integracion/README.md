@@ -1,6 +1,6 @@
 # Contrato de integración — Nexo (Cabina de Fletes) ↔ Portal de la Administración
 
-**Versión 1.2.0** · Sprint 2 · Issues #7 y #15
+**Versión 1.3.0** · Sprint 2 · Issues #7, #15, #16 y #17
 
 Este documento manda. El módulo `cabina-fletes` del portal está en desarrollo y no
 es la referencia: lo que hoy tenga construido se adapta a lo que diga aquí, no al
@@ -292,13 +292,49 @@ líneas hay.
 
 ## 5. Avisos en vivo
 
-El backend empuja el avance por SignalR. El frontend se suscribe al trabajo y
-recibe los cambios de estado sin preguntar.
+```
+Hub:      /hubs/trabajos          (requiere la misma identidad que el API)
+Suscribir:   Suscribir(trabajoId)
+Desuscribir: Desuscribir(trabajoId)
+Evento:      "avance"
+```
 
-**El aviso en vivo es una mejora, no una garantía.** La conexión se cae, el
-navegador se duerme, la persona cambia de pestaña. La verdad siempre está en
-`GET /api/trabajos/{id}`, y el frontend tiene que poder reconstruir el estado
-completo con esa consulta sola, sin haber recibido un solo aviso.
+Cada trabajo es un grupo, así que solo llegan los avisos de los trabajos a los que
+el cliente se suscribió. No hay difusión general.
+
+### Qué trae el aviso, y qué no
+
+```json
+{
+  "trabajoId": "3f2b...",
+  "estado": "Procesando",
+  "avance": { "total": 300, "resueltas": 187, "pendientes": 3,
+              "pendientesTecnicas": 1, "requierenTarifaManual": 2 },
+  "terminadoEn": null
+}
+```
+
+Es el mismo estado que devuelve la consulta **sin la lista de pendientes**, y se
+construye desde ella para que los campos compartidos no puedan divergir.
+
+La lista no viaja por una razón medida: un pliego de 300 líneas con 50 pendientes
+pesa entre 12 y 25 KB por aviso, y se avisa unas 300 veces. Serían varios megabytes
+por pliego y por cliente conectado. Solo con los contadores el aviso pesa unos 200
+bytes.
+
+**El reparto es ese: el aviso mueve la barra de progreso, la consulta trae el
+detalle.** Quien necesite ver qué líneas están pendientes y por qué, llama a
+`GET /api/trabajos/{id}` — al terminar, o cuando el usuario abra ese panel.
+
+### El aviso es una mejora, no una garantía
+
+La conexión se cae, el navegador se duerme, la persona cambia de pestaña. La verdad
+siempre está en `GET /api/trabajos/{id}`, y el frontend tiene que poder reconstruir
+el estado completo con esa consulta sola, sin haber recibido un solo aviso.
+
+**SignalR NO reenvía lo que te perdiste mientras estabas desconectado.** Al
+reconectar hay que consultar el estado; el canal no tiene memoria. Prometer otra cosa
+sería mentir.
 
 Quien construya la pantalla asumiendo que los avisos llegan siempre va a tener un
 error que solo aparece con mala red y que es muy difícil de reproducir.
