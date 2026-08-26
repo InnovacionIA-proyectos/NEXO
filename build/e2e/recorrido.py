@@ -31,6 +31,7 @@ Termina con código distinto de cero si algo falla, para que sirva en un pipelin
 import json
 import os
 import sys
+import threading
 import time
 import urllib.error
 import urllib.parse
@@ -102,17 +103,22 @@ def parametros(horizonte=240, urgencia=0.40, valor=0.30, prob=0.20, tipo=0.10):
 
 class ClienteDelHub:
     """
-    Cliente del hub de avisos por long polling, con la biblioteca estándar.
+    Cliente de un hub de SignalR por long polling, con la biblioteca estándar.
 
     Se usa long polling y no WebSocket para no depender de instalar una librería: es uno
     de los tres transportes que el propio hub negocia, y el camino de empuje es el mismo.
+
+    Sirve para los dos hubs —el de trabajos y el de bandeja— porque la ruta es parámetro.
     """
 
-    def __init__(self):
+    def __init__(self, ruta="/hubs/trabajos"):
+        self.ruta = ruta
         self.token = None
+        self._escuchando = False
+        self._hilo = None
 
     def _url(self):
-        return f"{API}/hubs/trabajos?id={urllib.parse.quote(self.token)}"
+        return f"{API}{self.ruta}?id={urllib.parse.quote(self.token)}"
 
     def _enviar(self, cuerpo):
         req = urllib.request.Request(self._url(), data=cuerpo.encode(), method="POST")
@@ -132,36 +138,65 @@ class ClienteDelHub:
 
     def conectar(self):
         req = urllib.request.Request(
-            f"{API}/hubs/trabajos/negotiate?negotiateVersion=1", method="POST")
+            f"{API}{self.ruta}/negotiate?negotiateVersion=1", method="POST")
         req.add_header(*ADMIN)
         with urllib.request.urlopen(req, timeout=15) as r:
             negociacion = json.load(r)
         self.token = negociacion["connectionToken"]
         transportes = [t["transport"] for t in negociacion["availableTransports"]]
-        ok("LongPolling" in transportes, f"transportes ofrecidos por el hub: {transportes}")
+        ok("LongPolling" in transportes, f"transportes de {self.ruta}: {transportes}")
         self._enviar(json.dumps({"protocol": "json", "version": 1}) + SEP)
         # El primer sondeo puede volver vacío según cómo caiga el ciclo. Que el apretón de
         # manos sirvió lo demuestra que después lleguen avisos.
         self._sondear(10)
 
-    def invocar(self, metodo, argumentos):
+    def invocar(self, metodo, argumentos=None):
         self._enviar(json.dumps({"type": 1, "target": metodo,
-                                 "arguments": argumentos, "invocationId": "1"}) + SEP)
+                                 "arguments": argumentos or [], "invocationId": "1"}) + SEP)
+
+    def _leer(self, crudo, evento, destino):
+        for trozo in (crudo or "").split(SEP):
+            if not trozo.strip():
+                continue
+            try:
+                m = json.loads(trozo)
+            except json.JSONDecodeError:
+                continue
+            if m.get("type") == 1 and m.get("target") == evento:
+                destino.append(m["arguments"][0])
 
     def recolectar(self, evento, segundos):
         recibidos, limite = [], time.time() + segundos
         while time.time() < limite:
-            crudo = self._sondear(8)
-            for trozo in (crudo or "").split(SEP):
-                if not trozo.strip():
-                    continue
-                try:
-                    m = json.loads(trozo)
-                except json.JSONDecodeError:
-                    continue
-                if m.get("type") == 1 and m.get("target") == evento:
-                    recibidos.append(m["arguments"][0])
+            self._leer(self._sondear(8), evento, recibidos)
         return recibidos
+
+    def escuchar_en_segundo_plano(self, evento):
+        """
+        Sondea sin parar en un hilo aparte y acumula lo que llegue.
+
+        HACE FALTA, no es comodidad. Con long polling el sondeo ES la conexión: si el
+        cliente deja de sondear, el servidor lo da por desconectado y lo saca de sus
+        grupos. Suscribirse y volver cuarenta segundos después no funciona — se pierde
+        todo lo de mientras y encima sin error, que es lo que despista.
+
+        Un cliente de SignalR de verdad hace esto solo; aquí hay que hacerlo a mano.
+        """
+        recibidos = []
+        self._escuchando = True
+
+        def bucle():
+            while self._escuchando:
+                self._leer(self._sondear(8), evento, recibidos)
+
+        self._hilo = threading.Thread(target=bucle, daemon=True)
+        self._hilo.start()
+        return recibidos
+
+    def dejar_de_escuchar(self):
+        self._escuchando = False
+        if getattr(self, "_hilo", None):
+            self._hilo.join(timeout=12)
 
     def cerrar(self):
         try:
@@ -199,11 +234,24 @@ def main():
     _, p = pedir("/api/priorizacion/parametros")
     ok(p["pesoUrgencia"] == 0.40, "un rechazo no dejó los parámetros a medio cambiar")
 
+    paso("Autorización del canal de bandeja (HU-05.2)")
+    codigo, _ = pedir("/hubs/bandeja/negotiate?negotiateVersion=1",
+                      None, "POST", rol=("Accept", "*/*"))
+    ok(codigo == 401, f"negotiate de /hubs/bandeja sin identidad -> {codigo} (esperado 401)")
+
     paso("Solicitud con deadline futuro")
     _, clientes = pedir("/api/captura-solicitudes/clientes?q=a")
     if not ok(len(clientes) > 0, f"clientes disponibles = {len(clientes)}"):
         return
     cliente = clientes[0]["clienteId"]
+
+    # Se conecta al canal de bandeja ANTES de mover nada, para poder observar los avisos
+    # que provoca el resto del recorrido.
+    bandeja_hub = ClienteDelHub("/hubs/bandeja")
+    bandeja_hub.conectar()
+    bandeja_hub.invocar("Suscribir")
+    # Escucha desde ya y sin parar: con long polling, dejar de sondear es desconectarse.
+    avisos_bandeja = bandeja_hub.escuchar_en_segundo_plano("bandeja")
     # 30 días = 720 horas. Con horizonte 240 queda fuera y el puntaje es 0; el paso final
     # sube el horizonte a 4000 y tiene que pasar a 82 = 100*(1 - 720/4000).
     deadline = (datetime.now(timezone.utc) + timedelta(days=30)).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -271,6 +319,22 @@ def main():
     ok(len(resultado["pendientes"]) == resultado["avance"]["pendientes"],
        "la lista de pendientes cuadra con su contador")
 
+    paso("Bandeja: el pliego entero produce UN aviso, no uno por línea (HU-05.2)")
+    time.sleep(6)   # margen para que lleguen los del cierre del trabajo
+    motivos = [a["motivo"] for a in list(avisos_bandeja)]
+    dato(f"motivos recibidos: {motivos}")
+
+    ok(motivos.count("solicitud-nueva") >= 1,
+       "el alta de la solicitud avisó a la bandeja")
+    ok(motivos.count("trabajo-terminado") == 1,
+       f"el pliego de 15 líneas produjo {motivos.count('trabajo-terminado')} aviso(s) de "
+       f"trabajo-terminado (esperado 1, NO 15)")
+    ok(all(set(a) == {"motivo", "en"} for a in list(avisos_bandeja)),
+       "el aviso es una señal, no la bandeja: solo motivo y fecha")
+    ok(motivos.count("trabajo-terminado") < len(avisos),
+       f"la bandeja avisó {motivos.count('trabajo-terminado')} vez del cierre y el avance "
+       f"{len(avisos)} veces: el canal de bandeja se agrupa, el de avance no")
+
     paso("Cotización completa sobre el módulo piloto")
     _, det = pedir(f"/api/solicitudes/{solicitud}")
     linea = det["lineas"][0]["lineaId"]
@@ -322,6 +386,16 @@ def main():
     time.sleep(8)
     ok(score_de(vigilada) == antes,
        f"el puntaje sigue en {antes} después de cambiar los pesos")
+
+    paso("Bandeja: recalibrar avisa por el canal (HU-05.2)")
+    antes = len(avisos_bandeja)
+    pedir("/api/priorizacion/parametros", parametros(240), "PUT", esperado=200)
+    time.sleep(8)
+    nuevos = [a["motivo"] for a in list(avisos_bandeja)[antes:]]
+    ok("parametros-recalibrados" in nuevos,
+       f"llegó el aviso de recalibración (motivos nuevos: {nuevos})")
+    bandeja_hub.dejar_de_escuchar()
+    bandeja_hub.cerrar()
 
     paso("Bandeja: sirve por puntaje descendente, no por orden de llegada")
     _, bandeja = pedir("/api/solicitudes?atencion=todas")
