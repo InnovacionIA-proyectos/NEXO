@@ -44,7 +44,11 @@ public class OutboxConsistenciaTests : IAsyncLifetime
         // que sin esto la prueba se vuelve intermitente — y una prueba intermitente enseña
         // al equipo a reintentar en vez de investigar.
         servicios.AddDbContext<CabinaFletesDbContext>(o =>
-            o.UseSqlServer(ApiFactory.TestConnection, sql => sql.CommandTimeout(180)));
+            o.UseSqlServer(
+                // Base propia: la de ApiFixture se borra al arrancar esa suite, y las
+                // colecciones de xUnit corren en paralelo.
+                ApiFactory.ConexionA("CabinaFletes_Outbox"),
+                sql => sql.CommandTimeout(180)));
 
         servicios.AddMassTransitTestHarness(x =>
         {

@@ -19,6 +19,26 @@ public class ApiFactory : WebApplicationFactory<Program>
         Environment.GetEnvironmentVariable("TEST_DB_CONNECTION")
         ?? "Server=localhost;Database=CabinaFletesClean_Test;Trusted_Connection=True;TrustServerCertificate=True;";
 
+    /// <summary>
+    /// La misma cadena apuntando a OTRA base.
+    ///
+    /// Hace falta porque xUnit corre las colecciones en paralelo y varias suites usaban
+    /// la misma base: <see cref="ApiFixture"/> hace EnsureDeleted al arrancar y se la
+    /// borraba en plena migración a las pruebas del outbox. El síntoma era "A severe
+    /// error occurred on the current command", que no dice nada del choque.
+    ///
+    /// Estuvo escondido varias sesiones porque las suites se corrían por separado y con
+    /// filtros. Cada grupo con su base: compartirla no aporta nada y sí acopla.
+    /// </summary>
+    public static string ConexionA(string baseDeDatos)
+    {
+        var constructor = new Microsoft.Data.SqlClient.SqlConnectionStringBuilder(TestConnection)
+        {
+            InitialCatalog = baseDeDatos
+        };
+        return constructor.ConnectionString;
+    }
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Development");

@@ -65,20 +65,27 @@ public sealed class AutoCosteoSaga : MassTransitStateMachine<EstadoAutoCosteo>
                 })
                 .Schedule(Expiracion, c => new ExpiracionAutoCosteo(c.Saga.CorrelationId))
                 .Publish(c => new RepartirLineasDeCosteo(c.Saga.CorrelationId, c.Saga.SolicitudId))
+                .Then(c => c.Saga.Secuencia++)
+                .Publish(c => new TrabajoActualizado(c.Saga.CorrelationId))
                 .TransitionTo(Procesando));
 
         During(Procesando,
             // El reparto puede llegar DESPUÉS de algunos resultados: hasta que no se
             // sabe el total, la saga no puede saber si ya terminó. De ahí que el cierre
             // se evalúe también aquí.
-            CerrarSiTermino(When(Repartido).Then(c => c.Saga.TotalLineas = c.Message.TotalLineas)),
-            CerrarSiTermino(When(LineaResuelta).Then(c => c.Saga.Resueltas++)),
-            CerrarSiTermino(When(LineaConFalloTecnico).Then(c => c.Saga.PendientesTecnicas++)),
-            CerrarSiTermino(When(LineaEsperandoPersona).Then(c => c.Saga.RequierenManual++)),
+            Avisar(CerrarSiTermino(When(Repartido).Then(c => c.Saga.TotalLineas = c.Message.TotalLineas))),
+            Avisar(CerrarSiTermino(When(LineaResuelta).Then(c => c.Saga.Resueltas++))),
+            Avisar(CerrarSiTermino(When(LineaConFalloTecnico).Then(c => c.Saga.PendientesTecnicas++))),
+            Avisar(CerrarSiTermino(When(LineaEsperandoPersona).Then(c => c.Saga.RequierenManual++))),
 
             When(Expiracion.Received)
-                .Then(c => c.Saga.TerminadoEn = DateTimeOffset.UtcNow)
-                .TransitionTo(Parcial));
+                .Then(c =>
+                {
+                    c.Saga.TerminadoEn = DateTimeOffset.UtcNow;
+                    c.Saga.Secuencia++;
+                })
+                .TransitionTo(Parcial)
+                .Publish(c => new TrabajoActualizado(c.Saga.CorrelationId)));
 
         // Un trabajo ya cerrado no se reabre por un mensaje que llegó tarde: se ignora
         // en vez de reventar la saga. Pasa de verdad — un reintento que se resolvió
@@ -94,6 +101,24 @@ public sealed class AutoCosteoSaga : MassTransitStateMachine<EstadoAutoCosteo>
         // terminar, y el estado es justamente lo que el cliente consulta después. Un
         // trabajo terminado tiene que seguir siendo consultable.
     }
+
+    /// <summary>
+    /// Anuncia que el trabajo cambió, para que quien lo esté mirando lo vea.
+    ///
+    /// Se avisa en CADA cambio y no solo en hitos: una barra que salta de cero a cien no
+    /// informa nada, y quien espera un pliego largo necesita ver que algo se mueve.
+    ///
+    /// El costo está medido y es asumible a la escala del PRD: el mensaje lleva solo el
+    /// identificador, así que un pliego de 300 líneas son 300 mensajes diminutos. Si algún
+    /// día un pliego pasa de ~2.000 líneas, o el Outbox se queda con más de ~5.000 filas
+    /// vivas, toca agrupar los avisos. Está en una sola actividad justamente para que ese
+    /// cambio sea de una línea.
+    /// </summary>
+    private static EventActivityBinder<EstadoAutoCosteo, T> Avisar<T>(
+        EventActivityBinder<EstadoAutoCosteo, T> binder) where T : class =>
+        binder
+            .Then(c => c.Saga.Secuencia++)
+            .Publish(c => new TrabajoActualizado(c.Saga.CorrelationId));
 
     /// <summary>
     /// Cuando todas las líneas tienen desenlace, cierra el trabajo: apaga el timeout y

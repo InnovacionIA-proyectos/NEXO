@@ -347,6 +347,29 @@ public class CabinaFletesDbContext : DbContext
             });
         });
 
+        // LA CLAVE LA ASIGNA EL DOMINIO, NO LA BASE.
+        //
+        // Las entidades nacen con su Id (`= Guid.NewGuid()`), que es lo correcto en DDD:
+        // una entidad tiene identidad desde que existe, no desde que se guarda. Pero por
+        // convención EF marca toda clave Guid como generada al insertar, y entonces una
+        // clave YA puesta le dice "esto viene de la base, o sea ya existe". Al agregar un
+        // hijo nuevo a un padre ya persistido, EF emitía UPDATE en vez de INSERT: cero
+        // filas afectadas, DbUpdateConcurrencyException y un 409 CONFLICTO_CONCURRENCIA
+        // al usuario.
+        //
+        // Se rompía POST /api/cotizaciones/{id}/lineas —agregar el flete a una cotización,
+        // el camino principal del módulo piloto— y llevaba así desde antes del sprint 2.
+        // No se veía porque la suite de Api.Tests no se corría completa.
+        //
+        // Esto le dice al modelo lo que de verdad pasa: la clave llega puesta y hay que
+        // insertarla tal cual.
+        foreach (var entity in b.Model.GetEntityTypes().Where(t => t.ClrType.IsClass))
+        {
+            var clave = entity.FindPrimaryKey();
+            if (clave is { Properties.Count: 1 } && clave.Properties[0].ClrType == typeof(Guid))
+                b.Entity(entity.ClrType).Property(clave.Properties[0].Name).ValueGeneratedNever();
+        }
+
         // Default a nivel de BD para los timestamps de toda tabla auditable.
         foreach (var entity in b.Model.GetEntityTypes()
                      .Where(t => typeof(IAuditable).IsAssignableFrom(t.ClrType)))

@@ -88,6 +88,11 @@ public sealed class RecostearLineaSolicitadaValidador : IValidadorDeMensaje<Reco
         Motivos.De(("TrabajoId", m.TrabajoId), ("SolicitudId", m.SolicitudId), ("LineaId", m.LineaId));
 }
 
+public sealed class TrabajoActualizadoValidador : IValidadorDeMensaje<TrabajoActualizado>
+{
+    public IReadOnlyList<string> Validar(TrabajoActualizado m) => Motivos.De(("TrabajoId", m.TrabajoId));
+}
+
 /// <summary>Los identificadores vacíos son el motivo que se repite en todos los mensajes.</summary>
 internal static class Motivos
 {

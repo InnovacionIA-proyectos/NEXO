@@ -178,6 +178,62 @@ public class AutoCosteoSagaTests : IAsyncLifetime
         Assert.Equal(1, despues.Resueltas);
     }
 
+    // ---------------------------------------------- avisos (issue #17)
+
+    [Fact]
+    public async Task Cada_cambio_de_estado_anuncia_el_trabajo()
+    {
+        var trabajoId = await IniciarTrabajo(2);
+
+        await _bus.Bus.Publish(new LineaCosteada(trabajoId, Guid.NewGuid(), 1_000_000m, "Sicetac"));
+        await _bus.Bus.Publish(new LineaCosteada(trabajoId, Guid.NewGuid(), 900_000m, "Sicetac"));
+        await EsperarEstado(trabajoId, e => e.ConDesenlace == 2);
+
+        // Uno al arrancar, uno por el reparto y uno por cada línea. Se avisa en cada
+        // cambio y no solo al final: una barra que salta de cero a cien no informa nada.
+        var avisos = _bus.Published.Select<TrabajoActualizado>()
+            .Count(m => m.Context.Message.TrabajoId == trabajoId);
+
+        Assert.True(avisos >= 4, $"Se esperaban al menos 4 avisos y hubo {avisos}.");
+    }
+
+    [Fact]
+    public async Task El_aviso_lleva_solo_el_identificador_para_que_no_pueda_llegar_desordenado_con_datos_viejos()
+    {
+        var trabajoId = await IniciarTrabajo(1);
+        await _bus.Bus.Publish(new LineaCosteada(trabajoId, Guid.NewGuid(), 500_000m, "Sicetac"));
+        await EsperarEstado(trabajoId, e => e.ConDesenlace == 1);
+
+        var aviso = _bus.Published.Select<TrabajoActualizado>()
+            .First(m => m.Context.Message.TrabajoId == trabajoId).Context.Message;
+
+        // Si el mensaje llevara su propia foto del avance, uno viejo entregado tarde
+        // haría RETROCEDER la barra. Llevando solo el id, quien recibe lee el estado
+        // actual y lo peor que pasa es avisar dos veces lo mismo.
+        Assert.Single(typeof(TrabajoActualizado).GetProperties());
+        Assert.Equal(trabajoId, aviso.TrabajoId);
+    }
+
+    [Fact]
+    public async Task La_secuencia_del_trabajo_solo_crece()
+    {
+        var trabajoId = await IniciarTrabajo(3);
+        var alArrancar = (await EsperarEstado(trabajoId, e => e.TotalLineas == 3)).Secuencia;
+
+        await _bus.Bus.Publish(new LineaCosteada(trabajoId, Guid.NewGuid(), 1_000_000m, "Sicetac"));
+        var trasUnaLinea = (await EsperarEstado(trabajoId, e => e.ConDesenlace == 1)).Secuencia;
+
+        await _bus.Bus.Publish(new LineaFalloTecnico(trabajoId, Guid.NewGuid(), "Sicetac no responde"));
+        var trasElFallo = (await EsperarEstado(trabajoId, e => e.ConDesenlace == 2)).Secuencia;
+
+        // Que solo crezca es lo que permite al navegador descartar un aviso rezagado.
+        // Leer el estado actual evita datos viejos DENTRO del aviso, pero dos avisos
+        // procesados a la vez pueden llegar al revés y dejar la barra retrocedida.
+        Assert.True(alArrancar > 0, "Arrancar el trabajo ya es un cambio y debe contar.");
+        Assert.True(trasUnaLinea > alArrancar, $"{trasUnaLinea} no es mayor que {alArrancar}.");
+        Assert.True(trasElFallo > trasUnaLinea, $"{trasElFallo} no es mayor que {trasUnaLinea}.");
+    }
+
     private async Task<EstadoAutoCosteo> EsperarEstado(
         Guid trabajoId, Func<EstadoAutoCosteo, bool> condicion, int intentos = 50)
     {

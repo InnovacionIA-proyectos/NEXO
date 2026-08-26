@@ -81,3 +81,19 @@ public sealed record TarifasActualizadas(string Motivo, DateTimeOffset OcurridoE
 /// pendiente, no el trabajo de entonces.
 /// </summary>
 public sealed record RecostearLineaSolicitada(Guid TrabajoId, Guid SolicitudId, Guid LineaId);
+
+/// <summary>
+/// El estado de un trabajo cambió. Sirve para avisarle a quien lo esté mirando.
+///
+/// Lleva SOLO el identificador, no el estado. Quien lo recibe lee el estado actual y
+/// empuja eso, y con ello se ganan dos cosas.
+///
+/// La primera es que el aviso y la consulta de respaldo salen de la misma fuente, así
+/// que no pueden decir cosas distintas — que es exactamente lo que el contrato promete.
+///
+/// La segunda es más sutil: dos mensajes pueden llegar desordenados. Si cada uno
+/// llevara su foto del avance, un mensaje viejo entregado tarde haría RETROCEDER la
+/// barra de progreso. Leyendo el estado al recibir, lo peor que pasa es avisar dos
+/// veces lo mismo.
+/// </summary>
+public sealed record TrabajoActualizado(Guid TrabajoId);

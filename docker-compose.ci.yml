@@ -44,6 +44,33 @@ services:
       retries: 24
       start_period: 20s
 
+  # TODAS las pruebas de la solución en una corrida, con la base levantada.
+  #
+  #   docker compose -f docker-compose.ci.yml build &&   #   docker compose -f docker-compose.ci.yml run --rm pruebas
+  #
+  # Existe porque correr las suites por separado y con filtros deja huecos sin que
+  # nadie se dé cuenta: pasó con las pruebas de integración de Api.Tests, que se
+  # quedaron sin correr varias sesiones porque el filtro por categoría las excluía
+  # y el verde de las demás tapaba el hueco.
+  #
+  # Sin filtro y sobre el .sln: si alguien agrega un proyecto de pruebas, entra solo.
+  pruebas:
+    image: nexo-ci:local
+    depends_on:
+      db-pruebas:
+        condition: service_healthy
+    environment:
+      TEST_DB_CONNECTION: "Server=db-pruebas,1433;Database=CabinaFletes_Test;User Id=sa;Password=${TEST_DB_PASSWORD:-Pruebas_Nexo_2026!};TrustServerCertificate=True;Encrypt=True;"
+    networks:
+      - ci
+    command:
+      - dotnet
+      - test
+      - CabinaFletes.Clean.sln
+      - -c
+      - Release
+      - --no-restore
+
   # Pruebas de integración: las que necesitan una base de verdad porque lo que
   # verifican es el comportamiento transaccional del motor.
   #

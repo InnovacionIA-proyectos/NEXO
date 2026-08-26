@@ -40,6 +40,7 @@ public sealed class EfEstadoDeTrabajoRepository(CabinaFletesDbContext db, IPendi
                 saga.RequierenManual),
             saga.SolicitadoEn,
             saga.TerminadoEn,
-            pendientesDelTrabajo);
+            pendientesDelTrabajo,
+            saga.Secuencia);
     }
 }

@@ -1,7 +1,10 @@
+using CabinaFletes.Api.Trabajos;
+using CabinaFletes.Application.CasosDeUso.Trabajos.Interfaces;
 using CabinaFletes.Application.CasosDeUso.Costeo;
 using CabinaFletes.Application.CasosDeUso.Trabajos;
 using CabinaFletes.Infrastructure.Common.Mensajeria;
 using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using CabinaFletes.Api.Common.Auth;
 using CabinaFletes.Api.Common.Errors;
 using CabinaFletes.Api.Common.Middleware;
@@ -55,6 +58,11 @@ builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddMensajeria(builder.Configuration);
 builder.Services.AddTrabajosUseCases();
 builder.Services.AddCosteoUseCases();
+
+// Canal de avisos. El adaptador vive aquí porque SignalR es ASP.NET Core; el
+// consumidor de Infrastructure solo conoce el puerto.
+builder.Services.AddSignalR();
+builder.Services.AddScoped<INotificadorDeTrabajos, NotificadorSignalR>();
 builder.Services.AddCotizacionesUseCases();
 builder.Services.AddReglasSoloSicetacUseCases();
 builder.Services.AddAjustesVigenciaPlazaUseCases();
@@ -80,6 +88,15 @@ if (builder.Environment.IsProduction() && !azureAdConfigured)
     throw new InvalidOperationException(
         "AzureAd no está configurado en Producción. El esquema de autenticación de desarrollo " +
         "queda deshabilitado por seguridad. Configure la sección 'AzureAd' antes de desplegar.");
+
+// Mismo criterio para el broker: sin cadena configurada la mensajería va en memoria,
+// que sirve para pruebas y para levantar el API sin RabbitMQ, pero en Producción
+// significaría perder cada mensaje al reiniciar el proceso. Mejor no arrancar.
+if (builder.Environment.IsProduction() &&
+    string.IsNullOrWhiteSpace(builder.Configuration.GetConnectionString("RabbitMq")))
+    throw new InvalidOperationException(
+        "ConnectionStrings:RabbitMq no está configurado en Producción. Sin broker la mensajería " +
+        "va en memoria y los mensajes no sobreviven a un reinicio. Configure el broker antes de desplegar.");
 
 var defaultScheme = azureAdConfigured ? JwtBearerDefaults.AuthenticationScheme : DevAuthenticationHandler.SchemeName;
 var authBuilder = builder.Services.AddAuthentication(defaultScheme);
@@ -181,7 +198,40 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
-app.MapHealthChecks("/health").AllowAnonymous();
+
+// El canal de avisos del avance de trabajos. La ruta es parte del contrato con el
+// frontend: es a donde se conecta el cliente para suscribirse a un trabajo.
+app.MapHub<TrabajosHub>("/hubs/trabajos");
+// /health responde JSON con el detalle por chequeo, no solo "Healthy"/"Unhealthy".
+//
+// El motivo es concreto: un 503 con el cuerpo en texto plano no dice QUÉ está caído.
+// Diagnosticar uno costó varias corridas hasta resolver HealthCheckService a mano para
+// ver que el chequeo en rojo era el del bus. Con esto se lee en la respuesta.
+//
+// Es una sonda de readiness: incluye el bus de mensajería, así que hay una ventana al
+// arrancar en la que responde 503 con "Not ready: not started". Es correcto — hasta que
+// el bus no está listo el proceso no debería recibir tráfico — y el compose ya lo
+// contempla con start_period.
+app.MapHealthChecks("/health", new HealthCheckOptions
+{
+    ResponseWriter = async (contexto, reporte) =>
+    {
+        contexto.Response.ContentType = "application/json; charset=utf-8";
+        await contexto.Response.WriteAsJsonAsync(new
+        {
+            status = reporte.Status.ToString(),
+            duracion = reporte.TotalDuration.TotalMilliseconds,
+            chequeos = reporte.Entries.ToDictionary(
+                e => e.Key,
+                e => new
+                {
+                    status = e.Value.Status.ToString(),
+                    descripcion = e.Value.Description,
+                    error = e.Value.Exception?.Message
+                })
+        });
+    }
+}).AllowAnonymous();
 
 app.Run();
 
