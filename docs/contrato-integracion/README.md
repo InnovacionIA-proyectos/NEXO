@@ -1,6 +1,6 @@
 # Contrato de integración — Nexo (Cabina de Fletes) ↔ Portal de la Administración
 
-**Versión 1.4.0** · Sprint 2 · Issues #7, #15, #16, #17 y #19
+**Versión 1.5.0** · Sprint 2 · Issues #7, #15, #16, #17, #19 y #20
 
 Este documento manda. El módulo `cabina-fletes` del portal está en desarrollo y no
 es la referencia: lo que hoy tenga construido se adapta a lo que diga aquí, no al
@@ -187,6 +187,7 @@ decide qué mostrar.
 | Reglas solo SICE-TAC (todo) | `AdminTarifas`, `Admin` |
 | Métricas de cumplimiento | `LiderProceso`, `AdminTarifas`, `Admin` |
 | `GET` y `PUT /api/priorizacion/parametros` | `Admin` |
+| Hubs `/hubs/trabajos` y `/hubs/bandeja` | Cualquier rol autenticado |
 | Lecturas de biblioteca, solicitudes, cotizaciones, conexos | Cualquier rol autenticado |
 
 Cuando esta tabla y el código no coincidan, es un defecto y se corrige el código.
@@ -352,6 +353,64 @@ contador con ese valor y sigue con la misma regla.
 
 Los números pueden saltar (191, 194, 195) y eso es normal — no todos los cambios
 alcanzan a llegar. Lo único que se promete es que nunca retroceden.
+
+## 5.2 Avisos de la Bandeja Priorizada
+
+```
+Hub:      /hubs/bandeja           (requiere la misma identidad que el API)
+Suscribir:   Suscribir()
+Desuscribir: Desuscribir()
+Evento:      "bandeja"
+```
+
+Hub aparte del de trabajos, y sin parámetro: la bandeja no está filtrada por usuario, así
+que todos los conectados ven lo mismo y hay un solo grupo.
+
+### El aviso NO trae la bandeja
+
+```json
+{ "motivo": "solicitud-nueva", "en": "2026-08-26T15:04:11Z" }
+```
+
+Y no es por peso: **es que no existe "la bandeja"**. La consulta admite cinco filtros
+—estado, atención, desde, hasta, vigencia— y cada cliente mira una porción distinta. El
+servidor no sabe qué filtros usa cada uno, así que empujar filas obligaría a mandarlas
+todas y filtrar en el navegador.
+
+**La regla del cliente es: al recibir el aviso, vuelve a consultar `GET /api/solicitudes`
+con TUS filtros.** La pantalla se actualiza sola; lo que no se hace es duplicar la
+consulta dentro del canal.
+
+Tampoco lleva secuencia, al contrario que el aviso de avance de un trabajo. Allá el aviso
+pintaba un valor y uno rezagado hacía retroceder la barra. Aquí solo dice *reconsulta*, y
+eso es idempotente: dos avisos duplicados o desordenados producen dos consultas y el mismo
+resultado.
+
+### Los cinco motivos
+
+| `motivo` | Cuándo |
+|---|---|
+| `solicitud-nueva` | Entró una solicitud, ya priorizada |
+| `solicitud-rechazada` | Se descartó una: sale de la cola de trabajo |
+| `trabajo-terminado` | Cerró el auto-costeo de un pliego y sus líneas dejan de estar sin flete |
+| `parametros-recalibrados` | El Admin cambió el horizonte del puntaje: reordena de verdad |
+| `refresco-periodico` | Latido del recálculo. Ver abajo |
+
+**Un pliego de 300 líneas produce UN aviso de bandeja, no 300.** El aviso sale cuando el
+trabajo cierra, no por línea. La barra de progreso necesita el detalle —eso es el hub de
+trabajos— pero la bandeja solo necesita saber que reconsulte, y una vez basta.
+
+### Por qué existe el latido periódico
+
+Es el motivo menos obvio y conviene entenderlo antes de "optimizarlo".
+
+El orden de la bandeja depende del *ahora*: la urgencia sube sola a medida que se acerca
+cada deadline. Eso significa que **el orden cambia continuamente sin que nadie toque
+nada**, y ese cambio no tiene ningún evento que lo represente.
+
+El latido lo cubre. Sale con cada recálculo —por defecto cada 15 minutos— aunque no se
+haya actualizado ningún puntaje persistido. Si alguien lo cambia para avisar solo cuando
+algo cambió, la bandeja abierta se queda con el orden de hace horas.
 
 ### El aviso es una mejora, no una garantía
 

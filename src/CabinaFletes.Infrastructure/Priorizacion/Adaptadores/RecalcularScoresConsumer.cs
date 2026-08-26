@@ -2,6 +2,7 @@ using CabinaFletes.Application.CasosDeUso.Priorizacion;
 using CabinaFletes.Application.Common.Abstractions;
 using CabinaFletes.Application.CasosDeUso.Priorizacion.DTOs;
 using CabinaFletes.Infrastructure.Common.Mensajeria;
+using CabinaFletes.Mensajes.Bandeja;
 using CabinaFletes.Mensajes.Priorizacion;
 using MassTransit;
 using Microsoft.Extensions.Configuration;
@@ -47,5 +48,19 @@ public sealed class RecalcularScoresConsumer(
         log.LogInformation(
             "Recálculo de scores ({Motivo}): {Actualizadas} actualizadas de {Revisadas} revisadas en {Lotes} lote(s).",
             motivo, r.Actualizadas, r.Revisadas, r.Lotes);
+
+        // EL LATIDO DE LA BANDEJA, y conviene entender por qué se manda siempre y no solo
+        // cuando cambió algún puntaje persistido.
+        //
+        // Refrescar el puntaje persistido NO cambia lo que la bandeja muestra: la bandeja
+        // lo recalcula al leer. Lo que sí cambió desde el aviso anterior es EL TIEMPO, y la
+        // urgencia depende del ahora — el orden se mueve solo, de forma continua, sin que
+        // nadie toque nada.
+        //
+        // Ese movimiento no tiene ningún evento que lo represente. Este es el único aviso
+        // que lo cubre, y por eso sale aunque se hayan actualizado cero filas.
+        await contexto.Publish(
+            new BandejaCambio(MotivoDeCambio.RefrescoPeriodico, DateTimeOffset.UtcNow),
+            contexto.CancellationToken);
     }
 }

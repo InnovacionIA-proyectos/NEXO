@@ -1,3 +1,4 @@
+using CabinaFletes.Mensajes.Bandeja;
 using CabinaFletes.Mensajes.Costeo;
 using CabinaFletes.Mensajes.Solicitudes;
 using MassTransit;
@@ -85,7 +86,10 @@ public sealed class AutoCosteoSaga : MassTransitStateMachine<EstadoAutoCosteo>
                     c.Saga.Secuencia++;
                 })
                 .TransitionTo(Parcial)
-                .Publish(c => new TrabajoActualizado(c.Saga.CorrelationId)));
+                .Publish(c => new TrabajoActualizado(c.Saga.CorrelationId))
+                // Vencer el plazo también cierra el trabajo, así que también saca la fila
+                // del filtro de pendientes.
+                .Publish(c => new BandejaCambio(MotivoDeCambio.TrabajoTerminado, DateTimeOffset.UtcNow)));
 
         // Un trabajo ya cerrado no se reabre por un mensaje que llegó tarde: se ignora
         // en vez de reventar la saga. Pasa de verdad — un reintento que se resolvió
@@ -134,6 +138,11 @@ public sealed class AutoCosteoSaga : MassTransitStateMachine<EstadoAutoCosteo>
         binder.If(c => c.Saga.TodasConDesenlace, cerrar => cerrar
             .Then(c => c.Saga.TerminadoEn = DateTimeOffset.UtcNow)
             .Unschedule(Expiracion)
+            // La bandeja cambia AQUÍ y no en cada línea: es cuando el pliego deja de tener
+            // líneas sin flete y su fila puede salir del filtro de pendientes. Un pliego de
+            // 300 líneas produce 300 avisos de avance y UN aviso de bandeja — la barra de
+            // progreso necesita el detalle, la bandeja solo necesita saber que reconsulte.
+            .Publish(c => new BandejaCambio(MotivoDeCambio.TrabajoTerminado, DateTimeOffset.UtcNow))
             .IfElse(c => c.Saga.TodoResueltoPorElServicio,
                 completo => completo.TransitionTo(Completado),
                 parcial => parcial.TransitionTo(Parcial)));
