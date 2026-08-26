@@ -4,6 +4,7 @@ using CabinaFletes.Application.CasosDeUso.Priorizacion.Mappers;
 using CabinaFletes.Application.CasosDeUso.Priorizacion.Validadores;
 using CabinaFletes.Application.Common.Abstractions;
 using CabinaFletes.Application.Common.Ports;
+using CabinaFletes.Mensajes.Bandeja;
 using CabinaFletes.Mensajes.Priorizacion;
 
 namespace CabinaFletes.Application.CasosDeUso.Priorizacion;
@@ -41,6 +42,12 @@ public sealed class ActualizarParametrosScoreCommandHandler(
             new ParametrosDePriorizacionCambiaron(
                 CadenaDePriorizacion.Unica, command.UsuarioId, reloj.GetUtcNow()),
             ct);
+
+        // Y este cambio SÍ reordena la bandeja de verdad, a diferencia del refresco del
+        // puntaje persistido: la bandeja calcula el puntaje al leer, así que un horizonte
+        // distinto le cambia el orden en la siguiente consulta.
+        await publicador.PublicarAsync(
+            new BandejaCambio(MotivoDeCambio.ParametrosRecalibrados, reloj.GetUtcNow()), ct);
 
         await uow.SaveChangesAsync(ct);
         return fila.ADto();
