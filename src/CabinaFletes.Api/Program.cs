@@ -4,6 +4,7 @@ using CabinaFletes.Application.CasosDeUso.Costeo;
 using CabinaFletes.Application.CasosDeUso.Trabajos;
 using CabinaFletes.Infrastructure.Common.Mensajeria;
 using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using CabinaFletes.Api.Common.Auth;
 using CabinaFletes.Api.Common.Errors;
 using CabinaFletes.Api.Common.Middleware;
@@ -201,7 +202,36 @@ app.MapControllers();
 // El canal de avisos del avance de trabajos. La ruta es parte del contrato con el
 // frontend: es a donde se conecta el cliente para suscribirse a un trabajo.
 app.MapHub<TrabajosHub>("/hubs/trabajos");
-app.MapHealthChecks("/health").AllowAnonymous();
+// /health responde JSON con el detalle por chequeo, no solo "Healthy"/"Unhealthy".
+//
+// El motivo es concreto: un 503 con el cuerpo en texto plano no dice QUÉ está caído.
+// Diagnosticar uno costó varias corridas hasta resolver HealthCheckService a mano para
+// ver que el chequeo en rojo era el del bus. Con esto se lee en la respuesta.
+//
+// Es una sonda de readiness: incluye el bus de mensajería, así que hay una ventana al
+// arrancar en la que responde 503 con "Not ready: not started". Es correcto — hasta que
+// el bus no está listo el proceso no debería recibir tráfico — y el compose ya lo
+// contempla con start_period.
+app.MapHealthChecks("/health", new HealthCheckOptions
+{
+    ResponseWriter = async (contexto, reporte) =>
+    {
+        contexto.Response.ContentType = "application/json; charset=utf-8";
+        await contexto.Response.WriteAsJsonAsync(new
+        {
+            status = reporte.Status.ToString(),
+            duracion = reporte.TotalDuration.TotalMilliseconds,
+            chequeos = reporte.Entries.ToDictionary(
+                e => e.Key,
+                e => new
+                {
+                    status = e.Value.Status.ToString(),
+                    descripcion = e.Value.Description,
+                    error = e.Value.Exception?.Message
+                })
+        });
+    }
+}).AllowAnonymous();
 
 app.Run();
 
