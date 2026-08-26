@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using CabinaFletes.Api.Common.Auth;
 using CabinaFletes.Api.Common.Errors;
 using CabinaFletes.Api.Common.Middleware;
+using CabinaFletes.Api.Priorizacion;
 using CabinaFletes.Api.Solicitudes;
 using CabinaFletes.Application.CasosDeUso.AjustesVigenciaPlaza;
 using CabinaFletes.Application.CasosDeUso.Biblioteca;
@@ -75,7 +76,10 @@ builder.Services.AddServiciosConexosUseCases();
 builder.Services.AddTarifasGanadasUseCases();
 builder.Services.AddTarifasSicetacAdminUseCases();
 builder.Services.AddMetricasUseCases();
-builder.Services.AddHostedService<RecalculoScoreHostedService>();
+// Arma la cadena de priorización al arrancar y se va. NO tiene reloj: el reloj vive en
+// la saga, dentro del broker. Reemplaza al RecalculoScoreHostedService, que llevaba un
+// PeriodicTimer adentro y por lo tanto se duplicaba con cada réplica del API.
+builder.Services.AddHostedService<ArranqueDeLaCadenaHostedService>();
 
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddHttpContextAccessor();

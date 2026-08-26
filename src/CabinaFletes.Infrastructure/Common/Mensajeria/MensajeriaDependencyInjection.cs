@@ -10,8 +10,10 @@ using CabinaFletes.Infrastructure.Solicitudes.Adaptadores;
 using CabinaFletes.Application.CasosDeUso.Trabajos.Interfaces;
 using CabinaFletes.Infrastructure.Solicitudes.Repositorios;
 using CabinaFletes.Infrastructure.Trabajos.Adaptadores;
+using CabinaFletes.Infrastructure.Priorizacion.Adaptadores;
 using CabinaFletes.Infrastructure.Trabajos.Repositorios;
 using CabinaFletes.Mensajes.Costeo;
+using CabinaFletes.Mensajes.Priorizacion;
 using CabinaFletes.Mensajes.Solicitudes;
 using CabinaFletes.Infrastructure.Persistence;
 using MassTransit;
@@ -30,6 +32,14 @@ public static class MensajeriaDependencyInjection
     public static IServiceCollection AddMensajeria(this IServiceCollection services, IConfiguration config)
     {
         var host = config.GetConnectionString("RabbitMq") ?? config["RabbitMq:Host"];
+
+        // Se registra el INTERVALO, no la máquina de estados: MassTransit construye la
+        // máquina con el contenedor y su registro gana sobre cualquiera que pongamos
+        // nosotros. Pasarle el intervalo resuelto deja la saga instanciable en una prueba
+        // con 300 ms, sin armarle un IConfiguration.
+        services.AddSingleton(new IntervaloDeRecalculo(
+            SagaDePriorizacion.IntervaloDe(
+                ConfiguracionDeMensajeria.EnteroDeConfig(config, SagaDePriorizacion.ClaveIntervalo, SagaDePriorizacion.MinutosPorDefecto))));
 
         services.AddMassTransit(x =>
         {
@@ -63,6 +73,11 @@ public static class MensajeriaDependencyInjection
             x.AddConsumer<AvisarTrabajoConsumer>();
 
 
+            // Refresca el score persistido de las activas cuando la cadena de
+            // priorización lo pide. La excepción sube: si esto deja de correr, los
+            // reportes empiezan a mentir y hace falta que alguien se entere.
+            x.AddConsumer<RecalcularScoresConsumer>();
+
             // La saga se persiste en la misma base que los datos del negocio. Su estado
             // ES la respuesta al cliente que preguntó por su trabajo, así que un
             // reinicio no puede borrarlo.
@@ -72,6 +87,19 @@ public static class MensajeriaDependencyInjection
                     r.ExistingDbContext<CabinaFletesDbContext>();
                     // Bloqueo pesimista: dos resultados de línea del mismo pliego pueden
                     // llegar a la vez, y con optimista se perderían contadores.
+                    r.ConcurrencyMode = MassTransit.ConcurrencyMode.Pessimistic;
+                });
+
+            // El reloj del recálculo de scores. Reemplaza al PeriodicTimer que vivía en
+            // el proceso del API: la fila de esta saga es el candado que impide que haya
+            // dos cadenas, cosa que con un temporizador por proceso era imposible de
+            // garantizar en cuanto hubiera más de una réplica.
+            x.AddSagaStateMachine<SagaDePriorizacion, EstadoPriorizacion>()
+                .EntityFrameworkRepository(r =>
+                {
+                    r.ExistingDbContext<CabinaFletesDbContext>();
+                    // Pesimista por el mismo motivo que la otra: un tic del reloj y un
+                    // cambio de parámetros pueden caer sobre la misma fila a la vez.
                     r.ConcurrencyMode = MassTransit.ConcurrencyMode.Pessimistic;
                 });
 
@@ -166,6 +194,10 @@ public static class MensajeriaDependencyInjection
         services.AddScoped<IValidadorDeMensaje<TarifasActualizadas>, TarifasActualizadasValidador>();
         services.AddScoped<IValidadorDeMensaje<RecostearLineaSolicitada>, RecostearLineaSolicitadaValidador>();
         services.AddScoped<IValidadorDeMensaje<TrabajoActualizado>, TrabajoActualizadoValidador>();
+        services.AddScoped<IValidadorDeMensaje<ArrancarPriorizacion>, ArrancarPriorizacionValidador>();
+        services.AddScoped<IValidadorDeMensaje<TicDePriorizacion>, TicDePriorizacionValidador>();
+        services.AddScoped<IValidadorDeMensaje<ParametrosDePriorizacionCambiaron>, ParametrosDePriorizacionCambiaronValidador>();
+        services.AddScoped<IValidadorDeMensaje<RecalcularScoresSolicitado>, RecalcularScoresSolicitadoValidador>();
 
         return services;
     }
