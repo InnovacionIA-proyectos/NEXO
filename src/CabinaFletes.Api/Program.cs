@@ -8,12 +8,14 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using CabinaFletes.Api.Common.Auth;
 using CabinaFletes.Api.Common.Errors;
 using CabinaFletes.Api.Common.Middleware;
+using CabinaFletes.Api.Priorizacion;
 using CabinaFletes.Api.Solicitudes;
 using CabinaFletes.Application.CasosDeUso.AjustesVigenciaPlaza;
 using CabinaFletes.Application.CasosDeUso.Biblioteca;
 using CabinaFletes.Application.CasosDeUso.BibliotecaSapHistorico;
 using CabinaFletes.Application.CasosDeUso.Cotizaciones;
 using CabinaFletes.Application.CasosDeUso.Metricas;
+using CabinaFletes.Application.CasosDeUso.Priorizacion;
 using CabinaFletes.Application.CasosDeUso.ReglasSoloSicetac;
 using CabinaFletes.Application.CasosDeUso.ServiciosConexos;
 using CabinaFletes.Application.CasosDeUso.Solicitudes;
@@ -69,11 +71,15 @@ builder.Services.AddAjustesVigenciaPlazaUseCases();
 builder.Services.AddBibliotecaUseCases();
 builder.Services.AddBibliotecaSapHistoricoUseCases();
 builder.Services.AddSolicitudesUseCases();
+builder.Services.AddPriorizacionUseCases();
 builder.Services.AddServiciosConexosUseCases();
 builder.Services.AddTarifasGanadasUseCases();
 builder.Services.AddTarifasSicetacAdminUseCases();
 builder.Services.AddMetricasUseCases();
-builder.Services.AddHostedService<RecalculoScoreHostedService>();
+// Arma la cadena de priorización al arrancar y se va. NO tiene reloj: el reloj vive en
+// la saga, dentro del broker. Reemplaza al RecalculoScoreHostedService, que llevaba un
+// PeriodicTimer adentro y por lo tanto se duplicaba con cada réplica del API.
+builder.Services.AddHostedService<ArranqueDeLaCadenaHostedService>();
 
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddHttpContextAccessor();

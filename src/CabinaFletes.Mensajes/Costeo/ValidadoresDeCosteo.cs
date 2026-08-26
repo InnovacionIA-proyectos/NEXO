@@ -94,14 +94,3 @@ public sealed class TrabajoActualizadoValidador : IValidadorDeMensaje<TrabajoAct
 }
 
 /// <summary>Los identificadores vacíos son el motivo que se repite en todos los mensajes.</summary>
-internal static class Motivos
-{
-    public static List<string> De(params (string Nombre, Guid Valor)[] campos)
-    {
-        var motivos = new List<string>();
-        foreach (var (nombre, valor) in campos)
-            if (valor == Guid.Empty)
-                motivos.Add($"{nombre} no puede ser vacío.");
-        return motivos;
-    }
-}

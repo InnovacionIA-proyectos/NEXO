@@ -35,6 +35,4 @@ public interface ISolicitudesRepository
 
     Task<ParametrosScore> ParametrosScoreAsync(CancellationToken ct);
 
-    /// <summary>Tracked. Para el recálculo periódico del score (RecalculoScoreHostedService).</summary>
-    Task<IReadOnlyList<Solicitud>> ObtenerActivasAsync(CancellationToken ct);
 }
