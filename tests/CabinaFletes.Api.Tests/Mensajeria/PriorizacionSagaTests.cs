@@ -39,7 +39,7 @@ public class PriorizacionSagaTests() : PriorizacionSagaBase(TimeSpan.FromHours(1
         await Bus.Bus.Publish(new ArrancarPriorizacion(Cadena));
         await EsperarSaga(s => s.RearmadaEn > s.ArmadaEn);
 
-        Assert.Equal(1, Saga.Created.Select(s => s.CorrelationId == Cadena).Count());
+        Assert.Single(Saga.Created.Select(s => s.CorrelationId == Cadena));
     }
 
     [Fact]
