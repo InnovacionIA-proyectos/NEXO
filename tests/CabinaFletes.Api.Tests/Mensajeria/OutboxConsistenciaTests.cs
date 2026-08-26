@@ -38,7 +38,13 @@ public class OutboxConsistenciaTests : IAsyncLifetime
     {
         var servicios = new ServiceCollection();
 
-        servicios.AddDbContext<CabinaFletesDbContext>(o => o.UseSqlServer(ApiFactory.TestConnection));
+        // Tiempo de comando amplio a propósito. El contenedor de SQL Server nace con la
+        // corrida y aplicar todas las migraciones sobre una base vacía y en frío supera
+        // los 30 segundos por defecto. Con cada migración nueva el arranque se alarga, así
+        // que sin esto la prueba se vuelve intermitente — y una prueba intermitente enseña
+        // al equipo a reintentar en vez de investigar.
+        servicios.AddDbContext<CabinaFletesDbContext>(o =>
+            o.UseSqlServer(ApiFactory.TestConnection, sql => sql.CommandTimeout(180)));
 
         servicios.AddMassTransitTestHarness(x =>
         {
