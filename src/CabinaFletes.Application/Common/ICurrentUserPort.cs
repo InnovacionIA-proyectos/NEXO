@@ -1,4 +1,5 @@
 using CabinaFletes.Domain.Enums;
+using CabinaFletes.Domain.Usuarios.Entidades;
 
 namespace CabinaFletes.Application.Common;
 

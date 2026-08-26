@@ -79,21 +79,21 @@ cosmética: el original tenía tests solo en `NEXO/tests` (Domain, Api) y
 ya en `NEXO-Clean/tests/CabinaFletes.Domain.Tests`, así que en `NEXO-Clean`
 no queda duplicación — el original (`NEXO/`) queda igual, sin tocar.
 
-## Limpieza manual pendiente (limitación del puente al dispositivo) — RESUELTO
+## Limpieza post-migración — CERRADA (issue #2)
 
-El puente al dispositivo no permite `rm`, así que los 4 archivos marcadores
-("SUPERADO"/"movido a...") no se pudieron borrar; en su lugar se movieron a
-`src/_to_delete/` (fuera de los `.csproj`, no afectan la compilación) para
-que salieran del árbol de código activo:
+La migración dejó 4 archivos que solo contenían un comentario marcador
+("SUPERADO"/"movido a..."). No se pudieron borrar en su momento porque la
+herramienta usada entonces no permitía `rm`, así que se apartaron a
+`src/_to_delete/`, fuera de los `.csproj`.
 
-- `Application/Cotizaciones/Ports/IAuditoriaPort.cs` → `_to_delete/Application/Cotizaciones/Ports/`
-- `Application/Cotizaciones/Ports/IPropuestaTarifaPort.cs` → `_to_delete/Application/Cotizaciones/Ports/`
-- `Application/Cotizaciones/Dtos/PropuestaTarifaDtos.cs` → `_to_delete/Application/Cotizaciones/Dtos/`
-- `Infrastructure/Adapters/PropuestaTarifaNoMigradaAdapter.cs` → `_to_delete/Infrastructure/Adapters/`
+Esa carpeta ya no existe: se eliminó en la issue #2. Los cuatro tipos que
+mencionaban siguen vivos en su ubicación definitiva.
 
-Sigue pendiente el borrado físico definitivo: elimina la carpeta
-`src/_to_delete/` manualmente desde el Explorador de Windows cuando puedas
-(no se puede hacer desde esta sesión).
+- `IAuditoriaPort` → `Application/Common/Ports/`
+- `IPropuestaTarifaPort` → `Application/Common/Ports/`
+- `PropuestaTarifaDtos` → `Application/Common/Dtos/`
+- `PropuestaTarifaNoMigradaAdapter` → reemplazado por `PropuestaTarifaAdapter`
+  y `TarifarioSapAdapter` en `Infrastructure/Adapters/`
 
 ## Antes de correr el proyecto
 

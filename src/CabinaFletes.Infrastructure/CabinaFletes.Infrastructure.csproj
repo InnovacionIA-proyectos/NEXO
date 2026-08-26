@@ -17,6 +17,25 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!--
+      MassTransit FIJADO EN LA RAMA 8.x, y no por comodidad.
+
+      La 8.5.10 es Apache-2.0. A partir de la 9.0.0 el proyecto se movió a
+      massient.com con licencia comercial (el paquete ya no declara expresión SPDX,
+      solo un licenseUrl propio). Subir de mayor obligaría a una decisión de compra.
+
+      Es el mismo criterio por el que este backend implementa su propio CQRS en vez
+      de usar MediatR. Verificado contra los metadatos del paquete en nuget.org.
+
+      Si alguien necesita subir de la 8.x, que sea una decisión consciente y no un
+      "actualizar dependencias".
+    -->
+    <PackageReference Include="MassTransit" Version="8.5.10" />
+    <PackageReference Include="MassTransit.RabbitMQ" Version="8.5.10" />
+    <PackageReference Include="MassTransit.EntityFrameworkCore" Version="8.5.10" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\CabinaFletes.Domain\CabinaFletes.Domain.csproj" />
     <ProjectReference Include="..\CabinaFletes.Application\CabinaFletes.Application.csproj" />
   </ItemGroup>

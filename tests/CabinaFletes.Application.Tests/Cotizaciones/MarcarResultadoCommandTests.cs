@@ -1,11 +1,14 @@
+using CabinaFletes.Application.CasosDeUso.Cotizaciones.Excepciones;
+using CabinaFletes.Application.CasosDeUso.Cotizaciones;
+using CabinaFletes.Application.CasosDeUso.Cotizaciones.Interfaces;
 using CabinaFletes.Application.Common;
 using CabinaFletes.Application.Common.Abstractions;
 using CabinaFletes.Application.Common.Exceptions;
 using CabinaFletes.Application.Common.Ports;
-using CabinaFletes.Application.Cotizaciones.Commands;
-using CabinaFletes.Application.Cotizaciones.Ports;
-using CabinaFletes.Domain.Entities;
+using CabinaFletes.Domain.BibliotecaTarifas.Entidades;
+using CabinaFletes.Domain.Cotizaciones.Entidades;
 using CabinaFletes.Domain.Enums;
+using CabinaFletes.Domain.Solicitudes.Entidades;
 using Moq;
 
 namespace CabinaFletes.Application.Tests.Cotizaciones;
@@ -80,7 +83,7 @@ public class MarcarResultadoCommandTests
         var c = new Cotizacion { SolicitudId = Guid.NewGuid(), Estado = EstadoCotizacion.Borrador, Lineas = [] };
         _cotizaciones.Setup(r => r.ObtenerParaMarcarResultadoAsync(cotizacionId, default)).ReturnsAsync(c);
 
-        await Assert.ThrowsAsync<ValidationFailedException>(() =>
+        await Assert.ThrowsAsync<CotizacionSinFleteException>(() =>
             Handler().Handle(new MarcarResultadoCommand(cotizacionId, "ganada", null, null)));
     }
 
@@ -90,6 +93,9 @@ public class MarcarResultadoCommandTests
         var cotizacionId = Guid.NewGuid();
         var lineaSolicitud = new LineaSolicitud { RutaId = Guid.NewGuid(), ConfigVehiculoId = Guid.NewGuid(), Tipologia = TipologiaCarga.CargaSeca };
         var c = Entregada(Guid.NewGuid());
+        // El handler consulta ExistenParaCotizacionAsync por c.Id, no por el id del
+        // comando: sin igualarlos el mock nunca coincide y devuelve false por defecto.
+        c.Id = cotizacionId;
         c.Lineas =
         [
             new CotizacionLinea { ValorFlete = 100_000m, LineaSolicitud = lineaSolicitud },
@@ -110,6 +116,7 @@ public class MarcarResultadoCommandTests
     {
         var cotizacionId = Guid.NewGuid();
         var c = Entregada(Guid.NewGuid());
+        c.Id = cotizacionId;
         c.Lineas = [new CotizacionLinea { ValorFlete = 100_000m, LineaSolicitud = new LineaSolicitud() }];
         _cotizaciones.Setup(r => r.ObtenerParaMarcarResultadoAsync(cotizacionId, default)).ReturnsAsync(c);
         _solicitudes.Setup(s => s.ObtenerConClienteAsync(c.SolicitudId, default)).ReturnsAsync((Solicitud?)null);
@@ -119,11 +126,4 @@ public class MarcarResultadoCommandTests
 
         _tarifasHistoricas.Verify(t => t.Agregar(It.IsAny<TarifaHistorica>()), Times.Never);
     }
-}
-
-/// <summary>TimeProvider fijo y determinístico para pruebas.</summary>
-public sealed class FakeTimeProvider : TimeProvider
-{
-    public DateTimeOffset Fijo { get; set; } = new(2026, 6, 17, 12, 0, 0, TimeSpan.Zero);
-    public override DateTimeOffset GetUtcNow() => Fijo;
 }

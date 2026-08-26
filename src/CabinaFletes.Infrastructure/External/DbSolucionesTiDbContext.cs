@@ -1,3 +1,4 @@
+using CabinaFletes.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 
 namespace CabinaFletes.Infrastructure.External;

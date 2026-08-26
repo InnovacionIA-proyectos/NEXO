@@ -1,0 +1,98 @@
+# ============================================================================
+# Arnés de integración continua de NEXO.
+#
+# No levanta la aplicación: compila. Para correr la API con su SQL Server está
+# el docker-compose.yml de la raíz, que es otra cosa y se usa en otro momento.
+#
+#   docker compose -f docker-compose.ci.yml build && \
+#   docker compose -f docker-compose.ci.yml run --rm build
+#
+# El `&&` NO es opcional. Si la construcción de la imagen falla —por ejemplo con
+# un .sln mal formado, que rompe el restore— `run` arranca igual con la imagen
+# ANTERIOR y compila código viejo. El resultado es un verde falso, que es peor
+# que un rojo. Encadenar los dos comandos lo hace imposible.
+#
+# El código de salida del contenedor es el del compilador: 0 compila, distinto
+# de 0 no. Eso es lo que va a leer el workflow de GitHub Actions (issue #4).
+# ============================================================================
+name: nexo-ci
+
+services:
+  # Compila las 4 capas y los 3 proyectos de test en Release.
+  build:
+    build:
+      context: .
+      dockerfile: build/Dockerfile.ci
+    image: nexo-ci:local
+    command: ["dotnet", "build", "CabinaFletes.Clean.sln", "-c", "Release", "--no-restore"]
+
+  # SQL Server efímero para las pruebas de integración. NO es la base corporativa
+  # ni pretende serlo: nace y muere con la corrida, sin volumen, para que ninguna
+  # prueba dependa de lo que dejó la anterior.
+  db-pruebas:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: ${TEST_DB_PASSWORD:-Pruebas_Nexo_2026!}
+      MSSQL_PID: Developer
+    networks:
+      - ci
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -Q 'SELECT 1' || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 20s
+
+  # TODAS las pruebas de la solución en una corrida, con la base levantada.
+  #
+  #   docker compose -f docker-compose.ci.yml build &&   #   docker compose -f docker-compose.ci.yml run --rm pruebas
+  #
+  # Existe porque correr las suites por separado y con filtros deja huecos sin que
+  # nadie se dé cuenta: pasó con las pruebas de integración de Api.Tests, que se
+  # quedaron sin correr varias sesiones porque el filtro por categoría las excluía
+  # y el verde de las demás tapaba el hueco.
+  #
+  # Sin filtro y sobre el .sln: si alguien agrega un proyecto de pruebas, entra solo.
+  pruebas:
+    image: nexo-ci:local
+    depends_on:
+      db-pruebas:
+        condition: service_healthy
+    environment:
+      TEST_DB_CONNECTION: "Server=db-pruebas,1433;Database=CabinaFletes_Test;User Id=sa;Password=${TEST_DB_PASSWORD:-Pruebas_Nexo_2026!};TrustServerCertificate=True;Encrypt=True;"
+    networks:
+      - ci
+    command:
+      - dotnet
+      - test
+      - CabinaFletes.Clean.sln
+      - -c
+      - Release
+      - --no-restore
+
+  # Pruebas de integración: las que necesitan una base de verdad porque lo que
+  # verifican es el comportamiento transaccional del motor.
+  #
+  #   docker compose -f docker-compose.ci.yml run --rm pruebas-integracion
+  pruebas-integracion:
+    image: nexo-ci:local
+    depends_on:
+      db-pruebas:
+        condition: service_healthy
+    environment:
+      TEST_DB_CONNECTION: "Server=db-pruebas,1433;Database=CabinaFletes_Test;User Id=sa;Password=${TEST_DB_PASSWORD:-Pruebas_Nexo_2026!};TrustServerCertificate=True;Encrypt=True;"
+    networks:
+      - ci
+    command:
+      - dotnet
+      - test
+      - tests/CabinaFletes.Api.Tests
+      - -c
+      - Release
+      - --no-restore
+      - --filter
+      - Categoria=Integracion
+
+networks:
+  ci:

@@ -1,8 +1,8 @@
+using CabinaFletes.Application.CasosDeUso.ReglasSoloSicetac;
+using CabinaFletes.Application.CasosDeUso.ReglasSoloSicetac.Interfaces;
 using CabinaFletes.Application.Common.Abstractions;
 using CabinaFletes.Application.Common.Exceptions;
-using CabinaFletes.Application.ReglasSoloSicetac.Commands;
-using CabinaFletes.Application.ReglasSoloSicetac.Ports;
-using CabinaFletes.Domain.Entities;
+using CabinaFletes.Domain.Costeo.Entidades;
 using Moq;
 
 namespace CabinaFletes.Application.Tests.ReglasSoloSicetac;
@@ -30,6 +30,13 @@ public class CrearReglaSoloSicetacCommandTests
     [Fact]
     public async Task Regla_duplicada_lanza_ConflictException()
     {
+        // La forma canónica de Domain quita tildes: "Bogotá" queda "BOGOTA", así que la
+        // segunda regla para la misma ruta se detecta como duplicada (PR #53).
+        //
+        // Ese arreglo cubre la ESCRITURA. La lectura se corrige en la issue #16: el
+        // adaptador de propuesta comparaba el valor crudo de la ruta contra estas claves
+        // ya normalizadas, y por eso una ruta marcada "solo SICE-TAC" no aplicaba la
+        // regla al costear. Ver ClaveDeRutaTests en Domain.Tests.
         _reglas.Setup(r => r.ExisteAsync("BOGOTA", "CALI", "TURBO", default)).ReturnsAsync(true);
 
         await Assert.ThrowsAsync<ConflictException>(() =>

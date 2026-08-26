@@ -1,5 +1,16 @@
-using CabinaFletes.Domain.Entities;
+using CabinaFletes.Domain.Auditoria.Entidades;
+using CabinaFletes.Domain.BibliotecaTarifas.Entidades;
+using CabinaFletes.Domain.Catalogos.Entidades;
+using CabinaFletes.Domain.Common;
+using CabinaFletes.Domain.Costeo.Entidades;
+using CabinaFletes.Domain.Cotizaciones.Entidades;
 using CabinaFletes.Domain.Enums;
+using CabinaFletes.Domain.PlanDeCargue.Entidades;
+using CabinaFletes.Domain.Priorizacion.Entidades;
+using CabinaFletes.Domain.Solicitudes.Entidades;
+using CabinaFletes.Domain.Usuarios.Entidades;
+using CabinaFletes.Infrastructure.Common.Mensajeria.Saga;
+using MassTransit;
 using Microsoft.EntityFrameworkCore;
 
 namespace CabinaFletes.Infrastructure.Persistence;
@@ -35,6 +46,41 @@ public class CabinaFletesDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder b)
     {
         base.OnModelCreating(b);
+
+        // Tablas del Transactional Outbox de MassTransit. Viven en ESTA base a
+        // propósito: la garantía de atomicidad depende de que el mensaje y los datos
+        // del caso de uso se guarden en la misma transacción.
+        b.AddInboxStateEntity();
+        b.AddOutboxMessageEntity();
+        b.AddOutboxStateEntity();
+
+        // Líneas que quedaron sin costear, con su tipo y su motivo. Un solo sitio para
+        // las dos razones: dos sitios contando lo mismo acaban contradiciéndose.
+        //
+        // El índice va filtrado por las que siguen pendientes, que es la consulta que
+        // hace la pantalla; indexar las ya resueltas no aporta y la tabla crece.
+        b.Entity<LineaPendienteDeCosteo>(e =>
+        {
+            e.ToTable("lineas_pendientes_de_costeo");
+            e.Property(x => x.Motivo).HasMaxLength(500).IsRequired();
+            e.Property(x => x.Tipo).HasConversion<string>().HasMaxLength(20);
+            e.HasIndex(x => new { x.TrabajoId, x.LineaSolicitudId, x.Tipo });
+            e.HasIndex(x => x.SolicitudId).HasFilter("[ResueltaEn] IS NULL");
+        });
+
+        // Estado de la saga del auto-costeo. Se persiste aquí y no en otra base porque
+        // ES la respuesta al cliente que preguntó por su trabajo: si un reinicio lo
+        // borrara, quedaría preguntando por algo que ya nadie recuerda.
+        b.Entity<EstadoAutoCosteo>(e =>
+        {
+            e.ToTable("trabajos_auto_costeo");
+            e.HasKey(x => x.CorrelationId);
+            e.Property(x => x.CurrentState).HasMaxLength(64).IsRequired();
+            // Derivadas del estado, no columnas.
+            e.Ignore(x => x.ConDesenlace);
+            e.Ignore(x => x.TodasConDesenlace);
+            e.Ignore(x => x.TodoResueltoPorElServicio);
+        });
 
         b.Entity<Usuario>(e =>
         {
@@ -300,6 +346,29 @@ public class CabinaFletesDbContext : DbContext
                 UpdatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero)
             });
         });
+
+        // LA CLAVE LA ASIGNA EL DOMINIO, NO LA BASE.
+        //
+        // Las entidades nacen con su Id (`= Guid.NewGuid()`), que es lo correcto en DDD:
+        // una entidad tiene identidad desde que existe, no desde que se guarda. Pero por
+        // convención EF marca toda clave Guid como generada al insertar, y entonces una
+        // clave YA puesta le dice "esto viene de la base, o sea ya existe". Al agregar un
+        // hijo nuevo a un padre ya persistido, EF emitía UPDATE en vez de INSERT: cero
+        // filas afectadas, DbUpdateConcurrencyException y un 409 CONFLICTO_CONCURRENCIA
+        // al usuario.
+        //
+        // Se rompía POST /api/cotizaciones/{id}/lineas —agregar el flete a una cotización,
+        // el camino principal del módulo piloto— y llevaba así desde antes del sprint 2.
+        // No se veía porque la suite de Api.Tests no se corría completa.
+        //
+        // Esto le dice al modelo lo que de verdad pasa: la clave llega puesta y hay que
+        // insertarla tal cual.
+        foreach (var entity in b.Model.GetEntityTypes().Where(t => t.ClrType.IsClass))
+        {
+            var clave = entity.FindPrimaryKey();
+            if (clave is { Properties.Count: 1 } && clave.Properties[0].ClrType == typeof(Guid))
+                b.Entity(entity.ClrType).Property(clave.Properties[0].Name).ValueGeneratedNever();
+        }
 
         // Default a nivel de BD para los timestamps de toda tabla auditable.
         foreach (var entity in b.Model.GetEntityTypes()

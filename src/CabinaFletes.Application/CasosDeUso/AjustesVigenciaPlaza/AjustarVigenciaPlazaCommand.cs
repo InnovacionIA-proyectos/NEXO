@@ -1,0 +1,61 @@
+using CabinaFletes.Application.CasosDeUso.AjustesVigenciaPlaza.Interfaces;
+using CabinaFletes.Application.Common.Abstractions;
+using CabinaFletes.Application.Common.Ports;
+using CabinaFletes.Domain.Costeo.Entidades;
+using CabinaFletes.Mensajes.Costeo;
+
+namespace CabinaFletes.Application.CasosDeUso.AjustesVigenciaPlaza;
+
+/// <summary>Ajuste 1 a 1: fija (o reemplaza) la vigencia local de una tarifa de plaza.</summary>
+public sealed record AjustarVigenciaPlazaCommand(int TarifaPlazaId, DateTime NuevaVigencia, string? Motivo) : ICommand<Unit>;
+
+public sealed class AjustarVigenciaPlazaCommandHandler(
+    IAjustesVigenciaPlazaRepository ajustes,
+    IVigenciaSapPlazaPort vigenciaSap,
+    IAuditoriaPort auditoria,
+    Common.ICurrentUserPort usuarioActual,
+    IPublicadorDeMensajes publicador,
+    TimeProvider clock,
+    IUnitOfWork uow)
+    : ICommandHandler<AjustarVigenciaPlazaCommand, Unit>
+{
+    public async Task<Unit> Handle(AjustarVigenciaPlazaCommand command, CancellationToken ct = default)
+    {
+        var existente = await ajustes.ObtenerPorTarifaAsync(command.TarifaPlazaId, ct);
+
+        // SAP solo si es un ajuste NUEVO (para guardar la vigencia original de referencia).
+        var vigenciaSapOriginal = existente is null
+            ? (await vigenciaSap.VigenciasAsync([command.TarifaPlazaId], ct)).GetValueOrDefault(command.TarifaPlazaId)
+            : (DateTime?)null;
+
+        if (existente is not null)
+        {
+            existente.VigenciaAjustada = command.NuevaVigencia.Date;
+            if (!string.IsNullOrWhiteSpace(command.Motivo)) existente.Motivo = command.Motivo.Trim();
+            existente.AjustadoPor = usuarioActual.Id;
+        }
+        else
+        {
+            ajustes.Agregar(new Domain.Costeo.Entidades.AjusteVigenciaPlaza
+            {
+                TarifaPlazaId = command.TarifaPlazaId,
+                VigenciaAjustada = command.NuevaVigencia.Date,
+                VigenciaOriginal = vigenciaSapOriginal == default ? null : vigenciaSapOriginal,
+                Motivo = string.IsNullOrWhiteSpace(command.Motivo) ? null : command.Motivo.Trim(),
+                AjustadoPor = usuarioActual.Id,
+            });
+        }
+
+        auditoria.Registrar(usuarioActual.Id, "tarifas_plaza_vigencia", Guid.Empty, "ajustar",
+            $"{{\"tarifa\":{command.TarifaPlazaId},\"vigencia\":\"{command.NuevaVigencia:yyyy-MM-dd}\"}}");
+        // Extender una vigencia puede resolver líneas que estaban esperando esta tarifa.
+        // Va por el Outbox, antes del commit: si el ajuste no confirma, no se dispara un
+        // recosteo por una tarifa que nunca se extendió.
+        await publicador.PublicarAsync(
+            new TarifasActualizadas("Ajuste de vigencia de tarifa de plaza", clock.GetUtcNow()), ct);
+
+        await uow.SaveChangesAsync(ct);
+        ajustes.InvalidarCache();
+        return Unit.Value;
+    }
+}
