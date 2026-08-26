@@ -88,6 +88,15 @@ if (builder.Environment.IsProduction() && !azureAdConfigured)
         "AzureAd no está configurado en Producción. El esquema de autenticación de desarrollo " +
         "queda deshabilitado por seguridad. Configure la sección 'AzureAd' antes de desplegar.");
 
+// Mismo criterio para el broker: sin cadena configurada la mensajería va en memoria,
+// que sirve para pruebas y para levantar el API sin RabbitMQ, pero en Producción
+// significaría perder cada mensaje al reiniciar el proceso. Mejor no arrancar.
+if (builder.Environment.IsProduction() &&
+    string.IsNullOrWhiteSpace(builder.Configuration.GetConnectionString("RabbitMq")))
+    throw new InvalidOperationException(
+        "ConnectionStrings:RabbitMq no está configurado en Producción. Sin broker la mensajería " +
+        "va en memoria y los mensajes no sobreviven a un reinicio. Configure el broker antes de desplegar.");
+
 var defaultScheme = azureAdConfigured ? JwtBearerDefaults.AuthenticationScheme : DevAuthenticationHandler.SchemeName;
 var authBuilder = builder.Services.AddAuthentication(defaultScheme);
 if (azureAdConfigured)

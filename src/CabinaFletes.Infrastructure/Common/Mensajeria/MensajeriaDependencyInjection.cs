@@ -90,11 +90,12 @@ public static class MensajeriaDependencyInjection
                 o.QueryDelay = TimeSpan.FromSeconds(5);
             });
 
-            x.UsingRabbitMq((contexto, cfg) =>
+            // La tubería es la misma con broker y sin él. Se escribe una sola vez para
+            // que no puedan divergir: una prueba que corre sobre una tubería distinta
+            // de la de producción afirma menos de lo que parece.
+            void Tuberia<T>(IBusRegistrationContext contexto, IBusFactoryConfigurator<T> cfg)
+                where T : IReceiveEndpointConfigurator
             {
-                if (!string.IsNullOrWhiteSpace(host))
-                    cfg.Host(new Uri(host));
-
                 // Registrar el planificador NO basta: el bus tiene que usarlo en su
                 // tubería. Sin esta línea la actividad Schedule de la saga falla con
                 // "MessageSchedulerContext payload not found" — se descubrió en las
@@ -112,7 +113,28 @@ public static class MensajeriaDependencyInjection
                     TimeSpan.FromSeconds(60)));
 
                 cfg.ConfigureEndpoints(contexto);
-            });
+            }
+
+            // SIN BROKER CONFIGURADO, EL TRANSPORTE VA EN MEMORIA.
+            //
+            // No es una comodidad: sin esto el bus intenta conectarse a RabbitMQ, no
+            // lo consigue y se queda en "not started". El chequeo de salud del bus
+            // pasa a Unhealthy y /health responde 503 aunque el API atienda bien —
+            // que es exactamente lo que llevaba pasando en las pruebas desde la #14
+            // sin que nadie lo notara, porque la suite de Api.Tests no se corría
+            // completa.
+            //
+            // Arrancar sin broker en Producción sería perder mensajes en silencio, y
+            // eso lo impide la guarda de Program.cs, con el mismo criterio que la de
+            // AzureAd.
+            if (string.IsNullOrWhiteSpace(host))
+                x.UsingInMemory(Tuberia);
+            else
+                x.UsingRabbitMq((contexto, cfg) =>
+                {
+                    cfg.Host(new Uri(host));
+                    Tuberia(contexto, cfg);
+                });
         });
 
         // Cadena de publicación: el decorador de validación envuelve al adaptador de
