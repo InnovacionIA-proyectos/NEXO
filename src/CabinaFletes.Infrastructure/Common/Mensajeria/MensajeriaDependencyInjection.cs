@@ -4,6 +4,7 @@ using CabinaFletes.Mensajes;
 using CabinaFletes.Application.CasosDeUso.Solicitudes.Interfaces;
 using CabinaFletes.Application.CasosDeUso.Costeo.Interfaces;
 using CabinaFletes.Infrastructure.Common.Mensajeria.Saga;
+using CabinaFletes.Infrastructure.Bandeja.Adaptadores;
 using CabinaFletes.Infrastructure.Costeo.Adaptadores;
 using CabinaFletes.Infrastructure.Costeo.Repositorios;
 using CabinaFletes.Infrastructure.Solicitudes.Adaptadores;
@@ -12,6 +13,7 @@ using CabinaFletes.Infrastructure.Solicitudes.Repositorios;
 using CabinaFletes.Infrastructure.Trabajos.Adaptadores;
 using CabinaFletes.Infrastructure.Priorizacion.Adaptadores;
 using CabinaFletes.Infrastructure.Trabajos.Repositorios;
+using CabinaFletes.Mensajes.Bandeja;
 using CabinaFletes.Mensajes.Costeo;
 using CabinaFletes.Mensajes.Priorizacion;
 using CabinaFletes.Mensajes.Solicitudes;
@@ -77,6 +79,10 @@ public static class MensajeriaDependencyInjection
             // priorización lo pide. La excepción sube: si esto deja de correr, los
             // reportes empiezan a mentir y hace falta que alguien se entere.
             x.AddConsumer<RecalcularScoresConsumer>();
+
+            // Empuja a quien tenga la bandeja abierta que vuelva a consultarla. El fallo
+            // se registra y se sigue: que alguien cierre una pestaña no es una avería.
+            x.AddConsumer<AvisarBandejaConsumer>();
 
             // La saga se persiste en la misma base que los datos del negocio. Su estado
             // ES la respuesta al cliente que preguntó por su trabajo, así que un
@@ -198,6 +204,7 @@ public static class MensajeriaDependencyInjection
         services.AddScoped<IValidadorDeMensaje<TicDePriorizacion>, TicDePriorizacionValidador>();
         services.AddScoped<IValidadorDeMensaje<ParametrosDePriorizacionCambiaron>, ParametrosDePriorizacionCambiaronValidador>();
         services.AddScoped<IValidadorDeMensaje<RecalcularScoresSolicitado>, RecalcularScoresSolicitadoValidador>();
+        services.AddScoped<IValidadorDeMensaje<BandejaCambio>, BandejaCambioValidador>();
 
         return services;
     }

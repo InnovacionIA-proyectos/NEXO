@@ -1,4 +1,5 @@
 using CabinaFletes.Api.Trabajos;
+using CabinaFletes.Application.CasosDeUso.Bandeja.Interfaces;
 using CabinaFletes.Application.CasosDeUso.Trabajos.Interfaces;
 using CabinaFletes.Application.CasosDeUso.Costeo;
 using CabinaFletes.Application.CasosDeUso.Trabajos;
@@ -8,6 +9,7 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using CabinaFletes.Api.Common.Auth;
 using CabinaFletes.Api.Common.Errors;
 using CabinaFletes.Api.Common.Middleware;
+using CabinaFletes.Api.Bandeja;
 using CabinaFletes.Api.Priorizacion;
 using CabinaFletes.Api.Solicitudes;
 using CabinaFletes.Application.CasosDeUso.AjustesVigenciaPlaza;
@@ -65,6 +67,7 @@ builder.Services.AddCosteoUseCases();
 // consumidor de Infrastructure solo conoce el puerto.
 builder.Services.AddSignalR();
 builder.Services.AddScoped<INotificadorDeTrabajos, NotificadorSignalR>();
+builder.Services.AddScoped<INotificadorDeBandeja, NotificadorDeBandejaSignalR>();
 builder.Services.AddCotizacionesUseCases();
 builder.Services.AddReglasSoloSicetacUseCases();
 builder.Services.AddAjustesVigenciaPlazaUseCases();
@@ -208,6 +211,11 @@ app.MapControllers();
 // El canal de avisos del avance de trabajos. La ruta es parte del contrato con el
 // frontend: es a donde se conecta el cliente para suscribirse a un trabajo.
 app.MapHub<TrabajosHub>("/hubs/trabajos");
+
+// El canal de la bandeja va aparte del de trabajos a propósito: /hubs/trabajos ya está
+// publicado en el contrato como el canal del avance de UN trabajo, con un grupo por
+// trabajo. Meterle la bandeja dejaría el nombre mintiendo.
+app.MapHub<BandejaHub>("/hubs/bandeja");
 // /health responde JSON con el detalle por chequeo, no solo "Healthy"/"Unhealthy".
 //
 // El motivo es concreto: un 503 con el cuerpo en texto plano no dice QUÉ está caído.
