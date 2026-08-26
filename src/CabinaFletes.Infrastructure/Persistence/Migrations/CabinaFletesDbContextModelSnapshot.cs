@@ -25,7 +25,6 @@ namespace CabinaFletes.Infrastructure.Migrations
             modelBuilder.Entity("CabinaFletes.Domain.Auditoria.Entidades.AuditLog", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("Accion")
@@ -60,7 +59,6 @@ namespace CabinaFletes.Infrastructure.Migrations
             modelBuilder.Entity("CabinaFletes.Domain.BibliotecaTarifas.Entidades.TarifaHistorica", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<Guid?>("ConfigVehiculoId")
@@ -106,7 +104,6 @@ namespace CabinaFletes.Infrastructure.Migrations
             modelBuilder.Entity("CabinaFletes.Domain.BibliotecaTarifas.Entidades.TarifaSicetac", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("CondicionCarga")
@@ -205,7 +202,6 @@ namespace CabinaFletes.Infrastructure.Migrations
             modelBuilder.Entity("CabinaFletes.Domain.Catalogos.Entidades.Cliente", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<DateTimeOffset>("CreatedAt")
@@ -246,7 +242,6 @@ namespace CabinaFletes.Infrastructure.Migrations
             modelBuilder.Entity("CabinaFletes.Domain.Catalogos.Entidades.ConfiguracionVehiculo", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("Carroceria")
@@ -280,7 +275,6 @@ namespace CabinaFletes.Infrastructure.Migrations
             modelBuilder.Entity("CabinaFletes.Domain.Catalogos.Entidades.Ruta", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<DateTimeOffset>("CreatedAt")
@@ -314,7 +308,6 @@ namespace CabinaFletes.Infrastructure.Migrations
             modelBuilder.Entity("CabinaFletes.Domain.Catalogos.Entidades.ServicioConexo", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<bool>("Activo")
@@ -369,7 +362,6 @@ namespace CabinaFletes.Infrastructure.Migrations
             modelBuilder.Entity("CabinaFletes.Domain.Costeo.Entidades.AjusteVigenciaPlaza", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<Guid?>("AjustadoPor")
@@ -409,7 +401,6 @@ namespace CabinaFletes.Infrastructure.Migrations
             modelBuilder.Entity("CabinaFletes.Domain.Costeo.Entidades.ReglaSoloSicetac", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<Guid?>("CreadoPor")
@@ -451,7 +442,6 @@ namespace CabinaFletes.Infrastructure.Migrations
             modelBuilder.Entity("CabinaFletes.Domain.Cotizaciones.Entidades.Cotizacion", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<DateTimeOffset>("CreatedAt")
@@ -509,7 +499,6 @@ namespace CabinaFletes.Infrastructure.Migrations
             modelBuilder.Entity("CabinaFletes.Domain.Cotizaciones.Entidades.CotizacionConexo", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<decimal>("Cantidad")
@@ -546,7 +535,6 @@ namespace CabinaFletes.Infrastructure.Migrations
             modelBuilder.Entity("CabinaFletes.Domain.Cotizaciones.Entidades.CotizacionLinea", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<Guid>("CotizacionId")
@@ -591,7 +579,6 @@ namespace CabinaFletes.Infrastructure.Migrations
             modelBuilder.Entity("CabinaFletes.Domain.PlanDeCargue.Entidades.ColocacionCargue", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("Accesibilidad")
@@ -685,7 +672,6 @@ namespace CabinaFletes.Infrastructure.Migrations
             modelBuilder.Entity("CabinaFletes.Domain.PlanDeCargue.Entidades.ItemPlanCargue", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<decimal>("AltoMm")
@@ -794,7 +780,6 @@ namespace CabinaFletes.Infrastructure.Migrations
             modelBuilder.Entity("CabinaFletes.Domain.PlanDeCargue.Entidades.PlanCargue", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("Algoritmo")
@@ -873,7 +858,6 @@ namespace CabinaFletes.Infrastructure.Migrations
             modelBuilder.Entity("CabinaFletes.Domain.PlanDeCargue.Entidades.VehiculoCubicacion", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<decimal>("AltoInternoMm")
@@ -1018,7 +1002,6 @@ namespace CabinaFletes.Infrastructure.Migrations
             modelBuilder.Entity("CabinaFletes.Domain.Solicitudes.Entidades.LineaPendienteDeCosteo", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<DateTimeOffset>("CreatedAt")
@@ -1066,7 +1049,6 @@ namespace CabinaFletes.Infrastructure.Migrations
             modelBuilder.Entity("CabinaFletes.Domain.Solicitudes.Entidades.LineaSolicitud", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("CiudadDevolucionContenedor")
@@ -1161,7 +1143,6 @@ namespace CabinaFletes.Infrastructure.Migrations
             modelBuilder.Entity("CabinaFletes.Domain.Solicitudes.Entidades.Solicitud", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<Guid>("ClienteId")
@@ -1234,7 +1215,6 @@ namespace CabinaFletes.Infrastructure.Migrations
             modelBuilder.Entity("CabinaFletes.Domain.Usuarios.Entidades.Usuario", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<bool>("Activo")
@@ -1298,7 +1278,6 @@ namespace CabinaFletes.Infrastructure.Migrations
             modelBuilder.Entity("CabinaFletes.Infrastructure.Common.Mensajeria.Saga.EstadoAutoCosteo", b =>
                 {
                     b.Property<Guid>("CorrelationId")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("CurrentState")
@@ -1313,6 +1292,9 @@ namespace CabinaFletes.Infrastructure.Migrations
                         .HasColumnType("int");
 
                     b.Property<int>("Resueltas")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Secuencia")
                         .HasColumnType("int");
 
                     b.Property<DateTimeOffset>("SolicitadoEn")
@@ -1484,7 +1466,6 @@ namespace CabinaFletes.Infrastructure.Migrations
             modelBuilder.Entity("MassTransit.EntityFrameworkCoreIntegration.OutboxState", b =>
                 {
                     b.Property<Guid>("OutboxId")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<DateTime>("Created")
