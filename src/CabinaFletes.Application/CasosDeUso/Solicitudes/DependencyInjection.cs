@@ -19,7 +19,7 @@ public static class DependencyInjection
     public static IServiceCollection AddSolicitudesUseCases(this IServiceCollection services)
     {
         services.AddScoped<ICommandHandler<CrearSolicitudCommand, Guid>, CrearSolicitudCommandHandler>();
-        services.AddScoped<ICommandHandler<CargarLineasBulkCommand, int>, CargarLineasBulkCommandHandler>();
+        services.AddScoped<ICommandHandler<CargarLineasBulkCommand, Guid>, CargarLineasBulkCommandHandler>();
         services.AddScoped<ICommandHandler<RechazarSolicitudCommand, Unit>, RechazarSolicitudCommandHandler>();
         services.AddScoped<ICommandHandler<RecalcularScoreCommand, DesgloseScoreDto>, RecalcularScoreCommandHandler>();
         services.AddScoped<ICommandHandler<CapturarSolicitudCommand, CapturaResultDto>, CapturarSolicitudCommandHandler>();

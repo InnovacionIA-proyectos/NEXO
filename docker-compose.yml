@@ -39,6 +39,28 @@ services:
       start_period: 30s
     restart: unless-stopped
 
+  rabbit:
+    image: rabbitmq:3.13-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-nexo}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    ports:
+      # 15672 es la consola de administración: sirve para ver colas, mensajes
+      # atascados y la cola de error sin adivinar. No exponerla fuera de la red
+      # interna en un despliegue real.
+      - "${RABBITMQ_UI_PORT:-15672}:15672"
+    volumes:
+      - rabbit-data:/var/lib/rabbitmq
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_running"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    restart: unless-stopped
+
   api:
     build:
       context: .
@@ -46,11 +68,14 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      rabbit:
+        condition: service_healthy
     ports:
       - "${API_PORT:-8080}:8080"
     environment:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
       ConnectionStrings__CabinaFletes: "Server=db,1433;Database=CabinaFletes;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True;Encrypt=True;"
+      ConnectionStrings__RabbitMq: "amqp://${RABBITMQ_USER:-nexo}:${RABBITMQ_PASSWORD}@rabbit:5672/"
       Database__MigrateOnStartup: ${MIGRATE_ON_STARTUP:-true}
       # Siembra datos de demostración al arrancar si la BD está vacía (idempotente).
       # Poner en "false" en producción real una vez cargados los datos definitivos.
@@ -127,3 +152,4 @@ networks:
 
 volumes:
   mssql-data:
+  rabbit-data:
