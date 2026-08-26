@@ -98,8 +98,20 @@ public class SolicitudesTests
                 new { tipologia = "GranelSolido", peso = 30000 },
             }
         });
-        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
-        Assert.Equal(2, (await resp.Json()).GetProperty("agregadas").GetInt32());
+        // Desde la #15 la carga masiva NO cuesta en el momento: guarda las líneas y
+        // devuelve 202 con el identificador del trabajo. La prueba se quedó afirmando
+        // el contrato viejo —200 con el conteo— y nadie lo vio porque Api.Tests no se
+        // corría completa. Se corrige aquí, junto con la corrida que lo destapó.
+        Assert.Equal(HttpStatusCode.Accepted, resp.StatusCode);
+
+        var cuerpo = await resp.Json();
+        Assert.NotEqual(Guid.Empty, cuerpo.GetProperty("trabajoId").GetGuid());
+        Assert.Equal("Pendiente", cuerpo.GetProperty("estado").GetString());
+
+        // La ruta de respaldo tiene que venir en la respuesta: es con lo que el cliente
+        // reconstruye el estado si nunca recibe un aviso.
+        Assert.Equal($"/api/trabajos/{cuerpo.GetProperty("trabajoId").GetGuid()}",
+            cuerpo.GetProperty("consultarEn").GetString());
     }
 
     [Fact] // bulk vacío -> 400
