@@ -271,6 +271,7 @@ GET /api/trabajos/{trabajoId}
   },
   "solicitadoEn": "2026-08-25T12:00:00Z",
   "terminadoEn": null,
+  "secuencia": 191,
   "esperandoTarifa": [
     {
       "lineaId": "7c1e...",
@@ -287,6 +288,10 @@ Administrador de Tarifas sabe qué cargar.
 
 `total` es nulo hasta que el pliego se reparte: antes de eso nadie sabe cuántas
 líneas hay.
+
+`secuencia` es un contador que solo crece dentro del trabajo. Guárdalo al consultar:
+sirve para descartar los avisos rezagados que lleguen después. Está explicado en el
+punto 5.
 
 ---
 
@@ -310,7 +315,8 @@ el cliente se suscribió. No hay difusión general.
   "estado": "Procesando",
   "avance": { "total": 300, "resueltas": 187, "pendientes": 3,
               "pendientesTecnicas": 1, "requierenTarifaManual": 2 },
-  "terminadoEn": null
+  "terminadoEn": null,
+  "secuencia": 191
 }
 ```
 
@@ -325,6 +331,26 @@ bytes.
 **El reparto es ese: el aviso mueve la barra de progreso, la consulta trae el
 detalle.** Quien necesite ver qué líneas están pendientes y por qué, llama a
 `GET /api/trabajos/{id}` — al terminar, o cuando el usuario abra ese panel.
+
+### Los avisos pueden llegar desordenados: descarta por `secuencia`
+
+Un trabajo grande genera cientos de avisos y varios se procesan a la vez, así que
+pueden llegar al navegador en orden distinto al que se generaron. Sin cuidado, un
+aviso viejo entregado tarde deja la barra de progreso retrocedida hasta el siguiente.
+
+`secuencia` solo crece dentro de un trabajo. La regla del cliente es una línea:
+
+```js
+if (aviso.secuencia <= ultimaSecuenciaPintada) return;   // rezagado, se ignora
+ultimaSecuenciaPintada = aviso.secuencia;
+pintar(aviso);
+```
+
+Al reconectar, `GET /api/trabajos/{id}` devuelve su propia `secuencia`: arranca el
+contador con ese valor y sigue con la misma regla.
+
+Los números pueden saltar (191, 194, 195) y eso es normal — no todos los cambios
+alcanzan a llegar. Lo único que se promete es que nunca retroceden.
 
 ### El aviso es una mejora, no una garantía
 

@@ -42,6 +42,17 @@ public class EstadoAutoCosteo : SagaStateMachineInstance, ISagaVersion
     public int PendientesTecnicas { get; set; }
     public int RequierenManual { get; set; }
 
+    /// <summary>
+    /// Se incrementa en CADA cambio. Viaja en el aviso para que el cliente descarte los
+    /// rezagados.
+    ///
+    /// Hace falta porque dos avisos concurrentes pueden llegar al navegador en orden
+    /// distinto al que se generaron, y sin un número que solo crece la barra de progreso
+    /// retrocedería. Que el mensaje lleve solo el identificador evita datos viejos en el
+    /// mensaje, pero no reordena las entregas.
+    /// </summary>
+    public int Secuencia { get; set; }
+
     /// <summary>Token del timeout, para poder cancelarlo si el trabajo termina antes.</summary>
     public Guid? TokenExpiracion { get; set; }
 

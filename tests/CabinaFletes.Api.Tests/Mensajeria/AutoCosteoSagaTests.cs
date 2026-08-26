@@ -214,6 +214,26 @@ public class AutoCosteoSagaTests : IAsyncLifetime
         Assert.Equal(trabajoId, aviso.TrabajoId);
     }
 
+    [Fact]
+    public async Task La_secuencia_del_trabajo_solo_crece()
+    {
+        var trabajoId = await IniciarTrabajo(3);
+        var alArrancar = (await EsperarEstado(trabajoId, e => e.TotalLineas == 3)).Secuencia;
+
+        await _bus.Bus.Publish(new LineaCosteada(trabajoId, Guid.NewGuid(), 1_000_000m, "Sicetac"));
+        var trasUnaLinea = (await EsperarEstado(trabajoId, e => e.ConDesenlace == 1)).Secuencia;
+
+        await _bus.Bus.Publish(new LineaFalloTecnico(trabajoId, Guid.NewGuid(), "Sicetac no responde"));
+        var trasElFallo = (await EsperarEstado(trabajoId, e => e.ConDesenlace == 2)).Secuencia;
+
+        // Que solo crezca es lo que permite al navegador descartar un aviso rezagado.
+        // Leer el estado actual evita datos viejos DENTRO del aviso, pero dos avisos
+        // procesados a la vez pueden llegar al revés y dejar la barra retrocedida.
+        Assert.True(alArrancar > 0, "Arrancar el trabajo ya es un cambio y debe contar.");
+        Assert.True(trasUnaLinea > alArrancar, $"{trasUnaLinea} no es mayor que {alArrancar}.");
+        Assert.True(trasElFallo > trasUnaLinea, $"{trasElFallo} no es mayor que {trasUnaLinea}.");
+    }
+
     private async Task<EstadoAutoCosteo> EsperarEstado(
         Guid trabajoId, Func<EstadoAutoCosteo, bool> condicion, int intentos = 50)
     {

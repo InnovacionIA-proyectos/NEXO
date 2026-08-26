@@ -20,7 +20,7 @@ public class AvisoDeTrabajoTests
 {
     private static EstadoTrabajoDto Estado(
         string estado = "Procesando", int? total = 300, int resueltas = 187,
-        int tecnicas = 1, int manuales = 2, int pendientesEnLista = 3) =>
+        int tecnicas = 1, int manuales = 2, int pendientesEnLista = 3, int secuencia = 7) =>
         new(
             Guid.Parse("dddddddd-0000-0000-0000-000000000001"),
             estado,
@@ -30,7 +30,8 @@ public class AvisoDeTrabajoTests
             Enumerable.Range(0, pendientesEnLista)
                 .Select(i => new PendienteDeCosteoDto(
                     Guid.NewGuid(), TipoPendienteDeCosteo.Manual, $"Motivo {i}", DateTimeOffset.UtcNow))
-                .ToList());
+                .ToList(),
+            secuencia);
 
     [Fact]
     public void El_aviso_repite_el_estado_y_el_avance_de_la_consulta()
@@ -65,6 +66,19 @@ public class AvisoDeTrabajoTests
 
         Assert.Equal("Parcial", aviso.Estado);
         Assert.NotNull(aviso.TerminadoEn);
+    }
+
+    [Fact]
+    public void El_aviso_repite_la_secuencia_de_la_consulta()
+    {
+        // Tienen que salir del mismo contador. Si el aviso llevara uno propio, el
+        // cliente que se reconecta no podría comparar lo que trae la consulta con lo
+        // que le llega por el canal, que es justo para lo que sirve el número.
+        var estado = Estado(secuencia: 42);
+
+        var aviso = AvisoDeTrabajo.Desde(estado);
+
+        Assert.Equal(42, aviso.Secuencia);
     }
 
     [Fact]

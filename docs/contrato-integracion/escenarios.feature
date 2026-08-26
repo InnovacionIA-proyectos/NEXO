@@ -168,3 +168,17 @@ Característica: Identidad e integración con el portal de la Administración
     Entonces el estado es Parcial y no Fallido
     Y las 297 líneas restantes quedan costeadas
     Y cada línea pendiente conserva su motivo
+
+  @hu-045 @avisos
+  Escenario: Un aviso rezagado no hace retroceder la barra de progreso
+    Dado un cliente suscrito a un trabajo que ya pintó la secuencia 195
+    Cuando le llega un aviso con secuencia 191, entregado tarde
+    Entonces lo descarta y la pantalla no cambia
+    Y el siguiente aviso con secuencia 196 sí se pinta
+
+  @hu-045 @avisos
+  Escenario: Al reconectar, la consulta deja al cliente sincronizado
+    Dado un cliente que estuvo desconectado y se perdió varios avisos
+    Cuando consulta el trabajo por su identificador
+    Entonces obtiene el estado actual y su secuencia
+    Y desde ahí descarta los avisos con secuencia menor o igual

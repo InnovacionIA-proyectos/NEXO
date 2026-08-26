@@ -65,6 +65,7 @@ public sealed class AutoCosteoSaga : MassTransitStateMachine<EstadoAutoCosteo>
                 })
                 .Schedule(Expiracion, c => new ExpiracionAutoCosteo(c.Saga.CorrelationId))
                 .Publish(c => new RepartirLineasDeCosteo(c.Saga.CorrelationId, c.Saga.SolicitudId))
+                .Then(c => c.Saga.Secuencia++)
                 .Publish(c => new TrabajoActualizado(c.Saga.CorrelationId))
                 .TransitionTo(Procesando));
 
@@ -78,7 +79,11 @@ public sealed class AutoCosteoSaga : MassTransitStateMachine<EstadoAutoCosteo>
             Avisar(CerrarSiTermino(When(LineaEsperandoPersona).Then(c => c.Saga.RequierenManual++))),
 
             When(Expiracion.Received)
-                .Then(c => c.Saga.TerminadoEn = DateTimeOffset.UtcNow)
+                .Then(c =>
+                {
+                    c.Saga.TerminadoEn = DateTimeOffset.UtcNow;
+                    c.Saga.Secuencia++;
+                })
                 .TransitionTo(Parcial)
                 .Publish(c => new TrabajoActualizado(c.Saga.CorrelationId)));
 
@@ -111,7 +116,9 @@ public sealed class AutoCosteoSaga : MassTransitStateMachine<EstadoAutoCosteo>
     /// </summary>
     private static EventActivityBinder<EstadoAutoCosteo, T> Avisar<T>(
         EventActivityBinder<EstadoAutoCosteo, T> binder) where T : class =>
-        binder.Publish(c => new TrabajoActualizado(c.Saga.CorrelationId));
+        binder
+            .Then(c => c.Saga.Secuencia++)
+            .Publish(c => new TrabajoActualizado(c.Saga.CorrelationId));
 
     /// <summary>
     /// Cuando todas las líneas tienen desenlace, cierra el trabajo: apaga el timeout y

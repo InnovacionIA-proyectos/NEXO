@@ -31,6 +31,11 @@ public record PendienteDeCosteoDto(
 /// <summary>
 /// Estado consultable de un trabajo. Es la consulta de respaldo del contrato: quien se
 /// reconecta reconstruye todo con esta sola llamada, sin haber recibido ningún aviso.
+///
+/// Trae <c>Secuencia</c> además del estado, y es lo que hace que reconectar funcione:
+/// el cliente consulta, se queda con ese número y a partir de ahí ignora cualquier
+/// aviso con un número menor o igual. Sin él, un aviso rezagado que llegue justo
+/// después de la consulta pisaría datos más nuevos con datos más viejos.
 /// </summary>
 public record EstadoTrabajoDto(
     Guid TrabajoId,
@@ -38,7 +43,8 @@ public record EstadoTrabajoDto(
     AvanceTrabajoDto Avance,
     DateTimeOffset SolicitadoEn,
     DateTimeOffset? TerminadoEn,
-    IReadOnlyList<PendienteDeCosteoDto> Pendientes);
+    IReadOnlyList<PendienteDeCosteoDto> Pendientes,
+    int Secuencia);
 
 /// <summary>
 /// Lo que viaja por el canal de avisos cuando un trabajo cambia.
@@ -55,13 +61,20 @@ public record EstadoTrabajoDto(
 ///
 /// El reparto es ese: el aviso mueve la barra de progreso, la consulta trae el detalle
 /// cuando alguien lo necesita — al terminar, o al abrir el panel de pendientes.
+///
+/// POR QUÉ LLEVA SECUENCIA. Que el mensaje interno solo lleve el identificador evita
+/// que el aviso salga con datos viejos, pero no ordena las ENTREGAS: dos avisos que se
+/// procesan a la vez pueden llegar al navegador al revés, y el más viejo dejaría la
+/// barra de progreso retrocedida hasta el siguiente aviso. <c>Secuencia</c> solo crece;
+/// el cliente descarta lo que llegue con un número menor o igual al último que pintó.
 /// </summary>
 public record AvisoDeTrabajo(
     Guid TrabajoId,
     string Estado,
     AvanceTrabajoDto Avance,
-    DateTimeOffset? TerminadoEn)
+    DateTimeOffset? TerminadoEn,
+    int Secuencia)
 {
     public static AvisoDeTrabajo Desde(EstadoTrabajoDto estado) =>
-        new(estado.TrabajoId, estado.Estado, estado.Avance, estado.TerminadoEn);
+        new(estado.TrabajoId, estado.Estado, estado.Avance, estado.TerminadoEn, estado.Secuencia);
 }

@@ -9,7 +9,7 @@ openapi: 3.0.3
 
 info:
   title: Nexo (Cabina de Fletes) — contrato de integración con el portal
-  version: 1.2.0
+  version: 1.3.0
   description: |
     Nexo no tiene inicio de sesión propio. La identidad la aporta la sesión del
     portal de la Administración; el backend resuelve los permisos contra la tabla
@@ -289,6 +289,12 @@ components:
             Las líneas que esperan intervención humana, con su motivo. Vacío cuando no
             hay ninguna.
           items: { $ref: '#/components/schemas/EsperaDeTarifa' }
+        secuencia:
+          type: integer
+          description: |
+            Contador que solo crece dentro del trabajo. El cliente lo guarda al
+            consultar y descarta los avisos del hub cuya secuencia sea menor o igual,
+            que son los que llegaron rezagados. Puede saltar números; nunca retrocede.
 
     ApiError:
       type: object
