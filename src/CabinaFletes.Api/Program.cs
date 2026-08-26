@@ -1,3 +1,5 @@
+using CabinaFletes.Application.CasosDeUso.Costeo;
+using CabinaFletes.Application.CasosDeUso.Trabajos;
 using CabinaFletes.Infrastructure.Common.Mensajeria;
 using System.Text.Json.Serialization;
 using CabinaFletes.Api.Common.Auth;
@@ -51,6 +53,8 @@ builder.Logging.AddSimpleConsole(o =>
 // --------------------------------------------------------------- Infraestructura + Application (Cotizaciones)
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddMensajeria(builder.Configuration);
+builder.Services.AddTrabajosUseCases();
+builder.Services.AddCosteoUseCases();
 builder.Services.AddCotizacionesUseCases();
 builder.Services.AddReglasSoloSicetacUseCases();
 builder.Services.AddAjustesVigenciaPlazaUseCases();

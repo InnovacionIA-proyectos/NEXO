@@ -5,6 +5,7 @@ using CabinaFletes.Application.Common.Abstractions;
 using CabinaFletes.Application.Common.Exceptions;
 using CabinaFletes.Application.Common.Ports;
 using CabinaFletes.Domain.Costeo.Entidades;
+using CabinaFletes.Mensajes.Costeo;
 
 namespace CabinaFletes.Application.CasosDeUso.AjustesVigenciaPlaza;
 
@@ -22,6 +23,8 @@ public sealed class AjustarVigenciaPlazaMasivoCommandHandler(
     IVigenciaSapPlazaPort vigenciaSap,
     IAuditoriaPort auditoria,
     Common.ICurrentUserPort usuarioActual,
+    IPublicadorDeMensajes publicador,
+    TimeProvider clock,
     IUnitOfWork uow)
     : ICommandHandler<AjustarVigenciaPlazaMasivoCommand, AjusteVigenciaResultDto>
 {
@@ -81,6 +84,9 @@ public sealed class AjustarVigenciaPlazaMasivoCommandHandler(
 
         auditoria.Registrar(usuarioActual.Id, "tarifas_plaza_vigencia", Guid.Empty, "ajustar_masivo",
             $"{{\"modo\":\"{modo}\",\"solicitadas\":{ids.Count},\"aplicadas\":{aplicados}}}");
+        await publicador.PublicarAsync(
+            new TarifasActualizadas("Ajuste masivo de vigencias de plaza", clock.GetUtcNow()), ct);
+
         await uow.SaveChangesAsync(ct);
         ajustes.InvalidarCache();
         return new AjusteVigenciaResultDto(aplicados, ids.Count);

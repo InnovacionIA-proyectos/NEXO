@@ -2,6 +2,7 @@ using CabinaFletes.Application.CasosDeUso.AjustesVigenciaPlaza.Interfaces;
 using CabinaFletes.Application.Common.Abstractions;
 using CabinaFletes.Application.Common.Ports;
 using CabinaFletes.Domain.Costeo.Entidades;
+using CabinaFletes.Mensajes.Costeo;
 
 namespace CabinaFletes.Application.CasosDeUso.AjustesVigenciaPlaza;
 
@@ -13,6 +14,8 @@ public sealed class AjustarVigenciaPlazaCommandHandler(
     IVigenciaSapPlazaPort vigenciaSap,
     IAuditoriaPort auditoria,
     Common.ICurrentUserPort usuarioActual,
+    IPublicadorDeMensajes publicador,
+    TimeProvider clock,
     IUnitOfWork uow)
     : ICommandHandler<AjustarVigenciaPlazaCommand, Unit>
 {
@@ -45,6 +48,12 @@ public sealed class AjustarVigenciaPlazaCommandHandler(
 
         auditoria.Registrar(usuarioActual.Id, "tarifas_plaza_vigencia", Guid.Empty, "ajustar",
             $"{{\"tarifa\":{command.TarifaPlazaId},\"vigencia\":\"{command.NuevaVigencia:yyyy-MM-dd}\"}}");
+        // Extender una vigencia puede resolver líneas que estaban esperando esta tarifa.
+        // Va por el Outbox, antes del commit: si el ajuste no confirma, no se dispara un
+        // recosteo por una tarifa que nunca se extendió.
+        await publicador.PublicarAsync(
+            new TarifasActualizadas("Ajuste de vigencia de tarifa de plaza", clock.GetUtcNow()), ct);
+
         await uow.SaveChangesAsync(ct);
         ajustes.InvalidarCache();
         return Unit.Value;

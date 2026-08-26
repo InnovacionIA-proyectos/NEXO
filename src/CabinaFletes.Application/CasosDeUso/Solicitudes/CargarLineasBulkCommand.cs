@@ -1,4 +1,5 @@
 using CabinaFletes.Application.CasosDeUso.Solicitudes.Interfaces;
+using CabinaFletes.Application.CasosDeUso.Trabajos.Interfaces;
 using CabinaFletes.Application.Common;
 using CabinaFletes.Application.Common.Abstractions;
 using CabinaFletes.Application.Common.Exceptions;
@@ -24,6 +25,7 @@ public sealed class CargarLineasBulkCommandHandler(
     IAuditoriaPort auditoria,
     ICurrentUserPort usuarioActual,
     IPublicadorDeMensajes publicador,
+    IRegistroDeTrabajos trabajos,
     TimeProvider clock,
     IUnitOfWork uow)
     : ICommandHandler<CargarLineasBulkCommand, Guid>
@@ -53,8 +55,16 @@ public sealed class CargarLineasBulkCommandHandler(
         // mete el mensaje en la misma transacción que las líneas. Si el commit falla, no
         // queda un trabajo encolado apuntando a líneas que nunca se guardaron.
         var trabajoId = Guid.NewGuid();
+        var ahora = clock.GetUtcNow();
+
+        // El trabajo se registra AQUÍ, no cuando la orquestación arranque. Así el
+        // identificador que se devuelve con el 202 es consultable desde el instante en
+        // que el cliente lo recibe, y no hay una ventana en la que responda 404 para un
+        // identificador que sí es válido.
+        trabajos.Registrar(trabajoId, s.Id, usuarioActual.Id, ahora);
+
         await publicador.PublicarAsync(
-            new AutoCosteoSolicitado(trabajoId, s.Id, nuevas.Count, usuarioActual.Id, clock.GetUtcNow()), ct);
+            new AutoCosteoSolicitado(trabajoId, s.Id, nuevas.Count, usuarioActual.Id, ahora), ct);
 
         await uow.SaveChangesAsync(ct);
         return trabajoId;

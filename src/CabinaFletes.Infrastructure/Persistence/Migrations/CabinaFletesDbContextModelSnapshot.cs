@@ -1015,6 +1015,54 @@ namespace CabinaFletes.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("CabinaFletes.Domain.Solicitudes.Entidades.LineaPendienteDeCosteo", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetimeoffset")
+                        .HasDefaultValueSql("SYSDATETIMEOFFSET()");
+
+                    b.Property<Guid>("LineaSolicitudId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Motivo")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTimeOffset?>("ResueltaEn")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("SolicitudId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Tipo")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<Guid>("TrabajoId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetimeoffset")
+                        .HasDefaultValueSql("SYSDATETIMEOFFSET()");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SolicitudId")
+                        .HasFilter("[ResueltaEn] IS NULL");
+
+                    b.HasIndex("TrabajoId", "LineaSolicitudId", "Tipo");
+
+                    b.ToTable("lineas_pendientes_de_costeo", (string)null);
+                });
+
             modelBuilder.Entity("CabinaFletes.Domain.Solicitudes.Entidades.LineaSolicitud", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1245,6 +1293,52 @@ namespace CabinaFletes.Infrastructure.Migrations
                             Rol = "Admin",
                             UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
                         });
+                });
+
+            modelBuilder.Entity("CabinaFletes.Infrastructure.Common.Mensajeria.Saga.EstadoAutoCosteo", b =>
+                {
+                    b.Property<Guid>("CorrelationId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CurrentState")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<int>("PendientesTecnicas")
+                        .HasColumnType("int");
+
+                    b.Property<int>("RequierenManual")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Resueltas")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset>("SolicitadoEn")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("SolicitadoPor")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("SolicitudId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("TerminadoEn")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("TokenExpiracion")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int?>("TotalLineas")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("int");
+
+                    b.HasKey("CorrelationId");
+
+                    b.ToTable("trabajos_auto_costeo", (string)null);
                 });
 
             modelBuilder.Entity("MassTransit.EntityFrameworkCoreIntegration.InboxState", b =>

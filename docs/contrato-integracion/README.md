@@ -1,6 +1,6 @@
 # Contrato de integración — Nexo (Cabina de Fletes) ↔ Portal de la Administración
 
-**Versión 1.0.0** · Sprint 2 · Issue #7 (S2-HU-02.1)
+**Versión 1.2.0** · Sprint 2 · Issues #7 y #15
 
 Este documento manda. El módulo `cabina-fletes` del portal está en desarrollo y no
 es la referencia: lo que hoy tenga construido se adapta a lo que diga aquí, no al
@@ -218,14 +218,38 @@ detrás, en la cola.
 ### Estados
 
 ```
-Pendiente → Procesando → Completado
-                       → Parcial
-                       → Fallido
+Procesando → Completado   el servicio resolvió todo por su cuenta
+           → Parcial      quedó algo pendiente: reintento o espera a una persona
+           → Fallido      se rompió el servicio mismo
 ```
 
-`Parcial` no es un error: es un pliego donde algunas líneas quedaron sin costear
-por una fuente caída, con su motivo y su reintento, mientras el resto avanzó.
-Cerrar un pliego con líneas pendientes es un desenlace previsto, no una falla.
+`Parcial` no es un error y va a ser el desenlace más común. `Fallido` está
+reservado para cuando el servicio se rompe, no para cuando simplemente no había
+tarifa.
+
+### Hay dos tipos de pendiente, y no se manejan igual
+
+Esto es lo que más importa entender del avance de un trabajo.
+
+**Pendiente técnica.** Una fuente se cayó. Se reintenta y se resuelve solo. Tiene
+reloj: entra en la ventana automática del trabajo.
+
+**Requiere tarifa manual.** No hay tarifa válida para esa línea. El servicio hizo
+su trabajo y la respuesta es que aquí hace falta el Administrador de Tarifas. **No
+se reintenta y no tiene reloj**: nada va a cambiar hasta que esa persona actúe, y
+puede tener otros pliegos delante. Poner un timeout sobre trabajo humano solo
+sirve para marcar como fallido algo que estaba esperando bien.
+
+Por eso el avance las devuelve por separado. Con un contador único habría que
+mentirle al usuario en la mitad de los casos: "estamos reintentando" cuando la
+verdad es "está en la cola del administrador de tarifas" son mensajes distintos,
+y el segundo le dice a quién ir a buscar.
+
+### El timeout mide máquina, no personas
+
+La ventana automática del trabajo cubre lo que el servicio puede hacer solo, cuya
+duración es predecible. Si vence con líneas sin desenlace, el trabajo cierra en
+`Parcial` con lo que hay, y las que faltan conservan su motivo.
 
 ### Consulta de estado
 
@@ -238,10 +262,31 @@ GET /api/trabajos/{trabajoId}
 {
   "trabajoId": "3f2b...",
   "estado": "Procesando",
-  "avance": { "total": 300, "resueltas": 187, "pendientes": 3 },
-  "resultado": null
+  "avance": {
+    "total": 300,
+    "resueltas": 187,
+    "pendientes": 3,
+    "pendientesTecnicas": 1,
+    "requierenTarifaManual": 2
+  },
+  "solicitadoEn": "2026-08-25T12:00:00Z",
+  "terminadoEn": null,
+  "esperandoTarifa": [
+    {
+      "lineaId": "7c1e...",
+      "motivo": "No hay tarifa de plaza vigente para la ruta.",
+      "esperandoDesde": "2026-08-25T12:00:04Z"
+    }
+  ]
 }
 ```
+
+`esperandoTarifa` es lo que hace útil el aviso. El contador dice cuántas; esto dice
+**cuáles y qué les falta**, y con eso el comercial sabe a quién ir a buscar y el
+Administrador de Tarifas sabe qué cargar.
+
+`total` es nulo hasta que el pliego se reparte: antes de eso nadie sabe cuántas
+líneas hay.
 
 ---
 

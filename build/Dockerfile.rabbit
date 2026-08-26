@@ -1,0 +1,27 @@
+# ============================================================================
+# RabbitMQ con el plugin de intercambio con retardo.
+#
+# Por qué una imagen propia: MassTransit programa los timeouts de saga a través del
+# broker, y eso necesita rabbitmq_delayed_message_exchange, que es un plugin de la
+# comunidad y NO viene en la imagen oficial.
+#
+# La alternativa era un planificador en memoria, y tiene un problema real: si la API
+# se reinicia a mitad de un pliego, el timeout se pierde y el trabajo queda en
+# Procesando para siempre. Nadie se enteraría hasta que alguien pregunte por qué ese
+# pliego nunca terminó. Con el plugin, el reloj vive en el broker y sobrevive al
+# reinicio.
+#
+# La versión del plugin debe coincidir con la línea de RabbitMQ (3.13.x aquí).
+# ============================================================================
+
+FROM rabbitmq:3.13-management-alpine
+
+ARG VERSION_PLUGIN=3.13.0
+ARG URL_PLUGIN=https://github.com/rabbitmq/rabbitmq-delayed-message-exchange/releases/download
+
+RUN set -eux; \
+    apk add --no-cache --virtual .descarga curl; \
+    curl -fsSL -o "$RABBITMQ_HOME/plugins/rabbitmq_delayed_message_exchange-${VERSION_PLUGIN}.ez" \
+        "${URL_PLUGIN}/v${VERSION_PLUGIN}/rabbitmq_delayed_message_exchange-${VERSION_PLUGIN}.ez"; \
+    apk del .descarga; \
+    rabbitmq-plugins enable --offline rabbitmq_delayed_message_exchange
