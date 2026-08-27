@@ -42,7 +42,7 @@ Ver:
 - **FastAPI** — API síncrona (`/api/cubicacion`, `/api/planes-cargue`)
 - **SQLAlchemy 2.0 (async)** — persistencia propia; `DATABASE_URL` apunta a SQLite en desarrollo o PostgreSQL en producción (mismo código, solo cambia la URL)
 - **aio-pika (RabbitMQ)** — worker consumidor separado, para `optimizar` y `crear-desde-línea`
-- **pytest** — 68 pruebas: 33 de reglas de negocio del motor (26 casos dorados de `MotorCubicacion3DTests.cs` + 5 de apilamiento multi-soporte) + **27 de paridad cross-motor** (los mismos 26 casos, comparados contra la salida real del motor C#, no contra un valor transcrito a mano) + 4 de humo end-to-end de la API + 2 de regresión del worker + 2 del registro de algoritmos intercambiables
+- **pytest** — 70 pruebas: 33 de reglas de negocio del motor (26 casos dorados de `MotorCubicacion3DTests.cs` + 5 de apilamiento multi-soporte) + **27 de paridad cross-motor** (los mismos 26 casos, comparados contra la salida real del motor C#, no contra un valor transcrito a mano) + 4 de humo end-to-end de la API + 2 de regresión del worker + 2 del registro de algoritmos intercambiables + 2 de la alerta al equipo cuando un mensaje cae a `cubicacion.dlq`
 
 ## Estado actual (léelo antes de asumir que algo funciona)
 
@@ -55,11 +55,12 @@ Ver:
   `tests/api/test_smoke.py`.
 - Autenticación por Bearer estático rechazando llamadas sin la key.
 
-**Verificado con Docker Compose real (Postgres + RabbitMQ + api + worker, los 4 contenedores sanos):**
+**Verificado con Docker Compose real (Postgres + api + worker propios, conectados al RabbitMQ compartido de NEXO):**
 - El mismo flujo de arriba, pero contra **PostgreSQL real** vía `docker
-  compose up -d` (con healthchecks: `api`/`worker` esperan a que `db` y
-  `rabbitmq` estén `healthy` antes de arrancar — sin eso, arrancaban antes de
-  que Postgres terminara su init y se caían).
+  compose up -d` (con healthcheck: `api`/`worker` esperan a que `db` esté
+  `healthy` antes de arrancar — sin eso, arrancaban antes de que Postgres
+  terminara su init y se caían). RabbitMQ ya no es un contenedor de este
+  compose — ver `docs/DECISIONES_TECNICAS.md` #9.
 - **El flujo asíncrono end-to-end, vía HTTP real**: `POST /{id}/optimizar`
   responde `202` de inmediato con el plan en `procesando`; el `worker` (otro
   contenedor) consume el mensaje de `cubicador.optimizar`, corre
@@ -125,8 +126,10 @@ Ver:
   service_healthy` correcto — el healthcheck de RabbitMQ puede dar "sano" un
   instante antes de que el puerto AMQP acepte conexiones de verdad. Corregido
   con reintentos en la conexión inicial (`infrastructure/mensajeria/
-  rabbitmq.py::conectar_con_reintentos`, 5 intentos / 2s). Reproducido a
-  propósito (`down -v` + `up`) para confirmar que ya no tumba el contenedor.
+  rabbitmq.py::conectar_con_reintentos`, entonces 5 intentos / 2s — subido
+  después a 30/2s, ver el bullet de unificación con NEXO más abajo).
+  Reproducido a propósito (`down -v` + `up`) para confirmar que ya no tumba
+  el contenedor.
 - **Swagger no mandaba el Bearer**: `verificar_api_key` usaba un `Header()`
   crudo llamado `authorization`; sin un esquema de seguridad real, Swagger UI
   no lo exponía de forma confiable (confirmado con un usuario real: el campo
@@ -146,21 +149,57 @@ Ver:
   `docs/DECISIONES_TECNICAS.md` #3 (la decisión de no construir esto se
   revirtió cuando la HU lo pidió explícitamente).
 
+**Unificación de RabbitMQ con el broker compartido de NEXO (2026-08-27):**
+- Este servicio ya NO trae su propio contenedor RabbitMQ — `api`/`worker` se
+  conectan al `rabbit` del `docker-compose.yml` raíz de NEXO (issue
+  #13/S2-HU-041) enganchándose a su red Docker por nombre externo. La base de
+  datos (Postgres) sigue siendo propia. Ver `docs/DECISIONES_TECNICAS.md` #9
+  (documenta por qué se revirtió la decisión original de un broker propio) y
+  la sección "Puesta en marcha" más abajo (ahora requiere levantar el
+  `rabbit` de NEXO antes que este stack).
+- Al no poder haber `depends_on` entre proyectos Compose distintos, se subió
+  el margen de `conectar_con_reintentos()` de 5 intentos/2s a **30/2s** —
+  verificado forzando el peor caso (arrancar este stack antes que el `rabbit`
+  de NEXO): conectó en el intento 4 de 30 una vez el broker quedó listo.
+- Verificado de punta a punta: mensaje publicado → consumido → confirmado vía
+  el broker compartido (RabbitMQ: `publish=1, ack=1`), sin colisión de
+  nombres con la topología MassTransit de NEXO (`cubicador.eventos`/
+  `cubicador.optimizar`/`cubicacion.dlq` no se cruzan con `CostearLinea`,
+  `AutoCosteoSolicitado`, etc. — ver `docs/mensajeria/TOPOLOGIA.md` en la
+  raíz de NEXO).
+
+**Alerta al equipo + prueba E2E por cola (2026-08-27, mismo día):**
+- `infrastructure/alertas/correo.py::alertar_mensaje_en_dlq` — al caer un
+  mensaje en `cubicacion.dlq` tras agotar los 3 reintentos, además del log ya
+  existente, ahora se envía un correo al equipo técnico (mismo mecanismo que
+  la alerta equivalente de NEXO, #13). 2 pruebas nuevas
+  (`tests/worker/test_mover_a_dlq.py`) cubren la conexión worker→alerta y que
+  degrada sin romper el worker si falta configuración de SMTP.
+- `scripts/ci_docker_smoke.py::flujo_resultado_por_cola` — el criterio
+  "trabajo publicado → resultado recibido por cola" (antes solo verificado a
+  mano, sección 2.3) ahora corre en cada push/PR: se suscribe a
+  `plan-de-cargue.generado` con una cola de prueba propia ANTES de disparar
+  `optimizar`, y confirma que el evento real llega por ahí, no solo que el
+  efecto quedó en la base de datos.
+
 ## CI
 
 `.github/workflows/cubicador-ci.yml` (raíz del repo NEXO, con
 `paths: ['cubicador/**']` para no disparar en cambios del backend C#), dos
-jobs en cada push/PR a `main`:
+jobs en cada push/PR a `QA`/`main`:
 
-- **`unit-tests`** — instala dependencias y corre `pytest` (68 pruebas contra
+- **`unit-tests`** — instala dependencias y corre `pytest` (70 pruebas contra
   SQLite en memoria, sin infraestructura externa).
-- **`docker-smoke`** — levanta el stack real (`docker compose up -d --build
-  --wait`: Postgres + RabbitMQ + api + worker) y corre
-  `scripts/ci_docker_smoke.py`, que automatiza el flujo de las secciones
-  2.2-2.4 de `docs/testDocumentation/PRUEBAS_DE_INTEGRACION.md`: `POST
-  /optimizar` → 202 → espera a que el worker lo procese → `optimizado` con
-  `metricas.puntaje == plan.puntaje` (regresión del bug real ya corregido),
-  y un mensaje con `tipo` inválido → 3 reintentos → cae en `cubicacion.dlq`.
+- **`docker-smoke`** — levanta primero el `rabbit` compartido de NEXO
+  (`docker compose -f ../docker-compose.yml up -d --wait rabbit`) y luego el
+  stack propio (`docker compose up -d --build --wait`: Postgres + api +
+  worker), y corre `scripts/ci_docker_smoke.py`, que automatiza el flujo de
+  las secciones 2.2-2.4 de `docs/testDocumentation/PRUEBAS_DE_INTEGRACION.md`:
+  `POST /optimizar` → 202 → espera a que el worker lo procese → `optimizado`
+  con `metricas.puntaje == plan.puntaje` (regresión del bug real ya
+  corregido); el resultado recibido **por cola**, no solo por HTTP
+  (`plan-de-cargue.generado`, sección 2.3 — antes solo verificado a mano); y
+  un mensaje con `tipo` inválido → 3 reintentos → cae en `cubicacion.dlq`.
   Falla el job (exit ≠ 0) si el flujo real no llega al resultado esperado, no
   solo si el código no compila/importa.
 
@@ -186,10 +225,22 @@ uvicorn api.main:app --reload
 curl http://localhost:8000/health
 ```
 
-**Con Docker Compose (api + worker + rabbitmq + Postgres):**
+**Con Docker Compose (api + worker + Postgres propios, RabbitMQ compartido de NEXO):**
+
+Requiere el `rabbit` de NEXO ya corriendo (ver `docs/DECISIONES_TECNICAS.md`
+#9) — desde la raíz del repo:
 
 ```bash
-cp .env.example .env   # completar POSTGRES_PASSWORD, RABBITMQ_DEFAULT_USER/PASS, CUBICADOR_API_KEY, NEXO_CALLBACK_API_KEY, NEXO_BASE_URL
+cd ..   # raíz de NEXO
+cp .env.example .env   # si no existe ya; completar RABBITMQ_PASSWORD como mínimo
+docker compose up -d --wait rabbit   # solo el broker, no todo NEXO (rabbit no depende de db/api)
+cd cubicador
+```
+
+Y luego el stack propio de Cubicador:
+
+```bash
+cp .env.example .env   # completar POSTGRES_PASSWORD, RABBITMQ_USER/PASSWORD (= los del .env raíz de NEXO), CUBICADOR_API_KEY, NEXO_CALLBACK_API_KEY, NEXO_BASE_URL
 docker compose up -d --build --wait
 curl http://localhost:8000/health
 ```

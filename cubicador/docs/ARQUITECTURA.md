@@ -66,7 +66,7 @@ tests/
   domain/                            # 33 pytest - las 31 reglas de testDocumentation/REGLAS_DE_NEGOCIO.md
   api/
     test_smoke.py                    # flujo end-to-end contra SQLite
-docker-compose.yml                    # api + worker + rabbitmq + postgres
+docker-compose.yml                    # api + worker + postgres (RabbitMQ es el compartido de NEXO, ver DECISIONES_TECNICAS.md #9)
 ```
 
 ## Por qué `domain/motor` es la pieza más importante
