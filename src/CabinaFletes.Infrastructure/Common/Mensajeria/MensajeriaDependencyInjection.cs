@@ -62,6 +62,28 @@ public static class MensajeriaDependencyInjection
             // misma fuente y no pueden decir cosas distintas.
             x.AddConsumer<AvisarTrabajoConsumer>();
 
+            // Issue #13: alerta al equipo cuando un mensaje agota reintentos y cae a la
+            // cola de error (ver AlertaDeFalloConsumer<T>). MassTransit 8.5 no tiene forma
+            // de registrar un Fault<T> genérico abierto contra IRegistrationConfigurator
+            // (AddConsumer(Type) solo acepta tipos CERRADOS, se verificó por reflexión y
+            // se confirmó en runtime: revienta con "Type.ContainsGenericParameters is
+            // true"), así que toca una línea por tipo de mensaje - igual que los
+            // validadores de abajo. Si se agrega un mensaje nuevo y se olvida esta lista,
+            // ese mensaje simplemente no genera alerta (sin excepción, sin romper nada) -
+            // por eso el criterio de cierre de la #13 debe verificar esto explícitamente,
+            // no asumir que es automático.
+            x.AddConsumer<AlertaDeFalloConsumer<AutoCosteoSolicitado>>();
+            x.AddConsumer<AlertaDeFalloConsumer<RepartirLineasDeCosteo>>();
+            x.AddConsumer<AlertaDeFalloConsumer<PliegoRepartido>>();
+            x.AddConsumer<AlertaDeFalloConsumer<CostearLineaSolicitada>>();
+            x.AddConsumer<AlertaDeFalloConsumer<LineaCosteada>>();
+            x.AddConsumer<AlertaDeFalloConsumer<LineaFalloTecnico>>();
+            x.AddConsumer<AlertaDeFalloConsumer<LineaRequiereTarifaManual>>();
+            x.AddConsumer<AlertaDeFalloConsumer<TarifasActualizadas>>();
+            x.AddConsumer<AlertaDeFalloConsumer<RecostearLineaSolicitada>>();
+            x.AddConsumer<AlertaDeFalloConsumer<TrabajoActualizado>>();
+            x.AddConsumer<AlertaDeFalloConsumer<ExpiracionAutoCosteo>>();
+
 
             // La saga se persiste en la misma base que los datos del negocio. Su estado
             // ES la respuesta al cliente que preguntó por su trabajo, así que un
