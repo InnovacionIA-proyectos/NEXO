@@ -11,6 +11,7 @@ using CabinaFletes.Application.Common.Ports;
 using CabinaFletes.Domain.Catalogos.Entidades;
 using CabinaFletes.Domain.Cotizaciones.Entidades;
 using CabinaFletes.Domain.Enums;
+using CabinaFletes.Mensajes.Bandeja;
 using CabinaFletes.Domain.Priorizacion.Reglas;
 using CabinaFletes.Domain.Solicitudes.Entidades;
 using Microsoft.Extensions.DependencyInjection;
@@ -47,7 +48,7 @@ public sealed class CapturarSolicitudCommandHandler(
     ISolicitudesRepository solicitudes, IRutasCatalogoPort rutasCatalogo,
     IConfiguracionesVehiculoPort vehiculosCatalogo, IClientesPort clientes, IClientesDwPort clientesDw,
     IPropuestaTarifaPort propuestas, IAuditoriaPort auditoria, ICurrentUserPort usuarioActual,
-    TimeProvider clock, IUnitOfWork uow, IServiceScopeFactory scopes)
+    TimeProvider clock, IPublicadorDeMensajes publicador, IUnitOfWork uow, IServiceScopeFactory scopes)
     : ICommandHandler<CapturarSolicitudCommand, CapturaResultDto>
 {
     private const int UmbralCosteoDiferido = 10;
@@ -145,6 +146,12 @@ public sealed class CapturarSolicitudCommandHandler(
         solicitudes.Agregar(solicitud);
         auditoria.Registrar(usuarioActual.Id, "solicitudes", solicitud.Id, "captura",
             $"{{\"tipo\":\"{solicitud.Tipo}\",\"lineas\":{solicitud.Lineas.Count},\"rutasCreadas\":{rutasCreadas},\"vehiculosCreados\":{vehiculosCreados}}}");
+
+        // La bandeja tiene una fila más. Se avisa UNA vez por captura, no una por línea:
+        // lo que cambia es que entró la solicitud, no cuántas líneas trae.
+        await publicador.PublicarAsync(
+            new BandejaCambio(MotivoDeCambio.SolicitudNueva, clock.GetUtcNow()), ct);
+
         await uow.SaveChangesAsync(ct);
 
         if (solicitud.Lineas.Count > UmbralCosteoDiferido)

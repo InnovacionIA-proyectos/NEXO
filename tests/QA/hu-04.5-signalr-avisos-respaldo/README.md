@@ -4,6 +4,23 @@ Rama: `17-s2-hu-045-signalr-avisos-y-respaldo` (se apila sobre HU-01.1 → HU-04
 Verificación hecha situándose en esa rama, antes de aprobar/mergear el PR #64.
 Sin conflictos de merge esta vez (`mergeable: true` desde el inicio).
 
+> ## ⚠️ Corrección (agregada durante la verificación de la HU-05.1, PR #66)
+> Este documento afirma más abajo que los avisos llegaron con **"secuencia
+> estrictamente creciente"**. Es impreciso y hay que corregirlo: el
+> `build/e2e/recorrido.py` del PR #66 reprodujo, contra la misma app real,
+> avisos **desordenados y repetidos de verdad** (`[1, 1, 8, 8, 8, 8, 9, 8, 9,
+> 9, 10, ...]`). Mi corrida de este documento solo tuvo 10 avisos y le tocó
+> un orden de llegada favorable — no probaba que el canal entregue
+> ordenado, solo que en esa corrida particular no se desordenó.
+>
+> **Lo que el contrato promete de verdad** (y que sigue cumpliéndose,
+> verificado de nuevo en la HU-05.1) no es que la entrega venga ordenada,
+> sino que el cliente descarta cualquier aviso con secuencia menor o igual
+> a la última que pintó — con esa regla aplicada, la barra de progreso
+> nunca retrocede aunque la entrega sí se desordene. Ver
+> `tests/QA/hu-05.1-recalculo-score-programado/README.md` para la
+> verificación correcta y la evidencia.
+
 ## Qué trae el PR
 - **Hub SignalR** (`/hubs/trabajos`): un grupo por `trabajoId`, evento `"avance"`, autenticado igual que el resto del API.
 - **`GET /api/trabajos/{id}`** como respaldo: reconstruye el estado completo sin haber recibido ningún aviso.

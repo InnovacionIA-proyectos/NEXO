@@ -95,6 +95,13 @@ services:
       # Poner en "false" en producción real una vez cargados los datos definitivos.
       Database__SeedOnStartup: ${SEED_ON_STARTUP:-true}
       Cors__FrontendOrigin: ${FRONTEND_ORIGIN:-http://localhost:5173}
+      # Recálculo del score persistido (#19). El reloj vive en el broker, no en este
+      # proceso, así que cambiar el intervalo solo afecta cada cuánto suena: no hay
+      # temporizador en memoria que se duplique con las réplicas.
+      Score__IntervaloRecalculoMinutos: ${SCORE_INTERVALO_MINUTOS:-15}
+      # Cuántas solicitudes por lote. Existe para no dejar una transacción larga
+      # bloqueando filas que la bandeja está leyendo.
+      Score__TamanoDeLoteRecalculo: ${SCORE_TAMANO_LOTE:-200}
       AzureAd__Instance: ${AzureAd__Instance:-https://login.microsoftonline.com/}
       AzureAd__TenantId: ${AzureAd__TenantId:-}
       AzureAd__ClientId: ${AzureAd__ClientId:-}
@@ -129,6 +136,41 @@ services:
       retries: 5
       start_period: 40s
     restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Recorrido de punta a punta contra la aplicación levantada.
+  #
+  #   docker compose up -d
+  #   docker compose --profile e2e run --rm e2e
+  #
+  # Comprueba lo que la suite no puede: la suite corre con transporte en memoria y
+  # bases efímeras —rápida y bien aislada, y por eso mismo ciega a si las piezas
+  # encajan de verdad—. Esto habla con el API real, con el Outbox entregando contra
+  # SQL Server, RabbitMQ con su plugin de retardo, la saga persistida y SignalR
+  # empujando a un cliente de verdad.
+  #
+  # No es teórico: así se encontró que el arranque de la cadena de priorización
+  # publicaba al Outbox sin guardar, cosa que ninguna prueba veía porque ninguna
+  # publica a través del Outbox.
+  #
+  # Va en un perfil para que `docker compose up` no lo arranque. Sale con código
+  # distinto de cero si algo falla, así que sirve tal cual en un pipeline.
+  #
+  # Solo biblioteca estándar de Python: sin pip, para que no falle por una red que
+  # intercepta TLS en vez de por el código.
+  e2e:
+    profiles: ["e2e"]
+    image: python:3.12-slim
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      API_BASE: http://api:8080
+    volumes:
+      - ./build/e2e:/e2e:ro
+    networks:
+      - internal
+    command: ["python", "/e2e/recorrido.py"]
 
   # One-shot opcional de seed:  docker compose --profile seed run --rm seed
   seed:
