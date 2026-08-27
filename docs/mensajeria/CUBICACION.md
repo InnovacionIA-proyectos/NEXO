@@ -162,44 +162,41 @@ saber de qué tipo es el mensaje), que NO pasa por `UseMessageRetry` ni por
 requiere haber identificado el tipo del mensaje primero). Distinción real
 entre dos categorías de fallo de MassTransit, no una suposición.
 
-## 4. Por qué Cubicador (Python) no puede consumir/producir esto todavía
+## 4. Compatibilidad con Cubicador (Python) — RESUELTO
 
-Cubicador publica/consume JSON plano vía `aio_pika` — sin el envelope de
-MassTransit (`messageType`, `message` anidado). Confirmado en runtime
-(2026-08-27): al publicar `CubicacionSolicitada` con el envelope real de
-MassTransit, el worker de Cubicador falló con:
+**Estado inicial (2026-08-27, primer intento)**: Cubicador publicaba/consumía
+JSON plano vía `aio_pika` — sin el envelope de MassTransit (`messageType`,
+`message` anidado). Al publicar `CubicacionSolicitada` con el envelope real
+de MassTransit, el worker de Cubicador fallaba con `KeyError: 'tipo'`
+(`cuerpo["tipo"]` ya no existía en la raíz), y su propio manejo de error
+también reventaba con el mismo `KeyError` al construir el movimiento a DLQ —
+el mensaje ni siquiera llegaba a `cubicacion.dlq`.
 
-```
-KeyError: 'tipo'
-  File "/app/worker/main.py", line 59, in _ejecutar_solicitud
-    tipo = cuerpo["tipo"]
-```
+**Solución implementada** (mismo día, ver `cubicador/docs/
+DECISIONES_TECNICAS.md` #12 para el detalle completo del lado Python):
+Cubicador NO adoptó MassTransit ni ninguna librería .NET — solo aprendió a
+hablar el shape de JSON que el envelope necesita, en los 2 puntos exactos
+donde cruza la frontera con NEXO:
 
-porque `cuerpo["tipo"]` ya no existe en la raíz — ahora está en
-`cuerpo["message"]["tipo"]`. **Hallazgo adicional**: el propio manejo de
-error de Cubicador también revienta con el mismo `KeyError` al construir el
-movimiento a DLQ (`worker/main.py:112`, `cuerpo["tipo"]` de nuevo) — es decir,
-el mensaje ni siquiera llega a `cubicacion.dlq` hoy; el handler de excepción
-se cae con una SEGUNDA excepción antes de completar el movimiento.
+- **Al consumir** `cubicacion.solicitada`
+  (`worker/main.py::_procesar`): si el JSON trae `message`+`messageType`, se
+  desenvuelve antes de procesar; si no, se usa tal cual — fallback
+  transparente, Cubicador consigo mismo sigue sin sobre.
+- **Al publicar** `plan-de-cargue.generado`/`cubicacion.rechazada`
+  (`infrastructure/mensajeria/rabbitmq.py::_sobre_masstransit`): se envuelven
+  con el `messageType` exacto de la clase C# correspondiente — acoplamiento
+  cruzado real y aceptado (si NEXO renombra esa clase, Cubicador queda
+  desincronizado en silencio, sin error de compilación que lo avise;
+  protegido hoy solo por `ContratoCubicacionTests.cs` de este lado y la
+  verificación E2E de `tests/QA/28-.../README.md`).
 
-Qué necesitaría Cubicador para consumir esto correctamente (ver discusión
-pendiente con el equipo, NO implementado en esta rama):
-
-1. **Leer `cuerpo["message"]["tipo"]`** en vez de `cuerpo["tipo"]` en
-   `_ejecutar_solicitud` (y en el fallback de `_mover_a_dlq`, que tiene el
-   mismo bug).
-2. **Publicar con el mismo envelope** al enviar `plan-de-cargue.generado`/
-   `cubicacion.rechazada`, para que los `IConsumer<T>` de NEXO los reciban:
-   `{"messageType": ["urn:message:CabinaFletes.Mensajes.Cubicacion:
-   PlanDeCargueGenerado"], "message": {...payload actual...}}` — el
-   `messageType` debe ser el namespace/nombre EXACTO de la clase C#
-   correspondiente (acoplamiento cruzado a tener en cuenta: si NEXO renombra
-   esa clase, Cubicador queda desincronizado en silencio, sin error de
-   compilación que lo avise).
-3. Actualizar las pruebas de Cubicador que dependen del shape actual
-   (`scripts/ci_docker_smoke.py::flujo_resultado_por_cola` hace
-   `evento["planId"]` directo hoy; pasaría a `evento["message"]["planId"]`) y
-   `cubicador/docs/CONTRATOS.md`.
+**Verificado de punta a punta con infraestructura real (mismo día, segunda
+corrida)**: plan creado en Cubicador → `CubicacionSolicitada` publicada por
+NEXO con MassTransit real → worker de Cubicador desenvuelve y optimiza
+correctamente → `plan-de-cargue.generado` publicado envuelto → NEXO lo
+consume → `PlanCargue` actualizado: **`estado=optimizado, puntaje=75.00`**.
+El flujo feliz completo del criterio 1 y 3 ya no depende de intervención
+manual — funciona con el Cubicador real, tal como quedó en esta rama.
 
 ## 5. Limitaciones conocidas, honestas (no resueltas por esta HU)
 

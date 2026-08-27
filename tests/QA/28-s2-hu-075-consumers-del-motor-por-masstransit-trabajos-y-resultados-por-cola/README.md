@@ -41,8 +41,13 @@ pieza aislada, lista para que quien dispare esto en el futuro solo llame a
   endpoints (ver hallazgos abajo).
 - `tests/CabinaFletes.Api.Tests/Cubicacion/ContratoCubicacionTests.cs` — 3
   pruebas de (de)serialización, sin broker.
-- `docs/mensajeria/CUBICACION.md` — contrato + decisiones + qué necesitaría
-  Cubicador para hablar el envelope de MassTransit (no implementado).
+- `docs/mensajeria/CUBICACION.md` — contrato + decisiones + compatibilidad
+  con el envelope de MassTransit del lado de Cubicador (implementada y
+  verificada, ver sección 4 de este documento).
+- Del lado de Cubicador (`cubicador/`, mismo repo): `worker/main.py`,
+  `infrastructure/mensajeria/rabbitmq.py`, `scripts/ci_docker_smoke.py`,
+  `docs/CONTRATOS.md`, `docs/DECISIONES_TECNICAS.md` #12 — compatibilidad
+  con el envelope de MassTransit, ver sección 4.
 
 ## 2. Criterios de cierre — verificados contra infraestructura real
 
@@ -127,12 +132,26 @@ identificar el tipo del mensaje), que no pasa por `UseMessageRetry` ni por
 `AlertaDeFalloConsumer<T>`. Dos categorías de fallo distintas en MassTransit,
 confirmado en runtime — ver `docs/mensajeria/CUBICACION.md` #3.
 
-**Efecto colateral real, esperado**: publicar `CubicacionSolicitada` con el
-envelope real de MassTransit hacia Cubicador (para probar el flujo feliz de
-la sección 3) hizo que su worker fallara con `KeyError: 'tipo'` — Cubicador
-lee JSON plano, no el envelope. Ver `docs/mensajeria/CUBICACION.md` #4 para
-la evidencia completa y qué necesitaría cambiar Cubicador (discusión
-pendiente con el equipo, no implementado en esta rama).
+**Efecto colateral encontrado y YA RESUELTO**: publicar `CubicacionSolicitada`
+con el envelope real de MassTransit hacia Cubicador hizo que su worker
+fallara con `KeyError: 'tipo'` en la primera corrida — Cubicador leía JSON
+plano, no el envelope. Se implementó compatibilidad del lado de Cubicador
+(desenvuelto al consumir con fallback, envelope al publicar los 2 eventos
+que sí lee NEXO — ver `docs/mensajeria/CUBICACION.md` #4 y
+`cubicador/docs/DECISIONES_TECNICAS.md` #12) y se re-verificó de punta a
+punta: **`estado=optimizado, puntaje=75.00`**, el mismo resultado de la
+sección 3, ahora sin ningún workaround manual.
+
+**Aparte, un hallazgo de metodología de prueba, no de producto**: al repetir
+la verificación con el contenedor `nexo-api-1` real corriendo A LA VEZ que el
+harness de xUnit, el mensaje de resultado se enrutó al consumer del
+contenedor real (mismo nombre de cola, RabbitMQ reparte round-robin entre
+ambos) en vez de al del harness — el harness, apuntando a la base de datos
+de PRUEBAS, vio el plan "atascado" en `procesando` y el test dio timeout,
+aunque el mensaje SÍ se procesó correctamente (confirmado en los logs del
+contenedor real). Se resolvió deteniendo `nexo-api-1` mientras corre el
+harness — no es un bug del puente, es evitar dos consumidores compitiendo
+por la misma cola durante la verificación.
 
 ## 5. Regresión
 
@@ -142,15 +161,12 @@ pendiente con el equipo, no implementado en esta rama).
 
 ## 6. Qué queda pendiente, honesto
 
-- **Cubicador no puede consumir/producir el envelope de MassTransit
-  todavía** — es el bloqueante real para que el flujo feliz funcione con el
-  Cubicador actual sin intervención manual. Ver
-  `docs/mensajeria/CUBICACION.md` #4 para el detalle exacto de qué cambiar
-  ahí (discusión pendiente, fuera de esta rama).
 - Nadie dispara `ICubicacionPort` todavía desde un flujo de usuario real —
   ver `docs/mensajeria/CUBICACION.md` #5 (datos duplicados entre las dos
   bases, disciplina del Outbox).
 - Solo se probó el camino "optimizar" (no "crear_desde_linea").
 - El harness de verificación no quedó como prueba automatizada en CI (igual
   criterio que HU-041) — la garantía de contrato en cada build la dan las 3
-  pruebas de `ContratoCubicacionTests` (rápidas, sin infraestructura).
+  pruebas de `ContratoCubicacionTests` (rápidas, sin infraestructura) del
+  lado NEXO, y las 70 de Cubicador (incluida la compatibilidad de envelope,
+  cubierta indirectamente por `ci_docker_smoke.py`) del otro lado.

@@ -376,3 +376,44 @@ detrás de flag) es justo la situación mixta que se quería evitar.
 **Acción cuando llegue el momento**: documentar en un `.md` de NEXO,
 explícito, qué archivos/tablas se retiran — para que no queden restos a medio
 camino en ninguno de los dos lados.
+
+## 12. Interoperabilidad con MassTransit (issue #28, S2-HU-075)
+
+**Contexto**: NEXO construyó un puente hacia Cubicador con `IConsumer<T>`
+reales de MassTransit (decisión del equipo: MassTransit nativo, no un cliente
+RabbitMQ crudo del lado de NEXO — ver `NEXO/docs/mensajeria/CUBICACION.md`).
+MassTransit espera que los mensajes vengan envueltos en su propio "sobre"
+(`messageType` + `message` anidado) para poder deserializarlos.
+
+**Decisión**: Cubicador SIGUE sin depender de MassTransit ni de ninguna
+librería .NET — solo aprende a hablar el shape de JSON que ese "sobre"
+necesita, a mano, en los 2 puntos exactos donde cruza la frontera con NEXO:
+
+- **Al consumir** `cubicacion.solicitada`: si el JSON trae `message`+
+  `messageType`, se desenvuelve antes de procesar; si no, se usa tal cual
+  (`worker/main.py::_procesar`). Fallback transparente: Cubicador consigo
+  mismo (su propia API, sus propios tests) sigue publicando sin sobre, sin
+  ningún cambio.
+- **Al publicar** `plan-de-cargue.generado`/`cubicacion.rechazada` (los 2
+  eventos que SI consume NEXO): se envuelven con `_sobre_masstransit()`
+  (`infrastructure/mensajeria/rabbitmq.py`). `cubicacion.solicitada` (el que
+  Cubicador consume de sí mismo) NUNCA se envuelve desde este lado — nadie
+  más lo necesita.
+
+**Por qué no ir más allá** (ej. no se adopta MassTransit-para-Python, no se
+imita su topología de exchanges por tipo): seguiría siendo un acoplamiento
+más profundo del que hace falta. El único costo real que se acepta es el
+`messageType`, que debe coincidir exacto con el namespace/nombre de la clase
+C# del otro lado — un acoplamiento cruzado real, sin verificación en tiempo
+de compilación en ninguno de los dos lados, protegido hoy solo por las
+pruebas de contrato de cada lado (`tests/CabinaFletes.Api.Tests/Cubicacion/
+ContratoCubicacionTests.cs` en NEXO, y la verificación E2E documentada en
+`tests/QA/28-.../README.md` de NEXO).
+
+**Verificado en runtime, no solo diseñado**: un mensaje `CubicacionSolicitada`
+publicado por NEXO con el sobre real llegó al worker, se desenvolvió
+correctamente y se procesó igual que uno sin sobre — sin este cambio fallaba
+con `KeyError: 'tipo'` (documentado con la traza real en
+`NEXO/docs/mensajeria/CUBICACION.md` #4, incluido un bug que ese mismo
+`KeyError` exponía en el manejo de error de `_mover_a_dlq`, ya corregido de
+paso al aplicar el mismo desenvuelto ahí).
