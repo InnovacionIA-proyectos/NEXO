@@ -3,7 +3,6 @@ using CabinaFletes.Application.CasosDeUso.Trabajos.Interfaces;
 using CabinaFletes.Application.CasosDeUso.Costeo;
 using CabinaFletes.Application.CasosDeUso.Trabajos;
 using CabinaFletes.Infrastructure.Common.Mensajeria;
-using CabinaFletes.Infrastructure.Cubicacion;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using CabinaFletes.Api.Common.Auth;
@@ -39,8 +38,8 @@ using Microsoft.EntityFrameworkCore;
 // tarifas ganadas), TarifasSicetacAdmin (caché local + import Excel) y Métricas
 // (Tablero del Líder). Cubicación 3D y Plan de Cargue son un microservicio
 // Python aparte (carpeta cubicador/ de este mismo repo) — NEXO no reimplementa
-// el motor, solo le pide trabajos y recibe resultados por cola (issue #28,
-// S2-HU-075, AddCubicacion() más abajo).
+// el motor, solo le pide trabajos y recibe resultados por cola vía MassTransit
+// (issue #28, S2-HU-075, ver AddMensajeria() y docs/mensajeria/CUBICACION.md).
 // -----------------------------------------------------------------------------
 
 var builder = WebApplication.CreateBuilder(args);
@@ -59,7 +58,6 @@ builder.Logging.AddSimpleConsole(o =>
 // --------------------------------------------------------------- Infraestructura + Application (Cotizaciones)
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddMensajeria(builder.Configuration);
-builder.Services.AddCubicacion();
 builder.Services.AddTrabajosUseCases();
 builder.Services.AddCosteoUseCases();
 
