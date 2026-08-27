@@ -4,18 +4,23 @@ namespace CabinaFletes.Mensajes.Cubicacion;
 /// Contrato de mensajes con el microservicio Cubicador (carpeta cubicador/ de este
 /// mismo repo, Python + aio_pika — ver cubicador/docs/CONTRATOS.md sección B).
 ///
-/// ADVERTENCIA para quien busque estos tipos en un consumer de MassTransit: no hay
-/// ninguno. Cubicador publica JSON plano al exchange `cubicador.eventos` (topic), sin
-/// el envelope de MassTransit (sin `messageType`, sin campo `message` anidado) — es
-/// el mismo exchange/formato que ya usan sus propios tests, no algo que valga la pena
-/// cambiar solo para que un `IConsumer&lt;T&gt;` nativo lo reciba. Por eso el puente
-/// vive en Infrastructure/Cubicacion/ con RabbitMQ.Client directo (ver
-/// CubicacionRabbitAdapter/CubicacionResultadosConsumidor), no con IPublishEndpoint/
-/// IConsumer — igual que Cubicador tampoco usa "MassTransit para Python", conviven en
-/// el mismo broker físico sin cruzarse (ver cubicador/docs/DECISIONES_TECNICAS.md #9).
+/// Estos SÍ son mensajes reales de MassTransit (issue #28, S2-HU-075 — decisión del
+/// equipo: MassTransit nativo, no un cliente RabbitMQ crudo del lado de NEXO):
+/// `CubicacionSolicitada` se publica con `IPublishEndpoint`
+/// (`Infrastructure/Cubicacion/CubicacionPublicadorAdapter.cs`) y
+/// `PlanDeCargueGenerado`/`CubicacionRechazada` se consumen con `IConsumer&lt;T&gt;`
+/// reales (`PlanDeCargueGeneradoConsumer`/`CubicacionRechazadaConsumer`) — heredan la
+/// misma tubería de reintentos/Fault/alerta que el resto de NEXO.
 ///
-/// Estos tipos son DTOs para (de)serializar en ese límite, con los mismos nombres de
-/// campo (camelCase) que ya usa Cubicador — no participan del bus de MassTransit.
+/// Lo ÚNICO no estándar es la TOPOLOGÍA: Cubicador declara su propio exchange topic
+/// (`cubicador.eventos`) con routing keys semánticas, no el exchange-por-tipo que
+/// MassTransit crea por defecto — por eso `MensajeriaDependencyInjection.cs` anula esa
+/// convención a mano solo para estos 3 tipos (`cfg.Message&lt;T&gt;()`/
+/// `cfg.Publish&lt;T&gt;()`/`ReceiveEndpoint` con `Bind()` manual). Cubicador, del otro
+/// lado, no adopta MassTransit — solo aprendió a hablar su "sobre" JSON mínimo en estos
+/// 2 puntos de cruce (ver cubicador/infrastructure/mensajeria/rabbitmq.py y
+/// cubicador/docs/DECISIONES_TECNICAS.md #12). Ver docs/mensajeria/CUBICACION.md para
+/// el detalle completo.
 /// </summary>
 
 /// <summary>

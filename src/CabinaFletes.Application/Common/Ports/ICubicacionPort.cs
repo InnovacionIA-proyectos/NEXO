@@ -2,19 +2,24 @@ namespace CabinaFletes.Application.Common.Ports;
 
 /// <summary>
 /// Solicita una cubicación (plan de cargue) al microservicio Cubicador — issue #28,
-/// S2-HU-075. NO usa <see cref="IPublicadorDeMensajes"/>: ese puerto publica vía
-/// MassTransit/Outbox con la topología propia de NEXO (un exchange por tipo de
-/// mensaje), y Cubicador espera un routing key y un shape de JSON específicos y ya
-/// documentados (cubicador/docs/CONTRATOS.md sección B) — ver
-/// CabinaFletes.Mensajes.Cubicacion.MensajesDeCubicacion para el porqué completo.
+/// S2-HU-075 (decisión del equipo: MassTransit nativo). NO usa
+/// <see cref="IPublicadorDeMensajes"/> — ese puerto no expone forma de fijar el
+/// routing key del mensaje, y Cubicador espera uno específico
+/// (`cubicacion.solicitada`) en su propio exchange (`cubicador.eventos`), no el
+/// exchange-por-tipo que MassTransit crea por defecto (confirmado en runtime: sin el
+/// routing key correcto, el mensaje "se publica" pero se pierde en silencio). El
+/// adaptador (`CubicacionPublicadorAdapter`) inyecta `IPublishEndpoint` directo con el
+/// routing key fijado por mensaje — sigue recibiendo el Outbox transaccional de NEXO
+/// (el Outbox intercepta a nivel de `IPublishEndpoint`, no de este puerto genérico) y
+/// valida las invariantes a mano con el mismo <see cref="IValidadorDeMensaje{T}"/> que
+/// usaría `IPublicadorDeMensajes`. Ver
+/// CabinaFletes.Mensajes.Cubicacion.MensajesDeCubicacion y
+/// docs/mensajeria/CUBICACION.md para el detalle completo.
 ///
-/// Limitación conocida y aceptada: a diferencia de IPublicadorDeMensajes, esta
-/// solicitud NO pasa por el Outbox transaccional — se publica directo al broker. Si
-/// el proceso muere entre guardar `PlanCargue` y publicar, el trabajo queda en
-/// "procesando" sin que nadie lo procese nunca (no hay reintento automático de la
-/// solicitud en sí, solo de su procesamiento del lado de Cubicador). Aceptable hoy
-/// porque nada dispara esto todavía en producción (ver DECISIONES_TECNICAS.md); si
-/// esto se vuelve una ruta crítica real, vale la pena revisar.
+/// Disciplina que exige el Outbox (no es una limitación de este puerto, es el patrón
+/// que ya usa el resto de NEXO): el mensaje solo se entrega si el MISMO `DbContext`
+/// llama a `SaveChangesAsync()` DESPUÉS de este método, no antes — confirmado en
+/// runtime, ver docs/mensajeria/CUBICACION.md #5.
 /// </summary>
 public interface ICubicacionPort
 {

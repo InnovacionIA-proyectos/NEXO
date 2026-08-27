@@ -17,7 +17,6 @@ using CabinaFletes.Mensajes.Solicitudes;
 using CabinaFletes.Infrastructure.Cubicacion;
 using CabinaFletes.Infrastructure.Persistence;
 using MassTransit;
-using RabbitMQ.Client;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -184,8 +183,12 @@ public static class MensajeriaDependencyInjection
                     // por defecto. Se anula esa convención SOLO para estos 3 tipos, tanto
                     // para publicar (CubicacionSolicitada) como para consumir (los otros 2):
                     // el resto de la mensajería de NEXO sigue con la convención por defecto.
+                    // "topic" es un string plano (no un enum) a propósito: MassTransit
+                    // expone el tipo de exchange como string en su API de topología, sin
+                    // depender de RabbitMQ.Client directo - todo el puente usa solamente
+                    // las abstracciones de MassTransit, ninguna API de bajo nivel.
                     cfg.Message<CubicacionSolicitada>(m => m.SetEntityName("cubicador.eventos"));
-                    cfg.Publish<CubicacionSolicitada>(p => p.ExchangeType = ExchangeType.Topic);
+                    cfg.Publish<CubicacionSolicitada>(p => p.ExchangeType = "topic");
 
                     // Nombres con prefijo "Cubicacion." a propósito: el nombre de endpoint
                     // por defecto de AlertaDeFalloConsumer<T> es el nombre del TIPO de
@@ -198,7 +201,7 @@ public static class MensajeriaDependencyInjection
                         e.ConfigureConsumeTopology = false;
                         e.Bind("cubicador.eventos", b =>
                         {
-                            b.ExchangeType = ExchangeType.Topic;
+                            b.ExchangeType = "topic";
                             b.RoutingKey = "plan-de-cargue.generado";
                         });
                         e.ConfigureConsumer<PlanDeCargueGeneradoConsumer>(contexto);
@@ -208,7 +211,7 @@ public static class MensajeriaDependencyInjection
                         e.ConfigureConsumeTopology = false;
                         e.Bind("cubicador.eventos", b =>
                         {
-                            b.ExchangeType = ExchangeType.Topic;
+                            b.ExchangeType = "topic";
                             b.RoutingKey = "cubicacion.rechazada";
                         });
                         e.ConfigureConsumer<CubicacionRechazadaConsumer>(contexto);
