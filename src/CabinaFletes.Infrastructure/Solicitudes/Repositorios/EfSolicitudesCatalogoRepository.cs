@@ -91,8 +91,4 @@ public sealed class EfSolicitudesCatalogoRepository(CabinaFletesDbContext db) : 
     public async Task<ParametrosScore> ParametrosScoreAsync(CancellationToken ct) =>
         await db.ParametrosScore.AsNoTracking().FirstOrDefaultAsync(ct) ?? new ParametrosScore();
 
-    public async Task<IReadOnlyList<Solicitud>> ObtenerActivasAsync(CancellationToken ct) =>
-        await db.Solicitudes
-            .Where(s => s.Estado == EstadoSolicitud.Pendiente || s.Estado == EstadoSolicitud.EnCosteo)
-            .ToListAsync(ct);
 }

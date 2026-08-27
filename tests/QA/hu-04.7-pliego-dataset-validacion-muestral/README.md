@@ -248,3 +248,71 @@ escenarios, apuntando a este dataset — sin tocar ningún `Dado/Cuando/Entonces
   `ReglaDeCosteo` (dominio puro). Se verificaron por inspección de código y con
   aserciones directas sobre el dataset, no ejecutando el adaptador real — eso
   requeriría la BD corporativa mencionada arriba.
+
+---
+
+## Verificación QA independiente (Kevin Cano, situado en esta rama antes de aprobar el PR #69)
+
+Reproducido, no solo leído: build `--no-cache` (0 errores, 1 advertencia conocida),
+y las 3 suites sin filtro contra SQL Server real — `Domain.Tests` **95/95** (coincide
+exacto: 61 preexistentes + 34 nuevas), `Application.Tests` 75/75, `Api.Tests` 54/54.
+Cero regresiones.
+
+### Cerrado uno de los dos "fuera de alcance" declarados arriba
+
+El propio PR deja explícito que no hay integración real contra `POST
+/api/captura-solicitudes` ni contra el endpoint de análisis de Excel, por falta de
+BD corporativa. Usando la BD local de Docker como sustituto (mismo patrón que el
+resto de esta carpeta QA), sí se pudo verificar lo siguiente **contra la app
+realmente levantada**, no en aislamiento:
+
+**1) El endpoint real de análisis de Excel** (`POST
+/api/captura-solicitudes/analizar-excel`), con el `.xlsx` real subido por HTTP
+multipart — no la llamada aislada al adaptador que hizo el autor a mano:
+
+```
+hoja: Pliego | filaEncabezado: 1 | encabezados: 14 | totalFilas: 320 | filas devueltas: 320
+encabezados: Id | Origen | Destino | Tipo Vehiculo | Carroceria | Tipologia de Carga |
+             Peso (kg) | Linea de Negocio | Clase de Viaje | Clase de Contenedor |
+             Exclusivo | Consolidado | Retorna Contenedor Vacio |
+             Ciudad Devolucion Contenedor
+```
+Coincide exacto con lo que el autor documentó arriba de su propia corrida manual.
+
+**2) Las 320 líneas del dataset, sometidas contra `POST /api/captura-solicitudes`
+real** (script: [`verify-captura-carga-real.mjs`](verify-captura-carga-real.mjs)) —
+la escala más grande sometida contra la app viva en toda esta sesión de QA:
+
+- Las 4 líneas `sin_ruta`/`peso_malformado`, enviadas **una por una**: las 4
+  rechazadas con `400`, tal como documenta la tabla de arriba. Confirmado en el log
+  de la API que el rechazo de la línea con `peso: null` es la excepción de
+  validación esperada (`PESO_REQUERIDO`), capturada limpiamente por el middleware —
+  no un crash.
+- Las **316 líneas válidas restantes, en una sola petición**: `201` en 1704 ms,
+  `rutasCreadas=20`, `vehiculosCreados=12` (resueltos desde el texto libre real del
+  dataset, sin que el cliente resuelva nada de antemano), `costeoEnProceso=true`
+  (correcto: >10 líneas difiere el auto-costeo, `UmbralCosteoDiferido=10`).
+- El costeo diferido en segundo plano **no dejó nada colgado**: verificado por
+  consulta directa a `lineas_solicitud` — las 316 quedaron en `PorCostear`, el
+  degradado correcto y documentado (`AutoCostearAsync` es best-effort) para un
+  entorno sin `ConnectionStrings:DwSice/DwCubos` configuradas. No es un defecto: es
+  la misma limitación de acceso corporativo que documenta la issue #3.
+- Estado del sistema después: `/health` sano, 0 líneas `fail:`/`crit:` reales en el
+  log (la única coincidencia de "Exception" es la validación esperada del punto
+  anterior), las 7 colas de RabbitMQ de este flujo en 0 mensajes — este camino de
+  captura no usa el broker (es `Task.Run` en proceso, a diferencia del flujo
+  `/lineas:bulk` de la HU-04.2, que sí es asíncrono vía saga).
+
+**Sigue fuera de alcance** (correctamente, según lo documentado arriba): el
+cortocircuito "solo SICE-TAC" y el renglón de retorno de contenedor vacío contra el
+adaptador real con datos que sí produzcan una tarifa — eso exige la matriz SICE-TAC
+real de `DWSice`, que sigue sin estar disponible en este entorno (issue #3, sin
+cambios).
+
+### Conclusión
+
+Las 95/95 pruebas y el hallazgo de "ninguna desviación" del autor se reprodujeron
+exactos. La verificación manual del Excel y el flujo de captura real, que el autor
+dejó fuera de alcance, se automatizaron y confirmaron contra la app viva a escala
+real (316 líneas en una sola petición, la mayor de esta sesión). Sin objeciones para
+mergear.

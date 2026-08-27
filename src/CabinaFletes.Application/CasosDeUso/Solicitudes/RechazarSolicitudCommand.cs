@@ -6,6 +6,7 @@ using CabinaFletes.Application.Common.Dtos;
 using CabinaFletes.Application.Common.Exceptions;
 using CabinaFletes.Application.Common.Ports;
 using CabinaFletes.Domain.Enums;
+using CabinaFletes.Mensajes.Bandeja;
 using CabinaFletes.Domain.Solicitudes.Entidades;
 
 namespace CabinaFletes.Application.CasosDeUso.Solicitudes;
@@ -15,7 +16,7 @@ public sealed record RechazarSolicitudCommand(Guid SolicitudId, string Motivo, s
 
 public sealed class RechazarSolicitudCommandHandler(
     ISolicitudesRepository solicitudes, IAuditoriaPort auditoria, ICurrentUserPort usuarioActual,
-    TimeProvider clock, IUnitOfWork uow)
+    TimeProvider clock, IPublicadorDeMensajes publicador, IUnitOfWork uow)
     : ICommandHandler<RechazarSolicitudCommand, Unit>
 {
     public async Task<Unit> Handle(RechazarSolicitudCommand command, CancellationToken ct = default)
@@ -37,6 +38,11 @@ public sealed class RechazarSolicitudCommandHandler(
 
         auditoria.Registrar(usuarioActual.Id, "solicitudes", s.Id, "rechazar",
             JsonSerializer.Serialize(new { motivo = command.Motivo.Trim(), comentario = command.Comentario }, CondicionesServicioDto.Json));
+        // La solicitud sale de la cola de trabajo. Va por el Outbox, en la misma
+        // transacción que el rechazo: no puede avisarse un rechazo que no se guardó.
+        await publicador.PublicarAsync(
+            new BandejaCambio(MotivoDeCambio.SolicitudRechazada, clock.GetUtcNow()), ct);
+
         await uow.SaveChangesAsync(ct);
         return Unit.Value;
     }

@@ -82,6 +82,13 @@ public class CabinaFletesDbContext : DbContext
             e.Ignore(x => x.TodoResueltoPorElServicio);
         });
 
+        b.Entity<EstadoPriorizacion>(e =>
+        {
+            e.ToTable("cadena_priorizacion");
+            e.HasKey(x => x.CorrelationId);
+            e.Property(x => x.CurrentState).HasMaxLength(64).IsRequired();
+        });
+
         b.Entity<Usuario>(e =>
         {
             e.ToTable("usuarios");
