@@ -205,11 +205,13 @@ mensaje en vez de dentro de `solicitud`) — corregido.
 
 ## 9. Infraestructura y RabbitMQ
 
-**Actualización**: este servicio se movió de ser un repo Git standalone a
-vivir como carpeta (`cubicador/`) dentro del repo de NEXO — pero la decisión
-de abajo sigue vigente tal cual: `docker-compose.yml` propio, sin red Docker
-compartida con el backend C#. Compartir repo no significa compartir
-despliegue ni red.
+**Decisión REVERTIDA (2026-08-27)** — la de abajo (RabbitMQ como contenedor
+propio, sin red compartida) fue la decisión ORIGINAL y ya NO aplica. Se
+mantiene documentada por su razonamiento, no como estado actual — ver la
+decisión vigente más abajo.
+
+<details>
+<summary>Decisión original (histórica, ya no vigente)</summary>
 
 **Decisión**: `docker-compose.yml` propio (api + worker + rabbitmq + base de
 datos) — sin red Docker compartida con NEXO. RabbitMQ es un **contenedor
@@ -225,6 +227,53 @@ cada lado — no hay que reestructurar topología de red ni tocar el otro repo.
 **Credenciales de RabbitMQ**: usuario real vía `RABBITMQ_DEFAULT_USER`/
 `RABBITMQ_DEFAULT_PASS` — nunca el `guest`/`guest` por defecto (ese usuario
 solo funciona desde `localhost`, y aquí se expone el puerto a otro host).
+
+</details>
+
+**Por qué se revirtió**: cuando se tomó la decisión original, Cubicador
+todavía era (o se planeaba como) un repo separado. Al moverlo a
+`NEXO/cubicador/` (ver la actualización que ya estaba aquí), ambos servicios
+quedaron en el MISMO repo, y además NEXO ya construyó un broker RabbitMQ
+propio con su topología para issue #13/S2-HU-041 (`docker-compose.yml` raíz,
+servicio `rabbit`, ver `docs/mensajeria/TOPOLOGIA.md` en la raíz de NEXO).
+Mantener un SEGUNDO broker RabbitMQ solo para Cubicador significaba
+infraestructura duplicada sin ningún beneficio real ya que "mover RabbitMQ a
+otro host" (la razón original para mantenerlos separados) sigue siendo
+igual de fácil compartiendo un broker: es la MISMA operación (cambiar una
+connection string), y ahora solo hay que hacerla una vez, no dos.
+
+**Decisión vigente**: la base de datos (Postgres, `db`) sigue siendo propia
+de este `docker-compose.yml` — eso no cambió. RabbitMQ SÍ se comparte: `api`
+y `worker` se conectan al `rabbit` del `docker-compose.yml` raíz de NEXO
+(proyecto Compose separado — no se fusionaron los archivos, siguen siendo dos
+`docker compose up` independientes) enganchándose a su red `internal` por
+nombre externo (`nexo_internal`, fijado por el `name: nexo` de la cabecera de
+ese archivo — ver `docker-compose.yml` de este repo, servicios `api`/`worker`,
+bloque `networks:`).
+
+**Por qué no colisiona con la topología de NEXO (MassTransit)**: Cubicador
+declara su propio exchange topic (`cubicador.eventos`) y sus propias colas
+(`cubicador.optimizar`, `cubicacion.dlq`) por nombre explícito vía `aio_pika`
+— nombres que no se cruzan con ninguno de los que MassTransit genera para
+NEXO (`CostearLinea`, `AutoCosteoSolicitado`, `MassTransit:Fault--...--`,
+etc. — ver `docs/mensajeria/TOPOLOGIA.md` en la raíz). Un mismo broker físico
+puede alojar topologías completamente independientes sin interferencia,
+siempre que no compartan nombres — y no los comparten.
+
+**Consecuencia operativa real (encontrada verificando esto, no teórica)**: al
+no poder haber `depends_on: rabbit: condition: service_healthy` ENTRE
+proyectos Compose distintos, no hay ninguna garantía de orden de arranque
+entre los dos stacks. `infrastructure/mensajeria/rabbitmq.py::
+conectar_con_reintentos` se ajustó de 5 intentos/2s (~8-10s) a 30 intentos/2s
+(~60s) para cubrir tanto el arranque en frío real del broker (medido: hasta
+~22s de hueco entre que Docker lo marca "healthy" y que el puerto AMQP
+realmente acepta conexiones — el mismo problema ya conocido de la nota
+operativa de más abajo, pero ahora sin ningún `depends_on` que lo amortigüe)
+como el caso de levantar este stack antes que el de NEXO.
+
+**Credenciales de RabbitMQ**: `RABBITMQ_USER`/`RABBITMQ_PASSWORD` en el `.env`
+de este repo DEBEN coincidir con los mismos nombres en el `.env` de la raíz
+de NEXO — es el mismo broker, el mismo usuario. `.env.example` lo documenta.
 
 **Healthcheck**: `/health`, misma convención que ya usa NEXO.
 
@@ -270,11 +319,15 @@ un Postgres 16 real en Docker Compose sin cambios de código. Confirmar con
 el equipo si se prefiere otro motor antes de desplegar a producción.
 
 **Nota operativa encontrada al probar**: `api` y `worker` necesitan esperar a
-que `db` y `rabbitmq` estén realmente listos (`condition: service_healthy`
-en `depends_on`), no solo a que el contenedor haya arrancado — Postgres tarda
-~15s en el ciclo de init/restart interno la primera vez, y sin el healthcheck
-ambos servicios se caían al intentar conectar antes de tiempo. Ya corregido
-en `docker-compose.yml`.
+que `db` esté realmente lista (`condition: service_healthy` en `depends_on`),
+no solo a que el contenedor haya arrancado — Postgres tarda ~15s en el ciclo
+de init/restart interno la primera vez, y sin el healthcheck ambos servicios
+se caían al intentar conectar antes de tiempo. Ya corregido en
+`docker-compose.yml`. (RabbitMQ tenía el mismo problema cuando era un
+contenedor de este compose — ver la sección de arriba: ahora que es el
+`rabbit` compartido de NEXO, en otro proyecto Compose, ni siquiera hay
+`depends_on` posible, así que se resuelve solo con reintentos, no con
+healthcheck.)
 
 ## 11. Transición en NEXO — reemplazo completo
 

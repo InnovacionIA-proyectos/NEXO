@@ -20,6 +20,8 @@
 #        docker compose --profile seed run --rm seed
 # ============================================================================
 
+name: nexo
+
 services:
   db:
     image: mcr.microsoft.com/mssql/server:2022-latest
@@ -53,6 +55,14 @@ services:
       # atascados y la cola de error sin adivinar. No exponerla fuera de la red
       # interna en un despliegue real.
       - "${RABBITMQ_UI_PORT:-15672}:15672"
+      # AMQP también publicado al host: `api` y `cubicador/` (docker-compose.yml
+      # propio, proyecto Compose separado que se engancha a esta misma red por
+      # nombre externo `nexo_internal`) alcanzan el puerto 5672 igual por esa
+      # red interna, sin necesitar esto — lo que sí lo necesita es cualquier
+      # herramienta/CI que inspeccione o publique mensajes de prueba desde
+      # fuera de Docker (ver cubicador/scripts/ci_docker_smoke.py). Mismo
+      # criterio que la consola de arriba: no exponer en un despliegue real.
+      - "${RABBITMQ_AMQP_PORT:-5672}:5672"
     volumes:
       - rabbit-data:/var/lib/rabbitmq
     networks:
@@ -138,18 +148,16 @@ services:
     restart: "no"
 
   # ---------------------------------------------------------------------
-  # Cubicador 3D — microservicio Python (PENDIENTE, no implementado).
-  # Descomentar y ajustar cuando el servicio exista; hoy la API NO lo llama.
+  # Cubicador 3D — microservicio Python. Vive en cubicador/ dentro de este
+  # mismo repo, con SU PROPIO docker-compose.yml (proyecto Compose separado:
+  # despliegue independiente, no forma parte de este `docker compose up`).
+  # No está aquí como servicio porque no comparte ciclo de vida ni base de
+  # datos con este stack — solo comparte el broker `rabbit` de arriba, al que
+  # cubicador/ se conecta enganchándose a la red `internal` por su nombre
+  # externo (`nexo_internal`, fijado por el `name:` de la cabecera de este
+  # archivo). Ver cubicador/docker-compose.yml y
+  # cubicador/docs/DECISIONES_TECNICAS.md #9.
   # ---------------------------------------------------------------------
-  # cubicador3d:
-  #   build:
-  #     context: ../cubicador3d          # repositorio/carpeta del microservicio Python
-  #     dockerfile: Dockerfile
-  #   environment:
-  #     API_KEY: ${CUBICADOR3D_API_KEY:-}
-  #   networks:
-  #     - internal
-  #   restart: unless-stopped
 
 networks:
   internal:

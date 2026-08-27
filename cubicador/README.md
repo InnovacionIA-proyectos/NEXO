@@ -55,11 +55,12 @@ Ver:
   `tests/api/test_smoke.py`.
 - Autenticación por Bearer estático rechazando llamadas sin la key.
 
-**Verificado con Docker Compose real (Postgres + RabbitMQ + api + worker, los 4 contenedores sanos):**
+**Verificado con Docker Compose real (Postgres + api + worker propios, conectados al RabbitMQ compartido de NEXO):**
 - El mismo flujo de arriba, pero contra **PostgreSQL real** vía `docker
-  compose up -d` (con healthchecks: `api`/`worker` esperan a que `db` y
-  `rabbitmq` estén `healthy` antes de arrancar — sin eso, arrancaban antes de
-  que Postgres terminara su init y se caían).
+  compose up -d` (con healthcheck: `api`/`worker` esperan a que `db` esté
+  `healthy` antes de arrancar — sin eso, arrancaban antes de que Postgres
+  terminara su init y se caían). RabbitMQ ya no es un contenedor de este
+  compose — ver `docs/DECISIONES_TECNICAS.md` #9.
 - **El flujo asíncrono end-to-end, vía HTTP real**: `POST /{id}/optimizar`
   responde `202` de inmediato con el plan en `procesando`; el `worker` (otro
   contenedor) consume el mensaje de `cubicador.optimizar`, corre
@@ -186,10 +187,22 @@ uvicorn api.main:app --reload
 curl http://localhost:8000/health
 ```
 
-**Con Docker Compose (api + worker + rabbitmq + Postgres):**
+**Con Docker Compose (api + worker + Postgres propios, RabbitMQ compartido de NEXO):**
+
+Requiere el `rabbit` de NEXO ya corriendo (ver `docs/DECISIONES_TECNICAS.md`
+#9) — desde la raíz del repo:
 
 ```bash
-cp .env.example .env   # completar POSTGRES_PASSWORD, RABBITMQ_DEFAULT_USER/PASS, CUBICADOR_API_KEY, NEXO_CALLBACK_API_KEY, NEXO_BASE_URL
+cd ..   # raíz de NEXO
+cp .env.example .env   # si no existe ya; completar RABBITMQ_PASSWORD como mínimo
+docker compose up -d --wait rabbit   # solo el broker, no todo NEXO (rabbit no depende de db/api)
+cd cubicador
+```
+
+Y luego el stack propio de Cubicador:
+
+```bash
+cp .env.example .env   # completar POSTGRES_PASSWORD, RABBITMQ_USER/PASSWORD (= los del .env raíz de NEXO), CUBICADOR_API_KEY, NEXO_CALLBACK_API_KEY, NEXO_BASE_URL
 docker compose up -d --build --wait
 curl http://localhost:8000/health
 ```
