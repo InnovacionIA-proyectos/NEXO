@@ -323,7 +323,87 @@ asyncio.run(main())
 docker compose logs worker --tail 20   # deberia mostrar el mensaje procesado
 ```
 
-## 3. Qué falta cubrir (honesto, no se ha hecho todavía)
+### 2.7 Verificación de la unificación con el `rabbit` compartido de NEXO (2026-08-27)
+
+Tras el cambio documentado en `docs/DECISIONES_TECNICAS.md` #9 (RabbitMQ dejó
+de ser un contenedor propio de este `docker-compose.yml`), se corrieron los
+dos jobs de CI (`unit-tests` y `docker-smoke`) exactamente como los correría
+el pipeline real, contra el `rabbit` compartido de NEXO real en Docker — no
+una simulación ni una lectura de código.
+
+**Preparación** (equivalente a lo que hace `.github/workflows/cubicador-ci.yml`):
+
+```bash
+cd .. && docker compose up -d --wait --wait-timeout 60 rabbit   # rabbit compartido de NEXO
+cd cubicador && docker compose up -d --build --wait --wait-timeout 90   # db + api + worker propios
+```
+
+Resultado: los 3 contenedores (`db`, `api`, `worker`) quedaron `healthy`/`Up`
+sin caídas — conexión limpia con el broker ya tibio, sin necesitar ningún
+reintento.
+
+**`unit-tests` (68 pruebas, `pytest`):**
+
+```
+....................................................................     [100%]
+68 passed in 2.59s
+```
+
+**`docker-smoke` (`scripts/ci_docker_smoke.py`, el mismo script que corre CI, con las variables `RABBITMQ_USER`/`RABBITMQ_PASSWORD` ya renombradas):**
+
+```
+[ci-smoke] esperando GET /health...
+[ci-smoke] api saludable.
+[ci-smoke] flujo REST + async: vehiculos -> plan -> item -> optimizar -> resultado
+[ci-smoke] optimizado correctamente, puntaje=75.1
+[ci-smoke] flujo de reintentos + Dead-Letter Queue (mensaje con tipo invalido)
+[ci-smoke] mensaje invalido termino en cubicacion.dlq tras agotar reintentos, como se esperaba.
+[ci-smoke] todo verificado correctamente.
+```
+
+Esto confirma, contra infraestructura real y no solo por lectura del
+`docker-compose.yml`: el flujo `optimizar` completo (vehículos → plan → ítem
+→ optimizar → resultado) publica al broker compartido, el `worker` lo
+consume y persiste el resultado (`puntaje=75.1`, mismo valor conocido de
+antes de la unificación — sin regresión de negocio); y el flujo de
+reintentos + Dead-Letter Queue (3 reintentos con contador `x-intentos`, caída
+a `cubicacion.dlq`) sigue funcionando igual sobre el broker compartido.
+
+**Prueba adicional del peor caso de arranque** (no la corre CI, se hizo a
+mano para confirmar el margen de `conectar_con_reintentos` subido a 30
+intentos/2s — ver `docs/DECISIONES_TECNICAS.md` #9): se derribaron ambos
+stacks, se levantó el `rabbit` de NEXO SIN esperar a que estuviera sano
+(`docker compose up -d rabbit`, sin `--wait`) y a los pocos segundos, sin
+ninguna pausa, se levantó el stack de Cubicador encima. Log real de `api`:
+
+```
+No se pudo conectar a RabbitMQ (intento 1/30): [Errno 111] Connection refused
+No se pudo conectar a RabbitMQ (intento 2/30): [Errno 111] Connection refused
+No se pudo conectar a RabbitMQ (intento 3/30): [Errno 111] Connection refused
+No se pudo conectar a RabbitMQ (intento 4/30): [Errno 111] Connection refused
+INFO:     Application startup complete.
+```
+
+Conectó en el intento 4 de 30 — margen real, no al filo (con el presupuesto
+viejo de 5/2s este caso habría fallado igual que en la corrida de referencia
+de más abajo). También se confirmó el caso límite: si el `rabbit` de NEXO
+nunca se ha levantado (la red `nexo_internal` no existe todavía),
+`docker compose up` de Cubicador falla de inmediato con un mensaje claro
+(`network nexo_internal declared as external, but could not be found`), no
+con un crash confuso — es un prerrequisito documentado en el README, no una
+carrera.
+
+**Corrida de referencia (documentada para comparar)**: la primera vez que se
+probó esto, con el broker de NEXO recién construido desde cero (`docker
+compose up -d --build --wait rabbit`, sin darle tiempo de calentar), la
+conexión falló del todo — RabbitMQ tardó ~22s en abrir el puerto AMQP real
+(`Time to start RabbitMQ: 21829 ms` en su propio log) pero Docker ya lo había
+marcado `healthy` antes; con el presupuesto de reintentos aún en 5/2s
+(~8-10s), tanto `api` como `worker` se cayeron con `AMQPConnectionError`.
+Ese hallazgo fue justamente lo que motivó subir el margen a 30/2s.
+
+**Limpieza**: `docker compose down` en ambos proyectos tras cada corrida —
+sin residuos.
 
 **Actualización**: el ítem que estaba aquí ("tests de integración
 automatizados contra Docker") ya se cerró — ver `.github/workflows/ci.yml` +

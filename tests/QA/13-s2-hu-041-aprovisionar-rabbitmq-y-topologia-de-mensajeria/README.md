@@ -166,3 +166,39 @@ docker rm -f smtp4dev-qa-test
 - El aprovisionamiento del broker corporativo (para ambientes reales, no
   Docker local) sigue dependiendo de IT — sin novedad respecto a lo que ya
   registró HU-04.2, ver `.env.example`.
+
+## 7. Re-verificación tras acoplar Cubicador al mismo broker (2026-08-27)
+
+Después del cierre de este PR se hicieron cambios adicionales al
+`docker-compose.yml` raíz para que `NEXO/cubicador/` (otro servicio de este
+mismo repo, antes con su propio RabbitMQ provisional) se conecte a este
+mismo `rabbit` compartido en vez de duplicar broker — ver
+`cubicador/docs/DECISIONES_TECNICAS.md` #9. Esos cambios (agregar `name:
+nexo` a la cabecera, publicar el puerto AMQP al host, limpiar el bloque
+`cubicador3d` comentado y obsoleto) tocan el mismo archivo que esta HU, así
+que se repitió la verificación completa del criterio 3 para confirmar que
+nada se rompió:
+
+- Mismo fallo forzado (`CostearLineaSolicitada` con IDs inexistentes) →
+  mismos 4 reintentos escalonados → `CostearLinea_error` con 1 mensaje → 6
+  correos confirmados de nuevo en un capturador SMTP desechable
+  (`rowCount=6`, los 6 destinatarios de `Alertas:EquipoTecnico`).
+- `dotnet test CabinaFletes.Clean.sln` completo: **190/190** (Domain 61,
+  Application 75, Api 54) — sin regresiones.
+- Confirmado además que Cubicador comparte el broker sin colisión de
+  nombres: su propia topología (`cubicador.eventos`, `cubicador.optimizar`,
+  `cubicacion.dlq`) convive en el mismo `rabbit` sin cruzarse con ninguna
+  cola/exchange de MassTransit de esta HU — ver
+  `cubicador/docs/testDocumentation/PRUEBAS_DE_INTEGRACION.md` sección 2.7
+  para la verificación del lado de Cubicador.
+
+## 8. CI hacia QA (issue #5)
+
+Aparte, se confirmó que el pipeline de Cubicador
+(`.github/workflows/cubicador-ci.yml`) ya dispara contra la rama `QA`, no
+solo `main`, en `push` y `pull_request` (`branches: [QA, main]`) — el fix ya
+estaba commiteado (`bc952b0`, anterior a esta rama) y sigue intacto. Cuando
+se abra el PR de esta HU hacia QA, el CI de Cubicador correrá si el PR toca
+`cubicador/**`; el backend C# de NEXO todavía no tiene un workflow de CI
+propio en este repo (solo `cubicador-ci.yml` y `add-to-project-nexo.yml`
+existen hoy en `.github/workflows/`) — fuera de alcance de esta HU.
