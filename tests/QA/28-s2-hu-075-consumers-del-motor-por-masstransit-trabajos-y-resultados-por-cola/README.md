@@ -21,6 +21,15 @@ sin ningún destino real esperando el resultado. Se construyó el puente como
 pieza aislada, lista para que quien dispare esto en el futuro solo llame a
 `ICubicacionPort`.
 
+**Cumplimiento línea por línea contra el texto original de la HU** (con sus
+salvedades: "NADA síncrono" cumple en el puente pero no resuelve cómo se
+crea el plan en Cubicador; "reintentos y DLQ según S2-HU-04.1" cumple
+funcionalmente pero con un patrón manual, no MassTransit nativo; "conecta con
+la saga de HU-04/HU-08" no se implementó, por decisión explícita) — ver
+`docs/mensajeria/CUBICACION.md` sección 0, incluida la puerta abierta: si se
+decide que esto debe ser MassTransit nativo de verdad, el usuario asumiría
+los cambios necesarios (documentados ahí, en ambos lados del puente).
+
 ## 1. Qué trae este PR
 
 - `src/CabinaFletes.Mensajes/Cubicacion/MensajesDeCubicacion.cs` — DTOs del

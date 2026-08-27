@@ -6,6 +6,38 @@ contrato desde su lado en `cubicador/docs/CONTRATOS.md` sección B — este
 archivo es la versión NEXO/C# del mismo contrato, más las decisiones que solo
 aplican de este lado.
 
+## 0. Cumplimiento contra el texto original de la HU-075 (honesto, línea por línea)
+
+> Objetivo: el servicio Python consume los trabajos de cubicación desde
+> RabbitMQ y publica resultados/rechazos por cola de respuesta — NADA
+> síncrono entre backend y motor. Reintentos y DLQ según la topología de
+> S2-HU-04.1. Conecta con la saga de HU-04 y alimenta el flujo de entrega de
+> HU-08.
+
+| Frase del objetivo | Estado | Salvedad |
+|---|---|---|
+| "el servicio Python consume los trabajos... y publica resultados/rechazos por cola" | ✅ Cumple | — |
+| "NADA síncrono entre backend y motor" | ⚠️ Cumple en el código del puente (`ICubicacionPort`/`CubicacionRabbitAdapter`/`CubicacionResultadosConsumidor` no hacen ninguna llamada HTTP) | Ver la precondición de la sección 2: hoy nada CREA el plan+ítems del lado de Cubicador antes de solicitar la cubicación salvo llamando a su API REST — esa pieza, cuando exista un disparador real, sí necesita resolverse (¿otro evento asíncrono con el payload completo? ¿el mismo puente `crear_desde_linea`?), y hoy no está resuelta |
+| "Reintentos y DLQ según la topología de S2-HU-04.1" | ⚠️ Hay reintentos + DLQ reales, verificados con infraestructura real | NO son la topología de MassTransit (`UseMessageRetry`/`Fault<T>`, 1s/5s/15s/60s) — ver sección 1 para el porqué completo y sección 3 para el patrón que sí se implementó (mismo que ya usa Cubicador: contador `x-intentos`, 3 intentos, cola de error, alerta) |
+| "Conecta con la saga de HU-04 y alimenta el flujo de entrega de HU-08" | ❌ No implementado — decisión explícita | `AutoCosteoSaga` es puramente de costeo por diseño (su propio docstring lo dice) y HU-08 no tiene ningún artefacto en el repo todavía. Acoplar cubicación a esa saga habría forzado dos conceptos de negocio sin destino real esperando el resultado — ver sección 4 |
+
+**Los 3 criterios de cierre sí cumplen**, verificados con infraestructura real (ver secciones 2 y 3 de este documento, y `tests/QA/28-s2-hu-075-.../README.md`):
+
+- Consumo de trabajos y publicación de resultados por cola, contrato documentado — ✅
+- Reintentos + DLQ + alerta ante fallos repetidos del motor — ✅ (con la salvedad de arriba: patrón manual, no MassTransit nativo)
+- Prueba de extremo a extremo: trabajo publicado → resultado recibido por cola — ✅
+
+**Puerta abierta**: si el equipo decide que esto debe ser MassTransit nativo
+de verdad (no la aproximación con RabbitMQ.Client directo elegida aquí), el
+usuario ya está al tanto de qué cambios concretos implicaría del lado de
+Cubicador (envolver los mensajes con el `messageType`/`message` de
+MassTransit en ambas direcciones, actualizar sus pruebas y su contrato
+documentado) y del lado de NEXO (reemplazar `CubicacionRabbitAdapter`/
+`CubicacionResultadosConsumidor` por `IConsumer<T>` reales + registro en
+`MensajeriaDependencyInjection.cs` + `Bind()` manual al exchange
+`cubicador.eventos`), y asumiría hacer esos cambios él mismo si se decide
+seguir por ese camino.
+
 ## 1. Por qué esto no es un `IConsumer<T>` de MassTransit
 
 Cubicador publica JSON plano al exchange `cubicador.eventos` (topic) vía
