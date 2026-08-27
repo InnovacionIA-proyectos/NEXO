@@ -126,8 +126,10 @@ Ver:
   service_healthy` correcto — el healthcheck de RabbitMQ puede dar "sano" un
   instante antes de que el puerto AMQP acepte conexiones de verdad. Corregido
   con reintentos en la conexión inicial (`infrastructure/mensajeria/
-  rabbitmq.py::conectar_con_reintentos`, 5 intentos / 2s). Reproducido a
-  propósito (`down -v` + `up`) para confirmar que ya no tumba el contenedor.
+  rabbitmq.py::conectar_con_reintentos`, entonces 5 intentos / 2s — subido
+  después a 30/2s, ver el bullet de unificación con NEXO más abajo).
+  Reproducido a propósito (`down -v` + `up`) para confirmar que ya no tumba
+  el contenedor.
 - **Swagger no mandaba el Bearer**: `verificar_api_key` usaba un `Header()`
   crudo llamado `authorization`; sin un esquema de seguridad real, Swagger UI
   no lo exponía de forma confiable (confirmado con un usuario real: el campo
@@ -146,6 +148,25 @@ Ver:
   con el esperado/obtenido exactos si algún caso deja de coincidir — ver
   `docs/DECISIONES_TECNICAS.md` #3 (la decisión de no construir esto se
   revirtió cuando la HU lo pidió explícitamente).
+
+**Unificación de RabbitMQ con el broker compartido de NEXO (2026-08-27):**
+- Este servicio ya NO trae su propio contenedor RabbitMQ — `api`/`worker` se
+  conectan al `rabbit` del `docker-compose.yml` raíz de NEXO (issue
+  #13/S2-HU-041) enganchándose a su red Docker por nombre externo. La base de
+  datos (Postgres) sigue siendo propia. Ver `docs/DECISIONES_TECNICAS.md` #9
+  (documenta por qué se revirtió la decisión original de un broker propio) y
+  la sección "Puesta en marcha" más abajo (ahora requiere levantar el
+  `rabbit` de NEXO antes que este stack).
+- Al no poder haber `depends_on` entre proyectos Compose distintos, se subió
+  el margen de `conectar_con_reintentos()` de 5 intentos/2s a **30/2s** —
+  verificado forzando el peor caso (arrancar este stack antes que el `rabbit`
+  de NEXO): conectó en el intento 4 de 30 una vez el broker quedó listo.
+- Verificado de punta a punta: mensaje publicado → consumido → confirmado vía
+  el broker compartido (RabbitMQ: `publish=1, ack=1`), sin colisión de
+  nombres con la topología MassTransit de NEXO (`cubicador.eventos`/
+  `cubicador.optimizar`/`cubicacion.dlq` no se cruzan con `CostearLinea`,
+  `AutoCosteoSolicitado`, etc. — ver `docs/mensajeria/TOPOLOGIA.md` en la
+  raíz de NEXO).
 
 ## CI
 

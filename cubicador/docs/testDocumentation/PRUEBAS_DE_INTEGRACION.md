@@ -64,28 +64,42 @@ pytest tests/api -v
 
 ## 2. Verificación manual contra Docker Compose real
 
+**Nota (2026-08-27)**: esta sección se escribió cuando RabbitMQ era un
+contenedor propio de este `docker-compose.yml` (4 contenedores: `db`,
+`rabbitmq`, `api`, `worker`). Eso ya no es así — ver
+`docs/DECISIONES_TECNICAS.md` #9: ahora son **3 contenedores propios** (`db`,
+`api`, `worker`) que se conectan al `rabbit` COMPARTIDO de NEXO. Se dejan los
+relatos de bugs de abajo tal como se encontraron en su momento (siguen siendo
+reales y relevantes para entender el porqué de `conectar_con_reintentos`),
+pero **el número de contenedores, el nombre del servicio `rabbitmq` y los "5
+intentos" ya no reflejan el estado actual** — ver la nota al final de 2.1.
+
 **No toda está automatizada** (el smoke test de CI, sección 2.4, cubre parte
 de esto en cada push/PR) — el resto se ejecutó a mano contra el stack completo
-(`db` = Postgres 16, `rabbitmq` = RabbitMQ 3, `api`, `worker`) y se registra
-aquí el resultado exacto para que quede como referencia de qué se probó y
-cuándo.
+(hoy: `rabbit` compartido de NEXO ya corriendo + `db`/`api`/`worker` propios
+de Cubicador) y se registra aquí el resultado exacto para que quede como
+referencia de qué se probó y cuándo.
 
-### 2.1 Los 4 contenedores arrancan sanos
+### 2.1 Los contenedores arrancan sanos
 
 ```bash
+cd .. && docker compose up -d --wait rabbit && cd cubicador   # el rabbit compartido de NEXO primero
 cp .env.example .env   # completar los valores
 docker compose up -d --build
 docker compose ps
 ```
 
-Resultado esperado: `db` y `rabbitmq` en estado `healthy` (tienen
-`healthcheck` definido en `docker-compose.yml`); `api` y `worker` `Up` sin
-reinicios. **Si `api`/`worker` se caen con `ConnectionRefusedError` apenas
-arrancan**: es porque no están esperando a que Postgres/RabbitMQ pasen su
-healthcheck — sería una regresión de la configuración `depends_on:
-condition: service_healthy` que ya está en `docker-compose.yml` (Postgres
-tarda ~15s en su ciclo de init/restart interno la primera vez; sin el
-healthcheck, `api`/`worker` intentan conectarse antes de que esté listo).
+Resultado esperado: `db` en estado `healthy` (tiene `healthcheck` definido en
+`docker-compose.yml`); `api` y `worker` `Up` sin reinicios. **Si
+`api`/`worker` se caen con `ConnectionRefusedError` apenas arrancan**: revisar
+primero que el `rabbit` de NEXO esté realmente `healthy` (`cd .. && docker
+compose ps rabbit`) — sin eso, el margen de reintentos (30 intentos/2s, ver
+nota al final de esta sección) puede no ser suficiente si el operador levantó
+este stack mucho antes que el de NEXO. Para Postgres, sigue aplicando la
+condición `depends_on: db: condition: service_healthy` que ya está en
+`docker-compose.yml` (Postgres tarda ~15s en su ciclo de init/restart interno
+la primera vez; sin el healthcheck, `api`/`worker` intentan conectarse antes
+de que esté listo).
 
 **Otro bug encontrado al reconstruir el stack tras conectar los routers a
 RabbitMQ**: `api` fallaba al arrancar con `AMQPConnectionError: [Errno 111]
@@ -108,12 +122,23 @@ connect_robust` solo reintenta reconexiones DESPUÉS de conectar una vez, no
 el primer intento, así que ese primer fallo tumbaba el contenedor completo
 (`ERROR: Application startup failed. Exiting.`) y había que reiniciarlo a
 mano (`docker compose up -d api worker`). Corregido agregando
-`conectar_con_reintentos()` en `infrastructure/mensajeria/rabbitmq.py` (5
-intentos, 2s de espera entre cada uno) — usado tanto por
+`conectar_con_reintentos()` en `infrastructure/mensajeria/rabbitmq.py`
+(entonces 5 intentos, 2s de espera entre cada uno) — usado tanto por
 `RabbitMqEventosPublisher.conectar()` como por la conexión propia del
 worker en `worker/main.py::main()`. Reproducido de nuevo a propósito
 (`down -v` + `up`, sin `--wait`) para confirmar: esta vez los logs muestran
 3 intentos fallidos seguidos de uno exitoso, y ningún contenedor se cayó.
+
+**Actualización (2026-08-27, unificación con el `rabbit` de NEXO)**: el
+mismo problema, pero peor — al conectarse ahora al `rabbit` compartido de
+NEXO (proyecto Compose separado, ver `docs/DECISIONES_TECNICAS.md` #9), no
+hay forma de expresar `depends_on: rabbit: condition: service_healthy` entre
+los dos proyectos, así que no hay ninguna garantía de orden de arranque en
+absoluto. Se subió el margen de `conectar_con_reintentos()` de 5 intentos/2s
+a **30 intentos/2s** — verificado necesario y suficiente: forzando el peor
+caso (arrancar Cubicador antes que el `rabbit` de NEXO, sin que existiera
+todavía), la conexión se logró en el intento 4 de 30 una vez el broker quedó
+listo.
 
 ### 2.2 Flujo REST completo contra Postgres real
 
@@ -275,11 +300,13 @@ NEXO):
 ### Cómo repetir esta verificación
 
 ```bash
+cd .. && docker compose up -d --wait rabbit && cd cubicador   # rabbit compartido de NEXO primero
 docker compose up -d --build
-docker compose ps                       # los 4 deben quedar "healthy"/"Up"
+docker compose ps                       # db/api/worker deben quedar "healthy"/"Up"
 curl http://localhost:8000/health
 
-# Para el flujo async, con el venv local activado:
+# Para el flujo async, con el venv local activado (localhost:5672 es el
+# rabbit COMPARTIDO de NEXO, publicado al host - ver docker-compose.yml raíz):
 python -c "
 import asyncio, json, aio_pika
 async def main():
