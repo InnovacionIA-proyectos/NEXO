@@ -5,6 +5,7 @@ using CabinaFletes.Application.CasosDeUso.Cotizaciones.Interfaces;
 using CabinaFletes.Application.CasosDeUso.Metricas.Interfaces;
 using CabinaFletes.Application.CasosDeUso.ReglasSoloSicetac.Interfaces;
 using CabinaFletes.Application.CasosDeUso.ServiciosConexos.Interfaces;
+using CabinaFletes.Application.CasosDeUso.Priorizacion.Interfaces;
 using CabinaFletes.Application.CasosDeUso.Solicitudes.Interfaces;
 using CabinaFletes.Application.CasosDeUso.TarifasGanadas.Interfaces;
 using CabinaFletes.Application.CasosDeUso.TarifasSicetacAdmin.Interfaces;
@@ -24,6 +25,7 @@ using CabinaFletes.Infrastructure.ReglasSoloSicetac.Adaptadores;
 using CabinaFletes.Infrastructure.ReglasSoloSicetac.Repositorios;
 using CabinaFletes.Infrastructure.ServiciosConexos.Repositorios;
 using CabinaFletes.Infrastructure.Solicitudes.Adaptadores;
+using CabinaFletes.Infrastructure.Priorizacion.Repositorios;
 using CabinaFletes.Infrastructure.Solicitudes.Repositorios;
 using CabinaFletes.Infrastructure.TarifasGanadas.Repositorios;
 using CabinaFletes.Infrastructure.TarifasSicetacAdmin.Repositorios;
@@ -102,6 +104,10 @@ public static class DependencyInjection
         services.AddMemoryCache();
 
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
+
+        // Priorización: los parámetros del score y las activas por lotes para refrescarlo.
+        services.AddScoped<IParametrosScorePort, EfParametrosScoreRepository>();
+        services.AddScoped<ISolicitudesParaRecalcularPort, EfSolicitudesParaRecalcularRepository>();
         services.AddScoped<ICotizacionRepository, EfCotizacionRepository>();
         services.AddScoped<ISolicitudesPort, EfSolicitudesRepository>();
         services.AddScoped<ILineasSolicitudPort, EfLineasSolicitudRepository>();
