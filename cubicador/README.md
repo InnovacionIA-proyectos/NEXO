@@ -42,7 +42,7 @@ Ver:
 - **FastAPI** — API síncrona (`/api/cubicacion`, `/api/planes-cargue`)
 - **SQLAlchemy 2.0 (async)** — persistencia propia; `DATABASE_URL` apunta a SQLite en desarrollo o PostgreSQL en producción (mismo código, solo cambia la URL)
 - **aio-pika (RabbitMQ)** — worker consumidor separado, para `optimizar` y `crear-desde-línea`
-- **pytest** — 68 pruebas: 33 de reglas de negocio del motor (26 casos dorados de `MotorCubicacion3DTests.cs` + 5 de apilamiento multi-soporte) + **27 de paridad cross-motor** (los mismos 26 casos, comparados contra la salida real del motor C#, no contra un valor transcrito a mano) + 4 de humo end-to-end de la API + 2 de regresión del worker + 2 del registro de algoritmos intercambiables
+- **pytest** — 70 pruebas: 33 de reglas de negocio del motor (26 casos dorados de `MotorCubicacion3DTests.cs` + 5 de apilamiento multi-soporte) + **27 de paridad cross-motor** (los mismos 26 casos, comparados contra la salida real del motor C#, no contra un valor transcrito a mano) + 4 de humo end-to-end de la API + 2 de regresión del worker + 2 del registro de algoritmos intercambiables + 2 de la alerta al equipo cuando un mensaje cae a `cubicacion.dlq`
 
 ## Estado actual (léelo antes de asumir que algo funciona)
 
@@ -168,21 +168,38 @@ Ver:
   `AutoCosteoSolicitado`, etc. — ver `docs/mensajeria/TOPOLOGIA.md` en la
   raíz de NEXO).
 
+**Alerta al equipo + prueba E2E por cola (2026-08-27, mismo día):**
+- `infrastructure/alertas/correo.py::alertar_mensaje_en_dlq` — al caer un
+  mensaje en `cubicacion.dlq` tras agotar los 3 reintentos, además del log ya
+  existente, ahora se envía un correo al equipo técnico (mismo mecanismo que
+  la alerta equivalente de NEXO, #13). 2 pruebas nuevas
+  (`tests/worker/test_mover_a_dlq.py`) cubren la conexión worker→alerta y que
+  degrada sin romper el worker si falta configuración de SMTP.
+- `scripts/ci_docker_smoke.py::flujo_resultado_por_cola` — el criterio
+  "trabajo publicado → resultado recibido por cola" (antes solo verificado a
+  mano, sección 2.3) ahora corre en cada push/PR: se suscribe a
+  `plan-de-cargue.generado` con una cola de prueba propia ANTES de disparar
+  `optimizar`, y confirma que el evento real llega por ahí, no solo que el
+  efecto quedó en la base de datos.
+
 ## CI
 
 `.github/workflows/cubicador-ci.yml` (raíz del repo NEXO, con
 `paths: ['cubicador/**']` para no disparar en cambios del backend C#), dos
-jobs en cada push/PR a `main`:
+jobs en cada push/PR a `QA`/`main`:
 
-- **`unit-tests`** — instala dependencias y corre `pytest` (68 pruebas contra
+- **`unit-tests`** — instala dependencias y corre `pytest` (70 pruebas contra
   SQLite en memoria, sin infraestructura externa).
-- **`docker-smoke`** — levanta el stack real (`docker compose up -d --build
-  --wait`: Postgres + RabbitMQ + api + worker) y corre
-  `scripts/ci_docker_smoke.py`, que automatiza el flujo de las secciones
-  2.2-2.4 de `docs/testDocumentation/PRUEBAS_DE_INTEGRACION.md`: `POST
-  /optimizar` → 202 → espera a que el worker lo procese → `optimizado` con
-  `metricas.puntaje == plan.puntaje` (regresión del bug real ya corregido),
-  y un mensaje con `tipo` inválido → 3 reintentos → cae en `cubicacion.dlq`.
+- **`docker-smoke`** — levanta primero el `rabbit` compartido de NEXO
+  (`docker compose -f ../docker-compose.yml up -d --wait rabbit`) y luego el
+  stack propio (`docker compose up -d --build --wait`: Postgres + api +
+  worker), y corre `scripts/ci_docker_smoke.py`, que automatiza el flujo de
+  las secciones 2.2-2.4 de `docs/testDocumentation/PRUEBAS_DE_INTEGRACION.md`:
+  `POST /optimizar` → 202 → espera a que el worker lo procese → `optimizado`
+  con `metricas.puntaje == plan.puntaje` (regresión del bug real ya
+  corregido); el resultado recibido **por cola**, no solo por HTTP
+  (`plan-de-cargue.generado`, sección 2.3 — antes solo verificado a mano); y
+  un mensaje con `tipo` inválido → 3 reintentos → cae en `cubicacion.dlq`.
   Falla el job (exit ≠ 0) si el flujo real no llega al resultado esperado, no
   solo si el código no compila/importa.
 

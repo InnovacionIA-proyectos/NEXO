@@ -55,6 +55,18 @@ descubrirse solo contra un broker real).
 | `test_ejecutar_solicitud_optimizar_desempaca_solicitud_anidada` | El camino `optimizar` (que nunca tuvo el bug) sigue leyendo `cuerpo["solicitud"]` correctamente. |
 | `test_ejecutar_solicitud_crear_desde_linea_desempaca_solicitud_anidada` | El camino `crear_desde_linea` (el que SÍ tenía el bug) lee `cuerpo["solicitud"]["lineaSolicitudId"]`, no `cuerpo["lineaSolicitudId"]`. Usa un `NexoLineaSolicitudClient` falso (vía `monkeypatch.setattr(worker_main, "NexoLineaSolicitudClient", ...)`) para no depender de NEXO real. |
 
+## 1.2 `tests/worker/test_mover_a_dlq.py` — 2 pruebas automatizadas (`pytest`)
+
+Cubre el criterio de cierre "Reintentos + DLQ + alerta ante fallos repetidos
+del motor" (ver `docs/DECISIONES_TECNICAS.md` #10) a nivel unitario, sin
+necesitar broker ni SMTP real — la verificación con infraestructura real
+está en la sección 2.8.
+
+| Test | Qué verifica |
+|---|---|
+| `test_mover_a_dlq_dispara_la_alerta` | `worker/main.py::_mover_a_dlq` llama a `alertar_mensaje_en_dlq(tipo, error, intentos)` con los valores correctos, y publica el mensaje crudo a `cubicacion.dlq` con los headers esperados — publisher y mensaje son dobles de prueba. |
+| `test_alertar_mensaje_en_dlq_degrada_sin_smtp_configurado` | `alertar_mensaje_en_dlq` no lanza excepción (solo loggea un warning) si `ALERTAS_SMTP_HOST` está vacío — un correo que no sale no debe tumbar el worker. |
+
 ### Cómo correrlas
 
 ```bash
@@ -188,6 +200,13 @@ funciona de punta a punta a nivel de mensajería. La sección 2.4 repite la
 misma verificación pero disparada desde el router HTTP real (`POST
 /optimizar`), que es como se usa en producción.
 
+**Actualización (2026-08-27)**: el paso 3 de arriba ("recibido por una cola
+de prueba suscrita a esa routing key") — el criterio de cierre "trabajo
+publicado -> resultado recibido por cola" — ya no es solo verificación
+manual: `scripts/ci_docker_smoke.py::flujo_resultado_por_cola` automatiza
+exactamente este mismo camino y corre en cada push/PR contra `QA`/`main` —
+ver sección 2.7.
+
 ### 2.4 Routers HTTP async, reintentos, Dead-Letter Queue y timeout de vigilancia
 
 Verificación ejecutada tras conectar `POST /{id}/optimizar` y `POST
@@ -221,6 +240,10 @@ exchange (para forzar los dos casos que el router normal no produce):
   `(intento 2/3)`, `(intento 3/3)` — y al agotar los intentos apareció en
   `cubicacion.dlq` (`messages: 1`, confirmado vía la API de administración
   de RabbitMQ, `GET /api/queues`). Purgado manualmente después de confirmar.
+- **Actualización (2026-08-27)**: el mismo escenario, repetido ya con la
+  alerta al equipo (`infrastructure/alertas/correo.py`) conectada, contra un
+  capturador SMTP real — los 6 destinatarios confirmados con evidencia
+  completa en `docs/DECISIONES_TECNICAS.md` #10.
 
 **c) Vigilante de timeout**, forzando el escenario sin esperar los 5 minutos
 reales configurados (`TIMEOUT_PROCESANDO_MINUTOS`):
@@ -404,6 +427,40 @@ Ese hallazgo fue justamente lo que motivó subir el margen a 30/2s.
 
 **Limpieza**: `docker compose down` en ambos proyectos tras cada corrida —
 sin residuos.
+
+### 2.8 Alerta al equipo + prueba E2E por cola (2026-08-27)
+
+Cierra los dos criterios de la HU que seguían pendientes tras el commit de
+la unificación: "Reintentos + DLQ + alerta ante fallos repetidos del motor"
+y "Prueba de extremo a extremo: trabajo publicado -> resultado recibido por
+cola" (ambos verificados antes solo parcialmente — ver `README.md` sección
+"Alerta al equipo + prueba E2E por cola").
+
+**La alerta** (`infrastructure/alertas/correo.py`), verificada contra un
+capturador SMTP real (`rnwood/smtp4dev`, nunca el corporativo) reforzando el
+mismo escenario de la sección 2.4(b) — evidencia completa (logs del worker,
+`rowCount: 6` del capturador) en `docs/DECISIONES_TECNICAS.md` #10.
+
+**La prueba E2E por cola** (`scripts/ci_docker_smoke.py::
+flujo_resultado_por_cola`), corrida como parte del smoke test completo:
+
+```
+[ci-smoke] esperando GET /health...
+[ci-smoke] api saludable.
+[ci-smoke] flujo REST + async: vehiculos -> plan -> item -> optimizar -> resultado
+[ci-smoke] optimizado correctamente, puntaje=75.1
+[ci-smoke] flujo E2E por cola: trabajo publicado -> resultado recibido en 'plan-de-cargue.generado'
+[ci-smoke] evento recibido por cola: {'correlationId': 'c488cad9-...', 'planId': 'c488cad9-...', 'resultado': {'estado': 'optimizado', 'puntaje': 75.0, 'colocaciones': 2}}
+[ci-smoke] flujo de reintentos + Dead-Letter Queue (mensaje con tipo invalido)
+[ci-smoke] mensaje invalido termino en cubicacion.dlq tras agotar reintentos, como se esperaba.
+[ci-smoke] todo verificado correctamente.
+```
+
+`pytest` completo tras estos cambios: **70/70** (68 anteriores + 2 nuevas en
+`tests/worker/test_mover_a_dlq.py`, que cubren la conexión worker→alerta y
+la degradación sin SMTP configurado, sin necesitar broker ni SMTP real).
+
+## 3. Qué falta cubrir (honesto, no se ha hecho todavía)
 
 **Actualización**: el ítem que estaba aquí ("tests de integración
 automatizados contra Docker") ya se cerró — ver `.github/workflows/ci.yml` +

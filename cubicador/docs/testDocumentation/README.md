@@ -7,7 +7,7 @@ y qué falta. Tres documentos, uno por nivel de prueba:
 |---|---|---|
 | [`REGLAS_DE_NEGOCIO.md`](./REGLAS_DE_NEGOCIO.md) | Unitario (dominio puro) | Las 31 reglas geométricas/de negocio del motor (`domain/motor/*`) — 26 de ellas son los casos dorados de `cabinaFletes/src/CabinaFletes.Tests/MotorCubicacion3DTests.cs` (mismo nombre/orden), las otras 5 cubren apilamiento multi-soporte. 33 pruebas en `tests/domain/` (una regla tiene 3 casos parametrizados). |
 | **Paridad cross-motor** (sin doc propio aún — ver sección de abajo) | Paridad automatizada (hotspot H5, S2-HU-07.3) | `tests/paridad/test_paridad_casos_dorados.py`: los mismos 26 casos, pero comparados contra la salida REAL del motor C# (grabada por `herramientas/generador_casos_dorados/`), no contra un valor transcrito a mano. 27 pruebas (26 casos + 1 guarda de conteo). |
-| [`PRUEBAS_DE_INTEGRACION.md`](./PRUEBAS_DE_INTEGRACION.md) | Integración + infraestructura real | Las 4 pruebas de `tests/api/test_smoke.py` (flujo completo vía HTTP contra SQLite), las 2 de `tests/worker/test_ejecutar_solicitud.py` (regresión del desempaque de mensajes RabbitMQ) y el registro de la verificación manual/CI contra Docker Compose real (Postgres propio + RabbitMQ compartido de NEXO, ver `docs/DECISIONES_TECNICAS.md` #9): qué se probó, qué bug apareció y cómo se corrigió, y cómo repetirlo. |
+| [`PRUEBAS_DE_INTEGRACION.md`](./PRUEBAS_DE_INTEGRACION.md) | Integración + infraestructura real | Las 4 pruebas de `tests/api/test_smoke.py` (flujo completo vía HTTP contra SQLite), las 2 de `tests/worker/test_ejecutar_solicitud.py` (regresión del desempaque de mensajes RabbitMQ), las 2 de `tests/worker/test_mover_a_dlq.py` (la alerta al equipo cuando un mensaje cae a `cubicacion.dlq`) y el registro de la verificación manual/CI contra Docker Compose real (Postgres propio + RabbitMQ compartido de NEXO, ver `docs/DECISIONES_TECNICAS.md` #9): qué se probó, qué bug apareció y cómo se corrigió, y cómo repetirlo. |
 
 Aparte, `tests/domain/test_optimizadores_registro.py` (2 pruebas) verifica
 que un motor alternativo se puede registrar y usar sin tocar `motor.py`.
@@ -18,9 +18,9 @@ que un motor alternativo se puede registrar y usar sin tocar `motor.py`.
 pytest tests/ -v
 ```
 
-→ **68 pruebas automatizadas, todas verdes**: 33 de reglas de negocio + 27
+→ **70 pruebas automatizadas, todas verdes**: 33 de reglas de negocio + 27
 de paridad cross-motor + 4 de integración HTTP/SQLite + 2 de regresión del
-worker + 2 del registro de algoritmos.
+worker + 2 del registro de algoritmos + 2 de la alerta al `cubicacion.dlq`.
 
 Además, verificado contra **Docker Compose real** (Postgres + api + worker
 propios, RabbitMQ compartido de NEXO): el smoke test de CI (`.github/workflows/cubicador-ci.yml` +

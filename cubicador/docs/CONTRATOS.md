@@ -82,7 +82,12 @@ Publicado por la API al recibir `POST /{id}/optimizar` o `POST /desde-linea/{id}
 - Exchange `cubicador.eventos` (topic).
 - Routing keys: `cubicacion.solicitada`, `plan-de-cargue.generado`,
   `cubicacion.rechazada`, `plan-de-cargue.ajustado`.
-- Dead-letter: `cubicacion.dlq` (ver DECISIONES_TECNICAS.md #10).
+- Dead-letter: `cubicacion.dlq` (ver DECISIONES_TECNICAS.md #10). Al caer un
+  mensaje ahí (agotados los 3 reintentos), el worker además alerta por
+  correo al equipo técnico —
+  `infrastructure/alertas/correo.py::alertar_mensaje_en_dlq`, configurable
+  vía `ALERTAS_SMTP_*`/`ALERTAS_EQUIPO_TECNICO` (ver `.env.example`); si no
+  hay SMTP configurado, degrada a un log sin romper el worker.
 
 ## C. Formato de error (API REST)
 

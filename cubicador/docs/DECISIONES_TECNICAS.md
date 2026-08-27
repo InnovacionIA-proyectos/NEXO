@@ -288,11 +288,20 @@ no para escala masiva):
 - Reintentos limitados vía un contador manual en la cabecera del mensaje
   (`x-intentos`, no vía TTL/DLX nativo de RabbitMQ — más simple de razonar
   con ack manual): 3 intentos antes de publicar en `cubicacion.dlq` para
-  inspección manual (nadie la consume automáticamente) — nunca reintentos
-  infinitos. Un error de negocio (`AppException`: validación, no encontrado)
-  NO reintenta — se marca/reporta una sola vez, porque reintentar da siempre
-  el mismo resultado; solo un error inesperado (bug, DB caída) entra al ciclo
-  de reintentos.
+  inspección manual — nunca reintentos infinitos. Un error de negocio
+  (`AppException`: validación, no encontrado) NO reintenta — se
+  marca/reporta una sola vez, porque reintentar da siempre el mismo
+  resultado; solo un error inesperado (bug, DB caída) entra al ciclo de
+  reintentos.
+- **Alerta al equipo** (2026-08-27, criterio de cierre de la HU: "Reintentos
+  + DLQ + alerta ante fallos repetidos del motor"): al caer un mensaje en
+  `cubicacion.dlq`, además del log, se envía un correo al equipo técnico —
+  `infrastructure/alertas/correo.py::alertar_mensaje_en_dlq`, llamado desde
+  `worker/main.py::_mover_a_dlq`. SMTP directo (sin depender de que NEXO esté
+  arriba), mismo destinatarios por defecto que la alerta equivalente de NEXO
+  (#13, `Alertas:EquipoTecnico`). Nadie CONSUME `cubicacion.dlq`
+  automáticamente (el mensaje sigue ahí para inspección manual) — pero ya no
+  hace falta ir a mirar la cola para enterarse de que algo falló.
 - Idempotencia por diseño: reprocesar el mismo plan (por un reintento) no
   duplica nada — `guardar_resultado_optimizacion` borra e inserta, el
   resultado se reemplaza completo.
@@ -309,6 +318,27 @@ contador `x-intentos` subiendo en cada intento, y al agotarse apareció en
 `cubicacion.dlq`; un mensaje con `planId` inexistente (`AppException`) se
 procesó una sola vez, sin reintento; deteniendo el `worker` con un plan en
 `procesando` y forzando el límite de tiempo, el plan pasó a `error`.
+
+**Alerta verificada contra un capturador SMTP real** (no el corporativo,
+`rnwood/smtp4dev`, 2026-08-27): mismo escenario de arriba
+(`tipo_invalido_ci`), log real del worker:
+
+```
+ERROR:cubicador.worker:Fallo procesando mensaje (intento 1/3)
+ERROR:cubicador.worker:Fallo procesando mensaje (intento 2/3)
+ERROR:cubicador.worker:Fallo procesando mensaje (intento 3/3)
+ERROR:cubicador.worker:Mensaje movido a cubicacion.dlq tras 3 intentos: Tipo de mensaje desconocido: tipo_invalido_ci
+INFO:cubicador.alertas:Correo de alerta enviado a scalderon@boterosoto.com.co
+INFO:cubicador.alertas:Correo de alerta enviado a dguerra@boterosoto.com.co
+INFO:cubicador.alertas:Correo de alerta enviado a jpvelez@boterosoto.com.co
+INFO:cubicador.alertas:Correo de alerta enviado a kcano@boterosoto.com.co
+INFO:cubicador.alertas:Correo de alerta enviado a ivasco@boterosoto.com.co
+INFO:cubicador.alertas:Correo de alerta enviado a bquintero@boterosoto.com.co
+```
+
+Confirmado también en el capturador (`GET /api/Messages`): `rowCount: 6`,
+los 6 destinatarios, asunto `[Cubicador] Mensaje tipo_invalido_ci cayo a la
+cola de error tras 3 intentos`.
 
 **Motor de base de datos**: se eligió **PostgreSQL** para producción
 (`docker-compose.yml`) por ser el más común en stacks Python/FastAPI; el

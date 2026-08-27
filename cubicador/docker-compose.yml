@@ -62,6 +62,16 @@ services:
       CUBICADOR_RABBITMQ_URL: amqp://${RABBITMQ_USER:?definir en .env}:${RABBITMQ_PASSWORD:?definir en .env}@rabbit:5672/
       NEXO_BASE_URL: ${NEXO_BASE_URL:?definir en .env}
       NEXO_CALLBACK_API_KEY: ${NEXO_CALLBACK_API_KEY:?definir en .env}
+      # Alerta por correo al caer un mensaje en cubicacion.dlq (ver
+      # infrastructure/alertas/correo.py). Opcionales: sin ALERTAS_SMTP_HOST
+      # se degrada solo (log warning, no rompe el worker) - ver ese archivo.
+      ALERTAS_SMTP_HOST: ${ALERTAS_SMTP_HOST:-}
+      ALERTAS_SMTP_PUERTO: ${ALERTAS_SMTP_PUERTO:-587}
+      ALERTAS_SMTP_SSL: ${ALERTAS_SMTP_SSL:-true}
+      ALERTAS_SMTP_REMITENTE: ${ALERTAS_SMTP_REMITENTE:-cubicador@local}
+      ALERTAS_SMTP_USUARIO: ${ALERTAS_SMTP_USUARIO:-}
+      ALERTAS_SMTP_CLAVE: ${ALERTAS_SMTP_CLAVE:-}
+      ALERTAS_EQUIPO_TECNICO: ${ALERTAS_EQUIPO_TECNICO:-}
     depends_on:
       db:
         condition: service_healthy
