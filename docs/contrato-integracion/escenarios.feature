@@ -145,6 +145,8 @@ Característica: Identidad e integración con el portal de la Administración
 
   # ---------------------------------------------------- trabajos pesados
 
+  # Insumo real (S2-HU-04.7): tests/CabinaFletes.Domain.Tests/TestData/pliego-300-lineas.json
+  # (320 líneas) — ver tests/QA/hu-04.7-pliego-dataset-validacion-muestral/README.md
   @hu-04 @asincrono
   Escenario: Cargar un pliego responde de inmediato
     Dado un pliego de 300 líneas
@@ -161,6 +163,8 @@ Característica: Identidad e integración con el portal de la Administración
     Entonces obtiene el estado completo y el avance
     Y no necesitó ningún aviso para saberlo
 
+  # Insumo real (S2-HU-04.7): las 3 líneas fuenteCae=true (ids 318, 319, 320) del
+  # mismo pliego-300-lineas.json — ver tests/QA/hu-04.7-pliego-dataset-validacion-muestral/README.md
   @hu-04 @asincrono
   Escenario: Un pliego con líneas sin resolver termina en estado parcial
     Dado un pliego donde una fuente externa falla para 3 líneas
