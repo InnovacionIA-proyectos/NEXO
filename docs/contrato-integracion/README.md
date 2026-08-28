@@ -1,6 +1,6 @@
 # Contrato de integración — Nexo (Cabina de Fletes) ↔ Portal de la Administración
 
-**Versión 1.3.0** · Sprint 2 · Issues #7, #15, #16 y #17
+**Versión 1.6.0** · Sprint 2 · Issues #7, #15, #16, #17, #19, #20 y #21
 
 Este documento manda. El módulo `cabina-fletes` del portal está en desarrollo y no
 es la referencia: lo que hoy tenga construido se adapta a lo que diga aquí, no al
@@ -186,6 +186,8 @@ decide qué mostrar.
 | Servicios conexos: crear, editar, importar | `ServiciosLogisticos`, `AdminTarifas`, `Admin` |
 | Reglas solo SICE-TAC (todo) | `AdminTarifas`, `Admin` |
 | Métricas de cumplimiento | `LiderProceso`, `AdminTarifas`, `Admin` |
+| `GET` y `PUT /api/priorizacion/parametros` | `Admin` |
+| Hubs `/hubs/trabajos` y `/hubs/bandeja` | Cualquier rol autenticado |
 | Lecturas de biblioteca, solicitudes, cotizaciones, conexos | Cualquier rol autenticado |
 
 Cuando esta tabla y el código no coincidan, es un defecto y se corrige el código.
@@ -352,6 +354,64 @@ contador con ese valor y sigue con la misma regla.
 Los números pueden saltar (191, 194, 195) y eso es normal — no todos los cambios
 alcanzan a llegar. Lo único que se promete es que nunca retroceden.
 
+## 5.2 Avisos de la Bandeja Priorizada
+
+```
+Hub:      /hubs/bandeja           (requiere la misma identidad que el API)
+Suscribir:   Suscribir()
+Desuscribir: Desuscribir()
+Evento:      "bandeja"
+```
+
+Hub aparte del de trabajos, y sin parámetro: la bandeja no está filtrada por usuario, así
+que todos los conectados ven lo mismo y hay un solo grupo.
+
+### El aviso NO trae la bandeja
+
+```json
+{ "motivo": "solicitud-nueva", "en": "2026-08-26T15:04:11Z" }
+```
+
+Y no es por peso: **es que no existe "la bandeja"**. La consulta admite cinco filtros
+—estado, atención, desde, hasta, vigencia— y cada cliente mira una porción distinta. El
+servidor no sabe qué filtros usa cada uno, así que empujar filas obligaría a mandarlas
+todas y filtrar en el navegador.
+
+**La regla del cliente es: al recibir el aviso, vuelve a consultar `GET /api/solicitudes`
+con TUS filtros.** La pantalla se actualiza sola; lo que no se hace es duplicar la
+consulta dentro del canal.
+
+Tampoco lleva secuencia, al contrario que el aviso de avance de un trabajo. Allá el aviso
+pintaba un valor y uno rezagado hacía retroceder la barra. Aquí solo dice *reconsulta*, y
+eso es idempotente: dos avisos duplicados o desordenados producen dos consultas y el mismo
+resultado.
+
+### Los cinco motivos
+
+| `motivo` | Cuándo |
+|---|---|
+| `solicitud-nueva` | Entró una solicitud, ya priorizada |
+| `solicitud-rechazada` | Se descartó una: sale de la cola de trabajo |
+| `trabajo-terminado` | Cerró el auto-costeo de un pliego y sus líneas dejan de estar sin flete |
+| `parametros-recalibrados` | El Admin cambió el horizonte del puntaje: reordena de verdad |
+| `refresco-periodico` | Latido del recálculo. Ver abajo |
+
+**Un pliego de 300 líneas produce UN aviso de bandeja, no 300.** El aviso sale cuando el
+trabajo cierra, no por línea. La barra de progreso necesita el detalle —eso es el hub de
+trabajos— pero la bandeja solo necesita saber que reconsulte, y una vez basta.
+
+### Por qué existe el latido periódico
+
+Es el motivo menos obvio y conviene entenderlo antes de "optimizarlo".
+
+El orden de la bandeja depende del *ahora*: la urgencia sube sola a medida que se acerca
+cada deadline. Eso significa que **el orden cambia continuamente sin que nadie toque
+nada**, y ese cambio no tiene ningún evento que lo represente.
+
+El latido lo cubre. Sale con cada recálculo —por defecto cada 15 minutos— aunque no se
+haya actualizado ningún puntaje persistido. Si alguien lo cambia para avisar solo cuando
+algo cambió, la bandeja abierta se queda con el orden de hace horas.
+
 ### El aviso es una mejora, no una garantía
 
 La conexión se cae, el navegador se duerme, la persona cambia de pestaña. La verdad
@@ -364,6 +424,125 @@ sería mentir.
 
 Quien construya la pantalla asumiendo que los avisos llegan siempre va a tener un
 error que solo aparece con mala red y que es muy difícil de reproducir.
+
+---
+
+## 5.1 Recalibrar la priorización
+
+```http
+GET  /api/priorizacion/parametros
+PUT  /api/priorizacion/parametros
+```
+
+Solo `Admin`. Cambiar estos pesos reordena la bandeja de TODO el mundo: le cambia el
+trabajo a los coordinadores sin que ellos hayan tocado nada. No es una preferencia de
+pantalla, es política de operación.
+
+```json
+{
+  "pesoUrgencia": 0.40,
+  "pesoValor": 0.30,
+  "pesoProbabilidad": 0.20,
+  "pesoTipo": 0.10,
+  "horizonteHoras": 240,
+  "valorReferencia": 100000000,
+  "puntajeLicitacion": 100,
+  "puntajeSpot": 50,
+  "valorPorDefectoSinValor": 30,
+  "probabilidadPorDefecto": 50
+}
+```
+
+### Cuidado: hoy solo `horizonteHoras` mueve el puntaje
+
+Esto hay que saberlo antes de construir la pantalla, porque si no el Admin va a mover un
+peso, no va a pasar nada, y va a reportar un defecto que no existe.
+
+Por decisión de negocio, el puntaje total es **exclusivamente la urgencia por deadline**.
+Los otros tres componentes se calculan y se muestran en el desglose, pero no se ponderan
+en el total. Consecuencia directa:
+
+| Parámetro | ¿Mueve el puntaje? |
+|---|---|
+| `horizonteHoras` | **Sí.** Es la rampa: vencido = 100, fuera del horizonte = 0 |
+| `pesoUrgencia`, `pesoValor`, `pesoProbabilidad`, `pesoTipo` | No. Configuración dormida |
+| `valorReferencia`, `puntajeLicitacion`, `puntajeSpot`, y los dos por defecto | No en el total; sí en el desglose de una solicitud |
+
+Medido contra el backend corriendo: subir `pesoUrgencia` de 0.40 a 0.60 recalculó las 12
+solicitudes activas y actualizó **cero**. Subir `horizonteHoras` de 240 a 4000 llevó una
+solicitud a 30 días de su deadline de **0.00 a 82.00**.
+
+**Los cuatro pesos deben sumar 1.0** de todas formas, y la respuesta es
+`400 PARAMETROS_SCORE_INVALIDOS` si no. No porque hoy importen, sino para que el día que
+el total vuelva a ser una suma ponderada no arranque con una configuración torcida.
+
+**El `PUT` responde de inmediato y no espera el recálculo.** Guardar los pesos y refrescar
+el score de todas las solicitudes activas son dos cosas: la segunda corre aparte, con sus
+reintentos. Así recalibrar no deja al Admin esperando, y un fallo del refresco no le
+devuelve un error por un cambio que sí se guardó.
+
+Ese refresco es del valor PERSISTIDO, el que leen métricas y tableros. **La bandeja no lo
+necesita**: recalcula el score al leerlo, porque la urgencia depende del ahora y una
+licitación tiene que subir sola a medida que se acerca su deadline. Por eso el orden que se
+ve en pantalla ya está al día antes de recalibrar nada.
+
+---
+
+## 5.3 Entregar una cotización ya no espera al correo
+
+```http
+POST /api/cotizaciones/{id}/entregar
+```
+
+**La respuesta cambió, y el frontend lo va a notar.** Antes traía el resultado del envío
+del correo; ahora el correo se manda en segundo plano, así que al responder no ha salido
+nada y esos campos habrían quedado mintiendo.
+
+Antes:
+
+```json
+{
+  "cotizacion": { },
+  "emailEnviado": true,
+  "nombreResponsable": "Ana Gómez",
+  "correoResponsable": "ana@boterosoto.com.co",
+  "mensaje": "Cotización entregada y enviada a ana@boterosoto.com.co."
+}
+```
+
+Ahora:
+
+```json
+{
+  "cotizacion": { },
+  "estadoNotificacion": "encolada",
+  "mensaje": "Cotización entregada. La notificación por correo sale en segundo plano."
+}
+```
+
+**Qué se puede seguir afirmando:** que la notificación quedó encolada. Eso está
+garantizado, porque el evento se publica en la misma transacción que la entrega — si la
+entrega quedó firme, la notificación está pendiente de salir.
+
+**Qué ya no:** a quién se le envió. Resolver el destinatario exigía consultar el Data
+Warehouse dentro de la petición, y esa es justo una de las esperas que se quitaron. Medido:
+la entrega responde en **~100 ms** con la salida de correo caída.
+
+### La notificación es interna
+
+Va al correo corporativo de quien pidió la consulta de flete. **Nunca al cliente.** La
+HU-06.2 (#22) deriva el destinatario de la sesión y deja una prueba automatizada de que
+ninguna dirección de cliente puede ser destinataria.
+
+### Si el correo falla
+
+No afecta la entrega, que ya quedó firme. El fallo se reintenta de forma escalonada y, si
+se agotan los intentos, el mensaje queda en la cola de error de donde sale la alerta al
+equipo.
+
+Con una distinción que importa: lo que **no tiene arreglo** —un adjunto que pesa más de lo
+permitido, un correo que el relay rechaza por su forma— no se reintenta. Va derecho a la
+cola de error, así que la alerta llega al primer intento en vez de noventa segundos después.
 
 ---
 

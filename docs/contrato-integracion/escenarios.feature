@@ -205,3 +205,93 @@ Característica: Identidad e integración con el portal de la Administración
     Y la fuente de la propuesta queda trazada como "provisional"
     Y una línea sobre una ruta marcada "sin plaza" en el dataset no propone nada solo
       con esa fuente, igual que si no hubiera plaza real
+  @hu-051 @priorizacion
+  Escenario: La bandeja se reordena al recalcular el puntaje por paso del tiempo
+    Dado un trabajo de recálculo programado en el broker
+    Cuando vence el plazo
+    Entonces se pide refrescar el puntaje de las solicitudes activas
+    Y el plazo siguiente queda programado
+
+  @hu-051 @priorizacion
+  Escenario: La bandeja se reordena al recalcular el puntaje por cambio de parámetros
+    Dado un Admin que cambia el horizonte de urgencia de 240 a 4000 horas
+    Cuando guarda el cambio
+    Entonces la respuesta es inmediata y no espera el recálculo
+    Y se pide refrescar el puntaje sin esperar el plazo
+    Y una solicitud a 30 días de su deadline pasa de 0 a 82
+
+  @hu-051 @priorizacion
+  Escenario: Cambiar un peso no mueve ningún puntaje
+    Dado que el total del puntaje es solo la urgencia por deadline
+    Cuando el Admin cambia el peso de urgencia de 0.40 a 0.60
+    Entonces se revisan todas las solicitudes activas
+    Y no se actualiza ninguna
+
+  @hu-051 @priorizacion
+  Escenario: Pesos que no suman uno se rechazan
+    Dado un Admin que envía pesos que suman 1.3
+    Cuando guarda el cambio
+    Entonces la respuesta es 400 PARAMETROS_SCORE_INVALIDOS
+    Y los parámetros guardados no cambiaron
+
+  @hu-051 @priorizacion
+  Escenario: El recálculo falla sin afectar mi trabajo
+    Dado un recálculo del puntaje que falla
+    Cuando se agotan sus reintentos
+    Entonces el mensaje queda en la cola de error para alertar al equipo
+    Y el API sigue atendiendo con normalidad
+    Y el plazo siguiente sigue programado
+
+  @hu-052 @bandeja
+  Escenario: Una solicitud nueva entra priorizada a la bandeja
+    Dado un cliente con la bandeja abierta y suscrito al canal
+    Cuando se da de alta una solicitud
+    Entonces recibe un aviso con motivo solicitud-nueva
+    Y al reconsultar con sus filtros la ve en la posición que le toca por puntaje
+
+  @hu-052 @bandeja
+  Escenario: Un pliego grande produce un solo aviso de bandeja
+    Dado un pliego de 300 líneas costeándose
+    Cuando termina el trabajo
+    Entonces se recibe UN aviso de bandeja, no uno por línea
+    Y el canal de avance sí recibió uno por línea
+
+  @hu-052 @bandeja
+  Escenario: La bandeja se refresca aunque no cambie ningún puntaje guardado
+    Dado que la urgencia depende del momento y el orden se mueve solo
+    Cuando corre el recálculo periódico sin actualizar ninguna fila
+    Entonces igual se avisa con motivo refresco-periodico
+
+  @hu-052 @bandeja
+  Escenario: La consulta de la bandeja sigue siendo el respaldo
+    Dado un cliente que nunca se conectó al canal de la bandeja
+    Cuando consulta la bandeja
+    Entonces obtiene el orden correcto y completo
+    Y no necesitó ningún aviso para saberlo
+
+  @hu-061 @notificacion
+  Escenario: El correo falla y la entrega no se afecta
+    Dado un relay de correo caído
+    Cuando se entrega una cotización
+    Entonces la respuesta es inmediata y la cotización queda Entregada
+    Y la notificación queda encolada para reintentarse
+
+  @hu-061 @notificacion
+  Escenario: Un rechazo sin arreglo no gasta reintentos
+    Dado un adjunto que pesa más de lo que el relay admite
+    Cuando el consumidor intenta enviar el correo
+    Entonces no se reintenta
+    Y el fallo queda en la cola de error al primer intento
+
+  @hu-061 @notificacion
+  Escenario: Un fallo pasajero se reintenta antes de alertar
+    Dado un relay de correo que no responde
+    Cuando el consumidor intenta enviar el correo
+    Entonces se reintenta de forma escalonada
+    Y solo al agotar los intentos el fallo queda en la cola de error
+
+  @hu-061 @notificacion
+  Escenario: El correo nunca se manda dentro de la petición de entrega
+    Dado el caso de uso que entrega la cotización
+    Cuando se revisan sus dependencias
+    Entonces no tiene ninguna salida de correo entre ellas

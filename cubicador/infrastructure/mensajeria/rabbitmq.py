@@ -21,13 +21,24 @@ EXCHANGE = "cubicador.eventos"
 logger = logging.getLogger("cubicador.rabbitmq")
 
 
-async def conectar_con_reintentos(url: str, intentos: int = 5, espera_s: float = 2.0) -> aio_pika.RobustConnection:
-    """Reintenta la conexion INICIAL a RabbitMQ. Cubre una carrera real de
-    arranque en Docker Compose: el healthcheck de RabbitMQ puede dar 'sano'
-    un instante antes de que el puerto AMQP acepte conexiones, y sin
-    reintento aqui eso tumbaba el contenedor completo (`connect_robust` solo
-    reintenta reconexiones DESPUES de conectar una vez, no el primer
-    intento) - ver docs/testDocumentation/PRUEBAS_DE_INTEGRACION.md."""
+async def conectar_con_reintentos(url: str, intentos: int = 30, espera_s: float = 2.0) -> aio_pika.RobustConnection:
+    """Reintenta la conexion INICIAL a RabbitMQ. Cubre dos carreras reales de
+    arranque en Docker Compose:
+
+    1. El healthcheck de RabbitMQ puede dar 'sano' un instante antes de que
+       el puerto AMQP acepte conexiones de verdad (medido: hasta ~22s de hueco
+       en un arranque en frio) - sin reintento aqui eso tumbaba el contenedor
+       completo (`connect_robust` solo reintenta reconexiones DESPUES de
+       conectar una vez, no el primer intento).
+    2. Desde que el broker es el `rabbit` COMPARTIDO de NEXO (docker-compose.yml
+       raiz, proyecto Compose separado - ver DECISIONES_TECNICAS.md #9), no hay
+       forma de expresar `depends_on: rabbit: condition: service_healthy` entre
+       proyectos distintos: este stack puede arrancar sin ninguna garantia de
+       que el de NEXO ya este corriendo. El margen por defecto (30 intentos x
+       2s = ~60s) cubre tanto el arranque en frio del broker como que alguien
+       levante este stack un poco antes que el de NEXO.
+
+    Ver docs/testDocumentation/PRUEBAS_DE_INTEGRACION.md."""
     ultimo_error: Exception | None = None
     for intento in range(1, intentos + 1):
         try:

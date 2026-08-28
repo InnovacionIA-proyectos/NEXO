@@ -1,6 +1,13 @@
-# Ver DECISIONES_TECNICAS.md #9: repo propio, sin red Docker compartida con
-# NEXO. RabbitMQ expone su puerto AMQP al host; NEXO se conecta por
-# connection string (Cubicador3D__RabbitMqUrl), no por esta red de compose.
+# Ver DECISIONES_TECNICAS.md #9: la base de datos es propia (db, Postgres),
+# pero el broker de mensajeria YA NO lo es - se conecta al `rabbit` compartido
+# del docker-compose.yml raiz de NEXO via un nombre de red EXTERNO
+# (nexo_internal, fijado por el `name:` de ese archivo). Requiere que el
+# stack raiz de NEXO ya tenga corriendo (o corra) el servicio `rabbit`:
+#   cd .. && docker compose up -d --wait rabbit
+# antes de (o en paralelo con) `docker compose up` en esta carpeta - no hay
+# `depends_on` posible entre proyectos Compose distintos, por eso
+# infrastructure/mensajeria/rabbitmq.py reintenta la conexion inicial con
+# margen generoso (ver ese archivo) en vez de asumir que el broker ya esta.
 
 services:
   db:
@@ -19,20 +26,6 @@ services:
       timeout: 3s
       retries: 10
 
-  rabbitmq:
-    image: rabbitmq:3-management-alpine
-    environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:?definir en .env}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:?definir en .env}
-    ports:
-      - "5672:5672"    # AMQP - NEXO se conecta aqui
-      - "15672:15672"  # UI de administracion
-    healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
   api:
     build:
       context: .
@@ -40,7 +33,9 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://cubicador:${POSTGRES_PASSWORD}@db:5432/cubicador
       CUBICADOR_API_KEY: ${CUBICADOR_API_KEY:?definir en .env}
-      CUBICADOR_RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672/
+      # rabbit compartido de NEXO (mismas credenciales que su .env raiz) - ver
+      # comentario de cabecera de este archivo.
+      CUBICADOR_RABBITMQ_URL: amqp://${RABBITMQ_USER:?definir en .env}:${RABBITMQ_PASSWORD:?definir en .env}@rabbit:5672/
       NEXO_BASE_URL: ${NEXO_BASE_URL:?definir en .env}
       NEXO_CALLBACK_API_KEY: ${NEXO_CALLBACK_API_KEY:?definir en .env}
     ports:
@@ -48,8 +43,9 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
+    networks:
+      - default
+      - nexo_shared
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 3s
@@ -63,14 +59,31 @@ services:
       dockerfile: Dockerfile.worker
     environment:
       DATABASE_URL: postgresql+asyncpg://cubicador:${POSTGRES_PASSWORD}@db:5432/cubicador
-      CUBICADOR_RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672/
+      CUBICADOR_RABBITMQ_URL: amqp://${RABBITMQ_USER:?definir en .env}:${RABBITMQ_PASSWORD:?definir en .env}@rabbit:5672/
       NEXO_BASE_URL: ${NEXO_BASE_URL:?definir en .env}
       NEXO_CALLBACK_API_KEY: ${NEXO_CALLBACK_API_KEY:?definir en .env}
+      # Alerta por correo al caer un mensaje en cubicacion.dlq (ver
+      # infrastructure/alertas/correo.py). Opcionales: sin ALERTAS_SMTP_HOST
+      # se degrada solo (log warning, no rompe el worker) - ver ese archivo.
+      ALERTAS_SMTP_HOST: ${ALERTAS_SMTP_HOST:-}
+      ALERTAS_SMTP_PUERTO: ${ALERTAS_SMTP_PUERTO:-587}
+      ALERTAS_SMTP_SSL: ${ALERTAS_SMTP_SSL:-true}
+      ALERTAS_SMTP_REMITENTE: ${ALERTAS_SMTP_REMITENTE:-cubicador@local}
+      ALERTAS_SMTP_USUARIO: ${ALERTAS_SMTP_USUARIO:-}
+      ALERTAS_SMTP_CLAVE: ${ALERTAS_SMTP_CLAVE:-}
+      ALERTAS_EQUIPO_TECNICO: ${ALERTAS_EQUIPO_TECNICO:-}
     depends_on:
       db:
         condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
+    networks:
+      - default
+      - nexo_shared
+
+networks:
+  default: {}
+  nexo_shared:
+    name: nexo_internal
+    external: true
 
 volumes:
   db_data:

@@ -1323,6 +1323,42 @@ namespace CabinaFletes.Infrastructure.Migrations
                     b.ToTable("trabajos_auto_costeo", (string)null);
                 });
 
+            modelBuilder.Entity("CabinaFletes.Infrastructure.Common.Mensajeria.Saga.EstadoPriorizacion", b =>
+                {
+                    b.Property<Guid>("CorrelationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("ArmadaEn")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CurrentState")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<DateTimeOffset>("RearmadaEn")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<int>("RecalculosPorParametros")
+                        .HasColumnType("int");
+
+                    b.Property<int>("RecalculosPorReloj")
+                        .HasColumnType("int");
+
+                    b.Property<Guid?>("TokenTic")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("UltimoRecalculoEn")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("int");
+
+                    b.HasKey("CorrelationId");
+
+                    b.ToTable("cadena_priorizacion", (string)null);
+                });
+
             modelBuilder.Entity("MassTransit.EntityFrameworkCoreIntegration.InboxState", b =>
                 {
                     b.Property<long>("Id")
