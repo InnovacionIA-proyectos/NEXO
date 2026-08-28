@@ -250,3 +250,30 @@ Característica: Identidad e integración con el portal de la Administración
     Cuando consulta la bandeja
     Entonces obtiene el orden correcto y completo
     Y no necesitó ningún aviso para saberlo
+
+  @hu-061 @notificacion
+  Escenario: El correo falla y la entrega no se afecta
+    Dado un relay de correo caído
+    Cuando se entrega una cotización
+    Entonces la respuesta es inmediata y la cotización queda Entregada
+    Y la notificación queda encolada para reintentarse
+
+  @hu-061 @notificacion
+  Escenario: Un rechazo sin arreglo no gasta reintentos
+    Dado un adjunto que pesa más de lo que el relay admite
+    Cuando el consumidor intenta enviar el correo
+    Entonces no se reintenta
+    Y el fallo queda en la cola de error al primer intento
+
+  @hu-061 @notificacion
+  Escenario: Un fallo pasajero se reintenta antes de alertar
+    Dado un relay de correo que no responde
+    Cuando el consumidor intenta enviar el correo
+    Entonces se reintenta de forma escalonada
+    Y solo al agotar los intentos el fallo queda en la cola de error
+
+  @hu-061 @notificacion
+  Escenario: El correo nunca se manda dentro de la petición de entrega
+    Dado el caso de uso que entrega la cotización
+    Cuando se revisan sus dependencias
+    Entonces no tiene ninguna salida de correo entre ellas

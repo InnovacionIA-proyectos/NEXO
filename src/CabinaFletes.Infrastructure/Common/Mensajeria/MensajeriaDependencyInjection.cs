@@ -5,6 +5,7 @@ using CabinaFletes.Application.CasosDeUso.Solicitudes.Interfaces;
 using CabinaFletes.Application.CasosDeUso.Costeo.Interfaces;
 using CabinaFletes.Infrastructure.Common.Mensajeria.Saga;
 using CabinaFletes.Infrastructure.Bandeja.Adaptadores;
+using CabinaFletes.Infrastructure.Notificaciones.Adaptadores;
 using CabinaFletes.Infrastructure.Costeo.Adaptadores;
 using CabinaFletes.Infrastructure.Costeo.Repositorios;
 using CabinaFletes.Infrastructure.Solicitudes.Adaptadores;
@@ -14,6 +15,7 @@ using CabinaFletes.Infrastructure.Trabajos.Adaptadores;
 using CabinaFletes.Infrastructure.Priorizacion.Adaptadores;
 using CabinaFletes.Infrastructure.Trabajos.Repositorios;
 using CabinaFletes.Mensajes.Bandeja;
+using CabinaFletes.Mensajes.Notificaciones;
 using CabinaFletes.Mensajes.Costeo;
 using CabinaFletes.Mensajes.Priorizacion;
 using CabinaFletes.Mensajes.Solicitudes;
@@ -106,6 +108,10 @@ public static class MensajeriaDependencyInjection
             // se registra y se sigue: que alguien cierre una pestaña no es una avería.
             x.AddConsumer<AvisarBandejaConsumer>();
 
+            // Manda el correo de una cotización entregada. La excepción sube: una
+            // notificación perdida no se recupera consultando nada y nadie se enteraría.
+            x.AddConsumer<NotificarEntregaConsumer>();
+
             // La saga se persiste en la misma base que los datos del negocio. Su estado
             // ES la respuesta al cliente que preguntó por su trabajo, así que un
             // reinicio no puede borrarlo.
@@ -162,11 +168,21 @@ public static class MensajeriaDependencyInjection
                 // fuente externa no debe tumbar el mensaje al primer intento. Agotados
                 // los intentos, MassTransit lo lleva a la cola de error (DLQ), que es
                 // donde la #13 conectará la alerta al equipo.
-                cfg.UseMessageRetry(r => r.Intervals(
-                    TimeSpan.FromSeconds(1),
-                    TimeSpan.FromSeconds(5),
-                    TimeSpan.FromSeconds(15),
-                    TimeSpan.FromSeconds(60)));
+                cfg.UseMessageRetry(r =>
+                {
+                    // NO SE REINTENTA LO QUE NO TIENE ARREGLO. Un adjunto que pesa más de
+                    // lo permitido, o un correo que el relay rechaza por su forma, va a
+                    // fallar igual las cuatro veces: reintentarlo solo retrasa la alerta
+                    // hasta un minuto y medio. Marcado así, va derecho a la cola de error
+                    // y el equipo se entera al primer intento.
+                    r.Ignore<CorreoRechazadoException>();
+
+                    r.Intervals(
+                        TimeSpan.FromSeconds(1),
+                        TimeSpan.FromSeconds(5),
+                        TimeSpan.FromSeconds(15),
+                        TimeSpan.FromSeconds(60));
+                });
 
                 cfg.ConfigureEndpoints(contexto);
             }
@@ -227,6 +243,7 @@ public static class MensajeriaDependencyInjection
         services.AddScoped<IValidadorDeMensaje<ParametrosDePriorizacionCambiaron>, ParametrosDePriorizacionCambiaronValidador>();
         services.AddScoped<IValidadorDeMensaje<RecalcularScoresSolicitado>, RecalcularScoresSolicitadoValidador>();
         services.AddScoped<IValidadorDeMensaje<BandejaCambio>, BandejaCambioValidador>();
+        services.AddScoped<IValidadorDeMensaje<CotizacionEntregada>, CotizacionEntregadaValidador>();
 
         return services;
     }

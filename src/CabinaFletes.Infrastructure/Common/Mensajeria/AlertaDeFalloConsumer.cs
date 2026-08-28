@@ -63,7 +63,17 @@ public sealed class AlertaDeFalloConsumer<T>(
             para ver el mensaje completo y decidir si reintentar manualmente.</p>
             """;
 
-        foreach (var destinatario in destinatarios)
-            await correo.EnviarAsync(destinatario, asunto, cuerpo, null, null, contexto.CancellationToken);
+        // Igual que arriba: un correo que no sale no debe, a su vez, agotar reintentos y
+        // terminar en su propia cola de error - por eso se degrada en silencio (con log)
+        // en vez de dejar subir CorreoRechazadoException/CorreoTransitorioException.
+        try
+        {
+            await correo.EnviarAsync(
+                new CorreoParaEnviar(destinatarios, asunto, cuerpo, []), contexto.CancellationToken);
+        }
+        catch (Exception ex) when (ex is CorreoRechazadoException or CorreoTransitorioException)
+        {
+            logger.LogWarning(ex, "No se pudo enviar la alerta por correo para {Tipo} - nadie recibió correo por este fallo.", tipo);
+        }
     }
 }

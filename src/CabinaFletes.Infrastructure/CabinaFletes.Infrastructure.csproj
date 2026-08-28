@@ -13,6 +13,11 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.0" />
+    <!-- IHttpClientFactory, para el cliente tipado del microservicio de correo. Un
+         HttpClient creado por llamada agota puertos; la fábrica reutiliza conexiones y
+         respeta el reciclado de DNS, que importa porque la URL del MailSender cambia
+         entre despliegues. -->
+    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.0" />
     <PackageReference Include="ClosedXML" Version="0.104.2" />
   </ItemGroup>
 
