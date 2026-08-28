@@ -6,6 +6,7 @@ using CabinaFletes.Application.Common.Exceptions;
 using CabinaFletes.Application.Common.Ports;
 using CabinaFletes.Domain.Priorizacion.Entidades;
 using CabinaFletes.Domain.Solicitudes.Entidades;
+using CabinaFletes.Mensajes.Bandeja;
 using Moq;
 
 namespace CabinaFletes.Application.Tests.Solicitudes;
@@ -17,10 +18,12 @@ public class CrearSolicitudCommandTests
     private readonly Mock<IAuditoriaPort> _auditoria = new();
     private readonly Mock<ICurrentUserPort> _usuarioActual = new();
     private readonly Mock<IUnitOfWork> _uow = new();
+    private readonly Mock<IPublicadorDeMensajes> _publicador = new();
     private static readonly TimeProvider Clock = TimeProvider.System;
 
     private CrearSolicitudCommandHandler Handler() => new(
-        _solicitudes.Object, _clientes.Object, _auditoria.Object, _usuarioActual.Object, Clock, _uow.Object);
+        _solicitudes.Object, _clientes.Object, _auditoria.Object, _usuarioActual.Object, Clock,
+        _publicador.Object, _uow.Object);
 
     private void PermitirClienteYParametros(Guid clienteId)
     {
@@ -80,5 +83,53 @@ public class CrearSolicitudCommandTests
 
         Assert.Single(guardada!.Lineas);
         Assert.Equal(linea.RutaId, guardada.Lineas.First().RutaId);
+    }
+
+    [Fact]
+    public async Task Avisa_que_la_bandeja_cambio_al_dar_de_alta_una_solicitud()
+    {
+        // Es el criterio de la HU-05.2: una solicitud nueva entra priorizada y quien tenga
+        // la bandeja abierta tiene que enterarse sin refrescar.
+        var clienteId = Guid.NewGuid();
+        PermitirClienteYParametros(clienteId);
+
+        await Handler().Handle(new CrearSolicitudCommand(clienteId, "Spot", null, null, null, null, null));
+
+        _publicador.Verify(p => p.PublicarAsync(
+            It.Is<BandejaCambio>(m => m.Motivo == MotivoDeCambio.SolicitudNueva),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task El_aviso_de_bandeja_se_publica_antes_de_guardar()
+    {
+        // Con el Outbox, publicar ANTES de SaveChanges es lo que mete el mensaje en la
+        // misma transacción. Al revés podría avisarse un alta que después se revierte, o
+        // guardarse una solicitud sin que nadie se entere.
+        var clienteId = Guid.NewGuid();
+        PermitirClienteYParametros(clienteId);
+        var orden = new List<string>();
+        _publicador.Setup(p => p.PublicarAsync(It.IsAny<BandejaCambio>(), It.IsAny<CancellationToken>()))
+            .Callback(() => orden.Add("publicar")).Returns(Task.CompletedTask);
+        _uow.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .Callback(() => orden.Add("guardar")).ReturnsAsync(1);
+
+        await Handler().Handle(new CrearSolicitudCommand(clienteId, "Spot", null, null, null, null, null));
+
+        Assert.Equal(new[] { "publicar", "guardar" }, orden);
+    }
+
+    [Fact]
+    public async Task Un_alta_rechazada_no_avisa_a_la_bandeja()
+    {
+        // Sería lo peor: la bandeja se refresca para mostrar exactamente lo mismo, porque
+        // la solicitud nunca existió.
+        var clienteId = Guid.NewGuid();
+        _clientes.Setup(c => c.ExisteAsync(clienteId, default)).ReturnsAsync(false);
+
+        await Assert.ThrowsAsync<ValidationFailedException>(() =>
+            Handler().Handle(new CrearSolicitudCommand(clienteId, "Spot", null, null, null, null, null)));
+
+        _publicador.VerifyNoOtherCalls();
     }
 }

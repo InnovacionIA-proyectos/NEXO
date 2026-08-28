@@ -1,4 +1,5 @@
 using CabinaFletes.Api.Trabajos;
+using CabinaFletes.Application.CasosDeUso.Bandeja.Interfaces;
 using CabinaFletes.Application.CasosDeUso.Trabajos.Interfaces;
 using CabinaFletes.Application.CasosDeUso.Costeo;
 using CabinaFletes.Application.CasosDeUso.Trabajos;
@@ -8,12 +9,15 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using CabinaFletes.Api.Common.Auth;
 using CabinaFletes.Api.Common.Errors;
 using CabinaFletes.Api.Common.Middleware;
+using CabinaFletes.Api.Bandeja;
+using CabinaFletes.Api.Priorizacion;
 using CabinaFletes.Api.Solicitudes;
 using CabinaFletes.Application.CasosDeUso.AjustesVigenciaPlaza;
 using CabinaFletes.Application.CasosDeUso.Biblioteca;
 using CabinaFletes.Application.CasosDeUso.BibliotecaSapHistorico;
 using CabinaFletes.Application.CasosDeUso.Cotizaciones;
 using CabinaFletes.Application.CasosDeUso.Metricas;
+using CabinaFletes.Application.CasosDeUso.Priorizacion;
 using CabinaFletes.Application.CasosDeUso.ReglasSoloSicetac;
 using CabinaFletes.Application.CasosDeUso.ServiciosConexos;
 using CabinaFletes.Application.CasosDeUso.Solicitudes;
@@ -65,17 +69,22 @@ builder.Services.AddCosteoUseCases();
 // consumidor de Infrastructure solo conoce el puerto.
 builder.Services.AddSignalR();
 builder.Services.AddScoped<INotificadorDeTrabajos, NotificadorSignalR>();
+builder.Services.AddScoped<INotificadorDeBandeja, NotificadorDeBandejaSignalR>();
 builder.Services.AddCotizacionesUseCases();
 builder.Services.AddReglasSoloSicetacUseCases();
 builder.Services.AddAjustesVigenciaPlazaUseCases();
 builder.Services.AddBibliotecaUseCases();
 builder.Services.AddBibliotecaSapHistoricoUseCases();
 builder.Services.AddSolicitudesUseCases();
+builder.Services.AddPriorizacionUseCases();
 builder.Services.AddServiciosConexosUseCases();
 builder.Services.AddTarifasGanadasUseCases();
 builder.Services.AddTarifasSicetacAdminUseCases();
 builder.Services.AddMetricasUseCases();
-builder.Services.AddHostedService<RecalculoScoreHostedService>();
+// Arma la cadena de priorización al arrancar y se va. NO tiene reloj: el reloj vive en
+// la saga, dentro del broker. Reemplaza al RecalculoScoreHostedService, que llevaba un
+// PeriodicTimer adentro y por lo tanto se duplicaba con cada réplica del API.
+builder.Services.AddHostedService<ArranqueDeLaCadenaHostedService>();
 
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddHttpContextAccessor();
@@ -204,6 +213,11 @@ app.MapControllers();
 // El canal de avisos del avance de trabajos. La ruta es parte del contrato con el
 // frontend: es a donde se conecta el cliente para suscribirse a un trabajo.
 app.MapHub<TrabajosHub>("/hubs/trabajos");
+
+// El canal de la bandeja va aparte del de trabajos a propósito: /hubs/trabajos ya está
+// publicado en el contrato como el canal del avance de UN trabajo, con un grupo por
+// trabajo. Meterle la bandeja dejaría el nombre mintiendo.
+app.MapHub<BandejaHub>("/hubs/bandeja");
 // /health responde JSON con el detalle por chequeo, no solo "Healthy"/"Unhealthy".
 //
 // El motivo es concreto: un 503 con el cuerpo en texto plano no dice QUÉ está caído.

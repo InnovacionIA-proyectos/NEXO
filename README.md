@@ -366,7 +366,52 @@ capas que tiene sentido probar de forma distinta:
   Conexos, Tarifas Históricas, Tarifas SICE-TAC (import de Excel
   idempotente con ClosedXML) y Métricas.
 
-Cómo ejecutar:
+### Recorrido de punta a punta (`build/e2e/`)
+
+Los tres proyectos de arriba corren con transporte en memoria y bases efímeras.
+Eso los hace rápidos y bien aislados, y por eso mismo **ciegos a si las piezas
+encajan de verdad**. El recorrido de punta a punta cubre ese hueco: habla con el
+API real, con el Outbox entregando contra SQL Server, RabbitMQ con su plugin de
+retardo, la saga persistida y SignalR empujando a un cliente de verdad.
+
+```
+docker compose up -d
+docker compose --profile e2e run --rm e2e
+```
+
+No es teoría. Así se encontró que el arranque de la cadena de priorización
+publicaba al Outbox **sin llamar a SaveChanges**: el log decía "cadena armada" y
+no quedaba ni una fila. Ninguna prueba lo veía, porque ninguna publica a través
+del Outbox. Y así se confirmó que los avisos del hub llegan desordenados y
+repetidos de verdad —`[1, 2, 3, 4, 6, 5, 6, 7…]` en una corrida—, que es lo que
+justifica la secuencia del contrato.
+
+Solo usa la biblioteca estándar de Python, a propósito: una prueba que necesita
+`pip install` falla por la red y no por el código. Sale con código distinto de
+cero si algo falla, así que sirve tal cual en un pipeline.
+
+### Cómo ejecutar
+
+Todo en contenedor, sin depender del SDK instalado en la máquina:
+
+```
+# Compilar las 4 capas y los 3 proyectos de test
+docker compose -f docker-compose.ci.yml build && docker compose -f docker-compose.ci.yml run --rm build
+
+# La solución completa, sin filtros, con SQL Server efímero
+docker compose -f docker-compose.ci.yml run --rm pruebas
+```
+
+El `&&` no es opcional: si la construcción de la imagen falla, `run` arranca con
+la imagen anterior y compila código viejo — un verde falso, que es peor que un
+rojo.
+
+El servicio `pruebas` va **sin filtro y sobre el `.sln`** por un motivo concreto:
+correr las suites con `--filter` dejó 42 pruebas de `Api.Tests` sin ejecutar
+durante varias sesiones, y el verde de las otras tapaba el hueco. Sin filtro, si
+alguien agrega un proyecto de pruebas, entra solo.
+
+Fuera de contenedor:
 
 ```
 dotnet test CabinaFletes.Clean.sln

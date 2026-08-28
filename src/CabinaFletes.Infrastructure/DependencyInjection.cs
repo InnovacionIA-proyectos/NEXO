@@ -5,6 +5,7 @@ using CabinaFletes.Application.CasosDeUso.Cotizaciones.Interfaces;
 using CabinaFletes.Application.CasosDeUso.Metricas.Interfaces;
 using CabinaFletes.Application.CasosDeUso.ReglasSoloSicetac.Interfaces;
 using CabinaFletes.Application.CasosDeUso.ServiciosConexos.Interfaces;
+using CabinaFletes.Application.CasosDeUso.Priorizacion.Interfaces;
 using CabinaFletes.Application.CasosDeUso.Solicitudes.Interfaces;
 using CabinaFletes.Application.CasosDeUso.TarifasGanadas.Interfaces;
 using CabinaFletes.Application.CasosDeUso.TarifasSicetacAdmin.Interfaces;
@@ -24,6 +25,8 @@ using CabinaFletes.Infrastructure.ReglasSoloSicetac.Adaptadores;
 using CabinaFletes.Infrastructure.ReglasSoloSicetac.Repositorios;
 using CabinaFletes.Infrastructure.ServiciosConexos.Repositorios;
 using CabinaFletes.Infrastructure.Solicitudes.Adaptadores;
+using CabinaFletes.Infrastructure.Priorizacion.Repositorios;
+using CabinaFletes.Infrastructure.Notificaciones.Adaptadores;
 using CabinaFletes.Infrastructure.Solicitudes.Repositorios;
 using CabinaFletes.Infrastructure.TarifasGanadas.Repositorios;
 using CabinaFletes.Infrastructure.TarifasSicetacAdmin.Repositorios;
@@ -102,6 +105,10 @@ public static class DependencyInjection
         services.AddMemoryCache();
 
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
+
+        // Priorización: los parámetros del score y las activas por lotes para refrescarlo.
+        services.AddScoped<IParametrosScorePort, EfParametrosScoreRepository>();
+        services.AddScoped<ISolicitudesParaRecalcularPort, EfSolicitudesParaRecalcularRepository>();
         services.AddScoped<ICotizacionRepository, EfCotizacionRepository>();
         services.AddScoped<ISolicitudesPort, EfSolicitudesRepository>();
         services.AddScoped<ILineasSolicitudPort, EfLineasSolicitudRepository>();
@@ -111,7 +118,34 @@ public static class DependencyInjection
         services.AddScoped<IAuditoriaPort, EfAuditoriaRepository>();
 
         services.AddScoped<IComercialResponsablePort, ComercialResponsableSapAdapter>();
-        services.AddScoped<ICorreoPort, SmtpCorreoAdapter>();
+        // SALIDA DE CORREO: se elige por configuración.
+        //
+        // Con MailSender:BaseUrl puesta va por el microservicio de la compañía, que es el
+        // camino previsto — el relay SOAP corporativo solo adjunta archivos que ya están
+        // en una ruta suya, y el formato de la cotización llega como archivo en la
+        // petición. Sin esa URL cae al SMTP directo, que sigue sirviendo para correo sin
+        // adjunto y evita que un entorno ya configurado se quede sin notificación.
+        //
+        // Mismo criterio que con el transporte del bus: el adaptador lo decide la
+        // configuración, no una constante en el código.
+        var mailSender = config[MailSenderCorreoAdapter.ClaveBaseUrl];
+        if (!string.IsNullOrWhiteSpace(mailSender))
+        {
+            // Cliente tipado por IHttpClientFactory: reutiliza conexiones y respeta el
+            // reciclado de DNS. Un HttpClient creado a mano por llamada agota puertos.
+            services.AddHttpClient<ICorreoPort, MailSenderCorreoAdapter>(cliente =>
+            {
+                cliente.BaseAddress = new Uri(mailSender.TrimEnd('/') + "/");
+                // Corto a propósito: el MailSender solo encola y responde 202. Si tarda
+                // más que esto, algo va mal y conviene reintentar en vez de esperar.
+                cliente.Timeout = TimeSpan.FromSeconds(
+                    int.TryParse(config["MailSender:TimeoutSegundos"], out var s) ? Math.Clamp(s, 5, 120) : 30);
+            });
+        }
+        else
+        {
+            services.AddScoped<ICorreoPort, SmtpCorreoAdapter>();
+        }
         services.AddSingleton<IExportadorCotizacionExcelPort, ExportadorCotizacionExcelClosedXml>(); // sin estado
 
         // Reglas "solo SICE-TAC" (el mismo repositorio implementa el puerto de lectura

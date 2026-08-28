@@ -202,3 +202,74 @@ se abra el PR de esta HU hacia QA, el CI de Cubicador correrá si el PR toca
 `cubicador/**`; el backend C# de NEXO todavía no tiene un workflow de CI
 propio en este repo (solo `cubicador-ci.yml` y `add-to-project-nexo.yml`
 existen hoy en `.github/workflows/`) — fuera de alcance de esta HU.
+
+---
+
+## Verificación QA independiente (Kevin Cano, situado en esta rama antes de aprobar el PR #70)
+
+Reproducido, no solo leído: build (0 errores), `dotnet test CabinaFletes.Clean.sln`
+completo — **190/190** (`Domain.Tests` 61/61, `Application.Tests` 75/75, `Api.Tests`
+54/54), y `pytest` de Cubicador — **70/70**. Coincide exacto con lo que afirma el PR.
+
+### El flujo real fallo → DLQ → alerta, reproducido de cero, con evidencia propia
+
+Con la app real levantada y un capturador SMTP desechable (`rnwood/smtp4dev`, mismo
+patrón que documenta la sección 5), publiqué yo mismo — con un publicador MassTransit
+desechable, nunca commiteado — un `CostearLineaSolicitada` con `SolicitudId`/`LineaId`
+inexistentes directo contra el RabbitMQ real:
+
+```
+20:02:22 fail: AlertaDeFalloConsumer[0] Mensaje CostearLineaSolicitada cayó a la
+  cola de error tras agotar reintentos (...). Motivo: NotFoundException: Línea de
+  solicitud no encontrada.
+20:02:23 info: SmtpCorreoAdapter Correo enviado a scalderon@, dguerra@, jpvelez@,
+  kcano@, ivasco@, bquintero@ boterosoto.com.co: [NEXO] Mensaje
+  CostearLineaSolicitada cayó a la cola de error
+```
+
+**3 fuentes independientes, igual que documenta la sección 3:**
+`CostearLinea_error: messages=1, consumers=0`; smtp4dev con `rowCount=6`, uno por
+destinatario; y el log confirmando el disparo ~81s después de publicar (1s+5s+15s+60s).
+
+### Carga y estrés — la cobertura que el PR marca como "no aplica"
+
+El PR razona que no aplica porque el consumer solo dispara cuando algo YA falló 4
+veces. Cierto para un fallo aislado, pero un incidente real (una fuente externa caída,
+un bug que rompe un tipo de mensaje entero) puede tirar MUCHOS mensajes a la cola de
+error a la vez — y eso sí vale la pena probar, porque es exactamente el escenario en
+el que el equipo más necesita que la alerta no se caiga ni se pierda:
+
+**Ráfaga de 15 fallos `CostearLineaSolicitada` concurrentes**, purgada la cola de
+error antes de empezar:
+
+```
+CostearLinea_error: messages=15, consumers=0
+smtp4dev, +90 correos nuevos, repartidos exactos entre los 6 destinatarios
+  (16 cada uno = 15 de la ráfaga + 1 de la prueba anterior — sin pérdidas ni
+  duplicados)
+/health tras la ráfaga: Healthy
+```
+
+15 fallos concurrentes → 15 mensajes en la cola de error (ninguno se perdió, ninguno
+se procesó dos veces) y 90 correos (15×6) repartidos exactos entre los 6
+destinatarios. El envío secuencial por destinatario dentro de
+`AlertaDeFalloConsumer<T>` no se convirtió en un cuello de botella perceptible ni dejó
+nada a medio enviar.
+
+### Un evento observado, no atribuible a esta PR
+
+Durante el arranque inicial del contenedor (antes de cualquier prueba de esta
+verificación) apareció un `SqlException: Execution Timeout Expired` durante la
+aplicación de migraciones — el contenedor se reinició solo (política de Docker) y
+quedó sano en ~9 segundos. Ocurrió minutos antes de publicar el primer mensaje de
+prueba, no interactúa con nada de lo que cambia este PR, y no volvió a ocurrir en el
+resto de la verificación. Se documenta por transparencia, no como un defecto de esta
+HU — es la misma fragilidad de arranque de SQL Server en Docker ya observada en
+sesiones anteriores.
+
+### Conclusión
+
+Ningún hallazgo negativo. Las 3 fuentes de evidencia del flujo fallo→DLQ→alerta se
+reprodujeron exactas desde cero, y la cobertura de carga que el PR dejó fuera se
+completó sin sorpresas: el mecanismo aguanta una ráfaga de 15 fallos simultáneos sin
+perder ni duplicar ninguna alerta. Sin objeciones para mergear.

@@ -3,6 +3,7 @@ using CabinaFletes.Application.Common;
 using CabinaFletes.Application.Common.Abstractions;
 using CabinaFletes.Application.Common.Exceptions;
 using CabinaFletes.Application.Common.Ports;
+using CabinaFletes.Mensajes.Bandeja;
 using CabinaFletes.Domain.Enums;
 using CabinaFletes.Domain.Priorizacion.Reglas;
 using CabinaFletes.Domain.Solicitudes.Entidades;
@@ -18,7 +19,7 @@ public sealed record CrearLineaInput(Guid? RutaId, Guid? ConfigVehiculoId, strin
 
 public sealed class CrearSolicitudCommandHandler(
     ISolicitudesRepository solicitudes, IClientesPort clientes, IAuditoriaPort auditoria,
-    ICurrentUserPort usuarioActual, TimeProvider clock, IUnitOfWork uow)
+    ICurrentUserPort usuarioActual, TimeProvider clock, IPublicadorDeMensajes publicador, IUnitOfWork uow)
     : ICommandHandler<CrearSolicitudCommand, Guid>
 {
     public async Task<Guid> Handle(CrearSolicitudCommand command, CancellationToken ct = default)
@@ -54,6 +55,12 @@ public sealed class CrearSolicitudCommandHandler(
 
         solicitudes.Agregar(solicitud);
         auditoria.Registrar(usuarioActual.Id, "solicitudes", solicitud.Id, "crear", $"{{\"tipo\":\"{solicitud.Tipo}\"}}");
+        // La bandeja tiene una fila más. El aviso sale por el Outbox, o sea en la MISMA
+        // transacción: no puede quedar la solicitud guardada sin avisar, ni avisado un alta
+        // que se acabó revirtiendo.
+        await publicador.PublicarAsync(
+            new BandejaCambio(MotivoDeCambio.SolicitudNueva, clock.GetUtcNow()), ct);
+
         await uow.SaveChangesAsync(ct);
         return solicitud.Id;
     }
