@@ -55,20 +55,7 @@ public static class DependencyInjection
                 config.GetConnectionString("CabinaFletes"),
                 sql => sql.EnableRetryOnFailure(maxRetryCount: 5, maxRetryDelay: TimeSpan.FromSeconds(10), errorNumbersToAdd: null)));
 
-        // Comercial responsable del cliente (DWCubosEBSSAP, SOLO LECTURA). Opcional: si la
-        // cadena no está configurada, ComercialResponsableSapAdapter.Configurado = false.
-        var dwCubosSap = config.GetConnectionString("DwCubosSap");
-        if (!string.IsNullOrWhiteSpace(dwCubosSap))
-        {
-            services.AddDbContext<DwCubosSapDbContext>(options =>
-                options.UseSqlServer(dwCubosSap, sql =>
-                {
-                    sql.UseCompatibilityLevel(100); // el DW corre SQL Server 2008 R2
-                    sql.EnableRetryOnFailure(maxRetryCount: 3, maxRetryDelay: TimeSpan.FromSeconds(5), errorNumbersToAdd: null);
-                }));
-        }
-
-        // Datacenter corporativo (dbsolucionesTI, SOLO LECTURA): tarifario SAP TM
+// Datacenter corporativo (dbsolucionesTI, SOLO LECTURA): tarifario SAP TM
         // (TarifarioSapAdapter/PropuestaTarifaAdapter) y vigencia de tarifas de plaza.
         // Opcional: si la cadena no está configurada, esos adapters se degradan (null).
         var dbSolucionesTi = config.GetConnectionString("DbSolucionesTi");
@@ -143,7 +130,6 @@ public static class DependencyInjection
             services.AddScoped<IResolverIdentidadPortalPort, ResolverIdentidadPortalLocalAdapter>();
         }
 
-        services.AddScoped<IComercialResponsablePort, ComercialResponsableSapAdapter>();
         // SALIDA DE CORREO: se elige por configuración.
         //
         // Con MailSender:BaseUrl puesta va por el microservicio de la compañía, que es el

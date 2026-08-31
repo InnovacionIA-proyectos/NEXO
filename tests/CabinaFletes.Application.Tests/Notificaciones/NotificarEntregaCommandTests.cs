@@ -5,37 +5,46 @@ using CabinaFletes.Domain.Catalogos.Entidades;
 using CabinaFletes.Domain.Cotizaciones.Entidades;
 using CabinaFletes.Domain.Enums;
 using CabinaFletes.Domain.Solicitudes.Entidades;
+using CabinaFletes.Domain.Usuarios.Entidades;
 using Moq;
 
 namespace CabinaFletes.Application.Tests.Notificaciones;
 
 /// <summary>
-/// El caso de uso que manda el correo, ya fuera de la petición.
+/// El caso de uso que manda el correo, ya fuera de la petición (S2-HU-06.1) y con el
+/// destinatario resuelto de la sesión de quien solicitó la consulta (S2-HU-06.2), no de
+/// un "comercial responsable" sacado de un DW por NIT del cliente — ese mecanismo se
+/// retiró por completo (IComercialResponsablePort/DwCubosSap ya no existen).
 ///
 /// Lo que se protege aquí es la diferencia entre "no había correo que mandar" y "el correo
-/// falló". La primera se resuelve sin error: sin cliente, sin comercial responsable o sin
-/// relay configurado no hay avería, y reintentarlo cuatro veces no lo va a cambiar. La
-/// segunda tiene que subir como excepción para que el bus la reintente o la lleve a la
-/// cola de error — devolverla como resultado la dejaría enterrada en una línea de log.
+/// falló". La primera se resuelve sin error: sin cliente, sin creador o sin relay
+/// configurado no hay avería, y reintentarlo cuatro veces no lo va a cambiar. La segunda
+/// tiene que subir como excepción para que el bus la reintente o la lleve a la cola de
+/// error — devolverla como resultado la dejaría enterrada en una línea de log.
 /// </summary>
 public class NotificarEntregaCommandTests
 {
     private readonly Mock<ICotizacionRepository> _cotizaciones = new();
     private readonly Mock<ISolicitudesPort> _solicitudes = new();
-    private readonly Mock<IComercialResponsablePort> _comercial = new();
     private readonly Mock<ICorreoPort> _correo = new();
 
     private static readonly Guid CotizacionId = Guid.Parse("aaaa0000-0000-0000-0000-000000000001");
     private static readonly Guid SolicitudId = Guid.Parse("bbbb0000-0000-0000-0000-000000000001");
 
     private NotificarEntregaCommandHandler Handler() =>
-        new(_cotizaciones.Object, _solicitudes.Object, _comercial.Object, _correo.Object);
+        new(_cotizaciones.Object, _solicitudes.Object, _correo.Object);
 
     private static NotificarEntregaCommand Comando(byte[]? pdf = null, string? nombre = null) =>
         new(CotizacionId, SolicitudId, pdf, nombre);
 
-    /// <summary>Deja el camino completo listo: cotización, cliente, responsable y relay.</summary>
-    private void TodoListo(string correoResponsable = "comercial@boterosoto.com.co")
+    /// <summary>
+    /// Deja el camino completo listo: cotización, cliente y creador (quien solicitó la
+    /// consulta). El cliente y el creador usan dominios de correo DELIBERADAMENTE
+    /// distintos — si algún día alguien vuelve a colar un dato del cliente como
+    /// destinatario, una prueba que solo usara el mismo dominio para los dos no lo
+    /// detectaría.
+    /// </summary>
+    private void TodoListo(string correoCreador = "cherrera@boterosoto.com.co")
     {
         _cotizaciones.Setup(r => r.ObtenerConLineasYConexosAsync(CotizacionId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Cotizacion
@@ -50,25 +59,58 @@ public class NotificarEntregaCommandTests
             {
                 Id = SolicitudId,
                 Cliente = new Cliente { Nombre = "Colanta", Nit = "890900608-9" },
+                Creador = new Usuario { Nombre = "Carlos Herrera", Email = correoCreador, Rol = RolUsuario.CoordinadorFletes },
             });
-        _comercial.SetupGet(c => c.Configurado).Returns(true);
-        _comercial.Setup(c => c.BuscarPorNitAsync("890900608-9", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new ResponsableComercialDto("Ana Gómez", correoResponsable));
         _correo.SetupGet(c => c.Configurado).Returns(true);
         _correo.Setup(c => c.EnviarAsync(It.IsAny<CorreoParaEnviar>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync("id-del-relay-123");
     }
 
     [Fact]
-    public async Task Manda_el_correo_al_comercial_responsable_con_el_id_del_relay()
+    public async Task Manda_el_correo_a_quien_solicito_la_consulta_con_el_id_del_relay()
     {
         TodoListo();
 
         var r = await Handler().Handle(Comando());
 
         Assert.True(r.Enviado);
-        Assert.Equal("comercial@boterosoto.com.co", r.Destinatario);
+        Assert.Equal("cherrera@boterosoto.com.co", r.Destinatario);
         Assert.Equal("id-del-relay-123", r.IdEnElRelay);
+    }
+
+    /// <summary>
+    /// La salvaguarda de la #22: aunque el cliente tuviera algún dato de contacto, esta
+    /// prueba fija que el destinatario real es el correo del creador de la solicitud, no
+    /// nada derivado del cliente. Cliente ni siquiera tiene columna de correo (salvaguarda
+    /// estructural adicional) — esto verifica el comportamiento del caso de uso.
+    /// </summary>
+    [Fact]
+    public async Task Ninguna_direccion_del_cliente_puede_ser_destinataria()
+    {
+        TodoListo(correoCreador: "yzapata@boterosoto.com.co");
+
+        await Handler().Handle(Comando());
+
+        _correo.Verify(c => c.EnviarAsync(
+            It.Is<CorreoParaEnviar>(x =>
+                x.Destinatarios.Count == 1 &&
+                x.Destinatarios[0] == "yzapata@boterosoto.com.co" &&
+                x.Destinatarios.All(d => d.EndsWith("@boterosoto.com.co"))),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>
+    /// Salvaguarda estructural, no solo de comportamiento: aunque el handler tuviera un
+    /// bug mañana, no hay NINGÚN campo en Cliente que pudiera colarse como destinatario —
+    /// el tipo mismo no tiene de dónde sacar un correo de cliente.
+    /// </summary>
+    [Fact]
+    public void Cliente_no_tiene_ninguna_columna_de_correo()
+    {
+        var propiedades = typeof(Cliente).GetProperties().Select(p => p.Name);
+
+        Assert.DoesNotContain(propiedades, nombre => nombre.Contains("correo", StringComparison.OrdinalIgnoreCase)
+            || nombre.Contains("email", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -91,7 +133,7 @@ public class NotificarEntregaCommandTests
     [Fact]
     public async Task Sin_formato_el_correo_sale_igual_sin_adjunto()
     {
-        // Entregar sin archivo es válido: el comercial recibe el aviso con los totales.
+        // Entregar sin archivo es válido: el solicitante recibe el aviso con los totales.
         TodoListo();
 
         var r = await Handler().Handle(Comando());
@@ -117,8 +159,7 @@ public class NotificarEntregaCommandTests
     [Theory]
     [InlineData("sin cotización")]
     [InlineData("sin cliente")]
-    [InlineData("sin DW")]
-    [InlineData("sin responsable")]
+    [InlineData("sin creador")]
     [InlineData("sin relay")]
     public async Task Cuando_no_hay_a_quien_escribirle_no_es_un_fallo(string caso)
     {
@@ -133,12 +174,14 @@ public class NotificarEntregaCommandTests
                 _solicitudes.Setup(s => s.ObtenerConClienteAsync(SolicitudId, It.IsAny<CancellationToken>()))
                     .ReturnsAsync((Solicitud?)null);
                 break;
-            case "sin DW":
-                _comercial.SetupGet(c => c.Configurado).Returns(false);
-                break;
-            case "sin responsable":
-                _comercial.Setup(c => c.BuscarPorNitAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-                    .ReturnsAsync((ResponsableComercialDto?)null);
+            case "sin creador":
+                _solicitudes.Setup(s => s.ObtenerConClienteAsync(SolicitudId, It.IsAny<CancellationToken>()))
+                    .ReturnsAsync(new Solicitud
+                    {
+                        Id = SolicitudId,
+                        Cliente = new Cliente { Nombre = "Colanta", Nit = "890900608-9" },
+                        Creador = null,
+                    });
                 break;
             case "sin relay":
                 _correo.SetupGet(c => c.Configurado).Returns(false);
