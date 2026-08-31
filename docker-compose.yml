@@ -6,11 +6,13 @@
 #     original. La API queda publicada en el puerto del host (API_PORT,
 #     por defecto 8080) para que cualquier frontend (el original NEXO/frontend
 #     u otro) la consuma directamente — no hay proxy Nginx aquí.
-#   - Cubicación 3D / Plan de Cargue NO están migrados a propósito: el plan
-#     es un microservicio Python aparte (ver PENDIENTES.md, "Fuera de
-#     alcance"). Se deja un servicio de ejemplo COMENTADO más abajo para
-#     cuando ese microservicio exista: hoy la API no lo llama (no hay
-#     ningún adapter cableado a CUBICADOR3D_BASE_URL todavía).
+#   - Plan de cargue (S2-HU-08): el motor Cubicador es un microservicio
+#     Python aparte (carpeta cubicador/ de este mismo repo, su propio
+#     docker-compose.yml). NEXO le habla SOLO por colas del mismo RabbitMQ
+#     de abajo (ConnectionStrings:RabbitMq) — no hay URL HTTP ni servicio
+#     adicional que levantar acá. Sin la compuerta de paridad encendida
+#     (Cubicacion__Paridad*, ver .env.example), la función responde 503 "en
+#     verificación", nunca cae a un fallback.
 #
 # Uso:
 #   1) cp .env.example .env   y completar los valores (mínimo MSSQL_SA_PASSWORD).
@@ -121,10 +123,11 @@ services:
       Smtp__Remitente: ${Smtp__Remitente:-}
       Smtp__Usuario: ${Smtp__Usuario:-}
       Smtp__Clave: ${Smtp__Clave:-}
-      # Cubicador 3D (microservicio Python, FUERA DE ALCANCE — no cableado
-      # todavía a ningún puerto/adapter). Reservadas para cuando exista.
-      Cubicador3D__BaseUrl: ${CUBICADOR3D_BASE_URL:-}
-      Cubicador3D__ApiKey: ${CUBICADOR3D_API_KEY:-}
+      # Compuerta de liberación del plan de cargue por paridad (S2-HU-08.2, #30).
+      # Vacías por defecto: la función responde 503 "en verificación", sin fallback.
+      Cubicacion__ParidadVerificada: ${CUBICACION_PARIDAD_VERIFICADA:-false}
+      Cubicacion__ParidadEvidencia: ${CUBICACION_PARIDAD_EVIDENCIA:-}
+      Cubicacion__ParidadFecha: ${CUBICACION_PARIDAD_FECHA:-}
     networks:
       - internal
     healthcheck:
