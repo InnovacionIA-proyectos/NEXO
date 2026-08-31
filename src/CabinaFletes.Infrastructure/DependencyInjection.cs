@@ -19,6 +19,7 @@ using CabinaFletes.Infrastructure.Common;
 using CabinaFletes.Infrastructure.Cotizaciones.Adaptadores;
 using CabinaFletes.Infrastructure.Cotizaciones.Repositorios;
 using CabinaFletes.Infrastructure.External;
+using CabinaFletes.Infrastructure.Identidad.Adaptadores;
 using CabinaFletes.Infrastructure.Metricas.Adaptadores;
 using CabinaFletes.Infrastructure.Persistence;
 using CabinaFletes.Infrastructure.ReglasSoloSicetac.Adaptadores;
@@ -101,6 +102,21 @@ public static class DependencyInjection
                     sql.EnableRetryOnFailure(maxRetryCount: 3, maxRetryDelay: TimeSpan.FromSeconds(5), errorNumbersToAdd: null)));
         }
 
+        // Identidad del portal de la Administración (S2-HU-03, docs/contrato-integracion,
+        // sección 7): SOLO LECTURA, misma familia que los demás DW. A diferencia de esos,
+        // sin esta cadena NO se degrada a un adapter "no configurado" — Program.cs impide
+        // arrancar así en Producción (fail-closed, S2-HU-03.3); en Desarrollo/QA sin la
+        // fuente real todavía, se registra un adapter local contra la tabla Usuarios
+        // (ResolverIdentidadPortalLocalAdapter) para no bloquear el trabajo del equipo.
+        var identidadPortal = config.GetConnectionString("IdentidadPortal");
+        var identidadPortalConfigurada = !string.IsNullOrWhiteSpace(identidadPortal);
+        if (identidadPortalConfigurada)
+        {
+            services.AddDbContext<IdentidadPortalDbContext>(options =>
+                options.UseSqlServer(identidadPortal, sql =>
+                    sql.EnableRetryOnFailure(maxRetryCount: 3, maxRetryDelay: TimeSpan.FromSeconds(5), errorNumbersToAdd: null)));
+        }
+
         services.AddMemoryCache();
 
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
@@ -115,6 +131,16 @@ public static class DependencyInjection
         services.AddScoped<ITarifasHistoricasPort>(sp => sp.GetRequiredService<EfTarifasHistoricasRepository>());
         services.AddScoped<IHistoricoTarifasPort>(sp => sp.GetRequiredService<EfTarifasHistoricasRepository>());
         services.AddScoped<IAuditoriaPort, EfAuditoriaRepository>();
+
+        if (identidadPortalConfigurada)
+        {
+            services.AddScoped<IIdentidadPortalPort, IdentidadPortalAdapter>();
+            services.AddScoped<IResolverIdentidadPortalPort, ResolverIdentidadPortalAdapter>();
+        }
+        else
+        {
+            services.AddScoped<IResolverIdentidadPortalPort, ResolverIdentidadPortalLocalAdapter>();
+        }
 
         services.AddScoped<IComercialResponsablePort, ComercialResponsableSapAdapter>();
         services.AddScoped<ICorreoPort, SmtpCorreoAdapter>();

@@ -1212,6 +1212,58 @@ namespace CabinaFletes.Infrastructure.Migrations
                     b.ToTable("solicitudes", (string)null);
                 });
 
+            modelBuilder.Entity("CabinaFletes.Domain.Usuarios.Entidades.MapeoRolPortal", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("DescripcionRolPortal")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<long?>("IdRolPortal")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Rol")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IdRolPortal")
+                        .IsUnique()
+                        .HasFilter("[IdRolPortal] IS NOT NULL");
+
+                    b.ToTable("mapeo_rol_portal", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0001-000000000001"),
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DescripcionRolPortal = "TarifasComercial",
+                            Rol = "Comercial"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0001-000000000002"),
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DescripcionRolPortal = "TarifasAdministrador",
+                            Rol = "AdminTarifas"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0001-000000000003"),
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DescripcionRolPortal = "Administracion",
+                            Rol = "Admin"
+                        });
+                });
+
             modelBuilder.Entity("CabinaFletes.Domain.Usuarios.Entidades.Usuario", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1222,10 +1274,6 @@ namespace CabinaFletes.Infrastructure.Migrations
                         .HasColumnType("bit")
                         .HasDefaultValue(true);
 
-                    b.Property<string>("AdObjectId")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
                     b.Property<DateTimeOffset>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetimeoffset")
@@ -1235,6 +1283,9 @@ namespace CabinaFletes.Infrastructure.Migrations
                         .IsRequired()
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
+
+                    b.Property<long?>("IdentidadPortalId")
+                        .HasColumnType("bigint");
 
                     b.Property<string>("Nombre")
                         .IsRequired()
@@ -1253,12 +1304,12 @@ namespace CabinaFletes.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("AdObjectId")
-                        .IsUnique()
-                        .HasFilter("[AdObjectId] IS NOT NULL");
-
                     b.HasIndex("Email")
                         .IsUnique();
+
+                    b.HasIndex("IdentidadPortalId")
+                        .IsUnique()
+                        .HasFilter("[IdentidadPortalId] IS NOT NULL");
 
                     b.ToTable("usuarios", (string)null);
 
