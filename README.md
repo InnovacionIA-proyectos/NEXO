@@ -105,7 +105,6 @@ escritura; las migraciones ya versionadas viven en
 | `DwSice` | `DWSice.dbo.tblRutasSicetac` (SQL Server 2008 R2) | Biblioteca (matriz SICE-TAC en vivo) | El endpoint responde `503` accionable (`BibliotecaSicetacNoConfiguradoAdapter`) |
 | `DbSolucionesTi` | `dbsolucionesTI.dbo.tblSAPTarifasLog` | Biblioteca (tarifario SAP TM / propuesta de tarifa) | El adapter correspondiente queda sin registrar el DbContext (se degrada) |
 | `DwCubos` | `DWCubosOperacionesEBS.dbo.DimBPSolicitante` | Solicitudes/Captura (catálogo de clientes reales) | `ClientesDwAdapter.Configurado = false`; la búsqueda cae a la tabla local |
-| `DwCubosSap` | `DWCubosEBSSAP.dbo.DimCliente` | Cotizaciones (comercial responsable del cliente al entregar) | `ComercialResponsableSapAdapter.Configurado = false` |
 
 El DW `DwSice`/`DbSolucionesTi` corre en SQL Server 2008 R2 y solo negocia
 TLS 1.0 con cifradores heredados; el `Dockerfile` de la Api incluye una
@@ -205,8 +204,10 @@ documento manda sobre cualquier otra descripción, incluida esta.
 4. Se crea la `Cotizacion` (`POST /api/cotizaciones`), se aplican propuestas
    de tarifa (`POST /api/cotizaciones/{id}/aplicar-propuestas` — compara
    plaza SAP vs SICE-TAC vs histórico vía Biblioteca), se agregan servicios
-   conexos y se entrega (`POST /api/cotizaciones/{id}/entregar`, notifica al
-   comercial responsable por correo si SMTP está configurado).
+   conexos y se entrega (`POST /api/cotizaciones/{id}/entregar`). La entrega
+   responde de inmediato; un consumidor aparte (S2-HU-06) notifica por
+   correo a quien solicitó la consulta de flete — nunca al cliente — si la
+   salida de correo está configurada.
 5. Al marcar el resultado (`POST /api/cotizaciones/{id}/resultado`), si se
    gana, la tarifa aplicada realimenta la Biblioteca de Tarifas Ganadas
    (`TarifaHistorica`) para futuras sugerencias de costeo.

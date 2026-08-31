@@ -111,7 +111,6 @@ services:
       # se degradan solos (503 accionable o Configurado=false), no rompen.
       ConnectionStrings__DwSice: ${ConnectionStrings__DwSice:-}
       ConnectionStrings__DwCubos: ${ConnectionStrings__DwCubos:-}
-      ConnectionStrings__DwCubosSap: ${ConnectionStrings__DwCubosSap:-}
       ConnectionStrings__DbSolucionesTi: ${ConnectionStrings__DbSolucionesTi:-}
       # SMTP corporativo (envío de cotizaciones). Opcional: sin Host/Remitente no
       # envía. Nombres en español: SmtpCorreoAdapter lee Smtp:Puerto/Remitente/

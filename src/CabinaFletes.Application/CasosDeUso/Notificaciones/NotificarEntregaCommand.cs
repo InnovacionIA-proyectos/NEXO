@@ -9,15 +9,18 @@ namespace CabinaFletes.Application.CasosDeUso.Notificaciones;
 /// <summary>
 /// Manda el correo de una cotización entregada.
 ///
-/// FUERA DE LA PETICIÓN, y ese es el punto de la HU. Antes esto vivía dentro del caso de
-/// uso de entrega: quien entregaba esperaba a que el correo saliera, y con el relay lento
+/// FUERA DE LA PETICIÓN, y ese es el punto de la HU-06.1. Antes esto vivía dentro del caso
+/// de uso de entrega: quien entregaba esperaba a que el correo saliera, y con el relay lento
 /// esperaba de más. Ahora la entrega publica el evento y responde; esto corre después,
 /// llamado desde un consumidor.
 ///
-/// LA NOTIFICACIÓN ES INTERNA. Va al correo del comercial responsable —que es personal de
-/// Botero Soto— y nunca al cliente. La #22 va a derivar el destinatario de la sesión de
-/// quien pidió la consulta y a dejar una prueba de que ninguna dirección de cliente puede
-/// ser destinataria; hoy se mantiene la resolución que ya existía.
+/// LA NOTIFICACIÓN ES INTERNA Y VA A QUIEN LA PIDIÓ (S2-HU-06.2). El destinatario es
+/// <c>Solicitud.Creador</c> — el usuario de Nexo que dio de alta la solicitud de flete,
+/// resuelto contra la sesión real del portal (S2-HU-03) — nunca el cliente ni un
+/// "responsable comercial" sacado de un Data Warehouse por NIT (así resolvía esto antes
+/// de la #22; se retiró IComercialResponsablePort/DwCubosSap por completo, ya sin uso).
+/// Es, además, una salvaguarda estructural: <c>Cliente</c> no tiene columna de correo, así
+/// que no hay de dónde sacar una dirección de cliente aunque alguien lo intentara.
 ///
 /// LO QUE NO SE PUEDE HACER es tragarse los fallos. Antes se devolvían en el mensaje de
 /// la respuesta y quedaban ahí; ahora que nadie mira la respuesta, un fallo silencioso
@@ -26,8 +29,8 @@ namespace CabinaFletes.Application.CasosDeUso.Notificaciones;
 /// tienen arreglo.
 ///
 /// Lo que sí se resuelve sin error son las situaciones en que no hay a quién escribirle
-/// —sin cliente, sin comercial responsable, sin relay configurado—. Eso no es una avería:
-/// es que no había correo que mandar, y reintentarlo cuatro veces no lo va a cambiar.
+/// —sin cliente, sin creador, sin relay configurado—. Eso no es una avería: es que no
+/// había correo que mandar, y reintentarlo cuatro veces no lo va a cambiar.
 /// </summary>
 public sealed record NotificarEntregaCommand(
     Guid CotizacionId,
@@ -38,7 +41,6 @@ public sealed record NotificarEntregaCommand(
 public sealed class NotificarEntregaCommandHandler(
     ICotizacionRepository cotizaciones,
     ISolicitudesPort solicitudes,
-    IComercialResponsablePort comercialResponsable,
     ICorreoPort correo)
     : ICommandHandler<NotificarEntregaCommand, ResultadoDeNotificacionDto>
 {
@@ -56,14 +58,10 @@ public sealed class NotificarEntregaCommandHandler(
             return ResultadoDeNotificacionDto.NoHabiaQueEnviar(
                 "La cotización no tiene cliente asociado; no hay a quién notificar.");
 
-        if (!comercialResponsable.Configurado)
+        var solicitante = solicitud!.Creador;
+        if (solicitante is null)
             return ResultadoDeNotificacionDto.NoHabiaQueEnviar(
-                "El DW del comercial responsable no está configurado (ConnectionStrings:DwCubosSap).");
-
-        var responsable = await comercialResponsable.BuscarPorNitAsync(cliente.Nit.Trim(), ct);
-        if (responsable is null)
-            return ResultadoDeNotificacionDto.NoHabiaQueEnviar(
-                $"El cliente (NIT {cliente.Nit.Trim()}) no tiene comercial responsable con correo en DimCliente.");
+                "La solicitud no tiene un usuario creador identificable; no hay a quién notificar.");
 
         if (!correo.Configurado)
             return ResultadoDeNotificacionDto.NoHabiaQueEnviar(
@@ -82,13 +80,13 @@ public sealed class NotificarEntregaCommandHandler(
         // consultando el relay, sin cruzar logs a mano.
         var id = await correo.EnviarAsync(
             new CorreoParaEnviar(
-                [responsable.Correo.Trim()],
+                [solicitante.Email.Trim()],
                 PlantillaDeEntrega.Asunto(c, cliente),
-                PlantillaDeEntrega.CuerpoHtml(c, cliente, responsable.Nombre),
+                PlantillaDeEntrega.CuerpoHtml(c, cliente, solicitante.Nombre),
                 adjuntos,
                 Metadatos: new Dictionary<string, string> { ["cotizacion"] = c.Id.ToString() }),
             ct);
 
-        return ResultadoDeNotificacionDto.Enviada(responsable.Correo.Trim(), id, adjuntos.Length);
+        return ResultadoDeNotificacionDto.Enviada(solicitante.Email.Trim(), id, adjuntos.Length);
     }
 }

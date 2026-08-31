@@ -117,7 +117,9 @@ mencionaban siguen vivos en su ubicación definitiva.
 
 Falta `appsettings.{Environment}.local.json` (no versionado, uno por
 desarrollador) con al menos `ConnectionStrings:CabinaFletes`. Las cadenas
-`DwSice`, `DwCubosSap`, `DbSolucionesTi` y `DwCubos` son OPCIONALES: sin
-ellas, los adapters correspondientes se degradan solos (503 accionable o
+`DwSice`, `DbSolucionesTi` y `DwCubos` son OPCIONALES: sin ellas, los
+adapters correspondientes se degradan solos (503 accionable o
 `Configurado = false`), igual que en el original — no es necesario tenerlas
-todas para levantar el API.
+todas para levantar el API. `DwCubosSap` se retiró en S2-HU-06.2: el
+destinatario de la notificación de entrega ya no sale de ese DW (comercial
+responsable por NIT), sale de la sesión de quien solicitó la consulta.

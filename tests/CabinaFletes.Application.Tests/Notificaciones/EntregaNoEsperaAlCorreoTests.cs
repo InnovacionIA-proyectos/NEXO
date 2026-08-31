@@ -60,8 +60,10 @@ public class EntregaNoEsperaAlCorreoTests
             .GetConstructors().Single()
             .GetParameters().Select(p => p.ParameterType).ToList();
 
+        // IComercialResponsablePort ni siquiera existe ya en el código (S2-HU-06.2 lo
+        // retiró por completo: el destinatario sale de la sesión de quien solicitó la
+        // consulta, no de un DW por NIT del cliente) — no hay tipo que verificar aquí.
         Assert.DoesNotContain(typeof(ICorreoPort), dependencias);
-        Assert.DoesNotContain(typeof(IComercialResponsablePort), dependencias);
         Assert.Contains(typeof(IPublicadorDeMensajes), dependencias);
     }
 
