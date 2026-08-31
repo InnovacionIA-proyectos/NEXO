@@ -1,14 +1,18 @@
 using System.Security.Claims;
 using CabinaFletes.Application.Common;
 using CabinaFletes.Domain.Enums;
-using CabinaFletes.Domain.Usuarios.Entidades;
-using CabinaFletes.Infrastructure.Persistence;
 
 namespace CabinaFletes.Api.Common.Auth;
 
 /// <summary>
 /// Usuario autenticado de la petición actual. Extiende el puerto de Application
 /// (ICurrentUserPort) — así los Handlers lo consumen sin conocer HttpContext.
+///
+/// Lee directo los claims que deja IdentidadPortalAuthenticationHandler
+/// (NameIdentifier/Name/Role, ya resueltos contra la tabla del portal en esta misma
+/// petición — S2-HU-03.1/03.2). Sin fallback a un usuario de sistema: el fail-closed de
+/// Program.cs garantiza que si se llegó hasta un Handler, la petición ya tiene una
+/// identidad real.
 /// </summary>
 public interface ICurrentUser : ICurrentUserPort
 {
@@ -24,11 +28,11 @@ public class CurrentUser : ICurrentUser
     {
         get
         {
-            var principal = _http.HttpContext?.User;
-            // 'oid' es el claim de object id de Azure AD; NameIdentifier en el esquema Dev.
-            var sub = principal?.FindFirst("oid")?.Value
-                      ?? principal?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            return Guid.TryParse(sub, out var id) ? id : CabinaFletesDbContext.UsuarioSistemaId;
+            var sub = _http.HttpContext?.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            return Guid.TryParse(sub, out var id)
+                ? id
+                : throw new InvalidOperationException(
+                    "ICurrentUser.Id se consultó sin una identidad válida en el contexto de la petición.");
         }
     }
 

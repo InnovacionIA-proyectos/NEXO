@@ -92,11 +92,10 @@ services:
       # Cuántas solicitudes por lote. Existe para no dejar una transacción larga
       # bloqueando filas que la bandeja está leyendo.
       Score__TamanoDeLoteRecalculo: ${SCORE_TAMANO_LOTE:-200}
-      AzureAd__Instance: ${AzureAd__Instance:-https://login.microsoftonline.com/}
-      AzureAd__TenantId: ${AzureAd__TenantId:-}
-      AzureAd__ClientId: ${AzureAd__ClientId:-}
-      AzureAd__ClientSecret: ${AzureAd__ClientSecret:-}
-      AzureAd__Domain: ${AzureAd__Domain:-boterosoto.com.co}
+      # Identidad del portal de la Administración (S2-HU-03). Vacía en local: cae al
+      # adapter que resuelve contra la tabla Usuarios propia (ver .env.example).
+      # ASPNETCORE_ENVIRONMENT=Production EXIGE esta cadena (fail-closed).
+      ConnectionStrings__IdentidadPortal: ${ConnectionStrings__IdentidadPortal:-}
       # Data Warehouse corporativo (SOLO LECTURA). Opcionales: si van vacías,
       # los módulos que las usan (Biblioteca/SICE-TAC/histórico/clientes DW)
       # se degradan solos (503 accionable o Configurado=false), no rompen.

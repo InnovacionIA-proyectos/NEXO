@@ -159,8 +159,8 @@ public static class MensajeriaDependencyInjection
             // completa.
             //
             // Arrancar sin broker en Producción sería perder mensajes en silencio, y
-            // eso lo impide la guarda de Program.cs, con el mismo criterio que la de
-            // AzureAd.
+            // eso lo impide la guarda de Program.cs, con el mismo criterio fail-closed
+            // que la de la identidad del portal (S2-HU-03.3).
             if (string.IsNullOrWhiteSpace(host))
                 x.UsingInMemory(Tuberia);
             else
