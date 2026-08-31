@@ -49,6 +49,37 @@ compuerta cerrada igual, a propósito — no es un booleano suelto.
 - No hay ajuste manual de colocaciones expuesto todavía (existe en el
   dominio — `ColocacionCargue.AjusteManual` — pero ningún caso de uso lo usa).
 
+## Costeo con datos de plaza provisionales (S2-HU-09, #31/#33)
+
+Contrato de la conexión SAP nueva (plaza en vivo, hoy inexistente) definido
+en `ISapTarifaFleteEnVivoPort` (`Application/CasosDeUso/Biblioteca/Interfaces`,
+documentación completa en el XML doc del archivo: campos, tipos, semántica,
+vigencias). Mock sustituible (`SapTarifaFleteEnVivoMockAdapter`) conectado a
+`PropuestaTarifaAdapter` como sustitución ADITIVA de la plaza — nunca del
+piso SICE-TAC ni del histórico — activable solo por
+`SapTarifaFleteEnVivo:Modo=Mock`. Por defecto (`Deshabilitado`) el costeo se
+comporta exactamente igual que antes de esta HU: verificado corriendo la
+suite completa contra Docker real sin regresión.
+
+**Pendientes, sin fecha, dueño externo a este repo**:
+- **Contrato revisado con "el equipo de conexiones"** (criterio de cierre de
+  #31): no se hizo en esta sesión — no hay forma de contactar a ese equipo
+  desde acá. Queda **registrado, no enviado**: alguien del equipo tiene que
+  compartirles `ISapTarifaFleteEnVivoPort.cs` (el contrato) y este párrafo.
+- **Dataset de plaza validado formalmente por negocio** (S2-HU-09.2): el
+  dataset de `SapTarifaFleteEnVivoMockAdapter` es una estimación razonable a
+  partir de las tarifas ya sembradas en `DataSeeder.cs` para las mismas
+  rutas — NO es un valor que negocio haya confirmado como representativo.
+  Marcado explícito en el código y en el `Detalle` que devuelve cada
+  candidato (`"pendiente de validación formal por negocio"`).
+- **El adaptador REAL no existe** (`SapTarifaFleteEnVivo:Modo=Real` hoy se
+  comporta igual que `Deshabilitado`, con degradación segura). Cuando "el
+  equipo de conexiones" lo construya: un adaptador nuevo que implemente
+  `ISapTarifaFleteEnVivoPort`, un `if` más en
+  `Infrastructure/DependencyInjection.cs` — cero cambios en
+  `ReglaDeCosteo`, `PropuestaTarifaAdapter` (más allá de esa función) ni en
+  pantallas.
+
 ## Transversales (no bloqueantes, a decidir cuando haga falta)
 
 - RabbitMQ, Outbox y auditoría "de verdad" — el diagrama de referencia los

@@ -113,6 +113,9 @@ services:
       # se degradan solos (503 accionable o Configurado=false), no rompen.
       ConnectionStrings__DwSice: ${ConnectionStrings__DwSice:-}
       ConnectionStrings__DwCubos: ${ConnectionStrings__DwCubos:-}
+      # Conexión SAP nueva: plaza en vivo (S2-HU-09). Deshabilitado por defecto —
+      # la plaza real sigue saliendo de DbSolucionesTi, sin tocar.
+      SapTarifaFleteEnVivo__Modo: ${SAP_TARIFA_FLETE_EN_VIVO_MODO:-Deshabilitado}
       ConnectionStrings__DbSolucionesTi: ${ConnectionStrings__DbSolucionesTi:-}
       # SMTP corporativo (envío de cotizaciones). Opcional: sin Host/Remitente no
       # envía. Nombres en español: SmtpCorreoAdapter lee Smtp:Puerto/Remitente/

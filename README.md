@@ -80,7 +80,7 @@ valor aquí con un handler por caso de uso.
 |---|---|---|
 | Cotizaciones | `/api/cotizaciones` | Ciclo de vida de una cotización: crear, agregar líneas/servicios conexos, aplicar propuestas de tarifa, entregar, marcar resultado, exportar a Excel. Módulo piloto de la migración. |
 | Solicitudes / Captura | `/api/solicitudes`, `/api/captura-solicitudes` | Alta de solicitudes (spot/licitación), Bandeja Priorizada por `ScorePrioridad`, captura de líneas (manual o Excel), auto-costeo diferido en segundo plano, recálculo periódico de score (`RecalculoScoreHostedService`). |
-| Biblioteca | `/api/biblioteca-sicetac`, `/api/solicitudes/{id}/propuesta-tarifa`, `/api/biblioteca-sap-plaza` | Matriz SICE-TAC oficial EN VIVO desde el Data Warehouse, tarifario SAP TM y motor de propuesta de tarifa (compara plaza SAP vs SICE-TAC vs histórico). |
+| Biblioteca | `/api/biblioteca-sicetac`, `/api/solicitudes/{id}/propuesta-tarifa`, `/api/biblioteca-sap-plaza` | Matriz SICE-TAC oficial EN VIVO desde el Data Warehouse, tarifario SAP TM y motor de propuesta de tarifa (compara plaza SAP vs SICE-TAC vs histórico). Plaza puede venir de un dataset provisional mientras la conexión SAP nueva no exista (S2-HU-09) — ver sección 3. |
 | Reglas Solo-SICETAC | `/api/reglas-solo-sicetac` | Rutas + tipo de vehículo marcadas para cotizar exclusivamente con el piso SICE-TAC. |
 | Ajustes de Vigencia de Plaza | `/api/biblioteca-sap-plaza/{id}/vigencia` | Ajustar/quitar vigencia de tarifas de plaza SAP TM, individual y masivo. |
 | Servicios Conexos | `/api/servicios-conexos` | Catálogo administrado de servicios logísticos/adicionales (crear, editar, listar, import Excel). |
@@ -115,6 +115,16 @@ contenedor pueda completar ese handshake sin afectar al resto del sistema.
 - **SMTP corporativo** (opcional): notifica al comercial al entregar una
   cotización. Sin `Smtp:Host`/`Smtp:Remitente` configurados, la entrega
   sigue funcionando pero no envía el correo.
+- **Conexión SAP nueva: plaza en vivo** (S2-HU-09, `#31`/`#33`): todavía NO
+  EXISTE ("el equipo de conexiones" no la construyó). `ISapTarifaFleteEnVivoPort`
+  es su contrato ya definido; `SapTarifaFleteEnVivo:Modo=Deshabilitado`
+  (default) hace que el costeo se comporte exactamente igual que antes de
+  esta HU — la plaza real sigue saliendo de `DbSolucionesTi`, sin tocar.
+  `Modo=Mock` activa un dataset provisional (`SapTarifaFleteEnVivoMockAdapter`,
+  pendiente de validación formal por negocio, S2-HU-09.2) para Desarrollo/QA
+  sin acceso al DW corporativo — la regla del mayor y el piso SICE-TAC operan
+  idéntico. El día que exista la conexión real, se agrega un adaptador nuevo
+  y se cambia `Modo=Real`: cero cambios en `ReglaDeCosteo` ni en pantallas.
 - **Identidad del portal de la Administración** (S2-HU-03, solo lectura):
   Nexo no tiene login propio (`docs/contrato-integracion`, D1). Cada
   petición valida el encabezado `X-Portal-Usuario-Id` contra esta tabla, sin
