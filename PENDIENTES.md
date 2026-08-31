@@ -26,9 +26,27 @@ MIGRACION.md para el detalle de cada pasada y las decisiones de diseño.
   sugiere, pero no existen en el sistema actual; se recomienda incorporarlos
   solo cuando un módulo migrado los necesite de verdad (evitar complejidad
   anticipada).
-- Autenticación Azure AD real en producción (hoy sigue el esquema Dev del
-  original en desarrollo; en Producción el `Program.cs` ya EXIGE
-  `AzureAd:ClientId` configurado, igual que el original).
+- **Identidad del portal (S2-HU-03) — implementada, con 3 pendientes de negocio/TI
+  heredados del contrato** (`docs/contrato-integracion/README.md`, sección 2):
+  Azure AD y `DevAuthenticationHandler` quedaron retirados por completo
+  (S2-HU-03.3); `IdentidadPortalAuthenticationHandler` valida
+  `X-Portal-Usuario-Id` en cada petición y `MapeoRolPortal` traduce el rol del
+  portal a uno de los 6 de Nexo. Sin `ConnectionStrings:IdentidadPortal`
+  configurada, Producción no arranca (fail-closed); Desarrollo/QA caen a un
+  adapter que resuelve contra la tabla `Usuarios` local. Quedan abiertos, sin
+  fecha, los mismos 3 pendientes que ya traía el contrato:
+  - **P1** (dueño: TI) — confirmar las columnas reales de la tabla de
+    identidad del portal contra `sys.columns`; hoy el esquema
+    (`tblSAPUsuariosApp`/`tblSAPUsuarioRoles`/`tblSAPRoles`) es el de
+    referencia de la integración, sin verificar contra la base real.
+  - **P2** (dueño: Negocio) — solo 3 de los 6 roles de Nexo tienen
+    equivalente sembrado en `MapeoRolPortal` (`TarifasComercial`,
+    `TarifasAdministrador`, `Administracion`, resueltos por NOMBRE porque el
+    `IDROLES` real todavía no está confirmado). `CoordinadorFletes`,
+    `LiderProceso` y `ServiciosLogisticos` no tienen candidato.
+  - **P3** (dueño: Negocio) — el orden de precedencia cuando una persona
+    tiene varios roles a la vez (`Domain.Usuarios.Reglas.ResolucionRolPortal`)
+    es una propuesta técnica interina, no confirmada por negocio.
 - Ninguno de los archivos .cs de esta migración se compiló en este sandbox
   (sin SDK de .NET ni acceso a NuGet). Antes de desplegar: abrir la solución
   en Visual Studio/Rider/VS Code y revisar el panel de errores del

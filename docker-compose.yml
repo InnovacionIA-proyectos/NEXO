@@ -102,23 +102,10 @@ services:
       # Cuántas solicitudes por lote. Existe para no dejar una transacción larga
       # bloqueando filas que la bandeja está leyendo.
       Score__TamanoDeLoteRecalculo: ${SCORE_TAMANO_LOTE:-200}
-      # Microservicio de correo de la compañía (#21). LA URL CAMBIA EN CADA DESPLIEGUE
-      # mientras el servicio hace lo mismo, así que va por variable y no en el código.
-      #
-      # Sin ella la salida de correo cae al SMTP directo, que es el camino que la
-      # compañía está dejando atrás: el relay SOAP solo adjunta archivos que ya están en
-      # una ruta suya, y el formato de la cotización llega como archivo en la petición.
-      MailSender__BaseUrl: ${MAILSENDER_BASE_URL:-}
-      # Remitente. Opcional: el relay tiene el suyo por defecto.
-      MailSender__Remitente: ${MAILSENDER_REMITENTE:-}
-      # Corto a propósito: el MailSender solo encola y responde 202. Si tarda más, algo
-      # va mal y conviene reintentar en vez de seguir esperando.
-      MailSender__TimeoutSegundos: ${MAILSENDER_TIMEOUT_SEGUNDOS:-30}
-      AzureAd__Instance: ${AzureAd__Instance:-https://login.microsoftonline.com/}
-      AzureAd__TenantId: ${AzureAd__TenantId:-}
-      AzureAd__ClientId: ${AzureAd__ClientId:-}
-      AzureAd__ClientSecret: ${AzureAd__ClientSecret:-}
-      AzureAd__Domain: ${AzureAd__Domain:-boterosoto.com.co}
+      # Identidad del portal de la Administración (S2-HU-03). Vacía en local: cae al
+      # adapter que resuelve contra la tabla Usuarios propia (ver .env.example).
+      # ASPNETCORE_ENVIRONMENT=Production EXIGE esta cadena (fail-closed).
+      ConnectionStrings__IdentidadPortal: ${ConnectionStrings__IdentidadPortal:-}
       # Data Warehouse corporativo (SOLO LECTURA). Opcionales: si van vacías,
       # los módulos que las usan (Biblioteca/SICE-TAC/histórico/clientes DW)
       # se degradan solos (503 accionable o Configurado=false), no rompen.

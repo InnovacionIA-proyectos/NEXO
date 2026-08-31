@@ -18,10 +18,14 @@ public class Usuario : IAuditable
     [Required]
     public RolUsuario Rol { get; set; }
 
-    /// <summary>Vínculo con el directorio corporativo. Dato interno: no se expone en el API.</summary>
-    [MaxLength(100)]
+    /// <summary>
+    /// Vínculo con la identidad de la persona en la tabla de usuarios/permisos del
+    /// portal de la Administración (encabezado X-Portal-Usuario-Id, ver
+    /// docs/contrato-integracion). Reemplaza al antiguo AdObjectId de Azure AD,
+    /// retirado en S2-HU-03.3. Dato interno: no se expone en el API.
+    /// </summary>
     [JsonIgnore]
-    public string? AdObjectId { get; set; }
+    public long? IdentidadPortalId { get; set; }
 
     public bool Activo { get; set; } = true;
 

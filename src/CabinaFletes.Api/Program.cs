@@ -23,10 +23,10 @@ using CabinaFletes.Application.CasosDeUso.ServiciosConexos;
 using CabinaFletes.Application.CasosDeUso.Solicitudes;
 using CabinaFletes.Application.CasosDeUso.TarifasGanadas;
 using CabinaFletes.Application.CasosDeUso.TarifasSicetacAdmin;
+using CabinaFletes.Domain.Enums;
 using CabinaFletes.Infrastructure;
 using CabinaFletes.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
@@ -91,14 +91,15 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUser, CurrentUser>();
 builder.Services.AddScoped<CabinaFletes.Application.Common.ICurrentUserPort>(sp => sp.GetRequiredService<ICurrentUser>());
 
-// --------------------------------------------------------------- Autenticación / Autorización (igual que el original)
-var azureAdClientId = builder.Configuration["AzureAd:ClientId"];
-var azureAdConfigured = !string.IsNullOrWhiteSpace(azureAdClientId);
-
-if (builder.Environment.IsProduction() && !azureAdConfigured)
+// --------------------------------------------------------------- Autenticación / Autorización
+// S2-HU-03.3: fail-closed. Nexo no tiene login propio (docs/contrato-integracion, D1) — la
+// única fuente de identidad es la tabla de usuarios/permisos del portal. Sin ella configurada,
+// el arranque en Producción falla aquí mismo, antes de exponer un solo endpoint.
+var identidadPortalConfigurada = !string.IsNullOrWhiteSpace(builder.Configuration.GetConnectionString("IdentidadPortal"));
+if (builder.Environment.IsProduction() && !identidadPortalConfigurada)
     throw new InvalidOperationException(
-        "AzureAd no está configurado en Producción. El esquema de autenticación de desarrollo " +
-        "queda deshabilitado por seguridad. Configure la sección 'AzureAd' antes de desplegar.");
+        "ConnectionStrings:IdentidadPortal no está configurado en Producción. Sin la fuente de " +
+        "identidad del portal, Nexo no puede resolver sesiones reales. Configure la cadena antes de desplegar.");
 
 // Mismo criterio para el broker: sin cadena configurada la mensajería va en memoria,
 // que sirve para pruebas y para levantar el API sin RabbitMQ, pero en Producción
@@ -109,25 +110,21 @@ if (builder.Environment.IsProduction() &&
         "ConnectionStrings:RabbitMq no está configurado en Producción. Sin broker la mensajería " +
         "va en memoria y los mensajes no sobreviven a un reinicio. Configure el broker antes de desplegar.");
 
-var defaultScheme = azureAdConfigured ? JwtBearerDefaults.AuthenticationScheme : DevAuthenticationHandler.SchemeName;
-var authBuilder = builder.Services.AddAuthentication(defaultScheme);
-if (azureAdConfigured)
-{
-    var instance = (builder.Configuration["AzureAd:Instance"] ?? "https://login.microsoftonline.com/").TrimEnd('/');
-    var tenantId = builder.Configuration["AzureAd:TenantId"];
-    authBuilder.AddJwtBearer(options =>
-    {
-        options.Authority = $"{instance}/{tenantId}/v2.0";
-        options.Audience = azureAdClientId;
-    });
-}
-else
-{
-    authBuilder.AddScheme<AuthenticationSchemeOptions, DevAuthenticationHandler>(DevAuthenticationHandler.SchemeName, _ => { });
-}
+builder.Services.AddAuthentication(IdentidadPortalAuthenticationHandler.SchemeName)
+    .AddScheme<AuthenticationSchemeOptions, IdentidadPortalAuthenticationHandler>(
+        IdentidadPortalAuthenticationHandler.SchemeName, _ => { });
+
+// Autenticación (identidad válida, ver el Handler) y autorización (uno de los 6 roles de
+// Nexo, resuelto contra la tabla del portal) son cosas DISTINTAS a propósito: sin esta
+// segunda condición en el fallback, alguien con identidad válida pero sin permiso sobre
+// Cabina de Fletes pasaría cualquier endpoint que no declare [Authorize(Roles=...)] — el
+// contrato exige rechazarlo en TODOS, no solo en los que restringen por rol específico.
 builder.Services.AddAuthorization(options =>
 {
-    options.FallbackPolicy = new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build();
+    options.FallbackPolicy = new AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .RequireClaim(System.Security.Claims.ClaimTypes.Role, Enum.GetNames<RolUsuario>())
+        .Build();
 });
 
 builder.Services.Configure<ForwardedHeadersOptions>(o =>

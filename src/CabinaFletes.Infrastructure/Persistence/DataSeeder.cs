@@ -25,16 +25,22 @@ public static class DataSeeder
         var now = DateTimeOffset.UtcNow;
 
         // ----------------------------------------------------------------- Usuarios (10)
-        var coord1 = new Usuario { Nombre = "Carlos Herrera", Email = "cherrera@boterosoto.com.co", Rol = RolUsuario.CoordinadorFletes, AdObjectId = "ad-cherrera" };
-        var coord2 = new Usuario { Nombre = "Yined Zapata", Email = "yzapata@boterosoto.com.co", Rol = RolUsuario.CoordinadorFletes, AdObjectId = "ad-yzapata" };
+        //
+        // IdentidadPortalId: id que un desarrollador manda en X-Portal-Usuario-Id para
+        // entrar localmente como esta persona cuando ConnectionStrings:IdentidadPortal NO
+        // está configurada (ResolverIdentidadPortalLocalAdapter, ver DependencyInjection.cs).
+        // No todas tienen: coord3/lider2/sl2 simulan a alguien que todavía no inició sesión
+        // por el portal ("edge: sin identidad del portal").
+        var coord1 = new Usuario { Nombre = "Carlos Herrera", Email = "cherrera@boterosoto.com.co", Rol = RolUsuario.CoordinadorFletes, IdentidadPortalId = 1001 };
+        var coord2 = new Usuario { Nombre = "Yined Zapata", Email = "yzapata@boterosoto.com.co", Rol = RolUsuario.CoordinadorFletes, IdentidadPortalId = 1002 };
         var coord3 = new Usuario { Nombre = "Édinson Molina", Email = "emolina@boterosoto.com.co", Rol = RolUsuario.CoordinadorFletes };
         var coord4 = new Usuario { Nombre = "Mónica Barrera", Email = "mbarrera@boterosoto.com.co", Rol = RolUsuario.CoordinadorFletes, Activo = false }; // edge: inactivo
-        var lider1 = new Usuario { Nombre = "Luisa Chaverra", Email = "lchaverra@boterosoto.com.co", Rol = RolUsuario.LiderProceso, AdObjectId = "ad-lchaverra" };
+        var lider1 = new Usuario { Nombre = "Luisa Chaverra", Email = "lchaverra@boterosoto.com.co", Rol = RolUsuario.LiderProceso, IdentidadPortalId = 1003 };
         var lider2 = new Usuario { Nombre = "Andrés Pardo", Email = "apardo@boterosoto.com.co", Rol = RolUsuario.LiderProceso };
-        var sl1 = new Usuario { Nombre = "Sandra Nieto", Email = "snieto@boterosoto.com.co", Rol = RolUsuario.ServiciosLogisticos, AdObjectId = "ad-snieto" };
-        var sl2 = new Usuario { Nombre = "Jorge Organista", Email = "jorganista@boterosoto.com.co", Rol = RolUsuario.ServiciosLogisticos }; // edge: sin AD
-        var admin1 = new Usuario { Nombre = "Paola Restrepo", Email = "prestrepo@boterosoto.com.co", Rol = RolUsuario.Admin, AdObjectId = "ad-prestrepo" };
-        var admin2 = new Usuario { Nombre = "Albert Blanco", Email = "ablanco@boterosoto.com.co", Rol = RolUsuario.Admin, AdObjectId = "ad-ablanco" };
+        var sl1 = new Usuario { Nombre = "Sandra Nieto", Email = "snieto@boterosoto.com.co", Rol = RolUsuario.ServiciosLogisticos, IdentidadPortalId = 1004 };
+        var sl2 = new Usuario { Nombre = "Jorge Organista", Email = "jorganista@boterosoto.com.co", Rol = RolUsuario.ServiciosLogisticos }; // edge: sin identidad del portal
+        var admin1 = new Usuario { Nombre = "Paola Restrepo", Email = "prestrepo@boterosoto.com.co", Rol = RolUsuario.Admin, IdentidadPortalId = 1005 };
+        var admin2 = new Usuario { Nombre = "Albert Blanco", Email = "ablanco@boterosoto.com.co", Rol = RolUsuario.Admin, IdentidadPortalId = 1006 };
         db.Usuarios.AddRange(coord1, coord2, coord3, coord4, lider1, lider2, sl1, sl2, admin1, admin2);
 
         // ----------------------------------------------------------------- Clientes (10)

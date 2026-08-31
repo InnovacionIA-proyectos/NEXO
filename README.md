@@ -117,10 +117,13 @@ contenedor pueda completar ese handshake sin afectar al resto del sistema.
 - **SMTP corporativo** (opcional): notifica al comercial al entregar una
   cotización. Sin `Smtp:Host`/`Smtp:Remitente` configurados, la entrega
   sigue funcionando pero no envía el correo.
-- **Azure AD / Microsoft Entra ID**: autenticación JWT Bearer. Sin
-  `AzureAd:ClientId`, la Api usa un esquema de desarrollo
-  (`DevAuthenticationHandler`); en `ASPNETCORE_ENVIRONMENT=Production` el
-  arranque EXIGE que Azure AD esté configurado (falla rápido, por seguridad).
+- **Identidad del portal de la Administración** (S2-HU-03, solo lectura):
+  Nexo no tiene login propio (`docs/contrato-integracion`, D1). Cada
+  petición valida el encabezado `X-Portal-Usuario-Id` contra esta tabla, sin
+  caché de sesión. Sin `ConnectionStrings:IdentidadPortal`, la Api resuelve
+  contra la tabla `Usuarios` local (útil en Desarrollo); en
+  `ASPNETCORE_ENVIRONMENT=Production` el arranque EXIGE la cadena real
+  (falla rápido, fail-closed).
 - **Cubicador 3D** (microservicio Python, PENDIENTE): no implementado
   todavía. `Cubicador3D__BaseUrl`/`Cubicador3D__ApiKey` están reservadas en
   `.env.example` y `docker-compose.yml` para cuando exista, pero hoy ningún
@@ -132,8 +135,11 @@ Ver [`.env.example`](.env.example) para el listado completo y comentado.
 Resumen de las obligatorias para levantar la Api:
 
 - `ConnectionStrings__CabinaFletes` (o `MSSQL_SA_PASSWORD` si se usa Docker Compose).
-- Todo lo demás (DWs, SMTP, Azure AD, Cubicador 3D) es opcional: el sistema
-  se degrada, nunca se cae, si falta.
+- Todo lo demás (DWs, SMTP, Cubicador 3D) es opcional: el sistema se
+  degrada, nunca se cae, si falta. La excepción es
+  `ConnectionStrings:IdentidadPortal`: opcional en Desarrollo/QA (cae al
+  adapter local), pero OBLIGATORIA en Producción — sin ella el arranque
+  falla (fail-closed, S2-HU-03.3).
 
 ### Docker
 
@@ -207,11 +213,18 @@ documento manda sobre cualquier otra descripción, incluida esta.
 
 ### Flujo de autenticación
 
-JWT Bearer contra Azure AD (Microsoft Entra ID) cuando está configurado;
-`DevAuthenticationHandler` en desarrollo sin Azure AD. Autorización por
-rol (`[Authorize(Roles = "...")]`) en cada endpoint que lo requiere —
-ver la tabla de módulos en la sección 2 y el detalle de roles en cada
-controller.
+Nexo no tiene login propio (S2-HU-03, `docs/contrato-integracion`, D1): la
+identidad la aporta la sesión del portal de la Administración.
+`IdentidadPortalAuthenticationHandler` valida en CADA petición el
+encabezado `X-Portal-Usuario-Id` contra la tabla de usuarios/permisos del
+portal (o contra `Usuarios` local si `ConnectionStrings:IdentidadPortal` no
+está configurada — solo fuera de Producción), resuelve uno de los 6 roles
+de Nexo vía `MapeoRolPortal` y deja los claims listos para el resto del
+pipeline. `GET /api/sesion/actual` expone esa identidad resuelta al
+frontend. Autorización por rol (`[Authorize(Roles = "...")]`) en cada
+endpoint que lo requiere, más una `FallbackPolicy` que exige uno de los 6
+roles en TODO endpoint (aunque no declare `Roles=`) — ver la tabla de
+módulos en la sección 2 y el detalle de roles en cada controller.
 
 ## 5. Stack tecnológico
 
@@ -223,7 +236,7 @@ controller.
 - **SQL Server** — base de datos principal y (solo lectura) los cuatro Data
   Warehouses corporativos.
 - **Docker / Docker Compose** — empaquetado y orquestación local.
-- **Azure AD (Microsoft Entra ID)** — autenticación JWT Bearer en producción.
+- **Identidad delegada al portal de la Administración** — sin login propio ni JWT emitido por Nexo (S2-HU-03).
 
 ## 6. Ejecución local
 
