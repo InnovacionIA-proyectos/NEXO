@@ -153,10 +153,17 @@ builder.Services.AddControllers()
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-const string FrontendCors = "frontend";
-var frontendOrigin = builder.Configuration["Cors:FrontendOrigin"] ?? "http://localhost:5173";
-builder.Services.AddCors(o => o.AddPolicy(FrontendCors, p => p
-    .WithOrigins(frontendOrigin)
+// El backend lo consumen dos clientes con orígenes distintos: el frontend standalone
+// (desarrollo) y el módulo cabina-fletes dentro del portal de la Administración
+// (S2-HU-02.2) — el portal tiene su propio dominio por ambiente (QA, Producción) y
+// Nexo mantiene su propia URL base (docs/contrato-integracion/README.md, sección 7),
+// así que la llamada del portal es cross-origin. Por eso la configuración admite una
+// lista, no un único origen.
+const string ClientesCors = "clientes";
+var origenesPermitidos = (builder.Configuration["Cors:OrigenesPermitidos"] ?? "http://localhost:5173")
+    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+builder.Services.AddCors(o => o.AddPolicy(ClientesCors, p => p
+    .WithOrigins(origenesPermitidos)
     .AllowAnyHeader()
     .AllowAnyMethod()));
 
@@ -202,7 +209,7 @@ else
 }
 
 app.UseMiddleware<ErrorHandlingMiddleware>();
-app.UseCors(FrontendCors);
+app.UseCors(ClientesCors);
 app.UseAuthentication();
 app.UseAuthorization();
 
