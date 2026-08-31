@@ -166,6 +166,12 @@ async def _esperar_evento_del_plan(cola: aio_pika.abc.AbstractQueue, plan_id: st
         async for mensaje in mensajes:
             async with mensaje.process():
                 cuerpo = json.loads(mensaje.body)
+                # Issue #28: NEXO consume este mismo evento con un IConsumer<T> de
+                # MassTransit, así que ahora se publica envuelto (ver
+                # infrastructure/mensajeria/rabbitmq.py::_sobre_masstransit) - se
+                # desenvuelve aquí para que las aserciones de abajo no cambien.
+                if isinstance(cuerpo, dict) and "message" in cuerpo and "messageType" in cuerpo:
+                    cuerpo = cuerpo["message"]
                 if cuerpo.get("planId") == plan_id:
                     return cuerpo
     raise RuntimeError("la cola se cerró sin entregar el evento esperado")  # pragma: no cover - iterator() no termina solo

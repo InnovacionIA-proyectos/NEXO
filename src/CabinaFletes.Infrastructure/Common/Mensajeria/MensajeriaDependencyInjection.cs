@@ -17,8 +17,10 @@ using CabinaFletes.Infrastructure.Trabajos.Repositorios;
 using CabinaFletes.Mensajes.Bandeja;
 using CabinaFletes.Mensajes.Notificaciones;
 using CabinaFletes.Mensajes.Costeo;
+using CabinaFletes.Mensajes.Cubicacion;
 using CabinaFletes.Mensajes.Priorizacion;
 using CabinaFletes.Mensajes.Solicitudes;
+using CabinaFletes.Infrastructure.Cubicacion;
 using CabinaFletes.Infrastructure.Persistence;
 using MassTransit;
 using Microsoft.Extensions.Configuration;
@@ -98,6 +100,16 @@ public static class MensajeriaDependencyInjection
             x.AddConsumer<AlertaDeFalloConsumer<TrabajoActualizado>>();
             x.AddConsumer<AlertaDeFalloConsumer<ExpiracionAutoCosteo>>();
 
+            // Issue #28, S2-HU-075: puente hacia Cubicador (microservicio Python,
+            // cubicador/, mismo repo). MassTransit real (decisión del equipo: no la
+            // aproximación previa con RabbitMQ.Client directo) - ver
+            // docs/mensajeria/CUBICACION.md para el porqué de la topología manual de
+            // abajo (Cubicador usa un exchange/routing-keys propios, no el
+            // exchange-por-tipo que MassTransit crearía por defecto).
+            x.AddConsumer<PlanDeCargueGeneradoConsumer>();
+            x.AddConsumer<CubicacionRechazadaConsumer>();
+            x.AddConsumer<AlertaDeFalloConsumer<PlanDeCargueGenerado>>();
+            x.AddConsumer<AlertaDeFalloConsumer<CubicacionRechazada>>();
 
             // Refresca el score persistido de las activas cuando la cadena de
             // priorización lo pide. La excepción sube: si esto deja de correr, los
@@ -155,7 +167,14 @@ public static class MensajeriaDependencyInjection
             // La tubería es la misma con broker y sin él. Se escribe una sola vez para
             // que no puedan divergir: una prueba que corre sobre una tubería distinta
             // de la de producción afirma menos de lo que parece.
-            void Tuberia<T>(IBusRegistrationContext contexto, IBusFactoryConfigurator<T> cfg)
+            //
+            // `excluirDeAutoConfigurar`: consumers cuyo receive endpoint YA se configuró
+            // a mano (issue #28 - PlanDeCargueGeneradoConsumer/CubicacionRechazadaConsumer,
+            // enganchados al exchange propio de Cubicador, no al de MassTransit por tipo).
+            // Sin excluirlos, ConfigureEndpoints intenta crearles OTRO endpoint con el
+            // mismo nombre por defecto y revienta con "A receive endpoint with the same
+            // key was already added" - se confirmó en runtime, no es una suposición.
+            void Tuberia<T>(IBusRegistrationContext contexto, IBusFactoryConfigurator<T> cfg, params Type[] excluirDeAutoConfigurar)
                 where T : IReceiveEndpointConfigurator
             {
                 // Registrar el planificador NO basta: el bus tiene que usarlo en su
@@ -184,7 +203,10 @@ public static class MensajeriaDependencyInjection
                         TimeSpan.FromSeconds(60));
                 });
 
-                cfg.ConfigureEndpoints(contexto);
+                if (excluirDeAutoConfigurar.Length == 0)
+                    cfg.ConfigureEndpoints(contexto);
+                else
+                    cfg.ConfigureEndpoints(contexto, f => f.Exclude(excluirDeAutoConfigurar));
             }
 
             // SIN BROKER CONFIGURADO, EL TRANSPORTE VA EN MEMORIA.
@@ -200,12 +222,52 @@ public static class MensajeriaDependencyInjection
             // eso lo impide la guarda de Program.cs, con el mismo criterio que la de
             // AzureAd.
             if (string.IsNullOrWhiteSpace(host))
-                x.UsingInMemory(Tuberia);
+                x.UsingInMemory((contexto, cfg) => Tuberia(contexto, cfg));
             else
                 x.UsingRabbitMq((contexto, cfg) =>
                 {
                     cfg.Host(new Uri(host));
-                    Tuberia(contexto, cfg);
+
+                    // Cubicador declara su propio exchange topic (`cubicador.eventos`) con
+                    // routing keys semánticas - no el exchange-por-tipo que MassTransit usa
+                    // por defecto. Se anula esa convención SOLO para estos 3 tipos, tanto
+                    // para publicar (CubicacionSolicitada) como para consumir (los otros 2):
+                    // el resto de la mensajería de NEXO sigue con la convención por defecto.
+                    // "topic" es un string plano (no un enum) a propósito: MassTransit
+                    // expone el tipo de exchange como string en su API de topología, sin
+                    // depender de RabbitMQ.Client directo - todo el puente usa solamente
+                    // las abstracciones de MassTransit, ninguna API de bajo nivel.
+                    cfg.Message<CubicacionSolicitada>(m => m.SetEntityName("cubicador.eventos"));
+                    cfg.Publish<CubicacionSolicitada>(p => p.ExchangeType = "topic");
+
+                    // Nombres con prefijo "Cubicacion." a propósito: el nombre de endpoint
+                    // por defecto de AlertaDeFalloConsumer<T> es el nombre del TIPO de
+                    // mensaje ("PlanDeCargueGenerado"/"CubicacionRechazada", no el de la
+                    // clase consumer) - sin el prefijo, colisiona con estos dos endpoints
+                    // manuales (mismo nombre, "A receive endpoint with the same key was
+                    // already added"), confirmado en runtime.
+                    cfg.ReceiveEndpoint("Cubicacion.PlanDeCargueGenerado", (IRabbitMqReceiveEndpointConfigurator e) =>
+                    {
+                        e.ConfigureConsumeTopology = false;
+                        e.Bind("cubicador.eventos", b =>
+                        {
+                            b.ExchangeType = "topic";
+                            b.RoutingKey = "plan-de-cargue.generado";
+                        });
+                        e.ConfigureConsumer<PlanDeCargueGeneradoConsumer>(contexto);
+                    });
+                    cfg.ReceiveEndpoint("Cubicacion.CubicacionRechazada", (IRabbitMqReceiveEndpointConfigurator e) =>
+                    {
+                        e.ConfigureConsumeTopology = false;
+                        e.Bind("cubicador.eventos", b =>
+                        {
+                            b.ExchangeType = "topic";
+                            b.RoutingKey = "cubicacion.rechazada";
+                        });
+                        e.ConfigureConsumer<CubicacionRechazadaConsumer>(contexto);
+                    });
+
+                    Tuberia(contexto, cfg, typeof(PlanDeCargueGeneradoConsumer), typeof(CubicacionRechazadaConsumer));
                 });
         });
 
@@ -223,6 +285,7 @@ public static class MensajeriaDependencyInjection
         services.AddScoped<MassTransitPublicador>();
         services.AddScoped<IPublicadorDeMensajes>(sp =>
             new PublicadorValidado(sp.GetRequiredService<MassTransitPublicador>(), sp));
+        services.AddScoped<ICubicacionPort, CubicacionPublicadorAdapter>();
 
         // Los validadores de cada mensaje. Se registran explícitamente en vez de
         // escanear el ensamblado: es una línea por mensaje y se lee de un vistazo qué
@@ -238,6 +301,7 @@ public static class MensajeriaDependencyInjection
         services.AddScoped<IValidadorDeMensaje<TarifasActualizadas>, TarifasActualizadasValidador>();
         services.AddScoped<IValidadorDeMensaje<RecostearLineaSolicitada>, RecostearLineaSolicitadaValidador>();
         services.AddScoped<IValidadorDeMensaje<TrabajoActualizado>, TrabajoActualizadoValidador>();
+        services.AddScoped<IValidadorDeMensaje<CubicacionSolicitada>, CubicacionSolicitadaValidador>();
         services.AddScoped<IValidadorDeMensaje<ArrancarPriorizacion>, ArrancarPriorizacionValidador>();
         services.AddScoped<IValidadorDeMensaje<TicDePriorizacion>, TicDePriorizacionValidador>();
         services.AddScoped<IValidadorDeMensaje<ParametrosDePriorizacionCambiaron>, ParametrosDePriorizacionCambiaronValidador>();

@@ -70,7 +70,7 @@ public class PlanCargue : IAuditable
     /// </summary>
     public int NumeroVehiculo { get; set; } = 1;
 
-    /// <summary>borrador | optimizado | ajustado</summary>
+    /// <summary>borrador | procesando | optimizado | ajustado | error</summary>
     [MaxLength(20)]
     public string Estado { get; set; } = "borrador";
 

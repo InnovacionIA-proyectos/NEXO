@@ -83,6 +83,15 @@ async def _ejecutar_solicitud(cuerpo: dict, planes: SqlPlanCargueRepository, veh
 
 async def _procesar(mensaje: aio_pika.IncomingMessage, publisher: RabbitMqEventosPublisher) -> None:
     cuerpo = json.loads(mensaje.body)
+    # Issue #28: NEXO publica CubicacionSolicitada con MassTransit real, que
+    # envuelve el payload real bajo la clave "message" (mas messageType, etc
+    # - ver NEXO/docs/mensajeria/CUBICACION.md #1/#4). Cubicador no necesita
+    # nada de MassTransit para si mismo (sus propios tests y su API siguen
+    # publicando el payload plano, sin sobre) - por eso el desenvuelto es
+    # opcional: si no hay "message", cuerpo queda igual que antes. Verificado
+    # en runtime contra un mensaje real de NEXO.
+    if isinstance(cuerpo, dict) and "message" in cuerpo and "messageType" in cuerpo:
+        cuerpo = cuerpo["message"]
     correlation_id = cuerpo["correlationId"]
     intentos_previos = int((mensaje.headers or {}).get("x-intentos", 0))
 
