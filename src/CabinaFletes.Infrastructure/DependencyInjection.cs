@@ -5,6 +5,7 @@ using CabinaFletes.Application.CasosDeUso.Cotizaciones.Interfaces;
 using CabinaFletes.Application.CasosDeUso.Metricas.Interfaces;
 using CabinaFletes.Application.CasosDeUso.ReglasSoloSicetac.Interfaces;
 using CabinaFletes.Application.CasosDeUso.ServiciosConexos.Interfaces;
+using CabinaFletes.Application.CasosDeUso.PlanDeCargue.Interfaces;
 using CabinaFletes.Application.CasosDeUso.Priorizacion.Interfaces;
 using CabinaFletes.Application.CasosDeUso.Solicitudes.Interfaces;
 using CabinaFletes.Application.CasosDeUso.TarifasGanadas.Interfaces;
@@ -28,6 +29,8 @@ using CabinaFletes.Infrastructure.ServiciosConexos.Repositorios;
 using CabinaFletes.Infrastructure.Solicitudes.Adaptadores;
 using CabinaFletes.Infrastructure.Priorizacion.Repositorios;
 using CabinaFletes.Infrastructure.Notificaciones.Adaptadores;
+using CabinaFletes.Infrastructure.PlanDeCargue.Adaptadores;
+using CabinaFletes.Infrastructure.PlanDeCargue.Repositorios;
 using CabinaFletes.Infrastructure.Solicitudes.Repositorios;
 using CabinaFletes.Infrastructure.TarifasGanadas.Repositorios;
 using CabinaFletes.Infrastructure.TarifasSicetacAdmin.Repositorios;
@@ -208,6 +211,12 @@ public static class DependencyInjection
 
         // Métricas (Tablero del Líder)
         services.AddScoped<IMetricasPort, MetricasAdapter>();
+
+        // Plan de cargue (S2-HU-08): orquestación por colas contra el motor Cubicador
+        // (ICubicacionPort lo registra AddMensajeria(), no este método) + compuerta de
+        // paridad (S2-HU-08.2, #30).
+        services.AddScoped<IPlanCargueRepository, EfPlanCargueRepository>();
+        services.AddScoped<IParidadCubicadorPort, ParidadCubicadorAdapter>();
 
         return services;
     }

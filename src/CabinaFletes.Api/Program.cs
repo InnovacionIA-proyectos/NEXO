@@ -10,9 +10,12 @@ using CabinaFletes.Api.Common.Auth;
 using CabinaFletes.Api.Common.Errors;
 using CabinaFletes.Api.Common.Middleware;
 using CabinaFletes.Api.Bandeja;
+using CabinaFletes.Api.PlanDeCargue;
 using CabinaFletes.Api.Priorizacion;
 using CabinaFletes.Api.Solicitudes;
 using CabinaFletes.Application.CasosDeUso.AjustesVigenciaPlaza;
+using CabinaFletes.Application.CasosDeUso.PlanDeCargue;
+using CabinaFletes.Application.CasosDeUso.PlanDeCargue.Interfaces;
 using CabinaFletes.Application.CasosDeUso.Biblioteca;
 using CabinaFletes.Application.CasosDeUso.BibliotecaSapHistorico;
 using CabinaFletes.Application.CasosDeUso.Cotizaciones;
@@ -70,6 +73,8 @@ builder.Services.AddCosteoUseCases();
 builder.Services.AddSignalR();
 builder.Services.AddScoped<INotificadorDeTrabajos, NotificadorSignalR>();
 builder.Services.AddScoped<INotificadorDeBandeja, NotificadorDeBandejaSignalR>();
+builder.Services.AddScoped<INotificadorDePlanCargue, NotificadorPlanCargueSignalR>();
+builder.Services.AddPlanDeCargueUseCases();
 builder.Services.AddCotizacionesUseCases();
 builder.Services.AddReglasSoloSicetacUseCases();
 builder.Services.AddAjustesVigenciaPlazaUseCases();
@@ -222,6 +227,11 @@ app.MapHub<TrabajosHub>("/hubs/trabajos");
 // publicado en el contrato como el canal del avance de UN trabajo, con un grupo por
 // trabajo. Meterle la bandeja dejaría el nombre mintiendo.
 app.MapHub<BandejaHub>("/hubs/bandeja");
+
+// Plan de cargue (S2-HU-08): aparte de /hubs/trabajos por la misma razón que la bandeja
+// — un plan de cargue no tiene líneas pendientes ni reintentos técnicos, forzar esa
+// forma dejaría el nombre mintiendo.
+app.MapHub<PlanCargueHub>("/hubs/plan-cargue");
 // /health responde JSON con el detalle por chequeo, no solo "Healthy"/"Unhealthy".
 //
 // El motivo es concreto: un 503 con el cuerpo en texto plano no dice QUÉ está caído.

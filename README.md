@@ -11,12 +11,13 @@ el ciclo completo de una cotización hasta su entrega al comercial.
 Este repositorio (`NEXO-Clean`) es la migración del backend original
 (`NEXO/`, que se conserva intacto como referencia) a una arquitectura
 Clean Architecture de cuatro capas. El alcance de la migración es
-exclusivamente el backend (`src/`); no incluye frontend. Cubicación 3D y
-Plan de Cargue quedaron fuera de alcance por decisión explícita: el plan es
-reemplazarlos por un microservicio Python aparte, y por eso siguen viviendo,
-sin cambios, en `NEXO/`. El detalle de cada módulo migrado y las decisiones
-de diseño tomadas está en [`MIGRACION.md`](MIGRACION.md); el trabajo
-pendiente y lo explícitamente excluido está en [`PENDIENTES.md`](PENDIENTES.md).
+exclusivamente el backend (`src/`); no incluye frontend. El Plan de Cargue
+(S2-HU-08) no se migró tal cual: se reemplazó por una integración por colas
+con Cubicador, un motor de cubicación 3D aparte (microservicio Python,
+carpeta `cubicador/` de este mismo repo) — ver sección 2. El detalle de cada
+módulo migrado y las decisiones de diseño tomadas está en
+[`MIGRACION.md`](MIGRACION.md); el trabajo pendiente está en
+[`PENDIENTES.md`](PENDIENTES.md).
 
 ## 2. Arquitectura
 
@@ -86,9 +87,7 @@ valor aquí con un handler por caso de uso.
 | Tarifas Ganadas | `/api/tarifas-historicas` | Biblioteca de Tarifas Ganadas: histórico LOCAL (tarifas ya cobradas en cotizaciones ganadas), sugerencias para el costeo y búsqueda con cortes de vigencia. |
 | Tarifas SICE-TAC Admin | `/api/tarifas-sicetac` | Caché LOCAL del piso SICE-TAC, cargada por import Excel administrativo (distinta de Biblioteca, que consulta el DW en vivo). |
 | Métricas | `/api/metricas` | KPIs del Tablero del Líder: cumplimiento de SLA, licitaciones perdidas, cola por estado. |
-
-Fuera de este repositorio (viven en `NEXO/`, no migrados a propósito):
-Cubicación 3D y Plan de Cargue.
+| Plan de Cargue | `/api/planes-cargue` | Orquestación async del motor Cubicador (S2-HU-08): pedir la optimización de un plan (202+id), avance por SignalR, consulta de respaldo. Cerrado por compuerta de paridad hasta que el motor confirme 26/26 en los golden tests — ver sección 3. |
 
 ## 3. Infraestructura
 
@@ -123,10 +122,14 @@ contenedor pueda completar ese handshake sin afectar al resto del sistema.
   contra la tabla `Usuarios` local (útil en Desarrollo); en
   `ASPNETCORE_ENVIRONMENT=Production` el arranque EXIGE la cadena real
   (falla rápido, fail-closed).
-- **Cubicador 3D** (microservicio Python, PENDIENTE): no implementado
-  todavía. `Cubicador3D__BaseUrl`/`Cubicador3D__ApiKey` están reservadas en
-  `.env.example` y `docker-compose.yml` para cuando exista, pero hoy ningún
-  puerto ni adapter las lee. Ver `PENDIENTES.md`.
+- **Cubicador** (microservicio Python, carpeta `cubicador/` de este mismo
+  repo, S2-HU-08): motor de cubicación 3D / plan de cargue. NEXO le habla
+  SOLO por colas (MassTransit sobre el mismo RabbitMQ de abajo) — sin URL
+  HTTP ni cliente propio, ver `docs/mensajeria/CUBICACION.md`. La función
+  queda cerrada por una compuerta de paridad
+  (`Cubicacion:ParidadVerificada`/`ParidadEvidencia`/`ParidadFecha`) hasta
+  que el motor confirme 26/26 en sus golden tests — ver `PENDIENTES.md`,
+  sección "Plan de cargue".
 
 ### Variables de entorno
 
@@ -134,11 +137,14 @@ Ver [`.env.example`](.env.example) para el listado completo y comentado.
 Resumen de las obligatorias para levantar la Api:
 
 - `ConnectionStrings__CabinaFletes` (o `MSSQL_SA_PASSWORD` si se usa Docker Compose).
-- Todo lo demás (DWs, SMTP, Cubicador 3D) es opcional: el sistema se
-  degrada, nunca se cae, si falta. La excepción es
-  `ConnectionStrings:IdentidadPortal`: opcional en Desarrollo/QA (cae al
-  adapter local), pero OBLIGATORIA en Producción — sin ella el arranque
-  falla (fail-closed, S2-HU-03.3).
+- Todo lo demás (DWs, SMTP) es opcional: el sistema se degrada, nunca se
+  cae, si falta. Dos excepciones:
+  - `ConnectionStrings:IdentidadPortal`: opcional en Desarrollo/QA (cae al
+    adapter local), pero OBLIGATORIA en Producción — sin ella el arranque
+    falla (fail-closed, S2-HU-03.3).
+  - `Cubicacion:ParidadVerificada`/`ParidadEvidencia`/`ParidadFecha`: no
+    rompen el arranque si faltan, pero sin las tres juntas la función de
+    plan de cargue responde 503 "en verificación" (S2-HU-08.2).
 
 ### Docker
 
@@ -146,8 +152,9 @@ Resumen de las obligatorias para levantar la Api:
   Core runtime), usuario sin privilegios, healthcheck vía `/health`.
 - `docker-compose.yml` (raíz): servicios `db` (SQL Server 2022) y `api`, más
   un perfil `seed` para sembrar datos de demostración en un solo comando.
-  No incluye frontend (fuera de alcance de este repositorio) ni el
-  Cubicador 3D (no implementado; queda un bloque comentado de ejemplo).
+  No incluye frontend (fuera de alcance de este repositorio). Cubicador
+  (`cubicador/`) tiene su propio `docker-compose.yml`, despliegue
+  independiente — solo comparte el broker `rabbit` de este stack.
 
 ### Integración con el portal de la Administración (S2-HU-02, issue #8)
 
@@ -382,6 +389,18 @@ Los errores siguen un formato uniforme (`ErrorHandlingMiddleware`):
 | Método | Ruta | Propósito |
 |---|---|---|
 | GET | `/cumplimiento` | KPIs de cumplimiento de SLA y cola por estado |
+
+### Plan de Cargue — `/api/planes-cargue` (S2-HU-08)
+
+| Método | Ruta | Rol | Propósito |
+|---|---|---|---|
+| POST | `/{id}/optimizar` | Comercial, CoordinadorFletes, Admin | Pide la optimización de un plan ya existente. `202` inmediato con `{planCargueId, estado, consultarEn}`; `503 CUBICACION_EN_VERIFICACION` si la compuerta de paridad está cerrada; `409` si el plan ya está procesando |
+| GET | `/{id}` | cualquiera autenticado | Consulta de respaldo: estado y resultado del plan |
+
+Avance por SignalR en `/hubs/plan-cargue` (`Suscribir`/`Desuscribir(planCargueId)`,
+evento `"avance"`). Solo re-optimiza un plan que ya existe (con sus ítems)
+en la base de Cubicador — el flujo "pedir un plan desde una línea de
+solicitud" queda pendiente, ver `PENDIENTES.md`.
 
 ## 8. Testing
 

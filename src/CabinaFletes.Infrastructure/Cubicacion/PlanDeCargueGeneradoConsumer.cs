@@ -1,7 +1,10 @@
+using CabinaFletes.Application.CasosDeUso.PlanDeCargue.DTOs;
+using CabinaFletes.Application.CasosDeUso.PlanDeCargue.Interfaces;
 using CabinaFletes.Infrastructure.Persistence;
 using CabinaFletes.Mensajes.Cubicacion;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace CabinaFletes.Infrastructure.Cubicacion;
 
@@ -18,7 +21,9 @@ namespace CabinaFletes.Infrastructure.Cubicacion;
 /// exchange-por-tipo que MassTransit crearía por defecto) se configura en el
 /// registro del bus, no aquí.
 /// </summary>
-public sealed class PlanDeCargueGeneradoConsumer(CabinaFletesDbContext db) : IConsumer<PlanDeCargueGenerado>
+public sealed class PlanDeCargueGeneradoConsumer(
+    CabinaFletesDbContext db, INotificadorDePlanCargue avisos, ILogger<PlanDeCargueGeneradoConsumer> log)
+    : IConsumer<PlanDeCargueGenerado>
 {
     public async Task Consume(ConsumeContext<PlanDeCargueGenerado> context)
     {
@@ -32,5 +37,21 @@ public sealed class PlanDeCargueGeneradoConsumer(CabinaFletesDbContext db) : ICo
         plan.Puntaje = mensaje.Resultado.Puntaje;
         plan.UpdatedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync(context.CancellationToken);
+
+        // Un fallo al avisar NO es un fallo del trabajo (S2-HU-08.1): la verdad sigue en
+        // GET /api/planes-cargue/{id}. Dejar que la excepción suba mandaría este mensaje
+        // — que ya cumplió su parte, el plan quedó guardado — a reintentos y DLQ por algo
+        // tan ajeno como un navegador desconectado. Mismo criterio que AvisarTrabajoConsumer.
+        try
+        {
+            await avisos.AvisarAsync(
+                new AvisoPlanCargueDto(plan.Id, plan.Estado, plan.Puntaje), context.CancellationToken);
+        }
+        catch (Exception ex)
+        {
+            log.LogWarning(ex,
+                "No se pudo avisar el desenlace del plan de cargue {PlanCargueId}. El plan ya quedó " +
+                "guardado; se puede consultar en /api/planes-cargue/{PlanCargueId}.", plan.Id, plan.Id);
+        }
     }
 }

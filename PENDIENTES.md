@@ -1,24 +1,53 @@
 # Pendientes de la migración
 
-## Estado: migración del backend COMPLETA (excepto Cubicación 3D, exclusión intencional)
+## Estado: migración del backend COMPLETA
 
 Todos los módulos de negocio de `NEXO/src` están migrados a
 `NEXO-Clean/src` con la arquitectura de 4 capas: Cotizaciones (piloto),
 ReglasSoloSicetac, AjustesVigenciaPlaza, Biblioteca (TarifarioSap +
 PropuestaTarifa + matriz SICE-TAC), Solicitudes/Captura (Bandeja Priorizada +
 auto-costeo + recálculo periódico), ServiciosConexos, TarifasGanadas
-(Biblioteca de Tarifas Ganadas), TarifasSicetacAdmin y Métricas. Ver
+(Biblioteca de Tarifas Ganadas), TarifasSicetacAdmin, Métricas y Plan de
+Cargue (S2-HU-08, orquestado por colas contra el motor Cubicador). Ver
 MIGRACION.md para el detalle de cada pasada y las decisiones de diseño.
 
-## Fuera de alcance (decisión explícita del usuario, no un pendiente)
+## Plan de cargue (S2-HU-08) — estado real, honesto
 
-- **Cubicación 3D** (`Api/Services/Cubicacion3D/*`) y **Plan de Cargue**
-  (`PlanCargueService.cs`, el backend que ORQUESTA el cubicador 3D) — el plan
-  es reemplazarlos por un microservicio Python. Quedan completos en `NEXO/`
-  sin tocar. El día que exista ese microservicio, la integración desde
-  Clean Architecture es un puerto nuevo en `Application` (p. ej.
-  `ICubicacion3DPort`) implementado por un adapter HTTP en `Infrastructure`,
-  sin tocar Api ni el resto de Application.
+El plan original (`Api/Services/Cubicacion3D/*` del `NEXO/` original,
+reemplazado por un adapter HTTP) se descartó a favor de una integración
+100% por colas contra el motor Cubicador (`cubicador/`, microservicio
+Python, mismo repo) — issue #28 (S2-HU-075) construyó el puente
+(`ICubicacionPort`, consumers, ver `docs/mensajeria/CUBICACION.md`) y las
+issues #29/#30 (S2-HU-08.1/08.2) lo conectaron a un flujo real: 202+id,
+avance por SignalR (`/hubs/plan-cargue`), consulta de respaldo
+(`GET /api/planes-cargue/{id}`) y la compuerta de paridad.
+
+**Encendido de la función de plan de cargue (S2-HU-08.2, #30)**: cerrada por
+defecto (`Cubicacion:ParidadVerificada=false`) — todo intento responde `503
+CUBICACION_EN_VERIFICACION`, sin ningún fallback. Kevin (@kcano-ux) es quien
+la enciende, y solo después de confirmar 26/26 en los golden tests de
+paridad de `cubicador-ci.yml` (S2-HU-07.3): configurar juntas
+`Cubicacion:ParidadVerificada=true`, `Cubicacion:ParidadEvidencia` (la corrida
+de CI concreta que confirmó 26/26 — URL o commit) y `Cubicacion:ParidadFecha`.
+Las tres son obligatorias a la vez (`Domain.PlanDeCargue.Reglas.
+CompuertaDeParidad`): `ParidadVerificada=true` sin las otras dos dejas la
+compuerta cerrada igual, a propósito — no es un booleano suelto.
+
+**Lo que SÍ falta, sin fecha todavía**:
+- **Solo soporta re-optimizar un plan que YA EXISTE** (con sus ítems) en la
+  base de Cubicador. El flujo "pedir un plan de cargue desde una línea de
+  solicitud" (`crear_desde_linea`, ver `cubicador/docs/CONTRATOS.md` sección
+  B) depende de un endpoint `GET /api/lineas-solicitud/{id}/cubicacion` que
+  Cubicador ya llama (`NexoLineaSolicitudClient`) pero que **NEXO todavía no
+  implementa** — y de datos de dimensiones/cantidad de bultos por línea que
+  hoy `LineaSolicitud` no captura. Es trabajo real, no trivial: requiere
+  decidir dónde vive esa captura antes de construir el endpoint.
+- El endpoint de arriba, cuando exista, es autenticación servicio-a-servicio
+  (`Authorization: Bearer NEXO_CALLBACK_API_KEY`), no la sesión del portal —
+  necesita su propio esquema de autenticación aparte de
+  `IdentidadPortalAuthenticationHandler` (S2-HU-03).
+- No hay ajuste manual de colocaciones expuesto todavía (existe en el
+  dominio — `ColocacionCargue.AjusteManual` — pero ningún caso de uso lo usa).
 
 ## Transversales (no bloqueantes, a decidir cuando haga falta)
 
