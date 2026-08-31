@@ -145,6 +145,8 @@ Característica: Identidad e integración con el portal de la Administración
 
   # ---------------------------------------------------- trabajos pesados
 
+  # Insumo real (S2-HU-04.7): tests/CabinaFletes.Domain.Tests/TestData/pliego-300-lineas.json
+  # (320 líneas) — ver tests/QA/hu-04.7-pliego-dataset-validacion-muestral/README.md
   @hu-04 @asincrono
   Escenario: Cargar un pliego responde de inmediato
     Dado un pliego de 300 líneas
@@ -161,6 +163,8 @@ Característica: Identidad e integración con el portal de la Administración
     Entonces obtiene el estado completo y el avance
     Y no necesitó ningún aviso para saberlo
 
+  # Insumo real (S2-HU-04.7): las 3 líneas fuenteCae=true (ids 318, 319, 320) del
+  # mismo pliego-300-lineas.json — ver tests/QA/hu-04.7-pliego-dataset-validacion-muestral/README.md
   @hu-04 @asincrono
   Escenario: Un pliego con líneas sin resolver termina en estado parcial
     Dado un pliego donde una fuente externa falla para 3 líneas
@@ -246,3 +250,30 @@ Característica: Identidad e integración con el portal de la Administración
     Cuando consulta la bandeja
     Entonces obtiene el orden correcto y completo
     Y no necesitó ningún aviso para saberlo
+
+  @hu-061 @notificacion
+  Escenario: El correo falla y la entrega no se afecta
+    Dado un relay de correo caído
+    Cuando se entrega una cotización
+    Entonces la respuesta es inmediata y la cotización queda Entregada
+    Y la notificación queda encolada para reintentarse
+
+  @hu-061 @notificacion
+  Escenario: Un rechazo sin arreglo no gasta reintentos
+    Dado un adjunto que pesa más de lo que el relay admite
+    Cuando el consumidor intenta enviar el correo
+    Entonces no se reintenta
+    Y el fallo queda en la cola de error al primer intento
+
+  @hu-061 @notificacion
+  Escenario: Un fallo pasajero se reintenta antes de alertar
+    Dado un relay de correo que no responde
+    Cuando el consumidor intenta enviar el correo
+    Entonces se reintenta de forma escalonada
+    Y solo al agotar los intentos el fallo queda en la cola de error
+
+  @hu-061 @notificacion
+  Escenario: El correo nunca se manda dentro de la petición de entrega
+    Dado el caso de uso que entrega la cotización
+    Cuando se revisan sus dependencias
+    Entonces no tiene ninguna salida de correo entre ellas

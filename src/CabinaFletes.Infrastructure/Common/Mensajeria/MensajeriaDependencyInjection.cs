@@ -5,6 +5,7 @@ using CabinaFletes.Application.CasosDeUso.Solicitudes.Interfaces;
 using CabinaFletes.Application.CasosDeUso.Costeo.Interfaces;
 using CabinaFletes.Infrastructure.Common.Mensajeria.Saga;
 using CabinaFletes.Infrastructure.Bandeja.Adaptadores;
+using CabinaFletes.Infrastructure.Notificaciones.Adaptadores;
 using CabinaFletes.Infrastructure.Costeo.Adaptadores;
 using CabinaFletes.Infrastructure.Costeo.Repositorios;
 using CabinaFletes.Infrastructure.Solicitudes.Adaptadores;
@@ -14,6 +15,7 @@ using CabinaFletes.Infrastructure.Trabajos.Adaptadores;
 using CabinaFletes.Infrastructure.Priorizacion.Adaptadores;
 using CabinaFletes.Infrastructure.Trabajos.Repositorios;
 using CabinaFletes.Mensajes.Bandeja;
+using CabinaFletes.Mensajes.Notificaciones;
 using CabinaFletes.Mensajes.Costeo;
 using CabinaFletes.Mensajes.Priorizacion;
 using CabinaFletes.Mensajes.Solicitudes;
@@ -74,6 +76,28 @@ public static class MensajeriaDependencyInjection
             // misma fuente y no pueden decir cosas distintas.
             x.AddConsumer<AvisarTrabajoConsumer>();
 
+            // Issue #13: alerta al equipo cuando un mensaje agota reintentos y cae a la
+            // cola de error (ver AlertaDeFalloConsumer<T>). MassTransit 8.5 no tiene forma
+            // de registrar un Fault<T> genérico abierto contra IRegistrationConfigurator
+            // (AddConsumer(Type) solo acepta tipos CERRADOS, se verificó por reflexión y
+            // se confirmó en runtime: revienta con "Type.ContainsGenericParameters is
+            // true"), así que toca una línea por tipo de mensaje - igual que los
+            // validadores de abajo. Si se agrega un mensaje nuevo y se olvida esta lista,
+            // ese mensaje simplemente no genera alerta (sin excepción, sin romper nada) -
+            // por eso el criterio de cierre de la #13 debe verificar esto explícitamente,
+            // no asumir que es automático.
+            x.AddConsumer<AlertaDeFalloConsumer<AutoCosteoSolicitado>>();
+            x.AddConsumer<AlertaDeFalloConsumer<RepartirLineasDeCosteo>>();
+            x.AddConsumer<AlertaDeFalloConsumer<PliegoRepartido>>();
+            x.AddConsumer<AlertaDeFalloConsumer<CostearLineaSolicitada>>();
+            x.AddConsumer<AlertaDeFalloConsumer<LineaCosteada>>();
+            x.AddConsumer<AlertaDeFalloConsumer<LineaFalloTecnico>>();
+            x.AddConsumer<AlertaDeFalloConsumer<LineaRequiereTarifaManual>>();
+            x.AddConsumer<AlertaDeFalloConsumer<TarifasActualizadas>>();
+            x.AddConsumer<AlertaDeFalloConsumer<RecostearLineaSolicitada>>();
+            x.AddConsumer<AlertaDeFalloConsumer<TrabajoActualizado>>();
+            x.AddConsumer<AlertaDeFalloConsumer<ExpiracionAutoCosteo>>();
+
 
             // Refresca el score persistido de las activas cuando la cadena de
             // priorización lo pide. La excepción sube: si esto deja de correr, los
@@ -83,6 +107,10 @@ public static class MensajeriaDependencyInjection
             // Empuja a quien tenga la bandeja abierta que vuelva a consultarla. El fallo
             // se registra y se sigue: que alguien cierre una pestaña no es una avería.
             x.AddConsumer<AvisarBandejaConsumer>();
+
+            // Manda el correo de una cotización entregada. La excepción sube: una
+            // notificación perdida no se recupera consultando nada y nadie se enteraría.
+            x.AddConsumer<NotificarEntregaConsumer>();
 
             // La saga se persiste en la misma base que los datos del negocio. Su estado
             // ES la respuesta al cliente que preguntó por su trabajo, así que un
@@ -140,11 +168,21 @@ public static class MensajeriaDependencyInjection
                 // fuente externa no debe tumbar el mensaje al primer intento. Agotados
                 // los intentos, MassTransit lo lleva a la cola de error (DLQ), que es
                 // donde la #13 conectará la alerta al equipo.
-                cfg.UseMessageRetry(r => r.Intervals(
-                    TimeSpan.FromSeconds(1),
-                    TimeSpan.FromSeconds(5),
-                    TimeSpan.FromSeconds(15),
-                    TimeSpan.FromSeconds(60)));
+                cfg.UseMessageRetry(r =>
+                {
+                    // NO SE REINTENTA LO QUE NO TIENE ARREGLO. Un adjunto que pesa más de
+                    // lo permitido, o un correo que el relay rechaza por su forma, va a
+                    // fallar igual las cuatro veces: reintentarlo solo retrasa la alerta
+                    // hasta un minuto y medio. Marcado así, va derecho a la cola de error
+                    // y el equipo se entera al primer intento.
+                    r.Ignore<CorreoRechazadoException>();
+
+                    r.Intervals(
+                        TimeSpan.FromSeconds(1),
+                        TimeSpan.FromSeconds(5),
+                        TimeSpan.FromSeconds(15),
+                        TimeSpan.FromSeconds(60));
+                });
 
                 cfg.ConfigureEndpoints(contexto);
             }
@@ -205,6 +243,7 @@ public static class MensajeriaDependencyInjection
         services.AddScoped<IValidadorDeMensaje<ParametrosDePriorizacionCambiaron>, ParametrosDePriorizacionCambiaronValidador>();
         services.AddScoped<IValidadorDeMensaje<RecalcularScoresSolicitado>, RecalcularScoresSolicitadoValidador>();
         services.AddScoped<IValidadorDeMensaje<BandejaCambio>, BandejaCambioValidador>();
+        services.AddScoped<IValidadorDeMensaje<CotizacionEntregada>, CotizacionEntregadaValidador>();
 
         return services;
     }
