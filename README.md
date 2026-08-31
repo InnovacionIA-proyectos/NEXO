@@ -150,6 +150,41 @@ Resumen de las obligatorias para levantar la Api:
   No incluye frontend (fuera de alcance de este repositorio) ni el
   Cubicador 3D (no implementado; queda un bloque comentado de ejemplo).
 
+### Integración con el portal de la Administración (S2-HU-02, issue #8)
+
+Nexo se consume como un módulo más del portal, pero **no comparte dominio ni
+despliegue con él**: mantiene su propia URL base y el módulo `cabina-fletes`
+del portal la llama por HTTP, cross-origin. El contrato completo (identidad,
+roles, trabajos pesados, avisos, errores) vive en
+[`docs/contrato-integracion/`](docs/contrato-integracion/README.md) y ese
+documento manda sobre cualquier otra descripción, incluida esta.
+
+- **Prefijo/base path**: toda la API cuelga de `/api` (cada controller fija
+  su propia ruta con `[Route("api/...")]`), igual que declara
+  `docs/contrato-integracion/openapi.yaml` (`servers: - url: /api`). No hace
+  falta un `PathBase` ni un proxy inverso: el portal llama a la URL propia de
+  Nexo directamente, no a una ruta montada bajo el dominio del portal.
+- **CORS**: `Cors:OrigenesPermitidos` (env `Cors__OrigenesPermitidos`, o
+  `ORIGENES_PERMITIDOS_CORS` en Docker Compose) acepta una lista separada por
+  coma. Debe incluir el origen exacto (esquema + dominio + puerto) de cada
+  ambiente del portal que vaya a consumir la API — QA y Producción tienen
+  dominios distintos — además del frontend standalone de desarrollo. Sin el
+  origen exacto en la lista, el navegador bloquea la respuesta aunque la API
+  responda `200`; `tests/CabinaFletes.Api.Tests/CorsTests.cs` verifica el
+  mecanismo (un origen de la lista recibe `Access-Control-Allow-Origin`, uno
+  fuera de ella no).
+- **Healthcheck**: `/health` (sección 2, ya documentado) es público
+  (`AllowAnonymous`) y responde JSON con el detalle por chequeo. Es el mismo
+  endpoint que usa el healthcheck de Docker Compose; el orquestador de
+  despliegue del portal puede sondear la misma ruta.
+- **Identidad**: la resolución de la sesión contra la tabla de usuarios de la
+  administración (`GET /api/sesion/actual`, encabezado
+  `X-Portal-Usuario-Id`) es el alcance de las issues #9/#10/#11 del mismo
+  milestone, no de esta — hoy el backend sigue autenticando con Azure AD/JWT
+  (o el esquema de desarrollo sin Azure AD configurado). Ver
+  `docs/contrato-integracion/README.md` sección 1 y `ADR-001` para el diseño
+  ya acordado.
+
 ## 4. Flujo del sistema
 
 ### Flujo principal: de la solicitud a la cotización entregada
