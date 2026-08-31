@@ -97,6 +97,13 @@ SQL Server. `CabinaFletesDbContext` (EF Core 10) es la única fuente de
 escritura; las migraciones ya versionadas viven en
 `src/CabinaFletes.Infrastructure/Persistence/Migrations`.
 
+**Set de datos para el equipo de datos** (S2-HU-10, `#35`): el esquema
+`analitica` tiene vistas de solo lectura (`WITH (NOLOCK)`, sin interferir
+con la operación) sobre cotizaciones, líneas, resultados, tarifas ganadas
+archivadas y auditoría — más `analitica.inconsistencias`, que documenta
+registros con datos irregulares en vez de descartarlos. Diccionario completo
+en [`docs/analitica/DICCIONARIO_DATOS.md`](docs/analitica/DICCIONARIO_DATOS.md).
+
 ### Data Warehouses corporativos (solo lectura, todos opcionales)
 
 | Cadena | Fuente | Usada por | Si no está configurada |
