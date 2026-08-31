@@ -187,6 +187,24 @@ Característica: Identidad e integración con el portal de la Administración
     Entonces obtiene el estado actual y su secuencia
     Y desde ahí descarta los avisos con secuencia menor o igual
 
+  # ------------------------------------------------- fuentes de tarifa provisionales
+
+  # Insumo real (S2-HU-09.2, issue #32):
+  # docs/tarifas-plaza-provisionales/dataset-tarifas-plaza-provisionales.{json,xlsx}
+  # (210 filas: 150 de núcleo + 60 de casos borde, extraídas de dbSolucionesTI —
+  # ver el README de esa carpeta para el origen documentado y el acta de
+  # aprobación). El mecanismo que hace que ReglaDeCosteo/PropuestaTarifaAdapter
+  # lean de esta fuente todavía no existe — depende de la issue #33.
+  @hu-09 @issue-32 @pendiente-issue-33
+  Escenario: Propuesta calculada con datos de plaza provisionales realistas
+    Dado un dataset de tarifas de plaza provisionales validado por negocio,
+      con rutas frecuentes, valores reales y casos borde documentados
+      (sin plaza, vigencia vencida, valores extremos)
+    Cuando el motor de costeo propone una línea usando ese dataset como fuente
+    Entonces la propuesta sigue la regla del mayor y nunca queda por debajo del piso
+    Y la fuente de la propuesta queda trazada como "provisional"
+    Y una línea sobre una ruta marcada "sin plaza" en el dataset no propone nada solo
+      con esa fuente, igual que si no hubiera plaza real
   @hu-051 @priorizacion
   Escenario: La bandeja se reordena al recalcular el puntaje por paso del tiempo
     Dado un trabajo de recálculo programado en el broker
