@@ -45,13 +45,14 @@ public sealed class PropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuestaDeL
     private readonly TimeProvider _clock;
     private readonly IAjustesVigenciaPlazaRepository _ajustes;
     private readonly IClavesSoloSicetacPort _reglas;
+    private readonly ISapTarifaFleteEnVivoPort _sapEnVivo;
     private readonly bool _dwConfigurado;
     private readonly bool _dcConfigurado;
 
     public PropuestaTarifaAdapter(
         CabinaFletesDbContext db, IServiceProvider sp, IServiceScopeFactory scopes,
         IMemoryCache cache, TimeProvider clock, IAjustesVigenciaPlazaRepository ajustes,
-        IClavesSoloSicetacPort reglas)
+        IClavesSoloSicetacPort reglas, ISapTarifaFleteEnVivoPort sapEnVivo)
     {
         _db = db;
         _scopes = scopes;
@@ -61,6 +62,7 @@ public sealed class PropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuestaDeL
         _clock = clock;
         _ajustes = ajustes;
         _reglas = reglas;
+        _sapEnVivo = sapEnVivo;
     }
 
     /// <summary>
@@ -194,6 +196,29 @@ public sealed class PropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuestaDeL
             plaza = dc is null ? null : await CandidatoSapAsync(dc, dc.TarifasPlazaSap, "plaza", origen, destino, vehiculo, linea.Peso, soloVigentes: true, ajustesVigencia, ct);
         }
         var historico = dc is null ? null : await CandidatoSapAsync(dc, dc.TarifasLogSap, "historico_sap", origen, destino, vehiculo, linea.Peso, soloVigentes: false, ajustesVigencia, ct);
+
+        // S2-HU-09.1/09.3 (#31/#33): conexión SAP NUEVA (plaza en vivo), todavía no
+        // construida por "el equipo de conexiones". Con SapTarifaFleteEnVivo:Modo en
+        // Deshabilitado (default) o Real-sin-adaptador-todavía, _sapEnVivo.Configurado
+        // es false y esta rama nunca corre — la ruta de arriba (dc.TarifasPlazaSap, la
+        // fuente REAL) queda exactamente igual que antes de esta HU. Solo con
+        // Modo=Mock (u, en el futuro, un adaptador real) se sustituye la plaza — nunca
+        // el piso SICE-TAC ni el histórico, y "vencida" no aplica a una consulta en
+        // vivo (su propio contrato: la respuesta siempre es la vigente ahora).
+        if (_sapEnVivo.Configurado)
+        {
+            var enVivo = await _sapEnVivo.ConsultarPlazaAsync(new ConsultaTarifarioSap(
+                linea.Ruta.Origen, linea.Ruta.Destino,
+                linea.LineaNegocio, linea.ClaseViaje, linea.ClaseContenedor,
+                vehiculo, linea.ConfiguracionVehiculo?.Carroceria,
+                linea.Peso, linea.Exclusivo, linea.Consolidado,
+                linea.RetornaContenedor, linea.CiudadDevolucionContenedor), ct);
+            if (enVivo is not null)
+            {
+                plaza = enVivo;
+                vencida = false;
+            }
+        }
 
         var decision = ReglaDeCosteo.DecidirConTarifario(
             ADominio(sicetac), ADominio(plaza), ADominio(historico), vencida);

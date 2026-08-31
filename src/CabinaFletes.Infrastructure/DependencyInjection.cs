@@ -178,6 +178,17 @@ public static class DependencyInjection
         // "Aplicar propuestas" en Cotizaciones) + matriz SICE-TAC de solo lectura.
         services.AddScoped<ITarifarioSapPort, TarifarioSapAdapter>();
         services.AddScoped<IPropuestaTarifaPort, PropuestaTarifaAdapter>();
+
+        // S2-HU-09 (#31/#33): conexión SAP nueva (plaza en vivo), todavía inexistente.
+        // "Deshabilitado" (default) y "Real" (sin adaptador real todavía) resuelven al
+        // MISMO adaptador que nunca produce candidato — las fuentes de lectura reales
+        // que hoy operan (DwSice, DwCubos, DbSolucionesTi) no se tocan. Sin conmutar
+        // código, solo config: SapTarifaFleteEnVivo:Modo.
+        var modoSapEnVivo = config["SapTarifaFleteEnVivo:Modo"];
+        if (string.Equals(modoSapEnVivo, "Mock", StringComparison.OrdinalIgnoreCase))
+            services.AddScoped<ISapTarifaFleteEnVivoPort, SapTarifaFleteEnVivoMockAdapter>();
+        else
+            services.AddScoped<ISapTarifaFleteEnVivoPort, SapTarifaFleteEnVivoDeshabilitadoAdapter>();
         if (dwSiceConfigurado)
             services.AddScoped<IBibliotecaSicetacPort, BibliotecaSicetacAdapter>();
         else
