@@ -40,8 +40,10 @@ using Microsoft.EntityFrameworkCore;
 // Solicitudes/Captura (Bandeja Priorizada, alta spot/licitación, auto-costeo),
 // ServiciosConexos (catálogo administrado), TarifasGanadas (Biblioteca de
 // tarifas ganadas), TarifasSicetacAdmin (caché local + import Excel) y Métricas
-// (Tablero del Líder). Cubicación 3D y Plan de Cargue quedan fuera de alcance
-// por decisión explícita (microservicio Python aparte) — ver PENDIENTES.md.
+// (Tablero del Líder). Cubicación 3D y Plan de Cargue son un microservicio
+// Python aparte (carpeta cubicador/ de este mismo repo) — NEXO no reimplementa
+// el motor, solo le pide trabajos y recibe resultados por cola vía MassTransit
+// (issue #28, S2-HU-075, ver AddMensajeria() y docs/mensajeria/CUBICACION.md).
 // -----------------------------------------------------------------------------
 
 var builder = WebApplication.CreateBuilder(args);
