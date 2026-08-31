@@ -39,6 +39,7 @@ RUN dotnet restore "CabinaFletes.Clean.sln"
 # El código fuente. El restore ya quedó resuelto en la capa anterior.
 COPY src/   src/
 COPY tests/ tests/
+COPY docs/  docs/
 
 # El build va como comando del contenedor y no como RUN a propósito. Si fuera
 # parte de la construcción de la imagen, un error de compilación abortaría el
