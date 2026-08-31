@@ -1,9 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "PowerShell(Get-Command sqlcmd -ErrorAction SilentlyContinue)",
-      "PowerShell(Get-Command bcp -ErrorAction SilentlyContinue)",
-      "PowerShell(sqlcmd -S tbsdatacenter -d dbSolucionesTI -E -C -Q \"SELECT TOP 3 name FROM sys.tables WHERE name IN \\('tblSAPTarifas','tblSAPTarifasLog'\\)\" -l 10)"
-    ]
-  }
-}
