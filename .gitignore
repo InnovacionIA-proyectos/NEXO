@@ -18,6 +18,9 @@ appsettings.*.local.json
 .env.*
 !.env.example
 
+# Configuración local de Claude Code (permisos, hosts internos) — no versionar
+.claude/settings.json
+
 # Logs y temporales
 *.log
 *.tmp
