@@ -2,8 +2,10 @@
 
 Extracción **puntual** (una sola vez, no sincronización) desde los 4 data warehouses
 de solo lectura de la compañía, para dar contexto de mercado al histórico propio de
-CabinaFletes (el otro lado de este cruce es `docs/analitica/DICCIONARIO_DATOS.md`,
-S2-HU-10.1 / issue #35). El EDA de S2-HU-11 se hace sobre ambos sets.
+CabinaFletes (el otro lado de este cruce es
+`../bd-propia/DICCIONARIO_DATOS.md`, S2-HU-10.1 / issue #35). El EDA de
+S2-HU-11 se hace sobre ambos sets. El set final que une ambos lados vive en
+`../../01-set-final/`.
 
 **Qué es esto y qué NO es:** al igual que su HU hermana, esto es una foto única,
 cruda y documentada — no un DW ni un cubo propio, y no impone grano ni variable
@@ -29,13 +31,13 @@ Formato: CSV, separador `,`, codificación UTF-8 con BOM (`sqlcmd -f o:65001`).
 | `ID` | Identificador de la fila en origen, para verificarla contra la tabla real si hace falta |
 | `PERIODO` | Mes de vigencia de la matriz (`AAAAMM`) — en este extracto siempre `202608` |
 | `CONFIGURACION` | Configuración de ejes del vehículo (ej. `CA`, `3S3`, `2_5`) — una de las causas de que una misma ruta tenga múltiples valores |
-| `VALOR` | El piso regulatorio en pesos, el dato central de esta fuente |
+| `VALOR` | Componente base del piso, sin el ajuste por hora — **no es el valor que efectivamente se cotiza** |
 | `NOMBRERUTA` | Texto libre `"ORIGEN - DESTINO"`, tal como lo usa el motor de matching por `LIKE` |
 | `NOMBRETIPOCARGA` | Tipo de carga (Sin carga, Granel Sólido, General, Carga Refrigerada, Contenedor cargado/vacío, Granel líquido) |
 | `NOMBREUNIDADTRANSPORTE` | Unidad de transporte (Estibas, Furgón, Estacas, Plataforma, Furgón refrigerado, Volco, Portacontenedores, Tanque) |
 | `ORIGEN` / `DESTINO` | Código de municipio DANE de origen y destino |
 | `VALORHORA` | Componente del valor que se cobra por hora de recorrido (0 cuando la tarifa es fija) |
-| `VALORSICECONHORA` | Valor total ya incluyendo el componente por hora |
+| `VALORSICECONHORA` | **El valor que efectivamente se cotiza** — `VALOR` + el componente por hora. Verificado en S2-HU-10.3 cruzando cotizaciones reales: el motor usa este campo, no `VALOR` |
 | `HORASRECORRIDO` / `HORASPACTADAS` | Horas reales estimadas de viaje vs. horas pactadas contractualmente |
 | `CONDICIONCARGA` | `CARGADO` o `VACIO` |
 | `VIAESTANDAR` | Si la vía es estándar (`SI`) o no (`NO`) — afecta el valor |
@@ -121,7 +123,7 @@ más de 100 MB. Se extrajo en su lugar una **muestra representativa de 151 filas
 
 No se encontraron rutas en bucle (`ORIGEN=DESTINO`), valores nulos/en cero, ni
 horas en cero en la tabla completa — a diferencia de `tblSAPTarifas` (ver
-`docs/tarifas-plaza-provisionales/README.md`), esta tabla no tiene ese tipo de
+`../../../docs/tarifas-plaza-provisionales/README.md`), esta tabla no tiene ese tipo de
 suciedad.
 
 ## `tblSAPTarifas` y `tblSAPTarifasLog` — completas, no muestreadas
@@ -137,7 +139,7 @@ aplicar la corrección local** `AjusteVigenciaPlaza` (mecanismo de CabinaFletes 
 sobre-escribe vigencias puntuales conocidas como mal cargadas). Decisión explícita
 del negocio: quien consuma este extracto debe saber que algunas vigencias aquí
 pueden estar mal cargadas en el origen (SAP), tal como se documentó en
-`docs/tarifas-plaza-provisionales/README.md` (95,8% de `tblSAPTarifas` completa
+`../../../docs/tarifas-plaza-provisionales/README.md` (95,8% de `tblSAPTarifas` completa
 está vencida a la fecha de hoy).
 
 **Pendiente de confirmar con negocio** (no se pudo resolver solo con el código):
@@ -162,7 +164,7 @@ natural — en su mayoría conductores/contactos individuales, sin valor como
 | Dimensión | Cómo cruza | Confiabilidad |
 |---|---|---|
 | **Cliente** | `BUT000.TAXNUM` (NIT) ↔ NIT del catálogo `analitica.clientes` (S2-HU-10.1) | Alta — mismo dato (NIT), sin normalización necesaria |
-| **Vehículo/servicio** | `tblSAPTarifas.LINEANEGOCIO` / `CLASEVIAJE` / `CLASECONTENEDOR` ↔ los mismos campos en `analitica.lineas_solicitud` | Alta — esos campos en CabinaFletes ya se capturan como "catálogo replicado de SAP TM" (confirmado en `docs/analitica/DICCIONARIO_DATOS.md`), son los mismos códigos |
+| **Vehículo/servicio** | `tblSAPTarifas.LINEANEGOCIO` / `CLASEVIAJE` / `CLASECONTENEDOR` ↔ los mismos campos en `analitica.lineas_solicitud` | Alta — esos campos en CabinaFletes ya se capturan como "catálogo replicado de SAP TM" (confirmado en `../bd-propia/DICCIONARIO_DATOS.md`), son los mismos códigos |
 | **Ruta** | `tblSAPTarifas.ORIGEN`/`DESTINO` usa código DANE o texto de zona (`ZC_`/`ZTC_`); `tblRutasSicetac.NOMBRERUTA` es texto libre `"ORIGEN - DESTINO"`; `analitica.rutas` (propio) también es texto libre sin código DANE | Media — no hay atajo: cualquier cruce de ruta necesita la misma normalización de nombre de municipio → código DANE que ya usa `TarifarioSapAdapter.CodigosDaneAsync` en el motor de producción. No se replicó esa lógica aquí (decisión: extraer crudo, documentar, dejar el cruce al EDA) |
 | **Período** | `tblSAPTarifas`/`tblSAPTarifasLog.VIGENCIA` (fecha) vs `tblRutasSicetac.PERIODO` (entero `AAAAMM`, un solo valor: `202608`) vs fechas de `analitica.cotizaciones`/`analitica.tarifas_historicas` | Alta para SAP (fecha real comparable). Limitada para SICE-TAC: solo se puede cruzar contra situaciones de **agosto 2026** exactamente, no contra períodos anteriores |
 

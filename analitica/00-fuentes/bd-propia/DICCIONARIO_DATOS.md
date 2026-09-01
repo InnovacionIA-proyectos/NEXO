@@ -2,7 +2,7 @@
 
 Este documento describe las vistas de solo lectura del esquema `analitica`,
 creadas por la migración
-[`20260831194721_VistasAnaliticaSoloLectura`](../../src/CabinaFletes.Infrastructure/Persistence/Migrations/20260831194721_VistasAnaliticaSoloLectura.cs)
+[`20260831194721_VistasAnaliticaSoloLectura`](../../../src/CabinaFletes.Infrastructure/Persistence/Migrations/20260831194721_VistasAnaliticaSoloLectura.cs)
 sobre la base transaccional `CabinaFletes`.
 
 ## 1. Qué es esto y qué NO es
