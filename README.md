@@ -102,7 +102,7 @@ escritura; las migraciones ya versionadas viven en
 con la operación) sobre cotizaciones, líneas, resultados, tarifas ganadas
 archivadas y auditoría — más `analitica.inconsistencias`, que documenta
 registros con datos irregulares en vez de descartarlos. Diccionario completo
-en [`docs/analitica/DICCIONARIO_DATOS.md`](docs/analitica/DICCIONARIO_DATOS.md).
+en [`analitica/00-fuentes/bd-propia/DICCIONARIO_DATOS.md`](analitica/00-fuentes/bd-propia/DICCIONARIO_DATOS.md).
 
 ### Data Warehouses corporativos (solo lectura, todos opcionales)
 

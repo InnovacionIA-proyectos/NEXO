@@ -17,7 +17,9 @@ Verificación hecha antes de aprobar/mergear. Merge real contra `origin/QA`
   de datos documentadas (UNION ALL), pensada para que el equipo de datos
   detecte registros operativos inválidos sin tocar el negocio.
 - `docs/analitica/DICCIONARIO_DATOS.md`: diccionario de los 13 objetos, con
-  columnas, tipo y exclusiones justificadas.
+  columnas, tipo y exclusiones justificadas. (Reubicado en S2-HU-10.3 a
+  `analitica/00-fuentes/bd-propia/DICCIONARIO_DATOS.md` — esta referencia
+  queda como estaba al momento de esta verificación.)
 
 Todo el PR es SQL/documentación — no toca código C# de la aplicación.
 
