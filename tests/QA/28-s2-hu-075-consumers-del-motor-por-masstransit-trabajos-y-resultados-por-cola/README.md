@@ -170,3 +170,66 @@ por la misma cola durante la verificación.
   pruebas de `ContratoCubicacionTests` (rápidas, sin infraestructura) del
   lado NEXO, y las 70 de Cubicador (incluida la compatibilidad de envelope,
   cubierta indirectamente por `ci_docker_smoke.py`) del otro lado.
+
+## 7. Verificación QA independiente (Kevin Cano, situado en esta rama antes de aprobar el PR #73)
+
+Reproducido de cero, no solo leído — con los dos stacks reales corriendo a la vez
+(NEXO: `db`+`rabbit`+`api`; Cubicador: `db`+`api`+`worker`, conectado al mismo
+`rabbit`) y el publicador MassTransit de esta misma carpeta
+([`Program.cs`](Program.cs)/[`Publisher.csproj`](Publisher.csproj)), que respeta la
+misma topología manual que registra `MensajeriaDependencyInjection.cs` — sin eso el
+mensaje "se publica" pero no le llega a nadie (topic exchange sin bind que matchee,
+sin error, el mismo hallazgo #2 del autor).
+
+**Cómo reproducir** (con ambos stacks arriba, `rabbit` compartido por
+`nexo_internal`):
+```bash
+# 1) Feliz: crear plan+ítem en Cubicador (POST /api/planes-cargue, /{id}/items) y su
+#    espejo en NEXO (INSERT directo en planes_cargue/vehiculos_cubicacion — hoy no
+#    existe ningún endpoint que lo haga por REST, ver sección 6).
+docker run --rm --network nexo_internal \
+  -e RABBIT_HOST=rabbit -e RABBIT_USER=<user> -e RABBIT_PASS=<pass> \
+  -v "$PWD:/src" -w /src/tests/QA/28-s2-hu-075-consumers-del-motor-por-masstransit-trabajos-y-resultados-por-cola \
+  mcr.microsoft.com/dotnet/sdk:10.0 dotnet run -- solicitar <planId>
+
+# 2) Reintentos+DLQ+alerta: mismo publicador, modo "fault", sobre un plan que YA
+#    exista en NEXO (con uno inexistente no pasa nada — el propio consumer hace
+#    `if (plan is null) return`, a propósito).
+docker run --rm --network nexo_internal \
+  -e RABBIT_HOST=rabbit -e RABBIT_USER=<user> -e RABBIT_PASS=<pass> \
+  -v "$PWD:/src" -w /src/tests/QA/28-s2-hu-075-consumers-del-motor-por-masstransit-trabajos-y-resultados-por-cola \
+  mcr.microsoft.com/dotnet/sdk:10.0 dotnet run -- fault <planId-existente>
+
+# 3) Carga: "solicitar" admite varios planId a la vez, publicados concurrentemente.
+```
+
+**Regresión:** build 0 errores, `dotnet test` completo **Domain 103/103, Application
+113/113, Api.Tests 92/92** (+2 saltadas por diseño) — coincide con las 3 nuevas de
+`ContratoCubicacionTests` sumadas al total ya acumulado de sesiones anteriores. Cero
+regresiones.
+
+**Flujo feliz, reproducido con datos propios (no los del autor):** creé un plan +
+ítem en Cubicador por su API REST, su espejo en NEXO por SQL directo, y publiqué
+`CubicacionSolicitada` con la topología correcta. Resultado: **`estado=optimizado,
+puntaje=75.10`** — un resultado real del motor (distinto al `75.00` del autor porque
+usé datos de prueba distintos), confirmando que es una optimización real y no una
+respuesta fija.
+
+**Reintentos + DLQ + alerta, reproducido con un fallo propio:** publiqué un
+`PlanDeCargueGenerado` con `Resultado=null` sobre un plan que sí existe en NEXO (mi
+primer intento, con un plan inexistente, no disparó nada — confirma además el
+`if (plan is null) return` documentado por el autor). Resultado exacto al de la
+sección 4: `R-RETRY` → `R-FAULT` a los **85 s** (coincide con 1s+5s+15s+60s), **1
+correo con los 6 destinatarios** (consolidado, gracias al ajuste que le hice a
+`AlertaDeFalloConsumer<T>` en el PR #71), **1 mensaje en `Cubicacion.
+PlanDeCargueGenerado_error`**.
+
+**Carga y estrés — cobertura nueva, no incluida por el autor:** 5 solicitudes de
+cubicación concurrentes (planes distintos, mismo lote de publicación) → **las 5
+terminaron `optimizado`**, sin pérdidas ni cruces entre planes, colas en 0 mensajes
+después, ambos `/health` sanos.
+
+**Conclusión:** los 3 hallazgos reales del autor (disciplina del Outbox, routing key
+explícito, colisión de nombres de endpoint) están todos vigentes en el código
+mergeado y el puente funciona de punta a punta, verificado con datos y ejecuciones
+propias. Sin objeciones para mergear.
