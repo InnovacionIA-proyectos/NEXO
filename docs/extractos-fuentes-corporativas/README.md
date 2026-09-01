@@ -20,14 +20,78 @@ objetivo. Esas decisiones son del EDA (S2-HU-11).
 
 Formato: CSV, separador `,`, codificación UTF-8 con BOM (`sqlcmd -f o:65001`).
 
+## Qué trae cada archivo (columnas y para qué sirven)
+
+### `piso-sicetac-tblRutasSicetac-muestra-202608.csv`
+
+| Columna | Para qué sirve |
+|---|---|
+| `ID` | Identificador de la fila en origen, para verificarla contra la tabla real si hace falta |
+| `PERIODO` | Mes de vigencia de la matriz (`AAAAMM`) — en este extracto siempre `202608` |
+| `CONFIGURACION` | Configuración de ejes del vehículo (ej. `CA`, `3S3`, `2_5`) — una de las causas de que una misma ruta tenga múltiples valores |
+| `VALOR` | El piso regulatorio en pesos, el dato central de esta fuente |
+| `NOMBRERUTA` | Texto libre `"ORIGEN - DESTINO"`, tal como lo usa el motor de matching por `LIKE` |
+| `NOMBRETIPOCARGA` | Tipo de carga (Sin carga, Granel Sólido, General, Carga Refrigerada, Contenedor cargado/vacío, Granel líquido) |
+| `NOMBREUNIDADTRANSPORTE` | Unidad de transporte (Estibas, Furgón, Estacas, Plataforma, Furgón refrigerado, Volco, Portacontenedores, Tanque) |
+| `ORIGEN` / `DESTINO` | Código de municipio DANE de origen y destino |
+| `VALORHORA` | Componente del valor que se cobra por hora de recorrido (0 cuando la tarifa es fija) |
+| `VALORSICECONHORA` | Valor total ya incluyendo el componente por hora |
+| `HORASRECORRIDO` / `HORASPACTADAS` | Horas reales estimadas de viaje vs. horas pactadas contractualmente |
+| `CONDICIONCARGA` | `CARGADO` o `VACIO` |
+| `VIAESTANDAR` | Si la vía es estándar (`SI`) o no (`NO`) — afecta el valor |
+| `Muestra` | Columna agregada en esta extracción: `nucleo` (fila representativa) o una de las 5 categorías `rara_*` documentadas más abajo |
+
+### `tarifa-plaza-tblSAPTarifas-2022-09-01_a_hoy.csv`
+
+| Columna | Para qué sirve |
+|---|---|
+| `ID` | Identificador único de la tarifa en SAP — es la llave que enlaza con `ID_TARIFA` en el histórico |
+| `LINEANEGOCIO` / `LineaNegocioDescripcion` | Código y nombre de la línea de negocio — se cruza con el mismo campo capturado en `analitica.lineas_solicitud` |
+| `ORIGEN` / `DESTINO` | Código DANE o zona comercial (`ZC_`/`ZTC_`) |
+| `VALOR` | El valor de la tarifa en pesos |
+| `VIGENCIA` | Fecha hasta la que aplica esa tarifa — cruda, sin la corrección local `AjusteVigenciaPlaza` |
+| `CLASECONTENEDOR` / `TAMANOCONTENEDOR` | Si aplica a contenedor: su clase y tamaño (20/40 pies) |
+| `RANGOPESOINF` / `RANGOPESOSUP` | Rango de peso al que aplica la tarifa |
+| `TIPOVEHICULO` / `VehiculoDescripcion` | Código y nombre del tipo de vehículo (ej. Tractomula, Minimula) |
+| `TIPOCARROSERIA` | Tipo de carrocería |
+| `PESOLIMITE` | Peso límite adicional |
+| `FECHACREACION` / `USUARIOCREACION` | Auditoría de cuándo y quién cargó la tarifa |
+| `CLASEVIAJE` | Determina qué lógica de matching aplica en producción: con este campo presente se activa el matching con escalado a zonas; sin él, el matching simple |
+| `DEVOLUCION` | Si es una tarifa de devolución (ej. de contenedor vacío) |
+| `FECHAMODIFICACION` / `USUARIOMODIFICACION` | Auditoría de la última edición |
+| `DETALLESTARIFA` | Detalle adicional en texto libre |
+| `CONSOLIDADO` / `EXCLUSIVO` | Banderas de condición del servicio |
+
+### `historico-sap-tblSAPTarifasLog-2022-09-01_a_hoy.csv`
+
+Mismas columnas que `tblSAPTarifas` (salvo `FECHAMODIFICACION`, `USUARIOMODIFICACION`,
+`DETALLESTARIFA`, `CONSOLIDADO`, `EXCLUSIVO`, que no existen aquí porque cada
+cambio genera una fila nueva en vez de editar una existente), más:
+
+| Columna | Para qué sirve |
+|---|---|
+| `ID_TARIFA` | Enlaza cada fila del histórico con la fila de `tblSAPTarifas` que la originó |
+
+### `catalogo-clientes-BUT000-organizaciones.csv`
+
+| Columna | Para qué sirve |
+|---|---|
+| `PARTNER` | Identificador del socio de negocio (cliente) en SAP |
+| `TYPE` | Tipo de socio — en este extracto siempre `2` (organización), ya filtrado |
+| `BU_GROUP` | Grupo de agrupación del partner |
+| `NAME_ORG1` / `NAME_ORG2` | Razón social, hasta 2 líneas |
+| `TAXNUM` / `TAXNUMXL` | NIT — la llave de cruce contra el catálogo propio de clientes (`analitica.clientes`) |
+| `TEL_NUMBER` | Teléfono de contacto |
+| `CRDAT` | Fecha de creación del registro en SAP |
+| `VALID_TO` | Hasta cuándo es válido el registro (normalmente sin vencimiento) |
+
 ## Por qué el piso SICE-TAC es una muestra y no la tabla completa
 
 `tblRutasSicetac` **no tiene histórico real**: de sus 2.096.003 filas, 2.096.002
 pertenecen a un único período (`PERIODO=202608`, el mes vigente al momento de la
 extracción) y 1 fila es basura (`PERIODO=0`). No es una tabla que acumule fotos
-mensuales — cada mes reemplaza al anterior. Esto corrige una suposición inicial
-equivocada de esta misma sesión de trabajo (se pensó que `PERIODO` daría
-profundidad histórica; no es así).
+mensuales — cada mes reemplaza al anterior. `PERIODO` no aporta profundidad
+histórica, contrario a lo que su nombre podría sugerir.
 
 La tabla completa (esa única foto) pesa **824 MB** — es la matriz completa de
 ruta × vehículo × condición de carga de todo el país, y GitHub rechaza archivos de
@@ -123,8 +187,7 @@ natural — en su mayoría conductores/contactos individuales, sin valor como
   volumen real de las consultas ejecutadas (ninguna tocó más de 2M filas, y la más
   grande se abortó y se re-hizo acotada).
 - **Servidor de `DwSice`**: confirmado con el negocio que es el mismo servidor
-  `10.10.40.24` usado para los demás DW de "Cubos" — no un servidor aparte SQL
-  Server 2008 R2 como se creyó inicialmente en esta sesión.
+  `10.10.40.24` usado para los demás DW de "Cubos", no un servidor aparte.
 
 ## Consultas SQL reproducibles
 
@@ -141,8 +204,8 @@ SELECT ID, PERIODO, CONFIGURACION, VALOR, NOMBRERUTA, NOMBRETIPOCARGA, NOMBREUNI
   ORIGEN, DESTINO, VALORHORA, VALORSICECONHORA, HORASRECORRIDO, HORASPACTADAS, CONDICIONCARGA, VIAESTANDAR
 FROM Estratos WHERE rn <= 6;
 -- + 5 filas cada una para: valor máximo, valor mínimo, vía no estándar,
---   horas de recorrido máximas, y la ruta con 567 candidatos (ver script completo
---   ejecutado en esta sesión si se necesita reproducir exacto).
+--   horas de recorrido máximas, y la ruta con 567 candidatos (ver sección de
+--   hallazgos más arriba para el detalle completo de cada categoría).
 ```
 
 **Tarifa de plaza:**
@@ -165,8 +228,8 @@ FROM dbo.BUT000 WHERE TYPE = '2';
 ## Fuera de alcance (declarado)
 
 - No se replicó la lógica de matching de zonas/DANE de `TarifarioSapAdapter` — se
-  documentó cómo funciona (ver arriba y el hilo de esta sesión), pero el cruce real
-  entre fuentes es trabajo del EDA (S2-HU-11).
+  documentó cómo funciona más arriba en este documento, pero el cruce real entre
+  fuentes es trabajo del EDA (S2-HU-11).
 - No se aplicó `AjusteVigenciaPlaza` — se entrega `VIGENCIA` cruda, a propósito.
 - No se resolvió si `tblSAPTarifasLog` es "tarifa ganada" o "log de auditoría del
   catálogo" — queda pendiente de confirmar con negocio.

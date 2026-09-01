@@ -205,6 +205,27 @@ Característica: Identidad e integración con el portal de la Administración
     Y la fuente de la propuesta queda trazada como "provisional"
     Y una línea sobre una ruta marcada "sin plaza" en el dataset no propone nada solo
       con esa fuente, igual que si no hubiera plaza real
+
+  # ------------------------------------------------- contexto de mercado (DW externos)
+
+  # Insumo real (S2-HU-10, Habilitador B8 parte 1):
+  # docs/extractos-fuentes-corporativas/{README.md,*.csv}
+  # (4 extractos puntuales desde los 4 data warehouses de solo lectura: piso
+  # SICE-TAC, tarifa de plaza SAP, histórico SAP y catálogo de clientes — ver el
+  # README de esa carpeta para fecha de corte, volumen, llaves de cruce y
+  # hallazgos). Es el insumo de contexto de mercado para el EDA de S2-HU-11,
+  # que corre sobre este set y sobre el de S2-HU-10.1 (issue #35); no se consume
+  # desde ningún flujo del producto real.
+  @hu-10 @habilitador-b8
+  Escenario: Contexto de mercado entregado y documentado para el EDA
+    Dado un extracto puntual de piso SICE-TAC, tarifa de plaza SAP, histórico SAP
+      y catálogo de clientes, sacado de los 4 data warehouses de solo lectura
+    Cuando se publica junto con su documentación
+    Entonces cada archivo tiene su fecha de corte y su volumen de filas documentados
+    Y las llaves de cruce contra el histórico propio quedan identificadas para ruta,
+      vehículo, período y cliente
+    Y no se reporta impacto sobre los data warehouses compartidos durante la extracción
+
   @hu-051 @priorizacion
   Escenario: La bandeja se reordena al recalcular el puntaje por paso del tiempo
     Dado un trabajo de recálculo programado en el broker
