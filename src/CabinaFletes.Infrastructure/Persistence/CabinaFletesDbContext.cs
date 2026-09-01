@@ -48,6 +48,11 @@ public class CabinaFletesDbContext : DbContext
     {
         base.OnModelCreating(b);
 
+        // Esquema propio dentro de dbInformesAutomatizados_Pruebas (BD compartida con
+        // otra app ajena a NEXO, que ya vive en 'dbo' y en su propio 'dbo_prueba').
+        // Sin esto, las tablas de CabinaFletes quedan mezcladas con las de esa otra app.
+        b.HasDefaultSchema("dbo_NEXO_prueba");
+
         // Tablas del Transactional Outbox de MassTransit. Viven en ESTA base a
         // propósito: la garantía de atomicidad depende de que el mensaje y los datos
         // del caso de uso se guarden en la misma transacción.
