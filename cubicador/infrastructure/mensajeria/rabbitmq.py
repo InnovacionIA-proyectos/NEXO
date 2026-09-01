@@ -6,6 +6,15 @@ Verificado contra un RabbitMQ real en Docker Compose (ver
 docs/testDocumentation/PRUEBAS_DE_INTEGRACION.md seccion 2): flujo completo
 API -> publica -> worker consume -> persiste -> publica evento de resultado,
 mas el camino de reintentos/DLQ via `publicar_crudo`.
+
+Issue #28 (S2-HU-075): `plan-de-cargue.generado`/`cubicacion.rechazada` -los
+2 eventos que consume NEXO con un IConsumer<T> real de MassTransit- se
+publican envueltos en el "sobre" minimo de MassTransit (`_sobre_masstransit`)
+para que ese consumer los pueda deserializar. `cubicacion.solicitada` NO
+lleva sobre cuando lo publica Cubicador (nadie mas lo consume) - pero SI
+puede llegar envuelto cuando lo publica NEXO, y el worker lo desenvuelve con
+un fallback transparente (ver worker/main.py::_procesar). Ver NEXO/docs/
+mensajeria/CUBICACION.md #1/#4 para el detalle completo del porque.
 """
 
 from __future__ import annotations
@@ -13,6 +22,8 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import uuid
+from datetime import UTC, datetime
 from typing import Any
 
 import aio_pika
@@ -20,14 +31,49 @@ import aio_pika
 EXCHANGE = "cubicador.eventos"
 logger = logging.getLogger("cubicador.rabbitmq")
 
+# Namespace C# real de los mensajes que SI consume NEXO con un IConsumer<T>
+# de MassTransit - ver NEXO/src/CabinaFletes.Mensajes/Cubicacion/
+# MensajesDeCubicacion.cs. Acoplamiento cruzado real: si NEXO renombra esas
+# clases o el namespace, este valor queda desincronizado sin ningun error de
+# compilacion que lo avise - solo se nota si un mensaje deja de entregarse.
+_NAMESPACE_MENSAJES_NEXO = "CabinaFletes.Mensajes.Cubicacion"
 
-async def conectar_con_reintentos(url: str, intentos: int = 5, espera_s: float = 2.0) -> aio_pika.RobustConnection:
-    """Reintenta la conexion INICIAL a RabbitMQ. Cubre una carrera real de
-    arranque en Docker Compose: el healthcheck de RabbitMQ puede dar 'sano'
-    un instante antes de que el puerto AMQP acepte conexiones, y sin
-    reintento aqui eso tumbaba el contenedor completo (`connect_robust` solo
-    reintenta reconexiones DESPUES de conectar una vez, no el primer
-    intento) - ver docs/testDocumentation/PRUEBAS_DE_INTEGRACION.md."""
+
+def _sobre_masstransit(tipo_csharp: str, payload: dict[str, Any]) -> dict[str, Any]:
+    """Envuelve `payload` en el "sobre" minimo que un IConsumer<T> real de
+    MassTransit necesita para deserializarlo (ver NEXO/docs/mensajeria/
+    CUBICACION.md #1/#4) - solo hace falta para los eventos que SI consume
+    NEXO (`plan-de-cargue.generado`/`cubicacion.rechazada`), no para
+    `cubicacion.solicitada` (Cubicador-a-Cubicador, nadie mas lo lee).
+    Verificado contra un IConsumer<T> real: MassTransit acepta este sobre
+    minimo (messageType + message), no hace falta el resto de los campos
+    opcionales del formato completo (host, headers, etc.)."""
+    return {
+        "messageId": str(uuid.uuid4()),
+        "messageType": [f"urn:message:{_NAMESPACE_MENSAJES_NEXO}:{tipo_csharp}"],
+        "message": payload,
+        "sentTime": datetime.now(UTC).isoformat(),
+    }
+
+
+async def conectar_con_reintentos(url: str, intentos: int = 30, espera_s: float = 2.0) -> aio_pika.RobustConnection:
+    """Reintenta la conexion INICIAL a RabbitMQ. Cubre dos carreras reales de
+    arranque en Docker Compose:
+
+    1. El healthcheck de RabbitMQ puede dar 'sano' un instante antes de que
+       el puerto AMQP acepte conexiones de verdad (medido: hasta ~22s de hueco
+       en un arranque en frio) - sin reintento aqui eso tumbaba el contenedor
+       completo (`connect_robust` solo reintenta reconexiones DESPUES de
+       conectar una vez, no el primer intento).
+    2. Desde que el broker es el `rabbit` COMPARTIDO de NEXO (docker-compose.yml
+       raiz, proyecto Compose separado - ver DECISIONES_TECNICAS.md #9), no hay
+       forma de expresar `depends_on: rabbit: condition: service_healthy` entre
+       proyectos distintos: este stack puede arrancar sin ninguna garantia de
+       que el de NEXO ya este corriendo. El margen por defecto (30 intentos x
+       2s = ~60s) cubre tanto el arranque en frio del broker como que alguien
+       levante este stack un poco antes que el de NEXO.
+
+    Ver docs/testDocumentation/PRUEBAS_DE_INTEGRACION.md."""
     ultimo_error: Exception | None = None
     for intento in range(1, intentos + 1):
         try:
@@ -80,11 +126,9 @@ class RabbitMqEventosPublisher:
         })
 
     async def publicar_plan_generado(self, plan_id: str, resultado: dict[str, Any]) -> None:
-        await self._publicar("plan-de-cargue.generado", {
-            "correlationId": plan_id, "planId": plan_id, "resultado": resultado,
-        })
+        payload = {"correlationId": plan_id, "planId": plan_id, "resultado": resultado}
+        await self._publicar("plan-de-cargue.generado", _sobre_masstransit("PlanDeCargueGenerado", payload))
 
     async def publicar_cubicacion_rechazada(self, plan_id: str, codigo: str, mensaje: str) -> None:
-        await self._publicar("cubicacion.rechazada", {
-            "correlationId": plan_id, "planId": plan_id, "codigo": codigo, "mensaje": mensaje,
-        })
+        payload = {"correlationId": plan_id, "planId": plan_id, "codigo": codigo, "mensaje": mensaje}
+        await self._publicar("cubicacion.rechazada", _sobre_masstransit("CubicacionRechazada", payload))

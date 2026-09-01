@@ -17,4 +17,8 @@
     <ProjectReference Include="..\..\src\CabinaFletes.Domain\CabinaFletes.Domain.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="TestData\**\*.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

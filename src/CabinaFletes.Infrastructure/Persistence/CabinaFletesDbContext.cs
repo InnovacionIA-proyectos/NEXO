@@ -23,6 +23,7 @@ public class CabinaFletesDbContext : DbContext
     public CabinaFletesDbContext(DbContextOptions<CabinaFletesDbContext> options) : base(options) { }
 
     public DbSet<Usuario> Usuarios => Set<Usuario>();
+    public DbSet<MapeoRolPortal> MapeosRolPortal => Set<MapeoRolPortal>();
     public DbSet<Cliente> Clientes => Set<Cliente>();
     public DbSet<Solicitud> Solicitudes => Set<Solicitud>();
     public DbSet<LineaSolicitud> LineasSolicitud => Set<LineaSolicitud>();
@@ -95,8 +96,8 @@ public class CabinaFletesDbContext : DbContext
             e.HasIndex(x => x.Email).IsUnique();
             e.Property(x => x.Rol).HasConversion<string>().HasMaxLength(40);
             e.Property(x => x.Activo).HasDefaultValue(true);
-            // Único pero permitiendo múltiples NULL (usuarios aún sin vincular a AD).
-            e.HasIndex(x => x.AdObjectId).IsUnique().HasFilter("[AdObjectId] IS NOT NULL");
+            // Único pero permitiendo múltiples NULL (usuarios aún sin primer login por el portal).
+            e.HasIndex(x => x.IdentidadPortalId).IsUnique().HasFilter("[IdentidadPortalId] IS NOT NULL");
             // Usuario de sistema (placeholder) para integridad referencial mientras no hay auth.
             e.HasData(new Usuario
             {
@@ -108,6 +109,31 @@ public class CabinaFletesDbContext : DbContext
                 CreatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
                 UpdatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero)
             });
+        });
+
+        b.Entity<MapeoRolPortal>(e =>
+        {
+            e.ToTable("mapeo_rol_portal");
+            // Filtrado (no único plano): IdRolPortal queda NULL hasta que TI confirme el
+            // id real (ver comentario del seed más abajo), y puede haber varias filas así
+            // a la vez.
+            e.HasIndex(x => x.IdRolPortal).IsUnique().HasFilter("[IdRolPortal] IS NOT NULL");
+            e.Property(x => x.Rol).HasConversion<string>().HasMaxLength(40);
+            e.Property(x => x.DescripcionRolPortal).HasMaxLength(200);
+
+            // Equivalencias de ALTA confianza por nombre (docs/contrato-integracion,
+            // sección 2). El resto de los 6 roles de Nexo (CoordinadorFletes,
+            // LiderProceso, ServiciosLogisticos) no tienen candidato todavía: Pendiente
+            // P2, a confirmar por negocio. IdRolPortal queda NULL a propósito: no hay
+            // todavía un IDROLES real confirmado contra la base de identidad, y adivinar
+            // uno arriesgaría matchear por accidente el rol de otra persona. La resolución
+            // por nombre (ResolverIdentidadPortalAdapter) alcanza mientras tanto; cuando
+            // TI confirme el id real, se completa esta columna con un UPDATE, sin deploy.
+            e.HasData(
+                new MapeoRolPortal { Id = Guid.Parse("00000000-0000-0000-0001-000000000001"), IdRolPortal = null, DescripcionRolPortal = "TarifasComercial", Rol = RolUsuario.Comercial, CreatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero) },
+                new MapeoRolPortal { Id = Guid.Parse("00000000-0000-0000-0001-000000000002"), IdRolPortal = null, DescripcionRolPortal = "TarifasAdministrador", Rol = RolUsuario.AdminTarifas, CreatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero) },
+                new MapeoRolPortal { Id = Guid.Parse("00000000-0000-0000-0001-000000000003"), IdRolPortal = null, DescripcionRolPortal = "Administracion", Rol = RolUsuario.Admin, CreatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero) }
+            );
         });
 
         b.Entity<Cliente>(e =>

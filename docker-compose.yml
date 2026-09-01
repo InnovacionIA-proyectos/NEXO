@@ -6,11 +6,13 @@
 #     original. La API queda publicada en el puerto del host (API_PORT,
 #     por defecto 8080) para que cualquier frontend (el original NEXO/frontend
 #     u otro) la consuma directamente — no hay proxy Nginx aquí.
-#   - Cubicación 3D / Plan de Cargue NO están migrados a propósito: el plan
-#     es un microservicio Python aparte (ver PENDIENTES.md, "Fuera de
-#     alcance"). Se deja un servicio de ejemplo COMENTADO más abajo para
-#     cuando ese microservicio exista: hoy la API no lo llama (no hay
-#     ningún adapter cableado a CUBICADOR3D_BASE_URL todavía).
+#   - Plan de cargue (S2-HU-08): el motor Cubicador es un microservicio
+#     Python aparte (carpeta cubicador/ de este mismo repo, su propio
+#     docker-compose.yml). NEXO le habla SOLO por colas del mismo RabbitMQ
+#     de abajo (ConnectionStrings:RabbitMq) — no hay URL HTTP ni servicio
+#     adicional que levantar acá. Sin la compuerta de paridad encendida
+#     (Cubicacion__Paridad*, ver .env.example), la función responde 503 "en
+#     verificación", nunca cae a un fallback.
 #
 # Uso:
 #   1) cp .env.example .env   y completar los valores (mínimo MSSQL_SA_PASSWORD).
@@ -19,6 +21,8 @@
 #   4) Sembrar datos demo (opcional, alternativa a MIGRATE_ON_STARTUP=true):
 #        docker compose --profile seed run --rm seed
 # ============================================================================
+
+name: nexo
 
 services:
   db:
@@ -53,6 +57,14 @@ services:
       # atascados y la cola de error sin adivinar. No exponerla fuera de la red
       # interna en un despliegue real.
       - "${RABBITMQ_UI_PORT:-15672}:15672"
+      # AMQP también publicado al host: `api` y `cubicador/` (docker-compose.yml
+      # propio, proyecto Compose separado que se engancha a esta misma red por
+      # nombre externo `nexo_internal`) alcanzan el puerto 5672 igual por esa
+      # red interna, sin necesitar esto — lo que sí lo necesita es cualquier
+      # herramienta/CI que inspeccione o publique mensajes de prueba desde
+      # fuera de Docker (ver cubicador/scripts/ci_docker_smoke.py). Mismo
+      # criterio que la consola de arriba: no exponer en un despliegue real.
+      - "${RABBITMQ_AMQP_PORT:-5672}:5672"
     volumes:
       - rabbit-data:/var/lib/rabbitmq
     networks:
@@ -84,7 +96,7 @@ services:
       # Siembra datos de demostración al arrancar si la BD está vacía (idempotente).
       # Poner en "false" en producción real una vez cargados los datos definitivos.
       Database__SeedOnStartup: ${SEED_ON_STARTUP:-true}
-      Cors__FrontendOrigin: ${FRONTEND_ORIGIN:-http://localhost:5173}
+      Cors__OrigenesPermitidos: ${ORIGENES_PERMITIDOS_CORS:-http://localhost:5173}
       # Recálculo del score persistido (#19). El reloj vive en el broker, no en este
       # proceso, así que cambiar el intervalo solo afecta cada cuánto suena: no hay
       # temporizador en memoria que se duplique con las réplicas.
@@ -92,17 +104,18 @@ services:
       # Cuántas solicitudes por lote. Existe para no dejar una transacción larga
       # bloqueando filas que la bandeja está leyendo.
       Score__TamanoDeLoteRecalculo: ${SCORE_TAMANO_LOTE:-200}
-      AzureAd__Instance: ${AzureAd__Instance:-https://login.microsoftonline.com/}
-      AzureAd__TenantId: ${AzureAd__TenantId:-}
-      AzureAd__ClientId: ${AzureAd__ClientId:-}
-      AzureAd__ClientSecret: ${AzureAd__ClientSecret:-}
-      AzureAd__Domain: ${AzureAd__Domain:-boterosoto.com.co}
+      # Identidad del portal de la Administración (S2-HU-03). Vacía en local: cae al
+      # adapter que resuelve contra la tabla Usuarios propia (ver .env.example).
+      # ASPNETCORE_ENVIRONMENT=Production EXIGE esta cadena (fail-closed).
+      ConnectionStrings__IdentidadPortal: ${ConnectionStrings__IdentidadPortal:-}
       # Data Warehouse corporativo (SOLO LECTURA). Opcionales: si van vacías,
       # los módulos que las usan (Biblioteca/SICE-TAC/histórico/clientes DW)
       # se degradan solos (503 accionable o Configurado=false), no rompen.
       ConnectionStrings__DwSice: ${ConnectionStrings__DwSice:-}
       ConnectionStrings__DwCubos: ${ConnectionStrings__DwCubos:-}
-      ConnectionStrings__DwCubosSap: ${ConnectionStrings__DwCubosSap:-}
+      # Conexión SAP nueva: plaza en vivo (S2-HU-09). Deshabilitado por defecto —
+      # la plaza real sigue saliendo de DbSolucionesTi, sin tocar.
+      SapTarifaFleteEnVivo__Modo: ${SAP_TARIFA_FLETE_EN_VIVO_MODO:-Deshabilitado}
       ConnectionStrings__DbSolucionesTi: ${ConnectionStrings__DbSolucionesTi:-}
       # SMTP corporativo (envío de cotizaciones). Opcional: sin Host/Remitente no
       # envía. Nombres en español: SmtpCorreoAdapter lee Smtp:Puerto/Remitente/
@@ -113,10 +126,11 @@ services:
       Smtp__Remitente: ${Smtp__Remitente:-}
       Smtp__Usuario: ${Smtp__Usuario:-}
       Smtp__Clave: ${Smtp__Clave:-}
-      # Cubicador 3D (microservicio Python, FUERA DE ALCANCE — no cableado
-      # todavía a ningún puerto/adapter). Reservadas para cuando exista.
-      Cubicador3D__BaseUrl: ${CUBICADOR3D_BASE_URL:-}
-      Cubicador3D__ApiKey: ${CUBICADOR3D_API_KEY:-}
+      # Compuerta de liberación del plan de cargue por paridad (S2-HU-08.2, #30).
+      # Vacías por defecto: la función responde 503 "en verificación", sin fallback.
+      Cubicacion__ParidadVerificada: ${CUBICACION_PARIDAD_VERIFICADA:-false}
+      Cubicacion__ParidadEvidencia: ${CUBICACION_PARIDAD_EVIDENCIA:-}
+      Cubicacion__ParidadFecha: ${CUBICACION_PARIDAD_FECHA:-}
     networks:
       - internal
     healthcheck:
@@ -180,18 +194,16 @@ services:
     restart: "no"
 
   # ---------------------------------------------------------------------
-  # Cubicador 3D — microservicio Python (PENDIENTE, no implementado).
-  # Descomentar y ajustar cuando el servicio exista; hoy la API NO lo llama.
+  # Cubicador 3D — microservicio Python. Vive en cubicador/ dentro de este
+  # mismo repo, con SU PROPIO docker-compose.yml (proyecto Compose separado:
+  # despliegue independiente, no forma parte de este `docker compose up`).
+  # No está aquí como servicio porque no comparte ciclo de vida ni base de
+  # datos con este stack — solo comparte el broker `rabbit` de arriba, al que
+  # cubicador/ se conecta enganchándose a la red `internal` por su nombre
+  # externo (`nexo_internal`, fijado por el `name:` de la cabecera de este
+  # archivo). Ver cubicador/docker-compose.yml y
+  # cubicador/docs/DECISIONES_TECNICAS.md #9.
   # ---------------------------------------------------------------------
-  # cubicador3d:
-  #   build:
-  #     context: ../cubicador3d          # repositorio/carpeta del microservicio Python
-  #     dockerfile: Dockerfile
-  #   environment:
-  #     API_KEY: ${CUBICADOR3D_API_KEY:-}
-  #   networks:
-  #     - internal
-  #   restart: unless-stopped
 
 networks:
   internal:

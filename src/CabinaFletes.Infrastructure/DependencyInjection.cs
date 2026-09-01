@@ -5,6 +5,7 @@ using CabinaFletes.Application.CasosDeUso.Cotizaciones.Interfaces;
 using CabinaFletes.Application.CasosDeUso.Metricas.Interfaces;
 using CabinaFletes.Application.CasosDeUso.ReglasSoloSicetac.Interfaces;
 using CabinaFletes.Application.CasosDeUso.ServiciosConexos.Interfaces;
+using CabinaFletes.Application.CasosDeUso.PlanDeCargue.Interfaces;
 using CabinaFletes.Application.CasosDeUso.Priorizacion.Interfaces;
 using CabinaFletes.Application.CasosDeUso.Solicitudes.Interfaces;
 using CabinaFletes.Application.CasosDeUso.TarifasGanadas.Interfaces;
@@ -19,6 +20,7 @@ using CabinaFletes.Infrastructure.Common;
 using CabinaFletes.Infrastructure.Cotizaciones.Adaptadores;
 using CabinaFletes.Infrastructure.Cotizaciones.Repositorios;
 using CabinaFletes.Infrastructure.External;
+using CabinaFletes.Infrastructure.Identidad.Adaptadores;
 using CabinaFletes.Infrastructure.Metricas.Adaptadores;
 using CabinaFletes.Infrastructure.Persistence;
 using CabinaFletes.Infrastructure.ReglasSoloSicetac.Adaptadores;
@@ -26,6 +28,9 @@ using CabinaFletes.Infrastructure.ReglasSoloSicetac.Repositorios;
 using CabinaFletes.Infrastructure.ServiciosConexos.Repositorios;
 using CabinaFletes.Infrastructure.Solicitudes.Adaptadores;
 using CabinaFletes.Infrastructure.Priorizacion.Repositorios;
+using CabinaFletes.Infrastructure.Notificaciones.Adaptadores;
+using CabinaFletes.Infrastructure.PlanDeCargue.Adaptadores;
+using CabinaFletes.Infrastructure.PlanDeCargue.Repositorios;
 using CabinaFletes.Infrastructure.Solicitudes.Repositorios;
 using CabinaFletes.Infrastructure.TarifasGanadas.Repositorios;
 using CabinaFletes.Infrastructure.TarifasSicetacAdmin.Repositorios;
@@ -53,20 +58,7 @@ public static class DependencyInjection
                 config.GetConnectionString("CabinaFletes"),
                 sql => sql.EnableRetryOnFailure(maxRetryCount: 5, maxRetryDelay: TimeSpan.FromSeconds(10), errorNumbersToAdd: null)));
 
-        // Comercial responsable del cliente (DWCubosEBSSAP, SOLO LECTURA). Opcional: si la
-        // cadena no está configurada, ComercialResponsableSapAdapter.Configurado = false.
-        var dwCubosSap = config.GetConnectionString("DwCubosSap");
-        if (!string.IsNullOrWhiteSpace(dwCubosSap))
-        {
-            services.AddDbContext<DwCubosSapDbContext>(options =>
-                options.UseSqlServer(dwCubosSap, sql =>
-                {
-                    sql.UseCompatibilityLevel(100); // el DW corre SQL Server 2008 R2
-                    sql.EnableRetryOnFailure(maxRetryCount: 3, maxRetryDelay: TimeSpan.FromSeconds(5), errorNumbersToAdd: null);
-                }));
-        }
-
-        // Datacenter corporativo (dbsolucionesTI, SOLO LECTURA): tarifario SAP TM
+// Datacenter corporativo (dbsolucionesTI, SOLO LECTURA): tarifario SAP TM
         // (TarifarioSapAdapter/PropuestaTarifaAdapter) y vigencia de tarifas de plaza.
         // Opcional: si la cadena no está configurada, esos adapters se degradan (null).
         var dbSolucionesTi = config.GetConnectionString("DbSolucionesTi");
@@ -101,6 +93,21 @@ public static class DependencyInjection
                     sql.EnableRetryOnFailure(maxRetryCount: 3, maxRetryDelay: TimeSpan.FromSeconds(5), errorNumbersToAdd: null)));
         }
 
+        // Identidad del portal de la Administración (S2-HU-03, docs/contrato-integracion,
+        // sección 7): SOLO LECTURA, misma familia que los demás DW. A diferencia de esos,
+        // sin esta cadena NO se degrada a un adapter "no configurado" — Program.cs impide
+        // arrancar así en Producción (fail-closed, S2-HU-03.3); en Desarrollo/QA sin la
+        // fuente real todavía, se registra un adapter local contra la tabla Usuarios
+        // (ResolverIdentidadPortalLocalAdapter) para no bloquear el trabajo del equipo.
+        var identidadPortal = config.GetConnectionString("IdentidadPortal");
+        var identidadPortalConfigurada = !string.IsNullOrWhiteSpace(identidadPortal);
+        if (identidadPortalConfigurada)
+        {
+            services.AddDbContext<IdentidadPortalDbContext>(options =>
+                options.UseSqlServer(identidadPortal, sql =>
+                    sql.EnableRetryOnFailure(maxRetryCount: 3, maxRetryDelay: TimeSpan.FromSeconds(5), errorNumbersToAdd: null)));
+        }
+
         services.AddMemoryCache();
 
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
@@ -116,8 +123,44 @@ public static class DependencyInjection
         services.AddScoped<IHistoricoTarifasPort>(sp => sp.GetRequiredService<EfTarifasHistoricasRepository>());
         services.AddScoped<IAuditoriaPort, EfAuditoriaRepository>();
 
-        services.AddScoped<IComercialResponsablePort, ComercialResponsableSapAdapter>();
-        services.AddScoped<ICorreoPort, SmtpCorreoAdapter>();
+        if (identidadPortalConfigurada)
+        {
+            services.AddScoped<IIdentidadPortalPort, IdentidadPortalAdapter>();
+            services.AddScoped<IResolverIdentidadPortalPort, ResolverIdentidadPortalAdapter>();
+        }
+        else
+        {
+            services.AddScoped<IResolverIdentidadPortalPort, ResolverIdentidadPortalLocalAdapter>();
+        }
+
+        // SALIDA DE CORREO: se elige por configuración.
+        //
+        // Con MailSender:BaseUrl puesta va por el microservicio de la compañía, que es el
+        // camino previsto — el relay SOAP corporativo solo adjunta archivos que ya están
+        // en una ruta suya, y el formato de la cotización llega como archivo en la
+        // petición. Sin esa URL cae al SMTP directo, que sigue sirviendo para correo sin
+        // adjunto y evita que un entorno ya configurado se quede sin notificación.
+        //
+        // Mismo criterio que con el transporte del bus: el adaptador lo decide la
+        // configuración, no una constante en el código.
+        var mailSender = config[MailSenderCorreoAdapter.ClaveBaseUrl];
+        if (!string.IsNullOrWhiteSpace(mailSender))
+        {
+            // Cliente tipado por IHttpClientFactory: reutiliza conexiones y respeta el
+            // reciclado de DNS. Un HttpClient creado a mano por llamada agota puertos.
+            services.AddHttpClient<ICorreoPort, MailSenderCorreoAdapter>(cliente =>
+            {
+                cliente.BaseAddress = new Uri(mailSender.TrimEnd('/') + "/");
+                // Corto a propósito: el MailSender solo encola y responde 202. Si tarda
+                // más que esto, algo va mal y conviene reintentar en vez de esperar.
+                cliente.Timeout = TimeSpan.FromSeconds(
+                    int.TryParse(config["MailSender:TimeoutSegundos"], out var s) ? Math.Clamp(s, 5, 120) : 30);
+            });
+        }
+        else
+        {
+            services.AddScoped<ICorreoPort, SmtpCorreoAdapter>();
+        }
         services.AddSingleton<IExportadorCotizacionExcelPort, ExportadorCotizacionExcelClosedXml>(); // sin estado
 
         // Reglas "solo SICE-TAC" (el mismo repositorio implementa el puerto de lectura
@@ -135,6 +178,17 @@ public static class DependencyInjection
         // "Aplicar propuestas" en Cotizaciones) + matriz SICE-TAC de solo lectura.
         services.AddScoped<ITarifarioSapPort, TarifarioSapAdapter>();
         services.AddScoped<IPropuestaTarifaPort, PropuestaTarifaAdapter>();
+
+        // S2-HU-09 (#31/#33): conexión SAP nueva (plaza en vivo), todavía inexistente.
+        // "Deshabilitado" (default) y "Real" (sin adaptador real todavía) resuelven al
+        // MISMO adaptador que nunca produce candidato — las fuentes de lectura reales
+        // que hoy operan (DwSice, DwCubos, DbSolucionesTi) no se tocan. Sin conmutar
+        // código, solo config: SapTarifaFleteEnVivo:Modo.
+        var modoSapEnVivo = config["SapTarifaFleteEnVivo:Modo"];
+        if (string.Equals(modoSapEnVivo, "Mock", StringComparison.OrdinalIgnoreCase))
+            services.AddScoped<ISapTarifaFleteEnVivoPort, SapTarifaFleteEnVivoMockAdapter>();
+        else
+            services.AddScoped<ISapTarifaFleteEnVivoPort, SapTarifaFleteEnVivoDeshabilitadoAdapter>();
         if (dwSiceConfigurado)
             services.AddScoped<IBibliotecaSicetacPort, BibliotecaSicetacAdapter>();
         else
@@ -168,6 +222,12 @@ public static class DependencyInjection
 
         // Métricas (Tablero del Líder)
         services.AddScoped<IMetricasPort, MetricasAdapter>();
+
+        // Plan de cargue (S2-HU-08): orquestación por colas contra el motor Cubicador
+        // (ICubicacionPort lo registra AddMensajeria(), no este método) + compuerta de
+        // paridad (S2-HU-08.2, #30).
+        services.AddScoped<IPlanCargueRepository, EfPlanCargueRepository>();
+        services.AddScoped<IParidadCubicadorPort, ParidadCubicadorAdapter>();
 
         return services;
     }

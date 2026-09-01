@@ -1,13 +1,18 @@
 """Verificacion de humo contra el stack real de Docker Compose (Postgres +
 RabbitMQ + api + worker) - usado por el job `docker-smoke` de
-.github/workflows/ci.yml. Automatiza lo que hasta ahora era el procedimiento
-manual documentado en docs/testDocumentation/PRUEBAS_DE_INTEGRACION.md
-secciones 2.2/2.3/2.4/2.6: falla (exit != 0) si el flujo real no llega al
-resultado esperado, en vez de solo revisar el codigo por lectura.
+.github/workflows/cubicador-ci.yml. Automatiza lo que hasta ahora era el
+procedimiento manual documentado en docs/testDocumentation/
+PRUEBAS_DE_INTEGRACION.md secciones 2.2/2.3/2.4/2.6, INCLUIDO el criterio de
+cierre "trabajo publicado -> resultado recibido por cola" (2.3, ahora también
+automatizado en flujo_resultado_por_cola - antes solo se había probado a
+mano): falla (exit != 0) si el flujo real no llega al resultado esperado, en
+vez de solo revisar el codigo por lectura.
 
-Requiere el stack ya levantado y sano (`docker compose up -d --build --wait`)
-con los puertos por defecto publicados al host: api en 8000, RabbitMQ AMQP en
-5672 y su consola de administracion en 15672.
+Requiere el stack de cubicador ya levantado y sano (`docker compose up -d
+--build --wait`) con el puerto de la api publicado al host (8000), Y el
+`rabbit` compartido de NEXO (docker-compose.yml raiz, ver
+DECISIONES_TECNICAS.md #9) levantado con SUS puertos publicados al host: AMQP
+en 5672 y su consola de administracion en 15672.
 
 No cubre el vigilante de timeout (docs/DECISIONES_TECNICAS.md #10): ese
 escenario requiere detener el contenedor `worker` a mitad de un mensaje y
@@ -30,8 +35,8 @@ import httpx
 
 API_BASE_URL = os.environ.get("API_BASE_URL", "http://localhost:8000")
 API_KEY = os.environ["CUBICADOR_API_KEY"]
-RABBITMQ_USER = os.environ["RABBITMQ_DEFAULT_USER"]
-RABBITMQ_PASS = os.environ["RABBITMQ_DEFAULT_PASS"]
+RABBITMQ_USER = os.environ["RABBITMQ_USER"]
+RABBITMQ_PASS = os.environ["RABBITMQ_PASSWORD"]
 RABBITMQ_URL = f"amqp://{RABBITMQ_USER}:{RABBITMQ_PASS}@localhost:5672/"
 RABBITMQ_MGMT_URL = "http://localhost:15672"
 HEADERS = {"Authorization": f"Bearer {API_KEY}"}
@@ -107,6 +112,71 @@ async def _poll_resultado(client: httpx.AsyncClient, plan_id: str, timeout_s: fl
     raise TimeoutError(f"el plan {plan_id} siguio en 'procesando' tras {timeout_s}s (worker no proceso el mensaje)")
 
 
+async def flujo_resultado_por_cola(client: httpx.AsyncClient) -> None:
+    """Criterio de cierre 'trabajo publicado -> resultado recibido por cola':
+    a diferencia de flujo_optimizar_async (que confirma el resultado vía
+    HTTP/DB), esta prueba se suscribe DIRECTO a la routing key
+    `plan-de-cargue.generado` con una cola de prueba propia (exclusiva, no
+    la del worker) ANTES de disparar `optimizar`, y verifica que el evento
+    real llega por esa cola - no solo que el efecto quedó persistido. Mismo
+    camino que se probó a mano en PRUEBAS_DE_INTEGRACION.md sección 2.3,
+    ahora automatizado y repetible en cada push/PR."""
+    log("flujo E2E por cola: trabajo publicado -> resultado recibido en 'plan-de-cargue.generado'")
+
+    r = await client.get(f"{API_BASE_URL}/api/planes-cargue/vehiculos", headers=HEADERS)
+    r.raise_for_status()
+    furgon = next(v for v in r.json() if "13.6" in v["nombre"])
+
+    r = await client.post(
+        f"{API_BASE_URL}/api/planes-cargue", headers=HEADERS,
+        json={"nombre": "CI smoke cola", "vehiculoId": furgon["id"]},
+    )
+    r.raise_for_status()
+    plan = r.json()
+
+    r = await client.post(
+        f"{API_BASE_URL}/api/planes-cargue/{plan['id']}/items", headers=HEADERS,
+        json={"descripcion": "Pallet CI cola", "largoMm": 1200, "anchoMm": 1000, "altoMm": 1000, "pesoKg": 500, "cantidad": 2},
+    )
+    r.raise_for_status()
+
+    conexion = await aio_pika.connect_robust(RABBITMQ_URL)
+    async with conexion:
+        canal = await conexion.channel()
+        exchange = await canal.declare_exchange(EXCHANGE, aio_pika.ExchangeType.TOPIC, durable=True)
+        # Cola exclusiva/propia de esta verificación: se suma como OTRO suscriptor
+        # de la misma routing key, no interfiere con la cola del worker (cada cola
+        # ligada recibe su propia copia del evento).
+        cola = await canal.declare_queue(exclusive=True)
+        await cola.bind(exchange, routing_key="plan-de-cargue.generado")
+
+        r = await client.post(f"{API_BASE_URL}/api/planes-cargue/{plan['id']}/optimizar", headers=HEADERS, json={})
+        assert r.status_code == 202, r.text
+
+        evento = await asyncio.wait_for(_esperar_evento_del_plan(cola, plan["id"]), timeout=30)
+        assert evento["planId"] == plan["id"], evento
+        assert evento["correlationId"] == plan["id"], evento
+        assert evento["resultado"]["estado"] == "optimizado", evento
+        assert evento["resultado"]["colocaciones"] == 2, evento
+        log(f"evento recibido por cola: {evento}")
+
+
+async def _esperar_evento_del_plan(cola: aio_pika.abc.AbstractQueue, plan_id: str) -> dict:
+    async with cola.iterator() as mensajes:
+        async for mensaje in mensajes:
+            async with mensaje.process():
+                cuerpo = json.loads(mensaje.body)
+                # Issue #28: NEXO consume este mismo evento con un IConsumer<T> de
+                # MassTransit, así que ahora se publica envuelto (ver
+                # infrastructure/mensajeria/rabbitmq.py::_sobre_masstransit) - se
+                # desenvuelve aquí para que las aserciones de abajo no cambien.
+                if isinstance(cuerpo, dict) and "message" in cuerpo and "messageType" in cuerpo:
+                    cuerpo = cuerpo["message"]
+                if cuerpo.get("planId") == plan_id:
+                    return cuerpo
+    raise RuntimeError("la cola se cerró sin entregar el evento esperado")  # pragma: no cover - iterator() no termina solo
+
+
 async def flujo_reintentos_y_dlq(client: httpx.AsyncClient) -> None:
     log("flujo de reintentos + Dead-Letter Queue (mensaje con tipo invalido)")
     await _purgar_dlq(client)
@@ -155,6 +225,7 @@ async def main() -> None:
     async with httpx.AsyncClient() as client:
         await esperar_health(client)
         await flujo_optimizar_async(client)
+        await flujo_resultado_por_cola(client)
         await flujo_reintentos_y_dlq(client)
     log("todo verificado correctamente.")
 

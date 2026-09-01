@@ -12,10 +12,12 @@ de resultado -> el plan queda persistido.
 Resiliencia (ver docs/DECISIONES_TECNICAS.md #10): reintentos limitados via
 un contador en la cabecera del mensaje (no via TTL/DLX nativo de RabbitMQ,
 para mantenerlo simple) - al agotarse, el mensaje se publica en
-`cubicacion.dlq` para inspeccion manual. Un vigilante periodico marca
-`error` los planes que llevan demasiado tiempo en `procesando` (por si el
-worker se cae a mitad de un mensaje y este nunca llega a fallar ni a
-completarse - un caso que el reintento por si solo no cubre).
+`cubicacion.dlq` para inspeccion manual Y se alerta al equipo por correo
+(`infrastructure/alertas/correo.py::alertar_mensaje_en_dlq`). Un vigilante
+periodico marca `error` los planes que llevan demasiado tiempo en
+`procesando` (por si el worker se cae a mitad de un mensaje y este nunca
+llega a fallar ni a completarse - un caso que el reintento por si solo no
+cubre).
 """
 
 from __future__ import annotations
@@ -34,6 +36,7 @@ from application.plan_cargue.desde_linea import crear_plan_desde_linea
 from application.plan_cargue.optimizar import ParametrosOptimizacionInput, optimizar_plan
 from application.plan_cargue.resultado import obtener_resultado
 from domain.motor.dominio import PonderacionesCombinada
+from infrastructure.alertas.correo import alertar_mensaje_en_dlq
 from infrastructure.clientes.nexo_client import NexoLineaSolicitudClient
 from infrastructure.mensajeria.rabbitmq import EXCHANGE, RabbitMqEventosPublisher, conectar_con_reintentos
 from infrastructure.persistence.db import SessionLocal, crear_tablas
@@ -80,6 +83,15 @@ async def _ejecutar_solicitud(cuerpo: dict, planes: SqlPlanCargueRepository, veh
 
 async def _procesar(mensaje: aio_pika.IncomingMessage, publisher: RabbitMqEventosPublisher) -> None:
     cuerpo = json.loads(mensaje.body)
+    # Issue #28: NEXO publica CubicacionSolicitada con MassTransit real, que
+    # envuelve el payload real bajo la clave "message" (mas messageType, etc
+    # - ver NEXO/docs/mensajeria/CUBICACION.md #1/#4). Cubicador no necesita
+    # nada de MassTransit para si mismo (sus propios tests y su API siguen
+    # publicando el payload plano, sin sobre) - por eso el desenvuelto es
+    # opcional: si no hay "message", cuerpo queda igual que antes. Verificado
+    # en runtime contra un mensaje real de NEXO.
+    if isinstance(cuerpo, dict) and "message" in cuerpo and "messageType" in cuerpo:
+        cuerpo = cuerpo["message"]
     correlation_id = cuerpo["correlationId"]
     intentos_previos = int((mensaje.headers or {}).get("x-intentos", 0))
 
@@ -106,7 +118,7 @@ async def _procesar(mensaje: aio_pika.IncomingMessage, publisher: RabbitMqEvento
         except Exception as exc:  # noqa: BLE001 - fallo inesperado (bug, DB caida, etc.)
             logger.exception("Fallo procesando mensaje (intento %d/%d)", intentos_previos + 1, MAX_INTENTOS)
             if intentos_previos + 1 >= MAX_INTENTOS:
-                await _mover_a_dlq(mensaje, publisher, str(exc), intentos_previos + 1)
+                await _mover_a_dlq(mensaje, publisher, cuerpo["tipo"], str(exc), intentos_previos + 1)
                 if cuerpo["tipo"] == "optimizar":
                     await planes.marcar_error(cuerpo["planId"], f"Fallo tras {MAX_INTENTOS} intentos: {exc}")
                 await publisher.publicar_cubicacion_rechazada(correlation_id, "ERROR_INTERNO", str(exc))
@@ -120,9 +132,12 @@ async def _reencolar(mensaje: aio_pika.IncomingMessage, publisher: RabbitMqEvent
     await publisher.publicar_crudo("cubicacion.solicitada", mensaje.body, headers={"x-intentos": intentos})
 
 
-async def _mover_a_dlq(mensaje: aio_pika.IncomingMessage, publisher: RabbitMqEventosPublisher, error: str, intentos: int) -> None:
+async def _mover_a_dlq(
+    mensaje: aio_pika.IncomingMessage, publisher: RabbitMqEventosPublisher, tipo: str, error: str, intentos: int,
+) -> None:
     await publisher.publicar_crudo(COLA_DLQ, mensaje.body, headers={"x-intentos": intentos, "x-error": error[:1000]})
     logger.error("Mensaje movido a %s tras %d intentos: %s", COLA_DLQ, intentos, error)
+    await alertar_mensaje_en_dlq(tipo, error, intentos)
 
 
 async def _vigilante_de_timeouts() -> None:
@@ -155,8 +170,10 @@ async def main() -> None:
         exchange = await canal.declare_exchange(EXCHANGE, aio_pika.ExchangeType.TOPIC, durable=True)
         cola = await canal.declare_queue(COLA, durable=True)
         await cola.bind(exchange, routing_key="cubicacion.solicitada")
-        # Cola de mensajes agotados (solo para inspeccion manual, nadie la consume
-        # automaticamente) - routing key propia, ligada al mismo exchange.
+        # Cola de mensajes agotados, para inspeccion manual - routing key propia,
+        # ligada al mismo exchange. Nadie la CONSUME automaticamente (el mensaje
+        # se queda ahi para revisión manual), pero SÍ se alerta por correo en el
+        # momento en que un mensaje entra (ver _mover_a_dlq).
         cola_dlq = await canal.declare_queue(COLA_DLQ, durable=True)
         await cola_dlq.bind(exchange, routing_key=COLA_DLQ)
 

@@ -60,7 +60,13 @@ DECISIONES_TECNICAS.md #5. El caller sigue el resultado con polling sobre
 
 ### Comando entrante: `CubicaciónSolicitada`
 
-Publicado por la API al recibir `POST /{id}/optimizar` o `POST /desde-linea/{id}`.
+Publicado por la API al recibir `POST /{id}/optimizar` o `POST /desde-linea/{id}`
+(payload plano, sin sobre) — **o por NEXO** (issue #28, S2-HU-075), que lo
+publica con `IPublishEndpoint` de MassTransit real, envuelto en su "sobre"
+estándar (`messageType`/`message`). El worker acepta ambos shapes: si el JSON
+trae `message`+`messageType`, se desenvuelve primero; si no, se usa tal cual
+(`worker/main.py::_procesar`) — no hace falta que quien publique sepa si el
+otro lado usa MassTransit o no.
 
 ```json
 {
@@ -77,12 +83,41 @@ Publicado por la API al recibir `POST /{id}/optimizar` o `POST /desde-linea/{id}
 - **`CubicaciónRechazada`**: `{ correlationId, planId, codigo: string, mensaje: string }`
 - **`PlanDeCargueAjustado`**: mismo payload que `PlanDeCargueGenerado`, para si en el futuro el ajuste manual también se decide mover a async (hoy es síncrono, ver DECISIONES_TECNICAS.md #5).
 
+**Estos 2 primeros van envueltos en el "sobre" de MassTransit** (issue #28):
+NEXO los consume con un `IConsumer<T>` real
+(`PlanDeCargueGeneradoConsumer`/`CubicacionRechazadaConsumer`, ver
+`NEXO/docs/mensajeria/CUBICACION.md`), que espera ese formato para
+deserializar. El payload de arriba (`correlationId`/`planId`/...) viaja
+intacto dentro de la clave `"message"`:
+
+```json
+{
+  "messageId": "uuid",
+  "messageType": ["urn:message:CabinaFletes.Mensajes.Cubicacion:PlanDeCargueGenerado"],
+  "message": { "correlationId": "uuid", "planId": "uuid", "resultado": {...} },
+  "sentTime": "2026-08-27T21:00:00.000Z"
+}
+```
+
+`CubicaciónSolicitada` (el que Cubicador consume) NUNCA se publica envuelto
+desde este lado — solo lo consume Cubicador mismo, nadie más lo necesita.
+`_sobre_masstransit()` en `infrastructure/mensajeria/rabbitmq.py` arma el
+sobre; el `messageType` debe coincidir EXACTO con el namespace/nombre de la
+clase C# correspondiente — si NEXO renombra esa clase, este valor queda
+desincronizado sin ningún error de compilación que lo avise, solo se nota si
+el mensaje deja de entregarse.
+
 ### Colas/exchanges
 
 - Exchange `cubicador.eventos` (topic).
 - Routing keys: `cubicacion.solicitada`, `plan-de-cargue.generado`,
   `cubicacion.rechazada`, `plan-de-cargue.ajustado`.
-- Dead-letter: `cubicacion.dlq` (ver DECISIONES_TECNICAS.md #10).
+- Dead-letter: `cubicacion.dlq` (ver DECISIONES_TECNICAS.md #10). Al caer un
+  mensaje ahí (agotados los 3 reintentos), el worker además alerta por
+  correo al equipo técnico —
+  `infrastructure/alertas/correo.py::alertar_mensaje_en_dlq`, configurable
+  vía `ALERTAS_SMTP_*`/`ALERTAS_EQUIPO_TECNICO` (ver `.env.example`); si no
+  hay SMTP configurado, degrada a un log sin romper el worker.
 
 ## C. Formato de error (API REST)
 

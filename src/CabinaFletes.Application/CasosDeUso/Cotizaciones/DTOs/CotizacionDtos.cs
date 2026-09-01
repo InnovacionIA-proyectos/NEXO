@@ -29,14 +29,24 @@ public record CotizacionDto(
 public record AplicarPropuestasResultDto(CotizacionDto Cotizacion, int Agregadas);
 
 /// <summary>
-/// Resultado de entregar la cotización: la cotización entregada + el estado del
-/// envío del formato por email al comercial responsable del cliente.
+/// Resultado de entregar la cotización.
+///
+/// YA NO DICE SI EL CORREO SE ENVIÓ, y no podría: el envío pasó a un consumidor, así que
+/// al responder no ha salido nada. Los campos anteriores —<c>emailEnviado</c>, el correo
+/// del responsable y un mensaje con "enviada a fulano"— habrían quedado mintiendo.
+///
+/// Lo que sí se puede afirmar es que la notificación quedó encolada, y eso está
+/// garantizado: el evento se publica en la misma transacción que la entrega. Si la entrega
+/// quedó firme, la notificación está pendiente de salir.
+///
+/// El destinatario tampoco viaja aquí, y es a propósito: resolverlo exigía consultar el
+/// Data Warehouse dentro de la petición, que es una de las esperas que esta HU quita.
 /// </summary>
+/// <param name="EstadoNotificacion">Hoy siempre "encolada". Es lo único cierto al responder.</param>
+/// <param name="Mensaje">Texto para mostrar a quien entregó.</param>
 public record EntregarCotizacionResultDto(
     CotizacionDto Cotizacion,
-    bool EmailEnviado,
-    string? NombreResponsable,
-    string? CorreoResponsable,
+    string EstadoNotificacion,
     string Mensaje);
 
 /// <summary>Archivo binario de salida (usado por la exportación a Excel).</summary>

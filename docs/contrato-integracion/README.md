@@ -1,6 +1,6 @@
 # Contrato de integración — Nexo (Cabina de Fletes) ↔ Portal de la Administración
 
-**Versión 1.5.0** · Sprint 2 · Issues #7, #15, #16, #17, #19 y #20
+**Versión 1.6.0** · Sprint 2 · Issues #7, #15, #16, #17, #19, #20 y #21
 
 Este documento manda. El módulo `cabina-fletes` del portal está en desarrollo y no
 es la referencia: lo que hoy tenga construido se adapta a lo que diga aquí, no al
@@ -485,6 +485,64 @@ Ese refresco es del valor PERSISTIDO, el que leen métricas y tableros. **La ban
 necesita**: recalcula el score al leerlo, porque la urgencia depende del ahora y una
 licitación tiene que subir sola a medida que se acerca su deadline. Por eso el orden que se
 ve en pantalla ya está al día antes de recalibrar nada.
+
+---
+
+## 5.3 Entregar una cotización ya no espera al correo
+
+```http
+POST /api/cotizaciones/{id}/entregar
+```
+
+**La respuesta cambió, y el frontend lo va a notar.** Antes traía el resultado del envío
+del correo; ahora el correo se manda en segundo plano, así que al responder no ha salido
+nada y esos campos habrían quedado mintiendo.
+
+Antes:
+
+```json
+{
+  "cotizacion": { },
+  "emailEnviado": true,
+  "nombreResponsable": "Ana Gómez",
+  "correoResponsable": "ana@boterosoto.com.co",
+  "mensaje": "Cotización entregada y enviada a ana@boterosoto.com.co."
+}
+```
+
+Ahora:
+
+```json
+{
+  "cotizacion": { },
+  "estadoNotificacion": "encolada",
+  "mensaje": "Cotización entregada. La notificación por correo sale en segundo plano."
+}
+```
+
+**Qué se puede seguir afirmando:** que la notificación quedó encolada. Eso está
+garantizado, porque el evento se publica en la misma transacción que la entrega — si la
+entrega quedó firme, la notificación está pendiente de salir.
+
+**Qué ya no:** a quién se le envió. Resolver el destinatario exigía consultar el Data
+Warehouse dentro de la petición, y esa es justo una de las esperas que se quitaron. Medido:
+la entrega responde en **~100 ms** con la salida de correo caída.
+
+### La notificación es interna
+
+Va al correo corporativo de quien pidió la consulta de flete. **Nunca al cliente.** La
+HU-06.2 (#22) deriva el destinatario de la sesión y deja una prueba automatizada de que
+ninguna dirección de cliente puede ser destinataria.
+
+### Si el correo falla
+
+No afecta la entrega, que ya quedó firme. El fallo se reintenta de forma escalonada y, si
+se agotan los intentos, el mensaje queda en la cola de error de donde sale la alerta al
+equipo.
+
+Con una distinción que importa: lo que **no tiene arreglo** —un adjunto que pesa más de lo
+permitido, un correo que el relay rechaza por su forma— no se reintenta. Va derecho a la
+cola de error, así que la alerta llega al primer intento en vez de noventa segundos después.
 
 ---
 

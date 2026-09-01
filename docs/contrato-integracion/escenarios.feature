@@ -145,6 +145,8 @@ Característica: Identidad e integración con el portal de la Administración
 
   # ---------------------------------------------------- trabajos pesados
 
+  # Insumo real (S2-HU-04.7): tests/CabinaFletes.Domain.Tests/TestData/pliego-300-lineas.json
+  # (320 líneas) — ver tests/QA/hu-04.7-pliego-dataset-validacion-muestral/README.md
   @hu-04 @asincrono
   Escenario: Cargar un pliego responde de inmediato
     Dado un pliego de 300 líneas
@@ -161,6 +163,8 @@ Característica: Identidad e integración con el portal de la Administración
     Entonces obtiene el estado completo y el avance
     Y no necesitó ningún aviso para saberlo
 
+  # Insumo real (S2-HU-04.7): las 3 líneas fuenteCae=true (ids 318, 319, 320) del
+  # mismo pliego-300-lineas.json — ver tests/QA/hu-04.7-pliego-dataset-validacion-muestral/README.md
   @hu-04 @asincrono
   Escenario: Un pliego con líneas sin resolver termina en estado parcial
     Dado un pliego donde una fuente externa falla para 3 líneas
@@ -183,6 +187,24 @@ Característica: Identidad e integración con el portal de la Administración
     Entonces obtiene el estado actual y su secuencia
     Y desde ahí descarta los avisos con secuencia menor o igual
 
+  # ------------------------------------------------- fuentes de tarifa provisionales
+
+  # Insumo real (S2-HU-09.2, issue #32):
+  # docs/tarifas-plaza-provisionales/dataset-tarifas-plaza-provisionales.{json,xlsx}
+  # (210 filas: 150 de núcleo + 60 de casos borde, extraídas de dbSolucionesTI —
+  # ver el README de esa carpeta para el origen documentado y el acta de
+  # aprobación). El mecanismo que hace que ReglaDeCosteo/PropuestaTarifaAdapter
+  # lean de esta fuente todavía no existe — depende de la issue #33.
+  @hu-09 @issue-32 @pendiente-issue-33
+  Escenario: Propuesta calculada con datos de plaza provisionales realistas
+    Dado un dataset de tarifas de plaza provisionales validado por negocio,
+      con rutas frecuentes, valores reales y casos borde documentados
+      (sin plaza, vigencia vencida, valores extremos)
+    Cuando el motor de costeo propone una línea usando ese dataset como fuente
+    Entonces la propuesta sigue la regla del mayor y nunca queda por debajo del piso
+    Y la fuente de la propuesta queda trazada como "provisional"
+    Y una línea sobre una ruta marcada "sin plaza" en el dataset no propone nada solo
+      con esa fuente, igual que si no hubiera plaza real
   @hu-051 @priorizacion
   Escenario: La bandeja se reordena al recalcular el puntaje por paso del tiempo
     Dado un trabajo de recálculo programado en el broker
@@ -246,3 +268,30 @@ Característica: Identidad e integración con el portal de la Administración
     Cuando consulta la bandeja
     Entonces obtiene el orden correcto y completo
     Y no necesitó ningún aviso para saberlo
+
+  @hu-061 @notificacion
+  Escenario: El correo falla y la entrega no se afecta
+    Dado un relay de correo caído
+    Cuando se entrega una cotización
+    Entonces la respuesta es inmediata y la cotización queda Entregada
+    Y la notificación queda encolada para reintentarse
+
+  @hu-061 @notificacion
+  Escenario: Un rechazo sin arreglo no gasta reintentos
+    Dado un adjunto que pesa más de lo que el relay admite
+    Cuando el consumidor intenta enviar el correo
+    Entonces no se reintenta
+    Y el fallo queda en la cola de error al primer intento
+
+  @hu-061 @notificacion
+  Escenario: Un fallo pasajero se reintenta antes de alertar
+    Dado un relay de correo que no responde
+    Cuando el consumidor intenta enviar el correo
+    Entonces se reintenta de forma escalonada
+    Y solo al agotar los intentos el fallo queda en la cola de error
+
+  @hu-061 @notificacion
+  Escenario: El correo nunca se manda dentro de la petición de entrega
+    Dado el caso de uso que entrega la cotización
+    Cuando se revisan sus dependencias
+    Entonces no tiene ninguna salida de correo entre ellas

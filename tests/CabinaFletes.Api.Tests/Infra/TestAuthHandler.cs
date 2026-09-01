@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using System.Text.Encodings.Web;
+using CabinaFletes.Api.Common.Auth;
 using CabinaFletes.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Logging;
@@ -29,7 +30,10 @@ public class TestAuthHandler : AuthenticationHandler<AuthenticationSchemeOptions
         {
             new Claim(ClaimTypes.NameIdentifier, CabinaFletesDbContext.UsuarioSistemaId.ToString()),
             new Claim(ClaimTypes.Name, "Test User"),
-            new Claim(ClaimTypes.Role, role.ToString())
+            new Claim(ClaimTypes.Role, role.ToString()),
+            // Id "crudo del portal" simulado, para que SesionController (S2-HU-03.1) sea
+            // ejercitable en este harness igual que con el esquema real.
+            new Claim(IdentidadPortalAuthenticationHandler.ClaimIdPortal, "1"),
         };
         var identity = new ClaimsIdentity(claims, SchemeName);
         var ticket = new AuthenticationTicket(new ClaimsPrincipal(identity), SchemeName);
