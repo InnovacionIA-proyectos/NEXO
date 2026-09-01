@@ -47,10 +47,16 @@ public class IdentidadPortalDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder b)
     {
+        // Tipos reales verificados contra sys.columns de dbSolucionesTI_Prueba
+        // (2026-09-01): tblSAPUsuariosApp.ID es numeric(18,0), no bigint; y los
+        // IDROLES/IDUSUARIO de tblSAPUsuarioRoles/tblSAPRoles son int, no bigint.
+        // Sin el HasConversion + HasColumnType explícitos, SqlClient lanza
+        // InvalidCastException al leer (GetInt64 sobre una columna decimal/int).
         var usuarios = b.Entity<UsuarioPortalDw>();
         usuarios.ToTable("tblSAPUsuariosApp", "dbo", t => t.ExcludeFromMigrations());
         usuarios.HasKey(x => x.Id);
-        usuarios.Property(x => x.Id).HasColumnName("ID");
+        usuarios.Property(x => x.Id).HasColumnName("ID")
+            .HasConversion(v => (decimal)v, v => (long)v).HasColumnType("numeric(18,0)");
         usuarios.Property(x => x.NombreUsuario).HasColumnName("NOMBREUSUARIO");
         usuarios.Property(x => x.Email).HasColumnName("EMAIL");
         usuarios.Property(x => x.DescripcionUsuario).HasColumnName("DESCRIPCIONUSUARIO");
@@ -58,13 +64,16 @@ public class IdentidadPortalDbContext : DbContext
         var usuarioRoles = b.Entity<UsuarioRolPortalDw>();
         usuarioRoles.ToTable("tblSAPUsuarioRoles", "dbo", t => t.ExcludeFromMigrations());
         usuarioRoles.HasKey(x => new { x.IdUsuario, x.IdRoles });
-        usuarioRoles.Property(x => x.IdUsuario).HasColumnName("IDUSUARIO");
-        usuarioRoles.Property(x => x.IdRoles).HasColumnName("IDROLES");
+        usuarioRoles.Property(x => x.IdUsuario).HasColumnName("IDUSUARIO")
+            .HasConversion(v => (int)v, v => (long)v).HasColumnType("int");
+        usuarioRoles.Property(x => x.IdRoles).HasColumnName("IDROLES")
+            .HasConversion(v => (int)v, v => (long)v).HasColumnType("int");
 
         var roles = b.Entity<RolPortalDw>();
         roles.ToTable("tblSAPRoles", "dbo", t => t.ExcludeFromMigrations());
         roles.HasKey(x => x.IdRoles);
-        roles.Property(x => x.IdRoles).HasColumnName("IDROLES");
+        roles.Property(x => x.IdRoles).HasColumnName("IDROLES")
+            .HasConversion(v => (int)v, v => (long)v).HasColumnType("int");
         roles.Property(x => x.Descripcion).HasColumnName("DESCRIPCION");
     }
 

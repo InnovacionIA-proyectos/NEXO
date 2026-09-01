@@ -1262,6 +1262,54 @@ namespace CabinaFletes.Infrastructure.Migrations
                             CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
                             DescripcionRolPortal = "Administracion",
                             Rol = "Admin"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0001-000000000004"),
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 9, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DescripcionRolPortal = "ComercialNEXO",
+                            IdRolPortal = 48L,
+                            Rol = "Comercial"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0001-000000000005"),
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 9, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DescripcionRolPortal = "CoordinadorFletesNEXO",
+                            IdRolPortal = 49L,
+                            Rol = "CoordinadorFletes"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0001-000000000006"),
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 9, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DescripcionRolPortal = "AdminTarifasNEXO",
+                            IdRolPortal = 50L,
+                            Rol = "AdminTarifas"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0001-000000000007"),
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 9, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DescripcionRolPortal = "ServiciosLogisticosNEXO",
+                            IdRolPortal = 51L,
+                            Rol = "ServiciosLogisticos"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0001-000000000008"),
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 9, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DescripcionRolPortal = "LiderProcesoNEXO",
+                            IdRolPortal = 52L,
+                            Rol = "LiderProceso"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0001-000000000009"),
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 9, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DescripcionRolPortal = "AdminNEXO",
+                            IdRolPortal = 53L,
+                            Rol = "Admin"
                         });
                 });
 
