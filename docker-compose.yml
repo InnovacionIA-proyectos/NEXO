@@ -131,6 +131,10 @@ services:
       Cubicacion__ParidadVerificada: ${CUBICACION_PARIDAD_VERIFICADA:-false}
       Cubicacion__ParidadEvidencia: ${CUBICACION_PARIDAD_EVIDENCIA:-}
       Cubicacion__ParidadFecha: ${CUBICACION_PARIDAD_FECHA:-}
+      # Bearer de las llamadas ENTRANTES del Cubicador (GET /api/lineas-solicitud/{id}
+      # /cubicacion) — debe ser igual a NEXO_CALLBACK_API_KEY en cubicador/.env. Vacía =
+      # el endpoint responde 401 a cualquier Bearer (fail-closed).
+      Cubicador3D__InboundApiKey: ${CUBICADOR3D_INBOUND_API_KEY:-}
     networks:
       - internal
     healthcheck:

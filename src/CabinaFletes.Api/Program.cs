@@ -117,7 +117,12 @@ if (builder.Environment.IsProduction() &&
 
 builder.Services.AddAuthentication(IdentidadPortalAuthenticationHandler.SchemeName)
     .AddScheme<AuthenticationSchemeOptions, IdentidadPortalAuthenticationHandler>(
-        IdentidadPortalAuthenticationHandler.SchemeName, _ => { });
+        IdentidadPortalAuthenticationHandler.SchemeName, _ => { })
+    // Esquema aparte de servicio-a-servicio para el puente hacia el Cubicador (Python) —
+    // ver LineasSolicitudCubicacionController. No es el default: solo se usa donde el
+    // endpoint lo pide explícitamente con [Authorize(AuthenticationSchemes = ...)].
+    .AddScheme<AuthenticationSchemeOptions, CubicadorApiKeyAuthenticationHandler>(
+        CubicadorApiKeyAuthenticationHandler.SchemeName, _ => { });
 
 // Autenticación (identidad válida, ver el Handler) y autorización (uno de los 6 roles de
 // Nexo, resuelto contra la tabla del portal) son cosas DISTINTAS a propósito: sin esta
