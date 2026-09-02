@@ -13,9 +13,13 @@
 #     adicional que levantar acá. Sin la compuerta de paridad encendida
 #     (Cubicacion__Paridad*, ver .env.example), la función responde 503 "en
 #     verificación", nunca cae a un fallback.
+#   - El servicio 'db' (SQL Server local en contenedor) está DESHABILITADO:
+#     se usa una BD de pruebas/producción real vía ConnectionStrings__CabinaFletes
+#     (.env). No se elimina el bloque por si hace falta volver a levantarlo
+#     para desarrollo aislado.
 #
 # Uso:
-#   1) cp .env.example .env   y completar los valores (mínimo MSSQL_SA_PASSWORD).
+#   1) cp .env.example .env   y completar los valores (mínimo ConnectionStrings__CabinaFletes).
 #   2) docker compose up -d --build
 #   3) La API queda en http://localhost:${API_PORT:-8080} (health en /health).
 #   4) Sembrar datos demo (opcional, alternativa a MIGRATE_ON_STARTUP=true):
@@ -25,23 +29,28 @@
 name: nexo
 
 services:
-  db:
-    image: mcr.microsoft.com/mssql/server:2022-latest
-    environment:
-      ACCEPT_EULA: "Y"
-      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD}
-      MSSQL_PID: ${MSSQL_PID:-Developer}
-    volumes:
-      - mssql-data:/var/opt/mssql
-    networks:
-      - internal
-    healthcheck:
-      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -Q 'SELECT 1' || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
-      start_period: 30s
-    restart: unless-stopped
+  # db:
+  #   Deshabilitado: se está usando la BD de pruebas real (10.10.40.85, ver
+  #   ConnectionStrings__CabinaFletes en .env) antes de pasar a producción, no
+  #   un SQL Server local en contenedor. No se elimina el bloque por si hace
+  #   falta volver a levantarlo para desarrollo aislado.
+  # db:
+  #   image: mcr.microsoft.com/mssql/server:2022-latest
+  #   environment:
+  #     ACCEPT_EULA: "Y"
+  #     MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD}
+  #     MSSQL_PID: ${MSSQL_PID:-Developer}
+  #   volumes:
+  #     - mssql-data:/var/opt/mssql
+  #   networks:
+  #     - internal
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -Q 'SELECT 1' || exit 1"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 12
+  #     start_period: 30s
+  #   restart: unless-stopped
 
   rabbit:
     # Imagen propia: el plugin de retardo que MassTransit necesita para los timeouts
@@ -82,15 +91,16 @@ services:
       context: .
       dockerfile: src/CabinaFletes.Api/Dockerfile
     depends_on:
-      db:
-        condition: service_healthy
+      # db: deshabilitado junto con el servicio 'db' de arriba (BD de pruebas real).
       rabbit:
         condition: service_healthy
     ports:
       - "${API_PORT:-8080}:8080"
     environment:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
-      ConnectionStrings__CabinaFletes: "Server=db,1433;Database=CabinaFletes;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True;Encrypt=True;"
+      # 'db' local deshabilitado: se conecta directo a la BD de pruebas real
+      # definida en ConnectionStrings__CabinaFletes (.env), no al contenedor.
+      ConnectionStrings__CabinaFletes: ${ConnectionStrings__CabinaFletes}
       ConnectionStrings__RabbitMq: "amqp://${RABBITMQ_USER:-nexo}:${RABBITMQ_PASSWORD}@rabbit:5672/"
       Database__MigrateOnStartup: ${MIGRATE_ON_STARTUP:-true}
       # Siembra datos de demostración al arrancar si la BD está vacía (idempotente).
@@ -186,12 +196,10 @@ services:
     build:
       context: .
       dockerfile: src/CabinaFletes.Api/Dockerfile
-    depends_on:
-      db:
-        condition: service_healthy
+    # depends_on: db: deshabilitado junto con el servicio 'db' de arriba (BD de pruebas real).
     environment:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
-      ConnectionStrings__CabinaFletes: "Server=db,1433;Database=CabinaFletes;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True;Encrypt=True;"
+      ConnectionStrings__CabinaFletes: ${ConnectionStrings__CabinaFletes}
     entrypoint: ["dotnet", "CabinaFletes.Api.dll", "seed"]
     networks:
       - internal
