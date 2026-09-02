@@ -44,7 +44,10 @@ public class OutboxCargaTests : IAsyncLifetime
         using var alcance = _servicios.CreateScope();
         var db = alcance.ServiceProvider.GetRequiredService<CabinaFletesDbContext>();
         await db.Database.MigrateAsync();
-        await db.Database.ExecuteSqlRawAsync("DELETE FROM OutboxMessage");
+        // ExecuteDeleteAsync en vez de SQL crudo: un "DELETE FROM OutboxMessage" sin
+        // calificar asume esquema 'dbo', y dejó de ser cierto desde que
+        // CabinaFletesDbContext fijó HasDefaultSchema("dbo_NEXO_prueba") (issue #92).
+        await db.Set<OutboxMessage>().ExecuteDeleteAsync();
 
         _bus = _servicios.GetRequiredService<ITestHarness>();
         await _bus.Start();
