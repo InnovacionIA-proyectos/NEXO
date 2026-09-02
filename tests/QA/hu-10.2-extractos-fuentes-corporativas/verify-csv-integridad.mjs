@@ -4,13 +4,16 @@
 // (`awk -F','`), que da falsos positivos en cualquier CSV bien formado que traiga
 // texto libre con comas.
 //
-// Uso: node verify-csv-integridad.mjs   (correr desde esta carpeta o cualquier otra,
-// usa rutas relativas a docs/extractos-fuentes-corporativas/).
+// Uso: node verify-csv-integridad.mjs   (correr desde esta carpeta o cualquier otra).
+//
+// Nota (HU-10.3, PR #91): estos 4 archivos se reorganizaron de
+// docs/extractos-fuentes-corporativas/ a analitica/00-fuentes/fuentes-corporativas/
+// — la ruta de abajo se actualizó para seguir esa reubicación.
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
-const DIR = join(dirname(fileURLToPath(import.meta.url)), "../../../docs/extractos-fuentes-corporativas");
+const DIR = join(dirname(fileURLToPath(import.meta.url)), "../../../analitica/00-fuentes/fuentes-corporativas");
 
 function parseCsv(text) {
   const rows = [];
