@@ -14,11 +14,62 @@ objetivo. Esas decisiones son del EDA (S2-HU-11).
 | Archivo | Fuente real | Fecha de corte | Filas | Peso |
 |---|---|---|---|---|
 | `piso-sicetac-tblRutasSicetac-muestra-202608.csv` | `DWSice.dbo.tblRutasSicetac` (servidor `10.10.40.24`) | 2026-09-01 | 151 (muestra, ver abajo) | 12 KB |
-| `tarifa-plaza-tblSAPTarifas-2022-09-01_a_hoy.csv` | `dbSolucionesTI.dbo.tblSAPTarifas` (servidor `tbsdatacenter`) | 2026-09-01 | 23.546 | 5,5 MB |
-| `historico-sap-tblSAPTarifasLog-2022-09-01_a_hoy.csv` | `dbSolucionesTI.dbo.tblSAPTarifasLog` (servidor `tbsdatacenter`) | 2026-09-01 | 25.303 | 4,0 MB |
-| `catalogo-clientes-BUT000-organizaciones.csv` | `DWCubosOperacionesEBS.dbo.BUT000` (servidor `10.10.40.24`) | 2026-09-01 | 38.985 | 3,4 MB |
+| `tarifa-plaza-tblSAPTarifas-2022-09-01_a_hoy.csv` | `dbSolucionesTI.dbo.tblSAPTarifas` (servidor `tbsdatacenter`) | 2026-09-02 (re-extraído, ver corrección abajo) | 23.020 | 6,8 MB |
+| `historico-sap-tblSAPTarifasLog-2022-09-01_a_hoy.csv` | `dbSolucionesTI.dbo.tblSAPTarifasLog` (servidor `tbsdatacenter`) | 2026-09-02 (re-extraído) | 25.318 | 5,1 MB |
+| `catalogo-clientes-BUT000-organizaciones.csv` | `DWCubosOperacionesEBS.dbo.BUT000` (servidor `10.10.40.24`) | 2026-09-02 (re-extraído) | 38.995 | 4,5 MB |
 
-Formato: CSV, separador `,`, codificación UTF-8 con BOM (`sqlcmd -f o:65001`).
+Formato: CSV, separador `,`, codificación UTF-8 con BOM. `piso-sicetac` se generó con
+`sqlcmd -f o:65001` (sin cambios, nunca tuvo el problema de comillas de abajo).
+Los otros 3 se **regeneraron** con PowerShell + ADO.NET + `Export-Csv` (ver
+"Corrección de comillas RFC4180" más abajo) — las filas variaron levemente
+frente al corte original (2026-09-01) porque son tablas compartidas en
+producción que siguen recibiendo escrituras en vivo, no por error de la
+extracción.
+
+## Corrección de comillas RFC4180 (hallazgo real de QA, S2-HU-10.2)
+
+**El problema, encontrado por QA:** 3 de los 4 CSV (`tarifa-plaza`,
+`historico-sap`, `catalogo-clientes`) se generaron originalmente con `sqlcmd`
+uniendo columnas por `,` **sin envolver en comillas los campos de texto
+libre**. Cualquier valor con una coma o un salto de línea embebido
+desalineaba las columnas de ahí en adelante para cualquier parser CSV
+estándar (`pandas`, Excel). Verificado y cuantificado:
+
+| Archivo | Filas físicas con conteo de columnas incorrecto | % |
+|---|---|---|
+| `tarifa-plaza` | 3.363 de 23.546 | 14,3% |
+| `historico-sap` | 4.611 de 25.303 | 18,2% |
+| `catalogo-clientes` | 323 de 38.985 | 0,8% |
+| `piso-sicetac` | 0 de 151 | 0% (nunca tuvo el problema) |
+
+**Causa raíz identificada:** en `tblSAPTarifas`/`tblSAPTarifasLog`, la
+columna `DETALLESTARIFA` (notas de tarifa en texto libre, hasta 1.270
+caracteres) trae comas y saltos de línea reales en 2.453 y 490 filas
+respectivamente; y la descripción de vehículo compartida por catálogo
+(`tblSAPTiposVehiculoTarifario.DESCRIPCION = "Rígidos, Turbo o Sencillo"`)
+tiene una coma y se repite en miles de filas por `JOIN`. En `catalogo-clientes`,
+la razón social (`NAME_ORG1`/`NAME_ORG2`) ocasionalmente trae comas.
+
+**Corrección aplicada:** se regeneraron los 3 archivos con PowerShell +
+ADO.NET (`System.Data.SqlClient`) + `Export-Csv -NoTypeInformation -Encoding UTF8`,
+que aplica el escapado RFC4180 correcto automáticamente (comillas alrededor de
+cada campo, comillas internas duplicadas) — en vez de construir el CSV a mano.
+Cada archivo se releyó con `Import-Csv` inmediatamente después de escribirlo
+para confirmar que el número de filas y columnas cuadra exacto, cero
+desalineación. `piso-sicetac` no se tocó (nunca tuvo el problema, y su
+período vigente ya rotó de `202608` a uno posterior — no se puede re-extraer
+el mismo período histórico).
+
+**Efecto secundario del cambio de herramienta**: `DEVOLUCION`, `CONSOLIDADO` y
+`EXCLUSIVO` (banderas booleanas) ahora se ven como `True`/`False` en vez de
+`1`/`0` en `tarifa-plaza` y `historico-sap` — es solo un cambio de formato de
+`Export-Csv`, no un cambio de dato.
+
+**Lección para futuras extracciones de este tipo:** `sqlcmd` con `-s ","` NO
+es un generador de CSV real — solo concatena columnas con el separador, sin
+escapar nada. Para cualquier columna de texto libre, usar `Export-Csv` de
+PowerShell (o una librería CSV real) en vez de construir el archivo a mano
+con `sqlcmd`.
 
 ## Qué trae cada archivo (columnas y para qué sirven)
 
@@ -190,6 +241,15 @@ natural — en su mayoría conductores/contactos individuales, sin valor como
   `10.10.40.24` usado para los demás DW de "Cubos", no un servidor aparte.
 
 ## Consultas SQL reproducibles
+
+**Importante para reproducir `tarifa-plaza`, `historico-sap` y `catalogo-clientes`:**
+las consultas SELECT de abajo siguen siendo las correctas, pero **no las
+ejecutes con `sqlcmd -s ","` redirigido a un `.csv`** (así se generó
+originalmente el bug de comillas documentado arriba). Ejecuta el `SELECT` vía
+PowerShell + ADO.NET y expórtalo con `Export-Csv -NoTypeInformation -Encoding UTF8`,
+que sí escapa comas/comillas/saltos de línea correctamente. `piso-sicetac` sí
+se puede seguir generando con `sqlcmd` (nunca tuvo el problema, sus campos son
+todos cortos y sin comas).
 
 **Piso SICE-TAC (muestra):**
 ```sql
