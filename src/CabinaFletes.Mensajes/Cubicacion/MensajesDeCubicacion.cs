@@ -2,7 +2,7 @@ namespace CabinaFletes.Mensajes.Cubicacion;
 
 /// <summary>
 /// Contrato de mensajes con el microservicio Cubicador (carpeta cubicador/ de este
-/// mismo repo, Python + aio_pika — ver cubicador/docs/CONTRATOS.md sección B).
+/// mismo repo, Python + aio_pika — ver cubicador/CONTRATO.md sección 6).
 ///
 /// Estos SÍ son mensajes reales de MassTransit (issue #28, S2-HU-075 — decisión del
 /// equipo: MassTransit nativo, no un cliente RabbitMQ crudo del lado de NEXO):

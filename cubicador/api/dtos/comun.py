@@ -1,5 +1,5 @@
 """Base Pydantic con camelCase (igual que JsonSerializerDefaults.Web de
-NEXO) - ver docs/CONTRATOS.md convenciones generales."""
+NEXO) - ver CONTRATO.md seccion 2 (convenciones generales)."""
 
 from __future__ import annotations
 

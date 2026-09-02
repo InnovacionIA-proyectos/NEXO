@@ -27,7 +27,7 @@ class LineaParaCubicacion:
 
 
 class ILineaSolicitudPort(Protocol):
-    """Puerto de solo lectura hacia NEXO - GET /api/lineas-solicitud/{id}/cubicacion (ver docs/CONTRATOS.md)."""
+    """Puerto de solo lectura hacia NEXO - GET /api/lineas-solicitud/{id}/cubicacion (ver CONTRATO.md seccion 7)."""
 
     async def obtener(self, linea_solicitud_id: str) -> LineaParaCubicacion | None: ...
 
@@ -35,7 +35,7 @@ class ILineaSolicitudPort(Protocol):
 class IEventosPort(Protocol):
     """Publica los eventos de dominio a RabbitMQ (CubicaciónSolicitada,
     PlanDeCargueGenerado, CubicaciónRechazada, PlanDeCargueAjustado). Ver
-    docs/CONTRATOS.md seccion B para las rutas/colas."""
+    CONTRATO.md seccion 6 para las rutas/colas."""
 
     async def publicar_cubicacion_solicitada(
         self, plan_id: str, tipo: str, solicitud: dict[str, Any],

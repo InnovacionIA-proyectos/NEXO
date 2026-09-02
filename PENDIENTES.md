@@ -36,8 +36,8 @@ compuerta cerrada igual, a propósito — no es un booleano suelto.
 **Lo que SÍ falta, sin fecha todavía**:
 - **Solo soporta re-optimizar un plan que YA EXISTE** (con sus ítems) en la
   base de Cubicador. El flujo "pedir un plan de cargue desde una línea de
-  solicitud" (`crear_desde_linea`, ver `cubicador/docs/CONTRATOS.md` sección
-  B) depende de un endpoint `GET /api/lineas-solicitud/{id}/cubicacion` que
+  solicitud" (`crear_desde_linea`, ver `cubicador/CONTRATO.md` sección
+  6) depende de un endpoint `GET /api/lineas-solicitud/{id}/cubicacion` que
   Cubicador ya llama (`NexoLineaSolicitudClient`) pero que **NEXO todavía no
   implementa** — y de datos de dimensiones/cantidad de bultos por línea que
   hoy `LineaSolicitud` no captura. Es trabajo real, no trivial: requiere

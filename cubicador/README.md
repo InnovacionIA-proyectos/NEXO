@@ -31,9 +31,9 @@ MassTransit, S2-HU-04, aparte) — este endpoint REST podría no ser el
 mecanismo final.
 
 Ver:
+- [`CONTRATO.md`](./CONTRATO.md) — API REST, eventos de RabbitMQ, DTOs, errores, autenticación: todo lo necesario para conectar backend o frontend contra este servicio.
 - [`docs/ARQUITECTURA.md`](./docs/ARQUITECTURA.md) — capas, estructura de carpetas, cómo se traduce Clean Architecture a Python.
 - [`docs/DECISIONES_TECNICAS.md`](./docs/DECISIONES_TECNICAS.md) — registro de cada decisión tomada y por qué.
-- [`docs/CONTRATOS.md`](./docs/CONTRATOS.md) — API REST, eventos de RabbitMQ, DTOs, errores, autenticación.
 - [`docs/testDocumentation/`](./docs/testDocumentation/) — documentación completa de los tests: las 31 reglas de negocio portadas desde cabinaFletes y las pruebas de integración/Docker.
 
 ## Stack

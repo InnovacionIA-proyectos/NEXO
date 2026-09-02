@@ -1,6 +1,6 @@
 """Excepciones de caso de uso. Application no conoce HTTP: no lleva status
 code. Es la capa `api/` quien traduce el TIPO de excepcion a un codigo HTTP
-(ver docs/CONTRATOS.md seccion C). Equivalente a AppExceptions.cs de NEXO."""
+(ver CONTRATO.md seccion 4). Equivalente a AppExceptions.cs de NEXO."""
 
 from __future__ import annotations
 

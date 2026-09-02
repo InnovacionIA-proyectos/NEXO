@@ -47,8 +47,8 @@ app = FastAPI(
     description=(
         "Microservicio de cubicacion: cubicador rapido (SICCE) y motor de "
         "bin-packing 3D (Plan de Cargue). Autenticacion: Bearer estatico "
-        "servicio-a-servicio (boton Authorize en Swagger). Contrato completo "
-        "en docs/CONTRATOS.md; guia de integracion en CONTRATO.md."
+        "servicio-a-servicio (boton Authorize en Swagger). Contrato e "
+        "integracion completos en CONTRATO.md."
     ),
     lifespan=lifespan,
     servers=[

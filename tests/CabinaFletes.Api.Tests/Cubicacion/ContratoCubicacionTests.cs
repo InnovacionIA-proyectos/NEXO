@@ -8,7 +8,7 @@ namespace CabinaFletes.Api.Tests.Cubicacion;
 /// Guarda del CONTRATO de mensajes con Cubicador (issue #28, S2-HU-075) - sin
 /// broker, sin base de datos: solo que el JSON que produce/espera el lado C#
 /// coincide exactamente con lo que worker/main.py y RabbitMqEventosPublisher
-/// leen/escriben del otro lado (ver cubicador/docs/CONTRATOS.md sección B).
+/// leen/escriben del otro lado (ver cubicador/CONTRATO.md sección 6).
 ///
 /// Si alguno de los dos lados cambia un nombre de campo sin avisar al otro, este
 /// test lo detecta aquí - antes de que solo se note contra un broker real. La
