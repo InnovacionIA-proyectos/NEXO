@@ -326,7 +326,7 @@ NEXO):
 cd .. && docker compose up -d --wait rabbit && cd cubicador   # rabbit compartido de NEXO primero
 docker compose up -d --build
 docker compose ps                       # db/api/worker deben quedar "healthy"/"Up"
-curl http://localhost:8000/health
+curl http://localhost:8081/health       # puerto publicado al host desde CUBICADOR_HOST_PORT (default 8081)
 
 # Para el flujo async, con el venv local activado (localhost:5672 es el
 # rabbit COMPARTIDO de NEXO, publicado al host - ver docker-compose.yml raíz):

@@ -139,7 +139,9 @@ contenedor pueda completar ese handshake sin afectar al resto del sistema.
   queda cerrada por una compuerta de paridad
   (`Cubicacion:ParidadVerificada`/`ParidadEvidencia`/`ParidadFecha`) hasta
   que el motor confirme 26/26 en sus golden tests — ver `PENDIENTES.md`,
-  sección "Plan de cargue".
+  sección "Plan de cargue". Cubicador también expone su propia API REST
+  (para un frontend que la consuma directo, no para NEXO) — ver
+  [`cubicador/CONTRATO.md`](./cubicador/CONTRATO.md).
 
 ### Variables de entorno
 

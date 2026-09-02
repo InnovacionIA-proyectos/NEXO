@@ -242,12 +242,21 @@ Y luego el stack propio de Cubicador:
 ```bash
 cp .env.example .env   # completar POSTGRES_PASSWORD, RABBITMQ_USER/PASSWORD (= los del .env raíz de NEXO), CUBICADOR_API_KEY, NEXO_CALLBACK_API_KEY, NEXO_BASE_URL
 docker compose up -d --build --wait
-curl http://localhost:8000/health
+curl http://localhost:8081/health
 ```
 
-Swagger interactivo en `http://localhost:8000/docs` — botón "Authorize"
+El contenedor sigue escuchando en el puerto 8000 puertas adentro, pero se
+publica en el host en el **8081** por defecto (`CUBICADOR_HOST_PORT` en
+`.env`) — a propósito, para no chocar con el 8080 donde corre el backend
+.NET de NEXO. Si 8081 tampoco sirve, cambiá `CUBICADOR_HOST_PORT=8082`.
+
+Swagger interactivo en `http://localhost:8081/docs` — botón "Authorize"
 arriba a la derecha, pega ahí tu `CUBICADOR_API_KEY` (sin la palabra
 "Bearer", Swagger la agrega sola) y queda aplicado a todos los endpoints.
+También hay un contrato OpenAPI ya exportado en
+[`docs/openapi.json`](./docs/openapi.json) (importable en Postman/Insomnia o
+para generar un cliente), y una guía corta de integración en
+[`CONTRATO.md`](./CONTRATO.md).
 
 **Correr las pruebas:**
 
