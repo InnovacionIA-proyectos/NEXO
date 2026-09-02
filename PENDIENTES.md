@@ -85,26 +85,32 @@ suite completa contra Docker real sin regresión.
   `ReglaDeCosteo`, `PropuestaTarifaAdapter` (más allá de esa función) ni en
   pantallas.
 
-## Set de datos para el equipo de datos (S2-HU-10.1, #35)
+## Set de datos para el equipo de datos (S2-HU-10, Habilitador B8)
 
-Vistas de solo lectura en el esquema `analitica` (migración
-`VistasAnaliticaSoloLectura`), diccionario completo en
-[`docs/analitica/DICCIONARIO_DATOS.md`](docs/analitica/DICCIONARIO_DATOS.md).
-Cobertura: solicitudes, líneas, cotizaciones, líneas de cotización, conexos,
-tarifas ganadas archivadas, auditoría, y catálogos (clientes/rutas/
-vehículos/servicios/usuarios) — más `analitica.inconsistencias`, que
-documenta registros con datos irregulares en vez de descartarlos en
-silencio. Verificado contra SQL Server real (Docker): migración y rollback
-aplicados sin error, las 13 vistas devuelven filas contra el dataset de
-demostración.
+Entregable completo en [`analitica/`](analitica/README.md), en 3 partes:
+
+- **S2-HU-10.1 (`#35`)**: vistas de solo lectura en el esquema `analitica`
+  (migración `VistasAnaliticaSoloLectura`, luego `RecrearVistasAnaliticaEn
+  DboNexoPrueba` cuando el esquema base se movió a `dbo_NEXO_prueba`).
+  Cobertura: solicitudes, líneas, cotizaciones, líneas de cotización,
+  conexos, tarifas ganadas archivadas, auditoría, y catálogos (clientes/
+  rutas/vehículos/servicios/usuarios) — más `analitica.inconsistencias`, que
+  documenta registros con datos irregulares en vez de descartarlos en
+  silencio. Diccionario en
+  [`analitica/00-fuentes/bd-propia/DICCIONARIO_DATOS.md`](analitica/00-fuentes/bd-propia/DICCIONARIO_DATOS.md).
+- **S2-HU-10.2 (`#36`)**: 4 extractos puntuales de las fuentes de lectura
+  corporativas (piso SICE-TAC, tarifa de plaza SAP, histórico SAP, catálogo
+  de clientes) — ver
+  [`analitica/00-fuentes/fuentes-corporativas/README.md`](analitica/00-fuentes/fuentes-corporativas/README.md)
+  para fecha de corte, volumen y llaves de cruce.
+- **S2-HU-10.3 (`#37`)**: consolidación del set final versionado
+  (`analitica/01-set-final/v1.0.0-piloto/`), con diccionario y linaje
+  unificados de ambos lados y un reporte de control de calidad cruzado.
 
 **Pendiente, fuera del alcance de esta sesión**: ejecutar la extracción real
-(el export que recibe el equipo de datos) contra la base de producción, en
-ventana de bajo uso, con una cuenta de solo lectura sobre el esquema
-`analitica` — esta sesión no tiene acceso a esa base. El alcance acordado
-("foto única") también deja fuera de este repositorio los extractos de las
-4 fuentes de lectura externas (DwSice/DwCubos/DbSolucionesTi): el issue #35
-es específicamente sobre la BD propia (`CabinaFletes`).
+contra la base de producción (no un ambiente de pruebas), en ventana de bajo
+uso, con una cuenta de solo lectura acotada al esquema `analitica` — sigue
+sin haber acceso a esa base.
 
 ## Transversales (no bloqueantes, a decidir cuando haga falta)
 

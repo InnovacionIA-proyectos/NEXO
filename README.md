@@ -108,12 +108,16 @@ app. El DDL completo, comentado tabla por tabla, está en
 [`docs/Database/ESQUEMA_NEXO.sql`](docs/Database/ESQUEMA_NEXO.sql) (generado
 contra el catálogo real, no escrito a mano).
 
-**Set de datos para el equipo de datos** (S2-HU-10, `#35`): el esquema
-`analitica` tiene vistas de solo lectura (`WITH (NOLOCK)`, sin interferir
-con la operación) sobre cotizaciones, líneas, resultados, tarifas ganadas
-archivadas y auditoría — más `analitica.inconsistencias`, que documenta
-registros con datos irregulares en vez de descartarlos. Diccionario completo
-en [`docs/analitica/DICCIONARIO_DATOS.md`](docs/analitica/DICCIONARIO_DATOS.md).
+**Set de datos para el equipo de datos** (S2-HU-10, Habilitador B8): el
+esquema `analitica` tiene vistas de solo lectura (`WITH (NOLOCK)`, sin
+interferir con la operación) sobre cotizaciones, líneas, resultados, tarifas
+ganadas archivadas y auditoría — más `analitica.inconsistencias`, que
+documenta registros con datos irregulares en vez de descartarlos (S2-HU-10.1,
+`#35`). Se complementa con 4 extractos puntuales de las fuentes corporativas
+de solo lectura (piso SICE-TAC, tarifa de plaza SAP, histórico SAP, catálogo
+de clientes — S2-HU-10.2, `#36`) y un set final consolidado, versionado y con
+diccionario/linaje/control de calidad cruzado (S2-HU-10.3, `#37`). Todo vive
+en [`analitica/`](analitica/README.md) — empezar por ese README.
 
 ### Data Warehouses corporativos (solo lectura, todos opcionales)
 
