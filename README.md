@@ -157,7 +157,13 @@ contenedor pueda completar ese handshake sin afectar al resto del sistema.
   queda cerrada por una compuerta de paridad
   (`Cubicacion:ParidadVerificada`/`ParidadEvidencia`/`ParidadFecha`) hasta
   que el motor confirme 26/26 en sus golden tests — ver `PENDIENTES.md`,
-  sección "Plan de cargue".
+  sección "Plan de cargue". Cubicador también expone su propia API REST
+  (para un frontend que la consuma directo, no para NEXO) — ver
+  [`cubicador/CONTRATO.md`](./cubicador/CONTRATO.md). En sentido inverso,
+  NEXO sí expone un único endpoint HTTP de solo lectura para que Cubicador
+  llame de vuelta (`GET /api/lineas-solicitud/{id}/cubicacion`, puente
+  "crear plan desde línea" — `LineasSolicitudCubicacionController`,
+  autenticación de servicio-a-servicio dedicada, ver `PENDIENTES.md`).
 
 ### Variables de entorno
 

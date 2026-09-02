@@ -38,8 +38,13 @@ services:
       CUBICADOR_RABBITMQ_URL: amqp://${RABBITMQ_USER:?definir en .env}:${RABBITMQ_PASSWORD:?definir en .env}@rabbit:5672/
       NEXO_BASE_URL: ${NEXO_BASE_URL:?definir en .env}
       NEXO_CALLBACK_API_KEY: ${NEXO_CALLBACK_API_KEY:?definir en .env}
+      CUBICADOR_CORS_ORIGENES: ${CUBICADOR_CORS_ORIGENES:-}
     ports:
-      - "8000:8000"
+      # El contenedor sigue escuchando en 8000 puertas adentro (Dockerfile);
+      # solo cambia el puerto publicado al host, para no chocar con el 8080
+      # donde corre el backend .NET de NEXO. Configurable por si 8081 tampoco
+      # sirve (ej. CUBICADOR_HOST_PORT=8082 en el .env).
+      - "${CUBICADOR_HOST_PORT:-8081}:8000"
     depends_on:
       db:
         condition: service_healthy

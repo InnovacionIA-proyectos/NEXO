@@ -1,4 +1,4 @@
-"""Publicador de eventos hacia RabbitMQ (ver docs/CONTRATOS.md seccion B):
+"""Publicador de eventos hacia RabbitMQ (ver CONTRATO.md seccion 6):
 exchange `cubicador.eventos` (topic), routing keys `cubicacion.solicitada`,
 `plan-de-cargue.generado`, `cubicacion.rechazada`, `plan-de-cargue.ajustado`.
 

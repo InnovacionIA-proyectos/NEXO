@@ -1,5 +1,5 @@
 """Implementa ILineaSolicitudPort: GET /api/lineas-solicitud/{id}/cubicacion
-en NEXO (ver docs/CONTRATOS.md seccion E). NEXO es quien debe exponer este
+en NEXO (ver CONTRATO.md seccion 7). NEXO es quien debe exponer este
 endpoint - ver docs/DECISIONES_TECNICAS.md #8."""
 
 from __future__ import annotations

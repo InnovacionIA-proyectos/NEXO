@@ -1,4 +1,4 @@
-"""DTOs HTTP del Cubicador 3D / Plan de Cargue - ver docs/CONTRATOS.md seccion A."""
+"""DTOs HTTP del Cubicador 3D / Plan de Cargue - ver CONTRATO.md seccion 3.2."""
 
 from __future__ import annotations
 
@@ -235,7 +235,7 @@ class CrearPlanRequest(ApiModel):
 
 
 class SolicitudEncoladaDto(ApiModel):
-    """Respuesta 202 de una operacion que se resuelve async (ver docs/CONTRATOS.md seccion B)."""
+    """Respuesta 202 de una operacion que se resuelve async (ver CONTRATO.md seccion 6)."""
 
     correlation_id: str
     estado: str = "procesando"

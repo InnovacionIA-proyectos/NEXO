@@ -9,7 +9,9 @@ mano): falla (exit != 0) si el flujo real no llega al resultado esperado, en
 vez de solo revisar el codigo por lectura.
 
 Requiere el stack de cubicador ya levantado y sano (`docker compose up -d
---build --wait`) con el puerto de la api publicado al host (8000), Y el
+--build --wait`) con el puerto de la api publicado al host (8081 por
+defecto, CUBICADOR_HOST_PORT en .env - el contenedor sigue escuchando en
+8000 puertas adentro), Y el
 `rabbit` compartido de NEXO (docker-compose.yml raiz, ver
 DECISIONES_TECNICAS.md #9) levantado con SUS puertos publicados al host: AMQP
 en 5672 y su consola de administracion en 15672.
@@ -33,7 +35,7 @@ import time
 import aio_pika
 import httpx
 
-API_BASE_URL = os.environ.get("API_BASE_URL", "http://localhost:8000")
+API_BASE_URL = os.environ.get("API_BASE_URL", "http://localhost:8081")
 API_KEY = os.environ["CUBICADOR_API_KEY"]
 RABBITMQ_USER = os.environ["RABBITMQ_USER"]
 RABBITMQ_PASS = os.environ["RABBITMQ_PASSWORD"]

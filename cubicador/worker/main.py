@@ -1,8 +1,8 @@
 """Worker consumidor de RabbitMQ: procesa `optimizar` y `crear_desde_linea`
 (las 2 operaciones pesadas, ver docs/DECISIONES_TECNICAS.md #5) fuera del
 proceso de la API. Consume `cubicacion.solicitada` y publica
-`plan-de-cargue.generado` o `cubicacion.rechazada` (ver docs/CONTRATOS.md
-seccion B).
+`plan-de-cargue.generado` o `cubicacion.rechazada` (ver CONTRATO.md
+seccion 6).
 
 Verificado contra un RabbitMQ real en Docker Compose (ver
 docs/testDocumentation/PRUEBAS_DE_INTEGRACION.md seccion 2.3): mensaje
