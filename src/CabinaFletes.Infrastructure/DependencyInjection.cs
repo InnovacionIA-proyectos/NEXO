@@ -228,6 +228,8 @@ public static class DependencyInjection
         // paridad (S2-HU-08.2, #30).
         services.AddScoped<IPlanCargueRepository, EfPlanCargueRepository>();
         services.AddScoped<IParidadCubicadorPort, ParidadCubicadorAdapter>();
+        // Puente de solo lectura hacia Solicitudes para el Cubicador (crear-desde-línea).
+        services.AddScoped<ILineaSolicitudCubicacionPort, LineaSolicitudCubicacionAdapter>();
 
         return services;
     }
