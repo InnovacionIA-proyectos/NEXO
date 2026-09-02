@@ -84,9 +84,7 @@ suite completa contra Docker real sin regresión.
 
 Vistas de solo lectura en el esquema `analitica` (migración
 `VistasAnaliticaSoloLectura`), diccionario completo en
-[`analitica/00-fuentes/bd-propia/DICCIONARIO_DATOS.md`](analitica/00-fuentes/bd-propia/DICCIONARIO_DATOS.md).
-Reubicado en S2-HU-10.3 dentro del nuevo workstream de datos (`analitica/`,
-ver `analitica/README.md`).
+[`docs/analitica/DICCIONARIO_DATOS.md`](docs/analitica/DICCIONARIO_DATOS.md).
 Cobertura: solicitudes, líneas, cotizaciones, líneas de cotización, conexos,
 tarifas ganadas archivadas, auditoría, y catálogos (clientes/rutas/
 vehículos/servicios/usuarios) — más `analitica.inconsistencias`, que

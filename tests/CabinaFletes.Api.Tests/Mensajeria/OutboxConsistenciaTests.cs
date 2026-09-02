@@ -66,7 +66,14 @@ public class OutboxConsistenciaTests : IAsyncLifetime
             var db = alcance.ServiceProvider.GetRequiredService<CabinaFletesDbContext>();
             await db.Database.MigrateAsync();
             // Arranca limpio: otra corrida pudo dejar mensajes sin entregar.
-            await db.Database.ExecuteSqlRawAsync("DELETE FROM OutboxMessage");
+            //
+            // ExecuteDeleteAsync en vez de SQL crudo a propósito: un "DELETE FROM
+            // OutboxMessage" sin calificar asume que la tabla vive en 'dbo', y dejó de
+            // ser cierto cuando CabinaFletesDbContext fijó HasDefaultSchema("dbo_NEXO_prueba")
+            // (issue #92). Pasando por el DbSet, EF Core resuelve el esquema real del
+            // modelo — no hay nada que hardcodear ni que se pueda desactualizar si el
+            // esquema vuelve a cambiar.
+            await db.Set<OutboxMessage>().ExecuteDeleteAsync();
         }
 
         _bus = _servicios.GetRequiredService<ITestHarness>();
