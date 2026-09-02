@@ -72,9 +72,9 @@ no importa para nada** — lo que hace falta es:
       que se va a llamar (protocolo+host+puerto, sin barra final).
 - [ ] Frontend: tiene el `CUBICADOR_API_KEY` correcto para el header
       `Authorization: Bearer`.
-- [ ] No asumir que `POST /desde-linea/{id}` funciona de punta a punta sin
-      antes confirmar que `GET /api/lineas-solicitud/{id}/cubicacion` ya
-      existe del lado NEXO — ver ⚠️ en la sección 5.
+- [ ] `POST /desde-linea/{id}`: `NEXO_CALLBACK_API_KEY` (`cubicador/.env`) debe
+      ser IDÉNTICA a `Cubicador3D__InboundApiKey` (`NEXO/.env`) — es el mismo
+      secreto compartido, visto desde cada lado (sección 5).
 
 ---
 
@@ -484,8 +484,10 @@ Authorization: Bearer <secreto correspondiente>
 
 - NEXO/frontend → este servicio: valida contra `CUBICADOR_API_KEY`
   (`api/dependencias.py:verificar_api_key`).
-- Este servicio → NEXO (llamada de `crear_desde_linea`, ver abajo): NEXO
-  debería validar contra `NEXO_CALLBACK_API_KEY`.
+- Este servicio → NEXO (llamada de `crear_desde_linea`, ver sección 7): NEXO
+  valida contra `Cubicador3D__InboundApiKey`
+  (`CubicadorApiKeyAuthenticationHandler`, esquema `CubicadorApiKey` aparte
+  de la sesión del portal) — debe ser IDÉNTICA a `NEXO_CALLBACK_API_KEY` acá.
 
 Sin identidad de usuario ni roles en ninguno de los dos sentidos — es un
 secreto de servicio, no un login.
@@ -568,14 +570,28 @@ Authorization: Bearer <NEXO_CALLBACK_API_KEY>
 Implementado del lado Cubicador en
 `infrastructure/clientes/nexo_client.py` (timeout fijo de 10s, sin reintentos).
 
-⚠️ **Verificar antes de depender de esto**: del lado NEXO (repo actual, rama
-`QA`) **no existe** ningún controlador ni query para esa ruta — confirmado
-con `grep -rn "lineas-solicitud" src/` sin resultados en `NEXO/src/`, y es
-consistente con lo que dice `NEXO/PENDIENTES.md` ("el flujo completo... no
-se implementa"). Si estás integrando `POST /desde-linea/{id}`, confirmá
-primero que ese endpoint ya exista en el checkout de NEXO con el que estás
-trabajando — no asumas que "está implementado y verificado" solo porque
-algún documento anterior lo dijo.
+**Implementado del lado NEXO** (`LineasSolicitudCubicacionController` +
+`ObtenerCubicacionLineaQuery` + `LineaSolicitudCubicacionAdapter`,
+autenticación `CubicadorApiKeyAuthenticationHandler` — ver sección 5): lee
+`LineaSolicitud` con su `Ruta`, deserializa `Dimensiones` (JSON ya
+capturado por `CapturarSolicitudCommand` desde antes de este puente — no
+hacía falta ningún cambio de captura) y devuelve `{ posiciones, origen,
+destino }`. Cubierto por 6 tests de integración HTTP contra SQL Server real
+(200 con posiciones/ruta, lista vacía, 404, 401 sin Bearer, 401 con Bearer
+incorrecto, 401 con la sesión del portal en vez del Bearer de servicio).
+
+**Verificado de punta a punta**, no solo por tests: `POST /desde-linea/{id}`
+real contra ambos stacks en Docker (NEXO + Cubicador + RabbitMQ compartido) —
+el worker llamó este endpoint (`GET .../cubicacion` → `200`), armó el plan
+con el vehículo sugerido por el cubicador rápido, y lo optimizó (3/3
+unidades cargadas, estables, sin incidencias). Único detalle de
+infraestructura a tener en cuenta si armás un compose combinado: NEXO y
+Cubicador tienen cada uno un servicio llamado `api` en su propio
+`docker-compose.yml` — si el worker de Cubicador se conecta a las dos redes
+a la vez, `NEXO_BASE_URL=http://api:8080` puede resolver al `api` EQUIVOCADO
+(el propio del cubicador). Usar el nombre de contenedor explícito
+(`http://nexo-api-1:8080`, o el que corresponda según `container_name`/
+nombre de proyecto Compose) evita la ambigüedad.
 
 ---
 

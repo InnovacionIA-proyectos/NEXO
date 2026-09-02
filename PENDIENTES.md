@@ -33,19 +33,24 @@ Las tres son obligatorias a la vez (`Domain.PlanDeCargue.Reglas.
 CompuertaDeParidad`): `ParidadVerificada=true` sin las otras dos dejas la
 compuerta cerrada igual, a propósito — no es un booleano suelto.
 
+**Resuelto**: "pedir un plan de cargue desde una línea de solicitud"
+(`crear_desde_linea` — botón Cubicar de la Mesa de Costeo → Cubicador 3D)
+funciona de punta a punta. `LineaSolicitud.Dimensiones` **ya capturaba** las
+posiciones (JSON escrito por `CapturarSolicitudCommand`, leído por
+`ObtenerCosteoQuery` — ver `PosicionCargaDto` en
+`Application/CasosDeUso/Solicitudes/DTOs`); lo único que faltaba era el
+endpoint que el Cubicador ya llamaba. `GET /api/lineas-solicitud/{id}
+/cubicacion` (`LineasSolicitudCubicacionController` +
+`ObtenerCubicacionLineaQuery` + `LineaSolicitudCubicacionAdapter`, ver
+`cubicador/CONTRATO.md` sección 6) lo expone ahora, con autenticación de
+servicio-a-servicio dedicada (`CubicadorApiKeyAuthenticationHandler`, Bearer
+contra `Cubicador3D:InboundApiKey` — separada de
+`IdentidadPortalAuthenticationHandler`, S2-HU-03). Verificado con 6 tests de
+integración HTTP contra SQL Server real y con una corrida real de punta a
+punta cruzando NEXO y Cubicador en Docker (`POST /desde-linea` → RabbitMQ →
+worker → este endpoint → motor 3D → plan optimizado).
+
 **Lo que SÍ falta, sin fecha todavía**:
-- **Solo soporta re-optimizar un plan que YA EXISTE** (con sus ítems) en la
-  base de Cubicador. El flujo "pedir un plan de cargue desde una línea de
-  solicitud" (`crear_desde_linea`, ver `cubicador/CONTRATO.md` sección
-  6) depende de un endpoint `GET /api/lineas-solicitud/{id}/cubicacion` que
-  Cubicador ya llama (`NexoLineaSolicitudClient`) pero que **NEXO todavía no
-  implementa** — y de datos de dimensiones/cantidad de bultos por línea que
-  hoy `LineaSolicitud` no captura. Es trabajo real, no trivial: requiere
-  decidir dónde vive esa captura antes de construir el endpoint.
-- El endpoint de arriba, cuando exista, es autenticación servicio-a-servicio
-  (`Authorization: Bearer NEXO_CALLBACK_API_KEY`), no la sesión del portal —
-  necesita su propio esquema de autenticación aparte de
-  `IdentidadPortalAuthenticationHandler` (S2-HU-03).
 - No hay ajuste manual de colocaciones expuesto todavía (existe en el
   dominio — `ColocacionCargue.AjusteManual` — pero ningún caso de uso lo usa).
 

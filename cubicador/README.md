@@ -18,17 +18,18 @@ con su propia base de datos (Postgres, contenedor propio). NEXO lo consume
 vía REST (operaciones simples) y RabbitMQ (operaciones pesadas: optimizar,
 crear plan desde línea).
 
-**Nota sobre el puente hacia NEXO**: el endpoint que NEXO debe exponer para
-"crear plan desde línea" (`GET /api/lineas-solicitud/{id}/cubicacion`) fue
-construido en una fase anterior, en la rama `cubicador` de este mismo repo
-(un módulo C# de Cubicación 3D que quedó descartado con el cambio de
-dirección hacia este microservicio). **Esta rama no lo tiene** — si vas a
-probar `crear_desde_linea`, necesitas ese endpoint corriendo desde la otra
-rama, o usar `infrastructure/clientes/nexo_client.py` contra un NEXO que sí
-lo tenga. Además, la decisión técnica de S2-HU-072 apunta a que la
-comunicación NEXO↔Cubicador termine siendo solo por colas (RabbitMQ/
-MassTransit, S2-HU-04, aparte) — este endpoint REST podría no ser el
-mecanismo final.
+**Nota sobre el puente hacia NEXO** (actualizado 2026-09-02): el endpoint que
+NEXO expone para "crear plan desde línea" (`GET /api/lineas-solicitud/{id}
+/cubicacion`) ya está implementado y verificado en el NEXO real
+(`LineasSolicitudCubicacionController`, ver `PENDIENTES.md` y
+`docs/testDocumentation/PRUEBAS_DE_INTEGRACION.md` sección 2.9). Hubo un
+primer intento en una rama vieja del repo de NEXO (`cubicador`) que nunca se
+mezcló y quedó descolgada — ese diseño es el que se portó a la
+implementación actual. La comunicación NEXO→Cubicador sigue siendo por
+colas (RabbitMQ/MassTransit) para las operaciones pesadas; este es el único
+endpoint REST, en sentido inverso (Cubicador→NEXO), y es deliberadamente
+así — es una consulta de solo lectura puntual, no encaja en el patrón de
+eventos.
 
 Ver:
 - [`CONTRATO.md`](./CONTRATO.md) — API REST, eventos de RabbitMQ, DTOs, errores, autenticación: todo lo necesario para conectar backend o frontend contra este servicio.
@@ -182,6 +183,26 @@ Ver:
   `optimizar`, y confirma que el evento real llega por ahí, no solo que el
   efecto quedó en la base de datos.
 
+**Endpoint de NEXO para `crear_desde_linea` — implementado y verificado
+(2026-09-02):** el bullet de arriba (`infrastructure/clientes/nexo_client.py`
+verificado "contra la API de NEXO... rama `cubicador`") describía una
+verificación contra una rama que **nunca se mezcló a `QA`** — quedó
+descolgada antes de la reorganización del código por feature. `GET
+/api/lineas-solicitud/{id}/cubicacion` no existía en ningún checkout real de
+NEXO hasta ahora. Se portó el diseño de esa rama vieja (adaptado a la
+estructura actual: CQRS por feature, no por capa) al NEXO real:
+`LineasSolicitudCubicacionController` + `ObtenerCubicacionLineaQuery` +
+`LineaSolicitudCubicacionAdapter`, con autenticación de servicio-a-servicio
+dedicada (`CubicadorApiKeyAuthenticationHandler`, esquema `CubicadorApiKey`
+separado de la sesión del portal). `LineaSolicitud.Dimensiones` ya capturaba
+las posiciones desde antes — no hizo falta ningún cambio de captura, solo el
+endpoint. Verificado con 6 tests de integración HTTP contra SQL Server real
+(200/404/401 en sus tres variantes) y con una corrida real de punta a punta
+cruzando los dos stacks en Docker: `POST /desde-linea/{id}` → RabbitMQ →
+worker → `GET .../cubicacion` (200) → plan armado con el vehículo sugerido
+por el cubicador rápido → optimizado, 3/3 unidades cargadas. Detalle
+completo en `cubicador/CONTRATO.md` sección 7 y en `NEXO/PENDIENTES.md`.
+
 ## CI
 
 `.github/workflows/cubicador-ci.yml` (raíz del repo NEXO, con
@@ -209,9 +230,9 @@ jobs en cada push/PR a `QA`/`main`:
   script a la topología interna del compose de una forma que no valía la
   pena para CI — sigue siendo procedimiento manual (ver
   `docs/testDocumentation/PRUEBAS_DE_INTEGRACION.md` sección 2.4).
-- `crear_plan_desde_linea` de punta a punta contra un NEXO real: el job de
-  CI no levanta el repo NEXO — sigue siendo verificación manual con ambos
-  stacks corriendo a la vez (sección 2.6 del mismo documento).
+- `crear_plan_desde_linea` de punta a punta contra un NEXO real: verificado
+  manualmente (ver el bullet fechado 2026-09-02 más abajo), pero el job de
+  CI no levanta el repo NEXO — sigue sin automatizarse.
 
 ## Puesta en marcha
 
@@ -267,9 +288,24 @@ pytest
 
 ## Cómo se conecta con NEXO
 
-- **NEXO → este servicio**: REST síncrono para todo salvo optimizar/crear-desde-línea, que van por RabbitMQ (202 inmediato, resultado por polling — ver arriba). Autenticación: `Authorization: Bearer <CUBICADOR_API_KEY>`.
-- **Este servicio → NEXO**: un único endpoint de solo lectura que NEXO debe exponer (`GET /api/lineas-solicitud/{id}/cubicacion`) para el puente Mesa de Costeo → Cubicador. Autenticación: `Authorization: Bearer <NEXO_CALLBACK_API_KEY>`. **Ese endpoint solo existe en la rama `cubicador` de este repo** (ver nota al inicio de este README) — en esta rama, `crear_desde_linea` no tiene con qué hablar hasta que se decida el mecanismo final (posiblemente colas, no REST — ver S2-HU-04).
-- Aunque ahora viven en el mismo repo, siguen sin compartir red Docker ni base de datos — cada uno tiene su propio `docker-compose.yml` y todo cruce es por API o mensaje, nunca por tabla compartida.
+- **NEXO → este servicio**: NEXO **no llama** a la API REST de este
+  servicio (ver `CONTRATO.md` sección 1.1). `optimizar`/`crear-desde-línea`
+  van por RabbitMQ (202 inmediato del lado Cubicador, resultado por
+  polling). La API REST de este servicio es para un frontend que la
+  consuma directo, no para NEXO — autenticación `Authorization: Bearer
+  <CUBICADOR_API_KEY>`.
+- **Este servicio → NEXO**: un único endpoint de solo lectura, en sentido
+  inverso, que NEXO ya expone (`GET /api/lineas-solicitud/{id}/cubicacion`,
+  `LineasSolicitudCubicacionController`) para el puente Mesa de Costeo →
+  Cubicador (`crear_desde_linea`). Autenticación de servicio-a-servicio
+  dedicada: `Authorization: Bearer <NEXO_CALLBACK_API_KEY>` (debe ser
+  idéntica a `Cubicador3D__InboundApiKey` del `.env` de NEXO). Implementado
+  y verificado de punta a punta — ver `CONTRATO.md` sección 7 y
+  `docs/testDocumentation/PRUEBAS_DE_INTEGRACION.md` sección 2.9.
+- Siguen sin compartir red Docker ni base de datos entre sí como norma —
+  cada uno tiene su propio `docker-compose.yml` y todo cruce es por
+  RabbitMQ (compartido, ver "Puesta en marcha") o por este único endpoint
+  HTTP puntual, nunca por tabla compartida.
 
 ## Alcance explícitamente fuera de esta primera versión
 

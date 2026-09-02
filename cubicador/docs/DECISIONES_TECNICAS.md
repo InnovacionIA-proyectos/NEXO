@@ -192,16 +192,25 @@ ServiciosConexos, Métricas, TarifasSicetacAdmin) referencia
 `PlanCargue`/`VehiculoCubicacion`/`ColocacionCargue`/`ItemPlanCargue`/
 `ParametrosCubicacion` ni los servicios/puertos del cubicador.
 
-**Implementado y verificado**: este endpoint ya existe en NEXO
-(`LineasSolicitudController`/`ObtenerCubicacionLineaQuery`, rama
-`cubicador`, ver `MIGRACION.md` décima pasada de ese repo). Verificado de
-punta a punta con los dos stacks de Docker reales corriendo a la vez (ver
+**Implementado y verificado** (2026-09-02): este endpoint ya existe en NEXO
+(`LineasSolicitudCubicacionController`/`ObtenerCubicacionLineaQuery`/
+`LineaSolicitudCubicacionAdapter`, autenticación dedicada
+`CubicadorApiKeyAuthenticationHandler`). ⚠️ Nota histórica: una versión
+anterior de este párrafo decía que el endpoint vivía en la rama `cubicador`
+de NEXO — esa rama **nunca se mezcló** y quedó descolgada antes de la
+reorganización del código por feature; el diseño de ahí se portó (adaptado
+a la estructura actual) al NEXO real recién ahora. Verificado de punta a
+punta con los dos stacks de Docker reales corriendo a la vez (ver
 `docs/testDocumentation/PRUEBAS_DE_INTEGRACION.md` secciones 2.5 y 2.6):
 `infrastructure/clientes/nexo_client.py` contra la API de NEXO directamente,
 y `POST /desde-linea/{id}` disparando el camino completo (router → RabbitMQ
-→ worker → NEXO → plan creado y optimizado). Esta segunda prueba encontró un
-bug real en `worker/main.py` (leía `lineaSolicitudId` en el nivel raíz del
-mensaje en vez de dentro de `solicitud`) — corregido.
+→ worker → NEXO → plan creado y optimizado, 3/3 unidades cargadas). Esta
+segunda prueba encontró un bug real de infraestructura: NEXO y Cubicador
+tienen cada uno un servicio llamado `api` en su propio `docker-compose.yml`
+— con el worker conectado a las dos redes Docker a la vez,
+`NEXO_BASE_URL=http://api:8080` resolvía al `api` del propio Cubicador, no
+al de NEXO. Corregido usando el nombre de contenedor explícito
+(`http://nexo-api-1:8080`).
 
 ## 9. Infraestructura y RabbitMQ
 

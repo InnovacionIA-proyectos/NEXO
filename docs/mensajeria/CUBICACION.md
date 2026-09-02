@@ -98,8 +98,11 @@ optimiza un plan que él mismo persiste, no uno que solo NEXO conoce. Hoy nada
 crea ese plan del lado de Cubicador a partir de esta solicitud: quien dispare
 `ICubicacionPort.SolicitarCubicacionAsync` primero necesita que el plan (con
 sus ítems) ya exista en Cubicador — vía su propia API REST, o vía el puente
-`crear_desde_linea` (que a su vez depende de un endpoint de NEXO que tampoco
-existe todavía en esta rama, ver `cubicador/CONTRATO.md` sección 7).
+`crear_desde_linea`, que a su vez llama de vuelta a NEXO
+(`GET /api/lineas-solicitud/{id}/cubicacion`,
+`LineasSolicitudCubicacionController`, autenticación
+`CubicadorApiKeyAuthenticationHandler` — ver `cubicador/CONTRATO.md`
+sección 7). Verificado de punta a punta.
 
 ### Eventos entrantes: Cubicador → NEXO
 
