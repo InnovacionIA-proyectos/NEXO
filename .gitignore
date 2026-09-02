@@ -28,8 +28,3 @@ appsettings.*.local.json
 # OS
 Thumbs.db
 .DS_Store
-
-# Documentos de trabajo local, no se versionan
-docs/analisis-dw-sap-baseline-cubicador.md
-docs/captura-prueba-rutas-reales.xlsx
-docs/diccionario-datos-cabinafletes.md

@@ -205,59 +205,6 @@ Característica: Identidad e integración con el portal de la Administración
     Y la fuente de la propuesta queda trazada como "provisional"
     Y una línea sobre una ruta marcada "sin plaza" en el dataset no propone nada solo
       con esa fuente, igual que si no hubiera plaza real
-
-  # ------------------------------------------------- contexto de mercado (DW externos)
-
-  # Insumo real (S2-HU-10, Habilitador B8 parte 1):
-  # analitica/00-fuentes/fuentes-corporativas/{README.md,*.csv}
-  # (4 extractos puntuales desde los 4 data warehouses de solo lectura: piso
-  # SICE-TAC, tarifa de plaza SAP, histórico SAP y catálogo de clientes — ver el
-  # README de esa carpeta para fecha de corte, volumen, llaves de cruce y
-  # hallazgos). Es el insumo de contexto de mercado para el EDA de S2-HU-11,
-  # que corre sobre este set y sobre el de S2-HU-10.1 (issue #35); no se consume
-  # desde ningún flujo del producto real.
-  @hu-10 @habilitador-b8
-  Escenario: Contexto de mercado entregado y documentado para el EDA
-    Dado un extracto puntual de piso SICE-TAC, tarifa de plaza SAP, histórico SAP
-      y catálogo de clientes, sacado de los 4 data warehouses de solo lectura
-    Cuando se publica junto con su documentación
-    Entonces cada archivo tiene su fecha de corte y su volumen de filas documentados
-    Y las llaves de cruce contra el histórico propio quedan identificadas para ruta,
-      vehículo, período y cliente
-    Y no se reporta impacto sobre los data warehouses compartidos durante la extracción
-
-  # Insumo real (S2-HU-10, Habilitador B8 parte 3):
-  # analitica/01-set-final/v1.0.0-piloto/{README.md,diccionario-y-linaje.md,
-  # reporte-inconsistencias.md} + los crudos en analitica/00-fuentes/ — une la
-  # BD propia (S2-HU-10.1, issue #35) con los extractos corporativos
-  # (S2-HU-10.2, issue #36) en un solo entregable versionado. No es un DW ni
-  # un cubo, y no impone grano ni variable objetivo — eso lo decide el EDA de
-  # S2-HU-11.
-  @hu-10 @habilitador-b8
-  Escenario: El set final queda consolidado, versionado y con diccionario y linaje
-    Dado el lado propio (BD CabinaFletes) y el lado externo (4 fuentes corporativas)
-      ya extraídos y documentados por separado
-    Cuando se publican juntos como un set final con número de versión
-    Entonces existe un diccionario único que explica cada columna, su significado,
-      su unidad y de qué tabla de origen viene
-    Y cada tabla conserva su propio grano — ninguna columna del set final resulta
-      de aplanar varias fuentes en una sola tabla ancha
-
-  @hu-10 @habilitador-b8
-  Escenario: Los registros incompletos o contradictorios se documentan, no se descartan
-    Dado un registro con datos incompletos o contradictorios en cualquiera de las
-      dos fuentes del set final
-    Cuando se genera el reporte de inconsistencias
-    Entonces ese registro aparece en el reporte con el tipo de caso y su causa
-    Y el registro sigue presente en su archivo original, sin ser eliminado en silencio
-
-  @hu-10 @habilitador-b8
-  Escenario: La entrega al equipo de datos queda registrada
-    Dado el set final ya consolidado, versionado y con su control de calidad documentado
-    Cuando se entrega al equipo de datos
-    Entonces queda registrada la fecha de entrega y el contenido exacto entregado
-    Y la versión entregada queda identificada para poder rastrearla después
-
   @hu-051 @priorizacion
   Escenario: La bandeja se reordena al recalcular el puntaje por paso del tiempo
     Dado un trabajo de recálculo programado en el broker

@@ -88,6 +88,9 @@ valor aquí con un handler por caso de uso.
 | Tarifas SICE-TAC Admin | `/api/tarifas-sicetac` | Caché LOCAL del piso SICE-TAC, cargada por import Excel administrativo (distinta de Biblioteca, que consulta el DW en vivo). |
 | Métricas | `/api/metricas` | KPIs del Tablero del Líder: cumplimiento de SLA, licitaciones perdidas, cola por estado. |
 | Plan de Cargue | `/api/planes-cargue` | Orquestación async del motor Cubicador (S2-HU-08): pedir la optimización de un plan (202+id), avance por SignalR, consulta de respaldo. Cerrado por compuerta de paridad hasta que el motor confirme 26/26 en los golden tests — ver sección 3. |
+| Sesión | `/api/sesion` | Identidad resuelta del portal (`X-Portal-Usuario-Id`): id, nombre, rol y capacidades para pintar la UI. |
+| Priorización | `/api/priorizacion/parametros` | Recalibrar los pesos del score (solo Admin); dispara el recálculo persistido en segundo plano. |
+| Trabajos | `/api/trabajos` | Consulta de respaldo del estado de cualquier trabajo pesado (auto-costeo, etc.), sin depender de haber recibido un aviso por SignalR. |
 
 ## 3. Infraestructura
 
@@ -97,12 +100,20 @@ SQL Server. `CabinaFletesDbContext` (EF Core 10) es la única fuente de
 escritura; las migraciones ya versionadas viven en
 `src/CabinaFletes.Infrastructure/Persistence/Migrations`.
 
+Cuando la BD de destino es compartida con otra aplicación (p. ej. la de
+pruebas antes de producción, `dbInformesAutomatizados_Pruebas`), las tablas
+de NEXO NO van al esquema `dbo` por defecto: `CabinaFletesDbContext` fija
+`HasDefaultSchema("dbo_NEXO_prueba")`, así no se mezclan con las de la otra
+app. El DDL completo, comentado tabla por tabla, está en
+[`docs/Database/ESQUEMA_NEXO.sql`](docs/Database/ESQUEMA_NEXO.sql) (generado
+contra el catálogo real, no escrito a mano).
+
 **Set de datos para el equipo de datos** (S2-HU-10, `#35`): el esquema
 `analitica` tiene vistas de solo lectura (`WITH (NOLOCK)`, sin interferir
 con la operación) sobre cotizaciones, líneas, resultados, tarifas ganadas
 archivadas y auditoría — más `analitica.inconsistencias`, que documenta
 registros con datos irregulares en vez de descartarlos. Diccionario completo
-en [`analitica/00-fuentes/bd-propia/DICCIONARIO_DATOS.md`](analitica/00-fuentes/bd-propia/DICCIONARIO_DATOS.md).
+en [`docs/analitica/DICCIONARIO_DATOS.md`](docs/analitica/DICCIONARIO_DATOS.md).
 
 ### Data Warehouses corporativos (solo lectura, todos opcionales)
 
@@ -153,7 +164,9 @@ contenedor pueda completar ese handshake sin afectar al resto del sistema.
 Ver [`.env.example`](.env.example) para el listado completo y comentado.
 Resumen de las obligatorias para levantar la Api:
 
-- `ConnectionStrings__CabinaFletes` (o `MSSQL_SA_PASSWORD` si se usa Docker Compose).
+- `ConnectionStrings__CabinaFletes` (en Docker Compose, con el servicio `db`
+  local descomentado, en cambio la obligatoria es `MSSQL_SA_PASSWORD` — ver
+  sección 3, subsección Docker).
 - Todo lo demás (DWs, SMTP) es opcional: el sistema se degrada, nunca se
   cae, si falta. Dos excepciones:
   - `ConnectionStrings:IdentidadPortal`: opcional en Desarrollo/QA (cae al
@@ -167,11 +180,15 @@ Resumen de las obligatorias para levantar la Api:
 
 - `src/CabinaFletes.Api/Dockerfile`: build multi-stage (.NET 10 SDK → ASP.NET
   Core runtime), usuario sin privilegios, healthcheck vía `/health`.
-- `docker-compose.yml` (raíz): servicios `db` (SQL Server 2022) y `api`, más
-  un perfil `seed` para sembrar datos de demostración en un solo comando.
-  No incluye frontend (fuera de alcance de este repositorio). Cubicador
-  (`cubicador/`) tiene su propio `docker-compose.yml`, despliegue
-  independiente — solo comparte el broker `rabbit` de este stack.
+- `docker-compose.yml` (raíz): servicios `rabbit` y `api`, más un perfil
+  `seed` para sembrar datos de demostración en un solo comando. El servicio
+  `db` (SQL Server 2022 local) está **comentado, no eliminado** — se usa
+  cuando se apunta a una BD de pruebas/producción real vía
+  `ConnectionStrings__CabinaFletes` en `.env`; descomentarlo (y el
+  `depends_on`/la variable de `api` que lo referencian) para volver a un SQL
+  Server local en contenedor. No incluye frontend (fuera de alcance de este
+  repositorio). Cubicador (`cubicador/`) tiene su propio `docker-compose.yml`,
+  despliegue independiente — solo comparte el broker `rabbit` de este stack.
 
 ### Integración con el portal de la Administración (S2-HU-02, issue #8)
 
@@ -291,8 +308,10 @@ Swagger UI queda disponible en `/swagger` cuando
 
 ```bash
 cp .env.example .env
-# Editar .env: como mínimo, MSSQL_SA_PASSWORD (>= 8 caracteres, con
-# mayúscula, minúscula, dígito y símbolo; evitar '$' y '#').
+# Editar .env: como mínimo, ConnectionStrings__CabinaFletes (apunta a la BD
+# real de pruebas/producción — el servicio 'db' local está deshabilitado por
+# defecto, ver sección 3). Para volver a un SQL Server local en contenedor,
+# descomentar 'db' en docker-compose.yml y completar MSSQL_SA_PASSWORD.
 
 docker compose up -d --build
 # La Api queda en http://localhost:${API_PORT:-8080} (health: /health).
@@ -313,111 +332,25 @@ módulos que las usan se degradan solos.
 
 ## 7. API
 
-Todos los endpoints requieren autenticación (`[Authorize]`); algunos exigen
-además un rol específico (`Roles = "..."`), indicado entre paréntesis.
-Los errores siguen un formato uniforme (`ErrorHandlingMiddleware`):
+Todos los endpoints requieren autenticación (`X-Portal-Usuario-Id`, ver
+sección 4); algunos exigen además uno de los 6 roles de Nexo. Los errores
+siempre tienen la misma forma (`ErrorHandlingMiddleware`):
 
 ```json
-{ "codigo": "CODIGO_DE_ERROR", "mensaje": "Descripción legible.", "fecha": "2026-08-13T12:00:00Z", "detalles": { } }
+{ "code": "CODIGO_DE_ERROR", "message": "Descripción legible.", "timestamp": "2026-08-13T12:00:00Z", "details": null }
 ```
 
-| Código HTTP | Origen |
-|---|---|
-| 400 | `ValidationFailedException` — regla de negocio violada o input inválido |
-| 404 | `NotFoundException` — el recurso no existe |
-| 409 | `ConflictException` — conflicto con el estado actual del recurso |
-| 503 | `ServiceUnavailableException` — dependencia externa no configurada (p. ej. un DW opcional) |
+**La referencia completa — cada endpoint, qué rol lo exige, qué mandar en el
+`body`/`query`, qué esperar en la respuesta (con los tipos, estilo TypeScript)
+y el catálogo de errores — vive en [`CONTRATO.md`](CONTRATO.md).** Es lo que
+debe consultar el frontend; esta sección del README no la duplica para que no
+queden dos fuentes de la verdad divergiendo con el tiempo.
 
-### Cotizaciones — `/api/cotizaciones`
-
-| Método | Ruta | Rol | Propósito |
-|---|---|---|---|
-| POST | `/` | Comercial, AdminTarifas, CoordinadorFletes, Admin | Crear cotización para una solicitud |
-| GET | `/{id}` | cualquiera autenticado | Obtener cotización |
-| POST | `/{id}/aplicar-propuestas` | Comercial, AdminTarifas, CoordinadorFletes, Admin | Aplicar propuestas de tarifa (Biblioteca) a las líneas |
-| POST | `/{id}/lineas` | AdminTarifas, CoordinadorFletes, Admin | Agregar línea de flete |
-| POST | `/{id}/conexos` | Comercial, CoordinadorFletes, Admin | Agregar servicios conexos |
-| POST | `/{id}/entregar` | AdminTarifas, CoordinadorFletes, Admin | Entregar al comercial (dispara notificación SMTP) |
-| POST | `/{id}/resultado` | Comercial, AdminTarifas, CoordinadorFletes, Admin | Marcar ganada/perdida (realimenta Tarifas Ganadas si gana) |
-| GET | `/{id}/exportar-excel` | cualquiera autenticado | Exportar la cotización a Excel |
-
-### Solicitudes / Captura — `/api/solicitudes`, `/api/captura-solicitudes`
-
-| Método | Ruta | Rol | Propósito |
-|---|---|---|---|
-| GET | `/api/solicitudes` | cualquiera autenticado | Bandeja Priorizada (filtros por atención/estado/fechas) |
-| GET | `/api/solicitudes/{id}` | cualquiera autenticado | Detalle con líneas |
-| POST | `/api/solicitudes` | CoordinadorFletes, Admin | Alta de solicitud (spot/licitación) |
-| POST | `/api/solicitudes/{id}/lineas:bulk` | CoordinadorFletes, Admin | Carga masiva de líneas |
-| POST | `/api/solicitudes/{id}/rechazar` | Comercial, CoordinadorFletes, Admin | Rechazar/descartar |
-| POST | `/api/solicitudes/{id}/recalcular-score` | CoordinadorFletes, Admin | Recalcular score manualmente |
-| POST | `/api/captura-solicitudes/analizar-excel` | Comercial, Admin | Analizar un Excel antes de capturarlo |
-| POST | `/api/captura-solicitudes` | Comercial, Admin | Capturar líneas desde Excel (dispara auto-costeo si aplica) |
-| GET | `/api/captura-solicitudes/aprovisionamiento` | Comercial, Admin | Estimación de aprovisionamiento |
-| GET | `/api/captura-solicitudes/clientes` | Comercial, Admin | Búsqueda de clientes (local + DW) |
-
-### Biblioteca — `/api/biblioteca-sicetac`, `/api/solicitudes/{id}/propuesta-tarifa`, `/api/biblioteca-sap-plaza`
-
-| Método | Ruta | Rol | Propósito |
-|---|---|---|---|
-| GET | `/api/biblioteca-sicetac` | cualquiera autenticado | Matriz SICE-TAC (filtros por ruta/config/carga/vía) |
-| GET | `/api/biblioteca-sicetac/periodos` | cualquiera autenticado | Periodos disponibles en el DW |
-| GET | `/api/biblioteca-sicetac/filtros` | cualquiera autenticado | Valores disponibles para los filtros |
-| GET | `/api/solicitudes/{id}/propuesta-tarifa` | cualquiera autenticado | Propuesta de tarifa para una solicitud (plaza SAP vs SICE-TAC vs histórico) |
-| PATCH | `/api/biblioteca-sap-plaza/{tarifaId}/vigencia` | AdminTarifas, CoordinadorFletes, Admin | Ajustar vigencia de una tarifa de plaza |
-| POST | `/api/biblioteca-sap-plaza/vigencia/masivo` | AdminTarifas, CoordinadorFletes, Admin | Ajuste masivo de vigencia |
-| DELETE | `/api/biblioteca-sap-plaza/{tarifaId}/vigencia` | AdminTarifas, CoordinadorFletes, Admin | Quitar el ajuste de vigencia |
-
-### Reglas Solo-SICETAC — `/api/reglas-solo-sicetac` (rol: AdminTarifas, Admin)
-
-| Método | Ruta | Propósito |
-|---|---|---|
-| GET | `/` | Listar reglas |
-| POST | `/` | Crear regla (origen + destino + tipo de vehículo) |
-| DELETE | `/{id}` | Eliminar regla |
-| POST | `/importar-excel` | Carga masiva desde Excel |
-
-### Servicios Conexos — `/api/servicios-conexos`
-
-| Método | Ruta | Rol | Propósito |
-|---|---|---|---|
-| GET | `/` | cualquiera autenticado | Listar catálogo (paginado, filtros por texto/categoría/activos) |
-| POST | `/` | AdminTarifas, Admin | Crear servicio |
-| PATCH | `/{id}` | AdminTarifas, Admin | Editar servicio (parcial) |
-| POST | `/importar-excel` | AdminTarifas, Admin | Carga masiva desde Excel |
-
-### Tarifas Ganadas — `/api/tarifas-historicas` (cualquiera autenticado)
-
-| Método | Ruta | Propósito |
-|---|---|---|
-| GET | `/?ruta=&vehiculo=&mercancia=` | Sugerencias para el costeo |
-| GET | `/?q=&mercancia=&vigencia=&origen=` | Búsqueda filtrada de la Biblioteca |
-
-### Tarifas SICE-TAC Admin — `/api/tarifas-sicetac`
-
-| Método | Ruta | Rol | Propósito |
-|---|---|---|---|
-| GET | `/` | cualquiera autenticado | Consultar el piso SICE-TAC local |
-| POST | `/importar` | CoordinadorFletes, Admin | Cargar Excel SICE-TAC (upsert idempotente) |
-| GET | `/importaciones` | cualquiera autenticado | Historial de cargas |
-
-### Métricas — `/api/metricas` (rol: LiderProceso, AdminTarifas, Admin)
-
-| Método | Ruta | Propósito |
-|---|---|---|
-| GET | `/cumplimiento` | KPIs de cumplimiento de SLA y cola por estado |
-
-### Plan de Cargue — `/api/planes-cargue` (S2-HU-08)
-
-| Método | Ruta | Rol | Propósito |
-|---|---|---|---|
-| POST | `/{id}/optimizar` | Comercial, CoordinadorFletes, Admin | Pide la optimización de un plan ya existente. `202` inmediato con `{planCargueId, estado, consultarEn}`; `503 CUBICACION_EN_VERIFICACION` si la compuerta de paridad está cerrada; `409` si el plan ya está procesando |
-| GET | `/{id}` | cualquiera autenticado | Consulta de respaldo: estado y resultado del plan |
-
-Avance por SignalR en `/hubs/plan-cargue` (`Suscribir`/`Desuscribir(planCargueId)`,
-evento `"avance"`). Solo re-optimiza un plan que ya existe (con sus ítems)
-en la base de Cubicador — el flujo "pedir un plan desde una línea de
-solicitud" queda pendiente, ver `PENDIENTES.md`.
+Quién puede hacer qué, explicado por rol (en vez de por endpoint), está en
+[`docs/ROLES_Y_PERMISOS.md`](docs/ROLES_Y_PERMISOS.md). El contrato de
+identidad/sesión con el portal de la Administración —independiente de esta
+API, con su propio versionado— sigue en
+[`docs/contrato-integracion/`](docs/contrato-integracion/README.md).
 
 ## 8. Testing
 
@@ -537,10 +470,13 @@ NEXO/
   CabinaFletes.Clean.sln
   .env.example                 # Variables de entorno (backend + Docker Compose)
   .dockerignore                # Qué NO entra al contexto de build
-  docker-compose.yml           # db + api (+ perfil seed)
+  docker-compose.yml           # rabbit + api (+ perfil seed); 'db' comentado, ver sección 3
   docker-compose.ci.yml        # Arnés: compila la solución completa en contenedor
   build/Dockerfile.ci          # Imagen del arnés (las 4 capas + los 3 proyectos de test)
-  docs/contrato-integracion/   # Contrato con el portal, OpenAPI, Gherkin y ADR
+  CONTRATO.md                  # Referencia completa de la API: endpoints, request/response, errores
+  docs/contrato-integracion/   # Contrato de IDENTIDAD con el portal, OpenAPI, Gherkin y ADR
+  docs/ROLES_Y_PERMISOS.md     # Qué puede hacer cada uno de los 6 roles
+  docs/Database/               # DDL real del esquema de NEXO, comentado tabla por tabla
   MIGRACION.md · PENDIENTES.md · README.md
 
   src/
