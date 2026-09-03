@@ -1,6 +1,6 @@
 """Router `/api/planes-cargue` - vehiculos, planes, items, optimizar,
-ajustar, resultado, flota, demo, puente desde linea. Ver docs/CONTRATOS.md
-seccion A. `optimizar`/`reoptimizar` y `desde-linea` publican a RabbitMQ y
+ajustar, resultado, flota, demo, puente desde linea. Ver CONTRATO.md
+seccion 3.2. `optimizar`/`reoptimizar` y `desde-linea` publican a RabbitMQ y
 responden 202 de inmediato (ver docs/DECISIONES_TECNICAS.md #5) - el worker
 (`worker/main.py`) es quien corre el caso de uso pesado de verdad. El ajuste
 manual (`PATCH .../colocaciones/{id}`) sigue siempre sincrono a proposito."""

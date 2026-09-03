@@ -51,7 +51,7 @@ _bearer_scheme = HTTPBearer(auto_error=False)
 
 
 async def verificar_api_key(credenciales: HTTPAuthorizationCredentials | None = Security(_bearer_scheme)) -> None:
-    """Bearer estatico de servicio-a-servicio (ver docs/CONTRATOS.md seccion D) -
+    """Bearer estatico de servicio-a-servicio (ver CONTRATO.md seccion 5) -
     no identifica un usuario, solo autoriza al backend llamante.
 
     Usa HTTPBearer (esquema de seguridad real) en vez de un Header() crudo:

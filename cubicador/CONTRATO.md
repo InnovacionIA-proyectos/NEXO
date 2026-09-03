@@ -1,0 +1,609 @@
+# Contrato de integración — Cubicador
+
+> Documento único (reemplaza a `docs/CONTRATOS.md`, que quedaba enterrado y
+> duplicaba contenido). Todo lo que este servicio expone, todo lo que
+> consume de NEXO, y las formas exactas de datos — verificado contra el
+> código real al escribir esto, no copiado de memoria. Si algo cambia acá
+> (endpoint, DTO, código de error), el sitio a actualizar es este archivo.
+
+## 1. Quickstart — URLs, Swagger, cómo conectarse
+
+| Entorno | URL base | Notas |
+|---|---|---|
+| Docker Compose (recomendado) | `http://localhost:8081` | Puerto publicado al host (`CUBICADOR_HOST_PORT` en `.env`, default `8081`). El contenedor sigue escuchando en `8000` puertas adentro — no cambia nada de la red interna, solo lo que ve el host. Se eligió 8081 para no chocar con el 8080 donde corre el backend .NET de NEXO; si tampoco sirve, `CUBICADOR_HOST_PORT=8082`. |
+| Local sin Docker (`uvicorn --reload`) | `http://localhost:8000` | Sin cambios — el `--port` de uvicorn no se tocó, solo el mapeo de Docker. |
+
+- **Swagger interactivo**: `{URL_BASE}/docs` (botón "Authorize" arriba a la
+  derecha — pegar el `CUBICADOR_API_KEY` sin la palabra "Bearer", Swagger la
+  agrega sola).
+- **OpenAPI ya exportado**: [`docs/openapi.json`](./docs/openapi.json) —
+  para importar en Postman/Insomnia o generar un cliente sin tener el
+  servicio corriendo. Regenerarlo tras cambiar endpoints/DTOs:
+  ```bash
+  .venv/Scripts/python.exe -c "
+  import json, sys; sys.path.insert(0, '.')
+  from api.main import app
+  json.dump(app.openapi(), open('docs/openapi.json', 'w', encoding='utf-8'), indent=2, ensure_ascii=False)
+  "
+  ```
+
+### 1.1 Backend .NET (NEXO) — no habla REST con este servicio
+
+⚠️ Punto que no es obvio desde afuera: NEXO **no llama** a la API REST de
+este servicio. El contrato real backend↔motor es **solo por colas**
+(RabbitMQ + MassTransit, mismo broker que el resto de NEXO — issue #28). Ver
+sección 3 más abajo para el mensaje de entrada y los eventos de salida.
+
+Consecuencia práctica: si estás integrando el lado .NET, **el puerto 8081
+no importa para nada** — lo que hace falta es:
+- que ambos `.env` (raíz de NEXO y `cubicador/`) tengan el **mismo**
+  `RABBITMQ_USER`/`RABBITMQ_PASSWORD` (mismo broker compartido);
+- que el `rabbit` de la raíz de NEXO esté corriendo antes (o en paralelo)
+  de levantar `cubicador/` — no hay `depends_on` entre proyectos Compose
+  distintos: `docker compose up -d --wait rabbit` desde la raíz primero;
+- que la compuerta de paridad de NEXO
+  (`Cubicacion__ParidadVerificada`/`ParidadEvidencia`/`ParidadFecha`) esté
+  encendida — si no, `POST /api/planes-cargue/{id}/optimizar` en NEXO
+  responde `503` sin publicar nada a la cola.
+
+### 1.2 Frontend — sí puede hablar REST directo
+
+1. **Auth**: header `Authorization: Bearer <CUBICADOR_API_KEY>` en cada
+   request (excepto `GET /health`). No hay identidad de usuario ni roles —
+   es un secreto de servicio compartido, no un login (sección 4).
+2. **CORS**: por defecto el servicio **no tiene CORS activado** (pensado
+   para consumidores server-to-server). Se activa configurando
+   `CUBICADOR_CORS_ORIGENES` (lista separada por comas, mismo criterio que
+   `Cors__OrigenesPermitidos` en NEXO) — sin esa variable, el middleware no
+   se agrega. `.env.example` ya trae
+   `CUBICADOR_CORS_ORIGENES=http://localhost:5173` para desarrollo local.
+3. **Endpoints y DTOs**: secciones 2 y 3 de este documento, o el
+   `openapi.json`/Swagger para explorarlo interactivamente.
+
+### 1.3 Checklist antes de integrar
+
+- [ ] `docker compose up -d --wait rabbit` en la raíz de NEXO, ANTES (o en
+      paralelo con) levantar `cubicador/`.
+- [ ] `RABBITMQ_USER`/`RABBITMQ_PASSWORD` idénticos en `NEXO/.env` y
+      `cubicador/.env`.
+- [ ] Backend .NET: compuerta de paridad configurada, o `/optimizar`
+      responde `503` siempre (sección 1.1).
+- [ ] Frontend: `CUBICADOR_CORS_ORIGENES` incluye el origen exacto desde el
+      que se va a llamar (protocolo+host+puerto, sin barra final).
+- [ ] Frontend: tiene el `CUBICADOR_API_KEY` correcto para el header
+      `Authorization: Bearer`.
+- [ ] `POST /desde-linea/{id}`: `NEXO_CALLBACK_API_KEY` (`cubicador/.env`) debe
+      ser IDÉNTICA a `Cubicador3D__InboundApiKey` (`NEXO/.env`) — es el mismo
+      secreto compartido, visto desde cada lado (sección 5).
+
+---
+
+## 2. Convenciones generales
+
+- **JSON en camelCase** en todo el cuerpo de request/response
+  (`api/dtos/comun.py` — `ApiModel` con `alias_generator=to_camel`;
+  atributos Python en snake_case, JSON de la red en camelCase).
+- **Unidades**: milímetros y kilogramos en todo lo que toca el motor 3D
+  (`/api/planes-cargue`: vehículos, ítems, colocaciones). El cubicador
+  rápido (`/api/cubicacion`) trabaja en **centímetros** — son dos sistemas
+  heredados de dos prototipos distintos, no se unifican (cambiaría
+  comportamiento, no solo forma). ⚠️ Si tu integración toca ambos endpoints,
+  no asumas la misma unidad en los dos.
+- **Ejes**: X = largo, Y = ancho, Z = alto. Origen (0,0,0) = esquina inferior
+  interna opuesta a la puerta trasera.
+- **Decimales**: todo `float` de punta a punta (no hay `Decimal` en este
+  servicio — ver el motor en el brief de extracción del repo si necesitás
+  el detalle de por qué).
+
+---
+
+## 3. API REST
+
+### 3.1 `/api/cubicacion` — cubicador rápido (sin persistencia salvo medidas estándar)
+
+| Método | Ruta | Body | Respuesta |
+|---|---|---|---|
+| POST | `/api/cubicacion` | `CubicacionRequestDto` | `CubicacionResponseDto` |
+| GET | `/api/cubicacion/unidades` | — | `UnidadCubicacionDto[]` |
+| GET | `/api/cubicacion/medidas-estandar` | — | `MedidasEstandarDto` |
+| PUT | `/api/cubicacion/medidas-estandar` | `MedidasEstandarDto` | `MedidasEstandarDto` |
+
+Límite: **10.000 bultos totales por request** (`application/cubicacion_rapida/casos_de_uso.py:12`) — por encima, `400 CUBICACION_DEMASIADO_GRANDE`.
+
+DTOs reales (`api/dtos/cubicacion_rapida.py`):
+
+```python
+class ItemCubicacionDto(ApiModel):
+    descripcion: str | None = None
+    cantidad: int = 1
+    largo_cm: float
+    ancho_cm: float
+    alto_cm: float
+    peso_kg: float | None = None
+    tipo_mercancia: str | None = None
+
+class CubicacionRequestDto(ApiModel):
+    items: list[ItemCubicacionDto]
+    unidad_ids: list[str] | None = None
+    clase_viaje: str | None = None
+
+class UnidadCubicacionDto(ApiModel):
+    id: str
+    nombre: str
+    geometria: str
+    control_ambiental: str
+    largo_util_m: float
+    ancho_util_m: float
+    alto_util_m: float
+    peso_bruto_permitido_kg: float
+    peso_vacio_kg: float
+    capacidad_por_eje_kg: list[float]
+    config_vehiculo: str | None
+    carroceria: str | None
+    clase_viaje: str | None
+    clase_contenedor: str | None
+
+class MedidasEstandarDto(ApiModel):
+    largo_max_cm: float
+    ancho_max_cm: float
+    alto_max_cm: float
+    peso_max_kg: float
+
+class CubicacionResponseDto(ApiModel):
+    matrices: list[MatrizCubicacionDto]        # una fila por unidad evaluada
+    sugerencia: SugerenciaVehiculoDto | None    # mejor unidad para UN vehículo
+    advertencias: list[str]
+    sugerencia_flota: SugerenciaFlotaDto | None = None   # si necesita varios vehículos
+    extradimension: DeteccionExtradimensionDto | None = None
+
+class MatrizCubicacionDto(ApiModel):
+    unidad: UnidadCubicacionDto
+    criterios: list[CriterioCubicacionDto]      # {criterio, resultado, detalle, criticidad}
+    banda: str
+    advertencias: list[str]
+    disposicion: DisposicionDto | None          # colocaciones + peso + centro de gravedad
+
+class SugerenciaVehiculoDto(ApiModel):
+    unidad_id: str
+    unidad_nombre: str
+    banda: str
+    factor_utilizacion: float
+    config_vehiculo: str | None
+    carroceria: str | None
+    clase_viaje: str | None
+    clase_contenedor: str | None
+
+class DeteccionExtradimensionDto(ApiModel):
+    hay_extradimension: bool
+    medidas_estandar: MedidasEstandarDto
+    piezas: list[PiezaExcedidaDto]              # {descripcion, excesos, largo_cm, ancho_cm, alto_cm, peso_kg}
+    sugerencia: str | None
+```
+
+### 3.2 `/api/planes-cargue` — motor 3D (con persistencia)
+
+| Método | Ruta | Notas |
+|---|---|---|
+| GET/POST | `/vehiculos` | catálogo de tipos de vehículo (siembra los 9 presets en el primer GET) |
+| DELETE | `/vehiculos/{id}` | `409 VEHICULO_EN_USO` si tiene planes asociados |
+| GET/POST | `` (raíz) | listar / crear plan vacío |
+| GET | `/{id}` | plan con sus ítems |
+| GET | `/{id}/flota` | vehículos (planes) de la misma flota |
+| DELETE | `/{id}` | elimina el plan |
+| POST | `/demo` | escenario de demostración |
+| POST | `/{id}/items`, `/{id}/items/importar`, DELETE `/{id}/items/{itemId}` | alta/borrado de ítems (importar: 1-2000) |
+| GET | `/{id}/resultado`, `/colocaciones`, `/metricas`, `/no-cargadas`, `/exportar` | resultado completo o subconjuntos |
+| PATCH | `/{id}/colocaciones/{colocacionId}` | ajuste manual — **siempre síncrono**, nunca pasa por cola |
+| POST | `/{id}/optimizar`, `/{id}/reoptimizar` | **asíncrono**: encola en RabbitMQ, responde `202` con el plan en `procesando` |
+| POST | `/desde-linea/{lineaSolicitudId}` | puente Mesa de Costeo → 3D — **asíncrono**, responde `202 SolicitudEncoladaDto` (ver ⚠️ sección 5) |
+| GET | `/por-linea/{lineaSolicitudId}` | flota resultante del `POST` de arriba — lista vacía mientras sigue `procesando` |
+
+`optimizar`/`reoptimizar` y `desde-linea` encolan y responden de inmediato
+con `202`. El caller sigue el resultado con **polling** sobre
+`GET /{id}/resultado` (o `GET /por-linea/{lineaSolicitudId}` para el
+puente) — no hay webhook ni notificación push desde este servicio.
+
+DTOs reales (`api/dtos/plan_cargue.py`):
+
+```python
+class EjeVehiculoDto(ApiModel):
+    posicion_mm: float
+    capacidad_kg: float
+
+class VehiculoCubicacionDto(ApiModel):
+    id: str
+    nombre: str
+    descripcion: str | None
+    largo_interno_mm: float
+    ancho_interno_mm: float
+    alto_interno_mm: float
+    capacidad_kg: float
+    tara_kg: float
+    puerta_ancho_mm: float
+    puerta_alto_mm: float
+    puerta_posicion: str          # trasera | frontal | costado_izquierdo | costado_derecho
+    ejes: list[EjeVehiculoDto]
+    tolerancia_paredes_mm: float
+    tolerancia_entre_unidades_mm: float
+    es_preset: bool
+
+class GuardarVehiculoInput(ApiModel):
+    id: str | None = None         # None = crear; con id = actualizar (upsert)
+    nombre: str
+    descripcion: str | None = None
+    largo_interno_mm: float
+    ancho_interno_mm: float
+    alto_interno_mm: float
+    capacidad_kg: float
+    tara_kg: float
+    puerta_ancho_mm: float
+    puerta_alto_mm: float
+    puerta_posicion: str
+    ejes: list[EjeVehiculoDto]
+    tolerancia_paredes_mm: float = 0.0
+    tolerancia_entre_unidades_mm: float = 0.0
+
+class ItemPlanCargueDto(ApiModel):
+    id: str
+    plan_cargue_id: str
+    sku: str
+    descripcion: str
+    pedido: str | None
+    cliente: str | None
+    destino: str | None
+    secuencia_entrega: int
+    largo_mm: float
+    ancho_mm: float
+    alto_mm: float
+    peso_kg: float
+    cantidad: int
+    color: str | None
+    prioridad: int
+    tipo_embalaje: str | None
+    apilable: bool
+    max_niveles: int
+    max_peso_encima_kg: float     # -1.0 = sin restriccion (ver GuardarItemPlanCargueInput)
+    rotable: bool
+    mantener_vertical: bool
+    fragil: bool
+    peligroso: bool               # declarado, sin efecto en la optimizacion hoy
+    refrigerado: bool             # declarado, sin efecto en la optimizacion hoy
+    grupo_compatibilidad: str | None
+    observaciones: str | None
+
+class GuardarItemPlanCargueInput(ApiModel):
+    id: str | None = None
+    sku: str = ""
+    descripcion: str
+    pedido: str | None = None
+    cliente: str | None = None
+    destino: str | None = None
+    secuencia_entrega: int = 1
+    largo_mm: float
+    ancho_mm: float
+    alto_mm: float
+    peso_kg: float
+    cantidad: int = 1
+    color: str | None = None
+    prioridad: int = 3
+    tipo_embalaje: str | None = None
+    apilable: bool = True
+    max_niveles: int = 0
+    max_peso_encima_kg: float = -1.0
+    rotable: bool = True
+    mantener_vertical: bool = False
+    fragil: bool = False
+    peligroso: bool = False
+    refrigerado: bool = False
+    grupo_compatibilidad: str | None = None
+    observaciones: str | None = None
+
+class PlanCargueDto(ApiModel):
+    id: str
+    nombre: str
+    vehiculo_id: str
+    linea_solicitud_id: str | None
+    numero_vehiculo: int
+    estado: str                   # borrador | procesando | optimizado | ajustado | error
+    estrategia: str                # default "Combinada"
+    algoritmo: str                  # default "bfd" (o "ffd")
+    semilla: int | None
+    peso_total_kg: float
+    volumen_utilizado_m3: float
+    utilizacion_volumen: float
+    utilizacion_piso: float
+    puntaje: float
+    items: list[ItemPlanCargueDto]
+    created_at: datetime
+    updated_at: datetime
+
+class ColocacionCargueDto(ApiModel):
+    id: str
+    plan_cargue_id: str
+    item_plan_cargue_id: str
+    indice_unidad: int
+    cargada: bool                  # false = rechazada; ver codigo_rechazo/razon_rechazo
+    x: float
+    y: float
+    z: float
+    largo_colocado_mm: float
+    ancho_colocado_mm: float
+    alto_colocado_mm: float
+    orientacion_indice: int
+    secuencia_cargue: int
+    soporte_colocacion_id: str | None
+    porcentaje_soporte: float
+    peso_encima_kg: float
+    estado_estabilidad: str        # estable | advertencia
+    accesibilidad: str
+    bloqueada: bool
+    ajuste_manual: bool
+    codigo_rechazo: str | None     # ver catalogo en 3.3 mas abajo
+    razon_rechazo: str | None
+
+class IncidenciaValidacionDto(ApiModel):
+    severidad: str
+    codigo_regla: str
+    titulo: str
+    descripcion: str
+    accion_sugerida: str | None
+    colocacion_item_id: str | None
+
+class MetricasCubicacionDto(ApiModel):
+    volumen_interno_m3: float
+    volumen_utilizado_m3: float
+    porcentaje_volumen: float
+    area_piso_m2: float
+    area_piso_utilizada_m2: float
+    porcentaje_piso: float
+    peso_maximo_kg: float
+    peso_cargado_kg: float
+    porcentaje_peso: float
+    unidades_totales: int
+    unidades_cargadas: int
+    unidades_no_cargadas: int
+    pedidos_completos: int
+    pedidos_parciales: int
+    destinos: int
+    altura_maxima_mm: float
+    centro_gravedad_mm: list[float]
+    peso_por_eje_kg: list[float]
+    diferencia_lados_kg: float
+    advertencias: int
+    violaciones_criticas: int
+    puntaje: float
+    puntajes_parciales: dict[str, float]
+    espacio_vacio_util_m3: float
+    espacio_fragmentado_m3: float
+
+class ResultadoPlanDto(ApiModel):
+    plan: PlanCargueDto
+    vehiculo: VehiculoCubicacionDto
+    colocaciones: list[ColocacionCargueDto]
+    metricas: MetricasCubicacionDto | None
+    incidencias: list[IncidenciaValidacionDto]
+
+class PlanFlotaItemDto(ApiModel):
+    id: str
+    numero_vehiculo: int
+    total_vehiculos: int
+    unidades_cargadas: int
+    unidades_totales: int
+
+class OptimizarRequestDto(ApiModel):
+    estrategia: str = "Combinada"
+    algoritmo: str = "bfd"
+    semilla: int | None = None
+    ponderaciones: PonderacionesCombinadaDto | None = None
+    respetar_bloqueadas: bool = False
+
+class PonderacionesCombinadaDto(ApiModel):
+    volumen: float = 0.25
+    balance_ejes: float = 0.25
+    estabilidad: float = 0.20
+    secuencia: float = 0.15
+    prioridad: float = 0.10
+    unidades: float = 0.05
+
+class AjusteColocacionInput(ApiModel):
+    x: float | None = None
+    y: float | None = None
+    z: float | None = None
+    orientacion_indice: int | None = None
+    bloqueada: bool | None = None
+    retirar: bool | None = None
+    reinsertar: bool | None = None
+
+class CrearPlanRequest(ApiModel):
+    nombre: str
+    vehiculo_id: str
+
+class SolicitudEncoladaDto(ApiModel):
+    """Respuesta 202 de una operacion que se resuelve async."""
+    correlation_id: str
+    estado: str = "procesando"
+```
+
+### 3.3 Catálogo de `codigo_rechazo` en `ColocacionCargueDto`
+
+Distinto del catálogo de errores HTTP de la sección 4 — estos son razones de
+negocio dentro de una respuesta `200` exitosa, cuando una unidad no se pudo
+cargar:
+
+| Código | Cuándo (`domain/motor/optimizadores.py`, `infrastructure/persistence/repositorios/plan_cargue_repo.py`) |
+|---|---|
+| `PUERTA` | Ninguna orientación permitida pasa por la puerta del vehículo |
+| `PESO_TOTAL` | Cargarla superaría la capacidad del vehículo |
+| `COMPATIBILIDAD` | Choca con el grupo de compatibilidad de otra unidad ya cargada |
+| `SIN_ESPACIO` | No se encontró posición válida (colisión/soporte/apilamiento/límites) para ninguna orientación |
+| `RETIRADA_MANUAL` | El usuario la retiró con `PATCH .../colocaciones/{id}` (`{"retirar": true}`) |
+
+---
+
+## 4. Formato de error (API REST)
+
+```json
+{ "codigo": "PLAN_NO_ENCONTRADO", "mensaje": "Plan de cargue no encontrado." }
+```
+
+HTTP status por tipo de excepción (`api/main.py`, `application/excepciones.py`):
+
+| Excepción | Status |
+|---|---|
+| `ValidationFailedException` | 400 |
+| `NotFoundException` | 404 |
+| `ConflictException` | 409 |
+| `ServiceUnavailableException` | 503 |
+| Bearer inválido/ausente (`api/dependencias.py`) | 401 `NO_AUTORIZADO` |
+
+Catálogo de `codigo` verificado por grep contra el código real (los 28 que
+efectivamente existen — no una lista heredada sin revisar):
+
+`ALGORITMO_INVALIDO`, `APILAMIENTO`, `CANTIDAD_INVALIDA`,
+`CAPACIDAD_INVALIDA`, `COLISION`, `COLOCACION_NO_ENCONTRADA`,
+`CUBICACION_DEMASIADO_GRANDE`, `DIMENSIONES_INVALIDAS`, `EJES_INVALIDOS`,
+`ESTRATEGIA_INVALIDA`, `FUERA_DE_LIMITES`, `IMPORTACION_INVALIDA`,
+`LINEA_NO_ENCONTRADA`, `MEDIDAS_INVALIDAS`, `NO_AUTORIZADO`,
+`ORIENTACION_NO_PERMITIDA`, `PESO_INVALIDO`, `PLAN_DEMASIADO_GRANDE`,
+`PLAN_NO_ENCONTRADO`, `PUERTA_INVALIDA`, `PUERTA_POSICION_INVALIDA`,
+`SOPORTE_INSUFICIENTE`, `TOLERANCIA_INVALIDA`, `VEHICULO_EN_USO`,
+`VEHICULO_INVALIDO`, `VEHICULO_NO_ENCONTRADO`.
+
+(`SIN_ESPACIO` y `RETIRADA_MANUAL` NO son códigos de error HTTP — son
+valores de `codigo_rechazo`, ver sección 3.3.)
+
+---
+
+## 5. Autenticación
+
+Header en **todas** las llamadas, en ambas direcciones:
+
+```
+Authorization: Bearer <secreto correspondiente>
+```
+
+- NEXO/frontend → este servicio: valida contra `CUBICADOR_API_KEY`
+  (`api/dependencias.py:verificar_api_key`).
+- Este servicio → NEXO (llamada de `crear_desde_linea`, ver sección 7): NEXO
+  valida contra `Cubicador3D__InboundApiKey`
+  (`CubicadorApiKeyAuthenticationHandler`, esquema `CubicadorApiKey` aparte
+  de la sesión del portal) — debe ser IDÉNTICA a `NEXO_CALLBACK_API_KEY` acá.
+
+Sin identidad de usuario ni roles en ninguno de los dos sentidos — es un
+secreto de servicio, no un login.
+
+---
+
+## 6. Mensajería (RabbitMQ / MassTransit) — el contrato real con NEXO
+
+### 6.1 Comando entrante: `CubicaciónSolicitada`
+
+Publicado por la API al recibir `POST /{id}/optimizar` o
+`POST /desde-linea/{id}` (payload plano, sin sobre) — **o por NEXO**
+(issue #28, S2-HU-075), que lo publica con `IPublishEndpoint` de MassTransit
+real, envuelto en su "sobre" estándar (`messageType`/`message`). El worker
+acepta ambos formatos: si el JSON trae `message`+`messageType`, se
+desenvuelve primero; si no, se usa tal cual (`worker/main.py::_procesar`).
+
+```json
+{
+  "tipo": "optimizar" | "crear_desde_linea",
+  "planId": "uuid",
+  "correlationId": "uuid",
+  "solicitud": { "estrategia": "...", "algoritmo": "...", "semilla": null, "ponderaciones": null, "respetarBloqueadas": false }
+}
+```
+
+### 6.2 Eventos de salida (el worker publica UNO de estos al terminar)
+
+- **`PlanDeCargueGenerado`**: `{ correlationId, planId, resultado: {...} }`
+- **`CubicaciónRechazada`**: `{ correlationId, planId, codigo: string, mensaje: string }`
+- **`PlanDeCargueAjustado`**: mismo payload que `PlanDeCargueGenerado`, reservado por si en el futuro el ajuste manual también se mueve a async (hoy es siempre síncrono).
+
+Los dos primeros van envueltos en el "sobre" de MassTransit — NEXO los
+consume con un `IConsumer<T>` real
+(`PlanDeCargueGeneradoConsumer`/`CubicacionRechazadaConsumer`, ver
+`NEXO/docs/mensajeria/CUBICACION.md`), que espera ese formato para
+deserializar:
+
+```json
+{
+  "messageId": "uuid",
+  "messageType": ["urn:message:CabinaFletes.Mensajes.Cubicacion:PlanDeCargueGenerado"],
+  "message": { "correlationId": "uuid", "planId": "uuid", "resultado": {...} },
+  "sentTime": "2026-08-27T21:00:00.000Z"
+}
+```
+
+`CubicaciónSolicitada` (el que Cubicador consume) nunca se publica envuelto
+desde este lado — solo lo consume Cubicador mismo. `_sobre_masstransit()`
+en `infrastructure/mensajeria/rabbitmq.py` arma el sobre; el `messageType`
+debe coincidir EXACTO con el namespace/nombre de la clase C#
+correspondiente — si NEXO renombra esa clase, este valor queda
+desincronizado sin ningún error de compilación que lo avise, solo se nota
+si el mensaje deja de entregarse.
+
+### 6.3 Colas/exchanges (verificado contra `infrastructure/mensajeria/rabbitmq.py`)
+
+- Exchange: `cubicador.eventos` (topic).
+- Routing keys: `cubicacion.solicitada`, `plan-de-cargue.generado`,
+  `cubicacion.rechazada`, `plan-de-cargue.ajustado`.
+- Dead-letter: `cubicacion.dlq`. Al caer un mensaje ahí (agotados los
+  **3** reintentos, `worker/main.py:49` `MAX_INTENTOS = 3`), el worker
+  además alerta por correo al equipo técnico
+  (`infrastructure/alertas/correo.py::alertar_mensaje_en_dlq`, configurable
+  vía `ALERTAS_SMTP_*`/`ALERTAS_EQUIPO_TECNICO`); sin SMTP configurado,
+  degrada a un log sin romper el worker.
+
+---
+
+## 7. Lo que este servicio consume DE NEXO
+
+```
+GET {NEXO_BASE_URL}/api/lineas-solicitud/{id}/cubicacion
+Authorization: Bearer <NEXO_CALLBACK_API_KEY>
+
+200 → { "lineaId": "guid", "posiciones": [{ "descripcion"?, "cantidad", "largoCm", "anchoCm", "altoCm", "pesoKg"? }], "origen"?, "destino"? }
+404 → este cliente solo mira el status code (ver infrastructure/clientes/nexo_client.py), no parsea el cuerpo.
+```
+
+Implementado del lado Cubicador en
+`infrastructure/clientes/nexo_client.py` (timeout fijo de 10s, sin reintentos).
+
+**Implementado del lado NEXO** (`LineasSolicitudCubicacionController` +
+`ObtenerCubicacionLineaQuery` + `LineaSolicitudCubicacionAdapter`,
+autenticación `CubicadorApiKeyAuthenticationHandler` — ver sección 5): lee
+`LineaSolicitud` con su `Ruta`, deserializa `Dimensiones` (JSON ya
+capturado por `CapturarSolicitudCommand` desde antes de este puente — no
+hacía falta ningún cambio de captura) y devuelve `{ posiciones, origen,
+destino }`. Cubierto por 6 tests de integración HTTP contra SQL Server real
+(200 con posiciones/ruta, lista vacía, 404, 401 sin Bearer, 401 con Bearer
+incorrecto, 401 con la sesión del portal en vez del Bearer de servicio).
+
+**Verificado de punta a punta**, no solo por tests: `POST /desde-linea/{id}`
+real contra ambos stacks en Docker (NEXO + Cubicador + RabbitMQ compartido) —
+el worker llamó este endpoint (`GET .../cubicacion` → `200`), armó el plan
+con el vehículo sugerido por el cubicador rápido, y lo optimizó (3/3
+unidades cargadas, estables, sin incidencias). Único detalle de
+infraestructura a tener en cuenta si armás un compose combinado: NEXO y
+Cubicador tienen cada uno un servicio llamado `api` en su propio
+`docker-compose.yml` — si el worker de Cubicador se conecta a las dos redes
+a la vez, `NEXO_BASE_URL=http://api:8080` puede resolver al `api` EQUIVOCADO
+(el propio del cubicador). Usar el nombre de contenedor explícito
+(`http://nexo-api-1:8080`, o el que corresponda según `container_name`/
+nombre de proyecto Compose) evita la ambigüedad.
+
+---
+
+## 8. Límites y comportamiento a tener en cuenta al integrar
+
+- Dimensión máxima de un ítem: `30000mm` por lado (`application/plan_cargue/items.py:13`).
+- Peso máximo de un ítem: `100000kg` (`items.py:15`).
+- Cantidad por ítem: `1..2000` (`items.py:17-18`).
+- Ítems por importación masiva: `1..2000` (`items.py:31-32`).
+- No hay timeout sobre la ejecución del algoritmo de optimización en sí —
+  para planes muy grandes, el polling de `GET /{id}/resultado` puede tardar
+  sin que haya un límite duro que lo corte.
+- `PATCH .../colocaciones/{id}` es la única operación de escritura que
+  **nunca** pasa por cola — todo el resto de mutaciones sobre un plan
+  (crear, optimizar, reoptimizar, crear-desde-línea) son asíncronas.

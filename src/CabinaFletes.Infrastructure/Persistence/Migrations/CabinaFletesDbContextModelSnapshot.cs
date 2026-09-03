@@ -17,6 +17,7 @@ namespace CabinaFletes.Infrastructure.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
+                .HasDefaultSchema("dbo_NEXO_prueba")
                 .HasAnnotation("ProductVersion", "10.0.0")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
@@ -53,7 +54,7 @@ namespace CabinaFletes.Infrastructure.Migrations
 
                     b.HasIndex("Entidad", "EntidadId");
 
-                    b.ToTable("audit_log", (string)null);
+                    b.ToTable("audit_log", "dbo_NEXO_prueba");
                 });
 
             modelBuilder.Entity("CabinaFletes.Domain.BibliotecaTarifas.Entidades.TarifaHistorica", b =>
@@ -98,7 +99,7 @@ namespace CabinaFletes.Infrastructure.Migrations
 
                     b.HasIndex("RutaId", "ConfigVehiculoId", "Tipologia");
 
-                    b.ToTable("tarifas_historicas", (string)null);
+                    b.ToTable("tarifas_historicas", "dbo_NEXO_prueba");
                 });
 
             modelBuilder.Entity("CabinaFletes.Domain.BibliotecaTarifas.Entidades.TarifaSicetac", b =>
@@ -196,7 +197,7 @@ namespace CabinaFletes.Infrastructure.Migrations
                     b.HasIndex("Periodo", "OrigenDane", "DestinoDane", "Configuracion", "TipoCarga", "UnidadTransporte", "CondicionCarga")
                         .IsUnique();
 
-                    b.ToTable("tarifas_sicetac", (string)null);
+                    b.ToTable("tarifas_sicetac", "dbo_NEXO_prueba");
                 });
 
             modelBuilder.Entity("CabinaFletes.Domain.Catalogos.Entidades.Cliente", b =>
@@ -236,7 +237,7 @@ namespace CabinaFletes.Infrastructure.Migrations
                     b.HasIndex("Nit")
                         .IsUnique();
 
-                    b.ToTable("clientes", (string)null);
+                    b.ToTable("clientes", "dbo_NEXO_prueba");
                 });
 
             modelBuilder.Entity("CabinaFletes.Domain.Catalogos.Entidades.ConfiguracionVehiculo", b =>
@@ -269,7 +270,7 @@ namespace CabinaFletes.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("configuraciones_vehiculo", (string)null);
+                    b.ToTable("configuraciones_vehiculo", "dbo_NEXO_prueba");
                 });
 
             modelBuilder.Entity("CabinaFletes.Domain.Catalogos.Entidades.Ruta", b =>
@@ -302,7 +303,7 @@ namespace CabinaFletes.Infrastructure.Migrations
                     b.HasIndex("Origen", "Destino")
                         .IsUnique();
 
-                    b.ToTable("rutas", (string)null);
+                    b.ToTable("rutas", "dbo_NEXO_prueba");
                 });
 
             modelBuilder.Entity("CabinaFletes.Domain.Catalogos.Entidades.ServicioConexo", b =>
@@ -356,7 +357,7 @@ namespace CabinaFletes.Infrastructure.Migrations
 
                     b.HasIndex("ActualizadoPor");
 
-                    b.ToTable("servicios_conexos", (string)null);
+                    b.ToTable("servicios_conexos", "dbo_NEXO_prueba");
                 });
 
             modelBuilder.Entity("CabinaFletes.Domain.Costeo.Entidades.AjusteVigenciaPlaza", b =>
@@ -395,7 +396,7 @@ namespace CabinaFletes.Infrastructure.Migrations
                     b.HasIndex("TarifaPlazaId")
                         .IsUnique();
 
-                    b.ToTable("ajustes_vigencia_plaza", (string)null);
+                    b.ToTable("ajustes_vigencia_plaza", "dbo_NEXO_prueba");
                 });
 
             modelBuilder.Entity("CabinaFletes.Domain.Costeo.Entidades.ReglaSoloSicetac", b =>
@@ -436,7 +437,7 @@ namespace CabinaFletes.Infrastructure.Migrations
                     b.HasIndex("Origen", "Destino", "TipoVehiculo")
                         .IsUnique();
 
-                    b.ToTable("reglas_solo_sicetac", (string)null);
+                    b.ToTable("reglas_solo_sicetac", "dbo_NEXO_prueba");
                 });
 
             modelBuilder.Entity("CabinaFletes.Domain.Cotizaciones.Entidades.Cotizacion", b =>
@@ -493,7 +494,7 @@ namespace CabinaFletes.Infrastructure.Migrations
 
                     b.HasIndex("SolicitudId");
 
-                    b.ToTable("cotizaciones", (string)null);
+                    b.ToTable("cotizaciones", "dbo_NEXO_prueba");
                 });
 
             modelBuilder.Entity("CabinaFletes.Domain.Cotizaciones.Entidades.CotizacionConexo", b =>
@@ -529,7 +530,7 @@ namespace CabinaFletes.Infrastructure.Migrations
 
                     b.HasIndex("ServicioConexoId");
 
-                    b.ToTable("cotizacion_conexos", (string)null);
+                    b.ToTable("cotizacion_conexos", "dbo_NEXO_prueba");
                 });
 
             modelBuilder.Entity("CabinaFletes.Domain.Cotizaciones.Entidades.CotizacionLinea", b =>
@@ -573,7 +574,7 @@ namespace CabinaFletes.Infrastructure.Migrations
 
                     b.HasIndex("LineaSolicitudId");
 
-                    b.ToTable("cotizacion_lineas", (string)null);
+                    b.ToTable("cotizacion_lineas", "dbo_NEXO_prueba");
                 });
 
             modelBuilder.Entity("CabinaFletes.Domain.PlanDeCargue.Entidades.ColocacionCargue", b =>
@@ -666,7 +667,7 @@ namespace CabinaFletes.Infrastructure.Migrations
 
                     b.HasIndex("PlanCargueId", "Cargada");
 
-                    b.ToTable("colocaciones_cargue", (string)null);
+                    b.ToTable("colocaciones_cargue", "dbo_NEXO_prueba");
                 });
 
             modelBuilder.Entity("CabinaFletes.Domain.PlanDeCargue.Entidades.ItemPlanCargue", b =>
@@ -774,7 +775,7 @@ namespace CabinaFletes.Infrastructure.Migrations
 
                     b.HasIndex("PlanCargueId");
 
-                    b.ToTable("items_plan_cargue", (string)null);
+                    b.ToTable("items_plan_cargue", "dbo_NEXO_prueba");
                 });
 
             modelBuilder.Entity("CabinaFletes.Domain.PlanDeCargue.Entidades.PlanCargue", b =>
@@ -852,7 +853,7 @@ namespace CabinaFletes.Infrastructure.Migrations
 
                     b.HasIndex("VehiculoId");
 
-                    b.ToTable("planes_cargue", (string)null);
+                    b.ToTable("planes_cargue", "dbo_NEXO_prueba");
                 });
 
             modelBuilder.Entity("CabinaFletes.Domain.PlanDeCargue.Entidades.VehiculoCubicacion", b =>
@@ -920,7 +921,7 @@ namespace CabinaFletes.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("vehiculos_cubicacion", (string)null);
+                    b.ToTable("vehiculos_cubicacion", "dbo_NEXO_prueba");
                 });
 
             modelBuilder.Entity("CabinaFletes.Domain.Priorizacion.Entidades.ParametrosScore", b =>
@@ -978,7 +979,7 @@ namespace CabinaFletes.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("parametros_score", (string)null);
+                    b.ToTable("parametros_score", "dbo_NEXO_prueba");
 
                     b.HasData(
                         new
@@ -1043,7 +1044,7 @@ namespace CabinaFletes.Infrastructure.Migrations
 
                     b.HasIndex("TrabajoId", "LineaSolicitudId", "Tipo");
 
-                    b.ToTable("lineas_pendientes_de_costeo", (string)null);
+                    b.ToTable("lineas_pendientes_de_costeo", "dbo_NEXO_prueba");
                 });
 
             modelBuilder.Entity("CabinaFletes.Domain.Solicitudes.Entidades.LineaSolicitud", b =>
@@ -1137,7 +1138,7 @@ namespace CabinaFletes.Infrastructure.Migrations
 
                     b.HasIndex("SolicitudId");
 
-                    b.ToTable("lineas_solicitud", (string)null);
+                    b.ToTable("lineas_solicitud", "dbo_NEXO_prueba");
                 });
 
             modelBuilder.Entity("CabinaFletes.Domain.Solicitudes.Entidades.Solicitud", b =>
@@ -1209,7 +1210,7 @@ namespace CabinaFletes.Infrastructure.Migrations
 
                     b.HasIndex("Estado", "ScorePrioridad");
 
-                    b.ToTable("solicitudes", (string)null);
+                    b.ToTable("solicitudes", "dbo_NEXO_prueba");
                 });
 
             modelBuilder.Entity("CabinaFletes.Domain.Usuarios.Entidades.MapeoRolPortal", b =>
@@ -1238,7 +1239,7 @@ namespace CabinaFletes.Infrastructure.Migrations
                         .IsUnique()
                         .HasFilter("[IdRolPortal] IS NOT NULL");
 
-                    b.ToTable("mapeo_rol_portal", (string)null);
+                    b.ToTable("mapeo_rol_portal", "dbo_NEXO_prueba");
 
                     b.HasData(
                         new
@@ -1260,6 +1261,54 @@ namespace CabinaFletes.Infrastructure.Migrations
                             Id = new Guid("00000000-0000-0000-0001-000000000003"),
                             CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
                             DescripcionRolPortal = "Administracion",
+                            Rol = "Admin"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0001-000000000004"),
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 9, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DescripcionRolPortal = "ComercialNEXO",
+                            IdRolPortal = 48L,
+                            Rol = "Comercial"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0001-000000000005"),
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 9, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DescripcionRolPortal = "CoordinadorFletesNEXO",
+                            IdRolPortal = 49L,
+                            Rol = "CoordinadorFletes"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0001-000000000006"),
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 9, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DescripcionRolPortal = "AdminTarifasNEXO",
+                            IdRolPortal = 50L,
+                            Rol = "AdminTarifas"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0001-000000000007"),
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 9, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DescripcionRolPortal = "ServiciosLogisticosNEXO",
+                            IdRolPortal = 51L,
+                            Rol = "ServiciosLogisticos"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0001-000000000008"),
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 9, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DescripcionRolPortal = "LiderProcesoNEXO",
+                            IdRolPortal = 52L,
+                            Rol = "LiderProceso"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-0000-0001-000000000009"),
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 9, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DescripcionRolPortal = "AdminNEXO",
+                            IdRolPortal = 53L,
                             Rol = "Admin"
                         });
                 });
@@ -1311,7 +1360,7 @@ namespace CabinaFletes.Infrastructure.Migrations
                         .IsUnique()
                         .HasFilter("[IdentidadPortalId] IS NOT NULL");
 
-                    b.ToTable("usuarios", (string)null);
+                    b.ToTable("usuarios", "dbo_NEXO_prueba");
 
                     b.HasData(
                         new
@@ -1371,7 +1420,7 @@ namespace CabinaFletes.Infrastructure.Migrations
 
                     b.HasKey("CorrelationId");
 
-                    b.ToTable("trabajos_auto_costeo", (string)null);
+                    b.ToTable("trabajos_auto_costeo", "dbo_NEXO_prueba");
                 });
 
             modelBuilder.Entity("CabinaFletes.Infrastructure.Common.Mensajeria.Saga.EstadoPriorizacion", b =>
@@ -1407,7 +1456,7 @@ namespace CabinaFletes.Infrastructure.Migrations
 
                     b.HasKey("CorrelationId");
 
-                    b.ToTable("cadena_priorizacion", (string)null);
+                    b.ToTable("cadena_priorizacion", "dbo_NEXO_prueba");
                 });
 
             modelBuilder.Entity("MassTransit.EntityFrameworkCoreIntegration.InboxState", b =>
@@ -1454,7 +1503,7 @@ namespace CabinaFletes.Infrastructure.Migrations
 
                     b.HasIndex("Delivered");
 
-                    b.ToTable("InboxState");
+                    b.ToTable("InboxState", "dbo_NEXO_prueba");
                 });
 
             modelBuilder.Entity("MassTransit.EntityFrameworkCoreIntegration.OutboxMessage", b =>
@@ -1547,7 +1596,7 @@ namespace CabinaFletes.Infrastructure.Migrations
                         .IsUnique()
                         .HasFilter("[InboxMessageId] IS NOT NULL AND [InboxConsumerId] IS NOT NULL");
 
-                    b.ToTable("OutboxMessage");
+                    b.ToTable("OutboxMessage", "dbo_NEXO_prueba");
                 });
 
             modelBuilder.Entity("MassTransit.EntityFrameworkCoreIntegration.OutboxState", b =>
@@ -1576,7 +1625,7 @@ namespace CabinaFletes.Infrastructure.Migrations
 
                     b.HasIndex("Created");
 
-                    b.ToTable("OutboxState");
+                    b.ToTable("OutboxState", "dbo_NEXO_prueba");
                 });
 
             modelBuilder.Entity("CabinaFletes.Domain.Auditoria.Entidades.AuditLog", b =>

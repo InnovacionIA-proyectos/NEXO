@@ -33,19 +33,24 @@ Las tres son obligatorias a la vez (`Domain.PlanDeCargue.Reglas.
 CompuertaDeParidad`): `ParidadVerificada=true` sin las otras dos dejas la
 compuerta cerrada igual, a propósito — no es un booleano suelto.
 
+**Resuelto**: "pedir un plan de cargue desde una línea de solicitud"
+(`crear_desde_linea` — botón Cubicar de la Mesa de Costeo → Cubicador 3D)
+funciona de punta a punta. `LineaSolicitud.Dimensiones` **ya capturaba** las
+posiciones (JSON escrito por `CapturarSolicitudCommand`, leído por
+`ObtenerCosteoQuery` — ver `PosicionCargaDto` en
+`Application/CasosDeUso/Solicitudes/DTOs`); lo único que faltaba era el
+endpoint que el Cubicador ya llamaba. `GET /api/lineas-solicitud/{id}
+/cubicacion` (`LineasSolicitudCubicacionController` +
+`ObtenerCubicacionLineaQuery` + `LineaSolicitudCubicacionAdapter`, ver
+`cubicador/CONTRATO.md` sección 6) lo expone ahora, con autenticación de
+servicio-a-servicio dedicada (`CubicadorApiKeyAuthenticationHandler`, Bearer
+contra `Cubicador3D:InboundApiKey` — separada de
+`IdentidadPortalAuthenticationHandler`, S2-HU-03). Verificado con 6 tests de
+integración HTTP contra SQL Server real y con una corrida real de punta a
+punta cruzando NEXO y Cubicador en Docker (`POST /desde-linea` → RabbitMQ →
+worker → este endpoint → motor 3D → plan optimizado).
+
 **Lo que SÍ falta, sin fecha todavía**:
-- **Solo soporta re-optimizar un plan que YA EXISTE** (con sus ítems) en la
-  base de Cubicador. El flujo "pedir un plan de cargue desde una línea de
-  solicitud" (`crear_desde_linea`, ver `cubicador/docs/CONTRATOS.md` sección
-  B) depende de un endpoint `GET /api/lineas-solicitud/{id}/cubicacion` que
-  Cubicador ya llama (`NexoLineaSolicitudClient`) pero que **NEXO todavía no
-  implementa** — y de datos de dimensiones/cantidad de bultos por línea que
-  hoy `LineaSolicitud` no captura. Es trabajo real, no trivial: requiere
-  decidir dónde vive esa captura antes de construir el endpoint.
-- El endpoint de arriba, cuando exista, es autenticación servicio-a-servicio
-  (`Authorization: Bearer NEXO_CALLBACK_API_KEY`), no la sesión del portal —
-  necesita su propio esquema de autenticación aparte de
-  `IdentidadPortalAuthenticationHandler` (S2-HU-03).
 - No hay ajuste manual de colocaciones expuesto todavía (existe en el
   dominio — `ColocacionCargue.AjusteManual` — pero ningún caso de uso lo usa).
 
@@ -80,26 +85,32 @@ suite completa contra Docker real sin regresión.
   `ReglaDeCosteo`, `PropuestaTarifaAdapter` (más allá de esa función) ni en
   pantallas.
 
-## Set de datos para el equipo de datos (S2-HU-10.1, #35)
+## Set de datos para el equipo de datos (S2-HU-10, Habilitador B8)
 
-Vistas de solo lectura en el esquema `analitica` (migración
-`VistasAnaliticaSoloLectura`), diccionario completo en
-[`docs/analitica/DICCIONARIO_DATOS.md`](docs/analitica/DICCIONARIO_DATOS.md).
-Cobertura: solicitudes, líneas, cotizaciones, líneas de cotización, conexos,
-tarifas ganadas archivadas, auditoría, y catálogos (clientes/rutas/
-vehículos/servicios/usuarios) — más `analitica.inconsistencias`, que
-documenta registros con datos irregulares en vez de descartarlos en
-silencio. Verificado contra SQL Server real (Docker): migración y rollback
-aplicados sin error, las 13 vistas devuelven filas contra el dataset de
-demostración.
+Entregable completo en [`analitica/`](analitica/README.md), en 3 partes:
+
+- **S2-HU-10.1 (`#35`)**: vistas de solo lectura en el esquema `analitica`
+  (migración `VistasAnaliticaSoloLectura`, luego `RecrearVistasAnaliticaEn
+  DboNexoPrueba` cuando el esquema base se movió a `dbo_NEXO_prueba`).
+  Cobertura: solicitudes, líneas, cotizaciones, líneas de cotización,
+  conexos, tarifas ganadas archivadas, auditoría, y catálogos (clientes/
+  rutas/vehículos/servicios/usuarios) — más `analitica.inconsistencias`, que
+  documenta registros con datos irregulares en vez de descartarlos en
+  silencio. Diccionario en
+  [`analitica/00-fuentes/bd-propia/DICCIONARIO_DATOS.md`](analitica/00-fuentes/bd-propia/DICCIONARIO_DATOS.md).
+- **S2-HU-10.2 (`#36`)**: 4 extractos puntuales de las fuentes de lectura
+  corporativas (piso SICE-TAC, tarifa de plaza SAP, histórico SAP, catálogo
+  de clientes) — ver
+  [`analitica/00-fuentes/fuentes-corporativas/README.md`](analitica/00-fuentes/fuentes-corporativas/README.md)
+  para fecha de corte, volumen y llaves de cruce.
+- **S2-HU-10.3 (`#37`)**: consolidación del set final versionado
+  (`analitica/01-set-final/v1.0.0-piloto/`), con diccionario y linaje
+  unificados de ambos lados y un reporte de control de calidad cruzado.
 
 **Pendiente, fuera del alcance de esta sesión**: ejecutar la extracción real
-(el export que recibe el equipo de datos) contra la base de producción, en
-ventana de bajo uso, con una cuenta de solo lectura sobre el esquema
-`analitica` — esta sesión no tiene acceso a esa base. El alcance acordado
-("foto única") también deja fuera de este repositorio los extractos de las
-4 fuentes de lectura externas (DwSice/DwCubos/DbSolucionesTi): el issue #35
-es específicamente sobre la BD propia (`CabinaFletes`).
+contra la base de producción (no un ambiente de pruebas), en ventana de bajo
+uso, con una cuenta de solo lectura acotada al esquema `analitica` — sigue
+sin haber acceso a esa base.
 
 ## Transversales (no bloqueantes, a decidir cuando haga falta)
 
