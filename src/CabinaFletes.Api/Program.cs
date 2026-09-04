@@ -171,10 +171,17 @@ builder.Services.AddSwaggerGen();
 const string ClientesCors = "clientes";
 var origenesPermitidos = (builder.Configuration["Cors:OrigenesPermitidos"] ?? "http://localhost:5173")
     .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-builder.Services.AddCors(o => o.AddPolicy(ClientesCors, p => p
-    .WithOrigins(origenesPermitidos)
-    .AllowAnyHeader()
-    .AllowAnyMethod()));
+// "*" es un atajo SOLO para desarrollo/pruebas: WithOrigins("*") no es un comodín (lo
+// compara como string literal y termina bloqueando todo), así que hay que pasar por
+// AllowAnyOrigin() explícitamente. No usar en QA/Producción — ver README sección 7.
+builder.Services.AddCors(o => o.AddPolicy(ClientesCors, p =>
+{
+    if (origenesPermitidos is [ "*" ])
+        p.AllowAnyOrigin();
+    else
+        p.WithOrigins(origenesPermitidos);
+    p.AllowAnyHeader().AllowAnyMethod();
+}));
 
 builder.Services.AddHealthChecks().AddDbContextCheck<CabinaFletesDbContext>("database");
 
