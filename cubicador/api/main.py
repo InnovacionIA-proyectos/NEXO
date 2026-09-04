@@ -52,8 +52,8 @@ app = FastAPI(
     ),
     lifespan=lifespan,
     servers=[
-        {"url": "http://localhost:8081", "description": "Docker Compose local (host)"},
-        {"url": "http://localhost:8000", "description": "Fuera de Docker (uvicorn --reload)"},
+        # {"url": "http://localhost:8081", "description": "Docker Compose local (host)"},
+        # {"url": "http://localhost:8000", "description": "Fuera de Docker (uvicorn --reload)"},
     ],
 )
 
