@@ -186,7 +186,7 @@ No hace falta un `.gitignore` propio de `02-eda/`: el crudo se commitea igual qu
 - Leer con `dtype=str` en una primera pasada para ver el crudo **tal como viene**, antes de que pandas infiera tipos y silencie problemas.  
 - Segunda pasada con tipado explícito y conversión controlada (`errors='coerce'`), contando cuántos valores fallaron cada conversión.  
 - Persistir a Parquet en `datos/interim/` con los tipos ya fijados; el resto del EDA lee de allí (más rápido y determinista que releer Excel).  
-- Normalizar nombres de columna a `snake_case` en el código, manteniendo el mapeo original documentado.
+- Normalizar nombres de columna a `camelCase` en el código, manteniendo el mapeo original documentado. *(Decisión de equipo, 2026-09-08: se prefirió camelCase sobre snake_case — no afecta el contenido del dato, solo la convención de nombres en código. Ver `notebooks/00_setup_y_carga.ipynb`, Paso 5.)*
 
 ---
 
