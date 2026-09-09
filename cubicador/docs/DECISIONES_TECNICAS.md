@@ -301,10 +301,16 @@ de NEXO — es el mismo broker, el mismo usuario. `.env.example` lo documenta.
 
 **Decisión** (pensada para no complicar la operación de un servicio interno,
 no para escala masiva):
-- Timeout de vigilancia (5 min, `worker/main.py:_vigilante_de_timeouts`, corre
-  cada 60s): si un plan lleva más de eso en `procesando` sin recibir el
-  evento de respuesta, se marca `error` automáticamente
-  (`marcar_error_por_timeout`).
+- Timeout de vigilancia (`worker/main.py:_vigilante_de_timeouts`, cada 60s y
+  5 min de umbral por defecto, ambos configurables vía
+  `CUBICADOR_INTERVALO_VIGILANTE_SEGUNDOS`/`CUBICADOR_TIMEOUT_PROCESANDO_MINUTOS`
+  desde S3-HU-06.1): si un plan lleva más de eso en `procesando` sin recibir el
+  evento de respuesta, el worker publica `cubicacion.rechazada` con
+  `codigo: "TIMEOUT_PROCESAMIENTO"` y **después** lo marca `error`
+  (`obtener_atascados` + `marcar_error`, en ese orden — ver CONTRATO.md 6.4:
+  publicar antes de persistir es lo que evita que un broker caído deje el plan
+  fuera de `procesando` sin haber avisado a nadie). Hasta S3-HU-06.1 solo
+  marcaba `error` sin publicar, y NEXO se quedaba en `procesando` para siempre.
 - Reintentos limitados vía un contador manual en la cabecera del mensaje
   (`x-intentos`, no vía TTL/DLX nativo de RabbitMQ — más simple de razonar
   con ack manual): 3 intentos antes de publicar en `cubicacion.dlq` para

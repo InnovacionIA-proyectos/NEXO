@@ -256,6 +256,17 @@ reales configurados (`TIMEOUT_PROCESANDO_MINUTOS`):
    `limite` = el instante actual en vez de "ahora menos 5 minutos", para no
    tener que esperar) → devolvió `marcados: 1`.
 4. `GET /{id}` confirmó `estado: "error"` en el plan.
+
+> **Actualizado en S3-HU-06.1.** Ese método ya no existe: se partió en
+> `obtener_atascados(limite)` (solo consulta) más el `marcar_error` que ya
+> había, y el vigilante ahora además **publica `cubicacion.rechazada` con
+> `codigo: "TIMEOUT_PROCESAMIENTO"` antes** de marcar el plan (ver CONTRATO.md
+> 6.4). Para repetir esta verificación manual, el punto 3 pasa a ser una
+> llamada a `worker.main._revisar_timeouts(publisher)` con
+> `CUBICADOR_TIMEOUT_PROCESANDO_MINUTOS` bajo, y al punto 4 se le suma
+> comprobar que el mensaje llegó a la cola `Cubicacion.CubicacionRechazada` de
+> NEXO. La lógica en sí (incluido el orden publicar-antes-de-marcar) ya está
+> cubierta de forma automática en `tests/worker/test_vigilante_timeouts.py`.
 5. Se reinició el `worker` (`docker compose start worker`) y se confirmó en
    sus logs que retomó el consumo normalmente.
 
@@ -546,9 +557,12 @@ automatizados contra Docker") ya se cerró — ver `.github/workflows/ci.yml` +
 push/PR. Lo que sigue sin automatizar, porque requiere infraestructura que
 el runner de CI no tiene o una topología más compleja de simular:
 
-- **El vigilante de timeout** (sección 2.4, punto c): requiere detener el
-  contenedor `worker` a mitad de un mensaje y llamar a
-  `marcar_error_por_timeout` directo contra la base — sigue siendo manual.
+- **El vigilante de timeout, de punta a punta** (sección 2.4, punto c):
+  requiere detener el contenedor `worker` a mitad de un mensaje y llamar a
+  `_revisar_timeouts` directo contra la base — sigue siendo manual. Desde
+  S3-HU-06.1 su *lógica* sí está automatizada con dobles de prueba
+  (`tests/worker/test_vigilante_timeouts.py`), incluido el caso de RabbitMQ
+  caído; lo que queda manual es el recorrido real contra los dos contenedores.
 - **`crear_plan_desde_linea` de punta a punta contra NEXO real** (secciones
   2.6 y 2.9): verificado manualmente contra la implementación real de NEXO
   (2.9) — funciona. Sigue sin automatizarse en CI: el runner no levanta el

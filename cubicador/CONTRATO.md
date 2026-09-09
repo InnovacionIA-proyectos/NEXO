@@ -605,6 +605,32 @@ si el mensaje deja de entregarse.
   vía `ALERTAS_SMTP_*`/`ALERTAS_EQUIPO_TECNICO`); sin SMTP configurado,
   degrada a un log sin romper el worker.
 
+### 6.4 Vigilante de timeouts (S3-HU-06.1)
+
+Cubre el caso que el reintento por `x-intentos` **no** cubre: que el worker se
+caiga a mitad de un mensaje, sin llegar ni a fallar ni a completar — no hay
+excepción que atrapar ni ack/nack que emitir, así que el plan quedaría en
+`procesando` para siempre.
+
+Cada `CUBICADOR_INTERVALO_VIGILANTE_SEGUNDOS` (60 por defecto), el worker busca
+los planes en `procesando` cuyo `updated_at` supere
+`CUBICADOR_TIMEOUT_PROCESANDO_MINUTOS` (5 por defecto) y, por cada uno:
+
+1. Publica `CubicaciónRechazada` con `codigo: "TIMEOUT_PROCESAMIENTO"`.
+2. **Después** marca el plan `error`.
+
+Ese orden es deliberado y es el punto de la HU. Marcar primero y publicar
+después significaría que, con el broker caído, el plan sale de `procesando` sin
+que nadie se entere y el ciclo siguiente ya no lo encuentra: NEXO se quedaría en
+`procesando` indefinidamente. Publicando primero, un fallo del broker deja el
+plan intacto y el próximo ciclo reintenta. Es el mismo criterio que el Outbox
+transaccional de NEXO (publicar antes de persistir). El precio es un posible
+rechazo duplicado si el proceso muere entre ambos pasos — inofensivo, porque el
+consumer de NEXO se limita a volver a poner `Estado = "error"`.
+
+`TIMEOUT_PROCESAMIENTO` es un `codigo` de mensajería, no de la API REST: no
+aparece en el catálogo de la sección 4, igual que `ERROR_INTERNO`.
+
 ---
 
 ## 7. Lo que este servicio consume DE NEXO
