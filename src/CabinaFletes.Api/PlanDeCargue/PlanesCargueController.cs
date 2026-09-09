@@ -1,6 +1,7 @@
 using CabinaFletes.Application.CasosDeUso.PlanDeCargue;
 using CabinaFletes.Application.CasosDeUso.PlanDeCargue.DTOs;
 using CabinaFletes.Application.Common.Abstractions;
+using CabinaFletes.Mensajes.Cubicacion;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -47,7 +48,12 @@ public class PlanesCargueController(
     ICommandHandler<EliminarItemCommand, ComandoAceptadoDto> eliminarItem,
     ICommandHandler<EliminarPlanCommand, ComandoAceptadoDto> eliminarPlan,
     ICommandHandler<AjustarColocacionCommand, ComandoAceptadoDto> ajustarColocacion,
-    IQueryHandler<ObtenerPlanCargueQuery, PlanCargueDto> consultar)
+    IQueryHandler<ObtenerPlanCargueQuery, PlanCargueDto> consultar,
+    IQueryHandler<ListarPlanesCargueQuery, IReadOnlyList<PlanCargueDto>> listar,
+    IQueryHandler<ObtenerResultadoPlanQuery, ResultadoPlanDto> obtenerResultado,
+    IQueryHandler<ObtenerFlotaPlanQuery, IReadOnlyList<PlanFlotaItemDto>> obtenerFlota,
+    IQueryHandler<ObtenerMetricasPlanQuery, MetricasCubicacionEvento?> obtenerMetricas,
+    IQueryHandler<ObtenerNoCargadasPlanQuery, IReadOnlyList<ColocacionCargueDto>> obtenerNoCargadas)
     : ControllerBase
 {
     /// <summary>
@@ -182,4 +188,63 @@ public class PlanesCargueController(
             body.Reinsertar), ct);
         return Accepted(r);
     }
+
+    // ----------------------------------------------------------------------------
+    // S3-HU-03 (issue #112): lectura del visor 3D, toda contra la proyección local que
+    // mantienen PlanDeCargueGeneradoConsumer/VehiculoCatalogoConsumer (issue #111) —
+    // NINGUNO de estos 5 endpoints llama a Cubicador (criterio no-negociable de la HU).
+    // [Authorize] sin rol específico: mismo criterio que el resto de las consultas del
+    // sistema (docs/ROLES_Y_PERMISOS.md — "cualquiera de los 6 roles puede consultar").
+    // ----------------------------------------------------------------------------
+
+    /// <summary>GET /api/planes-cargue — listado (100 más recientes) contra la proyección local.</summary>
+    [Authorize]
+    [HttpGet]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<PlanCargueDto>>> Listar(CancellationToken ct = default)
+        => Ok(await listar.Handle(new ListarPlanesCargueQuery(), ct));
+
+    /// <summary>GET /api/planes-cargue/{id}/resultado — detalle completo (ítems,
+    /// colocaciones con geometría, métricas, incidencias).</summary>
+    [Authorize]
+    [HttpGet("{id:guid}/resultado")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<ResultadoPlanDto>> ObtenerResultado(Guid id, CancellationToken ct = default)
+        => Ok(await obtenerResultado.Handle(new ObtenerResultadoPlanQuery(id), ct));
+
+    /// <summary>GET /api/planes-cargue/{id}/flota — los vehículos (planes) de la misma flota.</summary>
+    [Authorize]
+    [HttpGet("{id:guid}/flota")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<PlanFlotaItemDto>>> ObtenerFlota(Guid id, CancellationToken ct = default)
+        => Ok(await obtenerFlota.Handle(new ObtenerFlotaPlanQuery(id), ct));
+
+    /// <summary>GET /api/planes-cargue/{id}/metricas — subconjunto de /resultado.
+    /// Responde 200 con <c>null</c> si el plan existe pero nunca se optimizó.</summary>
+    [Authorize]
+    [HttpGet("{id:guid}/metricas")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<MetricasCubicacionEvento?>> ObtenerMetricas(Guid id, CancellationToken ct = default)
+        => Ok(await obtenerMetricas.Handle(new ObtenerMetricasPlanQuery(id), ct));
+
+    /// <summary>GET /api/planes-cargue/{id}/no-cargadas — subconjunto de /resultado, solo
+    /// las colocaciones rechazadas.</summary>
+    [Authorize]
+    [HttpGet("{id:guid}/no-cargadas")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<IReadOnlyList<ColocacionCargueDto>>> ObtenerNoCargadas(Guid id, CancellationToken ct = default)
+        => Ok(await obtenerNoCargadas.Handle(new ObtenerNoCargadasPlanQuery(id), ct));
+
+    /// <summary>GET /api/planes-cargue/{id}/exportar — mismo shape que /resultado (igual
+    /// que Cubicador: hoy es el mismo contenido, el nombre queda para una futura
+    /// diferenciación real, p.ej. un archivo).</summary>
+    [Authorize]
+    [HttpGet("{id:guid}/exportar")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<ResultadoPlanDto>> Exportar(Guid id, CancellationToken ct = default)
+        => Ok(await obtenerResultado.Handle(new ObtenerResultadoPlanQuery(id), ct));
 }

@@ -16,12 +16,14 @@ defecto, CUBICADOR_HOST_PORT en .env - el contenedor sigue escuchando en
 DECISIONES_TECNICAS.md #9) levantado con SUS puertos publicados al host: AMQP
 en 5672 y su consola de administracion en 15672.
 
-No cubre el vigilante de timeout (docs/DECISIONES_TECNICAS.md #10): ese
-escenario requiere detener el contenedor `worker` a mitad de un mensaje y
-llamar a `marcar_error_por_timeout` directo contra la base, lo que acopla
+No cubre el vigilante de timeout de punta a punta (docs/DECISIONES_TECNICAS.md
+#10): ese escenario requiere detener el contenedor `worker` a mitad de un
+mensaje y llamar a `_revisar_timeouts` directo contra la base, lo que acopla
 este script a la topologia interna de docker-compose de una forma que no
 vale la pena en CI - sigue siendo verificacion manual (ver PRUEBAS_DE_
-INTEGRACION.md seccion 2.4 punto (c)).
+INTEGRACION.md seccion 2.4 punto (c)). Lo que SI esta automatizado desde
+S3-HU-06.1 es la logica del vigilante con dobles de prueba, incluido el orden
+publicar-antes-de-marcar: tests/worker/test_vigilante_timeouts.py.
 """
 
 from __future__ import annotations
@@ -158,9 +160,14 @@ async def flujo_resultado_por_cola(client: httpx.AsyncClient) -> None:
         evento = await asyncio.wait_for(_esperar_evento_del_plan(cola, plan["id"]), timeout=30)
         assert evento["planId"] == plan["id"], evento
         assert evento["correlationId"] == plan["id"], evento
-        assert evento["resultado"]["estado"] == "optimizado", evento
-        assert evento["resultado"]["colocaciones"] == 2, evento
-        log(f"evento recibido por cola: {evento}")
+        # S3-HU-03 (issue #110): "resultado" ya no es {estado, puntaje, colocaciones: int}
+        # - es el ResultadoPlanDto completo (mismo shape que ya usa GET .../resultado,
+        # ver flujo_optimizar_async arriba).
+        assert evento["resultado"]["plan"]["estado"] == "optimizado", evento
+        assert len(evento["resultado"]["colocaciones"]) == 2, evento
+        assert all(c["cargada"] for c in evento["resultado"]["colocaciones"]), evento
+        log(f"evento recibido por cola: plan={evento['resultado']['plan']['estado']}, "
+            f"colocaciones={len(evento['resultado']['colocaciones'])}")
 
 
 async def _esperar_evento_del_plan(cola: aio_pika.abc.AbstractQueue, plan_id: str) -> dict:

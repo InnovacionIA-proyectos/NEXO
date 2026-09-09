@@ -524,24 +524,46 @@ desenvuelve primero; si no, se usa tal cual (`worker/main.py::_procesar`).
 
 ```json
 {
-  "tipo": "optimizar" | "crear_desde_linea",
+  "tipo": "optimizar" | "crear_desde_linea" | "crear_plan" | "crear_plan_demo" | "guardar_vehiculo" | "guardar_item" | "importar_items" | "eliminar_item" | "eliminar_plan" | "ajustar_colocacion",
   "planId": "uuid",
   "correlationId": "uuid",
-  "solicitud": { "estrategia": "...", "algoritmo": "...", "semilla": null, "ponderaciones": null, "respetarBloqueadas": false }
+  "solicitud": { "...": "shape distinto por tipo, ver NEXO/docs/mensajeria/CUBICACION.md seccion 6.3 (S3-HU-02) para el detalle de los 8 nuevos" }
 }
 ```
 
-### 6.2 Eventos de salida (el worker publica UNO de estos al terminar)
+Los 8 tipos nuevos (S3-HU-02, issue #105) son operaciones de datos, no de
+cálculo — comparten exchange/routing-key/reintentos con `optimizar`, pero
+NO pasan por ninguna compuerta de paridad. `ajustar_colocacion` reemplaza el
+PATCH síncrono que existía antes en `/{id}/colocaciones/{colocacionId}` (ver
+`docs/decisiones/ADR-ajuste-manual-async.md` del lado de NEXO) — sigue
+resolviéndose con la MISMA lógica de negocio de siempre
+(`application/plan_cargue/ajustar.py`), solo que ahora llega por cola en vez
+de HTTP directo.
 
-- **`PlanDeCargueGenerado`**: `{ correlationId, planId, resultado: {...} }`
+### 6.2 Eventos de salida (el worker publica alguno de estos al terminar)
+
+- **`PlanDeCargueGenerado`**: `{ correlationId, planId, resultado: {...} }` —
+  se publica para CUALQUIER tipo que termine con un plan vivo que reportar
+  (`optimizar`, `crear_desde_linea`, `crear_plan`, `crear_plan_demo`,
+  `guardar_item`, `importar_items`, `eliminar_item`, `ajustar_colocacion` —
+  no para `guardar_vehiculo`/`eliminar_plan`, que no tienen plan que
+  reportar). **Enriquecido en S3-HU-03** (issue #110): `resultado` ya no es
+  `{estado, puntaje, colocaciones: int}` — es el `ResultadoPlanDto` completo
+  (items, colocaciones con geometría, métricas, incidencias). No existe un
+  evento separado para el ajuste manual: reutiliza este mismo, es la misma
+  forma de reportar cualquier desenlace de un plan.
 - **`CubicaciónRechazada`**: `{ correlationId, planId, codigo: string, mensaje: string }`
-- **`PlanDeCargueAjustado`**: mismo payload que `PlanDeCargueGenerado`, reservado por si en el futuro el ajuste manual también se mueve a async (hoy es siempre síncrono).
+  — para CUALQUIERA de los 9 tipos que falle (ver `worker/main.py::_procesar`,
+  `marcar_error` es un no-op seguro si el id no corresponde a un plan real).
+- **`VehiculoCreado`/`VehiculoActualizado`** (S3-HU-03, issue #110): `{ correlationId, vehiculo: {...VehiculoCubicacionDto...} }`
+  — se publican cuando `guardar_vehiculo` crea o actualiza una fila,
+  respectivamente (según si el `id` ya existía antes de guardar).
 
-Los dos primeros van envueltos en el "sobre" de MassTransit — NEXO los
-consume con un `IConsumer<T>` real
-(`PlanDeCargueGeneradoConsumer`/`CubicacionRechazadaConsumer`, ver
-`NEXO/docs/mensajeria/CUBICACION.md`), que espera ese formato para
-deserializar:
+Todos menos `CubicaciónSolicitada` van envueltos en el "sobre" de MassTransit
+— NEXO los consume con un `IConsumer<T>` real
+(`PlanDeCargueGeneradoConsumer`/`CubicacionRechazadaConsumer`/
+`VehiculoCatalogoConsumer`, ver `NEXO/docs/mensajeria/CUBICACION.md`), que
+espera ese formato para deserializar:
 
 ```json
 {
@@ -564,13 +586,40 @@ si el mensaje deja de entregarse.
 
 - Exchange: `cubicador.eventos` (topic).
 - Routing keys: `cubicacion.solicitada`, `plan-de-cargue.generado`,
-  `cubicacion.rechazada`, `plan-de-cargue.ajustado`.
+  `cubicacion.rechazada` y, desde S3-HU-03, `vehiculo.creado`/
+  `vehiculo.actualizado`.
 - Dead-letter: `cubicacion.dlq`. Al caer un mensaje ahí (agotados los
   **3** reintentos, `worker/main.py:49` `MAX_INTENTOS = 3`), el worker
   además alerta por correo al equipo técnico
   (`infrastructure/alertas/correo.py::alertar_mensaje_en_dlq`, configurable
   vía `ALERTAS_SMTP_*`/`ALERTAS_EQUIPO_TECNICO`); sin SMTP configurado,
   degrada a un log sin romper el worker.
+
+### 6.4 Vigilante de timeouts (S3-HU-06.1)
+
+Cubre el caso que el reintento por `x-intentos` **no** cubre: que el worker se
+caiga a mitad de un mensaje, sin llegar ni a fallar ni a completar — no hay
+excepción que atrapar ni ack/nack que emitir, así que el plan quedaría en
+`procesando` para siempre.
+
+Cada `CUBICADOR_INTERVALO_VIGILANTE_SEGUNDOS` (60 por defecto), el worker busca
+los planes en `procesando` cuyo `updated_at` supere
+`CUBICADOR_TIMEOUT_PROCESANDO_MINUTOS` (5 por defecto) y, por cada uno:
+
+1. Publica `CubicaciónRechazada` con `codigo: "TIMEOUT_PROCESAMIENTO"`.
+2. **Después** marca el plan `error`.
+
+Ese orden es deliberado y es el punto de la HU. Marcar primero y publicar
+después significaría que, con el broker caído, el plan sale de `procesando` sin
+que nadie se entere y el ciclo siguiente ya no lo encuentra: NEXO se quedaría en
+`procesando` indefinidamente. Publicando primero, un fallo del broker deja el
+plan intacto y el próximo ciclo reintenta. Es el mismo criterio que el Outbox
+transaccional de NEXO (publicar antes de persistir). El precio es un posible
+rechazo duplicado si el proceso muere entre ambos pasos — inofensivo, porque el
+consumer de NEXO se limita a volver a poner `Estado = "error"`.
+
+`TIMEOUT_PROCESAMIENTO` es un `codigo` de mensajería, no de la API REST: no
+aparece en el catálogo de la sección 4, igual que `ERROR_INTERNO`.
 
 ---
 

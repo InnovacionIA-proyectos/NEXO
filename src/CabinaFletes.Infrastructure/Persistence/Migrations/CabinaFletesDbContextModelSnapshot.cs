@@ -810,6 +810,9 @@ namespace CabinaFletes.Infrastructure.Migrations
                     b.Property<Guid?>("LineaSolicitudId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("MetricasJson")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("Nombre")
                         .IsRequired()
                         .HasMaxLength(150)

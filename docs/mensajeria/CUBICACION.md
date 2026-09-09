@@ -423,21 +423,22 @@ esta HU y hay que leerla antes de construir la pantalla.
 
 ### 6.5 Limitaciones conocidas de ESTOS 8 comandos, honestas
 
-- **`crear_plan_demo` no tiene seguimiento por id todavía.** Cubicador elige
-  el vehículo internamente (preset "13.6 m" de SU catálogo, que NEXO no
-  conoce) y genera su propio `PlanId` — NEXO no tiene forma de anticiparlo,
-  así que el 202 solo trae un `correlationId` de seguimiento, no un
-  `PlanCargueId` consultable con `GET /api/planes-cargue/{id}`. El plan
-  creado no queda reflejado en NEXO en este alcance (no hay fila espejo que
-  el consumer pueda actualizar). Pensado para demos/pruebas — si el frontend
-  necesita seguirlo, es trabajo de una iteración futura de lectura.
-- **`guardar_vehiculo` no tiene aviso de éxito ni de fallo.** NEXO no
-  mantiene espejo de vehículos (la fuente de verdad es Cubicador — hoy nada
-  en NEXO lee su propia tabla `VehiculosCubicacion` salvo el stub interno que
-  `CrearPlanCommand` asegura para no romper su FK). Si Cubicador rechaza el
-  vehículo (dimensiones inválidas, etc.), `CubicacionRechazadaConsumer` no
-  encuentra ninguna fila que marcar y el rechazo se pierde en silencio del
-  lado de NEXO — el 202 es una promesa de "quedó en cola", no de "quedó
+- ~~`crear_plan_demo` no tiene seguimiento por id todavía.~~ **RESUELTO en
+  S3-HU-03 (ver sección 7.1)**: el evento `plan-de-cargue.generado` ahora
+  trae el `PlanCargueId` real que Cubicador generó (además del `Nombre`/
+  `VehiculoId` que eligió), y `PlanDeCargueGeneradoConsumer` inserta la fila
+  si no existía — el correlationId del 202 ya no es el único rastro; el
+  aviso de `/hubs/plan-cargue` sigue sin llegar a ESE correlationId
+  específico (el frontend no sabe el `PlanCargueId` real hasta que polling o
+  un futuro aviso por correlación lo revele), pero `GET /api/planes-cargue`
+  (sección 7.2) ya lo lista.
+- **`guardar_vehiculo` no tiene aviso de éxito ni de fallo.** Antes de
+  S3-HU-03 NEXO no mantenía espejo de vehículos en absoluto; ahora sí (ver
+  sección 7), pero la sincronización llega por `vehiculo.creado`/
+  `vehiculo.actualizado` — un RECHAZO (`cubicacion.rechazada`) sigue sin
+  encontrar ninguna fila de `PlanCargue` que marcar (un vehículo no es un
+  plan), así que el rechazo se sigue perdiendo en silencio del lado de NEXO.
+  El 202 sigue siendo una promesa de "quedó en cola", no de "quedó
   guardado". Mitigación posible a futuro: validar en NEXO lo mismo que ya
   valida `CubicacionSolicitadaValidador` (dimensiones, puerta, ejes) para que
   la mayoría de rechazos ni siquiera lleguen a encolarse.
@@ -448,4 +449,125 @@ esta HU y hay que leerla antes de construir la pantalla.
 - **`crear_plan` deja un stub de vehículo en la tabla `VehiculosCubicacion`
   de NEXO** (solo `Id` + `Nombre` = el mismo id, sin dimensiones) — existe
   ÚNICAMENTE para satisfacer la FK de `PlanCargue.VehiculoId` en la base de
-  NEXO. Nadie más lee esa fila; no es una fuente de verdad de vehículos.
+  NEXO. Nadie más lee esa fila; no es una fuente de verdad de vehículos
+  (aunque S3-HU-03 la actualiza con datos reales en cuanto llega el primer
+  `plan-de-cargue.generado` o `vehiculo.creado`/`vehiculo.actualizado` para
+  ese id — ver sección 7).
+
+---
+
+## 7. S3-HU-03 — proyección de lectura del visor 3D (issue #115)
+
+Contrato publicado para que el frontend (S3-HU-04 en
+`administracion_embarqa_nexo`) construya el visor en paralelo. **Si algo de
+esto cambia después de publicado, se avisa en la issue #115 — nunca en
+silencio.**
+
+### 7.0 Qué cambia
+
+Hasta esta HU, `plan-de-cargue.generado` solo traía un CONTEO de
+colocaciones — cualquier pantalla que necesitara el detalle (geometría,
+métricas, ítems no cargados) tenía que consultarlo directo a Cubicador. Eso
+se acaba: **NEXO proyecta el detalle completo en su propia base** y expone 7
+endpoints `GET` nuevos que leen EXCLUSIVAMENTE de esa proyección — ninguno
+reenvía la consulta a Cubicador (criterio no-negociable de la HU).
+
+Antes de tocar código se midió el tamaño real del evento enriquecido (issue
+#109) — ver
+[`docs/decisiones/medicion-evento-enriquecido-plan-cargue.md`](../decisiones/medicion-evento-enriquecido-plan-cargue.md):
+165 KB para un plan grande típico, 2.9 MB en el techo teórico de una sola
+importación — se aceptó tal cual, sin paginar ni comprimir, con un umbral de
+revisión documentado. Las 2 decisiones de arquitectura de fondo (S3-HU-01)
+siguen siendo las mismas de S3-HU-02: ver
+[`ADR-planid-generado-por-nexo.md`](../decisiones/ADR-planid-generado-por-nexo.md)
+y
+[`ADR-ajuste-manual-async.md`](../decisiones/ADR-ajuste-manual-async.md).
+
+### 7.1 Los 3 eventos (extienden la sección 2)
+
+**`plan-de-cargue.generado` — ENRIQUECIDO.** Mismo routing key y exchange de
+siempre; `resultado` pasó de `{estado, puntaje, colocaciones: int}` al
+`ResultadoPlanDto` completo de Cubicador:
+
+```json
+{
+  "correlationId": "...", "planId": "...",
+  "resultado": {
+    "plan": {
+      "id": "...", "nombre": "...", "vehiculoId": "...", "lineaSolicitudId": null,
+      "numeroVehiculo": 1, "estado": "optimizado", "estrategia": "Combinada",
+      "algoritmo": "bfd", "semilla": null, "pesoTotalKg": 500.0,
+      "volumenUtilizadoM3": 1.2, "utilizacionVolumen": 45.0, "utilizacionPiso": 60.0,
+      "puntaje": 75.1,
+      "items": [ { "id": "...", "sku": "...", "descripcion": "...", "...": "(todos los campos de guardar_item)" } ]
+    },
+    "vehiculo": { "id": "...", "nombre": "...", "...": "(mismo shape que guardar_vehiculo)" },
+    "colocaciones": [ { "id": "...", "itemPlanCargueId": "...", "x": 0.0, "y": 0.0, "z": 0.0, "cargada": true, "...": "(geometría completa)" } ],
+    "metricas": { "volumenInternoM3": 90.0, "unidadesCargadas": 1, "...": "(MetricasCubicacionDto completo, o null si aún no se optimizó)" },
+    "incidencias": [ { "severidad": "advertencia", "codigoRegla": "...", "...": "" } ]
+  }
+}
+```
+
+Shape exacto de cada objeto: `CabinaFletes.Mensajes.Cubicacion.
+MensajesDeCubicacion.cs` (`PlanCargueEvento`/`ItemPlanCargueEvento`/
+`ColocacionCargueEvento`/`MetricasCubicacionEvento`/
+`IncidenciaValidacionEvento`) del lado C#, `ResultadoPlanDto` (cubicador/
+CONTRATO.md §3.2) del lado Python — son el mismo contrato, dos lenguajes.
+
+**`vehiculo.creado`/`vehiculo.actualizado` — NUEVOS.** Se publican desde
+`worker/main.py` cuando el comando `guardar_vehiculo` (S3-HU-02) se ejecuta
+con éxito — "creado" si el `Id` no existía antes en la base de Cubicador,
+"actualizado" si ya existía:
+
+```json
+{ "correlationId": "<vehiculoId>", "vehiculo": { "id": "...", "nombre": "...", "...": "(mismo VehiculoCubicacionDto completo)" } }
+```
+
+Un solo consumer en NEXO (`VehiculoCatalogoConsumer`) atiende los 2 —
+`Consume(ConsumeContext<VehiculoCreado>)` y
+`Consume(ConsumeContext<VehiculoActualizado>)` — porque de este lado el
+tratamiento es idéntico: upsert por `Id`.
+
+### 7.2 Los 7 endpoints de lectura
+
+| # | Ruta | Roles | Responde |
+|---|---|---|---|
+| 1 | `GET /api/vehiculos` | `[Authorize]` (cualquier rol) | `VehiculoCubicacionDto[]` |
+| 2 | `GET /api/planes-cargue` | `[Authorize]` | `PlanCargueDto[]` (resumen, 100 más recientes) |
+| 3 | `GET /api/planes-cargue/{id}/resultado` | `[Authorize]` | `ResultadoPlanDto` (detalle completo) |
+| 4 | `GET /api/planes-cargue/{id}/flota` | `[Authorize]` | `PlanFlotaItemDto[]` |
+| 5 | `GET /api/planes-cargue/{id}/metricas` | `[Authorize]` | `MetricasCubicacionEvento?` (`null` si nunca se optimizó) |
+| 6 | `GET /api/planes-cargue/{id}/no-cargadas` | `[Authorize]` | `ColocacionCargueDto[]` (`cargada = false`) |
+| 7 | `GET /api/planes-cargue/{id}/exportar` | `[Authorize]` | `ResultadoPlanDto` (idéntico a #3, mismo criterio que Cubicador) |
+
+**Por qué `[Authorize]` sin rol específico**: es la regla general de NEXO
+para lecturas —
+[`docs/ROLES_Y_PERMISOS.md`](../ROLES_Y_PERMISOS.md): "cualquiera de los 6
+roles puede consultar (listados, detalles, exportar) casi todo el sistema".
+Ninguna de estas 7 consultas escribe ni cambia estado; no hay razón para
+restringirlas por rol — mismo criterio que ya usaba
+`GET /api/planes-cargue/{id}` desde S2-HU-08.1.
+
+Los DTOs completos (`VehiculoCubicacionDto`, `PlanCargueDetalleDto`,
+`ItemPlanCargueDetalleDto`, `ColocacionCargueDto`, `ResultadoPlanDto`,
+`PlanFlotaItemDto`) están en `CabinaFletes.Application.CasosDeUso.
+PlanDeCargue.DTOs.PlanCargueDtos.cs` — espejan 1:1 los DTOs de Cubicador
+citados en cubicador/CONTRATO.md §3.2, con `Guid`/`decimal` en vez de
+`string`/`float` (convención del resto de la API HTTP de NEXO).
+
+### 7.3 Limitaciones conocidas de esta proyección
+
+- **`GET .../metricas` puede responder `null`.** Un plan recién creado
+  (`crear_plan`, sin optimizar todavía) no tiene métricas que mostrar —
+  mismo comportamiento que Cubicador (sin colocaciones no hay nada que
+  calcular). No es un error, es el estado real del plan.
+- **El rechazo de `guardar_vehiculo` no actualiza el catálogo ni avisa nada**
+  (ver sección 6.5) — un vehículo inválido simplemente no aparece en
+  `GET /api/vehiculos` después del 202, sin explicación visible del lado de
+  NEXO. El log/DLQ de Cubicador sigue siendo la única fuente para ese caso.
+- **La proyección no hace ninguna llamada saliente a Cubicador, ni siquiera
+  para "reparar" datos faltantes.** Si un consumer nunca procesó el evento
+  de un plan viejo (p.ej. datos de antes de esta HU), ese plan simplemente
+  no aparece con detalle en NEXO — no hay backfill automático. Si hace falta
+  poblar planes históricos, es un script aparte, no parte de esta HU.

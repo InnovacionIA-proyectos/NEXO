@@ -67,6 +67,12 @@ services:
       CUBICADOR_RABBITMQ_URL: amqp://${RABBITMQ_USER:?definir en .env}:${RABBITMQ_PASSWORD:?definir en .env}@rabbit:5672/
       NEXO_BASE_URL: ${NEXO_BASE_URL:?definir en .env}
       NEXO_CALLBACK_API_KEY: ${NEXO_CALLBACK_API_KEY:?definir en .env}
+      # Vigilante de timeouts (S3-HU-06.1, ver CONTRATO.md 6.4): un plan que
+      # lleve mas de TIMEOUT minutos en 'procesando' se da por perdido - se
+      # publica cubicacion.rechazada (TIMEOUT_PROCESAMIENTO) y se marca 'error'.
+      # Solo aplican al worker: la api no corre el vigilante.
+      CUBICADOR_TIMEOUT_PROCESANDO_MINUTOS: ${CUBICADOR_TIMEOUT_PROCESANDO_MINUTOS:-5}
+      CUBICADOR_INTERVALO_VIGILANTE_SEGUNDOS: ${CUBICADOR_INTERVALO_VIGILANTE_SEGUNDOS:-60}
       # Alerta por correo al caer un mensaje en cubicacion.dlq (ver
       # infrastructure/alertas/correo.py). Opcionales: sin ALERTAS_SMTP_HOST
       # se degrada solo (log warning, no rompe el worker) - ver ese archivo.
