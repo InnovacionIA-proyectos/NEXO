@@ -26,4 +26,14 @@ public interface IPlanCargueRepository
     /// es una operación rara de deshacer y de bajo riesgo, ver EliminarPlanCommand.
     /// </summary>
     Task EliminarSiExisteAsync(Guid id, CancellationToken ct);
+
+    /// <summary>S3-HU-03 (issue #112): GET /api/planes-cargue — listado contra la
+    /// proyección local, sin ítems/colocaciones (sería demasiado para un listado).</summary>
+    Task<IReadOnlyList<PlanCargue>> ListarRecientesAsync(int top, CancellationToken ct);
+
+    /// <summary>S3-HU-03 (issue #112): GET /api/planes-cargue/{id}/flota — los planes
+    /// (vehículos) que comparten la MISMA LineaSolicitudId que <paramref name="planId"/>,
+    /// cada uno con sus colocaciones (para contar cargadas/totales) — o solo el propio
+    /// plan si no tiene LineaSolicitudId (flota de un solo vehículo).</summary>
+    Task<IReadOnlyList<PlanCargue>> ObtenerFlotaAsync(Guid planId, CancellationToken ct);
 }

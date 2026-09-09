@@ -51,3 +51,59 @@ public record AvisoPlanCargueDto(Guid PlanCargueId, string Estado, decimal Punta
 {
     public static AvisoPlanCargueDto Desde(PlanCargueDto p) => new(p.Id, p.Estado, p.Puntaje);
 }
+
+// ---------------------------------------------------------------------------------
+// S3-HU-03 (issue #112): lectura completa del visor 3D — TODAS contra la proyección
+// local que llena PlanDeCargueGeneradoConsumer/VehiculoCatalogoConsumer (issue #111).
+// Ninguna de estas consultas llama a Cubicador (criterio no-negociable de la HU). Los
+// shapes espejan cubicador/CONTRATO.md §3.2 (ResultadoPlanDto/VehiculoCubicacionDto/etc.)
+// para que el frontend (S3-HU-04) reciba lo mismo que ya conoce del contrato de Cubicador.
+// ---------------------------------------------------------------------------------
+
+public record EjeVehiculoDto(decimal PosicionMm, decimal CapacidadKg);
+
+public record VehiculoCubicacionDto(
+    Guid Id, string Nombre, string? Descripcion,
+    decimal LargoInternoMm, decimal AnchoInternoMm, decimal AltoInternoMm,
+    decimal CapacidadKg, decimal TaraKg, decimal PuertaAnchoMm, decimal PuertaAltoMm, string PuertaPosicion,
+    IReadOnlyList<EjeVehiculoDto> Ejes, decimal ToleranciaParedesMm, decimal ToleranciaEntreUnidadesMm,
+    bool EsPreset);
+
+public record ItemPlanCargueDetalleDto(
+    Guid Id, Guid PlanCargueId, string Sku, string Descripcion, string? Pedido, string? Cliente,
+    string? Destino, int SecuenciaEntrega, decimal LargoMm, decimal AnchoMm, decimal AltoMm, decimal PesoKg,
+    int Cantidad, string? Color, int Prioridad, string? TipoEmbalaje, bool Apilable, int MaxNiveles,
+    decimal MaxPesoEncimaKg, bool Rotable, bool MantenerVertical, bool Fragil, bool Peligroso, bool Refrigerado,
+    string? GrupoCompatibilidad, string? Observaciones);
+
+public record ColocacionCargueDto(
+    Guid Id, Guid PlanCargueId, Guid ItemPlanCargueId, int IndiceUnidad, bool Cargada,
+    decimal X, decimal Y, decimal Z, decimal LargoColocadoMm, decimal AnchoColocadoMm, decimal AltoColocadoMm,
+    int OrientacionIndice, int SecuenciaCargue, Guid? SoporteColocacionId, decimal PorcentajeSoporte,
+    decimal PesoEncimaKg, string EstadoEstabilidad, string Accesibilidad, bool Bloqueada, bool AjusteManual,
+    string? CodigoRechazo, string? RazonRechazo);
+
+/// <summary>Detalle completo del plan (a diferencia de <see cref="PlanCargueDto"/>, que es
+/// el resumen de la consulta de respaldo de S2-HU-08.1) — con sus ítems completos.</summary>
+public record PlanCargueDetalleDto(
+    Guid Id, string Nombre, Guid VehiculoId, Guid? LineaSolicitudId, int NumeroVehiculo,
+    string Estado, string Estrategia, string Algoritmo, int? Semilla,
+    decimal PesoTotalKg, decimal VolumenUtilizadoM3, decimal UtilizacionVolumen, decimal UtilizacionPiso,
+    decimal Puntaje, IReadOnlyList<ItemPlanCargueDetalleDto> Items,
+    DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt);
+
+/// <summary>GET /api/planes-cargue/{id}/resultado y /exportar (issue #112) — mismo shape
+/// que <c>ResultadoPlanDto</c> de Cubicador, leído de la proyección local. <c>Metricas</c>
+/// es <c>null</c> si el plan nunca se optimizó (nadie ha publicado un
+/// plan-de-cargue.generado con métricas todavía).</summary>
+public record ResultadoPlanDto(
+    PlanCargueDetalleDto Plan,
+    VehiculoCubicacionDto Vehiculo,
+    IReadOnlyList<ColocacionCargueDto> Colocaciones,
+    Mensajes.Cubicacion.MetricasCubicacionEvento? Metricas,
+    IReadOnlyList<Mensajes.Cubicacion.IncidenciaValidacionEvento> Incidencias);
+
+/// <summary>GET /api/planes-cargue/{id}/flota (issue #112) — los vehículos (planes)
+/// hermanos de una misma línea de solicitud (S2-HU-08: una carga que no cabe en un
+/// vehículo se reparte en varios planes con la misma LineaSolicitudId).</summary>
+public record PlanFlotaItemDto(Guid Id, int NumeroVehiculo, int TotalVehiculos, int UnidadesCargadas, int UnidadesTotales);

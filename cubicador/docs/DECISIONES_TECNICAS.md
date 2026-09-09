@@ -128,8 +128,19 @@ ahí, por la misma razón). Aquí ni siquiera hace falta un puerto separado para
 lograrlo: `ajustar.py` llama directo a `domain.motor.validadores` en memoria.
 
 **Eventos** (ya nombrados en la historia de usuario original, se usan tal
-cual): `CubicaciónSolicitada`, `PlanDeCargueGenerado`, `CubicaciónRechazada`,
-`PlanDeCargueAjustado`.
+cual): `CubicaciónSolicitada`, `PlanDeCargueGenerado`, `CubicaciónRechazada`.
+(`PlanDeCargueAjustado`, nombrado originalmente acá como reservado, nunca se
+implementó — ver la actualización siguiente.)
+
+**Actualización (S3-HU-02, ADR-ajuste-manual-async.md del lado de NEXO)**: el
+razonamiento de arriba ("el ajuste manual NO va por cola") sigue siendo
+válido para la API SÍNCRONA de Cubicador (`PATCH /{id}/colocaciones/{id}`,
+que no cambió) — pero NEXO, para no exponer Cubicador directo al navegador,
+agregó su propio endpoint que SÍ publica `ajustar_colocacion` por cola
+(reutilizando `PlanDeCargueGenerado`/`CubicaciónRechazada`, sin un evento
+`PlanDeCargueAjustado` separado). La UI optimista del frontend es lo que
+compensa la latencia que este párrafo quería evitar — ver el ADR para el
+detalle completo de esa decisión.
 
 **Payload de los mensajes**: las mismas formas ya definidas como DTOs REST —
 una sola forma de verdad, sea que viaje por HTTP o por cola.
