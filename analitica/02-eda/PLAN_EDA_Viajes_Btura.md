@@ -67,8 +67,8 @@ El diccionario embebido en `Distancia_0` (Anexo D) resuelve buena parte de estas
 
 | \# | Pregunta | Estado | Respuesta / qué falta |
 | :---- | :---- | :---- | :---- |
-| 1 | ¿Qué representa un registro? | ⚠️ Parcial | El diccionario define `FO` como "equivale al número del viaje", pero hay 130 `FO` repetidos (§4.2). El grano sigue sin cerrar |
-| 2 | ¿`FO` es identificador único? | ✅ Resuelto en intención | Debería serlo (= número del viaje). Por tanto los 130 repetidos **son un defecto**, no una característica del modelo. Esto endurece el hallazgo, no lo relaja |
+| 1 | ¿Qué representa un registro? | ⚠️ Parcial | El diccionario define `FO` como "equivale al número del viaje", pero hay 128 valores de `FO` repetidos (§4.2). El grano sigue sin cerrar |
+| 2 | ¿`FO` es identificador único? | ⚠️ Corregido (2026-09-08) | Ya **no** se sostiene que los repetidos "sean un defecto" sin más — la verificación sobre los 128 grupos completos (§4.2) muestra que el 100 % comparte vehículo y fecha pero difiere en cliente y/o peso, consistente con que `FO` identifique el **viaje del vehículo** (puede consolidar varios clientes), no la orden de un cliente. Pendiente de confirmar con negocio |
 | 3 | ¿`Fecha Creación FO` es creación o ejecución? | ✅ Resuelto | "Fecha en la cual fue creada la FO **en el sistema**" → es **administrativa**. Confirma que el set NO sirve para análisis de tiempos operativos (refuerza L-01) |
 | 4 | Semántica de las dos monetarias | ✅ Resuelto | `Tarifa Venta Cliente` \= "tarifa de venta del viaje realizado"; `Flete Producción FO` \= "costo de producción o flete que se paga al Transportista". Falta solo moneda e IVA |
 | 5 | Unidad de `Peso Neto` | ❌ Abierto | Define el concepto ("carga sin tara del vehículo") pero **no la unidad**. kg vs t sigue sin confirmar |
@@ -235,30 +235,48 @@ No hace falta un `.gitignore` propio de `02-eda/`: el crudo se commitea igual qu
 
 ### 4.1 Pruebas
 
-- [ ] Duplicados de fila completa. → **0 encontrados.**  
-- [ ] Duplicados de la supuesta clave `FO`. → **130 FOs repetidos** (41.107 únicos sobre 41.237 filas).  
-- [ ] Para cada `FO` repetido: ¿qué columnas difieren? ¿Son posiciones distintas de una misma orden, o un error de duplicación?  
-- [ ] Buscar clave compuesta que sí sea única: `FO` \+ `Posición Principal FWOP`, `FO` \+ `Vehículo`, etc.  
+- [x] Duplicados de fila completa. → **0 encontrados.**  
+- [x] Duplicados de la supuesta clave `FO`. → **128 valores de `FO` repetidos** (130 filas de más sobre 41.107 únicos — ver precisión del conteo en §4.2).  
+- [x] Para cada `FO` repetido: ¿qué columnas difieren? → Ver §4.2: no son posiciones de una misma orden ni un error simple — el patrón (100% de los 128 grupos) es carga consolidada de varios clientes en un mismo viaje de vehículo.  
+- [x] Buscar clave compuesta que sí sea única: `FO` \+ `Posición Principal FWOP`, `FO` \+ `Vehículo`, etc. → **Encontrada y verificada (notebook `02`, Paso 4):** `FO` \+ `BP Cliente` \+ `Peso Neto` \+ `Destino` identifica las 41.237 filas sin colisión (41.237 de 41.237). `FO` solo: 41.107/41.237. Agregar `Vehículo` no aporta nada (nunca varía dentro de un grupo repetido de `FO`, coherente con §4.2).  
 - [ ] Duplicados lógicos: mismo cliente, misma fecha, mismo origen-destino, mismo peso, distinto `FO`.  
 - [ ] Verificar si un mismo `Vehículo` aparece en dos viajes solapados en el tiempo (imposibilidad física).
 
-### 4.2 Hallazgo preliminar sobre los `FO` repetidos
+### 4.2 Hallazgo sobre los `FO` repetidos
 
-Los pares repetidos comparten fecha, distancia, peso, tipo y valores, y **difieren únicamente en `Origen`**:
+> **CORRECCIÓN (2026-09-08, notebook `02_calidad_del_dato.ipynb`, Paso 3).** La versión anterior de esta sección afirmaba, con base en solo 2 ejemplos, que los pares repetidos "comparten fecha, distancia, peso, tipo y valores, y difieren únicamente en Origen". La verificación sistemática sobre los **128 grupos completos** (no una muestra) descarta esa afirmación — el detalle queda abajo.
 
-| FO | Fecha | Origen | Destino | Distancia | Peso |
-| :---- | :---- | :---- | :---- | :---- | :---- |
-| 301204560 | 2025-04-01 | BOGOTA, D.C. | BUENAVENTURA | 277,5 | 2.300 |
-| 301204560 | 2025-04-01 | CAJICA | BUENAVENTURA | 277,5 | 2.300 |
-| 301205267 | 2025-04-02 | FUNZA | BUENAVENTURA | 260,5 | 2.300 |
-| 301205267 | 2025-04-02 | TOCANCIPA | BUENAVENTURA | 260,5 | 2.300 |
+**Precisión sobre el conteo:** hay **128 valores de `FO` distintos** con repetición, no 130. El "130" del plan y del Anexo A sigue siendo correcto, pero mide otra cosa: son las filas "de más" sobre el total de únicos (126 pares × 1 fila de más + 2 tríos × 2 filas de más = 130). Ambos números son correctos, no son contradictorios.
 
-Dos lecturas posibles, mutuamente excluyentes, y **hay que resolver cuál es** antes de sumar cualquier métrica:
+**Qué cambia realmente dentro de cada grupo repetido**, verificado sobre los 128 grupos completos:
 
-1. Son viajes multi-recogida legítimos (una FO con varios puntos de cargue) → **no se pueden sumar los valores**, se duplicaría el ingreso.  
-2. Es un error de duplicación en la extracción → hay que deduplicar.
+| Columna | Grupos con variación (de 128) | % |
+| :---- | :---- | :---- |
+| `Peso Neto` | 105 | 82 % |
+| `Flete Producción FO` | 102 | 80 % |
+| `Tarifa venta al cliente` | 99 | 77 % |
+| `BP Cliente` | 96 | 75 % |
+| `Clase Equipo FOP` | 48 | 38 % |
+| `Destino` | 34 | 27 % |
+| `Grupo de Equipo FWOP` | 33 | 26 % |
+| `Posición Principal FWOP` | 32 | 25 % |
+| `Origen` | 25 | 20 % |
+| `Distancia Total` | 17 | 13 % |
+| `Fecha Creación FO`, `ID Clase Documento FWO`, `ID Medio Transporte FO`, `Vehículo`, `Tipo`, `Propiedad` | 0 | 0 % |
 
-**Impacto si no se resuelve:** toda métrica agregada de ingreso, flete o peso está potencialmente inflada en hasta 130 registros.
+`Origen` —la columna que la versión anterior señalaba como la única que cambia— es en realidad de las que **menos** cambia. `Vehículo` y `Fecha Creación FO` nunca cambian dentro de un grupo repetido: eso sí es 100 % consistente.
+
+**Patrón universal confirmado — 128 de 128 grupos (100 %):** comparten el mismo `Vehículo` y la misma `Fecha Creación FO`, y difieren en `BP Cliente` y/o `Peso Neto` (y casi siempre en las columnas de plata).
+
+**Hipótesis más consistente con la evidencia:** el diccionario interno (Anexo D) define `FO` como *"documento de subcontratación con el dueño del vehículo... equivale al número del viaje"* — el número identifica el **viaje del vehículo**, no la orden de un cliente individual. La lectura más plausible es que **un mismo viaje puede consolidar carga de varios clientes distintos**, cada uno con su propio peso y su propia tarifa, bajo un único número de `FO`. Esto reemplaza la dicotomía original ("multi-recogida legítima" vs. "error de duplicación") por una tercera lectura mejor respaldada por el dato.
+
+**Sin resolver:** al menos un caso (`FO` 301205267) tiene cliente distinto con **tarifa idéntica** entre ambas filas — no se puede descartar que sea una corrección de cliente mal aplicada en vez de consolidación genuina. No hay forma de distinguirlo solo con el dato disponible.
+
+**Pregunta a escalar al negocio (reemplaza la pregunta genérica anterior):** ¿un mismo `FO` puede representar el viaje de un vehículo que transporta carga de varios clientes distintos (carga consolidada)? ¿O cada `FO` debería corresponder a un único cliente, y estos 128 casos son un defecto de la extracción o del sistema origen?
+
+**Impacto en el tratamiento de las cifras (invierte la recomendación anterior):** si la hipótesis de carga consolidada es correcta, **sumar `Tarifa venta al cliente`/`Flete producción FO` por fila** (no deduplicar por `FO`) sería lo correcto para métricas de ingreso — al contrario de lo que advertía la versión anterior de esta sección. **No usar estas cifras en reportes hasta confirmar con el negocio.**
+
+**Confirmación externa (2026-09-08, consulta directa a `FactFWOFUFO` en DWCubos).** El esquema de esa tabla confirma la hipótesis por diseño: `Distancia Total FO` está definida a nivel de `FO` (el viaje), mientras que `ID Ubicación Origen/Destino FWOP` está a nivel de `FWOP` (la posición de cada cliente dentro del viaje) — son dos grados distintos de la jerarquía, no se espera que varíen juntos. Verificado a escala de **toda la compañía**: de 90.285 viajes con más de un `FWO` (consolidados), la distancia varía en solo **660 (0,73%)** —la verdadera anomalía, pendiente de investigar si se retoma— mientras que el origen varía en **4.833 (5,35%)**, la minoría esperable. Esto corrobora, con el sistema fuente, que el patrón encontrado en el extracto de Buenaventura no es un defecto de la extracción sino el comportamiento normal del modelo de datos de origen.
 
 ---
 
@@ -317,7 +335,9 @@ Cubierto en §4.
 
 - Cardinalidad de cada categórica y valores de baja frecuencia (candidatos a error de digitación).  
 - Normalización de nombres de ciudad: detectar `BOGOTA, DISTRITO CAPITAL` vs `BOGOTA` vs `BOGOTÁ`; `GUADALAJARA DE BUGA` vs `BUGA`. Usar distancia de edición (`rapidfuzz`) para agrupar candidatos.  
+  > **RESUELTO (2026-09-09, notebook `02_calidad_del_dato.ipynb`, Paso 13).** Comparación sistemática con `rapidfuzz` (`token_set_ratio`, umbral 80) sobre los 113+122 nombres de origen/destino. Los ejemplos citados arriba (variantes de Bogotá, Buga) **no existen en este dataset** — eran ilustrativos, no verificados contra el dato real. Los únicos 4 candidatos que salieron (`GIRARDOT`/`GIRARDOTA`, `SOACHA`/`SOCHA`, `SANTA ROSA DE CABAL`/`SANTA ROSA DE OSOS`, `TURBACO`/`TURBO`) son **falsos positivos**: municipios colombianos reales y distintos que solo suenan parecido. **Conclusión: no hay evidencia de nombres de ciudad duplicados/inconsistentes en este set.**  
 - Coherencia entre columnas que describen lo mismo. **Ya detectado:** `Tipo` y `ID Medio Transporte FO` son casi redundantes pero **no coinciden siempre** — p. ej. 175 registros con `Tipo = TC.3S3` traen `ID Medio Transporte = FP-3S3`, y 9 registros `TC.2S2` traen `TC-3S3`. **Resuelto por el diccionario:** `Tipo` está definido textualmente como **"Puede omitirse"**, mientras `ID Medio Transporte FO` tiene definición sustantiva ("categoría o tipo de vehículo... TC-3S2 \= tractocamión de tres ejes con trailer de dos"). → **`ID Medio Transporte FO` es la fuente de verdad; `Tipo` se descarta.** Las discrepancias dejan de ser un problema a resolver y pasan a ser evidencia de que `Tipo` no es confiable.  
+  > **CORRECCIÓN DE MAGNITUD (2026-09-09, notebook `02_calidad_del_dato.ipynb`, Paso 12).** Los 175 y 9 casos citados eran solo 2 ejemplos, no el conteo completo. Verificado sobre las 32 combinaciones distintas de discrepancia: **5.420 registros (13,1 % del dataset)** tienen `Tipo` ≠ `ID Medio Transporte FO` (ya normalizando el separador `.` vs `-`). Muchos pares (ej. `C2.4.5T`→`TC_TURBO`, 1.203 casos; `C2.8T`→`TC_SENCI`, 860 casos) no son errores de captura sino **dos catálogos de nomenclatura paralelos** que nunca estuvieron pensados para coincidir letra por letra. Esto **refuerza** la decisión ya tomada (descartar `Tipo`), no la cambia — la magnitud real (13,1 %) hace aún más clara la falta de confiabilidad de `Tipo`.  
 - Valor basura confirmado: `ID Medio Transporte FO = "1"` en 2 registros.  
 - Coherencia jerárquica: ¿`Clase Equipo FOP` es siempre consistente con `Grupo de Equipo FWOP`?
 
@@ -327,7 +347,7 @@ Reglas de negocio verificables sobre el propio dato:
 
 | Regla | Resultado observado |
 | :---- | :---- |
-| `Distancia Total > 0` | **17 registros en 0** (0,04 %) |
+| `Distancia Total > 0` | **17 registros en 0** (0,04 %) — de estos, **14 tienen además `Origen ≠ Destino`** con ciudades reales y peso sustancial (ver refinamiento abajo) |
 | `Peso Neto > 0` | **82 registros en 0** (0,20 %) |
 | `Tarifa venta al cliente > 0` | **874 registros en 0** (2,12 %) |
 | `Flete producción FO > 0` | **183 en 0** (0,44 %) y **1 negativo** (−49.978) |
@@ -354,6 +374,12 @@ Reglas de negocio verificables sobre el propio dato:
 > **El defecto acotado son los 978 registros OPIM \+ OPTN con `Origen = Destino`** (2,4 % del set), que sí contradicen la definición de su clase (`OPIM` \= de puerto a interior, `OPTN` \= pedido nacional). Ésos son los que van a revisión.  
 >   
 > Nota: la intuición de que "OPEX explica el fenómeno" es errónea — OPEX es *interior a puerto*, precisamente un movimiento con origen distinto de destino, y aporta solo 34 casos.
+
+> **REFINAMIENTO (2026-09-09, notebook `02_calidad_del_dato.ipynb`, Paso 10).** Los 978 defectos `OPIM`+`OPTN` no son homogéneos: **974 de 978 (99,6 %) tienen `Distancia Total = 10`**, la misma "firma" numérica de las operaciones de descontenerización (`OHUB`/`OH3P`). Esto sugiere que la mayoría de estos 978 **no son un error de origen/destino, sino un código de clase de documento (`ID Clase Documento FWO`) mal asignado** — probablemente son descontenerización real etiquetada como `OPIM`/`OPTN` en vez de `OHUB`/`OH3P`. Solo **4 registros** (distancias 521, 521, 233,5 y 505 km) no siguen ese patrón y sí son genuinamente atípicos — esos ameritan revisión individual, no los 978 como bolsa homogénea.
+>
+> **Hipótesis alternativa probada y descartada:** ¿podrían ser viajes intraurbanos legítimos (ej. recogida y entrega dentro de la misma ciudad, en puntos distintos), dado que `Origen`/`Destino` se registran a nivel de población, no de dirección exacta? Verificado: **el 100 % de los 978 registros tienen `Origen = BUENAVENTURA`** — ninguna otra ciudad. Si fuera un fenómeno de granularidad intraurbana general, se esperaría variedad de ciudades. La concentración total en Buenaventura (la misma ciudad de la descontenerización legítima) refuerza la hipótesis del código mal asignado. Además, `OPIM` se define como *"Pedido de Puerto a interior"* — un registro que nunca sale del puerto contradice su propia definición por diseño.
+>
+> **Además, cruzando contra R01:** `Distancia Total = 0` y `Origen = Destino` casi no se superponen (solo 3 filas en común de 17 y 8.966 respectivamente). Los otros **14 registros con `Distancia Total = 0`** tienen `Origen ≠ Destino` con ciudades reales y distantes (Yumbo, Funza, Mosquera, Soledad, Bucaramanga, Chinchiná, Tuluá) y pesos sustanciales (4.000-34.000 kg) — son envíos de largo recorrido genuinos a los que simplemente **falta la distancia real** (debería ser de cientos de km, no 0). Es un defecto limpio, distinto del fenómeno de descontenerización.
 
 ### 5.6 Integridad referencial
 
@@ -687,6 +713,8 @@ Cifras calculadas directamente sobre `Viajes-Btura-2025-2026.xlsx` (41.237 filas
 | `ImporteFO_Negativo` | 1 | 1 (100 %) | — | `Flete producción FO` \< 0 |
 
 **Los 5 subconjuntos son íntegramente consistentes con el dataset.** La versión anterior de este anexo reportaba 30 filas en `Distancia_0` con solo 17 coincidencias; era un error de lectura (ver §5.6).
+
+**Nota (2026-09-09, notebook `02_calidad_del_dato.ipynb`, Paso 11):** `Costo_0` tiene 874 filas pero solo **869 `FO` únicos** — 5 `FO` se repiten dentro de esta misma hoja de excepciones, consistente con el patrón de carga consolidada ya documentado en §4.2 (no es un error, es el mismo fenómeno visto también aquí). Las otras 4 hojas no presentan esta diferencia.
 
 ⚠️ `Costo Producción` no es un costo: contiene la tarifa de venta. Verificado por valor en 872 de 874 filas, y respaldado por la definición oficial del diccionario interno.
 
