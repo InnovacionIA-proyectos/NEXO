@@ -7,6 +7,15 @@ namespace CabinaFletes.Application.CasosDeUso.PlanDeCargue.DTOs;
 public record SolicitudDeCubicacionAceptadaDto(Guid PlanCargueId, string Estado, string ConsultarEn);
 
 /// <summary>
+/// Respuesta 202 genérica de los comandos de escritura de S3-HU-02 que NO generan (ni
+/// tienen, ver issue #108) un recurso propio de NEXO para consultar — guardar_vehiculo,
+/// crear_plan_demo, guardar_item, importar_items, eliminar_item, eliminar_plan,
+/// ajustar_colocacion. <c>CorrelationId</c> es el mismo id que viaja en el sobre de la
+/// cola, útil para cruzar con logs/DLQ si el worker rechaza el comando.
+/// </summary>
+public record ComandoAceptadoDto(Guid CorrelationId, string Estado);
+
+/// <summary>
 /// Lo que el Cubicador (microservicio Python) necesita de una línea de solicitud para
 /// armar el plan de cargue 3D — puente Mesa de Costeo → Cubicador (crear-desde-línea,
 /// ver cubicador/CONTRATO.md sección 7). Ruta puede venir sin resolver (Origen/Destino

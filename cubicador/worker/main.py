@@ -1,8 +1,12 @@
 """Worker consumidor de RabbitMQ: procesa `optimizar` y `crear_desde_linea`
-(las 2 operaciones pesadas, ver docs/DECISIONES_TECNICAS.md #5) fuera del
-proceso de la API. Consume `cubicacion.solicitada` y publica
-`plan-de-cargue.generado` o `cubicacion.rechazada` (ver CONTRATO.md
-seccion 6).
+(las 2 operaciones pesadas, ver docs/DECISIONES_TECNICAS.md #5) mas, desde
+S3-HU-02 (issue #105), los 8 comandos de escritura del plan de cargue
+(crear_plan, crear_plan_demo, guardar_vehiculo, guardar_item, importar_items,
+eliminar_item, eliminar_plan, ajustar_colocacion) - antes solo llegaban por el
+POST/DELETE/PATCH sincrono de `api/routers/planes_cargue.py` directo contra
+esta base; ahora TODA escritura, pesada o no, pasa por esta misma cola. Consume
+`cubicacion.solicitada` y publica `plan-de-cargue.generado` o
+`cubicacion.rechazada` (ver CONTRATO.md seccion 6).
 
 Verificado contra un RabbitMQ real en Docker Compose (ver
 docs/testDocumentation/PRUEBAS_DE_INTEGRACION.md seccion 2.3): mensaje
@@ -31,7 +35,17 @@ from datetime import datetime, timedelta, timezone
 import aio_pika
 
 from api.dependencias import NEXO_BASE_URL, NEXO_CALLBACK_API_KEY
+from api.dtos.plan_cargue import (
+    GuardarItemPlanCargueInput as GuardarItemPlanCargueInputDto,
+    GuardarVehiculoInput as GuardarVehiculoInputDto,
+)
 from application.excepciones import AppException
+from application.plan_cargue import ajustar as ajustar_uc
+from application.plan_cargue import demo as demo_uc
+from application.plan_cargue import items as items_uc
+from application.plan_cargue import mapeos
+from application.plan_cargue import planes as planes_uc
+from application.plan_cargue import vehiculos as vehiculos_uc
 from application.plan_cargue.desde_linea import crear_plan_desde_linea
 from application.plan_cargue.optimizar import ParametrosOptimizacionInput, optimizar_plan
 from application.plan_cargue.resultado import obtener_resultado
@@ -52,14 +66,38 @@ INTERVALO_VIGILANTE_SEGUNDOS = 60
 logger = logging.getLogger("cubicador.worker")
 
 
-async def _ejecutar_solicitud(cuerpo: dict, planes: SqlPlanCargueRepository, vehiculos: SqlVehiculoCubicacionRepository) -> str:
-    """Corre el caso de uso pesado. Devuelve el plan_id resultante (para
-    `optimizar` es el mismo que llego en el mensaje; para `crear_desde_linea`
-    es nuevo, se crea aqui)."""
+#: Tipos que NO terminan con un plan vivo para reportar: "guardar_vehiculo" no tiene
+#: plan (es un vehiculo suelto); "eliminar_plan" ya borro la fila que reportaria. Ver
+#: `_procesar`: para estos dos no se llama a `obtener_resultado` ni se publica
+#: "plan-de-cargue.generado" (S3-HU-02, issue #105).
+TIPOS_SIN_RESULTADO_FINAL = frozenset({"guardar_vehiculo", "eliminar_plan"})
+
+
+def _ajuste_de_solicitud(solicitud: dict) -> "ajustar_uc.AjusteColocacionInput":
+    return ajustar_uc.AjusteColocacionInput(
+        x=solicitud.get("x"), y=solicitud.get("y"), z=solicitud.get("z"),
+        orientacion_indice=solicitud.get("orientacionIndice"), bloqueada=solicitud.get("bloqueada"),
+        retirar=bool(solicitud.get("retirar")), reinsertar=bool(solicitud.get("reinsertar")),
+    )
+
+
+async def _ejecutar_solicitud(
+    cuerpo: dict, planes: SqlPlanCargueRepository, vehiculos: SqlVehiculoCubicacionRepository,
+) -> str | None:
+    """Corre el caso de uso. Devuelve el plan_id resultante para que `_procesar`
+    reporte "plan-de-cargue.generado" (None para los tipos en
+    `TIPOS_SIN_RESULTADO_FINAL`, que no tienen plan que reportar).
+
+    S3-HU-02 (issue #105): los 8 comandos nuevos reutilizan EXACTAMENTE los mismos
+    casos de uso que ya usa `api/routers/planes_cargue.py` (el POST sincrono que este
+    trabajo reemplaza) - nada de logica de negocio nueva acá, solo el cableado
+    cola -> caso de uso -> escritura real en la base (antes solo llegaba por HTTP
+    directo)."""
     tipo = cuerpo["tipo"]
+    solicitud = cuerpo.get("solicitud") or {}
+
     if tipo == "optimizar":
         plan_id = cuerpo["planId"]
-        solicitud = cuerpo["solicitud"]
         ponderaciones = (
             PonderacionesCombinada(**solicitud["ponderaciones"]) if solicitud.get("ponderaciones") else None
         )
@@ -75,8 +113,54 @@ async def _ejecutar_solicitud(cuerpo: dict, planes: SqlPlanCargueRepository, veh
 
     if tipo == "crear_desde_linea":
         lineas = NexoLineaSolicitudClient(NEXO_BASE_URL, NEXO_CALLBACK_API_KEY)
-        plan = await crear_plan_desde_linea(planes, vehiculos, lineas, cuerpo["solicitud"]["lineaSolicitudId"])
+        plan = await crear_plan_desde_linea(planes, vehiculos, lineas, solicitud["lineaSolicitudId"])
         return plan.id
+
+    if tipo == "crear_plan":
+        # El plan_id lo genero NEXO (S3-HU-01.2): se crea la fila REAL con ESE id,
+        # nunca uno propio (HU S3-HU-02, criterio 1).
+        plan = await planes_uc.crear_plan(planes, solicitud["nombre"], solicitud["vehiculoId"], id=cuerpo["planId"])
+        return plan.id
+
+    if tipo == "crear_plan_demo":
+        plan = await demo_uc.crear_plan_demo(planes, vehiculos)
+        return plan.id
+
+    if tipo == "guardar_vehiculo":
+        dto = GuardarVehiculoInputDto.model_validate(solicitud)
+        await vehiculos_uc.guardar_vehiculo(vehiculos, mapeos.vehiculo_de_input(dto))
+        return None
+
+    if tipo == "guardar_item":
+        plan_id = cuerpo["planId"]
+        dto = GuardarItemPlanCargueInputDto.model_validate(solicitud)
+        await items_uc.guardar_item(planes, plan_id, dto.id, mapeos.item_de_input(dto, plan_id))
+        return plan_id
+
+    if tipo == "importar_items":
+        plan_id = cuerpo["planId"]
+        entidades = [
+            mapeos.item_de_input(GuardarItemPlanCargueInputDto.model_validate(i), plan_id)
+            for i in solicitud["items"]
+        ]
+        await items_uc.importar_items(planes, plan_id, entidades)
+        return plan_id
+
+    if tipo == "eliminar_item":
+        plan_id = cuerpo["planId"]
+        await items_uc.eliminar_item(planes, plan_id, solicitud["itemId"])
+        return plan_id
+
+    if tipo == "eliminar_plan":
+        await planes_uc.eliminar_plan(planes, cuerpo["planId"])
+        return None
+
+    if tipo == "ajustar_colocacion":
+        plan_id = cuerpo["planId"]
+        await ajustar_uc.ajustar_colocacion(
+            planes, vehiculos, plan_id, solicitud["colocacionId"], _ajuste_de_solicitud(solicitud),
+        )
+        return plan_id
 
     raise ValueError(f"Tipo de mensaje desconocido: {tipo}")
 
@@ -100,27 +184,31 @@ async def _procesar(mensaje: aio_pika.IncomingMessage, publisher: RabbitMqEvento
         vehiculos = SqlVehiculoCubicacionRepository(sesion)
         try:
             plan_id = await _ejecutar_solicitud(cuerpo, planes, vehiculos)
-            resultado = await obtener_resultado(planes, vehiculos, plan_id)
-            await publisher.publicar_plan_generado(plan_id, {
-                "estado": resultado.plan.estado, "puntaje": resultado.plan.puntaje,
-                "colocaciones": len(resultado.colocaciones),
-            })
+            # S3-HU-02 (issue #105): "guardar_vehiculo" no tiene plan que reportar y
+            # "eliminar_plan" ya borro el suyo - para esos dos no hay
+            # "plan-de-cargue.generado" que publicar (ver TIPOS_SIN_RESULTADO_FINAL).
+            if plan_id is not None and cuerpo["tipo"] not in TIPOS_SIN_RESULTADO_FINAL:
+                resultado = await obtener_resultado(planes, vehiculos, plan_id)
+                await publisher.publicar_plan_generado(plan_id, {
+                    "estado": resultado.plan.estado, "puntaje": resultado.plan.puntaje,
+                    "colocaciones": len(resultado.colocaciones),
+                })
             await mensaje.ack()
         except AppException as exc:
             # Error de negocio (validacion, no encontrado, etc.): no tiene sentido
-            # reintentar, es el mismo resultado siempre. Si ya existia un plan
-            # (tipo=optimizar), se marca error; si no (crear_desde_linea fallo
-            # antes de crear nada), solo se notifica.
-            if cuerpo["tipo"] == "optimizar":
-                await planes.marcar_error(cuerpo["planId"], exc.mensaje)
+            # reintentar, es el mismo resultado siempre. `marcar_error` es un no-op
+            # silencioso si `cuerpo["planId"]` no corresponde a ningun plan existente
+            # (p.ej. "guardar_vehiculo", o "crear_plan"/"crear_desde_linea" fallando
+            # antes de crear nada) - por eso se llama igual para los 9 tipos, sin
+            # bifurcar por tipo (antes solo cubria "optimizar").
+            await planes.marcar_error(cuerpo["planId"], exc.mensaje)
             await publisher.publicar_cubicacion_rechazada(correlation_id, exc.codigo, exc.mensaje)
             await mensaje.ack()
         except Exception as exc:  # noqa: BLE001 - fallo inesperado (bug, DB caida, etc.)
             logger.exception("Fallo procesando mensaje (intento %d/%d)", intentos_previos + 1, MAX_INTENTOS)
             if intentos_previos + 1 >= MAX_INTENTOS:
                 await _mover_a_dlq(mensaje, publisher, cuerpo["tipo"], str(exc), intentos_previos + 1)
-                if cuerpo["tipo"] == "optimizar":
-                    await planes.marcar_error(cuerpo["planId"], f"Fallo tras {MAX_INTENTOS} intentos: {exc}")
+                await planes.marcar_error(cuerpo["planId"], f"Fallo tras {MAX_INTENTOS} intentos: {exc}")
                 await publisher.publicar_cubicacion_rechazada(correlation_id, "ERROR_INTERNO", str(exc))
                 await mensaje.ack()
             else:

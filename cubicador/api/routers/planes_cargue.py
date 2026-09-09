@@ -31,40 +31,20 @@ from api.dtos.plan_cargue import (
 from application.plan_cargue import ajustar as ajustar_uc
 from application.plan_cargue import demo as demo_uc
 from application.plan_cargue import items as items_uc
+from application.plan_cargue import mapeos
 from application.plan_cargue import planes as planes_uc
 from application.plan_cargue import vehiculos as vehiculos_uc
 from application.plan_cargue.resultado import obtener_resultado
-from domain.entidades.entidades import EjeVehiculoRow, ItemPlanCargue, VehiculoCubicacion
 
 router = APIRouter(prefix="/api/planes-cargue", tags=["plan-cargue"], dependencies=[Depends(verificar_api_key)])
 
 
 # ------------------------------------------------------------- mapeo Pydantic <-> dominio
-
-
-def _vehiculo_de_input(v: GuardarVehiculoInputDto) -> VehiculoCubicacion:
-    kwargs = dict(
-        nombre=v.nombre, descripcion=v.descripcion,
-        largo_interno_mm=v.largo_interno_mm, ancho_interno_mm=v.ancho_interno_mm, alto_interno_mm=v.alto_interno_mm,
-        capacidad_kg=v.capacidad_kg, tara_kg=v.tara_kg,
-        puerta_ancho_mm=v.puerta_ancho_mm, puerta_alto_mm=v.puerta_alto_mm, puerta_posicion=v.puerta_posicion,
-        ejes=[EjeVehiculoRow(e.posicion_mm, e.capacidad_kg) for e in v.ejes],
-        tolerancia_paredes_mm=v.tolerancia_paredes_mm, tolerancia_entre_unidades_mm=v.tolerancia_entre_unidades_mm,
-    )
-    return VehiculoCubicacion(id=v.id, **kwargs) if v.id else VehiculoCubicacion(**kwargs)
-
-
-def _item_de_input(i: GuardarItemPlanCargueInputDto, plan_id: str) -> ItemPlanCargue:
-    kwargs = dict(
-        plan_cargue_id=plan_id, sku=i.sku, descripcion=i.descripcion, pedido=i.pedido, cliente=i.cliente,
-        destino=i.destino, secuencia_entrega=i.secuencia_entrega, largo_mm=i.largo_mm, ancho_mm=i.ancho_mm,
-        alto_mm=i.alto_mm, peso_kg=i.peso_kg, cantidad=i.cantidad, color=i.color, prioridad=i.prioridad,
-        tipo_embalaje=i.tipo_embalaje, apilable=i.apilable, max_niveles=i.max_niveles,
-        max_peso_encima_kg=i.max_peso_encima_kg, rotable=i.rotable, mantener_vertical=i.mantener_vertical,
-        fragil=i.fragil, peligroso=i.peligroso, refrigerado=i.refrigerado,
-        grupo_compatibilidad=i.grupo_compatibilidad, observaciones=i.observaciones,
-    )
-    return ItemPlanCargue(id=i.id, **kwargs) if i.id else ItemPlanCargue(**kwargs)
+#
+# `_vehiculo_de_input`/`_item_de_input` viven en application/plan_cargue/mapeos.py (S3-HU-02,
+# issue #105): el worker de colas los necesita exactamente igual, para no duplicar el mapeo.
+_vehiculo_de_input = mapeos.vehiculo_de_input
+_item_de_input = mapeos.item_de_input
 
 
 def _resultado_a_dto(r) -> ResultadoPlanDto:
