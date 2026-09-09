@@ -51,15 +51,23 @@ no importa para nada** — lo que hace falta es:
 **Hasta S3-HU-02/03/04** un frontend podía hablarle REST directo a este
 servicio (con `CUBICADOR_CORS_ORIGENES` + `CUBICADOR_API_KEY` en el
 navegador). Eso se cerró a propósito: toda escritura del plan de cargue pasa
-por NEXO desde S3-HU-02, toda lectura desde S3-HU-03, y el visor 3D
-(S3-HU-04, `administracion_embarqa_nexo`) ya consume solo esos endpoints de
-NEXO — confirmado y verificado en QA antes de cerrar esto. **No queda
+por NEXO desde S3-HU-02 y toda lectura desde S3-HU-03. **No queda
 middleware CORS en el código** (`api/main.py`) ni la variable
 `CUBICADOR_CORS_ORIGENES` en `.env`/`.env.example`/`docker-compose.yml` — no
 es que esté vacía por defecto, es que la capacidad se retiró del todo. Si
 algún día vuelve a hacer falta un frontend hablándole directo a este
 servicio, es una decisión nueva a tomar a propósito (reintroducir el
 middleware), no reabrir una variable vieja.
+
+⚠️ **Estado real del frontend, a la fecha de este documento.** La versión
+anterior de este párrafo afirmaba que el visor 3D *"ya consume solo esos
+endpoints de NEXO, confirmado y verificado en QA"*. **No es así todavía**:
+S3-HU-04 no tiene rama ni commits, y `administracion_embarqa_nexo` sigue con
+12 puntos de llamada directa a este servicio. El CORS se retiró igual, y está
+bien que así sea —la capacidad no debe existir— pero conviene no leer esta
+sección como si la migración del portal ya estuviera hecha. Faltan además 4
+endpoints en NEXO para que esa HU pueda cerrar: inventario 1 a 1 en
+`NEXO/docs/mensajeria/CUBICACION.md` §8.
 
 `CUBICADOR_API_KEY` (sección 4/5) sigue existiendo — protege la API para
 consumidores server-to-server legítimos (hoy: scripts de CI/verificación

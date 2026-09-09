@@ -590,3 +590,63 @@ citados en cubicador/CONTRATO.md §3.2, con `Guid`/`decimal` en vez de
   de un plan viejo (p.ej. datos de antes de esta HU), ese plan simplemente
   no aparece con detalle en NEXO — no hay backfill automático. Si hace falta
   poblar planes históricos, es un script aparte, no parte de esta HU.
+
+---
+
+## 8. Cobertura para S3-HU-04 — qué tiene y qué le falta al frontend
+
+Inventario 1 a 1 de lo que `administracion_embarqa_nexo` llama hoy contra lo que
+NEXO expone, verificado con `git grep` sobre `origin/main` del frontend y sobre
+los controladores de este repo. Es el insumo de **S3-HU-04.1** (tabla de
+equivalencia) y de **S3-HU-04.5** (punto de coordinación).
+
+> **Por qué existe esta sección.** S3-HU-05 (#116) retiró el CORS del Cubicador
+> y rotó la clave, dando por hecho que *"el visor 3D (S3-HU-04) ya consume solo
+> esos endpoints de NEXO"*. **Eso todavía no ocurrió**: S3-HU-04 no tiene rama ni
+> commits, y el frontend sigue con 12 puntos de llamada directa
+> (`cubicadorBaseUrl` en `cubicador-api.service.ts` y `captura-api.service.ts`).
+> Quien arranque esa HU no parte de cero: parte con 4 endpoints faltantes.
+
+### 8.1 Con equivalente en NEXO (16 de 20)
+
+| Método del frontend | Endpoint en NEXO | Desde |
+|---|---|---|
+| `optimizar()` | `POST /api/planes-cargue/{id}/optimizar` | S2-HU-08 |
+| `obtenerResumen()` | `GET /api/planes-cargue/{id}` | S2-HU-08 |
+| `crearPlan()` | `POST /api/planes-cargue` | S3-HU-02 |
+| `crearPlanDemo()` | `POST /api/planes-cargue/demo` | S3-HU-02 |
+| `eliminarPlan()` | `DELETE /api/planes-cargue/{id}` | S3-HU-02 |
+| `guardarItem()` | `POST /api/planes-cargue/{id}/items` | S3-HU-02 |
+| `importarItems()` | `POST /api/planes-cargue/{id}/items/importar` | S3-HU-02 |
+| `eliminarItem()` | `DELETE /api/planes-cargue/{id}/items/{itemId}` | S3-HU-02 |
+| `ajustarColocacion()` | `PATCH /api/planes-cargue/{id}/colocaciones/{colocacionId}` | S3-HU-02 |
+| `guardarVehiculo()` | `POST /api/vehiculos` | S3-HU-02 |
+| `eliminarVehiculo()` | `DELETE /api/vehiculos/{id}` | este PR |
+| `vehiculos()` | `GET /api/vehiculos` | S3-HU-03 |
+| `planes()` | `GET /api/planes-cargue` | S3-HU-03 |
+| `resultado()` | `GET /api/planes-cargue/{id}/resultado` | S3-HU-03 |
+| `flota()` | `GET /api/planes-cargue/{id}/flota` | S3-HU-03 |
+| `metricas()` | `GET /api/planes-cargue/{id}/metricas` | S3-HU-03 |
+| `noCargadas()` | `GET /api/planes-cargue/{id}/no-cargadas` | S3-HU-03 |
+| `exportar()` | `GET /api/planes-cargue/{id}/exportar` | S3-HU-03 |
+
+⚠️ **Cambio de ruta que hay que mirar**: los 3 de vehículos viven en
+`/api/vehiculos`, no en `/api/planes-cargue/vehiculos` como los pide el
+frontend hoy. No es un `replace` del host: cambia el prefijo.
+
+### 8.2 SIN equivalente en NEXO (4)
+
+| Método del frontend | Ruta que pide hoy | Situación |
+|---|---|---|
+| `crearPlanDesdeLinea()` | `POST /planes-cargue/desde-linea/{lineaId}` | El worker **ya lo implementa** (`tipo: crear_desde_linea`, verificado de punta a punta). Solo falta el endpoint en NEXO que publique el comando, en vez de que lo dispare el navegador. Es el Cubo 1 que quedó sin cerrar. |
+| `porLinea()` | `GET /planes-cargue/por-linea/{lineaId}` | Es el sondeo del anterior: sin él no hay forma de saber cuándo terminó. Van en par. |
+| `colocaciones()` | `GET /planes-cargue/{id}/colocaciones` | **Es la geometría del visor 3D.** S3-HU-03 agregó `resultado`/`metricas`/`no-cargadas`/`exportar` pero no este. Puede ser deliberado —`resultado` ya trae las colocaciones dentro—; si lo es, el frontend debe dejar de llamarlo y conviene decirlo explícitamente en lugar de dejar el hueco. |
+| `cubicar()` (`captura-api.service.ts`) | `POST /api/cubicacion` | Cubicación rápida (SICCE), sin persistencia. **Ninguna HU del sprint la cubre**: no es escritura del dominio (S3-HU-02) ni lectura proyectable (S3-HU-03) — no hay estado que proyectar. Necesita decisión e issue propia. |
+
+Las 3 primeras son endpoints que faltan por escribir. **La cuarta necesita una
+decisión de arquitectura antes de escribir nada**: al ser un cálculo puro sin
+persistencia, no encaja en el patrón de cola (habría que inventar persistencia
+para poder devolver el resultado) ni en el de proyección (no hay nada que
+proyectar). Las salidas razonables son un endpoint en NEXO que delegue por HTTP
+como excepción declarada y acotada, o tratarla explícitamente como la única
+operación que el navegador sigue resolviendo de otro modo.
