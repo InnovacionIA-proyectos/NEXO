@@ -15,6 +15,9 @@ public sealed class CubicacionSolicitadaValidador : IValidadorDeMensaje<Cubicaci
     {
         "optimizar", "crear_plan", "crear_plan_demo", "guardar_vehiculo", "guardar_item",
         "importar_items", "eliminar_item", "eliminar_plan", "ajustar_colocacion",
+        // Cierra el par de "guardar_vehiculo": sin el, esa escritura seguiria saliendo
+        // del navegador y S3-HU-05 no puede cerrar. Ver EliminarVehiculoInput.
+        "eliminar_vehiculo",
     };
 
     private static readonly HashSet<string> PuertaPosicionesValidas = new(StringComparer.Ordinal)
@@ -75,6 +78,9 @@ public sealed class CubicacionSolicitadaValidador : IValidadorDeMensaje<Cubicaci
                 break;
             case "eliminar_plan":
                 ExigirTipo<EliminarPlanInput>(mensaje.Solicitud, "eliminar_plan", motivos);
+                break;
+            case "eliminar_vehiculo":
+                ExigirTipo<EliminarVehiculoInput>(mensaje.Solicitud, "eliminar_vehiculo", motivos);
                 break;
             case "ajustar_colocacion":
                 ValidarAjustarColocacion(mensaje.Solicitud, motivos);

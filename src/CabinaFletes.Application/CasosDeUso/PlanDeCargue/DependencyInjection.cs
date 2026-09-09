@@ -18,5 +18,8 @@ public static class DependencyInjection
         .AddScoped<ICommandHandler<ImportarItemsCommand, ComandoAceptadoDto>, ImportarItemsCommandHandler>()
         .AddScoped<ICommandHandler<EliminarItemCommand, ComandoAceptadoDto>, EliminarItemCommandHandler>()
         .AddScoped<ICommandHandler<EliminarPlanCommand, ComandoAceptadoDto>, EliminarPlanCommandHandler>()
-        .AddScoped<ICommandHandler<AjustarColocacionCommand, ComandoAceptadoDto>, AjustarColocacionCommandHandler>();
+        .AddScoped<ICommandHandler<AjustarColocacionCommand, ComandoAceptadoDto>, AjustarColocacionCommandHandler>()
+        // Cierra el par de guardar_vehiculo: es la ultima escritura que el navegador
+        // hacia directo contra Cubicador, y sin ella S3-HU-05 no puede cerrar.
+        .AddScoped<ICommandHandler<EliminarVehiculoCommand, ComandoAceptadoDto>, EliminarVehiculoCommandHandler>();
 }

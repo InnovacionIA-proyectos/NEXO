@@ -123,6 +123,22 @@ public sealed record EliminarItemInput(string ItemId);
 /// <summary>"eliminar_plan" — sin payload adicional: el PlanId del sobre basta.</summary>
 public sealed record EliminarPlanInput;
 
+/// <summary>"eliminar_vehiculo" — sin payload adicional: el id del vehículo viaja en el
+/// PlanId del sobre, igual que hace "guardar_vehiculo" (ver la nota de esa asimetría en
+/// <see cref="GuardarVehiculoInput"/>: los comandos de catálogo no tienen plan, así que
+/// reutilizan ese campo como identidad del recurso afectado).
+///
+/// Cierra el par de "guardar_vehiculo": el frontend llama <c>eliminarVehiculo()</c>
+/// (cubicador-api.service.ts) y sin este comando esa única escritura seguiría saliendo
+/// del navegador directo a Cubicador con la API key en el bundle — lo que impide cerrar
+/// S3-HU-05 (retirar el CORS y rotar la clave), que exige CERO llamadas de navegador.
+///
+/// Puede ser rechazado con VEHICULO_EN_USO: Cubicador se niega a borrar un vehículo con
+/// planes de cargue asociados (application/plan_cargue/vehiculos.py::eliminar_vehiculo).
+/// Es un rechazo de negocio normal, viaja como "cubicacion.rechazada" y no se
+/// reintenta.</summary>
+public sealed record EliminarVehiculoInput;
+
 /// <summary>"ajustar_colocacion" — espeja AjusteColocacionInput + el ColocacionId que el
 /// PATCH síncrono llevaba en la ruta. Reemplaza el PATCH directo contra Cubicador
 /// (CompuertaDeParidad.cs no aplica acá: es dato, no cálculo).</summary>

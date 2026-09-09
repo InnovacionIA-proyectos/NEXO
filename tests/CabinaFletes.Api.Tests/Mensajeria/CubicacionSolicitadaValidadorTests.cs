@@ -197,6 +197,24 @@ public class CubicacionSolicitadaValidadorTests
         Assert.Empty(motivos);
     }
 
+    // ------------------------------------------------------------- eliminar_vehiculo
+
+    [Fact]
+    public void Eliminar_vehiculo_no_reporta_motivos()
+    {
+        var motivos = Validador.Validar(Mensaje("eliminar_vehiculo", new EliminarVehiculoInput()));
+
+        Assert.Empty(motivos);
+    }
+
+    [Fact]
+    public void Eliminar_vehiculo_con_solicitud_de_otro_tipo_es_rechazado()
+    {
+        var motivos = Validador.Validar(Mensaje("eliminar_vehiculo", new EliminarPlanInput()));
+
+        Assert.Contains(motivos, m => m.Contains("EliminarVehiculoInput"));
+    }
+
     // ------------------------------------------------------------- ajustar_colocacion
 
     [Fact]

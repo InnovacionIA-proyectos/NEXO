@@ -1,8 +1,8 @@
 """Worker consumidor de RabbitMQ: procesa `optimizar` y `crear_desde_linea`
 (las 2 operaciones pesadas, ver docs/DECISIONES_TECNICAS.md #5) mas, desde
 S3-HU-02 (issue #105), los 8 comandos de escritura del plan de cargue
-(crear_plan, crear_plan_demo, guardar_vehiculo, guardar_item, importar_items,
-eliminar_item, eliminar_plan, ajustar_colocacion) - antes solo llegaban por el
+(crear_plan, crear_plan_demo, guardar_vehiculo, eliminar_vehiculo, guardar_item,
+importar_items, eliminar_item, eliminar_plan, ajustar_colocacion) - antes solo llegaban por el
 POST/DELETE/PATCH sincrono de `api/routers/planes_cargue.py` directo contra
 esta base; ahora TODA escritura, pesada o no, pasa por esta misma cola. Consume
 `cubicacion.solicitada` y publica `plan-de-cargue.generado` o
@@ -66,11 +66,11 @@ INTERVALO_VIGILANTE_SEGUNDOS = 60
 logger = logging.getLogger("cubicador.worker")
 
 
-#: Tipos que NO terminan con un plan vivo para reportar: "guardar_vehiculo" no tiene
-#: plan (es un vehiculo suelto); "eliminar_plan" ya borro la fila que reportaria. Ver
-#: `_procesar`: para estos dos no se llama a `obtener_resultado` ni se publica
-#: "plan-de-cargue.generado" (S3-HU-02, issue #105).
-TIPOS_SIN_RESULTADO_FINAL = frozenset({"guardar_vehiculo", "eliminar_plan"})
+#: Tipos que NO terminan con un plan vivo para reportar: "guardar_vehiculo" y
+#: "eliminar_vehiculo" no tienen plan (son catalogo suelto); "eliminar_plan" ya borro la
+#: fila que reportaria. Ver `_procesar`: para estos no se llama a `obtener_resultado` ni
+#: se publica "plan-de-cargue.generado" (S3-HU-02, issue #105).
+TIPOS_SIN_RESULTADO_FINAL = frozenset({"guardar_vehiculo", "eliminar_vehiculo", "eliminar_plan"})
 
 
 def _ajuste_de_solicitud(solicitud: dict) -> "ajustar_uc.AjusteColocacionInput":
@@ -129,6 +129,15 @@ async def _ejecutar_solicitud(
     if tipo == "guardar_vehiculo":
         dto = GuardarVehiculoInputDto.model_validate(solicitud)
         await vehiculos_uc.guardar_vehiculo(vehiculos, mapeos.vehiculo_de_input(dto))
+        return None
+
+    if tipo == "eliminar_vehiculo":
+        # El id del vehiculo viaja en planId, igual que en "guardar_vehiculo": los
+        # comandos de catalogo no tienen plan y reutilizan ese campo del sobre.
+        # eliminar_vehiculo lanza ConflictException("VEHICULO_EN_USO") si el vehiculo
+        # tiene planes asociados - es AppException, asi que `_procesar` publica el
+        # rechazo y NO reintenta (el resultado seria el mismo siempre).
+        await vehiculos_uc.eliminar_vehiculo(vehiculos, cuerpo["planId"])
         return None
 
     if tipo == "guardar_item":

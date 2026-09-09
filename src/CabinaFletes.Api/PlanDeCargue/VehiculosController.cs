@@ -32,7 +32,9 @@ public record GuardarVehiculoRequest(
 /// </summary>
 [ApiController]
 [Route("api/vehiculos")]
-public class VehiculosController(ICommandHandler<GuardarVehiculoCommand, ComandoAceptadoDto> guardar)
+public class VehiculosController(
+    ICommandHandler<GuardarVehiculoCommand, ComandoAceptadoDto> guardar,
+    ICommandHandler<EliminarVehiculoCommand, ComandoAceptadoDto> eliminar)
     : ControllerBase
 {
     [Authorize(Roles = "Comercial,CoordinadorFletes,Admin")]
@@ -49,4 +51,20 @@ public class VehiculosController(ICommandHandler<GuardarVehiculoCommand, Comando
             body.ToleranciaParedesMm, body.ToleranciaEntreUnidadesMm), ct);
         return Accepted(r);
     }
+
+    /// <summary>
+    /// Baja de un vehículo del catálogo. Rol Admin: el catálogo es maestro y lo comparten
+    /// todos los planes, a diferencia del alta, que un comercial puede necesitar en medio
+    /// de una cotización.
+    ///
+    /// Responde 202 sin comprobar si el vehículo existe o si tiene planes asociados: NEXO
+    /// no mantiene espejo del catálogo (issue #108), así que no puede saberlo sin
+    /// preguntarle a Cubicador. Si está en uso, Cubicador rechaza con VEHICULO_EN_USO por
+    /// `cubicacion.rechazada`.
+    /// </summary>
+    [Authorize(Roles = "Admin")]
+    [HttpDelete("{id:guid}")]
+    [ProducesResponseType(StatusCodes.Status202Accepted)]
+    public async Task<ActionResult<ComandoAceptadoDto>> Eliminar(Guid id, CancellationToken ct = default)
+        => Accepted(await eliminar.Handle(new EliminarVehiculoCommand(id), ct));
 }

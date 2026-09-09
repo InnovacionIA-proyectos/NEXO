@@ -18,6 +18,7 @@ os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///:memory:")
 import pytest
 
 import worker.main as worker_main
+from application.excepciones import ConflictException
 from application.ports.externos import LineaParaCubicacion, PosicionCarga
 from application.plan_cargue.optimizar import ParametrosOptimizacionInput, optimizar_plan
 from domain.entidades.entidades import ItemPlanCargue
@@ -148,6 +149,37 @@ async def test_guardar_vehiculo_no_devuelve_plan_id_y_persiste(repos):
     guardado = await vehiculos.obtener(vehiculo_id)
     assert guardado is not None
     assert guardado.nombre == "Vehiculo de prueba"
+
+
+async def test_eliminar_vehiculo_no_devuelve_plan_id_y_borra(repos):
+    """Cierra el par de guardar_vehiculo. El id del vehiculo viaja en `planId`, igual que
+    en el alta: los comandos de catalogo no tienen plan."""
+    planes, vehiculos = repos
+    catalogo = await vehiculos.listar_con_siembra()
+    objetivo = catalogo[0]
+
+    cuerpo = _cuerpo_publicado(objetivo.id, "eliminar_vehiculo", {})
+    plan_id = await worker_main._ejecutar_solicitud(cuerpo, planes, vehiculos)
+
+    assert plan_id is None
+    assert await vehiculos.obtener(objetivo.id) is None
+
+
+async def test_eliminar_vehiculo_en_uso_es_rechazo_de_negocio(repos):
+    """Un vehiculo con planes asociados no se puede borrar: eliminar_vehiculo lanza
+    ConflictException (AppException), que `_procesar` traduce a `cubicacion.rechazada`
+    SIN reintentar - el resultado seria el mismo siempre."""
+    planes, vehiculos = repos
+    catalogo = await vehiculos.listar_con_siembra()
+    en_uso = catalogo[0]
+    await planes.crear("Plan que usa el vehiculo", en_uso.id)
+
+    cuerpo = _cuerpo_publicado(en_uso.id, "eliminar_vehiculo", {})
+    with pytest.raises(ConflictException) as excinfo:
+        await worker_main._ejecutar_solicitud(cuerpo, planes, vehiculos)
+
+    assert excinfo.value.codigo == "VEHICULO_EN_USO"
+    assert await vehiculos.obtener(en_uso.id) is not None
 
 
 async def test_guardar_item_e_importar_items_y_eliminar_item(repos):

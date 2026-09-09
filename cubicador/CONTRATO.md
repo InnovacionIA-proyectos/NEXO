@@ -205,10 +205,11 @@ PATCH de colocaciones de la fila de arriba) ahora tienen un camino alterno
 `POST /api/planes-cargue/demo`, `POST /api/vehiculos`,
 `POST /api/planes-cargue/{id}/items[/importar]`,
 `DELETE /api/planes-cargue/{id}[/items/{itemId}]`,
+`DELETE /api/vehiculos/{id}`,
 `PATCH /api/planes-cargue/{id}/colocaciones/{colocacionId}`) que publica por
 la MISMA cola que `optimizar`/`desde-linea` — ver
 `NEXO/docs/mensajeria/CUBICACION.md` sección 6 para el contrato completo.
-`worker/main.py` aplica esos 8 comandos con los MISMOS casos de uso que esta
+`worker/main.py` aplica esos 9 comandos con los MISMOS casos de uso que esta
 API síncrona (`application/plan_cargue/*.py`) — nada de lógica nueva, solo un
 segundo punto de entrada. Esta API directa NO se retira en esta HU (la siguen
 usando esta app y el smoke test de Docker); es el navegador de NEXO el que

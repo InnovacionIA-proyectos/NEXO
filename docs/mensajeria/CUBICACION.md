@@ -261,9 +261,21 @@ operaciones de datos, no de cálculo — la compuerta de paridad solo bloquea
 | 6 | `DELETE /api/planes-cargue/{id}/items/{itemId}` | `EliminarItemCommand` | `eliminar_item` | **202** `ComandoAceptadoDto` |
 | 7 | `DELETE /api/planes-cargue/{id}` | `EliminarPlanCommand` | `eliminar_plan` | **202** `ComandoAceptadoDto` |
 | 8 | `PATCH /api/planes-cargue/{id}/colocaciones/{colocacionId}` | `AjustarColocacionCommand` | `ajustar_colocacion` | **202** `ComandoAceptadoDto` |
+| 9 | `DELETE /api/vehiculos/{id}` | `EliminarVehiculoCommand` | `eliminar_vehiculo` | **202** `ComandoAceptadoDto` |
+
+> **Por qué son 9 y no 8.** El #9 no venía en la lista original de la HU, y se
+> agregó porque su ausencia bloqueaba S3-HU-05. El frontend llama
+> `eliminarVehiculo()` (`cubicador-api.service.ts`), así que sin este comando esa
+> escritura seguiría saliendo del navegador directo a Cubicador con la API key en
+> el bundle — y retirar el CORS y rotar la clave exige **cero** llamadas de
+> navegador. Cerrar el par de `guardar_vehiculo` era la única forma de no dejar
+> ese hilo suelto. Ver el comentario de `EliminarVehiculoCommand`.
 
 Todos exigen rol `Comercial`, `CoordinadorFletes` o `Admin` (mismo criterio
-que `POST /api/planes-cargue/{id}/optimizar`). Todos usan la forma de error
+que `POST /api/planes-cargue/{id}/optimizar`), **salvo `DELETE /api/vehiculos/{id}`,
+que exige `Admin`**: el catálogo de vehículos es maestro y lo comparten todos los
+planes, a diferencia del alta, que un comercial puede necesitar en medio de una
+cotización. Todos usan la forma de error
 uniforme de la sección 6 de `docs/contrato-integracion/README.md`
 (`{code, message, timestamp, details}`).
 
@@ -339,6 +351,10 @@ MensajesDeCubicacion.cs` para el shape exacto (records `CrearPlanInput`,
 
 // eliminar_plan — sin datos adicionales, planId ya identifica el plan
 { "tipo": "eliminar_plan", "planId": "<guid del plan>", "correlationId": "...", "solicitud": {} }
+
+// eliminar_vehiculo — el id del vehiculo viaja en planId, igual que en guardar_vehiculo
+// (los comandos de catalogo no tienen plan). Puede ser rechazado con VEHICULO_EN_USO.
+{ "tipo": "eliminar_vehiculo", "planId": "<guid del vehiculo>", "correlationId": "...", "solicitud": {} }
 
 // ajustar_colocacion — reemplaza el PATCH síncrono de Cubicador
 { "tipo": "ajustar_colocacion", "planId": "<guid del plan>", "correlationId": "...",
