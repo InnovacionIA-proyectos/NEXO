@@ -524,10 +524,29 @@ con éxito — "creado" si el `Id` no existía antes en la base de Cubicador,
 { "correlationId": "<vehiculoId>", "vehiculo": { "id": "...", "nombre": "...", "...": "(mismo VehiculoCubicacionDto completo)" } }
 ```
 
-Un solo consumer en NEXO (`VehiculoCatalogoConsumer`) atiende los 2 —
-`Consume(ConsumeContext<VehiculoCreado>)` y
-`Consume(ConsumeContext<VehiculoActualizado>)` — porque de este lado el
-tratamiento es idéntico: upsert por `Id`.
+**`vehiculo.eliminado` — el tercero del catálogo.** Se publica cuando
+`eliminar_vehiculo` borra la fila de verdad; si Cubicador rechaza con
+`VEHICULO_EN_USO`, no se publica nada (borrar en la proyección un vehículo que
+en Cubicador sigue existiendo dejaría las dos bases en desacuerdo).
+
+```json
+{ "correlationId": "<vehiculoId>", "vehiculoId": "<vehiculoId>" }
+```
+
+A diferencia de los otros dos, **no lleva el vehículo completo**: no hay nada
+que proyectar, solo una fila que borrar.
+
+Sin este evento la proyección se quedaría con el vehículo para siempre, y
+`GET /api/vehiculos` —que lee de ahí— seguiría ofreciendo un vehículo que ya no
+existe; el `crear_plan` que lo eligiera fallaría con `VEHICULO_INVALIDO`.
+
+Un solo consumer en NEXO (`VehiculoCatalogoConsumer`) atiende los 3 —
+`VehiculoCreado`, `VehiculoActualizado` y `VehiculoEliminado` — porque de este
+lado el tratamiento de los dos primeros es idéntico (upsert por `Id`) y el
+tercero es su inverso exacto. Los 3 son idempotentes: el upsert por
+construcción, y el borrado porque **borrar lo que no está no es un error** — el
+resultado deseado ya se cumplió, así que un duplicado retorna sin tocar nada en
+vez de irse a reintentos y DLQ.
 
 ### 7.2 Los 7 endpoints de lectura
 

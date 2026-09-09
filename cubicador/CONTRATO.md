@@ -587,7 +587,9 @@ si el mensaje deja de entregarse.
 - Exchange: `cubicador.eventos` (topic).
 - Routing keys: `cubicacion.solicitada`, `plan-de-cargue.generado`,
   `cubicacion.rechazada` y, desde S3-HU-03, `vehiculo.creado`/
-  `vehiculo.actualizado`.
+  `vehiculo.actualizado`/`vehiculo.eliminado` (los 3 del catálogo: el último
+  lo publica `eliminar_vehiculo`, y solo si el borrado se aplicó de verdad —
+  ver `NEXO/docs/mensajeria/CUBICACION.md` §7.1).
 - Dead-letter: `cubicacion.dlq`. Al caer un mensaje ahí (agotados los
   **3** reintentos, `worker/main.py:49` `MAX_INTENTOS = 3`), el worker
   además alerta por correo al equipo técnico

@@ -227,6 +227,19 @@ public sealed record VehiculoCreado(string CorrelationId, VehiculoCubicacionEven
 /// publicado cuando `guardar_vehiculo` actualiza una fila existente.</summary>
 public sealed record VehiculoActualizado(string CorrelationId, VehiculoCubicacionEvento Vehiculo);
 
+/// <summary>Evento entrante: Cubicador -> NEXO, routing key `vehiculo.eliminado` —
+/// publicado cuando `eliminar_vehiculo` borra la fila de verdad (si Cubicador rechaza
+/// con VEHICULO_EN_USO no se publica nada).
+///
+/// Cierra el trío del catálogo. Sin él la proyección de NEXO se quedaría con el vehículo
+/// para siempre: <c>GET /api/vehiculos</c> lee de ahí, así que seguiría ofreciendo un
+/// vehículo inexistente y el <c>crear_plan</c> que lo eligiera fallaría con
+/// VEHICULO_INVALIDO.
+///
+/// Solo lleva el id, no el <see cref="VehiculoCubicacionEvento"/> completo: no hay nada
+/// que proyectar, solo una fila que borrar.</summary>
+public sealed record VehiculoEliminado(string CorrelationId, string VehiculoId);
+
 public sealed record VehiculoCubicacionEvento(
     string Id, string Nombre, string? Descripcion,
     decimal LargoInternoMm, decimal AnchoInternoMm, decimal AltoInternoMm,

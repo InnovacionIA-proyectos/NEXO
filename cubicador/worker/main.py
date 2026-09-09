@@ -160,7 +160,13 @@ async def _ejecutar_solicitud(
         # eliminar_vehiculo lanza ConflictException("VEHICULO_EN_USO") si el vehiculo
         # tiene planes asociados - es AppException, asi que `_procesar` publica el
         # rechazo y NO reintenta (el resultado seria el mismo siempre).
-        await vehiculos_uc.eliminar_vehiculo(vehiculos, cuerpo["planId"])
+        vehiculo_id = cuerpo["planId"]
+        await vehiculos_uc.eliminar_vehiculo(vehiculos, vehiculo_id)
+        # Cierra el trio del catalogo junto a vehiculo.creado/actualizado (S3-HU-03):
+        # sin este evento la proyeccion de NEXO se queda con el vehiculo para siempre
+        # y GET /api/vehiculos seguiria ofreciendolo. Se publica DESPUES del borrado:
+        # si el caso de uso rechaza (VEHICULO_EN_USO), no hay nada que anunciar.
+        await publisher.publicar_vehiculo_eliminado(vehiculo_id)
         return None
 
     if tipo == "guardar_item":
