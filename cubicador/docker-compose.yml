@@ -38,7 +38,6 @@ services:
       CUBICADOR_RABBITMQ_URL: amqp://${RABBITMQ_USER:?definir en .env}:${RABBITMQ_PASSWORD:?definir en .env}@rabbit:5672/
       NEXO_BASE_URL: ${NEXO_BASE_URL:?definir en .env}
       NEXO_CALLBACK_API_KEY: ${NEXO_CALLBACK_API_KEY:?definir en .env}
-      CUBICADOR_CORS_ORIGENES: ${CUBICADOR_CORS_ORIGENES:-}
     ports:
       # El contenedor sigue escuchando en 8000 puertas adentro (Dockerfile);
       # solo cambia el puerto publicado al host, para no chocar con el 8080

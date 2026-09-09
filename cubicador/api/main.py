@@ -1,12 +1,18 @@
-"""Composition root de la API - equivalente a Program.cs de NEXO."""
+"""Composition root de la API - equivalente a Program.cs de NEXO.
+
+Sin middleware CORS a proposito (S3-HU-05, issue #116): ningun navegador
+llama a esta API directo desde que S3-HU-02/03/04 movieron toda escritura y
+lectura del plan de cargue a traves de NEXO. Esta API sigue existiendo para
+consumidores server-to-server (worker propio, scripts de CI/smoke) - esos
+nunca necesitaron CORS. Si algun dia vuelve a hacer falta un frontend
+hablandole directo a este servicio, es una decision nueva que hay que
+tomar a proposito, no reabrir la variable vieja."""
 
 from __future__ import annotations
 
-import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from api.dependencias import cerrar_publisher, iniciar_publisher
@@ -20,15 +26,6 @@ _STATUS_POR_EXCEPCION = {
     ConflictException: 409,
     ServiceUnavailableException: 503,
 }
-
-# Origenes autorizados a consumir la API directamente (un frontend que hable
-# REST con este servicio en vez de pasar por NEXO). Vacio por defecto: sin
-# CUBICADOR_CORS_ORIGENES configurada, no se agrega el middleware y el
-# comportamiento es el de antes (solo consumidores server-to-server, que no
-# necesitan CORS). Mismo criterio que Cors__OrigenesPermitidos en NEXO.
-_ORIGENES_CORS = [
-    o.strip() for o in os.environ.get("CUBICADOR_CORS_ORIGENES", "").split(",") if o.strip()
-]
 
 
 @asynccontextmanager
@@ -56,15 +53,6 @@ app = FastAPI(
         # {"url": "http://localhost:8000", "description": "Fuera de Docker (uvicorn --reload)"},
 #
 )
-
-if _ORIGENES_CORS:
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=_ORIGENES_CORS,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
 
 app.include_router(cubicacion.router)
 app.include_router(planes_cargue.router)

@@ -31,7 +31,19 @@ paridad de `cubicador-ci.yml` (S2-HU-07.3): configurar juntas
 de CI concreta que confirmó 26/26 — URL o commit) y `Cubicacion:ParidadFecha`.
 Las tres son obligatorias a la vez (`Domain.PlanDeCargue.Reglas.
 CompuertaDeParidad`): `ParidadVerificada=true` sin las otras dos dejas la
-compuerta cerrada igual, a propósito — no es un booleano suelto.
+compuerta cerrada igual, a propósito — no es un booleano suelto. Checklist
+formal (issue #118, S3-HU-05.3) en
+[`docs/CHECKLIST_DESPLIEGUE.md`](docs/CHECKLIST_DESPLIEGUE.md) — enlazado a
+S2-HU-07.3, sin ejecutar: sigue siendo responsabilidad de Kevin, no de esa HU.
+
+**Cierre de seguridad (S3-HU-05, #116/#117)**: `CUBICADOR_CORS_ORIGENES` se
+retiró por completo (código + `.env`/`.env.example`/`docker-compose.yml`) —
+ningún navegador llama a Cubicador directo desde que S3-HU-02/03/04 movieron
+toda escritura y lectura del plan de cargue a través de NEXO. `CUBICADOR_API_KEY`
+y el par `NEXO_CALLBACK_API_KEY`/`Cubicador3D__InboundApiKey` se rotaron — el
+valor que estuvo expuesto en el bundle público del portal queda inválido.
+Pendiente fuera de este repo: aplicar el valor nuevo en el despliegue real de
+producción (esta sesión solo rotó los `.env` locales de desarrollo).
 
 **Resuelto**: "pedir un plan de cargue desde una línea de solicitud"
 (`crear_desde_linea` — botón Cubicar de la Mesa de Costeo → Cubicador 3D)
