@@ -215,3 +215,181 @@ manual — funciona con el Cubicador real, tal como quedó en esta rama.
   escribió en `OutboxMessage` (0 filas). Mismo orden que ya usa
   `CostearLineaCommand.cs` en el resto de NEXO — no es una regla nueva, solo
   hay que respetarla cuando alguien conecte un trigger real.
+
+---
+
+## 6. S3-HU-02 — los 8 comandos de escritura del plan de cargue (issue #108)
+
+Contrato publicado para que el frontend (S3-HU-04 en
+`administracion_embarqa_nexo`) pueda construir en paralelo. **Si algo de esto
+cambia después de publicado, se avisa en la issue #108 — nunca en silencio**
+(compromiso explícito de la HU).
+
+Las 2 decisiones de diseño detrás de esta sección (S3-HU-01) están registradas
+como ADR en `docs/decisiones/`:
+[`ADR-planid-generado-por-nexo.md`](../decisiones/ADR-planid-generado-por-nexo.md)
+(issue #102) y
+[`ADR-ajuste-manual-async.md`](../decisiones/ADR-ajuste-manual-async.md)
+(issue #101).
+
+### 6.0 Qué cambia
+
+Hasta esta HU, el navegador podía hablarle directo a Cubicador para las
+operaciones de escritura del plan de cargue (POST/DELETE/PATCH síncronos de
+`cubicador/api/routers/planes_cargue.py`, ver `cubicador/CONTRATO.md` §3.2).
+Eso se acaba: **los 8 endpoints nuevos viven en NEXO** (nunca una URL de
+Cubicador) y publican por el MISMO camino de cola que ya usa `optimizar`
+(sección 2 de este documento) — mismo exchange `cubicador.eventos`, mismos
+reintentos 1s/5s/15s/60s, mismo DLQ, misma alerta. La única pieza compartida
+con `optimizar` es el tipo de mensaje `CubicacionSolicitada`: su campo
+`Solicitud` pasó de `SolicitudDeCubicacion` fijo a `object` — cada uno de los
+9 "Tipo" posibles (`optimizar` + los 8 de abajo) trae su propio payload, y
+`CubicacionSolicitadaValidador` (issue #103) valida cuál corresponde a cuál.
+A propósito, ninguno de los 8 pasa por `IParidadCubicadorPort`: son
+operaciones de datos, no de cálculo — la compuerta de paridad solo bloquea
+`optimizar`.
+
+### 6.1 Los 8 endpoints
+
+| # | Método y ruta | Comando NEXO | Tipo de cola | Respuesta |
+|---|---|---|---|---|
+| 1 | `POST /api/planes-cargue` | `CrearPlanCommand` | `crear_plan` | **202** `SolicitudDeCubicacionAceptadaDto` |
+| 2 | `POST /api/planes-cargue/demo` | `CrearPlanDemoCommand` | `crear_plan_demo` | **202** `ComandoAceptadoDto` |
+| 3 | `POST /api/vehiculos` | `GuardarVehiculoCommand` | `guardar_vehiculo` | **202** `ComandoAceptadoDto` |
+| 4 | `POST /api/planes-cargue/{id}/items` | `GuardarItemCommand` | `guardar_item` | **202** `ComandoAceptadoDto` |
+| 5 | `POST /api/planes-cargue/{id}/items/importar` | `ImportarItemsCommand` | `importar_items` | **202** `ComandoAceptadoDto` |
+| 6 | `DELETE /api/planes-cargue/{id}/items/{itemId}` | `EliminarItemCommand` | `eliminar_item` | **202** `ComandoAceptadoDto` |
+| 7 | `DELETE /api/planes-cargue/{id}` | `EliminarPlanCommand` | `eliminar_plan` | **202** `ComandoAceptadoDto` |
+| 8 | `PATCH /api/planes-cargue/{id}/colocaciones/{colocacionId}` | `AjustarColocacionCommand` | `ajustar_colocacion` | **202** `ComandoAceptadoDto` |
+
+Todos exigen rol `Comercial`, `CoordinadorFletes` o `Admin` (mismo criterio
+que `POST /api/planes-cargue/{id}/optimizar`). Todos usan la forma de error
+uniforme de la sección 6 de `docs/contrato-integracion/README.md`
+(`{code, message, timestamp, details}`).
+
+```csharp
+public record SolicitudDeCubicacionAceptadaDto(Guid PlanCargueId, string Estado, string ConsultarEn);
+public record ComandoAceptadoDto(Guid CorrelationId, string Estado);
+```
+
+### 6.2 Por qué los 8 responden 202 (no 200/201/204) — decisión documentada
+
+La issue #104 pide decidir esto endpoint por endpoint. La decisión fue
+**202 para los 8, sin excepción**, por consistencia con el resto del
+contrato de trabajos pesados (sección 4 de `docs/contrato-integracion/
+README.md`) — incluso donde un `200`/`201`/`204` síncrono hubiera sido
+defendible:
+
+- **`POST /api/planes-cargue` (#1)**: es el único de los 8 con un matiz real.
+  NEXO genera el `PlanId` y dejar su fila espejo en `borrador` **en el mismo
+  POST** (antes de responder) — un `GET /api/planes-cargue/{id}` inmediato
+  después del 202 ya funciona, aunque la fila REAL de Cubicador se cree
+  async. Se documenta como 202 igual, para no prometer un 201 que no sería
+  del todo cierto (la escritura definitiva sigue pendiente en Cubicador).
+- **`DELETE /api/planes-cargue/{id}` (#7)**: un DELETE normalmente responde
+  `204`. Acá responde **202** porque el borrado en Cubicador es async — la
+  fila espejo de NEXO sí se borra de inmediato (optimista, ver 6.4), pero
+  prometer `204` implicaría que el borrado ya es un hecho de punta a punta.
+- El resto (#2 a #6, #8) no tenían candidato razonable a síncrono: dependen
+  de que Cubicador aplique el comando en su propia base.
+
+### 6.3 Payload de cada comando en la cola
+
+Mismo sobre de siempre (routing key `cubicacion.solicitada`), con
+`solicitud` variando por tipo — ver `CabinaFletes.Mensajes.Cubicacion.
+MensajesDeCubicacion.cs` para el shape exacto (records `CrearPlanInput`,
+`GuardarVehiculoInput`, `GuardarItemInput`, `ImportarItemsInput`,
+`EliminarItemInput`, `EliminarPlanInput`, `AjustarColocacionInput`) y
+`cubicador/CONTRATO.md` §3.2 para los DTOs Pydantic espejo
+(`CrearPlanRequest`, `GuardarVehiculoInput`, `GuardarItemPlanCargueInput`,
+`AjusteColocacionInput`) que `worker/main.py` usa para aplicarlos.
+
+```json
+// crear_plan
+{ "tipo": "crear_plan", "planId": "<guid, generado por NEXO>", "correlationId": "<igual a planId>",
+  "solicitud": { "nombre": "Plan Bogotá-Medellín", "vehiculoId": "<guid del catálogo de Cubicador>" } }
+
+// crear_plan_demo — sin datos: Cubicador elige vehículo e ítems internamente
+{ "tipo": "crear_plan_demo", "planId": "<correlationId, NO es un plan real>", "correlationId": "...", "solicitud": {} }
+
+// guardar_vehiculo
+{ "tipo": "guardar_vehiculo", "planId": "<vehiculoId, generado por NEXO>", "correlationId": "...",
+  "solicitud": { "id": "<mismo vehiculoId>", "nombre": "...", "descripcion": null,
+    "largoInternoMm": 6200, "anchoInternoMm": 2200, "altoInternoMm": 2000,
+    "capacidadKg": 6300, "taraKg": 4200, "puertaAnchoMm": 2200, "puertaAltoMm": 1950,
+    "puertaPosicion": "trasera", "ejes": [{ "posicionMm": 1000, "capacidadKg": 3500 }],
+    "toleranciaParedesMm": 0, "toleranciaEntreUnidadesMm": 0 } }
+
+// guardar_item (planId = el plan al que pertenece)
+{ "tipo": "guardar_item", "planId": "<guid del plan>", "correlationId": "...",
+  "solicitud": { "id": null, "sku": "SKU-1", "descripcion": "Pallet industrial", "pedido": null,
+    "cliente": null, "destino": null, "secuenciaEntrega": 1, "largoMm": 1200, "anchoMm": 1000,
+    "altoMm": 1400, "pesoKg": 800, "cantidad": 10, "color": null, "prioridad": 3,
+    "tipoEmbalaje": null, "apilable": true, "maxNiveles": 0, "maxPesoEncimaKg": -1,
+    "rotable": true, "mantenerVertical": false, "fragil": false, "peligroso": false,
+    "refrigerado": false, "grupoCompatibilidad": null, "observaciones": null } }
+
+// importar_items — 1 a 2.000 ítems con el mismo shape que guardar_item
+{ "tipo": "importar_items", "planId": "<guid del plan>", "correlationId": "...",
+  "solicitud": { "items": [ { /* mismo shape que guardar_item.solicitud */ }, "..." ] } }
+
+// eliminar_item
+{ "tipo": "eliminar_item", "planId": "<guid del plan>", "correlationId": "...",
+  "solicitud": { "itemId": "<guid del item>" } }
+
+// eliminar_plan — sin datos adicionales, planId ya identifica el plan
+{ "tipo": "eliminar_plan", "planId": "<guid del plan>", "correlationId": "...", "solicitud": {} }
+
+// ajustar_colocacion — reemplaza el PATCH síncrono de Cubicador
+{ "tipo": "ajustar_colocacion", "planId": "<guid del plan>", "correlationId": "...",
+  "solicitud": { "colocacionId": "<guid>", "x": null, "y": null, "z": null,
+    "orientacionIndice": null, "bloqueada": null, "retirar": true, "reinsertar": null } }
+```
+
+### 6.4 Cómo se entera el frontend del desenlace
+
+Reutiliza EXACTAMENTE los dos eventos que ya existen (sección 2) — no se creó
+ningún evento nuevo para estos 8 comandos:
+
+- **Éxito** → `plan-de-cargue.generado` → `PlanDeCargueGeneradoConsumer`
+  actualiza `PlanCargue.Estado`/`Puntaje` en NEXO y avisa por
+  `/hubs/plan-cargue` (grupo = el id que el 202 devolvió).
+- **Rechazo** → `cubicacion.rechazada` → `CubicacionRechazadaConsumer` marca
+  `Estado = "error"` y avisa por el mismo canal — así es como
+  `ajustar_colocacion` "reconcilia" al frontend si el ajuste no era válido
+  (posición fuera de límites, colisión, soporte insuficiente...).
+
+**Esto solo funciona de punta a punta cuando NEXO tiene una fila de
+`PlanCargue` con ese id** (`crear_plan`, `guardar_item`, `importar_items`,
+`eliminar_item`, `ajustar_colocacion`, además de `optimizar`). Ver 6.5 para
+los dos comandos donde esto NO aplica — es la limitación más importante de
+esta HU y hay que leerla antes de construir la pantalla.
+
+### 6.5 Limitaciones conocidas de ESTOS 8 comandos, honestas
+
+- **`crear_plan_demo` no tiene seguimiento por id todavía.** Cubicador elige
+  el vehículo internamente (preset "13.6 m" de SU catálogo, que NEXO no
+  conoce) y genera su propio `PlanId` — NEXO no tiene forma de anticiparlo,
+  así que el 202 solo trae un `correlationId` de seguimiento, no un
+  `PlanCargueId` consultable con `GET /api/planes-cargue/{id}`. El plan
+  creado no queda reflejado en NEXO en este alcance (no hay fila espejo que
+  el consumer pueda actualizar). Pensado para demos/pruebas — si el frontend
+  necesita seguirlo, es trabajo de una iteración futura de lectura.
+- **`guardar_vehiculo` no tiene aviso de éxito ni de fallo.** NEXO no
+  mantiene espejo de vehículos (la fuente de verdad es Cubicador — hoy nada
+  en NEXO lee su propia tabla `VehiculosCubicacion` salvo el stub interno que
+  `CrearPlanCommand` asegura para no romper su FK). Si Cubicador rechaza el
+  vehículo (dimensiones inválidas, etc.), `CubicacionRechazadaConsumer` no
+  encuentra ninguna fila que marcar y el rechazo se pierde en silencio del
+  lado de NEXO — el 202 es una promesa de "quedó en cola", no de "quedó
+  guardado". Mitigación posible a futuro: validar en NEXO lo mismo que ya
+  valida `CubicacionSolicitadaValidador` (dimensiones, puerta, ejes) para que
+  la mayoría de rechazos ni siquiera lleguen a encolarse.
+- **`eliminar_plan` borra en NEXO de forma OPTIMISTA.** La fila espejo se
+  borra en el mismo request, antes de publicar — no se repone si Cubicador
+  rechaza el borrado (caso raro). Se prefirió esta asimetría sobre la
+  complejidad de reconciliar un borrado deshecho.
+- **`crear_plan` deja un stub de vehículo en la tabla `VehiculosCubicacion`
+  de NEXO** (solo `Id` + `Nombre` = el mismo id, sin dimensiones) — existe
+  ÚNICAMENTE para satisfacer la FK de `PlanCargue.VehiculoId` en la base de
+  NEXO. Nadie más lee esa fila; no es una fuente de verdad de vehículos.

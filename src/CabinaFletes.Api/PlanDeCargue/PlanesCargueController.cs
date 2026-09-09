@@ -8,18 +8,78 @@ namespace CabinaFletes.Api.PlanDeCargue;
 
 public record SolicitarOptimizacionRequest(string? Estrategia, string? Algoritmo, int? Semilla, bool? RespetarBloqueadas);
 
+public record CrearPlanRequest(string Nombre, Guid VehiculoId);
+
+public record GuardarItemRequest(
+    Guid? Id, string? Sku, string Descripcion, string? Pedido, string? Cliente, string? Destino,
+    int SecuenciaEntrega, decimal LargoMm, decimal AnchoMm, decimal AltoMm, decimal PesoKg, int Cantidad,
+    string? Color, int Prioridad, string? TipoEmbalaje, bool Apilable, int MaxNiveles, decimal MaxPesoEncimaKg,
+    bool Rotable, bool MantenerVertical, bool Fragil, bool Peligroso, bool Refrigerado,
+    string? GrupoCompatibilidad, string? Observaciones)
+{
+    public ItemAImportar AImportar() => new(
+        Sku, Descripcion, Pedido, Cliente, Destino, SecuenciaEntrega, LargoMm, AnchoMm, AltoMm, PesoKg, Cantidad,
+        Color, Prioridad, TipoEmbalaje, Apilable, MaxNiveles, MaxPesoEncimaKg, Rotable, MantenerVertical, Fragil,
+        Peligroso, Refrigerado, GrupoCompatibilidad, Observaciones);
+}
+
+public record ImportarItemsRequest(IReadOnlyList<GuardarItemRequest> Items);
+
+public record AjustarColocacionRequest(
+    decimal? X, decimal? Y, decimal? Z, int? OrientacionIndice, bool? Bloqueada, bool? Retirar, bool? Reinsertar);
+
 /// <summary>
-/// Plan de cargue (S2-HU-08): orquestación async contra el motor Cubicador. El patrón es
-/// el mismo que el resto de trabajos pesados del contrato — 202 + identificador, avance
-/// por SignalR (/hubs/plan-cargue), consulta de respaldo acá mismo.
+/// Plan de cargue (S2-HU-08, extendido en S3-HU-02): orquestación async contra el motor
+/// Cubicador. El patrón es el mismo que el resto de trabajos pesados del contrato —
+/// 202 + identificador, avance por SignalR (/hubs/plan-cargue), consulta de respaldo acá
+/// mismo. S3-HU-02 (issue #104) agrega la escritura del plan (alta, ítems, borrado,
+/// ajuste manual) al mismo camino de cola: ninguno de estos endpoints toca Cubicador
+/// directo, y su respuesta 202 se documenta caso por caso en la issue #108.
 /// </summary>
 [ApiController]
 [Route("api/planes-cargue")]
 public class PlanesCargueController(
     ICommandHandler<SolicitarOptimizacionCommand, SolicitudDeCubicacionAceptadaDto> solicitar,
+    ICommandHandler<CrearPlanCommand, SolicitudDeCubicacionAceptadaDto> crearPlan,
+    ICommandHandler<CrearPlanDemoCommand, ComandoAceptadoDto> crearPlanDemo,
+    ICommandHandler<GuardarItemCommand, ComandoAceptadoDto> guardarItem,
+    ICommandHandler<ImportarItemsCommand, ComandoAceptadoDto> importarItems,
+    ICommandHandler<EliminarItemCommand, ComandoAceptadoDto> eliminarItem,
+    ICommandHandler<EliminarPlanCommand, ComandoAceptadoDto> eliminarPlan,
+    ICommandHandler<AjustarColocacionCommand, ComandoAceptadoDto> ajustarColocacion,
     IQueryHandler<ObtenerPlanCargueQuery, PlanCargueDto> consultar)
     : ControllerBase
 {
+    /// <summary>
+    /// S3-HU-02 (issue #104): crea un plan de cargue nuevo. El PlanId lo genera NEXO acá
+    /// (S3-HU-01.2) — responde 202 porque la fila de Cubicador se crea async, aunque la
+    /// fila espejo de NEXO (consultable de inmediato con el GET de abajo) queda en
+    /// "borrador" en el mismo momento de este POST.
+    /// </summary>
+    [Authorize(Roles = "Comercial,CoordinadorFletes,Admin")]
+    [HttpPost]
+    [ProducesResponseType(StatusCodes.Status202Accepted)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<SolicitudDeCubicacionAceptadaDto>> Crear(
+        [FromBody] CrearPlanRequest body, CancellationToken ct = default)
+    {
+        var r = await crearPlan.Handle(new CrearPlanCommand(body.Nombre, body.VehiculoId), ct);
+        return Accepted(r.ConsultarEn, r);
+    }
+
+    /// <summary>
+    /// S3-HU-02 (issue #104): escenario de demostración. 202 con un CorrelationId de
+    /// seguimiento — a diferencia de <see cref="Crear"/>, acá NO hay un PlanId de NEXO
+    /// todavía (Cubicador elige el vehículo internamente): el plan resultante se sigue
+    /// por /hubs/plan-cargue una vez Cubicador lo confirma (ver limitación documentada
+    /// en la issue #108).
+    /// </summary>
+    [Authorize(Roles = "Comercial,CoordinadorFletes,Admin")]
+    [HttpPost("demo")]
+    [ProducesResponseType(StatusCodes.Status202Accepted)]
+    public async Task<ActionResult<ComandoAceptadoDto>> CrearDemo(CancellationToken ct = default)
+        => Accepted(await crearPlanDemo.Handle(new CrearPlanDemoCommand(), ct));
+
     /// <summary>
     /// Pide la optimización de un plan de cargue ya existente. No bloquea: responde 202
     /// de inmediato, el resultado llega por /hubs/plan-cargue o se consulta con GET
@@ -49,4 +109,75 @@ public class PlanesCargueController(
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<PlanCargueDto>> Obtener(Guid id, CancellationToken ct = default)
         => Ok(await consultar.Handle(new ObtenerPlanCargueQuery(id), ct));
+
+    /// <summary>S3-HU-02 (issue #104): alta/edición de un ítem del plan (Id nulo = alta).</summary>
+    [Authorize(Roles = "Comercial,CoordinadorFletes,Admin")]
+    [HttpPost("{id:guid}/items")]
+    [ProducesResponseType(StatusCodes.Status202Accepted)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<ComandoAceptadoDto>> GuardarItem(
+        Guid id, [FromBody] GuardarItemRequest body, CancellationToken ct = default)
+    {
+        var r = await guardarItem.Handle(new GuardarItemCommand(
+            id, body.Id, body.Sku, body.Descripcion, body.Pedido, body.Cliente, body.Destino, body.SecuenciaEntrega,
+            body.LargoMm, body.AnchoMm, body.AltoMm, body.PesoKg, body.Cantidad, body.Color, body.Prioridad,
+            body.TipoEmbalaje, body.Apilable, body.MaxNiveles, body.MaxPesoEncimaKg, body.Rotable,
+            body.MantenerVertical, body.Fragil, body.Peligroso, body.Refrigerado, body.GrupoCompatibilidad,
+            body.Observaciones), ct);
+        return Accepted(r);
+    }
+
+    /// <summary>S3-HU-02 (issue #104): importación masiva de ítems (1-2.000).</summary>
+    [Authorize(Roles = "Comercial,CoordinadorFletes,Admin")]
+    [HttpPost("{id:guid}/items/importar")]
+    [ProducesResponseType(StatusCodes.Status202Accepted)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<ComandoAceptadoDto>> ImportarItems(
+        Guid id, [FromBody] ImportarItemsRequest body, CancellationToken ct = default)
+    {
+        var r = await importarItems.Handle(
+            new ImportarItemsCommand(id, body.Items.Select(i => i.AImportar()).ToList()), ct);
+        return Accepted(r);
+    }
+
+    /// <summary>S3-HU-02 (issue #104): borra un ítem del plan.</summary>
+    [Authorize(Roles = "Comercial,CoordinadorFletes,Admin")]
+    [HttpDelete("{id:guid}/items/{itemId:guid}")]
+    [ProducesResponseType(StatusCodes.Status202Accepted)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<ComandoAceptadoDto>> EliminarItem(
+        Guid id, Guid itemId, CancellationToken ct = default)
+        => Accepted(await eliminarItem.Handle(new EliminarItemCommand(id, itemId), ct));
+
+    /// <summary>
+    /// S3-HU-02 (issue #104): borra el plan. Responde 202 (no 204): aunque NEXO ya borra
+    /// su fila espejo antes de publicar (borrado optimista), el borrado en Cubicador sigue
+    /// siendo async — 202 documenta esa asimetría en vez de prometer un 204 que no es
+    /// del todo cierto (ver issue #108).
+    /// </summary>
+    [Authorize(Roles = "Comercial,CoordinadorFletes,Admin")]
+    [HttpDelete("{id:guid}")]
+    [ProducesResponseType(StatusCodes.Status202Accepted)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<ComandoAceptadoDto>> Eliminar(Guid id, CancellationToken ct = default)
+        => Accepted(await eliminarPlan.Handle(new EliminarPlanCommand(id), ct));
+
+    /// <summary>
+    /// S3-HU-02 (issue #104, criterio 3): ajuste manual de una colocación. Deja de ser un
+    /// PATCH síncrono contra Cubicador — 202 async, reconciliado por el aviso de rechazo
+    /// en /hubs/plan-cargue si Cubicador lo rechaza.
+    /// </summary>
+    [Authorize(Roles = "Comercial,CoordinadorFletes,Admin")]
+    [HttpPatch("{id:guid}/colocaciones/{colocacionId:guid}")]
+    [ProducesResponseType(StatusCodes.Status202Accepted)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<ComandoAceptadoDto>> AjustarColocacion(
+        Guid id, Guid colocacionId, [FromBody] AjustarColocacionRequest body, CancellationToken ct = default)
+    {
+        var r = await ajustarColocacion.Handle(new AjustarColocacionCommand(
+            id, colocacionId, body.X, body.Y, body.Z, body.OrientacionIndice, body.Bloqueada, body.Retirar,
+            body.Reinsertar), ct);
+        return Accepted(r);
+    }
 }
