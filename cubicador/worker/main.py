@@ -63,8 +63,14 @@ RABBITMQ_URL = os.environ.get("CUBICADOR_RABBITMQ_URL", "amqp://guest:guest@loca
 COLA = "cubicador.optimizar"
 COLA_DLQ = "cubicacion.dlq"
 MAX_INTENTOS = 3
-TIMEOUT_PROCESANDO_MINUTOS = 5
-INTERVALO_VIGILANTE_SEGUNDOS = 60
+# Umbrales del vigilante, configurables por ambiente (S3-HU-06.1): un entorno
+# con planes grandes puede necesitar mas de 5 min antes de dar uno por perdido,
+# y bajar el intervalo acelera la deteccion a costa de mas consultas.
+TIMEOUT_PROCESANDO_MINUTOS = int(os.environ.get("CUBICADOR_TIMEOUT_PROCESANDO_MINUTOS", "5"))
+INTERVALO_VIGILANTE_SEGUNDOS = int(os.environ.get("CUBICADOR_INTERVALO_VIGILANTE_SEGUNDOS", "60"))
+# Codigo de rechazo propio del vigilante - no lo produce ningun caso de uso,
+# solo este camino (ver CONTRATO.md seccion 6).
+CODIGO_RECHAZO_TIMEOUT = "TIMEOUT_PROCESAMIENTO"
 logger = logging.getLogger("cubicador.worker")
 
 
@@ -248,18 +254,69 @@ async def _mover_a_dlq(
     await alertar_mensaje_en_dlq(tipo, error, intentos)
 
 
-async def _vigilante_de_timeouts() -> None:
-    """Corre en loop propio: marca `error` los planes atascados en `procesando`
-    (ej. el worker se cayo a mitad del proceso, antes de ack/nack el mensaje)."""
+def _mensaje_timeout() -> str:
+    return (
+        f"Timeout: el plan quedo mas de {TIMEOUT_PROCESANDO_MINUTOS} min en 'procesando' "
+        "(el worker probablemente se cayo a mitad del calculo)."
+    )
+
+
+async def _revisar_timeouts(publisher: RabbitMqEventosPublisher) -> list[str]:
+    """UNA pasada del vigilante: resuelve los planes atascados en `procesando`.
+    Devuelve los ids resueltos. Sin bucle ni sleep a proposito - el "cuando" es
+    responsabilidad de `_vigilante_de_timeouts`, y separarlos es lo que hace
+    esto testeable sin relojes de por medio.
+
+    Por cada plan atascado PUBLICA el rechazo y RECIEN DESPUES lo marca
+    `error`. Ese orden es el punto de S3-HU-06.1, no un detalle: si se marcara
+    primero y el broker estuviera caido, el plan saldria de `procesando` sin
+    que nadie se enterara y el proximo ciclo ya no lo encontraria - NEXO se
+    quedaria en `procesando` para siempre, que es exactamente el hueco que
+    esta issue cierra. Publicando primero, un fallo del broker deja el plan
+    como estaba y el proximo ciclo reintenta. El costo es la posibilidad de un
+    rechazo duplicado (si el proceso muere entre publicar y marcar), inofensivo
+    porque el consumer de NEXO solo vuelve a poner `Estado = "error"`. Es el
+    mismo criterio que el Outbox transaccional de NEXO: publicar antes de
+    persistir."""
+    limite = datetime.now(timezone.utc) - timedelta(minutes=TIMEOUT_PROCESANDO_MINUTOS)
+    mensaje = _mensaje_timeout()
+    resueltos: list[str] = []
+
+    async with SessionLocal() as sesion:
+        planes = SqlPlanCargueRepository(sesion)
+        for plan_id in await planes.obtener_atascados(limite):
+            # El plan_id va tambien como correlationId, y es el valor CORRECTO,
+            # no una aproximacion: el unico punto de todo el repo que pone un
+            # plan en `procesando` es POST /{id}/optimizar
+            # (api/routers/planes_cargue.py), y para ese flujo NEXO publica el
+            # mismo valor en ambos campos (CubicacionPublicadorAdapter).
+            # `crear_desde_linea` no cuenta: sus planes nacen en `borrador` y
+            # nunca pasan por `marcar_procesando`, asi que el vigilante no los
+            # alcanza. INVARIANTE A SOSTENER: si algun comando nuevo empieza a
+            # marcar `procesando` con un correlationId distinto del planId (hoy
+            # ninguno de los 8 de S3-HU-02 lo hace), hay que guardar ese
+            # correlationId en la fila del plan y leerlo aqui.
+            await publisher.publicar_cubicacion_rechazada(plan_id, CODIGO_RECHAZO_TIMEOUT, mensaje)
+            await planes.marcar_error(plan_id, mensaje)
+            resueltos.append(plan_id)
+
+    if resueltos:
+        logger.warning(
+            "Vigilante: %d plan(es) marcados 'error' por timeout de procesamiento y rechazados (%s).",
+            len(resueltos), CODIGO_RECHAZO_TIMEOUT,
+        )
+    return resueltos
+
+
+async def _vigilante_de_timeouts(publisher: RabbitMqEventosPublisher) -> None:
+    """Corre en loop propio: cada `INTERVALO_VIGILANTE_SEGUNDOS` dispara una
+    pasada de `_revisar_timeouts`. Cubre el caso que el reintento por
+    `x-intentos` no cubre - que el worker se caiga a mitad de un mensaje, sin
+    llegar ni a fallar ni a completar."""
     while True:
         await asyncio.sleep(INTERVALO_VIGILANTE_SEGUNDOS)
         try:
-            limite = datetime.now(timezone.utc) - timedelta(minutes=TIMEOUT_PROCESANDO_MINUTOS)
-            async with SessionLocal() as sesion:
-                planes = SqlPlanCargueRepository(sesion)
-                marcados = await planes.marcar_error_por_timeout(limite)
-                if marcados:
-                    logger.warning("Vigilante: %d plan(es) marcados 'error' por timeout de procesamiento.", marcados)
+            await _revisar_timeouts(publisher)
         except Exception:  # noqa: BLE001 - el vigilante no debe morir por un fallo puntual
             logger.exception("Fallo en el vigilante de timeouts (se reintenta en el proximo ciclo).")
 
@@ -285,7 +342,7 @@ async def main() -> None:
         cola_dlq = await canal.declare_queue(COLA_DLQ, durable=True)
         await cola_dlq.bind(exchange, routing_key=COLA_DLQ)
 
-        vigilante = asyncio.create_task(_vigilante_de_timeouts())
+        vigilante = asyncio.create_task(_vigilante_de_timeouts(publisher))
         logger.info(
             "Worker escuchando en '%s' (routing_key=cubicacion.solicitada); vigilante cada %ds, timeout %dmin.",
             COLA, INTERVALO_VIGILANTE_SEGUNDOS, TIMEOUT_PROCESANDO_MINUTOS,

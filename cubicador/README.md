@@ -77,10 +77,14 @@ Ver:
   marca/reporta una sola vez, como corresponde (reintentar dará siempre el
   mismo resultado).
 - **Vigilante de timeout**: un plan que quedó en `procesando` (ej. el worker
-  se detiene a mitad de proceso) es marcado `error` automáticamente al pasar
-  el límite configurado — confirmado forzando el escenario (worker detenido,
-  plan en `procesando`, se corrió `marcar_error_por_timeout` con el límite
-  cumplido) y viendo el plan pasar a `error` vía `GET /{id}`.
+  se detiene a mitad de proceso) recibe un `cubicacion.rechazada` con
+  `codigo: "TIMEOUT_PROCESAMIENTO"` y queda marcado `error` al pasar el límite
+  configurado (`CUBICADOR_TIMEOUT_PROCESANDO_MINUTOS`) — confirmado forzando el
+  escenario (worker detenido, plan en `procesando`, se corrió
+  `_revisar_timeouts` con el límite cumplido) y viendo el plan pasar a `error`
+  vía `GET /{id}`. El rechazo se publica **antes** de marcar el plan, para que
+  un broker caído se reintente en el ciclo siguiente en lugar de perderse — ver
+  CONTRATO.md 6.4.
 - Un bug real que solo apareció probando con datos reales: `metricas.puntaje`
   en `GET /resultado` siempre daba 0 porque `obtener_resultado` no
   reconstruía `resultado.puntaje` desde el plan persistido antes de pedirle
