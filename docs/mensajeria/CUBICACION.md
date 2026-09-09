@@ -293,17 +293,57 @@ README.md`) — incluso donde un `200`/`201`/`204` síncrono hubiera sido
 defendible:
 
 - **`POST /api/planes-cargue` (#1)**: es el único de los 8 con un matiz real.
-  NEXO genera el `PlanId` y dejar su fila espejo en `borrador` **en el mismo
-  POST** (antes de responder) — un `GET /api/planes-cargue/{id}` inmediato
-  después del 202 ya funciona, aunque la fila REAL de Cubicador se cree
-  async. Se documenta como 202 igual, para no prometer un 201 que no sería
-  del todo cierto (la escritura definitiva sigue pendiente en Cubicador).
+  NEXO genera el `PlanId` y deja su fila espejo **en el mismo POST** (antes de
+  responder) — un `GET /api/planes-cargue/{id}` inmediato después del 202 ya
+  funciona, aunque la fila REAL de Cubicador se cree async. Se documenta como
+  202 igual, para no prometer un 201 que no sería del todo cierto (la
+  escritura definitiva sigue pendiente en Cubicador). Esa fila nace en
+  **`procesando`** — ver el aviso de cambio de contrato de abajo.
 - **`DELETE /api/planes-cargue/{id}` (#7)**: un DELETE normalmente responde
   `204`. Acá responde **202** porque el borrado en Cubicador es async — la
   fila espejo de NEXO sí se borra de inmediato (optimista, ver 6.4), pero
   prometer `204` implicaría que el borrado ya es un hecho de punta a punta.
 - El resto (#2 a #6, #8) no tenían candidato razonable a síncrono: dependen
   de que Cubicador aplique el comando en su propia base.
+
+#### ⚠️ Cambio de contrato — `POST /api/planes-cargue` devuelve `procesando`
+
+**Publicado el 2026-09-09**, después de la publicación inicial del contrato.
+Se avisa acá y en el hilo de la issue, según el compromiso de S3-HU-02.6 (los
+cambios de contrato no se hacen en silencio).
+
+**Qué cambia:** el campo `estado` del `202` pasa de `"borrador"` a
+`"procesando"`. La fila espejo de NEXO nace en `procesando` y
+`PlanDeCargueGeneradoConsumer` la mueve al estado real cuando llega la
+confirmación de Cubicador (ese consumer ya hace
+`plan.Estado = mensaje.Resultado.Estado`, que para un plan recién creado es
+`borrador`) — no hizo falta código nuevo en el consumer.
+
+**Por qué:** con la fila en `borrador` desde el POST había una carrera real. Un
+`POST /{id}/optimizar` inmediato pasaba la guarda de
+`SolicitarOptimizacionCommand`, que solo rechaza con `409
+PLAN_CARGUE_EN_PROCESO` cuando el plan ya está en `procesando`. Los dos
+mensajes van a la **misma cola** con `prefetch_count = 2`, así que el worker
+podía atender `optimizar` antes que `crear_plan` y fallar con
+`PLAN_NO_ENCONTRADO` sobre un plan que estaba por crearse. Con `procesando`, esa
+guarda que ya existía bloquea el caso sin agregar código.
+
+Un beneficio adicional: `borrador` es un estado de reposo legítimo (un plan
+puede quedarse ahí días mientras el comercial le carga ítems), así que no
+distinguía "esperando a Cubicador" de "a medio armar". `procesando` sí, y eso
+es lo que hace posible un vigilante de timeout del lado NEXO para los comandos
+de Cubo 2 — hoy imposible, porque no había ningún estado que significara
+inequívocamente "esperando confirmación".
+
+**Impacto en el frontend (S3-HU-04):** ninguno si la UI trata el 202 como el
+resto del contrato de trabajos pesados — de hecho lo alinea con la UX descrita
+para Cubo 2 (spinner mientras el estado sea `procesando`, la fila aparece
+cuando llega el aviso por SignalR). Sí rompe a quien haya asumido literalmente
+el string `"borrador"` en esa respuesta.
+
+**Fuera de alcance:** `guardar_vehiculo` y `eliminar_vehiculo` no escriben
+ninguna fila en NEXO, así que siguen sin dejar rastro con el que detectar un
+comando perdido. Cubrirlos exige un registro explícito de comandos en vuelo.
 
 ### 6.3 Payload de cada comando en la cola
 

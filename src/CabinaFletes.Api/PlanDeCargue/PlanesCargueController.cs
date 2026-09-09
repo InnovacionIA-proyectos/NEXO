@@ -53,8 +53,10 @@ public class PlanesCargueController(
     /// <summary>
     /// S3-HU-02 (issue #104): crea un plan de cargue nuevo. El PlanId lo genera NEXO acá
     /// (S3-HU-01.2) — responde 202 porque la fila de Cubicador se crea async, aunque la
-    /// fila espejo de NEXO (consultable de inmediato con el GET de abajo) queda en
-    /// "borrador" en el mismo momento de este POST.
+    /// fila espejo de NEXO (consultable de inmediato con el GET de abajo) queda creada en
+    /// el mismo momento de este POST, en estado "procesando" hasta que llegue la
+    /// confirmación de Cubicador (ver <see cref="CrearPlanCommand"/> para la carrera que
+    /// ese estado evita).
     /// </summary>
     [Authorize(Roles = "Comercial,CoordinadorFletes,Admin")]
     [HttpPost]
