@@ -37,6 +37,7 @@ class IPlanCargueRepository(Protocol):
 
     async def crear(
         self, nombre: str, vehiculo_id: str, linea_solicitud_id: str | None = None, numero_vehiculo: int = 1,
+        id: str | None = None,
     ) -> PlanCargue: ...
 
     async def obtener(self, id: str) -> PlanCargue | None:
@@ -66,8 +67,14 @@ class IPlanCargueRepository(Protocol):
 
     async def marcar_error(self, plan_id: str, mensaje: str) -> None: ...
 
-    async def marcar_error_por_timeout(self, limite) -> int:
-        """Marca `error` los planes en `procesando` con `updated_at` anterior a `limite`. Devuelve cuantos se marcaron."""
+    async def obtener_atascados(self, limite) -> list[str]:
+        """Ids de los planes en `procesando` con `updated_at` anterior a
+        `limite`. SOLO consulta, no muta: quien llama publica el rechazo y
+        DESPUES marca cada uno con `marcar_error`. Ese orden es deliberado -
+        es el mismo criterio que el Outbox de NEXO (publicar antes de
+        persistir): si el broker falla, el plan sigue en `procesando` y el
+        proximo ciclo lo reintenta, en vez de quedar marcado `error` sin que
+        nadie se haya enterado. Ver worker/main.py::_revisar_timeouts."""
         ...
 
     async def obtener_colocacion(self, plan_id: str, colocacion_id: str): ...

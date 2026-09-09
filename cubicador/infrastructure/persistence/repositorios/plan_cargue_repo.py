@@ -32,9 +32,12 @@ class SqlPlanCargueRepository:
 
     async def crear(
         self, nombre: str, vehiculo_id: str, linea_solicitud_id: str | None = None, numero_vehiculo: int = 1,
+        id: str | None = None,
     ) -> PlanCargue:
+        # `id`: S3-HU-02 (issue #105) - "crear_plan" desde NEXO manda el id ya generado
+        # alla (S3-HU-01.2); sin id (POST sincrono, demo, crear_desde_linea) se genera acá.
         fila = PlanCargueModel(
-            id=str(uuid.uuid4()), nombre=nombre, vehiculo_id=vehiculo_id,
+            id=id or str(uuid.uuid4()), nombre=nombre, vehiculo_id=vehiculo_id,
             linea_solicitud_id=linea_solicitud_id, numero_vehiculo=numero_vehiculo,
         )
         self._s.add(fila)
@@ -174,18 +177,13 @@ class SqlPlanCargueRepository:
             plan.error_mensaje = mensaje
             await self._s.commit()
 
-    async def marcar_error_por_timeout(self, limite) -> int:
+    async def obtener_atascados(self, limite) -> list[str]:
         filas = (await self._s.execute(
-            select(PlanCargueModel).where(
+            select(PlanCargueModel.id).where(
                 PlanCargueModel.estado == "procesando", PlanCargueModel.updated_at < limite,
             )
         )).scalars().all()
-        for plan in filas:
-            plan.estado = "error"
-            plan.error_mensaje = f"Timeout: el plan quedo mas de lo esperado en 'procesando' (worker probablemente se cayo)."
-        if filas:
-            await self._s.commit()
-        return len(filas)
+        return list(filas)
 
     async def obtener_colocacion(self, plan_id: str, colocacion_id: str) -> ColocacionCargue | None:
         fila = await self._s.get(ColocacionCargueModel, colocacion_id)
