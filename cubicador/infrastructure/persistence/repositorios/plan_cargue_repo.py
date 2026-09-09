@@ -32,9 +32,12 @@ class SqlPlanCargueRepository:
 
     async def crear(
         self, nombre: str, vehiculo_id: str, linea_solicitud_id: str | None = None, numero_vehiculo: int = 1,
+        id: str | None = None,
     ) -> PlanCargue:
+        # `id`: S3-HU-02 (issue #105) - "crear_plan" desde NEXO manda el id ya generado
+        # alla (S3-HU-01.2); sin id (POST sincrono, demo, crear_desde_linea) se genera acá.
         fila = PlanCargueModel(
-            id=str(uuid.uuid4()), nombre=nombre, vehiculo_id=vehiculo_id,
+            id=id or str(uuid.uuid4()), nombre=nombre, vehiculo_id=vehiculo_id,
             linea_solicitud_id=linea_solicitud_id, numero_vehiculo=numero_vehiculo,
         )
         self._s.add(fila)

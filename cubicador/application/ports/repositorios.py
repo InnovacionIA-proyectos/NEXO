@@ -37,6 +37,7 @@ class IPlanCargueRepository(Protocol):
 
     async def crear(
         self, nombre: str, vehiculo_id: str, linea_solicitud_id: str | None = None, numero_vehiculo: int = 1,
+        id: str | None = None,
     ) -> PlanCargue: ...
 
     async def obtener(self, id: str) -> PlanCargue | None:

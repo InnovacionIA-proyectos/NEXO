@@ -42,9 +42,17 @@ public sealed class CubicacionPublicadorAdapter(
         CancellationToken ct)
     {
         var planIdTexto = planCargueId.ToString();
-        var mensaje = new CubicacionSolicitada(
-            "optimizar", planIdTexto, planIdTexto,
-            new SolicitudDeCubicacion(estrategia, algoritmo, semilla, null, respetarBloqueadas));
+        return PublicarAsync(
+            "optimizar", planIdTexto,
+            new SolicitudDeCubicacion(estrategia, algoritmo, semilla, null, respetarBloqueadas), ct);
+    }
+
+    public Task PublicarComandoAsync(string tipo, string idCorrelacion, object solicitud, CancellationToken ct) =>
+        PublicarAsync(tipo, idCorrelacion, solicitud, ct);
+
+    private Task PublicarAsync(string tipo, string idCorrelacion, object solicitud, CancellationToken ct)
+    {
+        var mensaje = new CubicacionSolicitada(tipo, idCorrelacion, idCorrelacion, solicitud);
 
         var motivos = validador.Validar(mensaje);
         if (motivos.Count > 0)

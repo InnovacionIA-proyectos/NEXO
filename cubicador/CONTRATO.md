@@ -198,6 +198,22 @@ class DeteccionExtradimensionDto(ApiModel):
 | POST | `/desde-linea/{lineaSolicitudId}` | puente Mesa de Costeo → 3D — **asíncrono**, responde `202 SolicitudEncoladaDto` (ver ⚠️ sección 5) |
 | GET | `/por-linea/{lineaSolicitudId}` | flota resultante del `POST` de arriba — lista vacía mientras sigue `procesando` |
 
+**S3-HU-02 (NEXO, issue #108)**: los endpoints de esta sección que hoy el
+navegador podía llamar DIRECTO (alta/borrado de vehículos, planes, ítems, y el
+PATCH de colocaciones de la fila de arriba) ahora tienen un camino alterno
+**recomendado** desde NEXO (`POST /api/planes-cargue`,
+`POST /api/planes-cargue/demo`, `POST /api/vehiculos`,
+`POST /api/planes-cargue/{id}/items[/importar]`,
+`DELETE /api/planes-cargue/{id}[/items/{itemId}]`,
+`PATCH /api/planes-cargue/{id}/colocaciones/{colocacionId}`) que publica por
+la MISMA cola que `optimizar`/`desde-linea` — ver
+`NEXO/docs/mensajeria/CUBICACION.md` sección 6 para el contrato completo.
+`worker/main.py` aplica esos 8 comandos con los MISMOS casos de uso que esta
+API síncrona (`application/plan_cargue/*.py`) — nada de lógica nueva, solo un
+segundo punto de entrada. Esta API directa NO se retira en esta HU (la siguen
+usando esta app y el smoke test de Docker); es el navegador de NEXO el que
+deja de llamarla.
+
 `optimizar`/`reoptimizar` y `desde-linea` encolan y responden de inmediato
 con `202`. El caller sigue el resultado con **polling** sobre
 `GET /{id}/resultado` (o `GET /por-linea/{lineaSolicitudId}` para el
