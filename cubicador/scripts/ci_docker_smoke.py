@@ -158,9 +158,14 @@ async def flujo_resultado_por_cola(client: httpx.AsyncClient) -> None:
         evento = await asyncio.wait_for(_esperar_evento_del_plan(cola, plan["id"]), timeout=30)
         assert evento["planId"] == plan["id"], evento
         assert evento["correlationId"] == plan["id"], evento
-        assert evento["resultado"]["estado"] == "optimizado", evento
-        assert evento["resultado"]["colocaciones"] == 2, evento
-        log(f"evento recibido por cola: {evento}")
+        # S3-HU-03 (issue #110): "resultado" ya no es {estado, puntaje, colocaciones: int}
+        # - es el ResultadoPlanDto completo (mismo shape que ya usa GET .../resultado,
+        # ver flujo_optimizar_async arriba).
+        assert evento["resultado"]["plan"]["estado"] == "optimizado", evento
+        assert len(evento["resultado"]["colocaciones"]) == 2, evento
+        assert all(c["cargada"] for c in evento["resultado"]["colocaciones"]), evento
+        log(f"evento recibido por cola: plan={evento['resultado']['plan']['estado']}, "
+            f"colocaciones={len(evento['resultado']['colocaciones'])}")
 
 
 async def _esperar_evento_del_plan(cola: aio_pika.abc.AbstractQueue, plan_id: str) -> dict:
