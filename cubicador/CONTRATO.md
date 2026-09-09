@@ -46,19 +46,26 @@ no importa para nada** — lo que hace falta es:
   encendida — si no, `POST /api/planes-cargue/{id}/optimizar` en NEXO
   responde `503` sin publicar nada a la cola.
 
-### 1.2 Frontend — sí puede hablar REST directo
+### 1.2 Frontend — YA NO habla REST directo (cerrado en S3-HU-05, issue #116)
 
-1. **Auth**: header `Authorization: Bearer <CUBICADOR_API_KEY>` en cada
-   request (excepto `GET /health`). No hay identidad de usuario ni roles —
-   es un secreto de servicio compartido, no un login (sección 4).
-2. **CORS**: por defecto el servicio **no tiene CORS activado** (pensado
-   para consumidores server-to-server). Se activa configurando
-   `CUBICADOR_CORS_ORIGENES` (lista separada por comas, mismo criterio que
-   `Cors__OrigenesPermitidos` en NEXO) — sin esa variable, el middleware no
-   se agrega. `.env.example` ya trae
-   `CUBICADOR_CORS_ORIGENES=http://localhost:5173` para desarrollo local.
-3. **Endpoints y DTOs**: secciones 2 y 3 de este documento, o el
-   `openapi.json`/Swagger para explorarlo interactivamente.
+**Hasta S3-HU-02/03/04** un frontend podía hablarle REST directo a este
+servicio (con `CUBICADOR_CORS_ORIGENES` + `CUBICADOR_API_KEY` en el
+navegador). Eso se cerró a propósito: toda escritura del plan de cargue pasa
+por NEXO desde S3-HU-02, toda lectura desde S3-HU-03, y el visor 3D
+(S3-HU-04, `administracion_embarqa_nexo`) ya consume solo esos endpoints de
+NEXO — confirmado y verificado en QA antes de cerrar esto. **No queda
+middleware CORS en el código** (`api/main.py`) ni la variable
+`CUBICADOR_CORS_ORIGENES` en `.env`/`.env.example`/`docker-compose.yml` — no
+es que esté vacía por defecto, es que la capacidad se retiró del todo. Si
+algún día vuelve a hacer falta un frontend hablándole directo a este
+servicio, es una decisión nueva a tomar a propósito (reintroducir el
+middleware), no reabrir una variable vieja.
+
+`CUBICADOR_API_KEY` (sección 4/5) sigue existiendo — protege la API para
+consumidores server-to-server legítimos (hoy: scripts de CI/verificación
+manual, `tests/api/test_smoke.py`, `scripts/ci_docker_smoke.py`). Rotada en
+S3-HU-05 (issue #117) porque el valor anterior estuvo expuesto en el bundle
+público del portal mientras el navegador todavía llamaba directo.
 
 ### 1.3 Checklist antes de integrar
 
@@ -67,11 +74,8 @@ no importa para nada** — lo que hace falta es:
 - [ ] `RABBITMQ_USER`/`RABBITMQ_PASSWORD` idénticos en `NEXO/.env` y
       `cubicador/.env`.
 - [ ] Backend .NET: compuerta de paridad configurada, o `/optimizar`
-      responde `503` siempre (sección 1.1).
-- [ ] Frontend: `CUBICADOR_CORS_ORIGENES` incluye el origen exacto desde el
-      que se va a llamar (protocolo+host+puerto, sin barra final).
-- [ ] Frontend: tiene el `CUBICADOR_API_KEY` correcto para el header
-      `Authorization: Bearer`.
+      responde `503` siempre (sección 1.1) — checklist de encendido en
+      `docs/CHECKLIST_DESPLIEGUE.md`.
 - [ ] `POST /desde-linea/{id}`: `NEXO_CALLBACK_API_KEY` (`cubicador/.env`) debe
       ser IDÉNTICA a `Cubicador3D__InboundApiKey` (`NEXO/.env`) — es el mismo
       secreto compartido, visto desde cada lado (sección 5).
@@ -499,12 +503,19 @@ Header en **todas** las llamadas, en ambas direcciones:
 Authorization: Bearer <secreto correspondiente>
 ```
 
-- NEXO/frontend → este servicio: valida contra `CUBICADOR_API_KEY`
-  (`api/dependencias.py:verificar_api_key`).
+- Consumidores server-to-server → este servicio: valida contra
+  `CUBICADOR_API_KEY` (`api/dependencias.py:verificar_api_key`). **NEXO no es
+  uno de esos consumidores** — habla con este servicio solo por colas, nunca
+  HTTP (sección 1.1). Hoy solo la usan CI/scripts de verificación manual;
+  hasta S3-HU-05 (issue #116) también la usaba el navegador vía CORS —
+  cerrado, y la clave rotada en la misma HU (issue #117) porque ese valor
+  estuvo expuesto en el bundle público del portal.
 - Este servicio → NEXO (llamada de `crear_desde_linea`, ver sección 7): NEXO
   valida contra `Cubicador3D__InboundApiKey`
   (`CubicadorApiKeyAuthenticationHandler`, esquema `CubicadorApiKey` aparte
   de la sesión del portal) — debe ser IDÉNTICA a `NEXO_CALLBACK_API_KEY` acá.
+  También rotada en S3-HU-05 (issue #117), como higiene general aunque este
+  par no fue el que se filtró.
 
 Sin identidad de usuario ni roles en ninguno de los dos sentidos — es un
 secreto de servicio, no un login.
