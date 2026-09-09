@@ -29,10 +29,16 @@ public record GuardarVehiculoRequest(
 /// síncrono que el navegador hacía directo contra Cubicador. La fuente de verdad del
 /// vehículo (dimensiones, presets, catálogo) sigue viviendo en Cubicador; NEXO solo
 /// genera el id y publica (ver issue #108 para el detalle de esta asimetría intencional).
+///
+/// S3-HU-03 (issue #112) agrega la lectura: GET, a diferencia del POST, SÍ está resuelto
+/// enteramente en NEXO — contra la proyección local que vehiculo.creado/vehiculo.actualizado
+/// mantienen sincronizada (issue #110/#111), nunca contra Cubicador en caliente.
 /// </summary>
 [ApiController]
 [Route("api/vehiculos")]
-public class VehiculosController(ICommandHandler<GuardarVehiculoCommand, ComandoAceptadoDto> guardar)
+public class VehiculosController(
+    ICommandHandler<GuardarVehiculoCommand, ComandoAceptadoDto> guardar,
+    IQueryHandler<ListarVehiculosQuery, IReadOnlyList<VehiculoCubicacionDto>> listar)
     : ControllerBase
 {
     [Authorize(Roles = "Comercial,CoordinadorFletes,Admin")]
@@ -49,4 +55,13 @@ public class VehiculosController(ICommandHandler<GuardarVehiculoCommand, Comando
             body.ToleranciaParedesMm, body.ToleranciaEntreUnidadesMm), ct);
         return Accepted(r);
     }
+
+    /// <summary>S3-HU-03 (issue #112): catálogo completo, contra la proyección local.
+    /// [Authorize] sin rol específico — mismo criterio que el resto de las consultas
+    /// del sistema (docs/ROLES_Y_PERMISOS.md).</summary>
+    [Authorize]
+    [HttpGet]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<VehiculoCubicacionDto>>> Listar(CancellationToken ct = default)
+        => Ok(await listar.Handle(new ListarVehiculosQuery(), ct));
 }

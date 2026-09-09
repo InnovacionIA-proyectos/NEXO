@@ -1,5 +1,6 @@
 using CabinaFletes.Application.CasosDeUso.PlanDeCargue.DTOs;
 using CabinaFletes.Application.Common.Abstractions;
+using CabinaFletes.Mensajes.Cubicacion;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace CabinaFletes.Application.CasosDeUso.PlanDeCargue;
@@ -18,5 +19,12 @@ public static class DependencyInjection
         .AddScoped<ICommandHandler<ImportarItemsCommand, ComandoAceptadoDto>, ImportarItemsCommandHandler>()
         .AddScoped<ICommandHandler<EliminarItemCommand, ComandoAceptadoDto>, EliminarItemCommandHandler>()
         .AddScoped<ICommandHandler<EliminarPlanCommand, ComandoAceptadoDto>, EliminarPlanCommandHandler>()
-        .AddScoped<ICommandHandler<AjustarColocacionCommand, ComandoAceptadoDto>, AjustarColocacionCommandHandler>();
+        .AddScoped<ICommandHandler<AjustarColocacionCommand, ComandoAceptadoDto>, AjustarColocacionCommandHandler>()
+        // S3-HU-03 (issue #112): lectura del visor 3D, toda contra la proyección local.
+        .AddScoped<IQueryHandler<ListarVehiculosQuery, IReadOnlyList<VehiculoCubicacionDto>>, ListarVehiculosQueryHandler>()
+        .AddScoped<IQueryHandler<ListarPlanesCargueQuery, IReadOnlyList<PlanCargueDto>>, ListarPlanesCargueQueryHandler>()
+        .AddScoped<IQueryHandler<ObtenerResultadoPlanQuery, ResultadoPlanDto>, ObtenerResultadoPlanQueryHandler>()
+        .AddScoped<IQueryHandler<ObtenerFlotaPlanQuery, IReadOnlyList<PlanFlotaItemDto>>, ObtenerFlotaPlanQueryHandler>()
+        .AddScoped<IQueryHandler<ObtenerMetricasPlanQuery, MetricasCubicacionEvento?>, ObtenerMetricasPlanQueryHandler>()
+        .AddScoped<IQueryHandler<ObtenerNoCargadasPlanQuery, IReadOnlyList<ColocacionCargueDto>>, ObtenerNoCargadasPlanQueryHandler>();
 }

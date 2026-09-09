@@ -139,13 +139,81 @@ public sealed record AjustarColocacionInput(
 /// <summary>
 /// Evento entrante: Cubicador -> NEXO, routing key `plan-de-cargue.generado`.
 /// Mismo shape que publica `RabbitMqEventosPublisher.publicar_plan_generado`.
+///
+/// S3-HU-03 (issue #110/#111): enriquecido — antes <c>Resultado</c> solo traía
+/// {estado, puntaje, colocaciones: int} (el CONTEO); ahora trae el <c>ResultadoPlanDto</c>
+/// completo de Cubicador (items, colocaciones con geometría, métricas, incidencias) para
+/// que <see cref="Infrastructure.Cubicacion.PlanDeCargueGeneradoConsumer"/> proyecte la
+/// base de NEXO sin volver a consultar a Cubicador. Tamaño medido ANTES de este cambio
+/// en docs/decisiones/medicion-evento-enriquecido-plan-cargue.md (issue #109).
 /// </summary>
 public sealed record PlanDeCargueGenerado(string CorrelationId, string PlanId, ResultadoDeCubicacion Resultado);
 
-public sealed record ResultadoDeCubicacion(string Estado, decimal Puntaje, int Colocaciones);
+public sealed record ResultadoDeCubicacion(
+    PlanCargueEvento Plan,
+    VehiculoCubicacionEvento Vehiculo,
+    IReadOnlyList<ColocacionCargueEvento> Colocaciones,
+    MetricasCubicacionEvento? Metricas,
+    IReadOnlyList<IncidenciaValidacionEvento> Incidencias);
+
+public sealed record PlanCargueEvento(
+    string Id, string Nombre, string VehiculoId, string? LineaSolicitudId, int NumeroVehiculo,
+    string Estado, string Estrategia, string Algoritmo, int? Semilla,
+    decimal PesoTotalKg, decimal VolumenUtilizadoM3, decimal UtilizacionVolumen, decimal UtilizacionPiso,
+    decimal Puntaje, IReadOnlyList<ItemPlanCargueEvento> Items);
+
+public sealed record ItemPlanCargueEvento(
+    string Id, string PlanCargueId, string Sku, string Descripcion, string? Pedido, string? Cliente,
+    string? Destino, int SecuenciaEntrega, decimal LargoMm, decimal AnchoMm, decimal AltoMm, decimal PesoKg,
+    int Cantidad, string? Color, int Prioridad, string? TipoEmbalaje, bool Apilable, int MaxNiveles,
+    decimal MaxPesoEncimaKg, bool Rotable, bool MantenerVertical, bool Fragil, bool Peligroso, bool Refrigerado,
+    string? GrupoCompatibilidad, string? Observaciones);
+
+public sealed record ColocacionCargueEvento(
+    string Id, string PlanCargueId, string ItemPlanCargueId, int IndiceUnidad, bool Cargada,
+    decimal X, decimal Y, decimal Z, decimal LargoColocadoMm, decimal AnchoColocadoMm, decimal AltoColocadoMm,
+    int OrientacionIndice, int SecuenciaCargue, string? SoporteColocacionId, decimal PorcentajeSoporte,
+    decimal PesoEncimaKg, string EstadoEstabilidad, string Accesibilidad, bool Bloqueada, bool AjusteManual,
+    string? CodigoRechazo, string? RazonRechazo);
+
+public sealed record MetricasCubicacionEvento(
+    decimal VolumenInternoM3, decimal VolumenUtilizadoM3, decimal PorcentajeVolumen,
+    decimal AreaPisoM2, decimal AreaPisoUtilizadaM2, decimal PorcentajePiso,
+    decimal PesoMaximoKg, decimal PesoCargadoKg, decimal PorcentajePeso,
+    int UnidadesTotales, int UnidadesCargadas, int UnidadesNoCargadas,
+    int PedidosCompletos, int PedidosParciales, int Destinos, decimal AlturaMaximaMm,
+    IReadOnlyList<decimal> CentroGravedadMm, IReadOnlyList<decimal> PesoPorEjeKg, decimal DiferenciaLadosKg,
+    int Advertencias, int ViolacionesCriticas, decimal Puntaje,
+    IReadOnlyDictionary<string, decimal> PuntajesParciales, decimal EspacioVacioUtilM3, decimal EspacioFragmentadoM3);
+
+public sealed record IncidenciaValidacionEvento(
+    string Severidad, string CodigoRegla, string Titulo, string Descripcion,
+    string? AccionSugerida, string? ColocacionItemId);
 
 /// <summary>
 /// Evento entrante: Cubicador -> NEXO, routing key `cubicacion.rechazada`.
 /// Mismo shape que publica `RabbitMqEventosPublisher.publicar_cubicacion_rechazada`.
 /// </summary>
 public sealed record CubicacionRechazada(string CorrelationId, string PlanId, string Codigo, string Mensaje);
+
+// ---------------------------------------------------------------------------------
+// S3-HU-03 (issue #110/#111): catálogo de vehículos. Cubicador es la fuente de verdad
+// (ver ADR-planid-generado-por-nexo.md sobre por qué NEXO no la posee) — estos 2 eventos
+// mantienen la proyección de NEXO (`VehiculosCubicacion`) al día para que
+// GET /api/vehiculos (issue #112) nunca tenga que preguntarle a Cubicador en caliente.
+// ---------------------------------------------------------------------------------
+
+/// <summary>Evento entrante: Cubicador -> NEXO, routing key `vehiculo.creado` — publicado
+/// cuando `guardar_vehiculo` (S3-HU-02) crea una fila nueva (Id no existía antes).</summary>
+public sealed record VehiculoCreado(string CorrelationId, VehiculoCubicacionEvento Vehiculo);
+
+/// <summary>Evento entrante: Cubicador -> NEXO, routing key `vehiculo.actualizado` —
+/// publicado cuando `guardar_vehiculo` actualiza una fila existente.</summary>
+public sealed record VehiculoActualizado(string CorrelationId, VehiculoCubicacionEvento Vehiculo);
+
+public sealed record VehiculoCubicacionEvento(
+    string Id, string Nombre, string? Descripcion,
+    decimal LargoInternoMm, decimal AnchoInternoMm, decimal AltoInternoMm,
+    decimal CapacidadKg, decimal TaraKg, decimal PuertaAnchoMm, decimal PuertaAltoMm, string PuertaPosicion,
+    IReadOnlyList<EjeVehiculoInput> Ejes, decimal ToleranciaParedesMm, decimal ToleranciaEntreUnidadesMm,
+    bool EsPreset);

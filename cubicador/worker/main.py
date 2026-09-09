@@ -38,6 +38,8 @@ from api.dependencias import NEXO_BASE_URL, NEXO_CALLBACK_API_KEY
 from api.dtos.plan_cargue import (
     GuardarItemPlanCargueInput as GuardarItemPlanCargueInputDto,
     GuardarVehiculoInput as GuardarVehiculoInputDto,
+    ResultadoPlanDto,
+    VehiculoCubicacionDto,
 )
 from application.excepciones import AppException
 from application.plan_cargue import ajustar as ajustar_uc
@@ -83,6 +85,7 @@ def _ajuste_de_solicitud(solicitud: dict) -> "ajustar_uc.AjusteColocacionInput":
 
 async def _ejecutar_solicitud(
     cuerpo: dict, planes: SqlPlanCargueRepository, vehiculos: SqlVehiculoCubicacionRepository,
+    publisher: RabbitMqEventosPublisher,
 ) -> str | None:
     """Corre el caso de uso. Devuelve el plan_id resultante para que `_procesar`
     reporte "plan-de-cargue.generado" (None para los tipos en
@@ -92,7 +95,15 @@ async def _ejecutar_solicitud(
     casos de uso que ya usa `api/routers/planes_cargue.py` (el POST sincrono que este
     trabajo reemplaza) - nada de logica de negocio nueva acá, solo el cableado
     cola -> caso de uso -> escritura real en la base (antes solo llegaba por HTTP
-    directo)."""
+    directo).
+
+    S3-HU-03 (issue #110): `guardar_vehiculo` es el UNICO tipo que publica su
+    propio evento acá mismo (vehiculo.creado/vehiculo.actualizado) en vez de
+    dejarselo a `_procesar` - no tiene un plan_id que reportar via
+    "plan-de-cargue.generado", y create-vs-update solo se sabe ANTES de guardar
+    (¿ya existia esa fila?). Si publicar falla, la excepcion sube igual que
+    cualquier otro fallo de este metodo: reintento normal (guardar_vehiculo es
+    upsert, reintentarlo es seguro)."""
     tipo = cuerpo["tipo"]
     solicitud = cuerpo.get("solicitud") or {}
 
@@ -128,7 +139,13 @@ async def _ejecutar_solicitud(
 
     if tipo == "guardar_vehiculo":
         dto = GuardarVehiculoInputDto.model_validate(solicitud)
-        await vehiculos_uc.guardar_vehiculo(vehiculos, mapeos.vehiculo_de_input(dto))
+        existia = dto.id is not None and await vehiculos.obtener(dto.id) is not None
+        guardado = await vehiculos_uc.guardar_vehiculo(vehiculos, mapeos.vehiculo_de_input(dto))
+        payload_vehiculo = VehiculoCubicacionDto.model_validate(guardado).model_dump(mode="json", by_alias=True)
+        if existia:
+            await publisher.publicar_vehiculo_actualizado(guardado.id, payload_vehiculo)
+        else:
+            await publisher.publicar_vehiculo_creado(guardado.id, payload_vehiculo)
         return None
 
     if tipo == "guardar_item":
@@ -183,16 +200,19 @@ async def _procesar(mensaje: aio_pika.IncomingMessage, publisher: RabbitMqEvento
         planes = SqlPlanCargueRepository(sesion)
         vehiculos = SqlVehiculoCubicacionRepository(sesion)
         try:
-            plan_id = await _ejecutar_solicitud(cuerpo, planes, vehiculos)
+            plan_id = await _ejecutar_solicitud(cuerpo, planes, vehiculos, publisher)
             # S3-HU-02 (issue #105): "guardar_vehiculo" no tiene plan que reportar y
             # "eliminar_plan" ya borro el suyo - para esos dos no hay
             # "plan-de-cargue.generado" que publicar (ver TIPOS_SIN_RESULTADO_FINAL).
             if plan_id is not None and cuerpo["tipo"] not in TIPOS_SIN_RESULTADO_FINAL:
                 resultado = await obtener_resultado(planes, vehiculos, plan_id)
-                await publisher.publicar_plan_generado(plan_id, {
-                    "estado": resultado.plan.estado, "puntaje": resultado.plan.puntaje,
-                    "colocaciones": len(resultado.colocaciones),
-                })
+                # S3-HU-03 (issue #109/#110): enriquecido con el `resultado` COMPLETO
+                # (items, colocaciones con geometria, metricas, incidencias) - no solo
+                # el conteo de antes. Reusa el mismo DTO que ya arma el GET sincrono
+                # (`ResultadoPlanDto`), medido en docs/decisiones/
+                # medicion-evento-enriquecido-plan-cargue.md ANTES de escribir esto.
+                payload = ResultadoPlanDto.model_validate(resultado).model_dump(mode="json", by_alias=True)
+                await publisher.publicar_plan_generado(plan_id, payload)
             await mensaje.ack()
         except AppException as exc:
             # Error de negocio (validacion, no encontrado, etc.): no tiene sentido
