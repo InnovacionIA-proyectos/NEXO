@@ -65,7 +65,12 @@ class IPlanCargueRepository(Protocol):
 
     async def marcar_procesando(self, plan_id: str) -> None: ...
 
-    async def marcar_error(self, plan_id: str, mensaje: str) -> None: ...
+    async def marcar_error(self, plan_id: str | None, mensaje: str) -> None:
+        """No-op silencioso si el plan no existe. Acepta None a proposito
+        (S3-HU-10.1): lo llama el manejador de errores del worker, que ante un
+        mensaje malformado puede no tener planId - y ese bloque nunca debe lanzar,
+        porque corre antes del `ack`."""
+        ...
 
     async def obtener_atascados(self, limite) -> list[str]:
         """Ids de los planes en `procesando` con `updated_at` anterior a

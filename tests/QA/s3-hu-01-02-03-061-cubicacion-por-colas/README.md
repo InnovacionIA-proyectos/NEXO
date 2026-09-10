@@ -49,6 +49,19 @@ Flujo feliz confirmado end-to-end, cruzando la cola real en ambas direcciones:
 
 ## Bugs encontrados (ninguno bloqueó las suites del autor; los 3 primeros sí importan para producción)
 
+> ✅ **Los 3 primeros están CERRADOS** en S3-HU-10 (issues #131/#132/#133). El relato de
+> abajo se deja tal como se escribió al encontrarlos: es el registro de qué se probó y
+> qué se vio, y reescribirlo lo volvería inútil. La verificación del arreglo —incluida
+> la confirmación con `ci_docker_smoke.py` que pedía el bug 1— está en
+> [`../s3-hu-10-tres-bugs-cubicacion/README.md`](../s3-hu-10-tres-bugs-cubicacion/README.md).
+>
+> Al arreglarlos aparecieron **dos defectos más de la misma causa**, que no se habían
+> visto acá: todo lo que fallaba *antes* del `try` de `_procesar` (body ilegible, JSON
+> que no es un objeto, falta `correlationId`, cabecera `x-intentos` corrupta) dejaba el
+> mensaje atascado igual que el bug 1 pero **sin llegar siquiera a la DLQ**; y
+> `eliminar_planes_de_linea()` tenía el bug 3 exacto, con el agravante de que un
+> `delete()` masivo tampoco dispara la cascada del ORM. Los dos van en la misma HU.
+
 ### Bug 1 — CRÍTICO: un mensaje malformado puede dejar el worker de Cubicador atascado para siempre
 
 `cubicador/worker/main.py`, manejador de errores (`except Exception`), usa

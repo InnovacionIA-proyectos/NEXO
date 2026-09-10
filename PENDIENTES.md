@@ -67,6 +67,41 @@ producción (esta sesión solo rotó los `.env` locales de desarrollo).
 > El cuarto, además, **no tiene issue** y necesita una decisión de arquitectura
 > antes de escribirse.
 
+**Resuelto — los 3 bugs de QA de Cubicación (S3-HU-10, #131/#132/#133)**: los tres
+que la verificación de los PR #122/#126 encontró y que seguían presentes en `QA`.
+
+1. Un mensaje sin `planId` dejaba el worker **atascado para siempre**: la línea que
+   reporta el fallo final usaba indexación directa y lanzaba antes del `ack`. Con
+   `prefetch_count=2`, dos mensajes así bloqueaban el worker completo y reiniciar el
+   contenedor no lo recuperaba.
+2. Un ítem **sin SKU** —caso de negocio legítimo, `string?` en NEXO— fallaba 3 veces
+   y marcaba *todo el plan* en `error`.
+3. Borrar un plan **ya optimizado** siempre fallaba con `ForeignKeyViolationError`, y
+   como NEXO borra de forma optimista, dejaba las dos bases en desacuerdo sin nada que
+   las reconciliara.
+
+Al arreglarlos aparecieron **dos defectos más de la misma causa**, incluidos en la
+misma HU: todo lo que fallaba *antes* del bloque de manejo de errores (body ilegible,
+JSON que no es un objeto, falta `correlationId`, cabecera `x-intentos` corrupta)
+atascaba el mensaje igual pero **sin llegar siquiera a la DLQ**; y
+`eliminar_planes_de_linea()` tenía el bug 3 exacto, agravado porque un `delete()`
+masivo tampoco dispara la cascada del ORM — o sea que **volver a cubicar una línea con
+flota optimizada fallaba siempre**.
+
+Verificado contra el stack real (Postgres + RabbitMQ + api + worker), no solo con
+tests: evidencia completa en
+[`tests/QA/s3-hu-10-tres-bugs-cubicacion/README.md`](tests/QA/s3-hu-10-tres-bugs-cubicacion/README.md).
+
+**Resuelto — aislamiento de la base entre tests de Cubicador (S3-HU-10)**: la suite
+compartía una sola base SQLite en memoria (`StaticPool`, necesario para que las
+conexiones vean la misma base), así que lo que un test escribía quedaba para los
+siguientes. Dos trampas concretas: colgarle un plan a un preset del catálogo lo dejaba
+"en uso" y rompía el test que lo borra; agregar un vehículo rompía el que afirma
+`len(vehiculos) == 9`. Lo peor era que fallaban **en otro archivo, con un error que no
+mencionaba al culpable**. Cerrado con `cubicador/tests/conftest.py` (no existía
+ninguno), que recrea el esquema antes de cada test: ~1 s sobre la suite completa, cero
+roturas, comprobado con un test contaminante deliberado.
+
 **Resuelto**: "pedir un plan de cargue desde una línea de solicitud"
 (`crear_desde_linea` — botón Cubicar de la Mesa de Costeo → Cubicador 3D)
 funciona de punta a punta. `LineaSolicitud.Dimensiones` **ya capturaba** las
