@@ -204,18 +204,37 @@ async def _ejecutar_solicitud(
 
 
 async def _procesar(mensaje: aio_pika.IncomingMessage, publisher: RabbitMqEventosPublisher) -> None:
-    cuerpo = json.loads(mensaje.body)
-    # Issue #28: NEXO publica CubicacionSolicitada con MassTransit real, que
-    # envuelve el payload real bajo la clave "message" (mas messageType, etc
-    # - ver NEXO/docs/mensajeria/CUBICACION.md #1/#4). Cubicador no necesita
-    # nada de MassTransit para si mismo (sus propios tests y su API siguen
-    # publicando el payload plano, sin sobre) - por eso el desenvuelto es
-    # opcional: si no hay "message", cuerpo queda igual que antes. Verificado
-    # en runtime contra un mensaje real de NEXO.
-    if isinstance(cuerpo, dict) and "message" in cuerpo and "messageType" in cuerpo:
-        cuerpo = cuerpo["message"]
-    correlation_id = cuerpo["correlationId"]
-    intentos_previos = int((mensaje.headers or {}).get("x-intentos", 0))
+    # S3-HU-10.1 (issue #131): TODO lo que corre antes del `try` de mas abajo va
+    # dentro de esta guarda. Ahi no habia ningun manejador de errores, asi que
+    # cualquier fallo -body ilegible, JSON que no es un objeto, falta
+    # `correlationId`, cabecera `x-intentos` corrupta- lanzaba antes del `ack` y
+    # dejaba el mensaje unacknowledged PARA SIEMPRE. Con prefetch_count=2 bastan dos
+    # mensajes asi para que el worker deje de procesar cualquier cosa, y reiniciarlo
+    # no ayuda: RabbitMQ los reentrega y se vuelven a atascar.
+    #
+    # Un mensaje que ni siquiera se puede interpretar no tiene reintento posible (el
+    # resultado seria identico), asi que va derecho a la DLQ con su alerta y se
+    # ackea. Perder un mensaje corrupto es aceptable; perder el worker, no.
+    try:
+        cuerpo = json.loads(mensaje.body)
+        # Issue #28: NEXO publica CubicacionSolicitada con MassTransit real, que
+        # envuelve el payload real bajo la clave "message" (mas messageType, etc
+        # - ver NEXO/docs/mensajeria/CUBICACION.md #1/#4). Cubicador no necesita
+        # nada de MassTransit para si mismo (sus propios tests y su API siguen
+        # publicando el payload plano, sin sobre) - por eso el desenvuelto es
+        # opcional: si no hay "message", cuerpo queda igual que antes. Verificado
+        # en runtime contra un mensaje real de NEXO.
+        if isinstance(cuerpo, dict) and "message" in cuerpo and "messageType" in cuerpo:
+            cuerpo = cuerpo["message"]
+        if not isinstance(cuerpo, dict):
+            raise ValueError(f"El cuerpo del mensaje no es un objeto JSON: {type(cuerpo).__name__}")
+        correlation_id = cuerpo.get("correlationId")
+        intentos_previos = int((mensaje.headers or {}).get("x-intentos", 0))
+    except Exception as exc:  # noqa: BLE001 - mensaje ilegible: nunca reintentable
+        logger.exception("Mensaje ilegible, va directo a %s sin reintentar.", COLA_DLQ)
+        await _mover_a_dlq(mensaje, publisher, "desconocido", f"Mensaje ilegible: {exc}", 0)
+        await mensaje.ack()
+        return
 
     async with SessionLocal() as sesion:
         planes = SqlPlanCargueRepository(sesion)
@@ -238,18 +257,32 @@ async def _procesar(mensaje: aio_pika.IncomingMessage, publisher: RabbitMqEvento
         except AppException as exc:
             # Error de negocio (validacion, no encontrado, etc.): no tiene sentido
             # reintentar, es el mismo resultado siempre. `marcar_error` es un no-op
-            # silencioso si `cuerpo["planId"]` no corresponde a ningun plan existente
+            # silencioso si el planId no corresponde a ningun plan existente
             # (p.ej. "guardar_vehiculo", o "crear_plan"/"crear_desde_linea" fallando
             # antes de crear nada) - por eso se llama igual para los 9 tipos, sin
             # bifurcar por tipo (antes solo cubria "optimizar").
-            await planes.marcar_error(cuerpo["planId"], exc.mensaje)
+            #
+            # S3-HU-10.1 (issue #131): `.get`, NO indexacion directa. Este bloque
+            # existe para REPORTAR un fallo; si el reporte lanza su propia excepcion
+            # nos quedamos sin llegar al `ack()` de abajo y el mensaje queda
+            # unacknowledged para siempre - con prefetch_count=2, dos mensajes asi
+            # bloquean el worker entero y ni reiniciarlo lo recupera.
+            await planes.marcar_error(cuerpo.get("planId"), exc.mensaje)
             await publisher.publicar_cubicacion_rechazada(correlation_id, exc.codigo, exc.mensaje)
             await mensaje.ack()
         except Exception as exc:  # noqa: BLE001 - fallo inesperado (bug, DB caida, etc.)
             logger.exception("Fallo procesando mensaje (intento %d/%d)", intentos_previos + 1, MAX_INTENTOS)
             if intentos_previos + 1 >= MAX_INTENTOS:
-                await _mover_a_dlq(mensaje, publisher, cuerpo["tipo"], str(exc), intentos_previos + 1)
-                await planes.marcar_error(cuerpo["planId"], f"Fallo tras {MAX_INTENTOS} intentos: {exc}")
+                # `.get` por lo mismo que el `planId` de abajo: es la ultima
+                # indexacion directa del camino de error, y si falta `tipo` el propio
+                # camino a la DLQ estallaria antes del ack (S3-HU-10.1, issue #131).
+                await _mover_a_dlq(
+                    mensaje, publisher, cuerpo.get("tipo", "desconocido"), str(exc), intentos_previos + 1,
+                )
+                # S3-HU-10.1 (issue #131): `.get` por lo mismo que arriba - es la
+                # linea que el mensaje sin planId de ci_docker_smoke.py hacia estallar
+                # en cada corrida, justo antes del ack.
+                await planes.marcar_error(cuerpo.get("planId"), f"Fallo tras {MAX_INTENTOS} intentos: {exc}")
                 await publisher.publicar_cubicacion_rechazada(correlation_id, "ERROR_INTERNO", str(exc))
                 await mensaje.ack()
             else:

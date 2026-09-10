@@ -302,7 +302,7 @@ class ItemPlanCargueDto(ApiModel):
 
 class GuardarItemPlanCargueInput(ApiModel):
     id: str | None = None
-    sku: str = ""
+    sku: str = ""          # acepta null explicito -> se normaliza a "" (ver nota abajo)
     descripcion: str
     pedido: str | None = None
     cliente: str | None = None
@@ -452,6 +452,18 @@ class SolicitudEncoladaDto(ApiModel):
     correlation_id: str
     estado: str = "procesando"
 ```
+
+> **`sku` acepta `null` explícito** (S3-HU-10.2, issue #132). `GuardarItemRequest.Sku`
+> en NEXO es `string?` —un ítem sin SKU es un caso de negocio legítimo— y cuando no lo
+> tiene, NEXO manda la clave con `null`, no la omite. En Pydantic el default solo aplica
+> si la clave **falta**, así que ese `null` se rechazaba contra un campo `str`: el ítem
+> fallaba 3 veces, caía en la DLQ y marcaba **todo el plan** en `error`.
+>
+> Un `field_validator(mode="before")` lo normaliza a `""` antes de la validación de
+> tipo. Se normaliza en vez de declarar `str | None` porque la columna `sku` **no es
+> nullable** (`modelos.py`: `Mapped[str]`, default `""`) y la entidad también usa `""`
+> como ausencia — aceptar el null solo en el borde habría movido el fallo a la base, no
+> lo habría quitado. Para quien consume el DTO, el tipo sigue siendo `str`.
 
 ### 3.3 Catálogo de `codigo_rechazo` en `ColocacionCargueDto`
 
