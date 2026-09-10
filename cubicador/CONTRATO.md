@@ -51,15 +51,23 @@ no importa para nada** — lo que hace falta es:
 **Hasta S3-HU-02/03/04** un frontend podía hablarle REST directo a este
 servicio (con `CUBICADOR_CORS_ORIGENES` + `CUBICADOR_API_KEY` en el
 navegador). Eso se cerró a propósito: toda escritura del plan de cargue pasa
-por NEXO desde S3-HU-02, toda lectura desde S3-HU-03, y el visor 3D
-(S3-HU-04, `administracion_embarqa_nexo`) ya consume solo esos endpoints de
-NEXO — confirmado y verificado en QA antes de cerrar esto. **No queda
+por NEXO desde S3-HU-02 y toda lectura desde S3-HU-03. **No queda
 middleware CORS en el código** (`api/main.py`) ni la variable
 `CUBICADOR_CORS_ORIGENES` en `.env`/`.env.example`/`docker-compose.yml` — no
 es que esté vacía por defecto, es que la capacidad se retiró del todo. Si
 algún día vuelve a hacer falta un frontend hablándole directo a este
 servicio, es una decisión nueva a tomar a propósito (reintroducir el
 middleware), no reabrir una variable vieja.
+
+⚠️ **Estado real del frontend, a la fecha de este documento.** La versión
+anterior de este párrafo afirmaba que el visor 3D *"ya consume solo esos
+endpoints de NEXO, confirmado y verificado en QA"*. **No es así todavía**:
+S3-HU-04 no tiene rama ni commits, y `administracion_embarqa_nexo` sigue con
+12 puntos de llamada directa a este servicio. El CORS se retiró igual, y está
+bien que así sea —la capacidad no debe existir— pero conviene no leer esta
+sección como si la migración del portal ya estuviera hecha. Faltan además 4
+endpoints en NEXO para que esa HU pueda cerrar: inventario 1 a 1 en
+`NEXO/docs/mensajeria/CUBICACION.md` §8.
 
 `CUBICADOR_API_KEY` (sección 4/5) sigue existiendo — protege la API para
 consumidores server-to-server legítimos (hoy: scripts de CI/verificación
@@ -209,10 +217,11 @@ PATCH de colocaciones de la fila de arriba) ahora tienen un camino alterno
 `POST /api/planes-cargue/demo`, `POST /api/vehiculos`,
 `POST /api/planes-cargue/{id}/items[/importar]`,
 `DELETE /api/planes-cargue/{id}[/items/{itemId}]`,
+`DELETE /api/vehiculos/{id}`,
 `PATCH /api/planes-cargue/{id}/colocaciones/{colocacionId}`) que publica por
 la MISMA cola que `optimizar`/`desde-linea` — ver
 `NEXO/docs/mensajeria/CUBICACION.md` sección 6 para el contrato completo.
-`worker/main.py` aplica esos 8 comandos con los MISMOS casos de uso que esta
+`worker/main.py` aplica esos 9 comandos con los MISMOS casos de uso que esta
 API síncrona (`application/plan_cargue/*.py`) — nada de lógica nueva, solo un
 segundo punto de entrada. Esta API directa NO se retira en esta HU (la siguen
 usando esta app y el smoke test de Docker); es el navegador de NEXO el que
@@ -597,7 +606,9 @@ si el mensaje deja de entregarse.
 - Exchange: `cubicador.eventos` (topic).
 - Routing keys: `cubicacion.solicitada`, `plan-de-cargue.generado`,
   `cubicacion.rechazada` y, desde S3-HU-03, `vehiculo.creado`/
-  `vehiculo.actualizado`.
+  `vehiculo.actualizado`/`vehiculo.eliminado` (los 3 del catálogo: el último
+  lo publica `eliminar_vehiculo`, y solo si el borrado se aplicó de verdad —
+  ver `NEXO/docs/mensajeria/CUBICACION.md` §7.1).
 - Dead-letter: `cubicacion.dlq`. Al caer un mensaje ahí (agotados los
   **3** reintentos, `worker/main.py:49` `MAX_INTENTOS = 3`), el worker
   además alerta por correo al equipo técnico

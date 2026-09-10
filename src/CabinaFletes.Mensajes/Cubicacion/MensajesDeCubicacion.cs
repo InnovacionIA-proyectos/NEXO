@@ -123,6 +123,22 @@ public sealed record EliminarItemInput(string ItemId);
 /// <summary>"eliminar_plan" — sin payload adicional: el PlanId del sobre basta.</summary>
 public sealed record EliminarPlanInput;
 
+/// <summary>"eliminar_vehiculo" — sin payload adicional: el id del vehículo viaja en el
+/// PlanId del sobre, igual que hace "guardar_vehiculo" (ver la nota de esa asimetría en
+/// <see cref="GuardarVehiculoInput"/>: los comandos de catálogo no tienen plan, así que
+/// reutilizan ese campo como identidad del recurso afectado).
+///
+/// Cierra el par de "guardar_vehiculo": el frontend llama <c>eliminarVehiculo()</c>
+/// (cubicador-api.service.ts) y sin este comando esa única escritura seguiría saliendo
+/// del navegador directo a Cubicador con la API key en el bundle — lo que impide cerrar
+/// S3-HU-05 (retirar el CORS y rotar la clave), que exige CERO llamadas de navegador.
+///
+/// Puede ser rechazado con VEHICULO_EN_USO: Cubicador se niega a borrar un vehículo con
+/// planes de cargue asociados (application/plan_cargue/vehiculos.py::eliminar_vehiculo).
+/// Es un rechazo de negocio normal, viaja como "cubicacion.rechazada" y no se
+/// reintenta.</summary>
+public sealed record EliminarVehiculoInput;
+
 /// <summary>"ajustar_colocacion" — espeja AjusteColocacionInput + el ColocacionId que el
 /// PATCH síncrono llevaba en la ruta. Reemplaza el PATCH directo contra Cubicador
 /// (CompuertaDeParidad.cs no aplica acá: es dato, no cálculo).</summary>
@@ -210,6 +226,19 @@ public sealed record VehiculoCreado(string CorrelationId, VehiculoCubicacionEven
 /// <summary>Evento entrante: Cubicador -> NEXO, routing key `vehiculo.actualizado` —
 /// publicado cuando `guardar_vehiculo` actualiza una fila existente.</summary>
 public sealed record VehiculoActualizado(string CorrelationId, VehiculoCubicacionEvento Vehiculo);
+
+/// <summary>Evento entrante: Cubicador -> NEXO, routing key `vehiculo.eliminado` —
+/// publicado cuando `eliminar_vehiculo` borra la fila de verdad (si Cubicador rechaza
+/// con VEHICULO_EN_USO no se publica nada).
+///
+/// Cierra el trío del catálogo. Sin él la proyección de NEXO se quedaría con el vehículo
+/// para siempre: <c>GET /api/vehiculos</c> lee de ahí, así que seguiría ofreciendo un
+/// vehículo inexistente y el <c>crear_plan</c> que lo eligiera fallaría con
+/// VEHICULO_INVALIDO.
+///
+/// Solo lleva el id, no el <see cref="VehiculoCubicacionEvento"/> completo: no hay nada
+/// que proyectar, solo una fila que borrar.</summary>
+public sealed record VehiculoEliminado(string CorrelationId, string VehiculoId);
 
 public sealed record VehiculoCubicacionEvento(
     string Id, string Nombre, string? Descripcion,

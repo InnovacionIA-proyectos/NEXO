@@ -1,6 +1,7 @@
 using CabinaFletes.Infrastructure.Persistence;
 using CabinaFletes.Mensajes.Cubicacion;
 using MassTransit;
+using Microsoft.EntityFrameworkCore;
 
 namespace CabinaFletes.Infrastructure.Cubicacion;
 
@@ -22,7 +23,7 @@ namespace CabinaFletes.Infrastructure.Cubicacion;
 /// issue #111): todo lo que escribe viene del propio evento.
 /// </summary>
 public sealed class VehiculoCatalogoConsumer(CabinaFletesDbContext db)
-    : IConsumer<VehiculoCreado>, IConsumer<VehiculoActualizado>
+    : IConsumer<VehiculoCreado>, IConsumer<VehiculoActualizado>, IConsumer<VehiculoEliminado>
 {
     public async Task Consume(ConsumeContext<VehiculoCreado> context)
     {
@@ -33,6 +34,27 @@ public sealed class VehiculoCatalogoConsumer(CabinaFletesDbContext db)
     public async Task Consume(ConsumeContext<VehiculoActualizado> context)
     {
         await VehiculoProyeccion.UpsertAsync(db, context.Message.Vehiculo, context.CancellationToken);
+        await db.SaveChangesAsync(context.CancellationToken);
+    }
+
+    /// <summary>
+    /// Cierra el trío del catálogo: sin esto la proyección se quedaría con vehículos que
+    /// ya no existen en Cubicador y <c>GET /api/vehiculos</c> los seguiría ofreciendo.
+    ///
+    /// Borrar lo que no está NO es un error: si el vehículo ya no está en la proyección
+    /// (evento duplicado, o la proyección se reconstruyó después del borrado) el
+    /// resultado deseado ya se cumplió. Dejar subir una excepción ahí mandaría a
+    /// reintentos y DLQ un mensaje que no tiene nada que arreglar — mismo criterio que
+    /// el upsert de arriba, que también es idempotente por construcción.
+    /// </summary>
+    public async Task Consume(ConsumeContext<VehiculoEliminado> context)
+    {
+        var id = Guid.Parse(context.Message.VehiculoId);
+        var vehiculo = await db.VehiculosCubicacion.FirstOrDefaultAsync(v => v.Id == id, context.CancellationToken);
+        if (vehiculo is null)
+            return;
+
+        db.VehiculosCubicacion.Remove(vehiculo);
         await db.SaveChangesAsync(context.CancellationToken);
     }
 }

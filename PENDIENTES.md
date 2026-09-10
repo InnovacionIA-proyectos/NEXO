@@ -45,6 +45,28 @@ valor que estuvo expuesto en el bundle público del portal queda inválido.
 Pendiente fuera de este repo: aplicar el valor nuevo en el despliegue real de
 producción (esta sesión solo rotó los `.env` locales de desarrollo).
 
+> ⚠️ **Corrección al párrafo de arriba.** Dice que S3-HU-04 ya movió el frontend
+> a NEXO. **Todavía no ocurrió**: esa HU no tiene rama ni commits, y
+> `administracion_embarqa_nexo` sigue con 12 puntos de llamada directa al
+> Cubicador (`cubicadorBaseUrl` en `cubicador-api.service.ts` y
+> `captura-api.service.ts`) — verificado con `git grep` sobre su `origin/main`.
+>
+> Qué implica hoy, en concreto: en producción no rompe nada (ese módulo ya
+> estaba inerte, `environment.prod.ts` tiene `cubicadorApiUrl` y
+> `cubicadorApiKey` vacíos), y en desarrollo el CORS tampoco muerde porque las
+> llamadas van por el proxy de Angular, que para el navegador es mismo origen.
+> **Lo que sí rompe es la clave rotada**: `environment.ts` lleva
+> `dev_cubicador_api_key` escrita a mano, así que quien levante el frontend
+> contra un Cubicador local recibe 401 en las 12 llamadas hasta que S3-HU-04
+> las migre.
+>
+> **Faltan 4 endpoints en NEXO** para que S3-HU-04 pueda cerrar:
+> `desde-linea/{lineaId}`, `por-linea/{lineaId}`, `{id}/colocaciones` y
+> `POST /api/cubicacion`. Inventario 1 a 1 de las 20 llamadas, con el detalle de
+> cada hueco, en [`docs/mensajeria/CUBICACION.md` §8](docs/mensajeria/CUBICACION.md).
+> El cuarto, además, **no tiene issue** y necesita una decisión de arquitectura
+> antes de escribirse.
+
 **Resuelto**: "pedir un plan de cargue desde una línea de solicitud"
 (`crear_desde_linea` — botón Cubicar de la Mesa de Costeo → Cubicador 3D)
 funciona de punta a punta. `LineaSolicitud.Dimensiones` **ya capturaba** las

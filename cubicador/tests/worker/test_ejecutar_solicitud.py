@@ -19,6 +19,7 @@ os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///:memory:")
 import pytest
 
 import worker.main as worker_main
+from application.excepciones import ConflictException
 from application.ports.externos import LineaParaCubicacion, PosicionCarga
 from application.plan_cargue.optimizar import ParametrosOptimizacionInput, optimizar_plan
 from domain.entidades.entidades import ItemPlanCargue
@@ -42,7 +43,11 @@ class _PublisherFalso:
     def __init__(self) -> None:
         self.vehiculos_creados: list[tuple[str, dict]] = []
         self.vehiculos_actualizados: list[tuple[str, dict]] = []
+        self.vehiculos_eliminados: list[str] = []
         self.planes_generados: list[tuple[str, dict]] = []
+
+    async def publicar_vehiculo_eliminado(self, vehiculo_id: str) -> None:
+        self.vehiculos_eliminados.append(vehiculo_id)
 
     async def publicar_vehiculo_creado(self, vehiculo_id: str, vehiculo: dict) -> None:
         self.vehiculos_creados.append((vehiculo_id, vehiculo))
@@ -210,6 +215,46 @@ async def test_guardar_vehiculo_dos_veces_publica_creado_y_luego_actualizado(rep
     assert len(publisher.vehiculos_creados) == 1
     assert len(publisher.vehiculos_actualizados) == 1
     assert publisher.vehiculos_actualizados[0][1]["nombre"] == "Vehiculo v2"
+
+
+async def test_eliminar_vehiculo_borra_y_publica_vehiculo_eliminado(repos):
+    """Cierra el par de guardar_vehiculo. El id del vehiculo viaja en `planId`, igual que
+    en el alta: los comandos de catalogo no tienen plan.
+
+    El evento importa tanto como el borrado: la proyeccion de NEXO se alimenta SOLO de
+    vehiculo.creado/actualizado/eliminado, asi que sin publicarlo GET /api/vehiculos
+    seguiria ofreciendo un vehiculo que ya no existe."""
+    planes, vehiculos, publisher = repos
+    catalogo = await vehiculos.listar_con_siembra()
+    objetivo = catalogo[0]
+
+    cuerpo = _cuerpo_publicado(objetivo.id, "eliminar_vehiculo", {})
+    plan_id = await worker_main._ejecutar_solicitud(cuerpo, planes, vehiculos, publisher)
+
+    assert plan_id is None
+    assert await vehiculos.obtener(objetivo.id) is None
+    assert publisher.vehiculos_eliminados == [objetivo.id]
+
+
+async def test_eliminar_vehiculo_en_uso_es_rechazo_y_no_publica_nada(repos):
+    """Un vehiculo con planes asociados no se puede borrar: eliminar_vehiculo lanza
+    ConflictException (AppException), que `_procesar` traduce a `cubicacion.rechazada`
+    SIN reintentar - el resultado seria el mismo siempre.
+
+    Y no debe publicarse vehiculo.eliminado: la proyeccion de NEXO borraria una fila que
+    en Cubicador sigue existiendo, dejando las dos bases en desacuerdo."""
+    planes, vehiculos, publisher = repos
+    catalogo = await vehiculos.listar_con_siembra()
+    en_uso = catalogo[0]
+    await planes.crear("Plan que usa el vehiculo", en_uso.id)
+
+    cuerpo = _cuerpo_publicado(en_uso.id, "eliminar_vehiculo", {})
+    with pytest.raises(ConflictException) as excinfo:
+        await worker_main._ejecutar_solicitud(cuerpo, planes, vehiculos, publisher)
+
+    assert excinfo.value.codigo == "VEHICULO_EN_USO"
+    assert await vehiculos.obtener(en_uso.id) is not None
+    assert publisher.vehiculos_eliminados == []
 
 
 async def test_guardar_item_e_importar_items_y_eliminar_item(repos):
