@@ -348,8 +348,8 @@ Reglas de negocio verificables sobre el propio dato:
 | Regla | Resultado observado |
 | :---- | :---- |
 | `Distancia Total > 0` | **17 registros en 0** (0,04 %) — de estos, **14 tienen además `Origen ≠ Destino`** con ciudades reales y peso sustancial (ver refinamiento abajo) |
-| `Peso Neto > 0` | **82 registros en 0** (0,20 %) |
-| `Tarifa venta al cliente > 0` | **874 registros en 0** (2,12 %) |
+| `Peso Neto > 0` | **82 registros en 0** (0,20 %) — más **2 registros adicionales en exactamente 1 kg** (notebook `03`, Paso 2), prácticamente equivalente a cero. Total funcional: 84 |
+| `Tarifa venta al cliente > 0` | **874 registros en 0** (2,12 %) — más **3 registros adicionales en exactamente $1** (notebook `03`, Paso 2), un valor de relleno equivalente a cero en la práctica. Total funcional: 877 |
 | `Flete producción FO > 0` | **183 en 0** (0,44 %) y **1 negativo** (−49.978) |
 | `Tarifa ≥ Flete` (margen no negativo) | **3.839 registros con margen negativo** (9,31 %) |
 | `Origen ≠ Destino` | **8.966 registros con Origen \= Destino** (21,74 %) |
