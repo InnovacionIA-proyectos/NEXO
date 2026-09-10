@@ -51,6 +51,38 @@ Plan optimizado con 3 colocaciones → `DELETE` → **HTTP 204**, y `GET` poster
 **404**. Sin `ForeignKeyViolationError`. Después, consulta directa a Postgres:
 **0 colocaciones huérfanas, 0 ítems huérfanos**.
 
+#### El criterio "deja a NEXO y Cubicador consistentes", de punta a punta
+
+Lo anterior prueba el lado de Cubicador. La consistencia entre las dos bases se
+verificó aparte, levantando **los dos stacks completos** — NEXO (api + SQL Server)
+más Cubicador (api + worker + Postgres) sobre el mismo RabbitMQ — porque inferirla
+del código no es lo mismo que verla:
+
+| Paso | Resultado |
+|---|---|
+| `POST /api/planes-cargue` **en NEXO** (rol Admin) | `202`, `estado: "procesando"` |
+| El worker crea la fila en Postgres con el id que generó NEXO | ✅ `GET` en Cubicador → 200 |
+| Ítem (con `sku: null`) + `optimizar` | `estado: optimizado`, **3 colocaciones** |
+| `DELETE /api/planes-cargue/{id}` **en NEXO** | `202` |
+| `GET` en NEXO / `GET` en Cubicador | **404 / 404 — consistentes** |
+| Huérfanos en Postgres · `ForeignKeyViolationError` en el log | **0 · 0** |
+
+Antes del arreglo, ese mismo recorrido terminaba con NEXO en 404 y Cubicador
+conservando el plan intacto.
+
+Dos apuntes de montaje, por si hay que repetirlo: el `.env` del repo apunta a
+`Server=localhost;Trusted_Connection=True` (para `dotnet run` en Windows, no sirve
+desde Docker), así que se levantó un SQL Server propio en la red `nexo_internal` y se
+sobrescribió `ConnectionStrings__CabinaFletes`. Y el encabezado
+`X-Portal-Usuario-Id` espera el **`IdentidadPortalId` numérico** de `Usuarios`
+(`long.TryParse` en `IdentidadPortalAuthenticationHandler`), no el `Id` GUID — con el
+GUID responde `401 SESION_INVALIDA`.
+
+El `optimizar` se disparó por la API de Cubicador y no por NEXO a propósito: la
+compuerta de paridad sigue cerrada (`Cubicacion__ParidadVerificada=false`) y abrirla
+no es parte de esta HU. Lo que el criterio pide verificar —crear y **borrar** desde
+NEXO— sí pasó por NEXO.
+
 Esta verificación importa más que las otras dos porque los tests unitarios **no
 podían** demostrarla: la suite corre sobre SQLite y `db.py` no activa
 `PRAGMA foreign_keys=ON`, así que SQLite no aplica las FK. Un test que esperara la
