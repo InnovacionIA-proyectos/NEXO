@@ -7,15 +7,15 @@ Cada hallazgo con su ficha estándar (§13.1 del plan), seguido del log de supue
 ## H-001
 ```
 ID:            H-001
-Título:        FO no es clave única — carga consolidada de múltiples clientes en un mismo viaje
+Título:        FO no es clave única — carga consolidada de múltiples clientes en un mismo viaje (CONFIRMADO)
 Dimensión:     Unicidad / Granularidad
-Evidencia:     128 valores de FO repetidos sobre 41.107 únicos (130 filas de más). Sobre los 128 grupos completos: 100% comparte Vehículo y Fecha Creación FO, difieren en BP Cliente y/o Peso Neto.
+Evidencia:     128 valores de FO repetidos sobre 41.107 únicos (130 filas de más). Sobre los 128 grupos completos: 100% comparte Vehículo y Fecha Creación FO, difieren en BP Cliente y/o Peso Neto. Confirmado a escala de toda la compañía: para FOs con más de un FWO en FactFWOFUFO, el número de clientes distintos casi siempre iguala al número de FWO (nunca lo supera) — cada FWO adicional es casi siempre un cliente distinto.
 Ejemplo:       FO 301205267 — cliente distinto pero tarifa idéntica entre ambas filas (caso sin resolver del todo)
-Hipótesis:     FO identifica el viaje del vehículo, no la orden individual de un cliente — un viaje puede consolidar carga de varios clientes.
-Verificación:  Confirmado contra FactFWOFUFO (jerarquía FO/FWO/FU): a escala de toda la compañía, en 90.285 viajes con más de un FWO, la distancia varía en solo 0,73% (esperado a nivel FO) vs. el origen que varía en 5,35% (esperado a nivel FWOP).
+Hipótesis:     N/A — confirmado directamente, ya no es hipótesis.
+Verificación:  Confirmado contra FactFWOFUFO (jerarquía FO/FWO/FU) en dos pasadas: (1) a nivel viaje, la distancia varía en solo 0,73% de 90.285 viajes con más de un FWO (esperado a nivel FO) vs. el origen que varía en 5,35% (esperado a nivel FWOP); (2) consulta directa FO↔FWO↔cliente confirma que cada FWO adicional casi siempre corresponde a un cliente distinto.
 Severidad:     Alta
 Impacto:       Cualquier conteo de "número de viajes" o métrica de ingreso que no sume por FO+cliente está mal calculada.
-Recomendación: Usar clave compuesta FO+BP Cliente+Peso Neto+Destino para el grano real; sumar (no deduplicar) tarifa/flete por fila para métricas de ingreso — pendiente de confirmar con negocio.
+Recomendación: Usar clave compuesta FO+BP Cliente+Peso Neto+Destino para el grano real; sumar (no deduplicar) tarifa/flete por fila para métricas de ingreso.
 ```
 
 ## H-002
@@ -156,6 +156,20 @@ Impacto:       Resuelve una pregunta abierta del plan (§1.2, punto 6); Distanci
 Recomendación: No usar Distancia Total como proxy de "kilómetros realmente recorridos" en análisis operativos (ej. consumo de combustible, desgaste de flota); sí es válida como variable de tarifa/ruta para el modelo predictivo de flete.
 ```
 
+## H-012 🔎
+```
+ID:            H-012
+Título:        Flete negativo (-$49.978) es un descuento operacional real, no un error de signo
+Dimensión:     Exactitud / Outlier
+Evidencia:     FO 301291984, único registro con Flete Producción FO negativo en todo el extracto. La fila completa en FactFWOFUFO muestra un campo explícito Importe Descuento Operacional FO = -2.300.000 COP.
+Ejemplo:       FO 301291984 — Clase Expedición FWO = "LTL (carga incompleta del camión)", 467 kg, TC_CAMNETA, Buenaventura→Guarne.
+Hipótesis:     N/A — confirmado.
+Verificación:  Consulta directa a FactFWOFUFO, fila completa del FO.
+Severidad:     Baja (caso único, ya explicado)
+Impacto:       Ninguno adicional — es un ajuste de negocio legítimo, no requiere corrección ni exclusión del análisis.
+Recomendación: Reclasificar de "por_confirmar" a "caso_legítimo" en cualquier análisis de outliers (ya reclasificado aquí).
+```
+
 ---
 
 ## Log de supuestos
@@ -165,7 +179,7 @@ Toda decisión tomada ante ambigüedad en este EDA, con su justificación y qué
 | # | Decisión | Justificación | Reversibilidad |
 |---|---|---|---|
 | 1 | Nombres de columna en camelCase en el código | Decisión de equipo (notebook `00`), no afecta el contenido del dato | Alta — solo convención de código |
-| 2 | Clave práctica `FO`+`BP Cliente`+`Peso Neto`+`Destino` para el grano | Única sobre las 41.237 filas, pero no confirmada formalmente con el negocio | Media — se reemplaza si el negocio define el grano oficialmente |
+| 2 | Clave práctica `FO`+`BP Cliente`+`Peso Neto`+`Destino` para el grano | Única sobre las 41.237 filas; la hipótesis de carga consolidada que la sustenta ya se confirmó directamente en `FactFWOFUFO` (H-001) | Baja — confirmada con evidencia directa, ya no depende de que el negocio la valide |
 | 3 | `Origen = Destino` tratado como segmento aparte, no como error | Explicado por descontenerización (88,7% de los casos) | Media — depende de confirmación de negocio en los 978 casos residuales |
 | 4 | El EDA y el futuro modelo se enfocan en `Flete Producción FO`, no en `Tarifa`/margen | Aclarado directamente por el negocio en esta sesión | Baja — es una decisión de alcance del negocio, no una suposición nuestra |
 | 5 | Valores "casi-cero" (tarifa=$1, peso=1kg) tratados como basura y excluidos de cálculos puntuales | Mismo criterio que los ceros exactos, evita distorsionar estadísticos | Alta — se puede recalcular sin excluirlos si se prefiere |
@@ -190,7 +204,7 @@ Toda decisión tomada ante ambigüedad en este EDA, con su justificación y qué
 - Revisar por qué `"1"` aparece como `ID Medio Transporte FO` válido (valor basura, 2 registros).
 
 **(c) Definiciones a formalizar en el diccionario:**
-- Confirmar si `FO` puede representar carga consolidada de varios clientes (reemplaza la pregunta original sobre si `FO` es clave única).
-- Unidad de `Peso Neto` (kg vs t) y moneda/IVA de las columnas monetarias.
-- Confirmar las 3 líneas de negocio ausentes del catálogo (`OHUC`, `OPSC`, `OPXL`): sin operación / filtradas en extracción / en otro sistema.
+- ~~Confirmar si `FO` puede representar carga consolidada de varios clientes~~ — **confirmado** (H-001), ya no es pregunta abierta.
+- ~~Unidad de `Peso Neto`~~ — **confirmada = KG** (dato directo de `FactFWOFUFO`). ~~Moneda de las columnas monetarias~~ — **confirmada = COP**. Sigue abierto solo si los montos incluyen IVA o no.
+- Las 3 líneas de negocio del catálogo (`OHUC`, `OPSC`, `OPXL`) **sí existen y se usan a nivel de toda la compañía** (`OHUC`: 1.028 registros, `OPSC`: 29.646, `OPXL`: 4 — verificado en `FactFWOFUFO`, sin filtro de ubicación). La pregunta ya no es "¿existen?" sino **¿por qué no aparecen en el corredor de Buenaventura en esta ventana?** — probable especialización por puerto (ej. la contenerización `OHUC` podría concentrarse en puertos del Caribe, no en Buenaventura, que es predominantemente descontenerización). Pendiente confirmar con negocio.
 - Confirmar formalmente el criterio de extracción y los estados excluidos (ya tenemos evidencia fuerte: `Concluido`/`Ejecutado` únicamente).

@@ -11,7 +11,7 @@ Diccionario único de las 17 columnas del extracto (`Viajes-Btura-2025-2026.xlsx
 | `Origen` | `origen` | Población donde se origina el transporte | — | Confiable como nombre de ciudad (sin duplicados de digitación, verificado con `rapidfuzz`), pero en la operación real se agrupa en **zonas de tarificación** más amplias, invisibles en el extracto (H-008) |
 | `Destino` | `destino` | Población donde termina el transporte | — | Misma nota que `Origen` |
 | `Distancia Total` | `distanciaTotal` | "Distancia total, en KM, de la operación de transporte" | KM (confirmado) | **Confirmado: valor planificado/de tabla por ruta o zona, no medición real** (H-011) — pares O-D con cientos de viajes registran exactamente el mismo número |
-| `Peso Neto` | `pesoNeto` | "Peso de la carga sin tara del vehículo" | Sin confirmar (kg vs t) | Unidad sigue sin confirmar con el negocio (L-08) |
+| `Peso Neto` | `pesoNeto` | "Peso de la carga sin tara del vehículo" | **KG (confirmado)** | Unidad confirmada con dato directo de `FactFWOFUFO` ("467.00000000000000 KG"), ya no es solo plausibilidad física |
 | `Posición Principal FWOP` | `posicionPrincipalFwop` | PKG (Paquete) / PRD (Producto) / TUR (Transportation Unit Resource) | — | Confiable. TUR = 81,8% del set |
 | `Grupo de Equipo FWOP` | `grupoDeEquipoFwop` | Aplica solo a posición TUR; CAM=camión, CN=contenedor | — | Nulos en PKG/PRD son **estructurales**, no defecto. Redundante con `Clase Equipo FOP` (V de Cramér=1,00, H-007) |
 | `Vehículo` | `vehiculo` | Placa del vehículo | — | Usar como **identificador**, no como categoría — casi determina `Tipo` e `ID Medio Transporte FO` (H-007) |
@@ -19,12 +19,12 @@ Diccionario único de las 17 columnas del extracto (`Viajes-Btura-2025-2026.xlsx
 | `Clase Equipo FOP` | `claseEquipoFop` | Aplica solo a grupos CN y CAM | — | Jerárquica bajo `Grupo de Equipo FWOP` (mapa completo confirmado, H-007). 1 fila mal clasificada conocida (`CNT40.HC` bajo `CAM`) |
 | `Propiedad` | `propiedad` | Flota propia vs. tercero externo | — | Confiable. 91,2% Tercero / 8,8% Propio — explicado por capacidad (127 camiones propios, tope diario), no preferencia |
 | `Tipo` | `tipo` | **"Puede omitirse"** (literal del diccionario) | — | **Descartado.** Redundante y menos confiable que `ID Medio Transporte FO` (13,1% de discrepancia entre ambos) |
-| `Tarifa venta al cliente` | `tarifaVentaAlCliente` | "Tarifa de venta del viaje realizado" | Sin confirmar (moneda/IVA) | **No confiable en este extracto** (H-002): 72,2% de las filas idénticas a `Flete Producción FO`, confirmado mal capturada en el sistema fuente. En la hoja de inconsistencias aparece rotulada como `Costo Producción` (rótulo invertido, ya corregido en HU-10.2/10.3) |
-| `Flete producción FO` | `fleteProduccionFo` | "Costo de producción o flete que se paga al Transportista" | Sin confirmar (moneda/IVA) | **Variable objetivo del futuro modelo predictivo** (aclarado por el negocio). En la hoja de inconsistencias aparece como `Importe FO`. Piso de referencia: SICE-TAC (`tblSAPTarifas`/`tblReglasRutasSicetac`, fuente externa) |
+| `Tarifa venta al cliente` | `tarifaVentaAlCliente` | "Tarifa de venta del viaje realizado" | **COP (confirmado)**, IVA sin confirmar | **No confiable en este extracto** (H-002): 72,2% de las filas idénticas a `Flete Producción FO`, confirmado mal capturada en el sistema fuente. En la hoja de inconsistencias aparece rotulada como `Costo Producción` (rótulo invertido, ya corregido en HU-10.2/10.3) |
+| `Flete producción FO` | `fleteProduccionFo` | "Costo de producción o flete que se paga al Transportista" | **COP (confirmado)**, IVA sin confirmar | **Variable objetivo del futuro modelo predictivo** (aclarado por el negocio). En la hoja de inconsistencias aparece como `Importe FO`. Piso de referencia: SICE-TAC (`tblSAPTarifas`/`tblReglasRutasSicetac`, fuente externa) |
 
 ## Qué no cubre este diccionario (ver `limitaciones.md` para el detalle completo)
 
-- Moneda e IVA de las dos columnas monetarias.
+- Si las dos columnas monetarias (ya confirmadas en COP) incluyen IVA o no.
 - Maestro de `BP Cliente` (código → nombre/segmento).
 - Criterio de extracción y estados excluidos (confirmado con evidencia externa: solo `Concluido`/`Ejecutado`, ver H-004 en `hallazgos.md`).
 - Mapeo completo ciudad → zona de tarificación (solo se confirmó su existencia, H-008, no se trajo la tabla completa a este análisis).
