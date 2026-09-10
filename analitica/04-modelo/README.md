@@ -1,12 +1,15 @@
 # Modelo predictivo — reservado, sin HU asignada todavía
 
-Sin contenido todavía. Parte de las conclusiones de [`../02-eda/`](../02-eda/)
-(grano y variable objetivo se deciden ahí, no aquí).
+Sin contenido todavía. Parte de las conclusiones de los dos EDA de S2-HU-11:
+[`../02-eda-viajes-btura/`](../02-eda-viajes-btura/) (grano y variable
+objetivo — predecir `Flete Producción FO` — se deciden ahí) y
+[`../03-eda-extraccion-4-fuentes/`](../03-eda-extraccion-4-fuentes/) (señal
+de contexto de mercado: piso SICE-TAC, plaza SAP).
 
 Estructura esperada (a confirmar cuando exista la HU):
 
 ```
-03-modelo/
+04-modelo/
 ├── features/         Ingeniería de variables derivadas del EDA
 ├── entrenamiento/     Código de entrenamiento
 └── artefactos/        Modelos entrenados

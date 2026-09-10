@@ -17,7 +17,7 @@ Si al releer el crudo el hash no coincide con el de arriba, el archivo cambió �
 ## Cómo correrlo
 
 ```bash
-cd analitica/02-eda
+cd analitica/02-eda-viajes-btura
 python -m venv .venv
 .venv\Scripts\activate          # Windows
 pip install -r requirements.txt
