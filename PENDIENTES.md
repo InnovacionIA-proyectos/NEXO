@@ -216,6 +216,41 @@ negocio de Application que valga la pena aislar con un mock ahí; su cobertura
 queda en `Api.Tests` (`TarifasHistoricasTests`, `TarifasSicetacTests`,
 `MetricasTests`), que ya ejercitan esos flujos de punta a punta.
 
+### No existe pipeline de CI para .NET (bloquea el cierre de S3-HU-06.2, #121)
+
+Los tests de .NET **no corren en ningún pipeline**: solo se ejecutan cuando
+alguien los lanza a mano. Verificado — `.github/workflows/` tiene únicamente
+`cubicador-ci.yml` (pytest + smoke de Docker, solo Python) y
+`add-to-project-nexo.yml` (automatización del tablero). **Ningún workflow
+menciona `dotnet`.**
+
+Es lo que impide cerrar el criterio de S3-HU-06.2: *"el test debe fallar el
+build si algún nombre deja de coincidir — no debe depender de que alguien lo
+note"*. La guarda ya existe y está verificada por mutación
+(`tests/CabinaFletes.Api.Tests/Cubicacion/ContratoMessageTypeTests.cs`), pero
+**sin build que falle, sigue dependiendo de que alguien la ejecute** — justo lo
+que esa HU quería eliminar. El test queda listo para engancharse el día que el
+workflow exista; no hace falta tocarlo.
+
+Qué haría falta, con el detalle que ya conocemos por haberlo hecho a mano
+decenas de veces en esta sesión:
+
+- `dotnet build` de la solución más las tres suites.
+- `Domain.Tests` y `Application.Tests` corren sin nada más.
+- **`Api.Tests` necesita SQL Server**: hay que levantarlo como *service
+  container* en el runner y pasarle `TEST_DB_CONNECTION`
+  (`ApiFixture.cs:20` cae por defecto a `Trusted_Connection`, que no sirve
+  contra un SQL Server en Linux). Ojo con la espera: el contenedor tarda
+  ~15 s en dar *"Recovery is complete"*, y lanzar los tests antes hace fallar
+  ~69 de ellos con `SqlException` — un falso rojo que se confunde con un bug
+  real.
+- Filtrar por `paths` igual que `cubicador-ci.yml`, para no correrlo en PRs que
+  solo tocan Python o documentación.
+
+Beneficio más allá de #121: hoy **nada** garantiza que `main`/`QA` compilen. Un
+PR que rompa la compilación de .NET entra sin que nadie se entere hasta que
+alguien clona y construye.
+
 Consolidar los proyectos de test duplicados (`tests/` y
 `src/CabinaFletes.Tests` en el original) sigue pendiente como limpieza
 cosmética: el original tenía tests solo en `NEXO/tests` (Domain, Api) y
