@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace CabinaFletes.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(CabinaFletesDbContext))]
-    [Migration("20260901201038_QuitarNolockVistasAnalitica")]
-    partial class QuitarNolockVistasAnalitica
+    [Migration("20260910231344_QuitarNolockVistasAnaliticaDboNexoPrueba")]
+    partial class QuitarNolockVistasAnaliticaDboNexoPrueba
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
