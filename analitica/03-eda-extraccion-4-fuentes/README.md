@@ -1,7 +1,8 @@
 # EDA-2 — extracción que cruza las 4 fuentes (S2-HU-11 parte 2)
 
-Sin contenido todavía. Segundo de los dos análisis que pide la HU-11 (ver
-[`../02-eda-viajes-btura/`](../02-eda-viajes-btura/) para el primero, ya
+Plan listo en [`PLAN_EDA_Extraccion_4_Fuentes.md`](PLAN_EDA_Extraccion_4_Fuentes.md);
+notebooks sin empezar todavía. Segundo de los dos análisis que pide la HU-11
+(ver [`../02-eda-viajes-btura/`](../02-eda-viajes-btura/) para el primero, ya
 completo). Este va sobre el **set consolidado de S2-HU-10**
 (`../01-set-final/v1.0.0-piloto/`) — BD propia + piso SICE-TAC histórico +
 plaza/histórico SAP + clientes — no sobre el histórico crudo de Viajes-Btura.
@@ -28,7 +29,7 @@ de históricos no tenía (ej. relación cotización vs. piso/plaza del período)
 ```
 03-eda-extraccion-4-fuentes/
 ├── README.md
-├── PLAN_EDA_[nombre].md        # plantilla: PLAN_EDA_Viajes_Btura.md del EDA-1
+├── PLAN_EDA_Extraccion_4_Fuentes.md
 ├── requirements.txt
 ├── datos/
 │   └── interim/
