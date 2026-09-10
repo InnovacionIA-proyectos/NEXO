@@ -32,10 +32,17 @@ namespace CabinaFletes.Api.Tests.Cubicacion;
 /// mover el namespace, agregar un consumer que Cubicador no publica, o publicar desde
 /// Cubicador algo que NEXO no consume.
 ///
-/// <b>Asimetría deliberada</b>: solo se verifica la dirección Cubicador → NEXO. En la
-/// otra (<c>CubicacionSolicitada</c>), el worker solo comprueba que EXISTA la clave
-/// `messageType` para desenvolver el sobre, sin mirar su valor
-/// (<c>worker/main.py::_procesar</c>) — no hay acoplamiento por nombre que proteger.
+/// <b>Asimetría deliberada en el sobre</b>: del `messageType` solo se verifica la
+/// dirección Cubicador → NEXO. En la otra (<c>CubicacionSolicitada</c>), el worker solo
+/// comprueba que EXISTA la clave `messageType` para desenvolver el sobre, sin mirar su
+/// valor (<c>worker/main.py::_procesar</c>) — no hay acoplamiento por nombre que
+/// proteger ahí.
+///
+/// <b>Pero esa dirección SÍ tiene su propio acoplamiento por texto</b>, y también se
+/// cubre acá: el discriminador `tipo` del comando. NEXO decide qué puede publicar con
+/// <c>TiposConocidos</c> y el worker despacha con <c>if tipo == "..."</c>. Es el mismo
+/// problema con peor desenlace — un `tipo` que NEXO publica y el worker no conoce lanza
+/// <c>ValueError</c>, gasta los 3 reintentos y muere en la DLQ sin que nada avise.
 /// </summary>
 public class ContratoMessageTypeTests
 {
@@ -120,6 +127,60 @@ public class ContratoMessageTypeTests
         }
     }
 
+    // ------------------------------------------------------------- el `tipo` del comando
+
+    /// <summary>Los `tipo` que NEXO se permite publicar, leídos del propio validador
+    /// (que es quien decide qué sale al broker: un `tipo` fuera de este conjunto se
+    /// rechaza antes de publicar). Se lee por reflexión y no del fuente para que sea el
+    /// valor real en runtime.</summary>
+    private static IReadOnlyList<string> TiposQueNexoPublica()
+    {
+        var campo = typeof(CabinaFletes.Mensajes.Cubicacion.CubicacionSolicitadaValidador)
+            .GetField("TiposConocidos", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+        Assert.True(campo is not null, "CubicacionSolicitadaValidador ya no tiene TiposConocidos: revisar este test.");
+
+        var valores = (IEnumerable<string>)campo!.GetValue(null)!;
+        return valores.OrderBy(t => t, StringComparer.Ordinal).ToList();
+    }
+
+    /// <summary>Los `tipo` que el worker sabe despachar, leídos de las ramas reales de
+    /// `_ejecutar_solicitud`.</summary>
+    private static IReadOnlyList<string> TiposQueCubicadorDespacha()
+    {
+        var directorio = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directorio is not null && !File.Exists(Path.Combine(directorio.FullName, "CabinaFletes.Clean.sln")))
+            directorio = directorio.Parent;
+
+        var ruta = Path.Combine(directorio!.FullName, "cubicador", "worker", "main.py");
+        Assert.True(File.Exists(ruta), "No existe cubicador/worker/main.py — ¿se movió el worker?");
+
+        return Regex.Matches(File.ReadAllText(ruta), "tipo\\s*==\\s*\"([a-z_]+)\"")
+            .Select(m => m.Groups[1].Value)
+            .Distinct()
+            .OrderBy(t => t, StringComparer.Ordinal)
+            .ToList();
+    }
+
+    [Fact]
+    public void Todo_tipo_que_NEXO_puede_publicar_lo_sabe_despachar_el_worker()
+    {
+        // El `tipo` es el MISMO acoplamiento por texto que el messageType, y con peor
+        // desenlace: un tipo que NEXO publica y el worker no conoce lanza ValueError,
+        // gasta los 3 reintentos y termina en la DLQ — en silencio, sin que nada avise
+        // que el par se desincronizó.
+        //
+        // Contención, NO igualdad: el worker despacha ADEMÁS `crear_desde_linea`, que
+        // hoy solo publica la propia API de Cubicador (a NEXO le falta ese endpoint —
+        // ver docs/mensajeria/CUBICACION.md §8.2). Que el worker sepa hacer de más es
+        // legítimo; que NEXO publique algo que el worker no entiende, no.
+        var sinDespachar = TiposQueNexoPublica().Except(TiposQueCubicadorDespacha()).ToList();
+
+        Assert.True(
+            sinDespachar.Count == 0,
+            $"NEXO puede publicar tipos que worker/main.py no despacha: {string.Join(", ", sinDespachar)}. "
+            + "Irían a la DLQ tras 3 reintentos, sin aviso.");
+    }
+
     [Fact]
     public void Hay_al_menos_un_evento_cubierto()
     {
@@ -127,5 +188,7 @@ public class ContratoMessageTypeTests
         // arriba pasarían comparando dos listas vacías y no protegerían absolutamente nada.
         Assert.NotEmpty(TiposQueNexoConsume());
         Assert.NotEmpty(TiposQueCubicadorPublica());
+        Assert.NotEmpty(TiposQueNexoPublica());
+        Assert.NotEmpty(TiposQueCubicadorDespacha());
     }
 }
