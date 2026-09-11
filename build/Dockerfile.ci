@@ -37,9 +37,17 @@ COPY ["tests/CabinaFletes.Api.Tests/CabinaFletes.Api.Tests.csproj",             
 RUN dotnet restore "CabinaFletes.Clean.sln"
 
 # El código fuente. El restore ya quedó resuelto en la capa anterior.
-COPY src/   src/
-COPY tests/ tests/
-COPY docs/  docs/
+COPY src/       src/
+COPY tests/     tests/
+COPY docs/      docs/
+# ContratoMessageTypeTests.cs (S3-HU-06.2/#121) lee cubicador/infrastructure/
+# mensajeria/rabbitmq.py y cubicador/worker/main.py directo del disco para
+# derivar el messageType/tipo real que publica Cubicador — sin esta carpeta,
+# esos 5 tests fallan con FileNotFoundException dentro de este contenedor
+# (hallazgo de QA en NEXO#128, S3-HU-11.1/#134). No hace falta para compilar
+# ni para correr el resto de la suite: solo para que ESTOS tests encuentren
+# su fuente de verdad Python.
+COPY cubicador/ cubicador/
 
 # El build va como comando del contenedor y no como RUN a propósito. Si fuera
 # parte de la construcción de la imagen, un error de compilación abortaría el
