@@ -31,6 +31,14 @@ jobs:
   # para probar la app contra su comportamiento real con SQL Server.
   build-and-test:
     runs-on: [self-hosted, dokploy_]
+    # Este runner solo tiene Windows PowerShell (con política de ejecución
+    # restringida) y cmd — no pwsh. Sin este default, cualquier "run:" sin
+    # "shell:" propio cae en PowerShell y falla con "la ejecución de scripts
+    # está deshabilitada en este sistema" (pasó en "Restaurar dependencias",
+    # "Compilar" y "Ejecutar toda la suite", los tres sin shell explícito).
+    defaults:
+      run:
+        shell: cmd
     steps:
       - uses: actions/checkout@v4
 
