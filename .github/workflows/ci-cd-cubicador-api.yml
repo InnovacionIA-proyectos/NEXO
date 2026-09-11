@@ -1,38 +1,60 @@
 name: CI/CD Cubicador-API
 
-# S3-HU-11.2/11.5 (issues #135/#138): dispara por cambios exclusivos de la API
-# de Cubicador (cubicador/api/**, su Dockerfile) Y por cambios en el código
-# COMPARTIDO con el worker (domain/application/infrastructure/tests/scripts,
-# requirements.txt, docker-compose.yml) — un cambio ahí dispara ESTE pipeline
-# Y ci-cd-cubicador-worker.yml, nunca solo uno. Ver
-# docs/CI_CD_RUTAS_COMPARTIDAS.md para la convención completa.
+# S3-HU-11.2/11.5 (issues #135/#138).
+#
+# Los `paths` de este workflow y los de ci-cd-cubicador-worker.yml son
+# IDENTICOS a proposito. No es copia-pega olvidada: es la consecuencia de dos
+# hechos verificados del repo.
+#
+# 1) El gate es compartido. Los dos workflows llaman al mismo
+#    _cubicador-pruebas.yml, que corre `pytest -v` sobre TODA la suite — 5 de
+#    los 11 archivos de test son de tests/worker/ — y ademas un smoke de
+#    Docker Compose que levanta api + worker + Postgres + RabbitMQ y ejercita
+#    el flujo async de punta a punta. Un cambio que toque solo al worker puede
+#    poner en rojo el gate de ESTE pipeline; si no se dispara, nadie se entera
+#    hasta el proximo cambio de api/.
+#
+# 2) Las dos imagenes contienen todo el arbol. cubicador/Dockerfile y
+#    cubicador/Dockerfile.worker hacen ambos `COPY . .`, asi que cualquier
+#    archivo bajo cubicador/ cambia las DOS imagenes. Desplegar una sola deja
+#    a la otra corriendo un commit distinto contra el mismo esquema y el mismo
+#    protocolo de cola.
+#
+# Lo unico que de verdad distingue a los dos workflows es a que aplicacion de
+# Dokploy le avisan. Ver docs/CI_CD_RUTAS_COMPARTIDAS.md.
+#
+# Separar por carpeta de nivel superior (cubicador/api/** aca,
+# cubicador/worker/** alla) ya estaba mal en la practica, no solo en teoria:
+# worker/main.py importa `api.dependencias` y `api.dtos.plan_cargue`, que es
+# justo donde vivia el bug 10.2 (#132) — un cambio bajo cubicador/api/ que
+# rompia al WORKER.
 on:
   push:
     branches: [main, Pre-Despliegue-BACKEND]
     paths:
-      - "cubicador/api/**"
-      - "cubicador/Dockerfile"
-      - "cubicador/domain/**"
-      - "cubicador/application/**"
-      - "cubicador/infrastructure/**"
-      - "cubicador/tests/**"
-      - "cubicador/scripts/**"
-      - "cubicador/requirements.txt"
-      - "cubicador/docker-compose.yml"
+      - "cubicador/**"
+      # Documentacion no cambia comportamiento: excluirla evita redesplegar
+      # los dos servicios por editar un README (`COPY . .` igual la mete en la
+      # imagen, pero un .md no justifica un reinicio en Pre-Despliegue).
+      - "!cubicador/docs/**"
+      - "!cubicador/**.md"
+      # Insumos de construccion del job docker-smoke que viven FUERA de
+      # cubicador/: ese job levanta el rabbit compartido con
+      # `docker compose -f docker-compose.yml up --build rabbit`, y ese
+      # servicio se construye desde build/Dockerfile.rabbit. Romper cualquiera
+      # de los dos rompe este pipeline.
+      - "docker-compose.yml"
+      - "build/Dockerfile.rabbit"
       - ".github/workflows/ci-cd-cubicador-api.yml"
       - ".github/workflows/_cubicador-pruebas.yml"
   pull_request:
     branches: [main, Pre-Despliegue-BACKEND]
     paths:
-      - "cubicador/api/**"
-      - "cubicador/Dockerfile"
-      - "cubicador/domain/**"
-      - "cubicador/application/**"
-      - "cubicador/infrastructure/**"
-      - "cubicador/tests/**"
-      - "cubicador/scripts/**"
-      - "cubicador/requirements.txt"
-      - "cubicador/docker-compose.yml"
+      - "cubicador/**"
+      - "!cubicador/docs/**"
+      - "!cubicador/**.md"
+      - "docker-compose.yml"
+      - "build/Dockerfile.rabbit"
       - ".github/workflows/ci-cd-cubicador-api.yml"
       - ".github/workflows/_cubicador-pruebas.yml"
 
