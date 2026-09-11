@@ -10,6 +10,18 @@ rama de #123), porque #124 está construido directamente encima de #122, y #123 
 no toca los mismos archivos— va a convivir con ambos en `QA`. El merge de las 3 ramas
 fue limpio (sin conflictos).
 
+## Scripts de esta carpeta
+
+| Script | Qué prueba |
+|---|---|
+| [`verify-flujo-plan-cargue.mjs`](verify-flujo-plan-cargue.mjs) | Flujo feliz completo: crear vehículo → plan → ítem → optimizar → `/resultado` → ajustar colocación |
+| [`verify-bug-worker-atascado.mjs`](verify-bug-worker-atascado.mjs) | Bug 1: publica mensajes sin `planId` vía la API de gestión de RabbitMQ y confirma si el worker queda atascado |
+| [`verify-bug-sku-nulo.mjs`](verify-bug-sku-nulo.mjs) | Bug 2: agrega un ítem con `sku: null` y confirma si tumba el plan a `error` |
+| [`verify-bug-eliminar-plan-optimizado.mjs`](verify-bug-eliminar-plan-optimizado.mjs) | Bug 3: optimiza un plan y lo borra, confirma si queda inconsistencia NEXO/Cubicador |
+| [`verify-vigilante-timeout.mjs`](verify-vigilante-timeout.mjs) + [`force-plan-procesando.sql`](force-plan-procesando.sql) | PR #123: fuerza un plan atascado en `procesando` y confirma que el vigilante lo marca `error` |
+
+Los 5 se corrieron contra un stack real (SQL Server + RabbitMQ + Cubicador) durante esta verificación.
+
 ## Resultado de las suites automatizadas
 
 | Suite | Resultado |

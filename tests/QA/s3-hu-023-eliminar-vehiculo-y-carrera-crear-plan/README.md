@@ -12,6 +12,15 @@ un `POST /optimizar` inmediato que el worker podía procesar antes que `crear_pl
 La rama ya traía el merge de `QA` incorporado (su propio commit de merge) — no
 hizo falta un merge adicional.
 
+## Scripts de esta carpeta
+
+| Script | Qué prueba |
+|---|---|
+| [`verify-eliminar-vehiculo.mjs`](verify-eliminar-vehiculo.mjs) | Crear/borrar vehículo, control de rol Admin, rechazo `VEHICULO_EN_USO` |
+| [`verify-guard-carrera-crear-plan.mjs`](verify-guard-carrera-crear-plan.mjs) + [`force-plan-procesando-nexo.sql`](force-plan-procesando-nexo.sql) | Guard `409 PLAN_CARGUE_EN_PROCESO` forzando el estado por SQL |
+
+Ambos corridos contra un stack real durante esta verificación.
+
 ## Resultado de las suites automatizadas
 
 | Suite | Resultado |
