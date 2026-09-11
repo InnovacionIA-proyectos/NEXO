@@ -1,0 +1,120 @@
+name: CI/CD API
+
+# S3-HU-11.1 (issue #134): dispara SOLO por cambios que puedan afectar al
+# servicio API (.NET) — nunca por cambios exclusivos de cubicador/ (ese
+# servicio tiene sus propios workflows, ver ci-cd-cubicador-api.yml/
+# ci-cd-cubicador-worker.yml). Ver docs/CI_CD_RUTAS_COMPARTIDAS.md para la
+# convención completa de qué ruta dispara qué pipeline.
+on:
+  push:
+    branches: [main, Pre-Despliegue]
+    paths:
+      - "src/**"
+      - "tests/**"
+      - "CabinaFletes.Clean.sln"
+      - ".github/workflows/ci-cd-api.yml"
+  pull_request:
+    branches: [main, Pre-Despliegue]
+    paths:
+      - "src/**"
+      - "tests/**"
+      - "CabinaFletes.Clean.sln"
+      - ".github/workflows/ci-cd-api.yml"
+
+jobs:
+  # Self-hosted acá también (no ubuntu-latest): TEST_DB_CONNECTION apunta a
+  # dbInformesAutomatizados_Pruebas, una base SQL Server real de la red
+  # corporativa privada (10.10.40.85, ver .env raíz) — un runner en la nube de
+  # GitHub JAMÁS podría alcanzarla, sin importar qué credenciales se le den.
+  # Verificado: no es una base descartable ni un contenedor efímero, es la
+  # misma base "de pruebas" (dedicada, pero real y persistente) que ya usan
+  # para probar la app contra su comportamiento real con SQL Server.
+  build-and-test:
+    runs-on: [self-hosted, dokploy]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restaurar dependencias
+        run: dotnet restore CabinaFletes.Clean.sln
+
+      - name: Compilar (Release)
+        run: dotnet build CabinaFletes.Clean.sln -c Release --no-restore
+
+      # CabinaFletes.Api.Tests corre contra dbInformesAutomatizados_Pruebas —
+      # la BD de pruebas REAL de la red corporativa (issue #134, criterio de
+      # cierre de NEXO#3/NEXO#128), NUNCA un contenedor efímero. TEST_DB_CONNECTION
+      # es un secreto de GitHub (el mismo valor que ConnectionStrings__CabinaFletes
+      # en el .env raíz, o el que corresponda a esa base de pruebas) — nunca un
+      # valor en el repo. Domain.Tests/Application.Tests no tocan ninguna base —
+      # dotnet test sobre el .sln completo los corre a los tres en una sola
+      # pasada (mismo criterio que docker-compose.ci.yml: sin filtro, para que
+      # un proyecto de test nuevo entre solo).
+      #
+      # CRÍTICO — no tocar sin leer esto: ApiFixture.cs (tests/CabinaFletes.
+      # Api.Tests/Infra/ApiFixture.cs) NUNCA debe volver a llamar
+      # Database.EnsureDeleted() mientras TEST_DB_CONNECTION apunte a esta base
+      # — se retiró a propósito en esta misma HU (S3-HU-11.1) precisamente para
+      # que este workflow no la borre. Migrate() es aditivo y DataSeeder.SeedAsync
+      # ya es idempotente (no-op si ya hay datos), así que correr esto repetidas
+      # veces contra la MISMA base es seguro en cuanto al esquema/semilla — lo
+      # que SÍ queda pendiente de auditar es si algún test individual (más allá
+      # del seed) asume una base pristina y podría fallar en una segunda corrida
+      # por choque de datos únicos; no se auditaron las ~150 pruebas de Api.Tests
+      # una por una en esta pasada.
+      #
+      # Sin service container de SQL Server acá: esta base ya está corriendo,
+      # alcanzable directo desde este runner — no hay contenedor que esperar
+      # ("Recovery is complete"). Ese detalle de NEXO#128 sigue siendo real SI
+      # algún día se vuelve a levantar SQL Server como contenedor efímero para
+      # otro propósito (ver docker-compose.ci.yml, que sí usa uno).
+      #
+      # Las otras 4 conexiones (todas SOLO LECTURA, ver .env raíz) son OPCIONALES
+      # para que la app arranque — sin ellas, Infrastructure/DependencyInjection.cs
+      # las degrada solas (503 accionable / adapter local), NUNCA falla la DI. Pero
+      # eso significa que sin definirlas ACÁ, TarifasHistoricasTests/
+      # TarifasSicetacTests/SesionTests pasan ejercitando el camino DEGRADADO, no
+      # las fuentes reales — verificado en runtime (17-sep-2026): con las 4 sin
+      # definir, esos tests igual pasaban en verde, pero contra el adapter local/
+      # "no configurado", no contra DwSice/DbSolucionesTi/DwCubos/IdentidadPortal.
+      # Se definen con el MISMO nombre de variable que lee IConfiguration
+      # (ConnectionStrings__*, doble guion bajo) — ASP.NET Core las mapea solo,
+      # cero cambio de código.
+      - name: "Ejecutar toda la suite (dotnet test CabinaFletes.Clean.sln)"
+        env:
+          TEST_DB_CONNECTION: ${{ secrets.TEST_DB_CONNECTION }}
+          ConnectionStrings__DwSice: ${{ secrets.CONNECTIONSTRINGS_DWSICE }}
+          ConnectionStrings__DbSolucionesTi: ${{ secrets.CONNECTIONSTRINGS_DBSOLUCIONESTI }}
+          ConnectionStrings__DwCubos: ${{ secrets.CONNECTIONSTRINGS_DWCUBOS }}
+          ConnectionStrings__IdentidadPortal: ${{ secrets.CONNECTIONSTRINGS_IDENTIDADPORTAL }}
+        run: dotnet test CabinaFletes.Clean.sln -c Release --no-build --logger "console;verbosity=normal"
+
+  # El despliegue queda atado estructuralmente a que la suite haya pasado en ESTE
+  # commit — nunca se dispara si "build-and-test" falla. Solo en push directo (nunca
+  # en PRs). Dokploy construye con el Dockerfile del servicio API al recibir esto.
+  deploy:
+    needs: build-and-test
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/Pre-Despliegue') && github.event_name == 'push'
+
+    # Self-hosted: corre en la red donde vive Dokploy — es la única forma de alcanzar
+    # su webhook, inalcanzable desde runners ubuntu-latest.
+    runs-on: [self-hosted, dokploy]
+    steps:
+      - name: Mostrar información del deploy
+        shell: cmd
+        run: |
+          echo Branch: ${{ github.ref }}
+          echo Commit: ${{ github.sha }}
+          echo Evento: ${{ github.event_name }}
+
+      - name: Disparar despliegue en Dokploy (servicio API)
+        shell: cmd
+        run: |
+          curl -f -X POST "${{ secrets.DOKPLOY_DEPLOY_WEBHOOK_URL_API }}" ^
+            -H "Content-Type: application/json" ^
+            -H "X-GitHub-Event: push" ^
+            -d "{\"ref\":\"${{ github.ref }}\",\"repository\":{\"full_name\":\"${{ github.repository }}\"}}"

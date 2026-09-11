@@ -38,17 +38,22 @@ public class OutboxConsistenciaTests : IAsyncLifetime
     {
         var servicios = new ServiceCollection();
 
-        // Tiempo de comando amplio a propósito. El contenedor de SQL Server nace con la
-        // corrida y aplicar todas las migraciones sobre una base vacía y en frío supera
-        // los 30 segundos por defecto. Con cada migración nueva el arranque se alarga, así
-        // que sin esto la prueba se vuelve intermitente — y una prueba intermitente enseña
-        // al equipo a reintentar en vez de investigar.
+        // Tiempo de comando amplio a propósito: contra una base remota (no local),
+        // un comando lento en un momento de carga puede superar los 30 segundos
+        // por defecto — y una prueba intermitente enseña al equipo a reintentar en
+        // vez de investigar.
+        //
+        // MISMA base que ApiFixture (S3-HU-11.1, issue #134) — ya NO una base propia
+        // ("CabinaFletes_Outbox") separada. Esa separación exigía poder crear bases
+        // nuevas a demanda, algo que TEST_DB_CONNECTION en CI (dbInformesAutomatizados_
+        // Pruebas, base real de la red corporativa) no permite ni debe permitir: el
+        // login de prueba no tiene ni debe tener permisos para crear/administrar
+        // bases, solo para leer/escribir filas — igual que la app real. El riesgo de
+        // colisión que esa separación evitaba (una colección borrando la base de otra)
+        // ya no aplica: ningún fixture hace EnsureDeleted() desde que TEST_DB_CONNECTION
+        // puede apuntar a una base real y persistente.
         servicios.AddDbContext<CabinaFletesDbContext>(o =>
-            o.UseSqlServer(
-                // Base propia: la de ApiFixture se borra al arrancar esa suite, y las
-                // colecciones de xUnit corren en paralelo.
-                ApiFactory.ConexionA("CabinaFletes_Outbox"),
-                sql => sql.CommandTimeout(180)));
+            o.UseSqlServer(ApiFactory.TestConnection, sql => sql.CommandTimeout(180)));
 
         servicios.AddMassTransitTestHarness(x =>
         {
@@ -64,7 +69,11 @@ public class OutboxConsistenciaTests : IAsyncLifetime
         using (var alcance = _servicios.CreateScope())
         {
             var db = alcance.ServiceProvider.GetRequiredService<CabinaFletesDbContext>();
-            await db.Database.MigrateAsync();
+            // Mismo criterio que ApiFixture (S3-HU-11.1, issue #134): NO migra por
+            // defecto contra la base real — el login de prueba no tiene permisos de
+            // DDL, y no debe tenerlos. El esquema ya debe estar desplegado ahí.
+            if (Environment.GetEnvironmentVariable("TEST_DB_MIGRATE_ON_STARTUP") == "true")
+                await db.Database.MigrateAsync();
             // Arranca limpio: otra corrida pudo dejar mensajes sin entregar.
             //
             // ExecuteDeleteAsync en vez de SQL crudo a propósito: un "DELETE FROM
@@ -89,11 +98,19 @@ public class OutboxConsistenciaTests : IAsyncLifetime
     private static AutoCosteoSolicitado Mensaje() =>
         new(Guid.NewGuid(), Guid.NewGuid(), 42, Guid.NewGuid(), DateTimeOffset.UtcNow);
 
-    private async Task<int> MensajesEnLaTablaDeSalida()
+    // Cuenta SOLO la fila de ESTE mensaje (por MessageId), no toda la tabla (S3-HU-11.1,
+    // issue #134): desde que esta clase comparte la base real con el resto de la suite
+    // (ya no una base "CabinaFletes_Outbox" exclusiva — ver InitializeAsync), CUALQUIER
+    // otro test que publique algo por el Outbox real (varios en Api.Tests lo hacen)
+    // agrega filas a esta misma tabla. Un COUNT() ciego sobre toda la tabla es exactamente
+    // el tipo de aserción que un test paralelo ajeno puede romper sin que el bug sea de
+    // este código — filtrar por el MessageId que EL PROPIO test fijó lo hace correcto sin
+    // importar qué más haya en la tabla al mismo tiempo.
+    private async Task<int> MensajesEnLaTablaDeSalida(Guid messageId)
     {
         using var alcance = _servicios.CreateScope();
         var db = alcance.ServiceProvider.GetRequiredService<CabinaFletesDbContext>();
-        return await db.Set<OutboxMessage>().CountAsync();
+        return await db.Set<OutboxMessage>().CountAsync(m => m.MessageId == messageId);
     }
 
     [Fact]
@@ -102,15 +119,16 @@ public class OutboxConsistenciaTests : IAsyncLifetime
         using var alcance = _servicios.CreateScope();
         var db = alcance.ServiceProvider.GetRequiredService<CabinaFletesDbContext>();
         var publicador = alcance.ServiceProvider.GetRequiredService<IPublishEndpoint>();
+        var messageId = Guid.NewGuid();
 
         await using (var tx = await db.Database.BeginTransactionAsync())
         {
-            await publicador.Publish(Mensaje());
+            await publicador.Publish(Mensaje(), ctx => ctx.MessageId = messageId);
             await db.SaveChangesAsync();
             await tx.CommitAsync();
         }
 
-        Assert.Equal(1, await MensajesEnLaTablaDeSalida());
+        Assert.Equal(1, await MensajesEnLaTablaDeSalida(messageId));
     }
 
     [Fact]
@@ -119,18 +137,19 @@ public class OutboxConsistenciaTests : IAsyncLifetime
         using var alcance = _servicios.CreateScope();
         var db = alcance.ServiceProvider.GetRequiredService<CabinaFletesDbContext>();
         var publicador = alcance.ServiceProvider.GetRequiredService<IPublishEndpoint>();
+        var messageId = Guid.NewGuid();
 
         await using (var tx = await db.Database.BeginTransactionAsync())
         {
-            await publicador.Publish(Mensaje());
+            await publicador.Publish(Mensaje(), ctx => ctx.MessageId = messageId);
             await db.SaveChangesAsync();
 
             // El caso real: algo falla después de publicar y antes de confirmar.
             await tx.RollbackAsync();
         }
 
-        Assert.Equal(0, await MensajesEnLaTablaDeSalida());
-        Assert.False(await _bus.Published.Any<AutoCosteoSolicitado>());
+        Assert.Equal(0, await MensajesEnLaTablaDeSalida(messageId));
+        Assert.False(await _bus.Published.Any<AutoCosteoSolicitado>(x => x.Context.MessageId == messageId));
     }
 
     [Fact]
@@ -139,13 +158,14 @@ public class OutboxConsistenciaTests : IAsyncLifetime
         using var alcance = _servicios.CreateScope();
         var db = alcance.ServiceProvider.GetRequiredService<CabinaFletesDbContext>();
         var publicador = alcance.ServiceProvider.GetRequiredService<IPublishEndpoint>();
+        var messageId = Guid.NewGuid();
 
         await using (await db.Database.BeginTransactionAsync())
         {
-            await publicador.Publish(Mensaje());
+            await publicador.Publish(Mensaje(), ctx => ctx.MessageId = messageId);
             // Ni SaveChanges ni Commit: se abandona el alcance, como haría una excepción.
         }
 
-        Assert.Equal(0, await MensajesEnLaTablaDeSalida());
+        Assert.Equal(0, await MensajesEnLaTablaDeSalida(messageId));
     }
 }
