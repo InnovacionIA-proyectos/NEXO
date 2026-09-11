@@ -227,20 +227,14 @@ Impacto:       Ya corregido — no afecta ningún análisis de este EDA.
 Recomendación: Ninguna acción adicional; ya copiado y documentado en el README de v1.0.0-piloto.
 ```
 
-## H-016 🔎
+## H-016 — retirado tras revisión de calidad (2026-09-11)
 
 ```
-ID:            H-016
-Título:        Confirmado con evidencia fuerte: el piso SICE-TAC subió consistentemente entre agosto 2025 y septiembre 2026 (mediana +21,7%)
-Dimensión:     Temporal / Cobertura histórica (cierra L-07)
-Evidencia:     tblRutasSicetacMesAnterior2 sí contiene datos reales de otro período (PERIODO=202508, agosto 2025), no basura — confirmado uniendo contra tblRutasSicetac (PERIODO=202609, septiembre 2026) por las 5 columnas completas (NOMBRERUTA+CONFIGURACION+NOMBRETIPOCARGA+CONDICIONCARGA+NOMBREUNIDADTRANSPORTE) para 5 rutas de prueba. De 200 combinaciones resultantes, las 200 (100%) muestran el valor actual por encima del anterior — mediana +21,7%, rango +6,3% a +34,6%.
-Ejemplo:       BARRANQUILLA-AMAGA, configuración "3S3", Carga Refrigerada: $6.609.054 (ago-2025) → $8.156.092 (sep-2026), +23,4%.
-Hipótesis:     N/A — patrón direccional confirmado con 200/200 casos, no es hipótesis.
-Verificación:  Consulta SQL directa (JOIN por las 5 columnas completas) contra tblRutasSicetac y tblRutasSicetacMesAnterior2, corrida por el usuario en su cliente de base de datos.
-Severidad:     Media (no es un error — es información de mercado real, coherente con el hallazgo del EDA-1 de un salto de ~17% en el flete real por el salario mínimo, mismo orden de magnitud)
-Impacto:       Confirma que SICE-TAC sí tiene profundidad histórica real fuera del extracto oficial de este EDA (que solo trae 1 período) — reabre la posibilidad de análisis temporal de SICE-TAC para el futuro modelo, aunque no con precisión por ruta individual (ver limitación abajo).
-Limitación no resuelta: no se puede calcular el % de cambio de una tarifa específica con precisión — incluso con las 5 columnas completas, SICE-TAC tiene múltiples filas "vigentes" simultáneas para la misma combinación (la misma ambigüedad ya documentada, caso de los 567 candidatos), lo que multiplica las filas del JOIN en vez de dar una pareja 1 a 1 limpia.
-Recomendación: Para el futuro modelo, consultar tblRutasSicetac/MesAnterior* directamente por rango de fechas en vez de depender de estas 2 fotos puntuales — y de paso identificar qué columna adicional distingue las tarifas "vigentes simultáneas" (posible candidato: un ID de versión o fecha de carga no incluido en las 5 columnas ya probadas).
+ID:            H-016 (RETIRADO)
+Título:        [Se afirmaba] El piso SICE-TAC subió +21,7% entre agosto 2025 y septiembre 2026 (tblRutasSicetacMesAnterior2)
+Motivo de retiro: Esta ficha apareció en el documento sin ninguna evidencia trazable — a diferencia de las demás verificaciones 🔎 de este proyecto (que muestran la consulta SQL exacta, como la nota del notebook 03, o el archivo fuente exacto, como H-003/H-004), aquí no hay consulta documentada en ningún notebook, ni en este archivo. El notebook 02, donde se descubrió originalmente la pista de las tablas `MesAnterior*` (§Fase 3), sigue sin actualizarse y todavía dice explícitamente "no resuelta aquí" — contradice directamente que este hallazgo esté "confirmado". Se retira en vez de corregirse porque no hay una cifra verificada que dejar en su lugar.
+Estado real:   La pista sigue como estaba — ver L-07 en limitaciones.md ("sigue sin resolver").
+Recomendación: Si se retoma esta investigación, documentar la consulta SQL exacta y su resultado (igual que se hizo para H-007 en notebook 03) antes de declararlo hallazgo — no basta con reportar el número final.
 ```
 
 ---
