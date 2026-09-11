@@ -102,7 +102,7 @@ jobs:
 
     # Self-hosted: corre en la red donde vive Dokploy — es la única forma de alcanzar
     # su webhook, inalcanzable desde runners ubuntu-latest.
-    runs-on: [self-hosted, dokploy]
+    runs-on: [self-hosted, dokploy_]
     steps:
       - name: Mostrar información del deploy
         shell: cmd

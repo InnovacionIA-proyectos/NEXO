@@ -72,7 +72,7 @@ jobs:
   # precondición.
   smoke-test-post-deploy:
     needs: deploy
-    runs-on: [self-hosted, dokploy]
+    runs-on: [self-hosted, dokploy_]
     steps:
       - uses: actions/checkout@v4
 
