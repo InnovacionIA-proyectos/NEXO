@@ -31,7 +31,76 @@ paridad de `cubicador-ci.yml` (S2-HU-07.3): configurar juntas
 de CI concreta que confirmó 26/26 — URL o commit) y `Cubicacion:ParidadFecha`.
 Las tres son obligatorias a la vez (`Domain.PlanDeCargue.Reglas.
 CompuertaDeParidad`): `ParidadVerificada=true` sin las otras dos dejas la
-compuerta cerrada igual, a propósito — no es un booleano suelto.
+compuerta cerrada igual, a propósito — no es un booleano suelto. Checklist
+formal (issue #118, S3-HU-05.3) en
+[`docs/CHECKLIST_DESPLIEGUE.md`](docs/CHECKLIST_DESPLIEGUE.md) — enlazado a
+S2-HU-07.3, sin ejecutar: sigue siendo responsabilidad de Kevin, no de esa HU.
+
+**Cierre de seguridad (S3-HU-05, #116/#117)**: `CUBICADOR_CORS_ORIGENES` se
+retiró por completo (código + `.env`/`.env.example`/`docker-compose.yml`) —
+ningún navegador llama a Cubicador directo desde que S3-HU-02/03/04 movieron
+toda escritura y lectura del plan de cargue a través de NEXO. `CUBICADOR_API_KEY`
+y el par `NEXO_CALLBACK_API_KEY`/`Cubicador3D__InboundApiKey` se rotaron — el
+valor que estuvo expuesto en el bundle público del portal queda inválido.
+Pendiente fuera de este repo: aplicar el valor nuevo en el despliegue real de
+producción (esta sesión solo rotó los `.env` locales de desarrollo).
+
+> ⚠️ **Corrección al párrafo de arriba.** Dice que S3-HU-04 ya movió el frontend
+> a NEXO. **Todavía no ocurrió**: esa HU no tiene rama ni commits, y
+> `administracion_embarqa_nexo` sigue con 12 puntos de llamada directa al
+> Cubicador (`cubicadorBaseUrl` en `cubicador-api.service.ts` y
+> `captura-api.service.ts`) — verificado con `git grep` sobre su `origin/main`.
+>
+> Qué implica hoy, en concreto: en producción no rompe nada (ese módulo ya
+> estaba inerte, `environment.prod.ts` tiene `cubicadorApiUrl` y
+> `cubicadorApiKey` vacíos), y en desarrollo el CORS tampoco muerde porque las
+> llamadas van por el proxy de Angular, que para el navegador es mismo origen.
+> **Lo que sí rompe es la clave rotada**: `environment.ts` lleva
+> `dev_cubicador_api_key` escrita a mano, así que quien levante el frontend
+> contra un Cubicador local recibe 401 en las 12 llamadas hasta que S3-HU-04
+> las migre.
+>
+> **Faltan 4 endpoints en NEXO** para que S3-HU-04 pueda cerrar:
+> `desde-linea/{lineaId}`, `por-linea/{lineaId}`, `{id}/colocaciones` y
+> `POST /api/cubicacion`. Inventario 1 a 1 de las 20 llamadas, con el detalle de
+> cada hueco, en [`docs/mensajeria/CUBICACION.md` §8](docs/mensajeria/CUBICACION.md).
+> El cuarto, además, **no tiene issue** y necesita una decisión de arquitectura
+> antes de escribirse.
+
+**Resuelto — los 3 bugs de QA de Cubicación (S3-HU-10, #131/#132/#133)**: los tres
+que la verificación de los PR #122/#126 encontró y que seguían presentes en `QA`.
+
+1. Un mensaje sin `planId` dejaba el worker **atascado para siempre**: la línea que
+   reporta el fallo final usaba indexación directa y lanzaba antes del `ack`. Con
+   `prefetch_count=2`, dos mensajes así bloqueaban el worker completo y reiniciar el
+   contenedor no lo recuperaba.
+2. Un ítem **sin SKU** —caso de negocio legítimo, `string?` en NEXO— fallaba 3 veces
+   y marcaba *todo el plan* en `error`.
+3. Borrar un plan **ya optimizado** siempre fallaba con `ForeignKeyViolationError`, y
+   como NEXO borra de forma optimista, dejaba las dos bases en desacuerdo sin nada que
+   las reconciliara.
+
+Al arreglarlos aparecieron **dos defectos más de la misma causa**, incluidos en la
+misma HU: todo lo que fallaba *antes* del bloque de manejo de errores (body ilegible,
+JSON que no es un objeto, falta `correlationId`, cabecera `x-intentos` corrupta)
+atascaba el mensaje igual pero **sin llegar siquiera a la DLQ**; y
+`eliminar_planes_de_linea()` tenía el bug 3 exacto, agravado porque un `delete()`
+masivo tampoco dispara la cascada del ORM — o sea que **volver a cubicar una línea con
+flota optimizada fallaba siempre**.
+
+Verificado contra el stack real (Postgres + RabbitMQ + api + worker), no solo con
+tests: evidencia completa en
+[`tests/QA/s3-hu-10-tres-bugs-cubicacion/README.md`](tests/QA/s3-hu-10-tres-bugs-cubicacion/README.md).
+
+**Resuelto — aislamiento de la base entre tests de Cubicador (S3-HU-10)**: la suite
+compartía una sola base SQLite en memoria (`StaticPool`, necesario para que las
+conexiones vean la misma base), así que lo que un test escribía quedaba para los
+siguientes. Dos trampas concretas: colgarle un plan a un preset del catálogo lo dejaba
+"en uso" y rompía el test que lo borra; agregar un vehículo rompía el que afirma
+`len(vehiculos) == 9`. Lo peor era que fallaban **en otro archivo, con un error que no
+mencionaba al culpable**. Cerrado con `cubicador/tests/conftest.py` (no existía
+ninguno), que recrea el esquema antes de cada test: ~1 s sobre la suite completa, cero
+roturas, comprobado con un test contaminante deliberado.
 
 **Resuelto**: "pedir un plan de cargue desde una línea de solicitud"
 (`crear_desde_linea` — botón Cubicar de la Mesa de Costeo → Cubicador 3D)
@@ -181,6 +250,41 @@ diseño ya documentada en MIGRACION.md para Biblioteca) — no hay regla de
 negocio de Application que valga la pena aislar con un mock ahí; su cobertura
 queda en `Api.Tests` (`TarifasHistoricasTests`, `TarifasSicetacTests`,
 `MetricasTests`), que ya ejercitan esos flujos de punta a punta.
+
+### No existe pipeline de CI para .NET (bloquea el cierre de S3-HU-06.2, #121)
+
+Los tests de .NET **no corren en ningún pipeline**: solo se ejecutan cuando
+alguien los lanza a mano. Verificado — `.github/workflows/` tiene únicamente
+`cubicador-ci.yml` (pytest + smoke de Docker, solo Python) y
+`add-to-project-nexo.yml` (automatización del tablero). **Ningún workflow
+menciona `dotnet`.**
+
+Es lo que impide cerrar el criterio de S3-HU-06.2: *"el test debe fallar el
+build si algún nombre deja de coincidir — no debe depender de que alguien lo
+note"*. La guarda ya existe y está verificada por mutación
+(`tests/CabinaFletes.Api.Tests/Cubicacion/ContratoMessageTypeTests.cs`), pero
+**sin build que falle, sigue dependiendo de que alguien la ejecute** — justo lo
+que esa HU quería eliminar. El test queda listo para engancharse el día que el
+workflow exista; no hace falta tocarlo.
+
+Qué haría falta, con el detalle que ya conocemos por haberlo hecho a mano
+decenas de veces en esta sesión:
+
+- `dotnet build` de la solución más las tres suites.
+- `Domain.Tests` y `Application.Tests` corren sin nada más.
+- **`Api.Tests` necesita SQL Server**: hay que levantarlo como *service
+  container* en el runner y pasarle `TEST_DB_CONNECTION`
+  (`ApiFixture.cs:20` cae por defecto a `Trusted_Connection`, que no sirve
+  contra un SQL Server en Linux). Ojo con la espera: el contenedor tarda
+  ~15 s en dar *"Recovery is complete"*, y lanzar los tests antes hace fallar
+  ~69 de ellos con `SqlException` — un falso rojo que se confunde con un bug
+  real.
+- Filtrar por `paths` igual que `cubicador-ci.yml`, para no correrlo en PRs que
+  solo tocan Python o documentación.
+
+Beneficio más allá de #121: hoy **nada** garantiza que `main`/`QA` compilen. Un
+PR que rompa la compilación de .NET entra sin que nadie se entere hasta que
+alguien clona y construye.
 
 Consolidar los proyectos de test duplicados (`tests/` y
 `src/CabinaFletes.Tests` en el original) sigue pendiente como limpieza

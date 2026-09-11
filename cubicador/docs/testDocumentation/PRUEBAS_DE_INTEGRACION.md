@@ -2,7 +2,7 @@
 
 Complementa a [`REGLAS_DE_NEGOCIO.md`](./REGLAS_DE_NEGOCIO.md) (que documenta
 las 33 pruebas unitarias del motor). Este documento cubre tres niveles más:
-las 6 pruebas de integración automatizadas (`tests/api/test_smoke.py` +
+las pruebas de integración automatizadas (`tests/api/test_smoke.py` +
 `tests/worker/test_ejecutar_solicitud.py`), el smoke test de CI contra
 Docker Compose real (`.github/workflows/ci.yml` + `scripts/ci_docker_smoke.py`,
 automatiza las secciones 2.2-2.4 de abajo en cada push/PR), y la
@@ -67,11 +67,49 @@ está en la sección 2.8.
 | `test_mover_a_dlq_dispara_la_alerta` | `worker/main.py::_mover_a_dlq` llama a `alertar_mensaje_en_dlq(tipo, error, intentos)` con los valores correctos, y publica el mensaje crudo a `cubicacion.dlq` con los headers esperados — publisher y mensaje son dobles de prueba. |
 | `test_alertar_mensaje_en_dlq_degrada_sin_smtp_configurado` | `alertar_mensaje_en_dlq` no lanza excepción (solo loggea un warning) si `ALERTAS_SMTP_HOST` está vacío — un correo que no sale no debe tumbar el worker. |
 
+## 1.3 Los 3 bugs de QA (S3-HU-10, issues #131/#132/#133)
+
+Guardas de regresión de los 3 bugs que la verificación de QA de los PR #122/#126
+encontró. Para los tres se escribió el test primero y **se comprobó que fallara**
+contra el código sin arreglar; al final se revirtieron los 5 arreglos a la vez y
+fallaron 7 tests.
+
+| Archivo | Qué verifica |
+|---|---|
+| `tests/worker/test_mensaje_malformado.py` (8) | Que un mensaje malformado **se ackee** — el síntoma del bug no era la excepción, era el mensaje sin confirmar que ocupa un hueco del `prefetch_count=2` para siempre. Cubre el caso de la issue (sin `planId`) y los 4 que fallaban *antes* del bloque de manejo de errores: body ilegible, JSON que no es un objeto, sin `correlationId`, cabecera `x-intentos` corrupta. Más el escenario del bloqueo: dos mensajes seguidos, ninguno sin ackear. |
+| `tests/api/test_item_sin_sku.py` (7) | Que un `"sku": null` **explícito** se acepte y se normalice a `""`, y que el plan no quede en `error`. Cubre por separado "clave ausente" y "clave presente en null": esa distinción **es** el bug (el default de Pydantic solo aplica si la clave falta). |
+| `tests/worker/test_eliminar_plan_optimizado.py` (4) | Que borrar un plan **ya optimizado** no deje filas huérfanas, ni por `eliminar()` ni por `eliminar_planes_de_linea()`. |
+
+⚠️ **Por qué estos tests no esperan `ForeignKeyViolationError`.** Sería un test que
+pasa siempre. La suite corre sobre SQLite y `db.py` no activa
+`PRAGMA foreign_keys=ON`, así que SQLite **no aplica las FK**: antes del arreglo, en
+vez de fallar, dejaba las colocaciones huérfanas en silencio. Se afirma entonces la
+propiedad real —que no queden huérfanas—, que en Postgres es lo que evita el error y
+en SQLite lo que evita la basura. La verificación contra Postgres real está en
+`tests/QA/s3-hu-10-tres-bugs-cubicacion/README.md`.
+
+## 1.4 `tests/conftest.py` — aislamiento de la base entre tests
+
+Recrea el esquema antes de cada test (`autouse`). Sin esto, **toda la suite comparte
+una sola base**: `DATABASE_URL` apunta a SQLite `:memory:` y `db.py` usa
+`poolclass=StaticPool` para esa URL, necesario para que las distintas conexiones vean
+la misma base — con el efecto colateral de que lo que un test escribe queda para los
+siguientes.
+
+Eso convirtió la suite en una trampa silenciosa, y se pisó dos veces escribiendo los
+tests de arriba: colgarle un plan a un preset del catálogo lo deja "en uso" y rompe
+`test_eliminar_vehiculo_borra_y_publica_vehiculo_eliminado`; agregar un vehículo rompe
+`test_flujo_completo_crear_optimizar`, que afirma `len(vehiculos) == 9`. **Fallan en
+otro archivo, con un error que no menciona al test culpable.**
+
+Costo medido: ~1 s sobre la suite completa, cero roturas. Comprobado con un test
+contaminante deliberado: sin el fixture rompe un test ajeno, con él no afecta a nadie.
+
 ### Cómo correrlas
 
 ```bash
 pip install -r requirements.txt   # incluye pytest + pytest-asyncio
-pytest tests/api -v
+pytest -v
 ```
 
 ## 2. Verificación manual contra Docker Compose real
@@ -256,6 +294,17 @@ reales configurados (`TIMEOUT_PROCESANDO_MINUTOS`):
    `limite` = el instante actual en vez de "ahora menos 5 minutos", para no
    tener que esperar) → devolvió `marcados: 1`.
 4. `GET /{id}` confirmó `estado: "error"` en el plan.
+
+> **Actualizado en S3-HU-06.1.** Ese método ya no existe: se partió en
+> `obtener_atascados(limite)` (solo consulta) más el `marcar_error` que ya
+> había, y el vigilante ahora además **publica `cubicacion.rechazada` con
+> `codigo: "TIMEOUT_PROCESAMIENTO"` antes** de marcar el plan (ver CONTRATO.md
+> 6.4). Para repetir esta verificación manual, el punto 3 pasa a ser una
+> llamada a `worker.main._revisar_timeouts(publisher)` con
+> `CUBICADOR_TIMEOUT_PROCESANDO_MINUTOS` bajo, y al punto 4 se le suma
+> comprobar que el mensaje llegó a la cola `Cubicacion.CubicacionRechazada` de
+> NEXO. La lógica en sí (incluido el orden publicar-antes-de-marcar) ya está
+> cubierta de forma automática en `tests/worker/test_vigilante_timeouts.py`.
 5. Se reinició el `worker` (`docker compose start worker`) y se confirmó en
    sus logs que retomó el consumo normalmente.
 
@@ -546,9 +595,12 @@ automatizados contra Docker") ya se cerró — ver `.github/workflows/ci.yml` +
 push/PR. Lo que sigue sin automatizar, porque requiere infraestructura que
 el runner de CI no tiene o una topología más compleja de simular:
 
-- **El vigilante de timeout** (sección 2.4, punto c): requiere detener el
-  contenedor `worker` a mitad de un mensaje y llamar a
-  `marcar_error_por_timeout` directo contra la base — sigue siendo manual.
+- **El vigilante de timeout, de punta a punta** (sección 2.4, punto c):
+  requiere detener el contenedor `worker` a mitad de un mensaje y llamar a
+  `_revisar_timeouts` directo contra la base — sigue siendo manual. Desde
+  S3-HU-06.1 su *lógica* sí está automatizada con dobles de prueba
+  (`tests/worker/test_vigilante_timeouts.py`), incluido el caso de RabbitMQ
+  caído; lo que queda manual es el recorrido real contra los dos contenedores.
 - **`crear_plan_desde_linea` de punta a punta contra NEXO real** (secciones
   2.6 y 2.9): verificado manualmente contra la implementación real de NEXO
   (2.9) — funciona. Sigue sin automatizarse en CI: el runner no levanta el

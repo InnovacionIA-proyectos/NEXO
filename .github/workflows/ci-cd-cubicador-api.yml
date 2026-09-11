@@ -1,0 +1,61 @@
+name: CI/CD Cubicador-API
+
+# S3-HU-11.2/11.5 (issues #135/#138): dispara por cambios exclusivos de la API
+# de Cubicador (cubicador/api/**, su Dockerfile) Y por cambios en el código
+# COMPARTIDO con el worker (domain/application/infrastructure/tests/scripts,
+# requirements.txt, docker-compose.yml) — un cambio ahí dispara ESTE pipeline
+# Y ci-cd-cubicador-worker.yml, nunca solo uno. Ver
+# docs/CI_CD_RUTAS_COMPARTIDAS.md para la convención completa.
+on:
+  push:
+    branches: [main, Pre-Despliegue-BACKEND]
+    paths:
+      - "cubicador/api/**"
+      - "cubicador/Dockerfile"
+      - "cubicador/domain/**"
+      - "cubicador/application/**"
+      - "cubicador/infrastructure/**"
+      - "cubicador/tests/**"
+      - "cubicador/scripts/**"
+      - "cubicador/requirements.txt"
+      - "cubicador/docker-compose.yml"
+      - ".github/workflows/ci-cd-cubicador-api.yml"
+      - ".github/workflows/_cubicador-pruebas.yml"
+  pull_request:
+    branches: [main, Pre-Despliegue-BACKEND]
+    paths:
+      - "cubicador/api/**"
+      - "cubicador/Dockerfile"
+      - "cubicador/domain/**"
+      - "cubicador/application/**"
+      - "cubicador/infrastructure/**"
+      - "cubicador/tests/**"
+      - "cubicador/scripts/**"
+      - "cubicador/requirements.txt"
+      - "cubicador/docker-compose.yml"
+      - ".github/workflows/ci-cd-cubicador-api.yml"
+      - ".github/workflows/_cubicador-pruebas.yml"
+
+jobs:
+  build-and-test:
+    uses: ./.github/workflows/_cubicador-pruebas.yml
+
+  deploy:
+    needs: build-and-test
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/Pre-Despliegue-BACKEND') && github.event_name == 'push'
+    runs-on: [self-hosted, dokploy_]
+    steps:
+      - name: Mostrar información del deploy
+        shell: cmd
+        run: |
+          echo Branch: ${{ github.ref }}
+          echo Commit: ${{ github.sha }}
+          echo Evento: ${{ github.event_name }}
+
+      - name: Disparar despliegue en Dokploy (Cubicador-API)
+        shell: cmd
+        run: |
+          curl -f -X POST "${{ secrets.DOKPLOY_DEPLOY_WEBHOOK_URL_CUBICADOR_API }}" ^
+            -H "Content-Type: application/json" ^
+            -H "X-GitHub-Event: push" ^
+            -d "{\"ref\":\"${{ github.ref }}\",\"repository\":{\"full_name\":\"${{ github.repository }}\"}}"

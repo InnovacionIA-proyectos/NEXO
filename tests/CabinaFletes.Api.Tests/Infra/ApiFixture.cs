@@ -19,26 +19,6 @@ public class ApiFactory : WebApplicationFactory<Program>
         Environment.GetEnvironmentVariable("TEST_DB_CONNECTION")
         ?? "Server=localhost;Database=CabinaFletesClean_Test;Trusted_Connection=True;TrustServerCertificate=True;";
 
-    /// <summary>
-    /// La misma cadena apuntando a OTRA base.
-    ///
-    /// Hace falta porque xUnit corre las colecciones en paralelo y varias suites usaban
-    /// la misma base: <see cref="ApiFixture"/> hace EnsureDeleted al arrancar y se la
-    /// borraba en plena migración a las pruebas del outbox. El síntoma era "A severe
-    /// error occurred on the current command", que no dice nada del choque.
-    ///
-    /// Estuvo escondido varias sesiones porque las suites se corrían por separado y con
-    /// filtros. Cada grupo con su base: compartirla no aporta nada y sí acopla.
-    /// </summary>
-    public static string ConexionA(string baseDeDatos)
-    {
-        var constructor = new Microsoft.Data.SqlClient.SqlConnectionStringBuilder(TestConnection)
-        {
-            InitialCatalog = baseDeDatos
-        };
-        return constructor.ConnectionString;
-    }
-
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Development");
@@ -62,7 +42,8 @@ public class ApiFactory : WebApplicationFactory<Program>
     }
 }
 
-/// <summary>Crea la BD de pruebas (limpia), aplica migraciones y siembra datos una sola vez por corrida.</summary>
+/// <summary>Se conecta a la BD de pruebas ya existente y siembra datos (si hace falta) una
+/// sola vez por corrida — NUNCA le administra el esquema.</summary>
 public class ApiFixture : IDisposable
 {
     public ApiFactory Factory { get; }
@@ -72,8 +53,24 @@ public class ApiFixture : IDisposable
         Factory = new ApiFactory();
         using var scope = Factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<CabinaFletesDbContext>();
-        db.Database.EnsureDeleted();
-        db.Database.Migrate();
+
+        // NUNCA EnsureDeleted() ni Migrate() por defecto acá (S3-HU-11.1, issue #134):
+        // TEST_DB_CONNECTION en CI apunta a dbInformesAutomatizados_Pruebas, una base
+        // real de la red corporativa (10.10.40.85, ver ci-cd-api.yml) cuyo LOGIN de
+        // prueba (userInformesOw) tiene, a propósito, los mismos permisos que la app
+        // real necesita para funcionar (leer/escribir filas) — NADA de DDL ni de
+        // "owner". Migrate() exige CREATE TABLE/CREATE DATABASE, que ese login no
+        // tiene y no debe tener: el esquema de esa base lo administra quien la
+        // aprovisiona, no este fixture. Mismo criterio que ya usa Program.cs en la app
+        // real: `Database:MigrateOnStartup` apagado por defecto, encendido solo a
+        // propósito en los entornos que sí deben crear/actualizar el esquema (docker
+        // compose local, por ejemplo). Acá el equivalente es la variable de entorno
+        // TEST_DB_MIGRATE_ON_STARTUP — sin ella, se asume que el esquema YA está
+        // desplegado y correcto; si no lo está, las pruebas van a fallar con errores
+        // de SQL claros (tabla/columna inexistente), no en silencio.
+        if (Environment.GetEnvironmentVariable("TEST_DB_MIGRATE_ON_STARTUP") == "true")
+            db.Database.Migrate();
+
         DataSeeder.SeedAsync(db).GetAwaiter().GetResult();
     }
 

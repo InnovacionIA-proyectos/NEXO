@@ -227,6 +227,8 @@ public static class DependencyInjection
         // (ICubicacionPort lo registra AddMensajeria(), no este método) + compuerta de
         // paridad (S2-HU-08.2, #30).
         services.AddScoped<IPlanCargueRepository, EfPlanCargueRepository>();
+        // S3-HU-03 (issue #112): catálogo de vehículos, proyectado por VehiculoCatalogoConsumer.
+        services.AddScoped<IVehiculoCubicacionRepository, EfVehiculoCubicacionRepository>();
         services.AddScoped<IParidadCubicadorPort, ParidadCubicadorAdapter>();
         // Puente de solo lectura hacia Solicitudes para el Cubicador (crear-desde-línea).
         services.AddScoped<ILineaSolicitudCubicacionPort, LineaSolicitudCubicacionAdapter>();

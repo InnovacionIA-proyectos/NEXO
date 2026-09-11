@@ -34,8 +34,9 @@ class ILineaSolicitudPort(Protocol):
 
 class IEventosPort(Protocol):
     """Publica los eventos de dominio a RabbitMQ (CubicaciónSolicitada,
-    PlanDeCargueGenerado, CubicaciónRechazada, PlanDeCargueAjustado). Ver
-    CONTRATO.md seccion 6 para las rutas/colas."""
+    PlanDeCargueGenerado, CubicaciónRechazada, y desde S3-HU-03 tambien
+    VehiculoCreado/VehiculoActualizado). Ver CONTRATO.md seccion 6 para las
+    rutas/colas."""
 
     async def publicar_cubicacion_solicitada(
         self, plan_id: str, tipo: str, solicitud: dict[str, Any],
@@ -44,3 +45,7 @@ class IEventosPort(Protocol):
     async def publicar_plan_generado(self, plan_id: str, resultado: dict[str, Any]) -> None: ...
 
     async def publicar_cubicacion_rechazada(self, plan_id: str, codigo: str, mensaje: str) -> None: ...
+
+    async def publicar_vehiculo_creado(self, vehiculo_id: str, vehiculo: dict[str, Any]) -> None: ...
+
+    async def publicar_vehiculo_actualizado(self, vehiculo_id: str, vehiculo: dict[str, Any]) -> None: ...
