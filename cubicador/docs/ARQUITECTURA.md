@@ -88,7 +88,7 @@ Mapeo de archivos origen → destino:
 | `MotorCubicacion3D.cs` | `domain/motor/motor.py` |
 | `CubicacionService.cs` (evaluador SICCE) | `domain/motor/cubicacion_rapida.py` |
 | `PlanCargueService.cs` | se reparte entre `application/plan_cargue/*.py` (orquestación) e `infrastructure/persistence/repositorios/plan_cargue_repo.py` (EF→SQLAlchemy) |
-| `Application/Cubicacion3D/Dtos/*.cs` de NEXO | `api/dtos/*.py` (Pydantic) — ver CONTRATOS.md |
+| `Application/Cubicacion3D/Dtos/*.cs` de NEXO | `api/dtos/*.py` (Pydantic) — ver ../CONTRATO.md |
 | `Application/Cubicacion3D/Ports/*.cs` de NEXO | `application/ports/*.py` (Protocols) |
 
 **Nota de traducción**: el original usa `decimal` en todas partes; aquí se

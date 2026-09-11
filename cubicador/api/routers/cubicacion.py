@@ -1,5 +1,5 @@
 """Router `/api/cubicacion` - cubicador rapido + medidas estandar. Ver
-docs/CONTRATOS.md seccion A. `POST /costear` del original NO se migro - ver
+CONTRATO.md seccion 3.1. `POST /costear` del original NO se migro - ver
 README.md."""
 
 from __future__ import annotations

@@ -18,22 +18,23 @@ con su propia base de datos (Postgres, contenedor propio). NEXO lo consume
 vía REST (operaciones simples) y RabbitMQ (operaciones pesadas: optimizar,
 crear plan desde línea).
 
-**Nota sobre el puente hacia NEXO**: el endpoint que NEXO debe exponer para
-"crear plan desde línea" (`GET /api/lineas-solicitud/{id}/cubicacion`) fue
-construido en una fase anterior, en la rama `cubicador` de este mismo repo
-(un módulo C# de Cubicación 3D que quedó descartado con el cambio de
-dirección hacia este microservicio). **Esta rama no lo tiene** — si vas a
-probar `crear_desde_linea`, necesitas ese endpoint corriendo desde la otra
-rama, o usar `infrastructure/clientes/nexo_client.py` contra un NEXO que sí
-lo tenga. Además, la decisión técnica de S2-HU-072 apunta a que la
-comunicación NEXO↔Cubicador termine siendo solo por colas (RabbitMQ/
-MassTransit, S2-HU-04, aparte) — este endpoint REST podría no ser el
-mecanismo final.
+**Nota sobre el puente hacia NEXO** (actualizado 2026-09-02): el endpoint que
+NEXO expone para "crear plan desde línea" (`GET /api/lineas-solicitud/{id}
+/cubicacion`) ya está implementado y verificado en el NEXO real
+(`LineasSolicitudCubicacionController`, ver `PENDIENTES.md` y
+`docs/testDocumentation/PRUEBAS_DE_INTEGRACION.md` sección 2.9). Hubo un
+primer intento en una rama vieja del repo de NEXO (`cubicador`) que nunca se
+mezcló y quedó descolgada — ese diseño es el que se portó a la
+implementación actual. La comunicación NEXO→Cubicador sigue siendo por
+colas (RabbitMQ/MassTransit) para las operaciones pesadas; este es el único
+endpoint REST, en sentido inverso (Cubicador→NEXO), y es deliberadamente
+así — es una consulta de solo lectura puntual, no encaja en el patrón de
+eventos.
 
 Ver:
+- [`CONTRATO.md`](./CONTRATO.md) — API REST, eventos de RabbitMQ, DTOs, errores, autenticación: todo lo necesario para conectar backend o frontend contra este servicio.
 - [`docs/ARQUITECTURA.md`](./docs/ARQUITECTURA.md) — capas, estructura de carpetas, cómo se traduce Clean Architecture a Python.
 - [`docs/DECISIONES_TECNICAS.md`](./docs/DECISIONES_TECNICAS.md) — registro de cada decisión tomada y por qué.
-- [`docs/CONTRATOS.md`](./docs/CONTRATOS.md) — API REST, eventos de RabbitMQ, DTOs, errores, autenticación.
 - [`docs/testDocumentation/`](./docs/testDocumentation/) — documentación completa de los tests: las 31 reglas de negocio portadas desde cabinaFletes y las pruebas de integración/Docker.
 
 ## Stack
@@ -42,7 +43,7 @@ Ver:
 - **FastAPI** — API síncrona (`/api/cubicacion`, `/api/planes-cargue`)
 - **SQLAlchemy 2.0 (async)** — persistencia propia; `DATABASE_URL` apunta a SQLite en desarrollo o PostgreSQL en producción (mismo código, solo cambia la URL)
 - **aio-pika (RabbitMQ)** — worker consumidor separado, para `optimizar` y `crear-desde-línea`
-- **pytest** — 70 pruebas: 33 de reglas de negocio del motor (26 casos dorados de `MotorCubicacion3DTests.cs` + 5 de apilamiento multi-soporte) + **27 de paridad cross-motor** (los mismos 26 casos, comparados contra la salida real del motor C#, no contra un valor transcrito a mano) + 4 de humo end-to-end de la API + 2 de regresión del worker + 2 del registro de algoritmos intercambiables + 2 de la alerta al equipo cuando un mensaje cae a `cubicacion.dlq`
+- **pytest** — 103 pruebas: 33 de reglas de negocio del motor (28 casos dorados de `MotorCubicacion3DTests.cs` + 5 de apilamiento multi-soporte) + **27 de paridad cross-motor** (los mismos casos, comparados contra la salida real del motor C#, no contra un valor transcrito a mano) + 4 de humo end-to-end de la API + 12 de regresión del worker (los 9 comandos por cola + el puente desde línea) + 4 del vigilante de timeouts + 2 del registro de algoritmos intercambiables + 2 de la alerta al equipo cuando un mensaje cae a `cubicacion.dlq` + **19 guardas de los 3 bugs de QA** (S3-HU-10: mensaje malformado que atascaba el worker, ítem sin SKU, borrado de plan optimizado)
 
 ## Estado actual (léelo antes de asumir que algo funciona)
 
@@ -76,10 +77,14 @@ Ver:
   marca/reporta una sola vez, como corresponde (reintentar dará siempre el
   mismo resultado).
 - **Vigilante de timeout**: un plan que quedó en `procesando` (ej. el worker
-  se detiene a mitad de proceso) es marcado `error` automáticamente al pasar
-  el límite configurado — confirmado forzando el escenario (worker detenido,
-  plan en `procesando`, se corrió `marcar_error_por_timeout` con el límite
-  cumplido) y viendo el plan pasar a `error` vía `GET /{id}`.
+  se detiene a mitad de proceso) recibe un `cubicacion.rechazada` con
+  `codigo: "TIMEOUT_PROCESAMIENTO"` y queda marcado `error` al pasar el límite
+  configurado (`CUBICADOR_TIMEOUT_PROCESANDO_MINUTOS`) — confirmado forzando el
+  escenario (worker detenido, plan en `procesando`, se corrió
+  `_revisar_timeouts` con el límite cumplido) y viendo el plan pasar a `error`
+  vía `GET /{id}`. El rechazo se publica **antes** de marcar el plan, para que
+  un broker caído se reintente en el ciclo siguiente en lugar de perderse — ver
+  CONTRATO.md 6.4.
 - Un bug real que solo apareció probando con datos reales: `metricas.puntaje`
   en `GET /resultado` siempre daba 0 porque `obtener_resultado` no
   reconstruía `resultado.puntaje` desde el plan persistido antes de pedirle
@@ -182,6 +187,26 @@ Ver:
   `optimizar`, y confirma que el evento real llega por ahí, no solo que el
   efecto quedó en la base de datos.
 
+**Endpoint de NEXO para `crear_desde_linea` — implementado y verificado
+(2026-09-02):** el bullet de arriba (`infrastructure/clientes/nexo_client.py`
+verificado "contra la API de NEXO... rama `cubicador`") describía una
+verificación contra una rama que **nunca se mezcló a `QA`** — quedó
+descolgada antes de la reorganización del código por feature. `GET
+/api/lineas-solicitud/{id}/cubicacion` no existía en ningún checkout real de
+NEXO hasta ahora. Se portó el diseño de esa rama vieja (adaptado a la
+estructura actual: CQRS por feature, no por capa) al NEXO real:
+`LineasSolicitudCubicacionController` + `ObtenerCubicacionLineaQuery` +
+`LineaSolicitudCubicacionAdapter`, con autenticación de servicio-a-servicio
+dedicada (`CubicadorApiKeyAuthenticationHandler`, esquema `CubicadorApiKey`
+separado de la sesión del portal). `LineaSolicitud.Dimensiones` ya capturaba
+las posiciones desde antes — no hizo falta ningún cambio de captura, solo el
+endpoint. Verificado con 6 tests de integración HTTP contra SQL Server real
+(200/404/401 en sus tres variantes) y con una corrida real de punta a punta
+cruzando los dos stacks en Docker: `POST /desde-linea/{id}` → RabbitMQ →
+worker → `GET .../cubicacion` (200) → plan armado con el vehículo sugerido
+por el cubicador rápido → optimizado, 3/3 unidades cargadas. Detalle
+completo en `cubicador/CONTRATO.md` sección 7 y en `NEXO/PENDIENTES.md`.
+
 ## CI
 
 `.github/workflows/cubicador-ci.yml` (raíz del repo NEXO, con
@@ -209,9 +234,9 @@ jobs en cada push/PR a `QA`/`main`:
   script a la topología interna del compose de una forma que no valía la
   pena para CI — sigue siendo procedimiento manual (ver
   `docs/testDocumentation/PRUEBAS_DE_INTEGRACION.md` sección 2.4).
-- `crear_plan_desde_linea` de punta a punta contra un NEXO real: el job de
-  CI no levanta el repo NEXO — sigue siendo verificación manual con ambos
-  stacks corriendo a la vez (sección 2.6 del mismo documento).
+- `crear_plan_desde_linea` de punta a punta contra un NEXO real: verificado
+  manualmente (ver el bullet fechado 2026-09-02 más abajo), pero el job de
+  CI no levanta el repo NEXO — sigue sin automatizarse.
 
 ## Puesta en marcha
 
@@ -242,12 +267,21 @@ Y luego el stack propio de Cubicador:
 ```bash
 cp .env.example .env   # completar POSTGRES_PASSWORD, RABBITMQ_USER/PASSWORD (= los del .env raíz de NEXO), CUBICADOR_API_KEY, NEXO_CALLBACK_API_KEY, NEXO_BASE_URL
 docker compose up -d --build --wait
-curl http://localhost:8000/health
+curl http://localhost:8081/health
 ```
 
-Swagger interactivo en `http://localhost:8000/docs` — botón "Authorize"
+El contenedor sigue escuchando en el puerto 8000 puertas adentro, pero se
+publica en el host en el **8081** por defecto (`CUBICADOR_HOST_PORT` en
+`.env`) — a propósito, para no chocar con el 8080 donde corre el backend
+.NET de NEXO. Si 8081 tampoco sirve, cambiá `CUBICADOR_HOST_PORT=8082`.
+
+Swagger interactivo en `http://localhost:8081/docs` — botón "Authorize"
 arriba a la derecha, pega ahí tu `CUBICADOR_API_KEY` (sin la palabra
 "Bearer", Swagger la agrega sola) y queda aplicado a todos los endpoints.
+También hay un contrato OpenAPI ya exportado en
+[`docs/openapi.json`](./docs/openapi.json) (importable en Postman/Insomnia o
+para generar un cliente), y una guía corta de integración en
+[`CONTRATO.md`](./CONTRATO.md).
 
 **Correr las pruebas:**
 
@@ -258,9 +292,24 @@ pytest
 
 ## Cómo se conecta con NEXO
 
-- **NEXO → este servicio**: REST síncrono para todo salvo optimizar/crear-desde-línea, que van por RabbitMQ (202 inmediato, resultado por polling — ver arriba). Autenticación: `Authorization: Bearer <CUBICADOR_API_KEY>`.
-- **Este servicio → NEXO**: un único endpoint de solo lectura que NEXO debe exponer (`GET /api/lineas-solicitud/{id}/cubicacion`) para el puente Mesa de Costeo → Cubicador. Autenticación: `Authorization: Bearer <NEXO_CALLBACK_API_KEY>`. **Ese endpoint solo existe en la rama `cubicador` de este repo** (ver nota al inicio de este README) — en esta rama, `crear_desde_linea` no tiene con qué hablar hasta que se decida el mecanismo final (posiblemente colas, no REST — ver S2-HU-04).
-- Aunque ahora viven en el mismo repo, siguen sin compartir red Docker ni base de datos — cada uno tiene su propio `docker-compose.yml` y todo cruce es por API o mensaje, nunca por tabla compartida.
+- **NEXO → este servicio**: NEXO **no llama** a la API REST de este
+  servicio (ver `CONTRATO.md` sección 1.1). `optimizar`/`crear-desde-línea`
+  van por RabbitMQ (202 inmediato del lado Cubicador, resultado por
+  polling). La API REST de este servicio es para un frontend que la
+  consuma directo, no para NEXO — autenticación `Authorization: Bearer
+  <CUBICADOR_API_KEY>`.
+- **Este servicio → NEXO**: un único endpoint de solo lectura, en sentido
+  inverso, que NEXO ya expone (`GET /api/lineas-solicitud/{id}/cubicacion`,
+  `LineasSolicitudCubicacionController`) para el puente Mesa de Costeo →
+  Cubicador (`crear_desde_linea`). Autenticación de servicio-a-servicio
+  dedicada: `Authorization: Bearer <NEXO_CALLBACK_API_KEY>` (debe ser
+  idéntica a `Cubicador3D__InboundApiKey` del `.env` de NEXO). Implementado
+  y verificado de punta a punta — ver `CONTRATO.md` sección 7 y
+  `docs/testDocumentation/PRUEBAS_DE_INTEGRACION.md` sección 2.9.
+- Siguen sin compartir red Docker ni base de datos entre sí como norma —
+  cada uno tiene su propio `docker-compose.yml` y todo cruce es por
+  RabbitMQ (compartido, ver "Puesta en marcha") o por este único endpoint
+  HTTP puntual, nunca por tabla compartida.
 
 ## Alcance explícitamente fuera de esta primera versión
 
