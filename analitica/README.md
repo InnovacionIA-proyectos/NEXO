@@ -17,6 +17,12 @@ EDA → modelo es estable.
 > (`02-eda-viajes-btura/` y `03-eda-extraccion-4-fuentes/`) en vez de una, y
 > `03-modelo/` se corrió a `04-modelo/` para dejarle el número 3 a la
 > segunda.
+>
+> **Nota (2026-09-11):** S2-HU-11 cierra con un tercer entregable —
+> comparativa de ambos EDA + propuesta de modelo(s) (issue #41), sin
+> construir ningún modelo este sprint. Ese documento vive aparte de ambos EDA
+> (`04-comparativa-y-propuesta-modelo/`), así que `04-modelo/` se corrió a
+> `05-modelo/` para dejarle el número 4 a la comparativa.
 
 ## Mapa
 
@@ -41,7 +47,11 @@ analitica/
 │                                   consolidado de 01-set-final/ (BD propia +
 │                                   SICE-TAC + SAP + clientes). ⏳ En curso.
 │
-├── 04-modelo/                      Reservado para features/entrenamiento/
+├── 04-comparativa-y-propuesta-modelo/  Comparativa de ambos EDA + propuesta
+│                                       de modelo(s) (S2-HU-11 parte 3, issue
+│                                       #41). Ningún modelo se construye acá.
+│
+├── 05-modelo/                      Reservado para features/entrenamiento/
 │                                   artefactos del modelo predictivo. Sin
 │                                   contenido todavía.
 │
@@ -68,7 +78,10 @@ analitica/
 4. **`03-eda-extraccion-4-fuentes/`** (EDA-2, en curso) — parte de
    `01-set-final/` para explorar la señal de contexto de mercado (piso
    SICE-TAC, plaza SAP) que el histórico no tiene.
-5. **`04-modelo/`** (futuro) — parte de lo que salga de ambos EDA.
+5. **`04-comparativa-y-propuesta-modelo/`** — contrasta los hallazgos de
+   ambos EDA y propone modelo(s) con su objetivo, grano, features y
+   supuestos. Sin construir ningún modelo.
+6. **`05-modelo/`** (futuro) — parte de lo que salga de la comparativa.
 
 ## Convenciones
 
@@ -82,7 +95,7 @@ analitica/
   se documenta con su causa en el reporte de inconsistencias correspondiente.
   Un faltante también es hallazgo.
 - **Artefactos de modelo (`.pkl`, `.joblib`, `.onnx`, etc.) nunca van directo
-  a git** cuando lleguemos a `04-modelo/artefactos/` — usar Git LFS o un
+  a git** cuando lleguemos a `05-modelo/artefactos/` — usar Git LFS o un
   storage aparte (S3/blob) con solo un manifiesto en el repo. Anotado ahora
   para no tener que redescubrirlo después.
 
@@ -94,6 +107,7 @@ analitica/
 | `00-fuentes/fuentes-corporativas/` | ✅ Poblada — 4 archivos |
 | `01-set-final/v1.0.0-piloto/` | ✅ Entregado (ver su `README.md` para el acta) |
 | `02-eda-viajes-btura/` | ✅ Completo — EDA-1 (S2-HU-11 parte 1) |
-| `03-eda-extraccion-4-fuentes/` | ⏳ En curso — EDA-2 (S2-HU-11 parte 2) |
-| `04-modelo/` | ⏳ Reservada, sin contenido |
+| `03-eda-extraccion-4-fuentes/` | ✅ Completo — EDA-2 (S2-HU-11 parte 2) |
+| `04-comparativa-y-propuesta-modelo/` | ⏳ En curso — S2-HU-11 parte 3 |
+| `05-modelo/` | ⏳ Reservada, sin contenido |
 | `pipeline/` | ⏳ Reservada, sin contenido |
