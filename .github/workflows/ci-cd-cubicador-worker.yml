@@ -8,7 +8,7 @@ name: CI/CD Cubicador-Worker
 # docs/CI_CD_RUTAS_COMPARTIDAS.md para la convención completa.
 on:
   push:
-    branches: [main, Pre-Despliegue]
+    branches: [main, Pre-Despliegue-BACKEND]
     paths:
       - "cubicador/worker/**"
       - "cubicador/Dockerfile.worker"
@@ -22,7 +22,7 @@ on:
       - ".github/workflows/ci-cd-cubicador-worker.yml"
       - ".github/workflows/_cubicador-pruebas.yml"
   pull_request:
-    branches: [main, Pre-Despliegue]
+    branches: [main, Pre-Despliegue-BACKEND]
     paths:
       - "cubicador/worker/**"
       - "cubicador/Dockerfile.worker"
@@ -42,7 +42,7 @@ jobs:
 
   deploy:
     needs: build-and-test
-    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/Pre-Despliegue') && github.event_name == 'push'
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/Pre-Despliegue-BACKEND') && github.event_name == 'push'
     runs-on: [self-hosted, dokploy]
     steps:
       - name: Mostrar información del deploy
