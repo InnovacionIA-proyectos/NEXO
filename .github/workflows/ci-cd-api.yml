@@ -30,7 +30,7 @@ jobs:
   # misma base "de pruebas" (dedicada, pero real y persistente) que ya usan
   # para probar la app contra su comportamiento real con SQL Server.
   build-and-test:
-    runs-on: [self-hosted, dokploy]
+    runs-on: [self-hosted, dokploy_]
     steps:
       - uses: actions/checkout@v4
 

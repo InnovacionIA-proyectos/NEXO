@@ -40,7 +40,7 @@ jobs:
   deploy:
     needs: build
     if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/Pre-Despliegue-BACKEND') && github.event_name == 'push'
-    runs-on: [self-hosted, dokploy]
+    runs-on: [self-hosted, dokploy_]
     steps:
       - name: Mostrar información del deploy
         shell: cmd
