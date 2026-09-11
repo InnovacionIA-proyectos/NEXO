@@ -34,10 +34,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # DOTNET_INSTALL_DIR explícito: por defecto setup-dotnet instala en
+      # "C:\Program Files\dotnet", y la cuenta con la que corre este runner
+      # self-hosted (dokploy_) no tiene permiso de escritura ahí (requiere
+      # admin) — el job fallaba con "doesn't have write access to the
+      # installation root". runner.tool_cache (RUNNER_TOOL_CACHE) apunta a
+      # una carpeta dentro del propio árbol del runner (_work\_tool), que SÍ
+      # es escribible por esa cuenta: el mismo runner ya escribe ahí al lado
+      # (_work\_temp) sin problema. El paso siguiente agrega esa carpeta al
+      # PATH porque setup-dotnet solo hace eso automáticamente para la
+      # ubicación por defecto.
       - name: Instalar .NET SDK
         uses: actions/setup-dotnet@v4
+        env:
+          DOTNET_INSTALL_DIR: ${{ runner.tool_cache }}\dotnet
         with:
           dotnet-version: "10.0.x"
+
+      - name: Agregar dotnet al PATH
+        shell: pwsh
+        run: echo "${{ runner.tool_cache }}\dotnet" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
 
       - name: Restaurar dependencias
         run: dotnet restore CabinaFletes.Clean.sln
