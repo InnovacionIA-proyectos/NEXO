@@ -605,13 +605,14 @@ equivalencia) y de **S3-HU-04.5** (punto de coordinación).
 > esos endpoints de NEXO"*. **Eso todavía no ocurrió**: el frontend sigue con
 > 12 puntos de llamada directa (`cubicadorBaseUrl` en `cubicador-api.service.ts`
 > y `captura-api.service.ts`) — nadie cambió esos call-sites todavía. Lo que sí
-> avanzó (issue #78, S3-HU-04.3) es el lado NEXO: de los 4 endpoints que
-> faltaban, ya existen 3 (`desde-linea`, `por-linea`, `colocaciones`, ver 8.1).
-> Solo queda `cubicar()`, que necesita una decisión de arquitectura aparte (8.2).
-> Migrar el frontend a los 19 endpoints ya disponibles sigue siendo trabajo
-> pendiente de esa HU.
+> avanzó (issue #78, S3-HU-04.3) es el lado NEXO: los 20 de 20 métodos ya tienen
+> equivalente — los 3 que faltaban (`desde-linea`, `por-linea`, `colocaciones`,
+> ver 8.1) más `cubicar()`, resuelto como excepción HTTP declarada y acotada
+> (ver 8.2) en vez de forzarlo al patrón de cola. Migrar el frontend a los 20
+> endpoints ya disponibles sigue siendo trabajo pendiente de esa HU — punto de
+> coordinación con Juan Pablo (responsable de S3-HU-04).
 
-### 8.1 Con equivalente en NEXO (19 de 20)
+### 8.1 Con equivalente en NEXO (20 de 20)
 
 | Método del frontend | Endpoint en NEXO | Desde |
 |---|---|---|
@@ -636,6 +637,7 @@ equivalencia) y de **S3-HU-04.5** (punto de coordinación).
 | `crearPlanDesdeLinea()` | `POST /api/planes-cargue/desde-linea/{lineaId}` | S3-HU-04.3 (issue #78) |
 | `porLinea()` | `GET /api/planes-cargue/por-linea/{lineaId}` | S3-HU-04.3 (issue #78) |
 | `colocaciones()` | `GET /api/planes-cargue/{id}/colocaciones` | S3-HU-04.3 (issue #78) |
+| `cubicar()` (`captura-api.service.ts`) | `POST /api/cubicacion` | S3-HU-04.3 (issue #78) — ver 8.2, excepción HTTP |
 
 ⚠️ **Cambio de ruta que hay que mirar**: los 3 de vehículos viven en
 `/api/vehiculos`, no en `/api/planes-cargue/vehiculos` como los pide el
@@ -655,16 +657,32 @@ resolvió implementándolo como equivalente 1:1 en vez de forzar un refactor del
 frontend — costaba poco (`ResultadoPlanMapper.AColocacion` ya existía) y evita
 un cambio de contrato no pedido por la issue.
 
-### 8.2 SIN equivalente en NEXO (1)
+### 8.2 `cubicar()` — resuelto como excepción HTTP declarada, no como cola
 
-| Método del frontend | Ruta que pide hoy | Situación |
-|---|---|---|
-| `cubicar()` (`captura-api.service.ts`) | `POST /api/cubicacion` | Cubicación rápida (SICCE), sin persistencia. **Ninguna HU del sprint la cubre**: no es escritura del dominio (S3-HU-02) ni lectura proyectable (S3-HU-03) — no hay estado que proyectar. Necesita decisión e issue propia. |
+`cubicar()` (`captura-api.service.ts`, usado por `captura-page` y
+`mesa-costeo-page`) pide `POST /api/cubicacion`: una cubicación rápida
+(SICE), sin persistencia. No encajaba ni en el patrón de escritura del
+dominio (S3-HU-02, que asume un plan con Id que guardar) ni en el de
+proyección (S3-HU-03, que asume un evento que proyectar) — no hay plan, no
+hay Id, no hay nada que una cola o una proyección pudieran servir después.
 
-**Necesita una decisión de arquitectura antes de escribir nada**: al ser un
-cálculo puro sin persistencia, no encaja en el patrón de cola (habría que
-inventar persistencia para poder devolver el resultado) ni en el de
-proyección (no hay nada que proyectar). Las salidas razonables son un
-endpoint en NEXO que delegue por HTTP como excepción declarada y acotada, o
-tratarla explícitamente como la única operación que el navegador sigue
-resolviendo de otro modo.
+**Decisión tomada**: NEXO expone `POST /api/cubicacion`
+(`CubicacionController`, `CubicarRapidoQuery` +
+`ICubicacionRapidaPort`/`CubicacionRapidaAdapter`) que delega por HTTP
+síncrono a Cubicador — la única llamada HTTP saliente de NEXO hacia
+Cubicador en todo el sistema, declarada y acotada a este único endpoint (ver
+`cubicador/CONTRATO.md` §1.1/§5 y el comentario de `ICubicacionRapidaPort`
+para el razonamiento completo). El secreto (`Cubicador3D:OutboundApiKey`,
+mismo valor que `CUBICADOR_API_KEY` del lado de Cubicador) vive solo en la
+configuración del backend — nunca en el bundle del portal, que es
+justamente el riesgo que esta HU existe para cerrar.
+
+Se descartó la alternativa de un patrón solicitud/respuesta sobre RabbitMQ
+(reply-to): habría mantenido "cero HTTP" al 100% pero a costa de introducir
+un patrón nuevo, sin otro uso en el sistema, para un cálculo que ya responde
+en el orden de cientos de milisegundos por HTTP directo.
+
+Sin `Cubicador3D:OutboundBaseUrl`/`OutboundApiKey` configuradas, el endpoint
+responde `503` accionable (`CUBICACION_RAPIDA_NO_CONFIGURADA`) — mismo
+criterio de degradación que el resto de integraciones externas opcionales
+del backend.

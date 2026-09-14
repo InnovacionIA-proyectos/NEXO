@@ -2,6 +2,7 @@ using CabinaFletes.Application.CasosDeUso.AjustesVigenciaPlaza.Interfaces;
 using CabinaFletes.Application.CasosDeUso.Biblioteca.Interfaces;
 using CabinaFletes.Application.CasosDeUso.BibliotecaSapHistorico.Interfaces;
 using CabinaFletes.Application.CasosDeUso.Cotizaciones.Interfaces;
+using CabinaFletes.Application.CasosDeUso.Cubicacion.Interfaces;
 using CabinaFletes.Application.CasosDeUso.Metricas.Interfaces;
 using CabinaFletes.Application.CasosDeUso.ReglasSoloSicetac.Interfaces;
 using CabinaFletes.Application.CasosDeUso.ServiciosConexos.Interfaces;
@@ -19,6 +20,7 @@ using CabinaFletes.Infrastructure.BibliotecaSapHistorico.Adaptadores;
 using CabinaFletes.Infrastructure.Common;
 using CabinaFletes.Infrastructure.Cotizaciones.Adaptadores;
 using CabinaFletes.Infrastructure.Cotizaciones.Repositorios;
+using CabinaFletes.Infrastructure.Cubicacion.Adaptadores;
 using CabinaFletes.Infrastructure.External;
 using CabinaFletes.Infrastructure.Identidad.Adaptadores;
 using CabinaFletes.Infrastructure.Metricas.Adaptadores;
@@ -38,6 +40,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using System.Net.Http.Headers;
 
 namespace CabinaFletes.Infrastructure;
 
@@ -48,8 +51,10 @@ public static class DependencyInjection
     /// (piloto), Reglas Solo-SICETAC, Ajustes de Vigencia de Plaza, Biblioteca
     /// (TarifarioSap + PropuestaTarifa + matriz SICE-TAC + histórico/plaza SAP en
     /// vivo), Solicitudes/Captura, Servicios Conexos, Tarifas Ganadas, Tarifas
-    /// SICE-TAC admin y Métricas. Cubicación 3D y Plan de Cargue quedan fuera de
-    /// alcance por decisión explícita (microservicio Python aparte) — ver PENDIENTES.md.
+    /// SICE-TAC admin, Métricas y Plan de Cargue (orquestación por colas contra el
+    /// motor Cubicador, microservicio Python aparte — ver PENDIENTES.md). Única
+    /// excepción HTTP declarada a ese "por colas": <see cref="ICubicacionRapidaPort"/>
+    /// (S3-HU-04.3, issue #78), ver el comentario de esa interfaz.
     /// </summary>
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration config)
     {
@@ -232,6 +237,32 @@ public static class DependencyInjection
         services.AddScoped<IParidadCubicadorPort, ParidadCubicadorAdapter>();
         // Puente de solo lectura hacia Solicitudes para el Cubicador (crear-desde-línea).
         services.AddScoped<ILineaSolicitudCubicacionPort, LineaSolicitudCubicacionAdapter>();
+
+        // [S3-HU-04.3, issue #78] cubicar() (captura-api.service.ts): único método de
+        // Cubicación sin cola ni proyección posibles (cálculo puro, sin persistencia) — ver
+        // ICubicacionRapidaPort para por qué esto SÍ es una llamada HTTP saliente, a
+        // diferencia de todo lo demás de este módulo. Sin las dos claves configuradas, se
+        // registra el adapter "no configurado" (503 accionable) en vez de fallar la DI —
+        // mismo criterio que BibliotecaSicetac/SapHistorico más arriba.
+        var cubicadorOutboundBaseUrl = config["Cubicador3D:OutboundBaseUrl"];
+        var cubicadorOutboundApiKey = config["Cubicador3D:OutboundApiKey"];
+        if (!string.IsNullOrWhiteSpace(cubicadorOutboundBaseUrl) && !string.IsNullOrWhiteSpace(cubicadorOutboundApiKey))
+        {
+            services.AddHttpClient<ICubicacionRapidaPort, CubicacionRapidaAdapter>(cliente =>
+            {
+                cliente.BaseAddress = new Uri(cubicadorOutboundBaseUrl.TrimEnd('/') + "/");
+                cliente.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", cubicadorOutboundApiKey);
+                // Cálculo en memoria del lado de Cubicador, sin I/O de base de datos: si
+                // tarda más que esto, conviene que la pantalla se entere pronto en vez de
+                // dejar al usuario mirando un spinner.
+                cliente.Timeout = TimeSpan.FromSeconds(
+                    int.TryParse(config["Cubicador3D:OutboundTimeoutSegundos"], out var s) ? Math.Clamp(s, 5, 60) : 15);
+            });
+        }
+        else
+        {
+            services.AddScoped<ICubicacionRapidaPort, CubicacionRapidaNoConfiguradoAdapter>();
+        }
 
         return services;
     }
