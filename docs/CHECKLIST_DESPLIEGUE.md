@@ -91,7 +91,7 @@ sin interpolación de `docker-compose.yml`):
 
 ```
 Cubicacion__ParidadVerificada=true
-Cubicacion__ParidadEvidencia=commit 82fb52ba73083b7d94ea07d42a4774a2b9b8e1e3 (Pre-Despliegue-BACKEND) - pytest tests/paridad: 27 passed (26/26 casos dorados) - docs/VERIFICACION_NEXO_CUBICADOR_2026-09-14.md#8
+Cubicacion__ParidadEvidencia=82fb52ba73083b7d94ea07d42a4774a2b9b8e1e3
 Cubicacion__ParidadFecha=2026-09-14
 ```
 

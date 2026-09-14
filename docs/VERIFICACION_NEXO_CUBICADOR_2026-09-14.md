@@ -356,10 +356,28 @@ tests/paridad/test_paridad_casos_dorados.py::test_hay_exactamente_26_fixtures_do
 
 ```
 Cubicacion__ParidadVerificada=true
-Cubicacion__ParidadEvidencia=commit 82fb52ba73083b7d94ea07d42a4774a2b9b8e1e3 (Pre-Despliegue-BACKEND) - pytest tests/paridad: 27 passed (26/26 casos dorados) - docs/VERIFICACION_NEXO_CUBICADOR_2026-09-14.md#8
+Cubicacion__ParidadEvidencia=82fb52ba73083b7d94ea07d42a4774a2b9b8e1e3
 Cubicacion__ParidadFecha=2026-09-14
 ```
 
 Nombres con doble guion bajo, tal cual — Dokploy despliega por `Dockerfile`
 directo, sin la interpolación de `docker-compose.yml` (ver conversación
 anterior sobre `CUBICADOR3D_INBOUND_API_KEY`).
+
+### 8.1 Nota: `#` en un valor de variable de entorno en Dokploy
+
+El primer valor de `Cubicacion__ParidadEvidencia` (más largo, con paréntesis
+y un `#8` al final apuntando a esta sección) quedó guardado y visible en el
+editor de Dokploy, y se confirmaron 3 redeploys completos ("Deploy", no solo
+"Restart") sin que la compuerta se abriera — con el código verificado
+correcto (`Program.cs` no tiene ningún `appsettings.*.local.json` en la
+imagen, `.dockerignore` lo excluye explícitamente) y sin ninguna otra
+variable en conflicto. Sospecha fuerte, no 100% confirmada: Dokploy
+probablemente serializa las variables como un archivo estilo `.env` antes de
+inyectarlas al contenedor, y un `#` sin comillas en el valor se interpreta
+como inicio de comentario — puede truncar o descartar esa línea completa,
+dejando `ParidadEvidencia` vacía para el proceso aunque se vea bien en el
+editor. Se simplificó el valor a solo el hash del commit (sin espacios,
+paréntesis, dos puntos ni `#`) para sacar esa variable de la ecuación.
+**Lección para variables de entorno en Dokploy en general: evitar `#`, `:`
+y comillas sin verificar primero cómo las serializa la plataforma.**
