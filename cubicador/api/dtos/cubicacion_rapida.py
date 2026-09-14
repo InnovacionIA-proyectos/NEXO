@@ -1,4 +1,4 @@
-"""DTOs HTTP del cubicador rapido - ver docs/CONTRATOS.md seccion A."""
+"""DTOs HTTP del cubicador rapido - ver CONTRATO.md seccion 3.1."""
 
 from __future__ import annotations
 

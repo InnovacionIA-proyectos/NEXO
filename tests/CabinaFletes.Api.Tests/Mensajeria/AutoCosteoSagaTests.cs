@@ -95,7 +95,8 @@ public class AutoCosteoSagaTests : IAsyncLifetime
         await _bus.Bus.Publish(new LineaCosteada(trabajoId, Guid.NewGuid(), 1_500_000m, "Sicetac"));
         await _bus.Bus.Publish(new LineaCosteada(trabajoId, Guid.NewGuid(), 900_000m, "Tarifario"));
 
-        var estado = await EsperarEstado(trabajoId, e => e.ConDesenlace == 2);
+        var estado = await EsperarEstado(trabajoId,
+            e => e.ConDesenlace == 2 && e.CurrentState == nameof(AutoCosteoSaga.Completado));
         Assert.Equal(2, estado.Resueltas);
         Assert.Equal(0, estado.RequierenManual);
         Assert.NotNull(estado.TerminadoEn);
@@ -112,7 +113,8 @@ public class AutoCosteoSagaTests : IAsyncLifetime
         await _bus.Bus.Publish(new LineaRequiereTarifaManual(
             trabajoId, Guid.NewGuid(), Guid.NewGuid(), "No hay tarifa de plaza vigente para la ruta."));
 
-        var estado = await EsperarEstado(trabajoId, e => e.ConDesenlace == 3);
+        var estado = await EsperarEstado(trabajoId,
+            e => e.ConDesenlace == 3 && e.CurrentState == nameof(AutoCosteoSaga.Parcial));
         Assert.Equal(2, estado.Resueltas);
         Assert.Equal(1, estado.RequierenManual);
         Assert.Equal(0, estado.PendientesTecnicas);
@@ -128,7 +130,8 @@ public class AutoCosteoSagaTests : IAsyncLifetime
         await _bus.Bus.Publish(new LineaFalloTecnico(trabajoId, Guid.NewGuid(), "DwSice no respondió."));
         await _bus.Bus.Publish(new LineaRequiereTarifaManual(trabajoId, Guid.NewGuid(), Guid.NewGuid(), "Tarifa de plaza vencida."));
 
-        var estado = await EsperarEstado(trabajoId, e => e.ConDesenlace == 3);
+        var estado = await EsperarEstado(trabajoId,
+            e => e.ConDesenlace == 3 && e.CurrentState == nameof(AutoCosteoSaga.Parcial));
 
         // El motivo de tenerlos separados: la pantalla dice cosas distintas y el usuario
         // hace cosas distintas. Una se resuelve sola, la otra necesita que alguien actúe.
@@ -156,7 +159,8 @@ public class AutoCosteoSagaTests : IAsyncLifetime
 
         await _bus.Bus.Publish(new PliegoRepartido(trabajoId, solicitudId, 1));
 
-        var cerrado = await EsperarEstado(trabajoId, e => e.TotalLineas == 1);
+        var cerrado = await EsperarEstado(trabajoId,
+            e => e.TotalLineas == 1 && e.CurrentState == nameof(AutoCosteoSaga.Completado));
         Assert.Equal(nameof(AutoCosteoSaga.Completado), cerrado.CurrentState);
     }
 
@@ -166,7 +170,8 @@ public class AutoCosteoSagaTests : IAsyncLifetime
         var trabajoId = await IniciarTrabajo(1);
 
         await _bus.Bus.Publish(new LineaCosteada(trabajoId, Guid.NewGuid(), 700_000m, "Sicetac"));
-        var cerrado = await EsperarEstado(trabajoId, e => e.ConDesenlace == 1);
+        var cerrado = await EsperarEstado(trabajoId,
+            e => e.ConDesenlace == 1 && e.CurrentState == nameof(AutoCosteoSaga.Completado));
         Assert.Equal(nameof(AutoCosteoSaga.Completado), cerrado.CurrentState);
 
         // Un reintento que se resolvió después del cierre. Pasa de verdad.

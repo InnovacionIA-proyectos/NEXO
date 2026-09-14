@@ -13,9 +13,13 @@
 #     adicional que levantar acá. Sin la compuerta de paridad encendida
 #     (Cubicacion__Paridad*, ver .env.example), la función responde 503 "en
 #     verificación", nunca cae a un fallback.
+#   - El servicio 'db' (SQL Server local en contenedor) está DESHABILITADO:
+#     se usa una BD de pruebas/producción real vía ConnectionStrings__CabinaFletes
+#     (.env). No se elimina el bloque por si hace falta volver a levantarlo
+#     para desarrollo aislado.
 #
 # Uso:
-#   1) cp .env.example .env   y completar los valores (mínimo MSSQL_SA_PASSWORD).
+#   1) cp .env.example .env   y completar los valores (mínimo ConnectionStrings__CabinaFletes).
 #   2) docker compose up -d --build
 #   3) La API queda en http://localhost:${API_PORT:-8080} (health en /health).
 #   4) Sembrar datos demo (opcional, alternativa a MIGRATE_ON_STARTUP=true):
@@ -25,23 +29,6 @@
 name: nexo
 
 services:
-  db:
-    image: mcr.microsoft.com/mssql/server:2022-latest
-    environment:
-      ACCEPT_EULA: "Y"
-      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD}
-      MSSQL_PID: ${MSSQL_PID:-Developer}
-    volumes:
-      - mssql-data:/var/opt/mssql
-    networks:
-      - internal
-    healthcheck:
-      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -Q 'SELECT 1' || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
-      start_period: 30s
-    restart: unless-stopped
 
   rabbit:
     # Imagen propia: el plugin de retardo que MassTransit necesita para los timeouts
@@ -53,9 +40,7 @@ services:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-nexo}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
     ports:
-      # 15672 es la consola de administración: sirve para ver colas, mensajes
-      # atascados y la cola de error sin adivinar. No exponerla fuera de la red
-      # interna en un despliegue real.
+
       - "${RABBITMQ_UI_PORT:-15672}:15672"
       # AMQP también publicado al host: `api` y `cubicador/` (docker-compose.yml
       # propio, proyecto Compose separado que se engancha a esta misma red por
@@ -82,21 +67,21 @@ services:
       context: .
       dockerfile: src/CabinaFletes.Api/Dockerfile
     depends_on:
-      db:
-        condition: service_healthy
       rabbit:
         condition: service_healthy
     ports:
       - "${API_PORT:-8080}:8080"
     environment:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
-      ConnectionStrings__CabinaFletes: "Server=db,1433;Database=CabinaFletes;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True;Encrypt=True;"
+      # 'db' local deshabilitado: se conecta directo a la BD de pruebas real
+      # definida en ConnectionStrings__CabinaFletes (.env), no al contenedor.
+      ConnectionStrings__CabinaFletes: ${ConnectionStrings__CabinaFletes}
       ConnectionStrings__RabbitMq: "amqp://${RABBITMQ_USER:-nexo}:${RABBITMQ_PASSWORD}@rabbit:5672/"
-      Database__MigrateOnStartup: ${MIGRATE_ON_STARTUP:-true}
+      Database__MigrateOnStartup: ${MIGRATE_ON_STARTUP}
       # Siembra datos de demostración al arrancar si la BD está vacía (idempotente).
       # Poner en "false" en producción real una vez cargados los datos definitivos.
       Database__SeedOnStartup: ${SEED_ON_STARTUP:-true}
-      Cors__OrigenesPermitidos: ${ORIGENES_PERMITIDOS_CORS:-http://localhost:5173}
+      Cors__OrigenesPermitidos: ${ORIGENES_PERMITIDOS_CORS}
       # Recálculo del score persistido (#19). El reloj vive en el broker, no en este
       # proceso, así que cambiar el intervalo solo afecta cada cuánto suena: no hay
       # temporizador en memoria que se duplique con las réplicas.
@@ -107,16 +92,16 @@ services:
       # Identidad del portal de la Administración (S2-HU-03). Vacía en local: cae al
       # adapter que resuelve contra la tabla Usuarios propia (ver .env.example).
       # ASPNETCORE_ENVIRONMENT=Production EXIGE esta cadena (fail-closed).
-      ConnectionStrings__IdentidadPortal: ${ConnectionStrings__IdentidadPortal:-}
+      ConnectionStrings__IdentidadPortal: ${ConnectionStrings__IdentidadPortal}
       # Data Warehouse corporativo (SOLO LECTURA). Opcionales: si van vacías,
       # los módulos que las usan (Biblioteca/SICE-TAC/histórico/clientes DW)
       # se degradan solos (503 accionable o Configurado=false), no rompen.
-      ConnectionStrings__DwSice: ${ConnectionStrings__DwSice:-}
-      ConnectionStrings__DwCubos: ${ConnectionStrings__DwCubos:-}
+      ConnectionStrings__DwSice: ${ConnectionStrings__DwSice}
+      ConnectionStrings__DwCubos: ${ConnectionStrings__DwCubos}
       # Conexión SAP nueva: plaza en vivo (S2-HU-09). Deshabilitado por defecto —
       # la plaza real sigue saliendo de DbSolucionesTi, sin tocar.
-      SapTarifaFleteEnVivo__Modo: ${SAP_TARIFA_FLETE_EN_VIVO_MODO:-Deshabilitado}
-      ConnectionStrings__DbSolucionesTi: ${ConnectionStrings__DbSolucionesTi:-}
+      SapTarifaFleteEnVivo__Modo: ${SAP_TARIFA_FLETE_EN_VIVO_MODO}
+      ConnectionStrings__DbSolucionesTi: ${ConnectionStrings__DbSolucionesTi}
       # SMTP corporativo (envío de cotizaciones). Opcional: sin Host/Remitente no
       # envía. Nombres en español: SmtpCorreoAdapter lee Smtp:Puerto/Remitente/
       # Usuario/Clave (no Port/From/User/Password).
@@ -128,9 +113,13 @@ services:
       Smtp__Clave: ${Smtp__Clave:-}
       # Compuerta de liberación del plan de cargue por paridad (S2-HU-08.2, #30).
       # Vacías por defecto: la función responde 503 "en verificación", sin fallback.
-      Cubicacion__ParidadVerificada: ${CUBICACION_PARIDAD_VERIFICADA:-false}
-      Cubicacion__ParidadEvidencia: ${CUBICACION_PARIDAD_EVIDENCIA:-}
-      Cubicacion__ParidadFecha: ${CUBICACION_PARIDAD_FECHA:-}
+      Cubicacion__ParidadVerificada: ${CUBICACION_PARIDAD_VERIFICADA}
+      Cubicacion__ParidadEvidencia: ${CUBICACION_PARIDAD_EVIDENCIA}
+      Cubicacion__ParidadFecha: ${CUBICACION_PARIDAD_FECHA}
+      # Bearer de las llamadas ENTRANTES del Cubicador (GET /api/lineas-solicitud/{id}
+      # /cubicacion) — debe ser igual a NEXO_CALLBACK_API_KEY en cubicador/.env. Vacía =
+      # el endpoint responde 401 a cualquier Bearer (fail-closed).
+      Cubicador3D__InboundApiKey: ${CUBICADOR3D_INBOUND_API_KEY}
     networks:
       - internal
     healthcheck:
@@ -182,12 +171,10 @@ services:
     build:
       context: .
       dockerfile: src/CabinaFletes.Api/Dockerfile
-    depends_on:
-      db:
-        condition: service_healthy
+    # depends_on: db: deshabilitado junto con el servicio 'db' de arriba (BD de pruebas real).
     environment:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
-      ConnectionStrings__CabinaFletes: "Server=db,1433;Database=CabinaFletes;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True;Encrypt=True;"
+      ConnectionStrings__CabinaFletes: ${ConnectionStrings__CabinaFletes}
     entrypoint: ["dotnet", "CabinaFletes.Api.dll", "seed"]
     networks:
       - internal

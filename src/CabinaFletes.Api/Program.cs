@@ -19,6 +19,7 @@ using CabinaFletes.Application.CasosDeUso.PlanDeCargue.Interfaces;
 using CabinaFletes.Application.CasosDeUso.Biblioteca;
 using CabinaFletes.Application.CasosDeUso.BibliotecaSapHistorico;
 using CabinaFletes.Application.CasosDeUso.Cotizaciones;
+using CabinaFletes.Application.CasosDeUso.Cubicacion;
 using CabinaFletes.Application.CasosDeUso.Metricas;
 using CabinaFletes.Application.CasosDeUso.Priorizacion;
 using CabinaFletes.Application.CasosDeUso.ReglasSoloSicetac;
@@ -75,6 +76,7 @@ builder.Services.AddScoped<INotificadorDeTrabajos, NotificadorSignalR>();
 builder.Services.AddScoped<INotificadorDeBandeja, NotificadorDeBandejaSignalR>();
 builder.Services.AddScoped<INotificadorDePlanCargue, NotificadorPlanCargueSignalR>();
 builder.Services.AddPlanDeCargueUseCases();
+builder.Services.AddCubicacionUseCases();
 builder.Services.AddCotizacionesUseCases();
 builder.Services.AddReglasSoloSicetacUseCases();
 builder.Services.AddAjustesVigenciaPlazaUseCases();
@@ -117,7 +119,12 @@ if (builder.Environment.IsProduction() &&
 
 builder.Services.AddAuthentication(IdentidadPortalAuthenticationHandler.SchemeName)
     .AddScheme<AuthenticationSchemeOptions, IdentidadPortalAuthenticationHandler>(
-        IdentidadPortalAuthenticationHandler.SchemeName, _ => { });
+        IdentidadPortalAuthenticationHandler.SchemeName, _ => { })
+    // Esquema aparte de servicio-a-servicio para el puente hacia el Cubicador (Python) —
+    // ver LineasSolicitudCubicacionController. No es el default: solo se usa donde el
+    // endpoint lo pide explícitamente con [Authorize(AuthenticationSchemes = ...)].
+    .AddScheme<AuthenticationSchemeOptions, CubicadorApiKeyAuthenticationHandler>(
+        CubicadorApiKeyAuthenticationHandler.SchemeName, _ => { });
 
 // Autenticación (identidad válida, ver el Handler) y autorización (uno de los 6 roles de
 // Nexo, resuelto contra la tabla del portal) son cosas DISTINTAS a propósito: sin esta
@@ -166,10 +173,17 @@ builder.Services.AddSwaggerGen();
 const string ClientesCors = "clientes";
 var origenesPermitidos = (builder.Configuration["Cors:OrigenesPermitidos"] ?? "http://localhost:5173")
     .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-builder.Services.AddCors(o => o.AddPolicy(ClientesCors, p => p
-    .WithOrigins(origenesPermitidos)
-    .AllowAnyHeader()
-    .AllowAnyMethod()));
+// "*" es un atajo SOLO para desarrollo/pruebas: WithOrigins("*") no es un comodín (lo
+// compara como string literal y termina bloqueando todo), así que hay que pasar por
+// AllowAnyOrigin() explícitamente. No usar en QA/Producción — ver README sección 7.
+builder.Services.AddCors(o => o.AddPolicy(ClientesCors, p =>
+{
+    if (origenesPermitidos is [ "*" ])
+        p.AllowAnyOrigin();
+    else
+        p.WithOrigins(origenesPermitidos);
+    p.AllowAnyHeader().AllowAnyMethod();
+}));
 
 builder.Services.AddHealthChecks().AddDbContextCheck<CabinaFletesDbContext>("database");
 

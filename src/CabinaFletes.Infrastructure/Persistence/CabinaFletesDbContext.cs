@@ -48,6 +48,11 @@ public class CabinaFletesDbContext : DbContext
     {
         base.OnModelCreating(b);
 
+        // Esquema propio dentro de dbInformesAutomatizados_Pruebas (BD compartida con
+        // otra app ajena a NEXO, que ya vive en 'dbo' y en su propio 'dbo_prueba').
+        // Sin esto, las tablas de CabinaFletes quedan mezcladas con las de esa otra app.
+        b.HasDefaultSchema("dbo_NEXO_prueba");
+
         // Tablas del Transactional Outbox de MassTransit. Viven en ESTA base a
         // propósito: la garantía de atomicidad depende de que el mensaje y los datos
         // del caso de uso se guarden en la misma transacción.
@@ -132,7 +137,17 @@ public class CabinaFletesDbContext : DbContext
             e.HasData(
                 new MapeoRolPortal { Id = Guid.Parse("00000000-0000-0000-0001-000000000001"), IdRolPortal = null, DescripcionRolPortal = "TarifasComercial", Rol = RolUsuario.Comercial, CreatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero) },
                 new MapeoRolPortal { Id = Guid.Parse("00000000-0000-0000-0001-000000000002"), IdRolPortal = null, DescripcionRolPortal = "TarifasAdministrador", Rol = RolUsuario.AdminTarifas, CreatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero) },
-                new MapeoRolPortal { Id = Guid.Parse("00000000-0000-0000-0001-000000000003"), IdRolPortal = null, DescripcionRolPortal = "Administracion", Rol = RolUsuario.Admin, CreatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero) }
+                new MapeoRolPortal { Id = Guid.Parse("00000000-0000-0000-0001-000000000003"), IdRolPortal = null, DescripcionRolPortal = "Administracion", Rol = RolUsuario.Admin, CreatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero) },
+                // Roles nuevos creados en el portal ya con el sufijo "NEXO" (uno por
+                // cada rol de Cabina de Fletes, IDROLES real de tblSAPRoles en
+                // dbSolucionesTI — ver docs/contrato-integracion): reemplazan en la
+                // práctica a los 3 de arriba para las pruebas de identidad real.
+                new MapeoRolPortal { Id = Guid.Parse("00000000-0000-0000-0001-000000000004"), IdRolPortal = 48, DescripcionRolPortal = "ComercialNEXO", Rol = RolUsuario.Comercial, CreatedAt = new DateTimeOffset(2026, 9, 1, 0, 0, 0, TimeSpan.Zero) },
+                new MapeoRolPortal { Id = Guid.Parse("00000000-0000-0000-0001-000000000005"), IdRolPortal = 49, DescripcionRolPortal = "CoordinadorFletesNEXO", Rol = RolUsuario.CoordinadorFletes, CreatedAt = new DateTimeOffset(2026, 9, 1, 0, 0, 0, TimeSpan.Zero) },
+                new MapeoRolPortal { Id = Guid.Parse("00000000-0000-0000-0001-000000000006"), IdRolPortal = 50, DescripcionRolPortal = "AdminTarifasNEXO", Rol = RolUsuario.AdminTarifas, CreatedAt = new DateTimeOffset(2026, 9, 1, 0, 0, 0, TimeSpan.Zero) },
+                new MapeoRolPortal { Id = Guid.Parse("00000000-0000-0000-0001-000000000007"), IdRolPortal = 51, DescripcionRolPortal = "ServiciosLogisticosNEXO", Rol = RolUsuario.ServiciosLogisticos, CreatedAt = new DateTimeOffset(2026, 9, 1, 0, 0, 0, TimeSpan.Zero) },
+                new MapeoRolPortal { Id = Guid.Parse("00000000-0000-0000-0001-000000000008"), IdRolPortal = 52, DescripcionRolPortal = "LiderProcesoNEXO", Rol = RolUsuario.LiderProceso, CreatedAt = new DateTimeOffset(2026, 9, 1, 0, 0, 0, TimeSpan.Zero) },
+                new MapeoRolPortal { Id = Guid.Parse("00000000-0000-0000-0001-000000000009"), IdRolPortal = 53, DescripcionRolPortal = "AdminNEXO", Rol = RolUsuario.Admin, CreatedAt = new DateTimeOffset(2026, 9, 1, 0, 0, 0, TimeSpan.Zero) }
             );
         });
 

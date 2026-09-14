@@ -2,7 +2,7 @@
 
 Complementa a [`REGLAS_DE_NEGOCIO.md`](./REGLAS_DE_NEGOCIO.md) (que documenta
 las 33 pruebas unitarias del motor). Este documento cubre tres niveles más:
-las 6 pruebas de integración automatizadas (`tests/api/test_smoke.py` +
+las pruebas de integración automatizadas (`tests/api/test_smoke.py` +
 `tests/worker/test_ejecutar_solicitud.py`), el smoke test de CI contra
 Docker Compose real (`.github/workflows/ci.yml` + `scripts/ci_docker_smoke.py`,
 automatiza las secciones 2.2-2.4 de abajo en cada push/PR), y la
@@ -67,11 +67,49 @@ está en la sección 2.8.
 | `test_mover_a_dlq_dispara_la_alerta` | `worker/main.py::_mover_a_dlq` llama a `alertar_mensaje_en_dlq(tipo, error, intentos)` con los valores correctos, y publica el mensaje crudo a `cubicacion.dlq` con los headers esperados — publisher y mensaje son dobles de prueba. |
 | `test_alertar_mensaje_en_dlq_degrada_sin_smtp_configurado` | `alertar_mensaje_en_dlq` no lanza excepción (solo loggea un warning) si `ALERTAS_SMTP_HOST` está vacío — un correo que no sale no debe tumbar el worker. |
 
+## 1.3 Los 3 bugs de QA (S3-HU-10, issues #131/#132/#133)
+
+Guardas de regresión de los 3 bugs que la verificación de QA de los PR #122/#126
+encontró. Para los tres se escribió el test primero y **se comprobó que fallara**
+contra el código sin arreglar; al final se revirtieron los 5 arreglos a la vez y
+fallaron 7 tests.
+
+| Archivo | Qué verifica |
+|---|---|
+| `tests/worker/test_mensaje_malformado.py` (8) | Que un mensaje malformado **se ackee** — el síntoma del bug no era la excepción, era el mensaje sin confirmar que ocupa un hueco del `prefetch_count=2` para siempre. Cubre el caso de la issue (sin `planId`) y los 4 que fallaban *antes* del bloque de manejo de errores: body ilegible, JSON que no es un objeto, sin `correlationId`, cabecera `x-intentos` corrupta. Más el escenario del bloqueo: dos mensajes seguidos, ninguno sin ackear. |
+| `tests/api/test_item_sin_sku.py` (7) | Que un `"sku": null` **explícito** se acepte y se normalice a `""`, y que el plan no quede en `error`. Cubre por separado "clave ausente" y "clave presente en null": esa distinción **es** el bug (el default de Pydantic solo aplica si la clave falta). |
+| `tests/worker/test_eliminar_plan_optimizado.py` (4) | Que borrar un plan **ya optimizado** no deje filas huérfanas, ni por `eliminar()` ni por `eliminar_planes_de_linea()`. |
+
+⚠️ **Por qué estos tests no esperan `ForeignKeyViolationError`.** Sería un test que
+pasa siempre. La suite corre sobre SQLite y `db.py` no activa
+`PRAGMA foreign_keys=ON`, así que SQLite **no aplica las FK**: antes del arreglo, en
+vez de fallar, dejaba las colocaciones huérfanas en silencio. Se afirma entonces la
+propiedad real —que no queden huérfanas—, que en Postgres es lo que evita el error y
+en SQLite lo que evita la basura. La verificación contra Postgres real está en
+`tests/QA/s3-hu-10-tres-bugs-cubicacion/README.md`.
+
+## 1.4 `tests/conftest.py` — aislamiento de la base entre tests
+
+Recrea el esquema antes de cada test (`autouse`). Sin esto, **toda la suite comparte
+una sola base**: `DATABASE_URL` apunta a SQLite `:memory:` y `db.py` usa
+`poolclass=StaticPool` para esa URL, necesario para que las distintas conexiones vean
+la misma base — con el efecto colateral de que lo que un test escribe queda para los
+siguientes.
+
+Eso convirtió la suite en una trampa silenciosa, y se pisó dos veces escribiendo los
+tests de arriba: colgarle un plan a un preset del catálogo lo deja "en uso" y rompe
+`test_eliminar_vehiculo_borra_y_publica_vehiculo_eliminado`; agregar un vehículo rompe
+`test_flujo_completo_crear_optimizar`, que afirma `len(vehiculos) == 9`. **Fallan en
+otro archivo, con un error que no menciona al test culpable.**
+
+Costo medido: ~1 s sobre la suite completa, cero roturas. Comprobado con un test
+contaminante deliberado: sin el fixture rompe un test ajeno, con él no afecta a nadie.
+
 ### Cómo correrlas
 
 ```bash
 pip install -r requirements.txt   # incluye pytest + pytest-asyncio
-pytest tests/api -v
+pytest -v
 ```
 
 ## 2. Verificación manual contra Docker Compose real
@@ -256,6 +294,17 @@ reales configurados (`TIMEOUT_PROCESANDO_MINUTOS`):
    `limite` = el instante actual en vez de "ahora menos 5 minutos", para no
    tener que esperar) → devolvió `marcados: 1`.
 4. `GET /{id}` confirmó `estado: "error"` en el plan.
+
+> **Actualizado en S3-HU-06.1.** Ese método ya no existe: se partió en
+> `obtener_atascados(limite)` (solo consulta) más el `marcar_error` que ya
+> había, y el vigilante ahora además **publica `cubicacion.rechazada` con
+> `codigo: "TIMEOUT_PROCESAMIENTO"` antes** de marcar el plan (ver CONTRATO.md
+> 6.4). Para repetir esta verificación manual, el punto 3 pasa a ser una
+> llamada a `worker.main._revisar_timeouts(publisher)` con
+> `CUBICADOR_TIMEOUT_PROCESANDO_MINUTOS` bajo, y al punto 4 se le suma
+> comprobar que el mensaje llegó a la cola `Cubicacion.CubicacionRechazada` de
+> NEXO. La lógica en sí (incluido el orden publicar-antes-de-marcar) ya está
+> cubierta de forma automática en `tests/worker/test_vigilante_timeouts.py`.
 5. Se reinició el `worker` (`docker compose start worker`) y se confirmó en
    sus logs que retomó el consumo normalmente.
 
@@ -264,6 +313,13 @@ Con esto, los 3 mecanismos de resiliencia diseñados en
 real, no solo revisados por lectura de código.
 
 ### 2.5 Puente hacia NEXO (`GET /api/lineas-solicitud/{id}/cubicacion`)
+
+⚠️ **Nota histórica (2026-09-02)**: esta sección y la 2.6 describen una
+verificación contra la rama `cubicador` del repo NEXO, que **nunca se
+mezcló a `QA`** — quedó descolgada antes de la reorganización del código
+por feature. El endpoint no existió en ningún checkout real de NEXO hasta
+que se portó (adaptado a la estructura actual) en esta fecha. Ver la
+sección 2.9 para la verificación contra la implementación real, vigente.
 
 El endpoint que NEXO debía exponer (ver `docs/DECISIONES_TECNICAS.md` #8) ya
 se implementó ahí (rama `cubicador` del repo NEXO,
@@ -326,7 +382,7 @@ NEXO):
 cd .. && docker compose up -d --wait rabbit && cd cubicador   # rabbit compartido de NEXO primero
 docker compose up -d --build
 docker compose ps                       # db/api/worker deben quedar "healthy"/"Up"
-curl http://localhost:8000/health
+curl http://localhost:8081/health       # puerto publicado al host desde CUBICADOR_HOST_PORT (default 8081)
 
 # Para el flujo async, con el venv local activado (localhost:5672 es el
 # rabbit COMPARTIDO de NEXO, publicado al host - ver docker-compose.yml raíz):
@@ -460,6 +516,77 @@ flujo_resultado_por_cola`), corrida como parte del smoke test completo:
 `tests/worker/test_mover_a_dlq.py`, que cubren la conexión worker→alerta y
 la degradación sin SMTP configurado, sin necesitar broker ni SMTP real).
 
+### 2.9 Puente hacia NEXO real, implementado y verificado (2026-09-02)
+
+A diferencia de 2.5/2.6 (rama `cubicador`, nunca mezclada), esta vez el
+endpoint se construyó directamente en el NEXO real (rama que se mezcló con
+`QA`): `LineasSolicitudCubicacionController` + `ObtenerCubicacionLineaQuery`
++ `LineaSolicitudCubicacionAdapter`, autenticación de servicio-a-servicio
+dedicada (`CubicadorApiKeyAuthenticationHandler`, esquema `CubicadorApiKey`
+separado de la sesión del portal, Bearer contra `Cubicador3D:InboundApiKey`).
+`LineaSolicitud.Dimensiones` ya capturaba las posiciones desde antes
+(`CapturarSolicitudCommand`/`PosicionCargaDto` en NEXO) — no hizo falta
+ningún cambio de captura, solo el endpoint de lectura.
+
+**Verificado con tests de integración HTTP reales** (`tests/CabinaFletes
+.Api.Tests/Cubicacion/LineasSolicitudCubicacionControllerTests.cs`, contra
+SQL Server real, no simulado): `200` con posiciones/ruta correctas, lista
+vacía sin posiciones, `404` con línea inexistente, `401` sin Bearer, `401`
+con Bearer incorrecto, y `401` si se intenta con la sesión del portal en vez
+del Bearer de servicio (confirma que los dos esquemas de auth están
+aislados). 361/361 tests de toda la solución NEXO pasaron.
+
+**Verificado con los dos stacks reales en Docker a la vez** (NEXO completo:
+`db`+`rabbit`+`api`; Cubicador completo: `db`+`api`+`worker`), con una línea
+sembrada real (`A407C429-FADA-4F57-8A69-14FDC07A423A`, ruta Cartagena de
+Indias → Soacha) a la que se le cargó `Dimensiones` de prueba (3 pallets
+120×100×100cm, 500kg c/u):
+
+1. `POST /api/planes-cargue/desde-linea/{lineaSolicitudId}` en Cubicador →
+   `202` con `SolicitudEncoladaDto`.
+2. **Bug real de infraestructura encontrado**: NEXO y Cubicador tienen cada
+   uno un servicio llamado `api` en su propio `docker-compose.yml`. El
+   worker de Cubicador está conectado a las dos redes Docker a la vez
+   (`cubicador_default` y `nexo_internal`, compartida con NEXO) — al
+   apuntar `NEXO_BASE_URL=http://api:8080`, el DNS embebido de Docker
+   resolvió `api` hacia el **propio** `cubicador-api-1` (mismo nombre de
+   servicio en la red `cubicador_default`), no hacia `nexo-api-1`. El
+   worker "conectó" pero contra sí mismo y falló (`httpx.ConnectError`,
+   3 reintentos, DLQ). Corregido apuntando al nombre de contenedor
+   explícito: `NEXO_BASE_URL=http://nexo-api-1:8080`.
+3. Repetido tras el fix: el worker llamó a
+   `GET http://nexo-api-1:8080/api/lineas-solicitud/{id}/cubicacion` →
+   confirmado `200 OK` en sus logs. Creó el plan con el vehículo sugerido
+   por el cubicador rápido ("Turbo con estacas") y lo optimizó. `GET
+   /api/planes-cargue/por-linea/{lineaSolicitudId}` mostró la flota
+   resultante (1 vehículo, 3/3 unidades cargadas). `GET /{id}/resultado`
+   confirmó `estado: "optimizado"`, `puntaje: 76.6`, 3 colocaciones con
+   coordenadas X/Y/Z reales, todas `estable`, sin incidencias, y el
+   `nombre` del plan con el origen/destino real tomado de NEXO ("Mesa -
+   Cartagena de Indias (BOL) -> Soacha (CUN) - Vehiculo 1").
+
+### Cómo repetir esta verificación (2.9)
+
+```bash
+# NEXO completo (raíz del repo)
+docker compose up -d --build --wait
+
+# Sembrar Dimensiones de prueba en una línea existente (ejemplo)
+docker exec nexo-db-1 /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P '<MSSQL_SA_PASSWORD>' \
+  -d CabinaFletes -Q "UPDATE lineas_solicitud SET Dimensiones = '[{\"descripcion\":\"Pallet\",\"cantidad\":3,\"largoCm\":120,\"anchoCm\":100,\"altoCm\":100,\"pesoKg\":500}]' WHERE Id = '<lineaSolicitudId>'"
+
+# cubicador/.env: NEXO_CALLBACK_API_KEY debe ser IDÉNTICA a
+# Cubicador3D__InboundApiKey del .env de NEXO, y NEXO_BASE_URL debe usar el
+# nombre de CONTENEDOR de NEXO (no el nombre de servicio "api" — ver el bug
+# de arriba), ej. NEXO_BASE_URL=http://nexo-api-1:8080
+cd cubicador && docker compose up -d --wait
+
+curl -X POST -H "Authorization: Bearer <CUBICADOR_API_KEY>" \
+  "http://localhost:8000/api/planes-cargue/desde-linea/<lineaSolicitudId>"
+curl "http://localhost:8000/api/planes-cargue/por-linea/<lineaSolicitudId>" \
+  -H "Authorization: Bearer <CUBICADOR_API_KEY>"
+```
+
 ## 3. Qué falta cubrir (honesto, no se ha hecho todavía)
 
 **Actualización**: el ítem que estaba aquí ("tests de integración
@@ -468,13 +595,16 @@ automatizados contra Docker") ya se cerró — ver `.github/workflows/ci.yml` +
 push/PR. Lo que sigue sin automatizar, porque requiere infraestructura que
 el runner de CI no tiene o una topología más compleja de simular:
 
-- **El vigilante de timeout** (sección 2.4, punto c): requiere detener el
-  contenedor `worker` a mitad de un mensaje y llamar a
-  `marcar_error_por_timeout` directo contra la base — sigue siendo manual.
-- **`crear_plan_desde_linea` de punta a punta contra NEXO real** (sección
-  2.6): el runner de CI no levanta el repo NEXO aparte — el bug real que
-  encontró esta prueba (el `KeyError` de `lineaSolicitudId`) NO lo habría
-  atrapado el smoke test de CI actual, precisamente porque ese camino
-  (`crear_desde_linea`) no se ejercita ahí. Si se automatiza NEXO en CI más
-  adelante (job aparte con su propio SQL Server), esta sección sería la
-  candidata a migrar.
+- **El vigilante de timeout, de punta a punta** (sección 2.4, punto c):
+  requiere detener el contenedor `worker` a mitad de un mensaje y llamar a
+  `_revisar_timeouts` directo contra la base — sigue siendo manual. Desde
+  S3-HU-06.1 su *lógica* sí está automatizada con dobles de prueba
+  (`tests/worker/test_vigilante_timeouts.py`), incluido el caso de RabbitMQ
+  caído; lo que queda manual es el recorrido real contra los dos contenedores.
+- **`crear_plan_desde_linea` de punta a punta contra NEXO real** (secciones
+  2.6 y 2.9): verificado manualmente contra la implementación real de NEXO
+  (2.9) — funciona. Sigue sin automatizarse en CI: el runner no levanta el
+  repo NEXO aparte, así que un futuro bug en este camino específico
+  (`crear_desde_linea`) no lo atraparía el smoke test actual, que solo
+  ejercita `optimizar`. Si se automatiza NEXO en CI más adelante (job aparte
+  con su propio SQL Server), esta sección sería la candidata a migrar.

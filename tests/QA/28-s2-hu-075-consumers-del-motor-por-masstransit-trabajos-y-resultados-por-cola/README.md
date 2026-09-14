@@ -46,7 +46,7 @@ pieza aislada, lista para que quien dispare esto en el futuro solo llame a
   verificada, ver sección 4 de este documento).
 - Del lado de Cubicador (`cubicador/`, mismo repo): `worker/main.py`,
   `infrastructure/mensajeria/rabbitmq.py`, `scripts/ci_docker_smoke.py`,
-  `docs/CONTRATOS.md`, `docs/DECISIONES_TECNICAS.md` #12 — compatibilidad
+  `CONTRATO.md`, `docs/DECISIONES_TECNICAS.md` #12 — compatibilidad
   con el envelope de MassTransit, ver sección 4.
 
 ## 2. Criterios de cierre — verificados contra infraestructura real

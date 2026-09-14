@@ -128,8 +128,19 @@ ahí, por la misma razón). Aquí ni siquiera hace falta un puerto separado para
 lograrlo: `ajustar.py` llama directo a `domain.motor.validadores` en memoria.
 
 **Eventos** (ya nombrados en la historia de usuario original, se usan tal
-cual): `CubicaciónSolicitada`, `PlanDeCargueGenerado`, `CubicaciónRechazada`,
-`PlanDeCargueAjustado`.
+cual): `CubicaciónSolicitada`, `PlanDeCargueGenerado`, `CubicaciónRechazada`.
+(`PlanDeCargueAjustado`, nombrado originalmente acá como reservado, nunca se
+implementó — ver la actualización siguiente.)
+
+**Actualización (S3-HU-02, ADR-ajuste-manual-async.md del lado de NEXO)**: el
+razonamiento de arriba ("el ajuste manual NO va por cola") sigue siendo
+válido para la API SÍNCRONA de Cubicador (`PATCH /{id}/colocaciones/{id}`,
+que no cambió) — pero NEXO, para no exponer Cubicador directo al navegador,
+agregó su propio endpoint que SÍ publica `ajustar_colocacion` por cola
+(reutilizando `PlanDeCargueGenerado`/`CubicaciónRechazada`, sin un evento
+`PlanDeCargueAjustado` separado). La UI optimista del frontend es lo que
+compensa la latencia que este párrafo quería evitar — ver el ADR para el
+detalle completo de esa decisión.
 
 **Payload de los mensajes**: las mismas formas ya definidas como DTOs REST —
 una sola forma de verdad, sea que viaje por HTTP o por cola.
@@ -192,16 +203,25 @@ ServiciosConexos, Métricas, TarifasSicetacAdmin) referencia
 `PlanCargue`/`VehiculoCubicacion`/`ColocacionCargue`/`ItemPlanCargue`/
 `ParametrosCubicacion` ni los servicios/puertos del cubicador.
 
-**Implementado y verificado**: este endpoint ya existe en NEXO
-(`LineasSolicitudController`/`ObtenerCubicacionLineaQuery`, rama
-`cubicador`, ver `MIGRACION.md` décima pasada de ese repo). Verificado de
-punta a punta con los dos stacks de Docker reales corriendo a la vez (ver
+**Implementado y verificado** (2026-09-02): este endpoint ya existe en NEXO
+(`LineasSolicitudCubicacionController`/`ObtenerCubicacionLineaQuery`/
+`LineaSolicitudCubicacionAdapter`, autenticación dedicada
+`CubicadorApiKeyAuthenticationHandler`). ⚠️ Nota histórica: una versión
+anterior de este párrafo decía que el endpoint vivía en la rama `cubicador`
+de NEXO — esa rama **nunca se mezcló** y quedó descolgada antes de la
+reorganización del código por feature; el diseño de ahí se portó (adaptado
+a la estructura actual) al NEXO real recién ahora. Verificado de punta a
+punta con los dos stacks de Docker reales corriendo a la vez (ver
 `docs/testDocumentation/PRUEBAS_DE_INTEGRACION.md` secciones 2.5 y 2.6):
 `infrastructure/clientes/nexo_client.py` contra la API de NEXO directamente,
 y `POST /desde-linea/{id}` disparando el camino completo (router → RabbitMQ
-→ worker → NEXO → plan creado y optimizado). Esta segunda prueba encontró un
-bug real en `worker/main.py` (leía `lineaSolicitudId` en el nivel raíz del
-mensaje en vez de dentro de `solicitud`) — corregido.
+→ worker → NEXO → plan creado y optimizado, 3/3 unidades cargadas). Esta
+segunda prueba encontró un bug real de infraestructura: NEXO y Cubicador
+tienen cada uno un servicio llamado `api` en su propio `docker-compose.yml`
+— con el worker conectado a las dos redes Docker a la vez,
+`NEXO_BASE_URL=http://api:8080` resolvía al `api` del propio Cubicador, no
+al de NEXO. Corregido usando el nombre de contenedor explícito
+(`http://nexo-api-1:8080`).
 
 ## 9. Infraestructura y RabbitMQ
 
@@ -281,10 +301,16 @@ de NEXO — es el mismo broker, el mismo usuario. `.env.example` lo documenta.
 
 **Decisión** (pensada para no complicar la operación de un servicio interno,
 no para escala masiva):
-- Timeout de vigilancia (5 min, `worker/main.py:_vigilante_de_timeouts`, corre
-  cada 60s): si un plan lleva más de eso en `procesando` sin recibir el
-  evento de respuesta, se marca `error` automáticamente
-  (`marcar_error_por_timeout`).
+- Timeout de vigilancia (`worker/main.py:_vigilante_de_timeouts`, cada 60s y
+  5 min de umbral por defecto, ambos configurables vía
+  `CUBICADOR_INTERVALO_VIGILANTE_SEGUNDOS`/`CUBICADOR_TIMEOUT_PROCESANDO_MINUTOS`
+  desde S3-HU-06.1): si un plan lleva más de eso en `procesando` sin recibir el
+  evento de respuesta, el worker publica `cubicacion.rechazada` con
+  `codigo: "TIMEOUT_PROCESAMIENTO"` y **después** lo marca `error`
+  (`obtener_atascados` + `marcar_error`, en ese orden — ver CONTRATO.md 6.4:
+  publicar antes de persistir es lo que evita que un broker caído deje el plan
+  fuera de `procesando` sin haber avisado a nadie). Hasta S3-HU-06.1 solo
+  marcaba `error` sin publicar, y NEXO se quedaba en `procesando` para siempre.
 - Reintentos limitados vía un contador manual en la cabecera del mensaje
   (`x-intentos`, no vía TTL/DLX nativo de RabbitMQ — más simple de razonar
   con ack manual): 3 intentos antes de publicar en `cubicacion.dlq` para
@@ -293,6 +319,24 @@ no para escala masiva):
   marca/reporta una sola vez, porque reintentar da siempre el mismo
   resultado; solo un error inesperado (bug, DB caída) entra al ciclo de
   reintentos.
+- **Mensaje ilegible: 0 reintentos, directo a la DLQ** (S3-HU-10.1, issue #131).
+  Si el cuerpo no se puede ni interpretar —no es JSON, es un JSON que no es un
+  objeto, le falta `correlationId`, o la cabecera `x-intentos` no es numérica—
+  no hay reintento que pueda cambiar el resultado, así que va a
+  `cubicacion.dlq` con su alerta y se ackea de inmediato.
+
+  La línea está trazada en **"¿se puede leer el mensaje?"**, no en "¿se puede
+  procesar?": un mensaje legible con un `tipo` desconocido (o sin `tipo`) SÍ pasa
+  por los 3 reintentos, como cualquier otro fallo del despacho. Darle trato
+  distinto a "falta `tipo`" que a "`tipo` inválido" sería una inconsistencia
+  nueva.
+
+  Existe porque todo eso corría ANTES del bloque de manejo de errores, sin red
+  ninguna: cualquiera de esos casos lanzaba antes del `ack` y dejaba el mensaje
+  `unacknowledged` para siempre. Con el prefetch de abajo, **dos mensajes así
+  bastaban para que el worker dejara de procesar cualquier cosa**, y reiniciar el
+  contenedor no ayudaba: RabbitMQ los reentrega y se vuelven a atascar. Perder un
+  mensaje corrupto es aceptable; perder el worker, no.
 - **Alerta al equipo** (2026-08-27, criterio de cierre de la HU: "Reintentos
   + DLQ + alerta ante fallos repetidos del motor"): al caer un mensaje en
   `cubicacion.dlq`, además del log, se envía un correo al equipo técnico —
@@ -307,6 +351,11 @@ no para escala masiva):
   resultado se reemplaza completo.
 - Prefetch bajo en el worker (`set_qos(prefetch_count=2)` en
   `worker/main.py`); escalar con más réplicas si hace falta más throughput.
+  ⚠️ Contrapartida que costó un bug crítico: un prefetch bajo hace que **muy pocos
+  mensajes sin ackear alcancen para bloquear el worker entero**. La decisión sigue
+  siendo la correcta —la cubicación es intensiva en CPU y no tiene sentido tomar 20
+  mensajes que se procesarán en fila—, pero obliga a que ningún camino de código
+  pueda terminar sin `ack`. De ahí la guarda de mensajes ilegibles de arriba.
 - Estado `error` visible (`PlanCargue.error_mensaje`) + acción de reintento
   manual para el usuario — se evita construir recuperación automática
   compleja en esta primera versión.

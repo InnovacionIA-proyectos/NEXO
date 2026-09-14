@@ -111,6 +111,13 @@ public static class MensajeriaDependencyInjection
             x.AddConsumer<AlertaDeFalloConsumer<PlanDeCargueGenerado>>();
             x.AddConsumer<AlertaDeFalloConsumer<CubicacionRechazada>>();
 
+            // S3-HU-03 (issue #110/#111): catálogo de vehículos - mismo puente, misma
+            // tubería. Un solo consumer atiende los 2 tipos (ver VehiculoCatalogoConsumer),
+            // pero MassTransit igual necesita un AddConsumer<T> y un Fault<T> por MENSAJE.
+            x.AddConsumer<VehiculoCatalogoConsumer>();
+            x.AddConsumer<AlertaDeFalloConsumer<VehiculoCreado>>();
+            x.AddConsumer<AlertaDeFalloConsumer<VehiculoActualizado>>();
+
             // Refresca el score persistido de las activas cuando la cadena de
             // priorización lo pide. La excepción sube: si esto deja de correr, los
             // reportes empiezan a mentir y hace falta que alguien se entere.
@@ -267,7 +274,50 @@ public static class MensajeriaDependencyInjection
                         e.ConfigureConsumer<CubicacionRechazadaConsumer>(contexto);
                     });
 
-                    Tuberia(contexto, cfg, typeof(PlanDeCargueGeneradoConsumer), typeof(CubicacionRechazadaConsumer));
+                    // S3-HU-03 (issue #110/#111): mismo patrón, 2 endpoints más porque cada
+                    // routing key necesita el suyo propio - MassTransit no permite bindear
+                    // 2 routing keys distintas a un mismo ReceiveEndpoint con nombres de cola
+                    // separados (y sí queremos colas separadas: un fallo en vehiculo.creado
+                    // no debe bloquear vehiculo.actualizado ni viceversa).
+                    cfg.ReceiveEndpoint("Cubicacion.VehiculoCreado", (IRabbitMqReceiveEndpointConfigurator e) =>
+                    {
+                        e.ConfigureConsumeTopology = false;
+                        e.Bind("cubicador.eventos", b =>
+                        {
+                            b.ExchangeType = "topic";
+                            b.RoutingKey = "vehiculo.creado";
+                        });
+                        e.ConfigureConsumer<VehiculoCatalogoConsumer>(contexto);
+                    });
+                    cfg.ReceiveEndpoint("Cubicacion.VehiculoActualizado", (IRabbitMqReceiveEndpointConfigurator e) =>
+                    {
+                        e.ConfigureConsumeTopology = false;
+                        e.Bind("cubicador.eventos", b =>
+                        {
+                            b.ExchangeType = "topic";
+                            b.RoutingKey = "vehiculo.actualizado";
+                        });
+                        e.ConfigureConsumer<VehiculoCatalogoConsumer>(contexto);
+                    });
+                    // Tercer endpoint del catálogo: sin este binding, `eliminar_vehiculo`
+                    // publicaría al exchange y el mensaje se descartaría EN SILENCIO (topic
+                    // exchange sin bind que calce = ni error ni entrega), dejando la
+                    // proyección con vehículos que ya no existen.
+                    cfg.ReceiveEndpoint("Cubicacion.VehiculoEliminado", (IRabbitMqReceiveEndpointConfigurator e) =>
+                    {
+                        e.ConfigureConsumeTopology = false;
+                        e.Bind("cubicador.eventos", b =>
+                        {
+                            b.ExchangeType = "topic";
+                            b.RoutingKey = "vehiculo.eliminado";
+                        });
+                        e.ConfigureConsumer<VehiculoCatalogoConsumer>(contexto);
+                    });
+
+                    Tuberia(
+                        contexto, cfg,
+                        typeof(PlanDeCargueGeneradoConsumer), typeof(CubicacionRechazadaConsumer),
+                        typeof(VehiculoCatalogoConsumer));
                 });
         });
 

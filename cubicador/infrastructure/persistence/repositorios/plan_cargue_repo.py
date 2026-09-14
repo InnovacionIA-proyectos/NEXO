@@ -32,9 +32,12 @@ class SqlPlanCargueRepository:
 
     async def crear(
         self, nombre: str, vehiculo_id: str, linea_solicitud_id: str | None = None, numero_vehiculo: int = 1,
+        id: str | None = None,
     ) -> PlanCargue:
+        # `id`: S3-HU-02 (issue #105) - "crear_plan" desde NEXO manda el id ya generado
+        # alla (S3-HU-01.2); sin id (POST sincrono, demo, crear_desde_linea) se genera acá.
         fila = PlanCargueModel(
-            id=str(uuid.uuid4()), nombre=nombre, vehiculo_id=vehiculo_id,
+            id=id or str(uuid.uuid4()), nombre=nombre, vehiculo_id=vehiculo_id,
             linea_solicitud_id=linea_solicitud_id, numero_vehiculo=numero_vehiculo,
         )
         self._s.add(fila)
@@ -54,9 +57,25 @@ class SqlPlanCargueRepository:
 
     async def eliminar(self, id: str) -> None:
         fila = await self._s.get(PlanCargueModel, id)
-        if fila is not None:
-            await self._s.delete(fila)
-            await self._s.commit()
+        if fila is None:
+            return
+
+        # S3-HU-10.3 (issue #133): las colocaciones van PRIMERO, mismo orden que ya
+        # respeta `eliminar_item`. `ColocacionCargueModel` tiene FK a `planes_cargue`
+        # y a `items_plan_cargue` pero NO tiene relationship ni cascada, asi que el
+        # `delete(fila)` de abajo (que si arrastra los items, por el cascade
+        # delete-orphan de PlanCargueModel.items) dejaba las colocaciones apuntando a
+        # dos filas muertas: en Postgres, ForeignKeyViolationError en cualquier plan
+        # ya optimizado; en SQLite -sin PRAGMA foreign_keys- filas huerfanas en
+        # silencio.
+        #
+        # Importa mas de lo que parece: NEXO borra de forma optimista (responde antes
+        # de saber si Cubicador lo logro), asi que el fallo dejaba a NEXO creyendo que
+        # el plan no existe y a Cubicador conservandolo intacto, sin nada que
+        # reconcilie la diferencia.
+        await self._s.execute(delete(ColocacionCargueModel).where(ColocacionCargueModel.plan_cargue_id == id))
+        await self._s.delete(fila)
+        await self._s.commit()
 
     async def guardar_item(self, plan_id: str, item_id: str | None, item: ItemPlanCargue) -> ItemPlanCargue:
         existente = await self._s.get(ItemPlanCargueModel, item_id) if item_id else None
@@ -167,25 +186,29 @@ class SqlPlanCargueRepository:
             plan.estado = "procesando"
             await self._s.commit()
 
-    async def marcar_error(self, plan_id: str, mensaje: str) -> None:
+    async def marcar_error(self, plan_id: str | None, mensaje: str) -> None:
+        # S3-HU-10.1 (issue #131): `plan_id` puede ser None - lo llama el manejador de
+        # errores del worker con `cuerpo.get("planId")`, y un mensaje malformado puede
+        # no traer la clave. Sin esta guarda, `get(Modelo, None)` emite hoy un
+        # SAWarning ("fully NULL primary key identity") y SQLAlchemy avisa que podria
+        # LANZAR en una version futura - lo que reintroduciria el atasco exacto que
+        # esta HU cierra, dentro del bloque que existe para reportarlo.
+        if plan_id is None:
+            return
+
         plan = await self._s.get(PlanCargueModel, plan_id)
         if plan is not None:
             plan.estado = "error"
             plan.error_mensaje = mensaje
             await self._s.commit()
 
-    async def marcar_error_por_timeout(self, limite) -> int:
+    async def obtener_atascados(self, limite) -> list[str]:
         filas = (await self._s.execute(
-            select(PlanCargueModel).where(
+            select(PlanCargueModel.id).where(
                 PlanCargueModel.estado == "procesando", PlanCargueModel.updated_at < limite,
             )
         )).scalars().all()
-        for plan in filas:
-            plan.estado = "error"
-            plan.error_mensaje = f"Timeout: el plan quedo mas de lo esperado en 'procesando' (worker probablemente se cayo)."
-        if filas:
-            await self._s.commit()
-        return len(filas)
+        return list(filas)
 
     async def obtener_colocacion(self, plan_id: str, colocacion_id: str) -> ColocacionCargue | None:
         fila = await self._s.get(ColocacionCargueModel, colocacion_id)
@@ -257,7 +280,23 @@ class SqlPlanCargueRepository:
         await self._s.commit()
 
     async def eliminar_planes_de_linea(self, linea_solicitud_id: str) -> None:
-        await self._s.execute(delete(PlanCargueModel).where(PlanCargueModel.linea_solicitud_id == linea_solicitud_id))
+        # S3-HU-10.3 (issue #133): mismo defecto que tenia `eliminar()`, y aqui es
+        # PEOR - un `delete()` masivo no dispara la cascada del ORM, asi que sin este
+        # borrado explicito quedaban huerfanos los items ADEMAS de las colocaciones.
+        #
+        # No es teorico: lo llama `crear_plan_desde_linea` para reconstruir la flota,
+        # o sea que volver a cubicar una linea que ya tenia flota optimizada fallaba
+        # en Postgres cada vez.
+        ids = (await self._s.execute(
+            select(PlanCargueModel.id).where(PlanCargueModel.linea_solicitud_id == linea_solicitud_id)
+        )).scalars().all()
+        if not ids:
+            return
+
+        # De hijos a padres, igual que `eliminar()` y `eliminar_item()`.
+        await self._s.execute(delete(ColocacionCargueModel).where(ColocacionCargueModel.plan_cargue_id.in_(ids)))
+        await self._s.execute(delete(ItemPlanCargueModel).where(ItemPlanCargueModel.plan_cargue_id.in_(ids)))
+        await self._s.execute(delete(PlanCargueModel).where(PlanCargueModel.id.in_(ids)))
         await self._s.commit()
 
     async def obtener_sobrantes(self, plan_id: str) -> list[tuple[str, int]]:
