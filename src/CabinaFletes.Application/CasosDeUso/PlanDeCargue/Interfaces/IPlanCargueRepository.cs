@@ -36,4 +36,14 @@ public interface IPlanCargueRepository
     /// cada uno con sus colocaciones (para contar cargadas/totales) — o solo el propio
     /// plan si no tiene LineaSolicitudId (flota de un solo vehículo).</summary>
     Task<IReadOnlyList<PlanCargue>> ObtenerFlotaAsync(Guid planId, CancellationToken ct);
+
+    /// <summary>
+    /// [S3-HU-04.3, issue #78] GET /api/planes-cargue/por-linea/{lineaId} — todos los
+    /// planes que comparten <paramref name="lineaSolicitudId"/>, directo — a diferencia de
+    /// <see cref="ObtenerFlotaAsync"/>, que parte de un PlanId ya conocido, este es lo que
+    /// hace falta cuando ese PlanId TODAVÍA no existe (sondeo de
+    /// <see cref="CrearPlanDesdeLineaCommand"/> mientras el comando sigue en proceso).
+    /// Lista vacía si ningún plan de esa línea ha llegado todavía — nunca null.
+    /// </summary>
+    Task<IReadOnlyList<PlanCargue>> ObtenerPorLineaAsync(Guid lineaSolicitudId, CancellationToken ct);
 }

@@ -602,12 +602,16 @@ equivalencia) y de **S3-HU-04.5** (punto de coordinación).
 
 > **Por qué existe esta sección.** S3-HU-05 (#116) retiró el CORS del Cubicador
 > y rotó la clave, dando por hecho que *"el visor 3D (S3-HU-04) ya consume solo
-> esos endpoints de NEXO"*. **Eso todavía no ocurrió**: S3-HU-04 no tiene rama ni
-> commits, y el frontend sigue con 12 puntos de llamada directa
-> (`cubicadorBaseUrl` en `cubicador-api.service.ts` y `captura-api.service.ts`).
-> Quien arranque esa HU no parte de cero: parte con 4 endpoints faltantes.
+> esos endpoints de NEXO"*. **Eso todavía no ocurrió**: el frontend sigue con
+> 12 puntos de llamada directa (`cubicadorBaseUrl` en `cubicador-api.service.ts`
+> y `captura-api.service.ts`) — nadie cambió esos call-sites todavía. Lo que sí
+> avanzó (issue #78, S3-HU-04.3) es el lado NEXO: de los 4 endpoints que
+> faltaban, ya existen 3 (`desde-linea`, `por-linea`, `colocaciones`, ver 8.1).
+> Solo queda `cubicar()`, que necesita una decisión de arquitectura aparte (8.2).
+> Migrar el frontend a los 19 endpoints ya disponibles sigue siendo trabajo
+> pendiente de esa HU.
 
-### 8.1 Con equivalente en NEXO (16 de 20)
+### 8.1 Con equivalente en NEXO (19 de 20)
 
 | Método del frontend | Endpoint en NEXO | Desde |
 |---|---|---|
@@ -629,24 +633,38 @@ equivalencia) y de **S3-HU-04.5** (punto de coordinación).
 | `metricas()` | `GET /api/planes-cargue/{id}/metricas` | S3-HU-03 |
 | `noCargadas()` | `GET /api/planes-cargue/{id}/no-cargadas` | S3-HU-03 |
 | `exportar()` | `GET /api/planes-cargue/{id}/exportar` | S3-HU-03 |
+| `crearPlanDesdeLinea()` | `POST /api/planes-cargue/desde-linea/{lineaId}` | S3-HU-04.3 (issue #78) |
+| `porLinea()` | `GET /api/planes-cargue/por-linea/{lineaId}` | S3-HU-04.3 (issue #78) |
+| `colocaciones()` | `GET /api/planes-cargue/{id}/colocaciones` | S3-HU-04.3 (issue #78) |
 
 ⚠️ **Cambio de ruta que hay que mirar**: los 3 de vehículos viven en
 `/api/vehiculos`, no en `/api/planes-cargue/vehiculos` como los pide el
 frontend hoy. No es un `replace` del host: cambia el prefijo.
 
-### 8.2 SIN equivalente en NEXO (4)
+⚠️ **Limitación conocida de `porLinea()` (issue #78)**: hoy el worker de
+Cubicador (`crear_desde_linea`) solo reporta el PRIMER vehículo de una flota
+que necesitó varios — `application/plan_cargue/desde_linea.py` arma toda la
+flota pero solo publica `plan-de-cargue.generado` para el primero. Mientras
+eso no se arregle del lado del motor (issue nueva, fuera de alcance de #78),
+`porLinea()` puede devolver una lista incompleta para líneas que requieran
+más de un vehículo.
+
+⚠️ **`colocaciones()` no se deprecó**: la duda que dejó abierta la 8.2 original
+(¿redundante con `resultado()`, que ya trae las colocaciones adentro?) se
+resolvió implementándolo como equivalente 1:1 en vez de forzar un refactor del
+frontend — costaba poco (`ResultadoPlanMapper.AColocacion` ya existía) y evita
+un cambio de contrato no pedido por la issue.
+
+### 8.2 SIN equivalente en NEXO (1)
 
 | Método del frontend | Ruta que pide hoy | Situación |
 |---|---|---|
-| `crearPlanDesdeLinea()` | `POST /planes-cargue/desde-linea/{lineaId}` | El worker **ya lo implementa** (`tipo: crear_desde_linea`, verificado de punta a punta). Solo falta el endpoint en NEXO que publique el comando, en vez de que lo dispare el navegador. Es el Cubo 1 que quedó sin cerrar. |
-| `porLinea()` | `GET /planes-cargue/por-linea/{lineaId}` | Es el sondeo del anterior: sin él no hay forma de saber cuándo terminó. Van en par. |
-| `colocaciones()` | `GET /planes-cargue/{id}/colocaciones` | **Es la geometría del visor 3D.** S3-HU-03 agregó `resultado`/`metricas`/`no-cargadas`/`exportar` pero no este. Puede ser deliberado —`resultado` ya trae las colocaciones dentro—; si lo es, el frontend debe dejar de llamarlo y conviene decirlo explícitamente en lugar de dejar el hueco. |
 | `cubicar()` (`captura-api.service.ts`) | `POST /api/cubicacion` | Cubicación rápida (SICCE), sin persistencia. **Ninguna HU del sprint la cubre**: no es escritura del dominio (S3-HU-02) ni lectura proyectable (S3-HU-03) — no hay estado que proyectar. Necesita decisión e issue propia. |
 
-Las 3 primeras son endpoints que faltan por escribir. **La cuarta necesita una
-decisión de arquitectura antes de escribir nada**: al ser un cálculo puro sin
-persistencia, no encaja en el patrón de cola (habría que inventar persistencia
-para poder devolver el resultado) ni en el de proyección (no hay nada que
-proyectar). Las salidas razonables son un endpoint en NEXO que delegue por HTTP
-como excepción declarada y acotada, o tratarla explícitamente como la única
-operación que el navegador sigue resolviendo de otro modo.
+**Necesita una decisión de arquitectura antes de escribir nada**: al ser un
+cálculo puro sin persistencia, no encaja en el patrón de cola (habría que
+inventar persistencia para poder devolver el resultado) ni en el de
+proyección (no hay nada que proyectar). Las salidas razonables son un
+endpoint en NEXO que delegue por HTTP como excepción declarada y acotada, o
+tratarla explícitamente como la única operación que el navegador sigue
+resolviendo de otro modo.

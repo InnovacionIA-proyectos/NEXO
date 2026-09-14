@@ -55,10 +55,10 @@ Pendiente fuera de este repo: aplicar el valor nuevo en el despliegue real de
 producción (esta sesión solo rotó los `.env` locales de desarrollo).
 
 > ⚠️ **Corrección al párrafo de arriba.** Dice que S3-HU-04 ya movió el frontend
-> a NEXO. **Todavía no ocurrió**: esa HU no tiene rama ni commits, y
-> `administracion_embarqa_nexo` sigue con 12 puntos de llamada directa al
-> Cubicador (`cubicadorBaseUrl` en `cubicador-api.service.ts` y
-> `captura-api.service.ts`) — verificado con `git grep` sobre su `origin/main`.
+> a NEXO. **Todavía no ocurrió**: `administracion_embarqa_nexo` sigue con 12
+> puntos de llamada directa al Cubicador (`cubicadorBaseUrl` en
+> `cubicador-api.service.ts` y `captura-api.service.ts`) — nadie tocó esos
+> call-sites todavía.
 >
 > Qué implica hoy, en concreto: en producción no rompe nada (ese módulo ya
 > estaba inerte, `environment.prod.ts` tiene `cubicadorApiUrl` y
@@ -69,12 +69,20 @@ producción (esta sesión solo rotó los `.env` locales de desarrollo).
 > contra un Cubicador local recibe 401 en las 12 llamadas hasta que S3-HU-04
 > las migre.
 >
-> **Faltan 4 endpoints en NEXO** para que S3-HU-04 pueda cerrar:
-> `desde-linea/{lineaId}`, `por-linea/{lineaId}`, `{id}/colocaciones` y
-> `POST /api/cubicacion`. Inventario 1 a 1 de las 20 llamadas, con el detalle de
-> cada hueco, en [`docs/mensajeria/CUBICACION.md` §8](docs/mensajeria/CUBICACION.md).
-> El cuarto, además, **no tiene issue** y necesita una decisión de arquitectura
-> antes de escribirse.
+> ✅ **Actualización (issue #78, S3-HU-04.3)**: de los 4 endpoints que faltaban
+> en NEXO, ya se agregaron 3 — `POST /api/planes-cargue/desde-linea/{lineaId}`,
+> `GET /api/planes-cargue/por-linea/{lineaId}` y
+> `GET /api/planes-cargue/{id}/colocaciones` — sobre el `crear_desde_linea` que
+> el worker de Cubicador ya implementaba de punta a punta. Detalle, incluida
+> una limitación conocida (el worker hoy solo reporta el primer vehículo de una
+> flota multi-vehículo), en [`docs/mensajeria/CUBICACION.md` §8](docs/mensajeria/CUBICACION.md).
+> Ojo: esto es solo el lado NEXO — los 12 call-sites del frontend siguen sin
+> migrar, eso sigue siendo trabajo de S3-HU-04 aparte.
+>
+> **Sigue faltando 1 endpoint**: `POST /api/cubicacion` (método `cubicar()`,
+> `captura-api.service.ts`). No tiene issue todavía y necesita una decisión de
+> arquitectura antes de escribirse — es cálculo puro sin persistencia, no encaja
+> ni en el patrón de cola ni en el de proyección que usa el resto del módulo.
 
 **Resuelto — los 3 bugs de QA de Cubicación (S3-HU-10, #131/#132/#133)**: los tres
 que la verificación de los PR #122/#126 encontró y que seguían presentes en `QA`.

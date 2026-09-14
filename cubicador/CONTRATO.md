@@ -62,12 +62,18 @@ middleware), no reabrir una variable vieja.
 ⚠️ **Estado real del frontend, a la fecha de este documento.** La versión
 anterior de este párrafo afirmaba que el visor 3D *"ya consume solo esos
 endpoints de NEXO, confirmado y verificado en QA"*. **No es así todavía**:
-S3-HU-04 no tiene rama ni commits, y `administracion_embarqa_nexo` sigue con
-12 puntos de llamada directa a este servicio. El CORS se retiró igual, y está
+`administracion_embarqa_nexo` sigue con 12 puntos de llamada directa a este
+servicio — nadie tocó esos call-sites todavía. El CORS se retiró igual, y está
 bien que así sea —la capacidad no debe existir— pero conviene no leer esta
-sección como si la migración del portal ya estuviera hecha. Faltan además 4
-endpoints en NEXO para que esa HU pueda cerrar: inventario 1 a 1 en
-`NEXO/docs/mensajeria/CUBICACION.md` §8.
+sección como si la migración del portal ya estuviera hecha.
+
+Del lado NEXO sí hubo avance (issue #78, S3-HU-04.3): de los 4 endpoints que
+faltaban para que esa HU pudiera cerrar, ya se agregaron 3 (`desde-linea/{id}`,
+`por-linea/{id}`, `{id}/colocaciones`) sobre el `crear_desde_linea` que este
+servicio ya implementaba de punta a punta — solo faltaba que NEXO lo publicara
+en vez de que lo disparara el navegador. Queda 1 sin cubrir (`POST
+/api/cubicacion`, sin issue todavía, necesita decisión de arquitectura).
+Inventario 1 a 1 en `NEXO/docs/mensajeria/CUBICACION.md` §8.
 
 `CUBICADOR_API_KEY` (sección 4/5) sigue existiendo — protege la API para
 consumidores server-to-server legítimos (hoy: scripts de CI/verificación

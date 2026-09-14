@@ -8,7 +8,9 @@ namespace CabinaFletes.Mensajes.Cubicacion;
 /// shape concreto correspondiente (ver MensajesDeCubicacion.cs) — el patrón de tipo en
 /// tiempo de ejecución funciona porque este validador corre ANTES de publicar, sobre la
 /// misma instancia en memoria con la que <see cref="Infrastructure.Cubicacion.CubicacionPublicadorAdapter"/>
-/// construyó el mensaje (no hay que deserializar nada).</summary>
+/// construyó el mensaje (no hay que deserializar nada).
+///
+/// [S3-HU-04.3, issue #78] Ahora son 10: se suma "crear_desde_linea".</summary>
 public sealed class CubicacionSolicitadaValidador : IValidadorDeMensaje<CubicacionSolicitada>
 {
     private static readonly HashSet<string> TiposConocidos = new(StringComparer.Ordinal)
@@ -18,6 +20,9 @@ public sealed class CubicacionSolicitadaValidador : IValidadorDeMensaje<Cubicaci
         // Cierra el par de "guardar_vehiculo": sin el, esa escritura seguiria saliendo
         // del navegador y S3-HU-05 no puede cerrar. Ver EliminarVehiculoInput.
         "eliminar_vehiculo",
+        // [S3-HU-04.3, issue #78] El worker de Cubicador ya implementa este tipo desde
+        // antes de esta HU (cubicador/worker/main.py) — ver CrearPlanDesdeLineaCommand.
+        "crear_desde_linea",
     };
 
     private static readonly HashSet<string> PuertaPosicionesValidas = new(StringComparer.Ordinal)
@@ -63,6 +68,9 @@ public sealed class CubicacionSolicitadaValidador : IValidadorDeMensaje<Cubicaci
                 break;
             case "crear_plan_demo":
                 ExigirTipo<CrearPlanDemoInput>(mensaje.Solicitud, "crear_plan_demo", motivos);
+                break;
+            case "crear_desde_linea":
+                ValidarCrearDesdeLinea(mensaje.Solicitud, motivos);
                 break;
             case "guardar_vehiculo":
                 ValidarGuardarVehiculo(mensaje.Solicitud, motivos);
@@ -124,6 +132,19 @@ public sealed class CubicacionSolicitadaValidador : IValidadorDeMensaje<Cubicaci
 
         if (string.IsNullOrWhiteSpace(s.VehiculoId) || !Guid.TryParse(s.VehiculoId, out _))
             motivos.Add("Solicitud.VehiculoId debe ser un GUID válido.");
+    }
+
+    /// <summary>[S3-HU-04.3, issue #78] "crear_desde_linea".</summary>
+    private static void ValidarCrearDesdeLinea(object solicitud, List<string> motivos)
+    {
+        if (solicitud is not CrearPlanDesdeLineaInput s)
+        {
+            motivos.Add("Solicitud debe ser de tipo CrearPlanDesdeLineaInput para Tipo 'crear_desde_linea'.");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(s.LineaSolicitudId) || !Guid.TryParse(s.LineaSolicitudId, out _))
+            motivos.Add("Solicitud.LineaSolicitudId debe ser un GUID válido.");
     }
 
     private static void ValidarGuardarVehiculo(object solicitud, List<string> motivos)
