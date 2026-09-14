@@ -38,6 +38,11 @@ namespace CabinaFletes.Mensajes.Cubicacion;
 /// hace <see cref="CubicacionSolicitadaValidador"/> con un patrón de tipo en tiempo de
 /// ejecución — funciona porque la validación corre ANTES de serializar, sobre la misma
 /// instancia en memoria con la que se construyó el mensaje.
+///
+/// [S3-HU-04.3, issue #78] "crear_desde_linea" (<see cref="CrearPlanDesdeLineaInput"/>) se
+/// suma como un décimo Tipo — el worker de Cubicador ya lo implementa desde antes (ver
+/// cubicador/worker/main.py), solo faltaba que NEXO lo publicara en vez de que lo disparara
+/// el navegador directo.
 /// </summary>
 public sealed record CubicacionSolicitada(
     string Tipo, string PlanId, string CorrelationId, object Solicitud);
@@ -62,6 +67,18 @@ public sealed record CrearPlanInput(string Nombre, string VehiculoId);
 /// <summary>"crear_plan_demo" — sin payload: Cubicador elige internamente el vehículo y
 /// los ítems del escenario de demostración (equivalente a application/plan_cargue/demo.py).</summary>
 public sealed record CrearPlanDemoInput;
+
+/// <summary>
+/// [S3-HU-04.3, issue #78] "crear_desde_linea" — dispara la generación de la flota
+/// (uno o más vehículos, ver <c>cubicador/application/plan_cargue/desde_linea.py</c>) a
+/// partir de las posiciones de una línea de solicitud ya cotizada (botón "Cubicar" de la
+/// Mesa de Costeo). El worker de Cubicador YA implementa este Tipo desde antes de esta HU
+/// (verificado contra <c>cubicador/worker/main.py</c>) — este payload es lo único que
+/// faltaba del lado de NEXO para poder publicarlo. <c>LineaSolicitudId</c> espeja el mismo
+/// campo (camelCase) que <c>worker/main.py</c> lee como <c>solicitud["lineaSolicitudId"]</c>.
+/// Ver <see cref="Application.CasosDeUso.PlanDeCargue.CrearPlanDesdeLineaCommand"/>.
+/// </summary>
+public sealed record CrearPlanDesdeLineaInput(string LineaSolicitudId);
 
 public sealed record EjeVehiculoInput(decimal PosicionMm, decimal CapacidadKg);
 
@@ -162,6 +179,11 @@ public sealed record AjustarColocacionInput(
 /// que <see cref="Infrastructure.Cubicacion.PlanDeCargueGeneradoConsumer"/> proyecte la
 /// base de NEXO sin volver a consultar a Cubicador. Tamaño medido ANTES de este cambio
 /// en docs/decisiones/medicion-evento-enriquecido-plan-cargue.md (issue #109).
+///
+/// [S3-HU-04.3, issue #78] LIMITACIÓN CONOCIDA: cuando "crear_desde_linea" reparte la carga
+/// en varios vehículos, hoy solo se publica UN evento de estos, para el primer plan de la
+/// flota (ver worker/main.py::_ejecutar_solicitud) — los vehículos 2..N no llegan acá. Ver
+/// la nota completa en <see cref="Application.CasosDeUso.PlanDeCargue.CrearPlanDesdeLineaCommand"/>.
 /// </summary>
 public sealed record PlanDeCargueGenerado(string CorrelationId, string PlanId, ResultadoDeCubicacion Resultado);
 

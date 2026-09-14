@@ -43,6 +43,7 @@ public class PlanesCargueController(
     ICommandHandler<SolicitarOptimizacionCommand, SolicitudDeCubicacionAceptadaDto> solicitar,
     ICommandHandler<CrearPlanCommand, SolicitudDeCubicacionAceptadaDto> crearPlan,
     ICommandHandler<CrearPlanDemoCommand, ComandoAceptadoDto> crearPlanDemo,
+    ICommandHandler<CrearPlanDesdeLineaCommand, ComandoAceptadoDto> crearPlanDesdeLinea,
     ICommandHandler<GuardarItemCommand, ComandoAceptadoDto> guardarItem,
     ICommandHandler<ImportarItemsCommand, ComandoAceptadoDto> importarItems,
     ICommandHandler<EliminarItemCommand, ComandoAceptadoDto> eliminarItem,
@@ -52,8 +53,10 @@ public class PlanesCargueController(
     IQueryHandler<ListarPlanesCargueQuery, IReadOnlyList<PlanCargueDto>> listar,
     IQueryHandler<ObtenerResultadoPlanQuery, ResultadoPlanDto> obtenerResultado,
     IQueryHandler<ObtenerFlotaPlanQuery, IReadOnlyList<PlanFlotaItemDto>> obtenerFlota,
+    IQueryHandler<ObtenerPlanesPorLineaQuery, IReadOnlyList<PlanFlotaItemDto>> obtenerPlanesPorLinea,
     IQueryHandler<ObtenerMetricasPlanQuery, MetricasCubicacionEvento?> obtenerMetricas,
-    IQueryHandler<ObtenerNoCargadasPlanQuery, IReadOnlyList<ColocacionCargueDto>> obtenerNoCargadas)
+    IQueryHandler<ObtenerNoCargadasPlanQuery, IReadOnlyList<ColocacionCargueDto>> obtenerNoCargadas,
+    IQueryHandler<ObtenerColocacionesPlanQuery, IReadOnlyList<ColocacionCargueDto>> obtenerColocaciones)
     : ControllerBase
 {
     /// <summary>
@@ -87,6 +90,22 @@ public class PlanesCargueController(
     [ProducesResponseType(StatusCodes.Status202Accepted)]
     public async Task<ActionResult<ComandoAceptadoDto>> CrearDemo(CancellationToken ct = default)
         => Accepted(await crearPlanDemo.Handle(new CrearPlanDemoCommand(), ct));
+
+    /// <summary>
+    /// [S3-HU-04.3, issue #78] Crea la flota de un plan de cargue a partir de una línea de
+    /// solicitud ya cotizada (botón "Cubicar" de la Mesa de Costeo) — reemplaza el POST que
+    /// <c>crearPlanDesdeLinea()</c> (cubicador-api.service.ts) hacía directo contra
+    /// Cubicador con la clave compartida. 202 con un CorrelationId de seguimiento que ES el
+    /// propio <paramref name="lineaId"/> (no hay PlanId de NEXO todavía: Cubicador decide
+    /// cuántos vehículos hacen falta) — sondear con <c>GET .../por-linea/{lineaId}</c>
+    /// (<see cref="ObtenerPlanesPorLineaQuery"/>) hasta que aparezca la flota.
+    /// </summary>
+    [Authorize(Roles = "Comercial,CoordinadorFletes,Admin")]
+    [HttpPost("desde-linea/{lineaId:guid}")]
+    [ProducesResponseType(StatusCodes.Status202Accepted)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<ComandoAceptadoDto>> CrearDesdeLinea(Guid lineaId, CancellationToken ct = default)
+        => Accepted(await crearPlanDesdeLinea.Handle(new CrearPlanDesdeLineaCommand(lineaId), ct));
 
     /// <summary>
     /// Pide la optimización de un plan de cargue ya existente. No bloquea: responde 202
@@ -192,7 +211,7 @@ public class PlanesCargueController(
     // ----------------------------------------------------------------------------
     // S3-HU-03 (issue #112): lectura del visor 3D, toda contra la proyección local que
     // mantienen PlanDeCargueGeneradoConsumer/VehiculoCatalogoConsumer (issue #111) —
-    // NINGUNO de estos 5 endpoints llama a Cubicador (criterio no-negociable de la HU).
+    // NINGUNO de estos endpoints llama a Cubicador (criterio no-negociable de la HU).
     // [Authorize] sin rol específico: mismo criterio que el resto de las consultas del
     // sistema (docs/ROLES_Y_PERMISOS.md — "cualquiera de los 6 roles puede consultar").
     // ----------------------------------------------------------------------------
@@ -203,6 +222,20 @@ public class PlanesCargueController(
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyList<PlanCargueDto>>> Listar(CancellationToken ct = default)
         => Ok(await listar.Handle(new ListarPlanesCargueQuery(), ct));
+
+    /// <summary>
+    /// [S3-HU-04.3, issue #78] GET /api/planes-cargue/por-linea/{lineaId} — sondeo de la
+    /// flota que crea <c>CrearDesdeLinea</c>, contra la proyección local. Responde
+    /// 200 con lista VACÍA (nunca 404) mientras el comando sigue en proceso — ver
+    /// <see cref="ObtenerPlanesPorLineaQuery"/>. Ubicado antes del GET por id en este
+    /// archivo solo por legibilidad: el ruteo no depende del orden, "por-linea" no calza
+    /// con la restricción <c>:guid</c> de <c>{id:guid}</c>.
+    /// </summary>
+    [Authorize]
+    [HttpGet("por-linea/{lineaId:guid}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<PlanFlotaItemDto>>> ObtenerPorLinea(Guid lineaId, CancellationToken ct = default)
+        => Ok(await obtenerPlanesPorLinea.Handle(new ObtenerPlanesPorLineaQuery(lineaId), ct));
 
     /// <summary>GET /api/planes-cargue/{id}/resultado — detalle completo (ítems,
     /// colocaciones con geometría, métricas, incidencias).</summary>
@@ -237,6 +270,20 @@ public class PlanesCargueController(
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<IReadOnlyList<ColocacionCargueDto>>> ObtenerNoCargadas(Guid id, CancellationToken ct = default)
         => Ok(await obtenerNoCargadas.Handle(new ObtenerNoCargadasPlanQuery(id), ct));
+
+    /// <summary>
+    /// [S3-HU-04.3, issue #78] GET /api/planes-cargue/{id}/colocaciones — todas las
+    /// colocaciones del plan (cargadas y no), subconjunto de /resultado. Reemplazo 1:1 de
+    /// <c>colocaciones()</c> en cubicador-api.service.ts — ver
+    /// <see cref="ObtenerColocacionesPlanQuery"/> para por qué se implementa en vez de
+    /// deprecarlo a favor de /resultado.
+    /// </summary>
+    [Authorize]
+    [HttpGet("{id:guid}/colocaciones")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<IReadOnlyList<ColocacionCargueDto>>> ObtenerColocaciones(Guid id, CancellationToken ct = default)
+        => Ok(await obtenerColocaciones.Handle(new ObtenerColocacionesPlanQuery(id), ct));
 
     /// <summary>GET /api/planes-cargue/{id}/exportar — mismo shape que /resultado (igual
     /// que Cubicador: hoy es el mismo contenido, el nombre queda para una futura

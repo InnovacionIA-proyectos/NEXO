@@ -23,18 +23,27 @@ avance por SignalR (`/hubs/plan-cargue`), consulta de respaldo
 (`GET /api/planes-cargue/{id}`) y la compuerta de paridad.
 
 **Encendido de la función de plan de cargue (S2-HU-08.2, #30)**: cerrada por
-defecto (`Cubicacion:ParidadVerificada=false`) — todo intento responde `503
-CUBICACION_EN_VERIFICACION`, sin ningún fallback. Kevin (@kcano-ux) es quien
-la enciende, y solo después de confirmar 26/26 en los golden tests de
-paridad de `cubicador-ci.yml` (S2-HU-07.3): configurar juntas
+defecto en el código (`Cubicacion:ParidadVerificada=false`) — todo intento
+responde `503 CUBICACION_EN_VERIFICACION`, sin ningún fallback. Kevin
+(@kcano-ux) es quien la enciende, y solo después de confirmar 26/26 en los
+golden tests de paridad (`cubicador/tests/paridad/
+test_paridad_casos_dorados.py`, S2-HU-07.3): configurar juntas
 `Cubicacion:ParidadVerificada=true`, `Cubicacion:ParidadEvidencia` (la corrida
-de CI concreta que confirmó 26/26 — URL o commit) y `Cubicacion:ParidadFecha`.
+concreta que confirmó 26/26 — URL o commit) y `Cubicacion:ParidadFecha`.
 Las tres son obligatorias a la vez (`Domain.PlanDeCargue.Reglas.
 CompuertaDeParidad`): `ParidadVerificada=true` sin las otras dos dejas la
 compuerta cerrada igual, a propósito — no es un booleano suelto. Checklist
 formal (issue #118, S3-HU-05.3) en
-[`docs/CHECKLIST_DESPLIEGUE.md`](docs/CHECKLIST_DESPLIEGUE.md) — enlazado a
-S2-HU-07.3, sin ejecutar: sigue siendo responsabilidad de Kevin, no de esa HU.
+[`docs/CHECKLIST_DESPLIEGUE.md`](docs/CHECKLIST_DESPLIEGUE.md).
+
+> ✅ **Encendida en Dokploy (Pre-Despliegue-BACKEND) el 2026-09-14**,
+> autorizado por Kevin Cano. Evidencia: corrida real de la suite de paridad
+> (27 passed, 26/26 casos dorados) contra el commit `82fb52ba73083b7d94ea07d42a4774a2b9b8e1e3`
+> — detalle completo y los tres valores exactos configurados en
+> `docs/CHECKLIST_DESPLIEGUE.md`, sección 1 ("Encendido confirmado").
+> `cubicador-ci.yml` (mencionado antes acá) ya no existe, se retiró en
+> S3-HU-11 — la suite corre hoy vía `ci-cd-cubicador-api.yml`/
+> `ci-cd-cubicador-worker.yml`.
 
 **Cierre de seguridad (S3-HU-05, #116/#117)**: `CUBICADOR_CORS_ORIGENES` se
 retiró por completo (código + `.env`/`.env.example`/`docker-compose.yml`) —
@@ -46,10 +55,10 @@ Pendiente fuera de este repo: aplicar el valor nuevo en el despliegue real de
 producción (esta sesión solo rotó los `.env` locales de desarrollo).
 
 > ⚠️ **Corrección al párrafo de arriba.** Dice que S3-HU-04 ya movió el frontend
-> a NEXO. **Todavía no ocurrió**: esa HU no tiene rama ni commits, y
-> `administracion_embarqa_nexo` sigue con 12 puntos de llamada directa al
-> Cubicador (`cubicadorBaseUrl` en `cubicador-api.service.ts` y
-> `captura-api.service.ts`) — verificado con `git grep` sobre su `origin/main`.
+> a NEXO. **Todavía no ocurrió**: `administracion_embarqa_nexo` sigue con 12
+> puntos de llamada directa al Cubicador (`cubicadorBaseUrl` en
+> `cubicador-api.service.ts` y `captura-api.service.ts`) — nadie tocó esos
+> call-sites todavía.
 >
 > Qué implica hoy, en concreto: en producción no rompe nada (ese módulo ya
 > estaba inerte, `environment.prod.ts` tiene `cubicadorApiUrl` y
@@ -60,12 +69,24 @@ producción (esta sesión solo rotó los `.env` locales de desarrollo).
 > contra un Cubicador local recibe 401 en las 12 llamadas hasta que S3-HU-04
 > las migre.
 >
-> **Faltan 4 endpoints en NEXO** para que S3-HU-04 pueda cerrar:
-> `desde-linea/{lineaId}`, `por-linea/{lineaId}`, `{id}/colocaciones` y
-> `POST /api/cubicacion`. Inventario 1 a 1 de las 20 llamadas, con el detalle de
-> cada hueco, en [`docs/mensajeria/CUBICACION.md` §8](docs/mensajeria/CUBICACION.md).
-> El cuarto, además, **no tiene issue** y necesita una decisión de arquitectura
-> antes de escribirse.
+> ✅ **Actualización (issue #78, S3-HU-04.3)**: de los 4 endpoints que faltaban
+> en NEXO, ya se agregaron 3 — `POST /api/planes-cargue/desde-linea/{lineaId}`,
+> `GET /api/planes-cargue/por-linea/{lineaId}` y
+> `GET /api/planes-cargue/{id}/colocaciones` — sobre el `crear_desde_linea` que
+> el worker de Cubicador ya implementaba de punta a punta. Detalle, incluida
+> una limitación conocida (el worker hoy solo reporta el primer vehículo de una
+> flota multi-vehículo), en [`docs/mensajeria/CUBICACION.md` §8](docs/mensajeria/CUBICACION.md).
+> Ojo: esto es solo el lado NEXO — los 12 call-sites del frontend siguen sin
+> migrar, eso sigue siendo trabajo de S3-HU-04 aparte.
+>
+> ✅ **Resuelto (issue #78, S3-HU-04.3)**: el último endpoint, `POST
+> /api/cubicacion` (método `cubicar()`, `captura-api.service.ts`), quedó
+> cubierto como excepción HTTP declarada y acotada (NEXO llama a Cubicador
+> directo, único caso en todo el sistema) en vez de forzarlo al patrón de
+> cola — es cálculo puro sin persistencia, no encaja en ninguno de los dos.
+> Detalle en `docs/mensajeria/CUBICACION.md` §8.2. Los 20 de 20 métodos del
+> frontend ya tienen equivalente del lado NEXO; migrar los call-sites sigue
+> siendo trabajo de S3-HU-04 en el otro repo.
 
 **Resuelto — los 3 bugs de QA de Cubicación (S3-HU-10, #131/#132/#133)**: los tres
 que la verificación de los PR #122/#126 encontró y que seguían presentes en `QA`.

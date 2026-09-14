@@ -27,12 +27,23 @@
   "
   ```
 
-### 1.1 Backend .NET (NEXO) — no habla REST con este servicio
+### 1.1 Backend .NET (NEXO) — no habla REST con este servicio (con una excepción declarada)
 
 ⚠️ Punto que no es obvio desde afuera: NEXO **no llama** a la API REST de
-este servicio. El contrato real backend↔motor es **solo por colas**
-(RabbitMQ + MassTransit, mismo broker que el resto de NEXO — issue #28). Ver
-sección 3 más abajo para el mensaje de entrada y los eventos de salida.
+este servicio para nada de Plan de Cargue. El contrato real backend↔motor es
+**por colas** (RabbitMQ + MassTransit, mismo broker que el resto de NEXO —
+issue #28). Ver sección 3 más abajo para el mensaje de entrada y los eventos
+de salida.
+
+**Única excepción, acotada a un solo endpoint** (S3-HU-04.3, issue #78):
+`POST /api/cubicacion` (cubicación rápida, sin persistencia — sección 3.1).
+Al no haber plan ni Id que guardar ni proyectar, no hay cola que lo procese
+ni proyección que lo sirva después — NEXO lo llama directo con el mismo
+Bearer de esta sección (`CUBICADOR_API_KEY`), guardado en su configuración
+como `Cubicador3D:OutboundApiKey` (nunca en el navegador). Ver
+`NEXO/src/CabinaFletes.Application/CasosDeUso/Cubicacion/Interfaces/ICubicacionRapidaPort.cs`
+para el razonamiento completo de por qué esto no reabre la puerta a más
+llamadas HTTP.
 
 Consecuencia práctica: si estás integrando el lado .NET, **el puerto 8081
 no importa para nada** — lo que hace falta es:
@@ -62,12 +73,19 @@ middleware), no reabrir una variable vieja.
 ⚠️ **Estado real del frontend, a la fecha de este documento.** La versión
 anterior de este párrafo afirmaba que el visor 3D *"ya consume solo esos
 endpoints de NEXO, confirmado y verificado en QA"*. **No es así todavía**:
-S3-HU-04 no tiene rama ni commits, y `administracion_embarqa_nexo` sigue con
-12 puntos de llamada directa a este servicio. El CORS se retiró igual, y está
+`administracion_embarqa_nexo` sigue con 12 puntos de llamada directa a este
+servicio — nadie tocó esos call-sites todavía. El CORS se retiró igual, y está
 bien que así sea —la capacidad no debe existir— pero conviene no leer esta
-sección como si la migración del portal ya estuviera hecha. Faltan además 4
-endpoints en NEXO para que esa HU pueda cerrar: inventario 1 a 1 en
-`NEXO/docs/mensajeria/CUBICACION.md` §8.
+sección como si la migración del portal ya estuviera hecha.
+
+Del lado NEXO sí hubo avance (issue #78, S3-HU-04.3): de los 4 endpoints que
+faltaban para que esa HU pudiera cerrar, ya se agregaron 3 (`desde-linea/{id}`,
+`por-linea/{id}`, `{id}/colocaciones`) sobre el `crear_desde_linea` que este
+servicio ya implementaba de punta a punta — solo faltaba que NEXO lo publicara
+en vez de que lo disparara el navegador. Los 20 de 20 ya tienen equivalente del lado NEXO: `POST /api/cubicacion` se
+resolvió como excepción HTTP declarada (sección 1.1), no como comando de
+cola — es la única de las 20 sin plan ni Id que persistir. Inventario 1 a 1
+en `NEXO/docs/mensajeria/CUBICACION.md` §8.
 
 `CUBICADOR_API_KEY` (sección 4/5) sigue existiendo — protege la API para
 consumidores server-to-server legítimos (hoy: scripts de CI/verificación
@@ -524,12 +542,14 @@ Authorization: Bearer <secreto correspondiente>
 ```
 
 - Consumidores server-to-server → este servicio: valida contra
-  `CUBICADOR_API_KEY` (`api/dependencias.py:verificar_api_key`). **NEXO no es
-  uno de esos consumidores** — habla con este servicio solo por colas, nunca
-  HTTP (sección 1.1). Hoy solo la usan CI/scripts de verificación manual;
-  hasta S3-HU-05 (issue #116) también la usaba el navegador vía CORS —
-  cerrado, y la clave rotada en la misma HU (issue #117) porque ese valor
-  estuvo expuesto en el bundle público del portal.
+  `CUBICADOR_API_KEY` (`api/dependencias.py:verificar_api_key`). **NEXO SÍ es
+  uno de estos consumidores, pero solo para un endpoint** (`POST
+  /api/cubicacion`, sección 1.1) — todo lo demás sigue siendo solo por
+  colas. NEXO guarda este mismo valor como `Cubicador3D__OutboundApiKey`.
+  Los otros consumidores son CI/scripts de verificación manual; hasta
+  S3-HU-05 (issue #116) también la usaba el navegador vía CORS — cerrado, y
+  la clave rotada en la misma HU (issue #117) porque ese valor estuvo
+  expuesto en el bundle público del portal.
 - Este servicio → NEXO (llamada de `crear_desde_linea`, ver sección 7): NEXO
   valida contra `Cubicador3D__InboundApiKey`
   (`CubicadorApiKeyAuthenticationHandler`, esquema `CubicadorApiKey` aparte

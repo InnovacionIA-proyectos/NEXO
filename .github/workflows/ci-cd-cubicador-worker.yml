@@ -1,0 +1,70 @@
+name: CI/CD Cubicador-Worker
+
+# S3-HU-11.3/11.5 (issues #136/#138).
+#
+# Los `paths` de este workflow y los de ci-cd-cubicador-api.yml son IDENTICOS
+# a proposito — el razonamiento completo esta en el encabezado de ese archivo
+# y en docs/CI_CD_RUTAS_COMPARTIDAS.md. En dos lineas: el job de pruebas es
+# uno solo y ejercita api+worker juntos (pytest corre la suite entera; el
+# smoke levanta los dos contenedores), y las dos imagenes hacen `COPY . .`,
+# asi que cualquier archivo bajo cubicador/ cambia las dos. Lo unico distinto
+# entre los dos workflows es a que aplicacion de Dokploy le avisan.
+#
+# Para este workflow en particular: el filtro anterior (cubicador/worker/** +
+# domain/application/infrastructure) dejaba afuera cubicador/api/, y el worker
+# SI importa de ahi — worker/main.py toma `api.dependencias` y
+# `api.dtos.plan_cargue`. Ese es exactamente el archivo del bug 10.2 (#132):
+# un cambio bajo cubicador/api/ que rompia al worker mandando items a la DLQ.
+# Con el filtro anterior ese arreglo habria desplegado solo la API, dejando al
+# worker con el codigo roto.
+on:
+  push:
+    branches: [main, Pre-Despliegue-BACKEND]
+    paths:
+      - "cubicador/**"
+      # Documentacion no cambia comportamiento: excluirla evita redesplegar
+      # los dos servicios por editar un README.
+      - "!cubicador/docs/**"
+      - "!cubicador/**.md"
+      # Insumos de construccion del job docker-smoke que viven FUERA de
+      # cubicador/: ese job levanta el rabbit compartido con
+      # `docker compose -f docker-compose.yml up --build rabbit`, y ese
+      # servicio se construye desde build/Dockerfile.rabbit.
+      - "docker-compose.yml"
+      - "build/Dockerfile.rabbit"
+      - ".github/workflows/ci-cd-cubicador-worker.yml"
+      - ".github/workflows/_cubicador-pruebas.yml"
+  pull_request:
+    branches: [main, Pre-Despliegue-BACKEND]
+    paths:
+      - "cubicador/**"
+      - "!cubicador/docs/**"
+      - "!cubicador/**.md"
+      - "docker-compose.yml"
+      - "build/Dockerfile.rabbit"
+      - ".github/workflows/ci-cd-cubicador-worker.yml"
+      - ".github/workflows/_cubicador-pruebas.yml"
+
+jobs:
+  build-and-test:
+    uses: ./.github/workflows/_cubicador-pruebas.yml
+
+  deploy:
+    needs: build-and-test
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/Pre-Despliegue-BACKEND') && github.event_name == 'push'
+    runs-on: [self-hosted, dokploy_]
+    steps:
+      - name: Mostrar información del deploy
+        shell: cmd
+        run: |
+          echo Branch: ${{ github.ref }}
+          echo Commit: ${{ github.sha }}
+          echo Evento: ${{ github.event_name }}
+
+      - name: Disparar despliegue en Dokploy (Cubicador-Worker)
+        shell: cmd
+        run: |
+          curl -f -X POST "${{ secrets.DOKPLOY_DEPLOY_WEBHOOK_URL_CUBICADOR_WORKER }}" ^
+            -H "Content-Type: application/json" ^
+            -H "X-GitHub-Event: push" ^
+            -d "{\"ref\":\"${{ github.ref }}\",\"repository\":{\"full_name\":\"${{ github.repository }}\"}}"

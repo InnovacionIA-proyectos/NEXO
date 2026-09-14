@@ -29,5 +29,11 @@ public static class DependencyInjection
         .AddScoped<IQueryHandler<ObtenerResultadoPlanQuery, ResultadoPlanDto>, ObtenerResultadoPlanQueryHandler>()
         .AddScoped<IQueryHandler<ObtenerFlotaPlanQuery, IReadOnlyList<PlanFlotaItemDto>>, ObtenerFlotaPlanQueryHandler>()
         .AddScoped<IQueryHandler<ObtenerMetricasPlanQuery, MetricasCubicacionEvento?>, ObtenerMetricasPlanQueryHandler>()
-        .AddScoped<IQueryHandler<ObtenerNoCargadasPlanQuery, IReadOnlyList<ColocacionCargueDto>>, ObtenerNoCargadasPlanQueryHandler>();
+        .AddScoped<IQueryHandler<ObtenerNoCargadasPlanQuery, IReadOnlyList<ColocacionCargueDto>>, ObtenerNoCargadasPlanQueryHandler>()
+        // [S3-HU-04.3, issue #78] los 3 equivalentes que le faltaban a NEXO para que el
+        // frontend pudiera dejar de hablarle directo al Cubicador (ver el comentario de
+        // bloqueo del issue): crear_desde_linea, su sondeo por línea, y colocaciones.
+        .AddScoped<ICommandHandler<CrearPlanDesdeLineaCommand, ComandoAceptadoDto>, CrearPlanDesdeLineaCommandHandler>()
+        .AddScoped<IQueryHandler<ObtenerPlanesPorLineaQuery, IReadOnlyList<PlanFlotaItemDto>>, ObtenerPlanesPorLineaQueryHandler>()
+        .AddScoped<IQueryHandler<ObtenerColocacionesPlanQuery, IReadOnlyList<ColocacionCargueDto>>, ObtenerColocacionesPlanQueryHandler>();
 }

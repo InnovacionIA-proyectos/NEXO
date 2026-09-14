@@ -58,4 +58,16 @@ public sealed class EfPlanCargueRepository(CabinaFletesDbContext db) : IPlanCarg
             .OrderBy(p => p.NumeroVehiculo)
             .ToListAsync(ct);
     }
+
+    /// <summary>[S3-HU-04.3, issue #78] Ver la firma en IPlanCargueRepository — a
+    /// diferencia de <see cref="ObtenerFlotaAsync"/>, no parte de un PlanId existente:
+    /// filtra directo por LineaSolicitudId, así que también sirve mientras ningún plan de
+    /// la línea ha llegado todavía (lista vacía, no falla).</summary>
+    public async Task<IReadOnlyList<PlanCargue>> ObtenerPorLineaAsync(Guid lineaSolicitudId, CancellationToken ct) =>
+        await db.PlanesCargue
+            .AsNoTracking()
+            .Where(p => p.LineaSolicitudId == lineaSolicitudId)
+            .Include(p => p.Colocaciones)
+            .OrderBy(p => p.NumeroVehiculo)
+            .ToListAsync(ct);
 }
