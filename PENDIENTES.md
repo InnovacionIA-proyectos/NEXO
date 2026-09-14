@@ -23,18 +23,27 @@ avance por SignalR (`/hubs/plan-cargue`), consulta de respaldo
 (`GET /api/planes-cargue/{id}`) y la compuerta de paridad.
 
 **Encendido de la función de plan de cargue (S2-HU-08.2, #30)**: cerrada por
-defecto (`Cubicacion:ParidadVerificada=false`) — todo intento responde `503
-CUBICACION_EN_VERIFICACION`, sin ningún fallback. Kevin (@kcano-ux) es quien
-la enciende, y solo después de confirmar 26/26 en los golden tests de
-paridad de `cubicador-ci.yml` (S2-HU-07.3): configurar juntas
+defecto en el código (`Cubicacion:ParidadVerificada=false`) — todo intento
+responde `503 CUBICACION_EN_VERIFICACION`, sin ningún fallback. Kevin
+(@kcano-ux) es quien la enciende, y solo después de confirmar 26/26 en los
+golden tests de paridad (`cubicador/tests/paridad/
+test_paridad_casos_dorados.py`, S2-HU-07.3): configurar juntas
 `Cubicacion:ParidadVerificada=true`, `Cubicacion:ParidadEvidencia` (la corrida
-de CI concreta que confirmó 26/26 — URL o commit) y `Cubicacion:ParidadFecha`.
+concreta que confirmó 26/26 — URL o commit) y `Cubicacion:ParidadFecha`.
 Las tres son obligatorias a la vez (`Domain.PlanDeCargue.Reglas.
 CompuertaDeParidad`): `ParidadVerificada=true` sin las otras dos dejas la
 compuerta cerrada igual, a propósito — no es un booleano suelto. Checklist
 formal (issue #118, S3-HU-05.3) en
-[`docs/CHECKLIST_DESPLIEGUE.md`](docs/CHECKLIST_DESPLIEGUE.md) — enlazado a
-S2-HU-07.3, sin ejecutar: sigue siendo responsabilidad de Kevin, no de esa HU.
+[`docs/CHECKLIST_DESPLIEGUE.md`](docs/CHECKLIST_DESPLIEGUE.md).
+
+> ✅ **Encendida en Dokploy (Pre-Despliegue-BACKEND) el 2026-09-14**,
+> autorizado por Kevin Cano. Evidencia: corrida real de la suite de paridad
+> (27 passed, 26/26 casos dorados) contra el commit `82fb52ba73083b7d94ea07d42a4774a2b9b8e1e3`
+> — detalle completo y los tres valores exactos configurados en
+> `docs/CHECKLIST_DESPLIEGUE.md`, sección 1 ("Encendido confirmado").
+> `cubicador-ci.yml` (mencionado antes acá) ya no existe, se retiró en
+> S3-HU-11 — la suite corre hoy vía `ci-cd-cubicador-api.yml`/
+> `ci-cd-cubicador-worker.yml`.
 
 **Cierre de seguridad (S3-HU-05, #116/#117)**: `CUBICADOR_CORS_ORIGENES` se
 retiró por completo (código + `.env`/`.env.example`/`docker-compose.yml`) —
