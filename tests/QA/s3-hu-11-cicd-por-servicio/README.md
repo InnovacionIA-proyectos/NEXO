@@ -7,6 +7,10 @@ Merge real de `QA` sobre la rama (estaba unos commits atrás — traía el EDA d
 y mi commit de scripts retroactivos). Sin conflictos, sin archivos perdidos
 (confirmado con `git diff --diff-filter=D`).
 
+Durante la revisión llegó un commit nuevo a la rama (`POST /api/cubicacion`, issue #78 —
+reemplaza la llamada HTTP directa del frontend a Cubicador). Se volvió a mergear `QA`,
+reconstruir y re-correr todo antes de seguir.
+
 ## Script de esta carpeta
 
 [`verify-suite-desde-cero.sh`](verify-suite-desde-cero.sh) — reproduce el hallazgo de
@@ -47,6 +51,13 @@ Probado con `docker compose -f docker-compose.ci.yml down -v` antes de cada corr
 
 Detalle completo y la corrección sugerida para dejarlo resuelto del todo: comentario
 en el PR.
+
+## Verificación en vivo del endpoint nuevo (`POST /api/cubicacion`, issue #78)
+
+- **Sin `Cubicador3D:OutboundBaseUrl`/`OutboundApiKey` configurados:** responde `503`
+  con `CUBICACION_RAPIDA_NO_CONFIGURADA` y un mensaje accionable — degrada, no revienta.
+- **Control de rol:** un usuario `ServiciosLogisticos` (no Comercial/CoordinadorFletes/Admin)
+  recibe `403 SIN_PERMISO_CABINA_FLETES`.
 
 ## Decisión
 
