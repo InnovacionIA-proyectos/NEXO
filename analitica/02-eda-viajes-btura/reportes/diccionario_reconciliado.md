@@ -4,7 +4,7 @@ Diccionario único de las 17 columnas del extracto (`Viajes-Btura-2025-2026.xlsx
 
 | Columna (original) | Nombre en código | Definición oficial | Unidad / moneda | Confiabilidad y notas de reconciliación |
 |---|---|---|---|---|
-| `ID Clase Documento FWO` | `idClaseDocumentoFwo` | Código de la línea de negocio (catálogo CLASE FWO, Anexo D) | — | Confiable. 7 de 10 códigos del catálogo presentes; 3 ausentes (`OHUC`, `OPSC`, `OPXL`) sin explicar (L-09) |
+| `ID Clase Documento FWO` | `idClaseDocumentoFwo` | Código de la línea de negocio (catálogo CLASE FWO, Anexo D) | — | Confiable. 7 de 10 códigos del catálogo presentes; 3 ausentes (`OHUC`, `OPSC`, `OPXL`) sin explicar (L-08) |
 | `FO` | `fo` | "Documento de subcontratación con el dueño del vehículo... equivale al número del viaje" | — | **No es clave única** (H-001). Identifica el viaje del vehículo, no la orden de un cliente — puede consolidar carga de varios clientes. Clave práctica: `FO`+`BP Cliente`+`Peso Neto`+`Destino` |
 | `Fecha Creación FO` | `fechaCreacionFo` | "Fecha en la cual fue creada la FO en el sistema" | Fecha | Administrativa, no operativa — no sirve para medir tiempos de tránsito reales (L-01). Sí sigue de cerca la operación real (único día en 0 en 372 días: 25-dic-2025) |
 | `BP Cliente` | `bpCliente` | Código de la empresa contratante | — | Solo código, sin maestro de nombres/segmento (L-08). 537 clientes distintos, concentración baja (HHI=331, H-010) |

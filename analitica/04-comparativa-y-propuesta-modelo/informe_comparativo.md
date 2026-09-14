@@ -39,7 +39,7 @@ Mismas dimensiones de calidad que exige el criterio de cierre del plan de EDA-2 
 | **Validez** | `Distancia Total` es valor de tabla/zona, no medición real — confirmado por desviación estándar = 0 en rutas de alto volumen (H-011 EDA-1) | `TAXNUMXL` 100% nula y `VALID_TO` 100% valor centinela (`9999-12-31`) — sin señal en este extracto (H-009 EDA-2) |
 | **Consistencia** | `Tarifa Venta al Cliente` = `Flete Producción FO` exacto en 72,2% de las filas — confirmado como mal capturada en el sistema origen (H-002 EDA-1) | `LineaNegocio`/`ClaseViaje`/`ClaseContenedor` no son "la misma llave" entre lado propio y SAP sin traducción — comparación directa da 0% de match (H-003 EDA-2); 5/18 cotizaciones huérfanas hacia `solicitudes` (H-013 EDA-2) |
 | **Exactitud** | 5 FO con flete de $39,6M–$46,8M, error de captura confirmado contra `tblSAPTarifas` (H-005 EDA-1); `$800.000` es valor de relleno del sistema, no tarifa real (H-006 EDA-1) | `ValorMercancia`, `Peso` y 3 líneas `Fuente=Manual` de `cotizacion_lineas` confirmadas por el usuario como valores puestos al azar, sin relación con la realidad (H-002 EDA-2) |
-| **Sesgos / representatividad** | Sesgo de selección y supervivencia **confirmado**: el set solo contiene FOs `Concluido`/`Ejecutado`, excluye 8.034 `Anulado` y 115.216 `En tratamiento` a nivel compañía (H-004 EDA-1); alcance geográfico limitado al corredor Buenaventura (L-06 EDA-1); concentración de clientes baja y saludable, HHI=331 (H-010 EDA-1) | Volumen real bajísimo (13 solicitudes) y **sin intención de cobertura/representatividad** — el usuario las creó a mano con datos al azar solo para probar el mecanismo (L-06 EDA-2, memoria del proyecto); piso SICE-TAC del extracto es una sola foto de un mes, no serie histórica (L-07 EDA-2) |
+| **Sesgos / representatividad** | Sesgo de selección y supervivencia **confirmado**: el set solo contiene FOs `Concluido`/`Ejecutado`, excluye 8.034 `Anulado` y 115.216 `En tratamiento` a nivel compañía (H-004 EDA-1); alcance geográfico limitado al corredor Buenaventura (L-05 EDA-1); concentración de clientes baja y saludable, HHI=331 (H-010 EDA-1) | Volumen real bajísimo (13 solicitudes) y **sin intención de cobertura/representatividad** — el usuario las creó a mano con datos al azar solo para probar el mecanismo (L-06 EDA-2, memoria del proyecto); piso SICE-TAC del extracto es una sola foto de un mes, no serie histórica (L-07 EDA-2) |
 
 **Lectura combinada:** los defectos de EDA-1 son de un set con volumen real (errores puntuales, columnas no confiables, sesgo de cobertura) — se pueden acotar y excluir sin perder el set completo. Los de EDA-2 son estructurales del volumen mismo (13 casos de prueba) — no se pueden "limpiar", solo declarar, hasta que exista producción real.
 
@@ -61,7 +61,7 @@ Antes de evaluar viabilidad de objetivos, vale aislar qué tan bien funciona el 
 
 | # | Objetivo | Viabilidad | Evidencia |
 |---|---|---|---|
-| 1 | Predecir `Flete Producción FO` con variables operativas del histórico (peso, zona/distancia, tipo de vehículo, flota, línea de negocio, componente temporal) | **Viable hoy** | EDA-1: 41.237 filas, grano definido (H-001), variable objetivo confiable, relaciones ya exploradas en el bivariado. Matices: solo aplica a viajes que llegan a concluirse (H-004) y solo al corredor Buenaventura (L-06 EDA-1) |
+| 1 | Predecir `Flete Producción FO` con variables operativas del histórico (peso, zona/distancia, tipo de vehículo, flota, línea de negocio, componente temporal) | **Viable hoy** | EDA-1: 41.237 filas, grano definido (H-001), variable objetivo confiable, relaciones ya exploradas en el bivariado. Matices: solo aplica a viajes que llegan a concluirse (H-004) y solo al corredor Buenaventura (L-05 EDA-1) |
 | 2 | Enriquecer el objetivo 1 con contexto de mercado vigente por fecha (piso SICE-TAC / plaza SAP) | **No viable hoy** | El cruce con SAP funciona (H-005 EDA-2) pero el de SICE-TAC no es reproducible con la muestra actual (H-005/H-007 EDA-2); además el piso SICE-TAC disponible es una foto de un solo mes (L-07 EDA-2), no una serie que se pueda alinear a los 13 meses de EDA-1; faltan las tablas reales de zona (H-003/H-004 EDA-2) |
 | 3 | Predecir o asistir la cotización de CabinaFletes (ej. sugerir `ValorFlete` al vendedor) | **No viable hoy** — el dato no soporta predicción útil | Solo 13 solicitudes de prueba manual, sin intención de representatividad (confirmado por el usuario); `ValorMercancia` y `Peso` tienen valores puestos al azar sin forma de separarlos programáticamente del dato real (H-002 EDA-2) |
 | 4 | Predecir cancelación o probabilidad de que un viaje no se concrete | **No viable con ninguna fuente actual** — el dato no soporta predicción útil | EDA-1 solo contiene FOs `Concluido`/`Ejecutado` (H-004 EDA-1, sesgo de selección confirmado contra `FactFWOFUFO`); EDA-2 no aporta estados de abandono de mercado real |
@@ -96,10 +96,10 @@ Deseable pero **no disponible hoy** (ver objetivo 2 en §4): piso SICE-TAC / pla
 
 | Limitación | Fuente(s) | Evidencia |
 |---|---|---|
-| Sesgo de selección y supervivencia — solo viajes concluidos | EDA-1 | H-004 EDA-1, L-04/L-05 EDA-1 |
-| Alcance geográfico limitado al corredor Buenaventura | EDA-1 | L-06 EDA-1 |
-| `Tarifa Venta al Cliente` / margen no confiables | EDA-1 | H-002 EDA-1, L-03 EDA-1 |
-| `Distancia Total` no es medición real, solo de tabla/zona | EDA-1 | H-011 EDA-1, L-07 EDA-1 |
+| Sesgo de selección y supervivencia — solo viajes concluidos | EDA-1 | H-004 EDA-1, L-03/L-04 EDA-1 |
+| Alcance geográfico limitado al corredor Buenaventura | EDA-1 | L-05 EDA-1 |
+| `Tarifa Venta al Cliente` / margen no confiables | EDA-1 | H-002 EDA-1 |
+| `Distancia Total` no es medición real, solo de tabla/zona | EDA-1 | H-011 EDA-1, L-06 EDA-1 |
 | Volumen real de CabinaFletes bajísimo y sin intención de representatividad | EDA-2 | L-06 EDA-2, memoria del proyecto |
 | Piso SICE-TAC disponible es una sola foto de un mes, sin profundidad histórica confirmada | EDA-2 | L-07 EDA-2 |
 | Traducción de códigos de negocio incompleta (`ClaseContenedor` sin mapeo fijo) | EDA-2 | H-003 EDA-2, L-03 EDA-2 |
