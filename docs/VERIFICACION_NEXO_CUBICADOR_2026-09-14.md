@@ -296,6 +296,26 @@ Probado en vivo contra esa URL:
 | 3 | Build desatualizado por disco lleno en el host | **Resuelto** — redeploy trajo los 16 endpoints, verificados funcionando en vivo |
 | 4 | Confirmar `Cubicador3D__InboundApiKey` == `NEXO_CALLBACK_API_KEY` en Dokploy (no en local) | **Pendiente de confirmar** — no verificable desde afuera sin el secreto real de producción |
 
+## 9. Verificación final completa (2026-09-14, 17:48 UTC) — TODO EN VERDE
+
+Última pasada contra `http://nexo-predesplieguebackend-ijaiqn-cdc194-10-10-40-17.sslip.io`,
+después de resolver la causa raíz de la sección 8.0 (caché de build):
+
+| # | Chequeo | Resultado |
+|---|---|---|
+| 1 | `GET /health` | `200 Healthy` — `masstransit-bus` y `database` OK |
+| 2 | `GET /api/sesion/actual`, los 6 roles (ivasco/kcano/bquintero/jpvelez/scalderon/dguerra) | `200`, los 6 resuelven con su rol correcto |
+| 3 | `GET /api/planes-cargue`, `GET /api/vehiculos` (S3-HU-02/03) | `200` ambos |
+| 4 | `GET /api/lineas-solicitud/{id}/cubicacion` sin Bearer / con Bearer incorrecto / con `Cubicador3D__InboundApiKey` real de Dokploy | `401` / `401` / **`404`** (autentica correctamente; 404 es "línea no existe", no un fallo de auth) |
+| 5 | Flujo completo `POST /demo` → `POST /{id}/optimizar` → `GET /{id}` | `202` → `202` → **`estado: "optimizado"`, `puntaje 59.00`, `59 colocaciones`** — motor real de Cubicador, no mock |
+
+**Confirmado explícitamente en este pase**: `Cubicador3D__InboundApiKey`
+configurada en la app de NEXO en Dokploy es la clave correcta — el puente
+inverso "crear plan desde línea" (botón *Cubicar* de la Mesa de Costeo) ya
+tiene su autenticación validada de punta a punta. Con esto, los 4 puntos de
+la tabla de la sección 5 quedan resueltos — no hay pendientes técnicos
+conocidos para el flujo NEXO ↔ Cubicador en este ambiente.
+
 ## 8. Evidencia de paridad y encendido de la compuerta (2026-09-14)
 
 Kevin Cano (@kcano-ux) autorizó encender la compuerta de paridad
@@ -364,7 +384,32 @@ Nombres con doble guion bajo, tal cual — Dokploy despliega por `Dockerfile`
 directo, sin la interpolación de `docker-compose.yml` (ver conversación
 anterior sobre `CUBICADOR3D_INBOUND_API_KEY`).
 
-### 8.1 Nota: `#` en un valor de variable de entorno en Dokploy
+### 8.0 Resuelto — la compuerta quedó abierta y verificada en vivo
+
+Tras varias rondas de diagnóstico (ver 8.1), la compuerta finalmente abrió.
+Verificado en producción, no solo por configuración: `POST /api/planes-cargue/demo`
+→ `POST /{id}/optimizar` → `202` (ya no `503 CUBICACION_EN_VERIFICACION`) →
+`GET /api/planes-cargue/{id}` con `estado: "optimizado"`, `puntaje: 59.00`,
+`totalColocaciones: 59` — resultado real del motor de Cubicador desplegado,
+no un mock.
+
+**Causa raíz real, confirmada**: NO era la sintaxis del valor de
+`ParidadEvidencia` (sección 8.1, hipótesis descartada), ni un duplicado de
+la variable en el editor de Dokploy (se buscó en mayúsculas/minúsculas, no
+había ninguno), ni la instancia duplicada que se había apagado antes. Era
+**caché de build de Docker obsoleto en el host de Dokploy**: `docker
+builder prune -af` fue lo que finalmente lo resolvió. Encaja con el mismo
+síntoma de disco lleno visto antes en esta sesión (sección 4.3) — el host
+llevaba varios `deploy` acumulando capas de BuildKit sin liberar, y en
+algún punto una imagen vieja (con las variables de entorno "horneadas" de
+una build anterior a los últimos cambios) se siguió sirviendo aunque el
+`git clone` y el log de build de cada intento se vieran "frescos". La
+lección para cualquier variable de entorno que no parezca aplicarse en
+Dokploy después de un redeploy normal: **antes de sospechar del código o
+del editor de variables, correr `docker builder prune -af` en el host y
+volver a desplegar.**
+
+### 8.1 Nota: `#` en un valor de variable de entorno en Dokploy (hipótesis descartada, se deja como referencia)
 
 El primer valor de `Cubicacion__ParidadEvidencia` (más largo, con paréntesis
 y un `#8` al final apuntando a esta sección) quedó guardado y visible en el
