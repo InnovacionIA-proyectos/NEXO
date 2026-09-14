@@ -296,6 +296,78 @@ Probado en vivo contra esa URL:
 | 3 | Build desatualizado por disco lleno en el host | **Resuelto** — redeploy trajo los 16 endpoints, verificados funcionando en vivo |
 | 4 | Confirmar `Cubicador3D__InboundApiKey` == `NEXO_CALLBACK_API_KEY` en Dokploy (no en local) | **Pendiente de confirmar** — no verificable desde afuera sin el secreto real de producción |
 
+## 10. Verificación local tras S3-HU-04.3 (2026-09-14, tarde-noche) — nuevos endpoints + bug real encontrado y corregido
+
+Se pidió repetir la verificación local completa después de varios commits
+nuevos, el más relevante `ccaa795` ([S3-HU-04.3], issue #78): agrega
+`POST /api/planes-cargue/desde-linea/{lineaId}`,
+`GET /api/planes-cargue/por-linea/{lineaId}` y
+`GET /api/planes-cargue/{id}/colocaciones`. El propio commit avisa que NO se
+compiló en el sandbox donde se escribió ("verificación manual línea por
+línea").
+
+### 10.1 Build y tests unitarios (antes de tocar Docker)
+
+- `dotnet build CabinaFletes.Clean.sln -c Release` → **compila sin errores**
+  (1 warning preexistente y no relacionado, `ASPDEPR005`).
+- `dotnet test tests/CabinaFletes.Domain.Tests` → **127/127 passed**.
+- `dotnet test tests/CabinaFletes.Application.Tests` → **139/139 passed**
+  (incluye los tests nuevos de `CrearPlanDesdeLineaCommandTests`,
+  `ObtenerColocacionesPlanQueryTests`, `ObtenerPlanesPorLineaQueryTests`,
+  `CubicacionSolicitadaValidadorTests`).
+
+### 10.2 Los 3 endpoints nuevos, probados contra contenedores reales
+
+| Endpoint | Caso | Resultado |
+|---|---|---|
+| `GET /{id}/colocaciones` | Plan real ya optimizado | `200`, geometría completa de las 59 colocaciones |
+| `GET /{id}/colocaciones` | Id inexistente | `404 PLAN_CARGUE_NO_ENCONTRADO` |
+| `GET /por-linea/{lineaId}` | Línea sin ningún plan todavía | `200 []` (nunca 404, como documenta el código) |
+| `POST /desde-linea/{lineaId}` | Línea inexistente | `404 LINEA_SOLICITUD_NO_ENCONTRADA` |
+| `POST /desde-linea/{lineaId}` | Línea real, ya cotizada | `202 procesando` → ver 10.3 |
+
+### 10.3 Bug real encontrado (config de desarrollo local, no de producción)
+
+`POST /desde-linea` inicialmente terminaba en `cubicacion.dlq` — el worker
+de Cubicador fallaba con `httpx.ConnectError: All connection attempts
+failed` al intentar llamar de vuelta a
+`GET /api/lineas-solicitud/{id}/cubicacion`. Causa, en dos capas:
+
+1. `cubicador/.env` tenía `NEXO_BASE_URL=http://localhost:8080` — dentro del
+   contenedor del worker, `localhost` es el propio contenedor, no el host ni
+   el contenedor de NEXO.
+2. Corregirlo a `http://api:8080` (el nombre de servicio "obvio") **tampoco
+   funcionó**: `cubicador/docker-compose.yml` y el `docker-compose.yml`
+   RAÍZ de NEXO tienen **cada uno su propio servicio llamado `api`**. Como
+   el worker pertenece a ambas redes (la propia de `cubicador` y la
+   compartida `nexo_internal`), el nombre corto `api` resuelve ambiguo al
+   `api` LOCAL de `cubicador` (`cubicador-api-1`), no al de NEXO —
+   confirmado con
+   `docker exec cubicador-worker-1 python -c "import socket; print(socket.gethostbyname('api'))"`.
+
+**Fix real**: usar el nombre de contenedor completo, que sí es único en
+todo el host — `NEXO_BASE_URL=http://nexo-api-1:8080` (verificado por
+resolución DNS antes de aplicarlo). Tras el fix: `httpx: HTTP Request: GET
+http://nexo-api-1:8080/... "HTTP/1.1 200 OK"` — el puente conecta. La línea
+de prueba usada no tenía posiciones capturadas (dato de seed, no del
+código), así que el resultado final es un rechazo de negocio limpio (sin
+excepción, sin log de error) — comportamiento correcto, no un fallo.
+
+**Corregido en `cubicador/.env`**, documentado ahí mismo con el detalle de
+las dos capas del problema para que nadie vuelva a perder tiempo con esto.
+Este bug es de configuración de **desarrollo local únicamente** — no aplica
+a Dokploy (ahí no hay dos proyectos Compose con nombres de servicio en
+colisión; cada app tiene su propio contenedor con nombre fijado por
+Dokploy).
+
+### 10.4 Regresión general — todo lo de las secciones 1-9 se repitió sin cambios
+
+Salud, los 6 roles, `crear_plan_demo` → `optimizar` → `optimizado` con
+métricas reales: todo verde de nuevo. RabbitMQ quedó con 2 mensajes en
+`cubicacion.dlq` (los intentos previos al fix del `NEXO_BASE_URL`, antes de
+corregirlo) — esperado, la DLQ no se autolimpia, queda para inspección
+manual. Sin colas `_error`.
+
 ## 9. Verificación final completa (2026-09-14, 17:48 UTC) — TODO EN VERDE
 
 Última pasada contra `http://nexo-predesplieguebackend-ijaiqn-cdc194-10-10-40-17.sslip.io`,
