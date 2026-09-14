@@ -5,6 +5,12 @@
 
 La rama ya estaba al día con `QA` (merge-base = tip actual) — no hizo falta merge.
 
+## Script de esta carpeta
+
+[`verify-contrato-tests-fuera-de-docker.sh`](verify-contrato-tests-fuera-de-docker.sh)
+— reproduce el contraste exacto: `dotnet test` local (5/5 verde) vs. el mismo filtro
+dentro de `docker-compose.ci.yml` (falla por `FileNotFoundException`).
+
 ## Resultado de las suites automatizadas
 
 | Suite | Resultado |
