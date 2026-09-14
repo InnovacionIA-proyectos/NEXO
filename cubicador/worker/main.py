@@ -261,33 +261,53 @@ async def _procesar(mensaje: aio_pika.IncomingMessage, publisher: RabbitMqEvento
             # (p.ej. "guardar_vehiculo", o "crear_plan"/"crear_desde_linea" fallando
             # antes de crear nada) - por eso se llama igual para los 9 tipos, sin
             # bifurcar por tipo (antes solo cubria "optimizar").
-            #
-            # S3-HU-10.1 (issue #131): `.get`, NO indexacion directa. Este bloque
-            # existe para REPORTAR un fallo; si el reporte lanza su propia excepcion
-            # nos quedamos sin llegar al `ack()` de abajo y el mensaje queda
-            # unacknowledged para siempre - con prefetch_count=2, dos mensajes asi
-            # bloquean el worker entero y ni reiniciarlo lo recupera.
-            await planes.marcar_error(cuerpo.get("planId"), exc.mensaje)
-            await publisher.publicar_cubicacion_rechazada(correlation_id, exc.codigo, exc.mensaje)
-            await mensaje.ack()
+            try:
+                await sesion.rollback()
+                await planes.marcar_error(cuerpo.get("planId"), exc.mensaje)
+                await publisher.publicar_cubicacion_rechazada(correlation_id, exc.codigo, exc.mensaje)
+            except Exception:  # noqa: BLE001 - ver el comentario del `finally`
+                logger.exception("Fallo el REPORTE del error de negocio; se ackea igual.")
+            finally:
+                await mensaje.ack()
         except Exception as exc:  # noqa: BLE001 - fallo inesperado (bug, DB caida, etc.)
             logger.exception("Fallo procesando mensaje (intento %d/%d)", intentos_previos + 1, MAX_INTENTOS)
-            if intentos_previos + 1 >= MAX_INTENTOS:
-                # `.get` por lo mismo que el `planId` de abajo: es la ultima
-                # indexacion directa del camino de error, y si falta `tipo` el propio
-                # camino a la DLQ estallaria antes del ack (S3-HU-10.1, issue #131).
-                await _mover_a_dlq(
-                    mensaje, publisher, cuerpo.get("tipo", "desconocido"), str(exc), intentos_previos + 1,
-                )
-                # S3-HU-10.1 (issue #131): `.get` por lo mismo que arriba - es la
-                # linea que el mensaje sin planId de ci_docker_smoke.py hacia estallar
-                # en cada corrida, justo antes del ack.
-                await planes.marcar_error(cuerpo.get("planId"), f"Fallo tras {MAX_INTENTOS} intentos: {exc}")
-                await publisher.publicar_cubicacion_rechazada(correlation_id, "ERROR_INTERNO", str(exc))
+            try:
+                # La sesion puede haber quedado INUTILIZABLE: si el fallo fue durante
+                # un flush (p.ej. ForeignKeyViolationError al insertar un item contra
+                # un plan que no existe), SQLAlchemy la deja en estado "pending
+                # rollback" y CUALQUIER operacion posterior sobre ella lanza
+                # PendingRollbackError - incluido el `marcar_error` de abajo, que es
+                # justo lo que corre para reportar el fallo. Sin este rollback, el
+                # reporte revienta y nunca se llega al ack (pre-despliegue,
+                # 14-sep-2026: 2 mensajes asi congelaron el worker entero).
+                await sesion.rollback()
+                if intentos_previos + 1 >= MAX_INTENTOS:
+                    # `.get` por lo mismo que el `planId` de abajo: es la ultima
+                    # indexacion directa del camino de error, y si falta `tipo` el propio
+                    # camino a la DLQ estallaria antes del ack (S3-HU-10.1, issue #131).
+                    await _mover_a_dlq(
+                        mensaje, publisher, cuerpo.get("tipo", "desconocido"), str(exc), intentos_previos + 1,
+                    )
+                    # S3-HU-10.1 (issue #131): `.get` por lo mismo que arriba - es la
+                    # linea que el mensaje sin planId de ci_docker_smoke.py hacia estallar
+                    # en cada corrida, justo antes del ack.
+                    await planes.marcar_error(cuerpo.get("planId"), f"Fallo tras {MAX_INTENTOS} intentos: {exc}")
+                    await publisher.publicar_cubicacion_rechazada(correlation_id, "ERROR_INTERNO", str(exc))
+                else:
+                    await _reencolar(mensaje, publisher, intentos_previos + 1)
+            except Exception:  # noqa: BLE001 - ver el comentario del `finally`
+                logger.exception("Fallo el REPORTE del fallo; se ackea igual para no atascar el worker.")
+            finally:
+                # El ack va en `finally`, no al final del bloque: este codigo existe
+                # para REPORTAR un fallo, y si el reporte lanza su propia excepcion el
+                # mensaje queda unacknowledged para siempre - con prefetch_count=2, dos
+                # mensajes asi bloquean el worker entero (S3-HU-10.1 #131 blindo UNA
+                # causa, el planId faltante; el `finally` cierra la clase completa,
+                # incluidas las que todavia no se nos ocurrieron).
+                #
+                # Perder el mensaje es preferible a congelar el servicio: el fallo
+                # queda en la DLQ y en el log, que es lo que un operador necesita.
                 await mensaje.ack()
-            else:
-                await _reencolar(mensaje, publisher, intentos_previos + 1)
-                await mensaje.ack()  # el reintento se publica aparte; este mensaje ya cumplio su ciclo
 
 
 async def _reencolar(mensaje: aio_pika.IncomingMessage, publisher: RabbitMqEventosPublisher, intentos: int) -> None:
