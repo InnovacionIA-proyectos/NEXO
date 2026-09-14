@@ -79,10 +79,14 @@ producción (esta sesión solo rotó los `.env` locales de desarrollo).
 > Ojo: esto es solo el lado NEXO — los 12 call-sites del frontend siguen sin
 > migrar, eso sigue siendo trabajo de S3-HU-04 aparte.
 >
-> **Sigue faltando 1 endpoint**: `POST /api/cubicacion` (método `cubicar()`,
-> `captura-api.service.ts`). No tiene issue todavía y necesita una decisión de
-> arquitectura antes de escribirse — es cálculo puro sin persistencia, no encaja
-> ni en el patrón de cola ni en el de proyección que usa el resto del módulo.
+> ✅ **Resuelto (issue #78, S3-HU-04.3)**: el último endpoint, `POST
+> /api/cubicacion` (método `cubicar()`, `captura-api.service.ts`), quedó
+> cubierto como excepción HTTP declarada y acotada (NEXO llama a Cubicador
+> directo, único caso en todo el sistema) en vez de forzarlo al patrón de
+> cola — es cálculo puro sin persistencia, no encaja en ninguno de los dos.
+> Detalle en `docs/mensajeria/CUBICACION.md` §8.2. Los 20 de 20 métodos del
+> frontend ya tienen equivalente del lado NEXO; migrar los call-sites sigue
+> siendo trabajo de S3-HU-04 en el otro repo.
 
 **Resuelto — los 3 bugs de QA de Cubicación (S3-HU-10, #131/#132/#133)**: los tres
 que la verificación de los PR #122/#126 encontró y que seguían presentes en `QA`.
