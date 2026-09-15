@@ -36,3 +36,8 @@ docs/diccionario-datos-cabinafletes.md
 docs/hallazgos-requisitos-estudio-bd.md
 docs/hallazgos-requisitos.md
 docs/propuesta-bd-nexo.md
+
+# Histórico oficial de SICE-TAC (26 excels, ~3,7 GB) — cada archivo supera el
+# límite de 100 MB de GitHub. Pendiente: manifiesto + almacenamiento externo
+# o Git LFS (ver analitica/04-comparativa-y-propuesta-modelo/recomendacion_captura_datos.md)
+analitica/00-fuentes/Historicos_SICE/
