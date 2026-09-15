@@ -122,6 +122,8 @@ Ejercicio obligatorio, columna por columna:
 
 ### 2.1 Estructura de repo sugerida
 
+> **Nota (2026-09-10):** esta carpeta se renombró de `analitica/02-eda/` a `analitica/02-eda-viajes-btura/` al arrancar el EDA-2 (S2-HU-11 parte 2, sobre el set consolidado de S2-HU-10), para distinguir claramente los dos análisis paralelos de la HU-11. Las rutas de abajo quedan como referencia histórica de cuando se escribió este plan; la ruta real actual es `analitica/02-eda-viajes-btura/`.
+
 **No es un sub-repo aparte.** Vive dentro de `analitica/02-eda/`, que ya existe en el repo con `datos/` ya poblada (los 7 archivos crudos) y `notebooks/` + `reportes/` ya prometidas en su `README.md`. La estructura de abajo es una combinación: conserva esos nombres (español, ya fijados) y les suma las piezas del plan original que el esqueleto todavía no cubría (`src/`, `datos/interim/`, `datos/processed/`).
 
 ```
