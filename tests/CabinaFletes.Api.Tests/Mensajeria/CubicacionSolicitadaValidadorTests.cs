@@ -7,6 +7,8 @@ namespace CabinaFletes.Api.Tests.Mensajeria;
 /// — payload válido no reporta motivos, payload inválido reporta el motivo esperado.
 /// "optimizar" ya estaba cubierto indirectamente por <c>SolicitarOptimizacionCommandTests</c>;
 /// acá se agrega cobertura directa del validador para los 8 comandos nuevos.
+///
+/// [S3-HU-04.3, issue #78] Se suma "crear_desde_linea" (el décimo tipo).
 /// </summary>
 public class CubicacionSolicitadaValidadorTests
 {
@@ -70,6 +72,32 @@ public class CubicacionSolicitadaValidadorTests
         var motivos = Validador.Validar(Mensaje("crear_plan_demo", new CrearPlanDemoInput()));
 
         Assert.Empty(motivos);
+    }
+
+    // ------------------------------------------------------------- crear_desde_linea [issue #78]
+
+    [Fact]
+    public void Crear_desde_linea_valido_no_reporta_motivos()
+    {
+        var motivos = Validador.Validar(Mensaje("crear_desde_linea", new CrearPlanDesdeLineaInput(Guid.NewGuid().ToString())));
+
+        Assert.Empty(motivos);
+    }
+
+    [Fact]
+    public void Crear_desde_linea_con_lineaid_no_guid_es_rechazado()
+    {
+        var motivos = Validador.Validar(Mensaje("crear_desde_linea", new CrearPlanDesdeLineaInput("no-es-guid")));
+
+        Assert.Contains(motivos, m => m.Contains("LineaSolicitudId"));
+    }
+
+    [Fact]
+    public void Crear_desde_linea_con_solicitud_de_otro_tipo_es_rechazado()
+    {
+        var motivos = Validador.Validar(Mensaje("crear_desde_linea", new CrearPlanDemoInput()));
+
+        Assert.Contains(motivos, m => m.Contains("CrearPlanDesdeLineaInput"));
     }
 
     // ------------------------------------------------------------- guardar_vehiculo
@@ -195,6 +223,24 @@ public class CubicacionSolicitadaValidadorTests
         var motivos = Validador.Validar(Mensaje("eliminar_plan", new EliminarPlanInput()));
 
         Assert.Empty(motivos);
+    }
+
+    // ------------------------------------------------------------- eliminar_vehiculo
+
+    [Fact]
+    public void Eliminar_vehiculo_no_reporta_motivos()
+    {
+        var motivos = Validador.Validar(Mensaje("eliminar_vehiculo", new EliminarVehiculoInput()));
+
+        Assert.Empty(motivos);
+    }
+
+    [Fact]
+    public void Eliminar_vehiculo_con_solicitud_de_otro_tipo_es_rechazado()
+    {
+        var motivos = Validador.Validar(Mensaje("eliminar_vehiculo", new EliminarPlanInput()));
+
+        Assert.Contains(motivos, m => m.Contains("EliminarVehiculoInput"));
     }
 
     // ------------------------------------------------------------- ajustar_colocacion

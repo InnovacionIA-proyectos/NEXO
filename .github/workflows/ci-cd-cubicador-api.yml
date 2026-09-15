@@ -1,0 +1,83 @@
+name: CI/CD Cubicador-API
+
+# S3-HU-11.2/11.5 (issues #135/#138).
+#
+# Los `paths` de este workflow y los de ci-cd-cubicador-worker.yml son
+# IDENTICOS a proposito. No es copia-pega olvidada: es la consecuencia de dos
+# hechos verificados del repo.
+#
+# 1) El gate es compartido. Los dos workflows llaman al mismo
+#    _cubicador-pruebas.yml, que corre `pytest -v` sobre TODA la suite — 5 de
+#    los 11 archivos de test son de tests/worker/ — y ademas un smoke de
+#    Docker Compose que levanta api + worker + Postgres + RabbitMQ y ejercita
+#    el flujo async de punta a punta. Un cambio que toque solo al worker puede
+#    poner en rojo el gate de ESTE pipeline; si no se dispara, nadie se entera
+#    hasta el proximo cambio de api/.
+#
+# 2) Las dos imagenes contienen todo el arbol. cubicador/Dockerfile y
+#    cubicador/Dockerfile.worker hacen ambos `COPY . .`, asi que cualquier
+#    archivo bajo cubicador/ cambia las DOS imagenes. Desplegar una sola deja
+#    a la otra corriendo un commit distinto contra el mismo esquema y el mismo
+#    protocolo de cola.
+#
+# Lo unico que de verdad distingue a los dos workflows es a que aplicacion de
+# Dokploy le avisan. Ver docs/CI_CD_RUTAS_COMPARTIDAS.md.
+#
+# Separar por carpeta de nivel superior (cubicador/api/** aca,
+# cubicador/worker/** alla) ya estaba mal en la practica, no solo en teoria:
+# worker/main.py importa `api.dependencias` y `api.dtos.plan_cargue`, que es
+# justo donde vivia el bug 10.2 (#132) — un cambio bajo cubicador/api/ que
+# rompia al WORKER.
+on:
+  push:
+    branches: [main, Pre-Despliegue-BACKEND]
+    paths:
+      - "cubicador/**"
+      # Documentacion no cambia comportamiento: excluirla evita redesplegar
+      # los dos servicios por editar un README (`COPY . .` igual la mete en la
+      # imagen, pero un .md no justifica un reinicio en Pre-Despliegue).
+      - "!cubicador/docs/**"
+      - "!cubicador/**.md"
+      # Insumos de construccion del job docker-smoke que viven FUERA de
+      # cubicador/: ese job levanta el rabbit compartido con
+      # `docker compose -f docker-compose.yml up --build rabbit`, y ese
+      # servicio se construye desde build/Dockerfile.rabbit. Romper cualquiera
+      # de los dos rompe este pipeline.
+      - "docker-compose.yml"
+      - "build/Dockerfile.rabbit"
+      - ".github/workflows/ci-cd-cubicador-api.yml"
+      - ".github/workflows/_cubicador-pruebas.yml"
+  pull_request:
+    branches: [main, Pre-Despliegue-BACKEND]
+    paths:
+      - "cubicador/**"
+      - "!cubicador/docs/**"
+      - "!cubicador/**.md"
+      - "docker-compose.yml"
+      - "build/Dockerfile.rabbit"
+      - ".github/workflows/ci-cd-cubicador-api.yml"
+      - ".github/workflows/_cubicador-pruebas.yml"
+
+jobs:
+  build-and-test:
+    uses: ./.github/workflows/_cubicador-pruebas.yml
+
+  deploy:
+    needs: build-and-test
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/Pre-Despliegue-BACKEND') && github.event_name == 'push'
+    runs-on: [self-hosted, dokploy_]
+    steps:
+      - name: Mostrar información del deploy
+        shell: cmd
+        run: |
+          echo Branch: ${{ github.ref }}
+          echo Commit: ${{ github.sha }}
+          echo Evento: ${{ github.event_name }}
+
+      - name: Disparar despliegue en Dokploy (Cubicador-API)
+        shell: cmd
+        run: |
+          curl -f -X POST "${{ secrets.DOKPLOY_DEPLOY_WEBHOOK_URL_CUBICADOR_API }}" ^
+            -H "Content-Type: application/json" ^
+            -H "X-GitHub-Event: push" ^
+            -d "{\"ref\":\"${{ github.ref }}\",\"repository\":{\"full_name\":\"${{ github.repository }}\"}}"

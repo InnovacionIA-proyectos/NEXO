@@ -319,6 +319,24 @@ no para escala masiva):
   marca/reporta una sola vez, porque reintentar da siempre el mismo
   resultado; solo un error inesperado (bug, DB caída) entra al ciclo de
   reintentos.
+- **Mensaje ilegible: 0 reintentos, directo a la DLQ** (S3-HU-10.1, issue #131).
+  Si el cuerpo no se puede ni interpretar —no es JSON, es un JSON que no es un
+  objeto, le falta `correlationId`, o la cabecera `x-intentos` no es numérica—
+  no hay reintento que pueda cambiar el resultado, así que va a
+  `cubicacion.dlq` con su alerta y se ackea de inmediato.
+
+  La línea está trazada en **"¿se puede leer el mensaje?"**, no en "¿se puede
+  procesar?": un mensaje legible con un `tipo` desconocido (o sin `tipo`) SÍ pasa
+  por los 3 reintentos, como cualquier otro fallo del despacho. Darle trato
+  distinto a "falta `tipo`" que a "`tipo` inválido" sería una inconsistencia
+  nueva.
+
+  Existe porque todo eso corría ANTES del bloque de manejo de errores, sin red
+  ninguna: cualquiera de esos casos lanzaba antes del `ack` y dejaba el mensaje
+  `unacknowledged` para siempre. Con el prefetch de abajo, **dos mensajes así
+  bastaban para que el worker dejara de procesar cualquier cosa**, y reiniciar el
+  contenedor no ayudaba: RabbitMQ los reentrega y se vuelven a atascar. Perder un
+  mensaje corrupto es aceptable; perder el worker, no.
 - **Alerta al equipo** (2026-08-27, criterio de cierre de la HU: "Reintentos
   + DLQ + alerta ante fallos repetidos del motor"): al caer un mensaje en
   `cubicacion.dlq`, además del log, se envía un correo al equipo técnico —
@@ -333,6 +351,11 @@ no para escala masiva):
   resultado se reemplaza completo.
 - Prefetch bajo en el worker (`set_qos(prefetch_count=2)` en
   `worker/main.py`); escalar con más réplicas si hace falta más throughput.
+  ⚠️ Contrapartida que costó un bug crítico: un prefetch bajo hace que **muy pocos
+  mensajes sin ackear alcancen para bloquear el worker entero**. La decisión sigue
+  siendo la correcta —la cubicación es intensiva en CPU y no tiene sentido tomar 20
+  mensajes que se procesarán en fila—, pero obliga a que ningún camino de código
+  pueda terminar sin `ack`. De ahí la guarda de mensajes ilegibles de arriba.
 - Estado `error` visible (`PlanCargue.error_mensaje`) + acción de reintento
   manual para el usuario — se evita construir recuperación automática
   compleja en esta primera versión.

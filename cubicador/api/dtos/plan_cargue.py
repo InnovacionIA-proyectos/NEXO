@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from datetime import datetime
 
+from pydantic import field_validator
+
 from .comun import ApiModel
 
 
@@ -78,6 +80,16 @@ class ItemPlanCargueDto(ApiModel):
 
 class GuardarItemPlanCargueInput(ApiModel):
     id: str | None = None
+    # S3-HU-10.2 (issue #132): un item sin SKU es un caso de negocio legitimo, y
+    # `GuardarItemRequest.Sku` en NEXO es `string?`. Cuando no lo tiene, NEXO manda
+    # la clave con null EXPLICITO - y en Pydantic el default solo aplica si la clave
+    # FALTA, asi que el null se rechazaba contra `str`: el item fallaba 3 veces,
+    # caia en la DLQ y marcaba TODO el plan en error.
+    #
+    # Se normaliza a "" en vez de declarar `str | None`: la columna `sku` no es
+    # nullable (modelos.py: Mapped[str], default "") y la entidad tambien usa "" como
+    # ausencia. Aceptar el null solo en el borde y dejarlo propagar hasta la base
+    # cambiaria el sitio del fallo, no lo quitaria.
     sku: str = ""
     descripcion: str
     pedido: str | None = None
@@ -102,6 +114,14 @@ class GuardarItemPlanCargueInput(ApiModel):
     refrigerado: bool = False
     grupo_compatibilidad: str | None = None
     observaciones: str | None = None
+
+    @field_validator("sku", mode="before")
+    @classmethod
+    def _sku_nulo_es_cadena_vacia(cls, valor: object) -> object:
+        """`mode="before"` a proposito: tiene que correr ANTES de la validacion de
+        tipo, que es justo la que rechazaba el null. Deja el tipo declarado en `str`,
+        asi que nada aguas abajo tiene que aprender a manejar un None."""
+        return "" if valor is None else valor
 
 
 class PlanCargueDto(ApiModel):

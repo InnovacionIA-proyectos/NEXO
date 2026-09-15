@@ -27,12 +27,23 @@
   "
   ```
 
-### 1.1 Backend .NET (NEXO) — no habla REST con este servicio
+### 1.1 Backend .NET (NEXO) — no habla REST con este servicio (con una excepción declarada)
 
 ⚠️ Punto que no es obvio desde afuera: NEXO **no llama** a la API REST de
-este servicio. El contrato real backend↔motor es **solo por colas**
-(RabbitMQ + MassTransit, mismo broker que el resto de NEXO — issue #28). Ver
-sección 3 más abajo para el mensaje de entrada y los eventos de salida.
+este servicio para nada de Plan de Cargue. El contrato real backend↔motor es
+**por colas** (RabbitMQ + MassTransit, mismo broker que el resto de NEXO —
+issue #28). Ver sección 3 más abajo para el mensaje de entrada y los eventos
+de salida.
+
+**Única excepción, acotada a un solo endpoint** (S3-HU-04.3, issue #78):
+`POST /api/cubicacion` (cubicación rápida, sin persistencia — sección 3.1).
+Al no haber plan ni Id que guardar ni proyectar, no hay cola que lo procese
+ni proyección que lo sirva después — NEXO lo llama directo con el mismo
+Bearer de esta sección (`CUBICADOR_API_KEY`), guardado en su configuración
+como `Cubicador3D:OutboundApiKey` (nunca en el navegador). Ver
+`NEXO/src/CabinaFletes.Application/CasosDeUso/Cubicacion/Interfaces/ICubicacionRapidaPort.cs`
+para el razonamiento completo de por qué esto no reabre la puerta a más
+llamadas HTTP.
 
 Consecuencia práctica: si estás integrando el lado .NET, **el puerto 8081
 no importa para nada** — lo que hace falta es:
@@ -51,15 +62,30 @@ no importa para nada** — lo que hace falta es:
 **Hasta S3-HU-02/03/04** un frontend podía hablarle REST directo a este
 servicio (con `CUBICADOR_CORS_ORIGENES` + `CUBICADOR_API_KEY` en el
 navegador). Eso se cerró a propósito: toda escritura del plan de cargue pasa
-por NEXO desde S3-HU-02, toda lectura desde S3-HU-03, y el visor 3D
-(S3-HU-04, `administracion_embarqa_nexo`) ya consume solo esos endpoints de
-NEXO — confirmado y verificado en QA antes de cerrar esto. **No queda
+por NEXO desde S3-HU-02 y toda lectura desde S3-HU-03. **No queda
 middleware CORS en el código** (`api/main.py`) ni la variable
 `CUBICADOR_CORS_ORIGENES` en `.env`/`.env.example`/`docker-compose.yml` — no
 es que esté vacía por defecto, es que la capacidad se retiró del todo. Si
 algún día vuelve a hacer falta un frontend hablándole directo a este
 servicio, es una decisión nueva a tomar a propósito (reintroducir el
 middleware), no reabrir una variable vieja.
+
+⚠️ **Estado real del frontend, a la fecha de este documento.** La versión
+anterior de este párrafo afirmaba que el visor 3D *"ya consume solo esos
+endpoints de NEXO, confirmado y verificado en QA"*. **No es así todavía**:
+`administracion_embarqa_nexo` sigue con 12 puntos de llamada directa a este
+servicio — nadie tocó esos call-sites todavía. El CORS se retiró igual, y está
+bien que así sea —la capacidad no debe existir— pero conviene no leer esta
+sección como si la migración del portal ya estuviera hecha.
+
+Del lado NEXO sí hubo avance (issue #78, S3-HU-04.3): de los 4 endpoints que
+faltaban para que esa HU pudiera cerrar, ya se agregaron 3 (`desde-linea/{id}`,
+`por-linea/{id}`, `{id}/colocaciones`) sobre el `crear_desde_linea` que este
+servicio ya implementaba de punta a punta — solo faltaba que NEXO lo publicara
+en vez de que lo disparara el navegador. Los 20 de 20 ya tienen equivalente del lado NEXO: `POST /api/cubicacion` se
+resolvió como excepción HTTP declarada (sección 1.1), no como comando de
+cola — es la única de las 20 sin plan ni Id que persistir. Inventario 1 a 1
+en `NEXO/docs/mensajeria/CUBICACION.md` §8.
 
 `CUBICADOR_API_KEY` (sección 4/5) sigue existiendo — protege la API para
 consumidores server-to-server legítimos (hoy: scripts de CI/verificación
@@ -209,10 +235,11 @@ PATCH de colocaciones de la fila de arriba) ahora tienen un camino alterno
 `POST /api/planes-cargue/demo`, `POST /api/vehiculos`,
 `POST /api/planes-cargue/{id}/items[/importar]`,
 `DELETE /api/planes-cargue/{id}[/items/{itemId}]`,
+`DELETE /api/vehiculos/{id}`,
 `PATCH /api/planes-cargue/{id}/colocaciones/{colocacionId}`) que publica por
 la MISMA cola que `optimizar`/`desde-linea` — ver
 `NEXO/docs/mensajeria/CUBICACION.md` sección 6 para el contrato completo.
-`worker/main.py` aplica esos 8 comandos con los MISMOS casos de uso que esta
+`worker/main.py` aplica esos 9 comandos con los MISMOS casos de uso que esta
 API síncrona (`application/plan_cargue/*.py`) — nada de lógica nueva, solo un
 segundo punto de entrada. Esta API directa NO se retira en esta HU (la siguen
 usando esta app y el smoke test de Docker); es el navegador de NEXO el que
@@ -293,7 +320,7 @@ class ItemPlanCargueDto(ApiModel):
 
 class GuardarItemPlanCargueInput(ApiModel):
     id: str | None = None
-    sku: str = ""
+    sku: str = ""          # acepta null explicito -> se normaliza a "" (ver nota abajo)
     descripcion: str
     pedido: str | None = None
     cliente: str | None = None
@@ -444,6 +471,18 @@ class SolicitudEncoladaDto(ApiModel):
     estado: str = "procesando"
 ```
 
+> **`sku` acepta `null` explícito** (S3-HU-10.2, issue #132). `GuardarItemRequest.Sku`
+> en NEXO es `string?` —un ítem sin SKU es un caso de negocio legítimo— y cuando no lo
+> tiene, NEXO manda la clave con `null`, no la omite. En Pydantic el default solo aplica
+> si la clave **falta**, así que ese `null` se rechazaba contra un campo `str`: el ítem
+> fallaba 3 veces, caía en la DLQ y marcaba **todo el plan** en `error`.
+>
+> Un `field_validator(mode="before")` lo normaliza a `""` antes de la validación de
+> tipo. Se normaliza en vez de declarar `str | None` porque la columna `sku` **no es
+> nullable** (`modelos.py`: `Mapped[str]`, default `""`) y la entidad también usa `""`
+> como ausencia — aceptar el null solo en el borde habría movido el fallo a la base, no
+> lo habría quitado. Para quien consume el DTO, el tipo sigue siendo `str`.
+
 ### 3.3 Catálogo de `codigo_rechazo` en `ColocacionCargueDto`
 
 Distinto del catálogo de errores HTTP de la sección 4 — estos son razones de
@@ -503,12 +542,14 @@ Authorization: Bearer <secreto correspondiente>
 ```
 
 - Consumidores server-to-server → este servicio: valida contra
-  `CUBICADOR_API_KEY` (`api/dependencias.py:verificar_api_key`). **NEXO no es
-  uno de esos consumidores** — habla con este servicio solo por colas, nunca
-  HTTP (sección 1.1). Hoy solo la usan CI/scripts de verificación manual;
-  hasta S3-HU-05 (issue #116) también la usaba el navegador vía CORS —
-  cerrado, y la clave rotada en la misma HU (issue #117) porque ese valor
-  estuvo expuesto en el bundle público del portal.
+  `CUBICADOR_API_KEY` (`api/dependencias.py:verificar_api_key`). **NEXO SÍ es
+  uno de estos consumidores, pero solo para un endpoint** (`POST
+  /api/cubicacion`, sección 1.1) — todo lo demás sigue siendo solo por
+  colas. NEXO guarda este mismo valor como `Cubicador3D__OutboundApiKey`.
+  Los otros consumidores son CI/scripts de verificación manual; hasta
+  S3-HU-05 (issue #116) también la usaba el navegador vía CORS — cerrado, y
+  la clave rotada en la misma HU (issue #117) porque ese valor estuvo
+  expuesto en el bundle público del portal.
 - Este servicio → NEXO (llamada de `crear_desde_linea`, ver sección 7): NEXO
   valida contra `Cubicador3D__InboundApiKey`
   (`CubicadorApiKeyAuthenticationHandler`, esquema `CubicadorApiKey` aparte
@@ -597,7 +638,9 @@ si el mensaje deja de entregarse.
 - Exchange: `cubicador.eventos` (topic).
 - Routing keys: `cubicacion.solicitada`, `plan-de-cargue.generado`,
   `cubicacion.rechazada` y, desde S3-HU-03, `vehiculo.creado`/
-  `vehiculo.actualizado`.
+  `vehiculo.actualizado`/`vehiculo.eliminado` (los 3 del catálogo: el último
+  lo publica `eliminar_vehiculo`, y solo si el borrado se aplicó de verdad —
+  ver `NEXO/docs/mensajeria/CUBICACION.md` §7.1).
 - Dead-letter: `cubicacion.dlq`. Al caer un mensaje ahí (agotados los
   **3** reintentos, `worker/main.py:49` `MAX_INTENTOS = 3`), el worker
   además alerta por correo al equipo técnico

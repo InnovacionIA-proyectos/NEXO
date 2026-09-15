@@ -9,7 +9,12 @@ es la referencia que usa quien SÍ va a encenderlo.
 
 ## 1. Compuerta de paridad del plan de cargue (S2-HU-08.2, issue #30)
 
-**Estado por defecto: CERRADA.** `POST /api/planes-cargue/{id}/optimizar`
+> ✅ **ENCENDIDA en Dokploy (ambiente Pre-Despliegue-BACKEND) el
+> 2026-09-14.** Autorizado por Kevin Cano (@kcano-ux). Ver "Encendido
+> confirmado" al final de esta sección para la evidencia y los valores
+> exactos que se configuraron.
+
+**Estado por defecto del código: CERRADA.** `POST /api/planes-cargue/{id}/optimizar`
 responde `503 CUBICACION_EN_VERIFICACION` sin publicar nada a la cola —
 fail-closed, sin fallback al PoC original (no operativo). La regla vive en
 `Domain.PlanDeCargue.Reglas.CompuertaDeParidad` y la lee
@@ -38,18 +43,57 @@ esta configuración a medias).
 **S2-HU-07.3** (hotspot H5, "paridad automatizada") — el criterio de cierre
 es **26/26** casos dorados coincidiendo exacto entre el motor C# original y
 el motor Python de Cubicador (`cubicador/tests/paridad/
-test_paridad_casos_dorados.py`, corrido en `cubicador-ci.yml`). La primera
-corrida ya dio 26/26 (ver `cubicador/docs/DECISIONES_TECNICAS.md` sección 3
-y `cubicador/README.md`) — pero esa corrida verde **todavía no está
-enlazada** como `Cubicacion:ParidadEvidencia` en ningún ambiente: encenderla
-es un paso deliberado, no automático, aunque el 26/26 ya exista.
+test_paridad_casos_dorados.py`).
+
+> ⚠️ **Corrección**: esta sección decía que la suite corre en
+> `cubicador-ci.yml`. Ese workflow **ya no existe** — se retiró en S3-HU-11.
+> Hoy la misma suite corre dentro de `_cubicador-pruebas.yml` (workflow
+> reusable, job "Pruebas unitarias y de integracion (pytest)"), invocado por
+> `ci-cd-cubicador-api.yml` y `ci-cd-cubicador-worker.yml` en cada push/PR
+> que toque `cubicador/`.
+
+La primera corrida ya había dado 26/26 (ver `cubicador/docs/
+DECISIONES_TECNICAS.md` sección 3 y `cubicador/README.md`).
 
 ### De quién es la decisión
 
 **Kevin Cano (@kcano-ux).** Ninguna otra HU de este repo enciende esta
-compuerta — S3-HU-05 (issue #118) explícitamente la deja enlazada, sin
-ejecutar. Ver `PENDIENTES.md`, sección "Encendido de la función de plan de
-cargue", para el detalle completo de la decisión original (S2-HU-08.2).
+compuerta por defecto — S3-HU-05 (issue #118) explícitamente la dejó
+enlazada, sin ejecutar. Ver `PENDIENTES.md`, sección "Encendido de la
+función de plan de cargue", para el detalle completo de la decisión
+original (S2-HU-08.2).
+
+### Encendido confirmado (2026-09-14)
+
+**Autorizado por Kevin Cano (@kcano-ux)** para el ambiente Dokploy
+"Pre-Despliegue-BACKEND"
+(`http://nexo-predesplieguebackend-ijaiqn-cdc194-10-10-40-17.sslip.io`).
+
+**Evidencia**: no se usó una corrida de GitHub Actions (no había una
+enlazada — ver el aviso de arriba sobre `cubicador-ci.yml`). En su lugar se
+corrió la MISMA suite (`pytest tests/paridad -v`) en un contenedor efímero
+`python:3.14-slim`, contra el código real de `cubicador/` en el estado
+exacto del commit desplegado:
+
+- **Commit**: `82fb52ba73083b7d94ea07d42a4774a2b9b8e1e3` (rama
+  `Pre-Despliegue-BACKEND`)
+- **Fecha de la corrida**: 2026-09-14
+- **Resultado**: `27 passed in 3.60s` — los 26 casos dorados
+  (`test_paridad_colisiones[01..05]`, `test_paridad_orientaciones[06..09]`,
+  `test_paridad_caso_10` a `test_paridad_caso_26`) más
+  `test_hay_exactamente_26_fixtures_dorados` (confirma que no falta ni sobra
+  ningún fixture). Salida completa registrada en
+  `docs/VERIFICACION_NEXO_CUBICADOR_2026-09-14.md`, sección 8.
+
+**Valores configurados en Dokploy** (app de la API de NEXO,
+`Cubicacion__*`, con doble guion bajo — Dokploy despliega por Dockerfile,
+sin interpolación de `docker-compose.yml`):
+
+```
+Cubicacion__ParidadVerificada=true
+Cubicacion__ParidadEvidencia=82fb52ba73083b7d94ea07d42a4774a2b9b8e1e3
+Cubicacion__ParidadFecha=2026-09-14
+```
 
 ---
 

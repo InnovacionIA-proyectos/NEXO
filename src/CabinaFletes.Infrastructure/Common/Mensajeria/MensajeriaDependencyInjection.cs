@@ -299,6 +299,20 @@ public static class MensajeriaDependencyInjection
                         });
                         e.ConfigureConsumer<VehiculoCatalogoConsumer>(contexto);
                     });
+                    // Tercer endpoint del catálogo: sin este binding, `eliminar_vehiculo`
+                    // publicaría al exchange y el mensaje se descartaría EN SILENCIO (topic
+                    // exchange sin bind que calce = ni error ni entrega), dejando la
+                    // proyección con vehículos que ya no existen.
+                    cfg.ReceiveEndpoint("Cubicacion.VehiculoEliminado", (IRabbitMqReceiveEndpointConfigurator e) =>
+                    {
+                        e.ConfigureConsumeTopology = false;
+                        e.Bind("cubicador.eventos", b =>
+                        {
+                            b.ExchangeType = "topic";
+                            b.RoutingKey = "vehiculo.eliminado";
+                        });
+                        e.ConfigureConsumer<VehiculoCatalogoConsumer>(contexto);
+                    });
 
                     Tuberia(
                         contexto, cfg,

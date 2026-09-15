@@ -1,0 +1,91 @@
+name: CI/CD RabbitMQ
+
+# S3-HU-11.4 (issue #137): RabbitMQ no tiene código fuente propio en este repo
+# — su definición completa vive en el docker-compose.yml de la raíz (servicio
+# `rabbit`) + build/Dockerfile.rabbit (imagen propia: RabbitMQ oficial + el
+# plugin de retardo que MassTransit necesita para los timeouts de saga). No
+# hace falta "consolidar" nada más: cubicador/docker-compose.yml NO define su
+# propio broker, se conecta al de acá por la red externa `nexo_internal` (ver
+# docs/mensajeria/TOPOLOGIA.md) — por eso este pipeline dispara solo con estos
+# 2 archivos, no con cualquier cambio del repo.
+on:
+  push:
+    branches: [main, Pre-Despliegue-BACKEND]
+    paths:
+      - "docker-compose.yml"
+      - "build/Dockerfile.rabbit"
+      - ".github/workflows/ci-cd-rabbitmq.yml"
+  pull_request:
+    branches: [main, Pre-Despliegue-BACKEND]
+    paths:
+      - "docker-compose.yml"
+      - "build/Dockerfile.rabbit"
+      - ".github/workflows/ci-cd-rabbitmq.yml"
+
+jobs:
+  # "build-and-test" acá es build a secas: no hay suite unitaria posible para
+  # un broker sin código propio (el smoke test real solo tiene sentido DESPUÉS
+  # de desplegar, ver el job de abajo) — pero SÍ hay algo que puede romperse:
+  # que la imagen propia (RabbitMQ oficial + plugin de retardo) deje de
+  # construir. Sin este job, un Dockerfile.rabbit roto se descubriría recién
+  # en el despliegue real.
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Construir la imagen propia de RabbitMQ (con el plugin de retardo)
+        run: docker build -f build/Dockerfile.rabbit -t rabbit-ci:local .
+
+  deploy:
+    needs: build
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/Pre-Despliegue-BACKEND') && github.event_name == 'push'
+    runs-on: [self-hosted, dokploy_]
+    steps:
+      - name: Mostrar información del deploy
+        shell: cmd
+        run: |
+          echo Branch: ${{ github.ref }}
+          echo Commit: ${{ github.sha }}
+          echo Evento: ${{ github.event_name }}
+
+      - name: Disparar despliegue en Dokploy (RabbitMQ)
+        shell: cmd
+        run: |
+          curl -f -X POST "${{ secrets.DOKPLOY_DEPLOY_WEBHOOK_URL_RABBITMQ }}" ^
+            -H "Content-Type: application/json" ^
+            -H "X-GitHub-Event: push" ^
+            -d "{\"ref\":\"${{ github.ref }}\",\"repository\":{\"full_name\":\"${{ github.repository }}\"}}"
+
+  # Smoke test POST-DEPLOY (issue #137, criterio de cierre): conexión al broker
+  # + verificación de que el exchange y los 7 bindings esperados (los 9
+  # comandos de S3-HU-02/optimizar despachados por UN solo binding compartido,
+  # más los 3 eventos de catálogo de vehículo, más los 2 eventos de resultado
+  # ya existentes) siguen declarados tras el despliegue. Corre en el mismo
+  # runner self-hosted que el deploy: es la única red desde la que se alcanza
+  # la consola de administración de este broker (no expuesta al público, ver
+  # docker-compose.yml raíz).
+  #
+  # Depende de que NEXO (API) y el worker de Cubicador ya se hayan conectado
+  # al menos una vez contra este broker para declarar sus colas/bindings — ver
+  # el docstring de scripts/rabbitmq_smoke.py para el detalle de esa
+  # precondición.
+  smoke-test-post-deploy:
+    needs: deploy
+    runs-on: [self-hosted, dokploy_]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Instalar dependencias (httpx)
+        run: pip install httpx
+
+      - name: Verificar exchange/colas/bindings esperados
+        env:
+          RABBITMQ_MGMT_URL: ${{ secrets.RABBITMQ_MGMT_URL }}
+          RABBITMQ_USER: ${{ secrets.RABBITMQ_USER }}
+          RABBITMQ_PASSWORD: ${{ secrets.RABBITMQ_PASSWORD }}
+        run: python scripts/rabbitmq_smoke.py

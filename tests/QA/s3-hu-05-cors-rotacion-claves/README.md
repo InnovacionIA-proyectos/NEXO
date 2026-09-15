@@ -10,6 +10,13 @@ El merge no tuvo conflictos.
 Esta rama no toca ningún archivo `.NET` (`src/`/`tests/`), así que las 3 suites de
 xUnit no se volvieron a correr (ya estaban en verde en `QA` tras la ronda anterior).
 
+## Script de esta carpeta
+
+[`verify-cors-cerrado.mjs`](verify-cors-cerrado.mjs) — confirma la ausencia de
+encabezados `Access-Control-*`, el rechazo del preflight `OPTIONS`, y que la
+autenticación sigue fail-closed. Corrido contra el stack real durante esta
+verificación.
+
 ## Resultado de las suites
 
 | Suite | Resultado |

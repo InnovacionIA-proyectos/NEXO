@@ -38,6 +38,11 @@ namespace CabinaFletes.Mensajes.Cubicacion;
 /// hace <see cref="CubicacionSolicitadaValidador"/> con un patrón de tipo en tiempo de
 /// ejecución — funciona porque la validación corre ANTES de serializar, sobre la misma
 /// instancia en memoria con la que se construyó el mensaje.
+///
+/// [S3-HU-04.3, issue #78] "crear_desde_linea" (<see cref="CrearPlanDesdeLineaInput"/>) se
+/// suma como un décimo Tipo — el worker de Cubicador ya lo implementa desde antes (ver
+/// cubicador/worker/main.py), solo faltaba que NEXO lo publicara en vez de que lo disparara
+/// el navegador directo.
 /// </summary>
 public sealed record CubicacionSolicitada(
     string Tipo, string PlanId, string CorrelationId, object Solicitud);
@@ -62,6 +67,18 @@ public sealed record CrearPlanInput(string Nombre, string VehiculoId);
 /// <summary>"crear_plan_demo" — sin payload: Cubicador elige internamente el vehículo y
 /// los ítems del escenario de demostración (equivalente a application/plan_cargue/demo.py).</summary>
 public sealed record CrearPlanDemoInput;
+
+/// <summary>
+/// [S3-HU-04.3, issue #78] "crear_desde_linea" — dispara la generación de la flota
+/// (uno o más vehículos, ver <c>cubicador/application/plan_cargue/desde_linea.py</c>) a
+/// partir de las posiciones de una línea de solicitud ya cotizada (botón "Cubicar" de la
+/// Mesa de Costeo). El worker de Cubicador YA implementa este Tipo desde antes de esta HU
+/// (verificado contra <c>cubicador/worker/main.py</c>) — este payload es lo único que
+/// faltaba del lado de NEXO para poder publicarlo. <c>LineaSolicitudId</c> espeja el mismo
+/// campo (camelCase) que <c>worker/main.py</c> lee como <c>solicitud["lineaSolicitudId"]</c>.
+/// Ver <see cref="Application.CasosDeUso.PlanDeCargue.CrearPlanDesdeLineaCommand"/>.
+/// </summary>
+public sealed record CrearPlanDesdeLineaInput(string LineaSolicitudId);
 
 public sealed record EjeVehiculoInput(decimal PosicionMm, decimal CapacidadKg);
 
@@ -123,6 +140,22 @@ public sealed record EliminarItemInput(string ItemId);
 /// <summary>"eliminar_plan" — sin payload adicional: el PlanId del sobre basta.</summary>
 public sealed record EliminarPlanInput;
 
+/// <summary>"eliminar_vehiculo" — sin payload adicional: el id del vehículo viaja en el
+/// PlanId del sobre, igual que hace "guardar_vehiculo" (ver la nota de esa asimetría en
+/// <see cref="GuardarVehiculoInput"/>: los comandos de catálogo no tienen plan, así que
+/// reutilizan ese campo como identidad del recurso afectado).
+///
+/// Cierra el par de "guardar_vehiculo": el frontend llama <c>eliminarVehiculo()</c>
+/// (cubicador-api.service.ts) y sin este comando esa única escritura seguiría saliendo
+/// del navegador directo a Cubicador con la API key en el bundle — lo que impide cerrar
+/// S3-HU-05 (retirar el CORS y rotar la clave), que exige CERO llamadas de navegador.
+///
+/// Puede ser rechazado con VEHICULO_EN_USO: Cubicador se niega a borrar un vehículo con
+/// planes de cargue asociados (application/plan_cargue/vehiculos.py::eliminar_vehiculo).
+/// Es un rechazo de negocio normal, viaja como "cubicacion.rechazada" y no se
+/// reintenta.</summary>
+public sealed record EliminarVehiculoInput;
+
 /// <summary>"ajustar_colocacion" — espeja AjusteColocacionInput + el ColocacionId que el
 /// PATCH síncrono llevaba en la ruta. Reemplaza el PATCH directo contra Cubicador
 /// (CompuertaDeParidad.cs no aplica acá: es dato, no cálculo).</summary>
@@ -146,6 +179,11 @@ public sealed record AjustarColocacionInput(
 /// que <see cref="Infrastructure.Cubicacion.PlanDeCargueGeneradoConsumer"/> proyecte la
 /// base de NEXO sin volver a consultar a Cubicador. Tamaño medido ANTES de este cambio
 /// en docs/decisiones/medicion-evento-enriquecido-plan-cargue.md (issue #109).
+///
+/// [S3-HU-04.3, issue #78] LIMITACIÓN CONOCIDA: cuando "crear_desde_linea" reparte la carga
+/// en varios vehículos, hoy solo se publica UN evento de estos, para el primer plan de la
+/// flota (ver worker/main.py::_ejecutar_solicitud) — los vehículos 2..N no llegan acá. Ver
+/// la nota completa en <see cref="Application.CasosDeUso.PlanDeCargue.CrearPlanDesdeLineaCommand"/>.
 /// </summary>
 public sealed record PlanDeCargueGenerado(string CorrelationId, string PlanId, ResultadoDeCubicacion Resultado);
 
@@ -210,6 +248,19 @@ public sealed record VehiculoCreado(string CorrelationId, VehiculoCubicacionEven
 /// <summary>Evento entrante: Cubicador -> NEXO, routing key `vehiculo.actualizado` —
 /// publicado cuando `guardar_vehiculo` actualiza una fila existente.</summary>
 public sealed record VehiculoActualizado(string CorrelationId, VehiculoCubicacionEvento Vehiculo);
+
+/// <summary>Evento entrante: Cubicador -> NEXO, routing key `vehiculo.eliminado` —
+/// publicado cuando `eliminar_vehiculo` borra la fila de verdad (si Cubicador rechaza
+/// con VEHICULO_EN_USO no se publica nada).
+///
+/// Cierra el trío del catálogo. Sin él la proyección de NEXO se quedaría con el vehículo
+/// para siempre: <c>GET /api/vehiculos</c> lee de ahí, así que seguiría ofreciendo un
+/// vehículo inexistente y el <c>crear_plan</c> que lo eligiera fallaría con
+/// VEHICULO_INVALIDO.
+///
+/// Solo lleva el id, no el <see cref="VehiculoCubicacionEvento"/> completo: no hay nada
+/// que proyectar, solo una fila que borrar.</summary>
+public sealed record VehiculoEliminado(string CorrelationId, string VehiculoId);
 
 public sealed record VehiculoCubicacionEvento(
     string Id, string Nombre, string? Descripcion,

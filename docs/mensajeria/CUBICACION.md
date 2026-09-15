@@ -261,9 +261,21 @@ operaciones de datos, no de cálculo — la compuerta de paridad solo bloquea
 | 6 | `DELETE /api/planes-cargue/{id}/items/{itemId}` | `EliminarItemCommand` | `eliminar_item` | **202** `ComandoAceptadoDto` |
 | 7 | `DELETE /api/planes-cargue/{id}` | `EliminarPlanCommand` | `eliminar_plan` | **202** `ComandoAceptadoDto` |
 | 8 | `PATCH /api/planes-cargue/{id}/colocaciones/{colocacionId}` | `AjustarColocacionCommand` | `ajustar_colocacion` | **202** `ComandoAceptadoDto` |
+| 9 | `DELETE /api/vehiculos/{id}` | `EliminarVehiculoCommand` | `eliminar_vehiculo` | **202** `ComandoAceptadoDto` |
+
+> **Por qué son 9 y no 8.** El #9 no venía en la lista original de la HU, y se
+> agregó porque su ausencia bloqueaba S3-HU-05. El frontend llama
+> `eliminarVehiculo()` (`cubicador-api.service.ts`), así que sin este comando esa
+> escritura seguiría saliendo del navegador directo a Cubicador con la API key en
+> el bundle — y retirar el CORS y rotar la clave exige **cero** llamadas de
+> navegador. Cerrar el par de `guardar_vehiculo` era la única forma de no dejar
+> ese hilo suelto. Ver el comentario de `EliminarVehiculoCommand`.
 
 Todos exigen rol `Comercial`, `CoordinadorFletes` o `Admin` (mismo criterio
-que `POST /api/planes-cargue/{id}/optimizar`). Todos usan la forma de error
+que `POST /api/planes-cargue/{id}/optimizar`), **salvo `DELETE /api/vehiculos/{id}`,
+que exige `Admin`**: el catálogo de vehículos es maestro y lo comparten todos los
+planes, a diferencia del alta, que un comercial puede necesitar en medio de una
+cotización. Todos usan la forma de error
 uniforme de la sección 6 de `docs/contrato-integracion/README.md`
 (`{code, message, timestamp, details}`).
 
@@ -281,17 +293,57 @@ README.md`) — incluso donde un `200`/`201`/`204` síncrono hubiera sido
 defendible:
 
 - **`POST /api/planes-cargue` (#1)**: es el único de los 8 con un matiz real.
-  NEXO genera el `PlanId` y dejar su fila espejo en `borrador` **en el mismo
-  POST** (antes de responder) — un `GET /api/planes-cargue/{id}` inmediato
-  después del 202 ya funciona, aunque la fila REAL de Cubicador se cree
-  async. Se documenta como 202 igual, para no prometer un 201 que no sería
-  del todo cierto (la escritura definitiva sigue pendiente en Cubicador).
+  NEXO genera el `PlanId` y deja su fila espejo **en el mismo POST** (antes de
+  responder) — un `GET /api/planes-cargue/{id}` inmediato después del 202 ya
+  funciona, aunque la fila REAL de Cubicador se cree async. Se documenta como
+  202 igual, para no prometer un 201 que no sería del todo cierto (la
+  escritura definitiva sigue pendiente en Cubicador). Esa fila nace en
+  **`procesando`** — ver el aviso de cambio de contrato de abajo.
 - **`DELETE /api/planes-cargue/{id}` (#7)**: un DELETE normalmente responde
   `204`. Acá responde **202** porque el borrado en Cubicador es async — la
   fila espejo de NEXO sí se borra de inmediato (optimista, ver 6.4), pero
   prometer `204` implicaría que el borrado ya es un hecho de punta a punta.
 - El resto (#2 a #6, #8) no tenían candidato razonable a síncrono: dependen
   de que Cubicador aplique el comando en su propia base.
+
+#### ⚠️ Cambio de contrato — `POST /api/planes-cargue` devuelve `procesando`
+
+**Publicado el 2026-09-09**, después de la publicación inicial del contrato.
+Se avisa acá y en el hilo de la issue, según el compromiso de S3-HU-02.6 (los
+cambios de contrato no se hacen en silencio).
+
+**Qué cambia:** el campo `estado` del `202` pasa de `"borrador"` a
+`"procesando"`. La fila espejo de NEXO nace en `procesando` y
+`PlanDeCargueGeneradoConsumer` la mueve al estado real cuando llega la
+confirmación de Cubicador (ese consumer ya hace
+`plan.Estado = mensaje.Resultado.Estado`, que para un plan recién creado es
+`borrador`) — no hizo falta código nuevo en el consumer.
+
+**Por qué:** con la fila en `borrador` desde el POST había una carrera real. Un
+`POST /{id}/optimizar` inmediato pasaba la guarda de
+`SolicitarOptimizacionCommand`, que solo rechaza con `409
+PLAN_CARGUE_EN_PROCESO` cuando el plan ya está en `procesando`. Los dos
+mensajes van a la **misma cola** con `prefetch_count = 2`, así que el worker
+podía atender `optimizar` antes que `crear_plan` y fallar con
+`PLAN_NO_ENCONTRADO` sobre un plan que estaba por crearse. Con `procesando`, esa
+guarda que ya existía bloquea el caso sin agregar código.
+
+Un beneficio adicional: `borrador` es un estado de reposo legítimo (un plan
+puede quedarse ahí días mientras el comercial le carga ítems), así que no
+distinguía "esperando a Cubicador" de "a medio armar". `procesando` sí, y eso
+es lo que hace posible un vigilante de timeout del lado NEXO para los comandos
+de Cubo 2 — hoy imposible, porque no había ningún estado que significara
+inequívocamente "esperando confirmación".
+
+**Impacto en el frontend (S3-HU-04):** ninguno si la UI trata el 202 como el
+resto del contrato de trabajos pesados — de hecho lo alinea con la UX descrita
+para Cubo 2 (spinner mientras el estado sea `procesando`, la fila aparece
+cuando llega el aviso por SignalR). Sí rompe a quien haya asumido literalmente
+el string `"borrador"` en esa respuesta.
+
+**Fuera de alcance:** `guardar_vehiculo` y `eliminar_vehiculo` no escriben
+ninguna fila en NEXO, así que siguen sin dejar rastro con el que detectar un
+comando perdido. Cubrirlos exige un registro explícito de comandos en vuelo.
 
 ### 6.3 Payload de cada comando en la cola
 
@@ -339,6 +391,10 @@ MensajesDeCubicacion.cs` para el shape exacto (records `CrearPlanInput`,
 
 // eliminar_plan — sin datos adicionales, planId ya identifica el plan
 { "tipo": "eliminar_plan", "planId": "<guid del plan>", "correlationId": "...", "solicitud": {} }
+
+// eliminar_vehiculo — el id del vehiculo viaja en planId, igual que en guardar_vehiculo
+// (los comandos de catalogo no tienen plan). Puede ser rechazado con VEHICULO_EN_USO.
+{ "tipo": "eliminar_vehiculo", "planId": "<guid del vehiculo>", "correlationId": "...", "solicitud": {} }
 
 // ajustar_colocacion — reemplaza el PATCH síncrono de Cubicador
 { "tipo": "ajustar_colocacion", "planId": "<guid del plan>", "correlationId": "...",
@@ -468,10 +524,29 @@ con éxito — "creado" si el `Id` no existía antes en la base de Cubicador,
 { "correlationId": "<vehiculoId>", "vehiculo": { "id": "...", "nombre": "...", "...": "(mismo VehiculoCubicacionDto completo)" } }
 ```
 
-Un solo consumer en NEXO (`VehiculoCatalogoConsumer`) atiende los 2 —
-`Consume(ConsumeContext<VehiculoCreado>)` y
-`Consume(ConsumeContext<VehiculoActualizado>)` — porque de este lado el
-tratamiento es idéntico: upsert por `Id`.
+**`vehiculo.eliminado` — el tercero del catálogo.** Se publica cuando
+`eliminar_vehiculo` borra la fila de verdad; si Cubicador rechaza con
+`VEHICULO_EN_USO`, no se publica nada (borrar en la proyección un vehículo que
+en Cubicador sigue existiendo dejaría las dos bases en desacuerdo).
+
+```json
+{ "correlationId": "<vehiculoId>", "vehiculoId": "<vehiculoId>" }
+```
+
+A diferencia de los otros dos, **no lleva el vehículo completo**: no hay nada
+que proyectar, solo una fila que borrar.
+
+Sin este evento la proyección se quedaría con el vehículo para siempre, y
+`GET /api/vehiculos` —que lee de ahí— seguiría ofreciendo un vehículo que ya no
+existe; el `crear_plan` que lo eligiera fallaría con `VEHICULO_INVALIDO`.
+
+Un solo consumer en NEXO (`VehiculoCatalogoConsumer`) atiende los 3 —
+`VehiculoCreado`, `VehiculoActualizado` y `VehiculoEliminado` — porque de este
+lado el tratamiento de los dos primeros es idéntico (upsert por `Id`) y el
+tercero es su inverso exacto. Los 3 son idempotentes: el upsert por
+construcción, y el borrado porque **borrar lo que no está no es un error** — el
+resultado deseado ya se cumplió, así que un duplicado retorna sin tocar nada en
+vez de irse a reintentos y DLQ.
 
 ### 7.2 Los 7 endpoints de lectura
 
@@ -515,3 +590,99 @@ citados en cubicador/CONTRATO.md §3.2, con `Guid`/`decimal` en vez de
   de un plan viejo (p.ej. datos de antes de esta HU), ese plan simplemente
   no aparece con detalle en NEXO — no hay backfill automático. Si hace falta
   poblar planes históricos, es un script aparte, no parte de esta HU.
+
+---
+
+## 8. Cobertura para S3-HU-04 — qué tiene y qué le falta al frontend
+
+Inventario 1 a 1 de lo que `administracion_embarqa_nexo` llama hoy contra lo que
+NEXO expone, verificado con `git grep` sobre `origin/main` del frontend y sobre
+los controladores de este repo. Es el insumo de **S3-HU-04.1** (tabla de
+equivalencia) y de **S3-HU-04.5** (punto de coordinación).
+
+> **Por qué existe esta sección.** S3-HU-05 (#116) retiró el CORS del Cubicador
+> y rotó la clave, dando por hecho que *"el visor 3D (S3-HU-04) ya consume solo
+> esos endpoints de NEXO"*. **Eso todavía no ocurrió**: el frontend sigue con
+> 12 puntos de llamada directa (`cubicadorBaseUrl` en `cubicador-api.service.ts`
+> y `captura-api.service.ts`) — nadie cambió esos call-sites todavía. Lo que sí
+> avanzó (issue #78, S3-HU-04.3) es el lado NEXO: los 20 de 20 métodos ya tienen
+> equivalente — los 3 que faltaban (`desde-linea`, `por-linea`, `colocaciones`,
+> ver 8.1) más `cubicar()`, resuelto como excepción HTTP declarada y acotada
+> (ver 8.2) en vez de forzarlo al patrón de cola. Migrar el frontend a los 20
+> endpoints ya disponibles sigue siendo trabajo pendiente de esa HU — punto de
+> coordinación con Juan Pablo (responsable de S3-HU-04).
+
+### 8.1 Con equivalente en NEXO (20 de 20)
+
+| Método del frontend | Endpoint en NEXO | Desde |
+|---|---|---|
+| `optimizar()` | `POST /api/planes-cargue/{id}/optimizar` | S2-HU-08 |
+| `obtenerResumen()` | `GET /api/planes-cargue/{id}` | S2-HU-08 |
+| `crearPlan()` | `POST /api/planes-cargue` | S3-HU-02 |
+| `crearPlanDemo()` | `POST /api/planes-cargue/demo` | S3-HU-02 |
+| `eliminarPlan()` | `DELETE /api/planes-cargue/{id}` | S3-HU-02 |
+| `guardarItem()` | `POST /api/planes-cargue/{id}/items` | S3-HU-02 |
+| `importarItems()` | `POST /api/planes-cargue/{id}/items/importar` | S3-HU-02 |
+| `eliminarItem()` | `DELETE /api/planes-cargue/{id}/items/{itemId}` | S3-HU-02 |
+| `ajustarColocacion()` | `PATCH /api/planes-cargue/{id}/colocaciones/{colocacionId}` | S3-HU-02 |
+| `guardarVehiculo()` | `POST /api/vehiculos` | S3-HU-02 |
+| `eliminarVehiculo()` | `DELETE /api/vehiculos/{id}` | este PR |
+| `vehiculos()` | `GET /api/vehiculos` | S3-HU-03 |
+| `planes()` | `GET /api/planes-cargue` | S3-HU-03 |
+| `resultado()` | `GET /api/planes-cargue/{id}/resultado` | S3-HU-03 |
+| `flota()` | `GET /api/planes-cargue/{id}/flota` | S3-HU-03 |
+| `metricas()` | `GET /api/planes-cargue/{id}/metricas` | S3-HU-03 |
+| `noCargadas()` | `GET /api/planes-cargue/{id}/no-cargadas` | S3-HU-03 |
+| `exportar()` | `GET /api/planes-cargue/{id}/exportar` | S3-HU-03 |
+| `crearPlanDesdeLinea()` | `POST /api/planes-cargue/desde-linea/{lineaId}` | S3-HU-04.3 (issue #78) |
+| `porLinea()` | `GET /api/planes-cargue/por-linea/{lineaId}` | S3-HU-04.3 (issue #78) |
+| `colocaciones()` | `GET /api/planes-cargue/{id}/colocaciones` | S3-HU-04.3 (issue #78) |
+| `cubicar()` (`captura-api.service.ts`) | `POST /api/cubicacion` | S3-HU-04.3 (issue #78) — ver 8.2, excepción HTTP |
+
+⚠️ **Cambio de ruta que hay que mirar**: los 3 de vehículos viven en
+`/api/vehiculos`, no en `/api/planes-cargue/vehiculos` como los pide el
+frontend hoy. No es un `replace` del host: cambia el prefijo.
+
+⚠️ **Limitación conocida de `porLinea()` (issue #78)**: hoy el worker de
+Cubicador (`crear_desde_linea`) solo reporta el PRIMER vehículo de una flota
+que necesitó varios — `application/plan_cargue/desde_linea.py` arma toda la
+flota pero solo publica `plan-de-cargue.generado` para el primero. Mientras
+eso no se arregle del lado del motor (issue nueva, fuera de alcance de #78),
+`porLinea()` puede devolver una lista incompleta para líneas que requieran
+más de un vehículo.
+
+⚠️ **`colocaciones()` no se deprecó**: la duda que dejó abierta la 8.2 original
+(¿redundante con `resultado()`, que ya trae las colocaciones adentro?) se
+resolvió implementándolo como equivalente 1:1 en vez de forzar un refactor del
+frontend — costaba poco (`ResultadoPlanMapper.AColocacion` ya existía) y evita
+un cambio de contrato no pedido por la issue.
+
+### 8.2 `cubicar()` — resuelto como excepción HTTP declarada, no como cola
+
+`cubicar()` (`captura-api.service.ts`, usado por `captura-page` y
+`mesa-costeo-page`) pide `POST /api/cubicacion`: una cubicación rápida
+(SICE), sin persistencia. No encajaba ni en el patrón de escritura del
+dominio (S3-HU-02, que asume un plan con Id que guardar) ni en el de
+proyección (S3-HU-03, que asume un evento que proyectar) — no hay plan, no
+hay Id, no hay nada que una cola o una proyección pudieran servir después.
+
+**Decisión tomada**: NEXO expone `POST /api/cubicacion`
+(`CubicacionController`, `CubicarRapidoQuery` +
+`ICubicacionRapidaPort`/`CubicacionRapidaAdapter`) que delega por HTTP
+síncrono a Cubicador — la única llamada HTTP saliente de NEXO hacia
+Cubicador en todo el sistema, declarada y acotada a este único endpoint (ver
+`cubicador/CONTRATO.md` §1.1/§5 y el comentario de `ICubicacionRapidaPort`
+para el razonamiento completo). El secreto (`Cubicador3D:OutboundApiKey`,
+mismo valor que `CUBICADOR_API_KEY` del lado de Cubicador) vive solo en la
+configuración del backend — nunca en el bundle del portal, que es
+justamente el riesgo que esta HU existe para cerrar.
+
+Se descartó la alternativa de un patrón solicitud/respuesta sobre RabbitMQ
+(reply-to): habría mantenido "cero HTTP" al 100% pero a costa de introducir
+un patrón nuevo, sin otro uso en el sistema, para un cálculo que ya responde
+en el orden de cientos de milisegundos por HTTP directo.
+
+Sin `Cubicador3D:OutboundBaseUrl`/`OutboundApiKey` configuradas, el endpoint
+responde `503` accionable (`CUBICACION_RAPIDA_NO_CONFIGURADA`) — mismo
+criterio de degradación que el resto de integraciones externas opcionales
+del backend.

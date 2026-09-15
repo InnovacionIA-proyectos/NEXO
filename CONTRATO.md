@@ -281,6 +281,13 @@ interface PlanCargueDto {
 }
 interface AvisoPlanCargueDto { planCargueId: UUID; estado: string; puntaje: Decimal; motivo: string | null }
 
+// [S3-HU-04.3, issue #78] respuesta común de los comandos async del puente Mesa de Costeo → 3D
+interface ComandoAceptadoDto { correlationId: UUID; estado: string }
+interface PlanFlotaItemDto { id: UUID; numeroVehiculo: number; totalVehiculos: number; unidadesCargadas: number; unidadesTotales: number }
+// ColocacionCargueDto: mismo shape que ya devuelve el `resultado` de `.../optimizar` dentro de `colocaciones[]`
+// (geometría + estado de cada bulto) — ver `CabinaFletes.Application.CasosDeUso.PlanDeCargue.DTOs.PlanCargueDtos.cs`
+// para el shape completo; espeja 1:1 el `ColocacionCargueDto` documentado en `cubicador/CONTRATO.md` §3.2.
+
 interface SesionActualDto { id: number; nombre: string; rol: RolUsuario; capacidades: string[] }
 ```
 
@@ -414,6 +421,22 @@ Cambiar esto reordena la bandeja de todo el mundo — ver
 - `POST /{id}/optimizar` — `Comercial, CoordinadorFletes, Admin`. No bloquea; `503 CUBICACION_EN_VERIFICACION` si la compuerta de paridad está cerrada, `409` si ya está procesando.
   `Body?: { estrategia?, algoritmo?, semilla?, respetarBloqueadas? }` → `202 SolicitudDeCubicacionAceptadaDto`
 - `GET /{id}` — `[Authorize]`. Consulta de respaldo → `200 PlanCargueDto` / `404`
+- `POST /desde-linea/{lineaId}` — `Comercial, CoordinadorFletes, Admin` (S3-HU-04.3, issue #78). Puente Mesa
+  de Costeo → 3D: publica `crear_desde_linea` para que Cubicador arme la flota a partir de las posiciones de
+  la línea. No pasa por la compuerta de paridad (es una operación de datos, no de cálculo, mismo criterio que
+  los 8 comandos de la sección 6 de `docs/mensajeria/CUBICACION.md`). `404 LINEA_SOLICITUD_NO_ENCONTRADA` si
+  la línea no existe.
+  → `202 ComandoAceptadoDto`
+- `GET /por-linea/{lineaId}` — `[Authorize]` (S3-HU-04.3, issue #78). Sondeo del `POST` de arriba contra la
+  proyección local: lista vacía mientras Cubicador sigue `procesando`, se llena cuando llega
+  `plan-de-cargue.generado`. ⚠️ Limitación conocida: hoy el worker de Cubicador solo reporta el primer
+  vehículo de una flota multi-vehículo, así que esta lista puede no reflejar el resto de la flota — pendiente
+  de resolver del lado del motor, fuera de alcance de este endpoint.
+  → `200 PlanFlotaItemDto[]`
+- `GET /{id}/colocaciones` — `[Authorize]` (S3-HU-04.3, issue #78). Todas las colocaciones del plan, cargadas
+  y rechazadas — a diferencia de `.../no-cargadas` (sección 7.2 de `docs/mensajeria/CUBICACION.md`), que
+  filtra por `Cargada = false`. `404` si el plan no existe.
+  → `200 ColocacionCargueDto[]`
 
 ### Trabajos — `/api/trabajos` (`[Authorize]`)
 

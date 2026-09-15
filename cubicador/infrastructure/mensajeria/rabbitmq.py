@@ -145,3 +145,12 @@ class RabbitMqEventosPublisher:
     async def publicar_vehiculo_actualizado(self, vehiculo_id: str, vehiculo: dict[str, Any]) -> None:
         payload = {"correlationId": vehiculo_id, "vehiculo": vehiculo}
         await self._publicar("vehiculo.actualizado", _sobre_masstransit("VehiculoActualizado", payload))
+
+    # Cierra el trio del catalogo. Sin este evento la proyeccion de NEXO se queda con
+    # el vehiculo para siempre: GET /api/vehiculos (issue #112) lee de ahi, asi que
+    # seguiria ofreciendo un vehiculo que ya no existe en esta base, y el crear_plan
+    # que lo eligiera fallaria con VEHICULO_INVALIDO. Solo lleva el id: no hay fila
+    # que proyectar, solo una que borrar.
+    async def publicar_vehiculo_eliminado(self, vehiculo_id: str) -> None:
+        payload = {"correlationId": vehiculo_id, "vehiculoId": vehiculo_id}
+        await self._publicar("vehiculo.eliminado", _sobre_masstransit("VehiculoEliminado", payload))

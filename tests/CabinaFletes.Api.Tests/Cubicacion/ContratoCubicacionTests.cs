@@ -165,4 +165,19 @@ public class ContratoCubicacionTests
         Assert.Equal("veh-1", evento.CorrelationId);
         Assert.Equal("Furgón 13.6m", evento.Vehiculo.Nombre);
     }
+
+    [Fact]
+    public void VehiculoEliminado_deserializa_el_JSON_real_que_publica_RabbitMqEventosPublisher()
+    {
+        // Copiado literal de RabbitMqEventosPublisher.publicar_vehiculo_eliminado.
+        // A diferencia de creado/actualizado, este NO lleva el vehículo completo: no hay
+        // nada que proyectar, solo una fila que borrar.
+        const string json = """{"correlationId": "veh-1", "vehiculoId": "veh-1"}""";
+
+        var evento = JsonSerializer.Deserialize<VehiculoEliminado>(json, Opciones);
+
+        Assert.NotNull(evento);
+        Assert.Equal("veh-1", evento.CorrelationId);
+        Assert.Equal("veh-1", evento.VehiculoId);
+    }
 }

@@ -10,6 +10,18 @@ rama de #123), porque #124 está construido directamente encima de #122, y #123 
 no toca los mismos archivos— va a convivir con ambos en `QA`. El merge de las 3 ramas
 fue limpio (sin conflictos).
 
+## Scripts de esta carpeta
+
+| Script | Qué prueba |
+|---|---|
+| [`verify-flujo-plan-cargue.mjs`](verify-flujo-plan-cargue.mjs) | Flujo feliz completo: crear vehículo → plan → ítem → optimizar → `/resultado` → ajustar colocación |
+| [`verify-bug-worker-atascado.mjs`](verify-bug-worker-atascado.mjs) | Bug 1: publica mensajes sin `planId` vía la API de gestión de RabbitMQ y confirma si el worker queda atascado |
+| [`verify-bug-sku-nulo.mjs`](verify-bug-sku-nulo.mjs) | Bug 2: agrega un ítem con `sku: null` y confirma si tumba el plan a `error` |
+| [`verify-bug-eliminar-plan-optimizado.mjs`](verify-bug-eliminar-plan-optimizado.mjs) | Bug 3: optimiza un plan y lo borra, confirma si queda inconsistencia NEXO/Cubicador |
+| [`verify-vigilante-timeout.mjs`](verify-vigilante-timeout.mjs) + [`force-plan-procesando.sql`](force-plan-procesando.sql) | PR #123: fuerza un plan atascado en `procesando` y confirma que el vigilante lo marca `error` |
+
+Los 5 se corrieron contra un stack real (SQL Server + RabbitMQ + Cubicador) durante esta verificación.
+
 ## Resultado de las suites automatizadas
 
 | Suite | Resultado |
@@ -48,6 +60,19 @@ Flujo feliz confirmado end-to-end, cruzando la cola real en ambas direcciones:
   describe.
 
 ## Bugs encontrados (ninguno bloqueó las suites del autor; los 3 primeros sí importan para producción)
+
+> ✅ **Los 3 primeros están CERRADOS** en S3-HU-10 (issues #131/#132/#133). El relato de
+> abajo se deja tal como se escribió al encontrarlos: es el registro de qué se probó y
+> qué se vio, y reescribirlo lo volvería inútil. La verificación del arreglo —incluida
+> la confirmación con `ci_docker_smoke.py` que pedía el bug 1— está en
+> [`../s3-hu-10-tres-bugs-cubicacion/README.md`](../s3-hu-10-tres-bugs-cubicacion/README.md).
+>
+> Al arreglarlos aparecieron **dos defectos más de la misma causa**, que no se habían
+> visto acá: todo lo que fallaba *antes* del `try` de `_procesar` (body ilegible, JSON
+> que no es un objeto, falta `correlationId`, cabecera `x-intentos` corrupta) dejaba el
+> mensaje atascado igual que el bug 1 pero **sin llegar siquiera a la DLQ**; y
+> `eliminar_planes_de_linea()` tenía el bug 3 exacto, con el agravante de que un
+> `delete()` masivo tampoco dispara la cascada del ORM. Los dos van en la misma HU.
 
 ### Bug 1 — CRÍTICO: un mensaje malformado puede dejar el worker de Cubicador atascado para siempre
 
