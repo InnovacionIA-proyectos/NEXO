@@ -11,7 +11,7 @@ namespace CabinaFletes.Application.CasosDeUso.Solicitudes.DTOs;
 
 public record LineaSolicitudDto(
     Guid Id, Guid? RutaId, Guid? ConfigVehiculoId, TipologiaCarga? Tipologia,
-    decimal? Peso, decimal? ValorMercancia, EstadoLinea EstadoLinea);
+    decimal? Peso, decimal? ValorMercancia, EstadoLinea EstadoLinea, string? MotivoPendiente);
 
 public record SolicitudDto(
     Guid Id, Guid ClienteId, string? ClienteNombre, TipoSolicitud Tipo, ModalidadSolicitud? Modalidad,

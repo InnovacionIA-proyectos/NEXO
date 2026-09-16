@@ -21,6 +21,7 @@ using CabinaFletes.Application.CasosDeUso.BibliotecaSapHistorico;
 using CabinaFletes.Application.CasosDeUso.Cotizaciones;
 using CabinaFletes.Application.CasosDeUso.Cubicacion;
 using CabinaFletes.Application.CasosDeUso.Metricas;
+using CabinaFletes.Application.CasosDeUso.Notificaciones;
 using CabinaFletes.Application.CasosDeUso.Priorizacion;
 using CabinaFletes.Application.CasosDeUso.ReglasSoloSicetac;
 using CabinaFletes.Application.CasosDeUso.ServiciosConexos;
@@ -78,6 +79,7 @@ builder.Services.AddScoped<INotificadorDePlanCargue, NotificadorPlanCargueSignal
 builder.Services.AddPlanDeCargueUseCases();
 builder.Services.AddCubicacionUseCases();
 builder.Services.AddCotizacionesUseCases();
+builder.Services.AddNotificacionesUseCases();
 builder.Services.AddReglasSoloSicetacUseCases();
 builder.Services.AddAjustesVigenciaPlazaUseCases();
 builder.Services.AddBibliotecaUseCases();

@@ -7,5 +7,6 @@ namespace CabinaFletes.Application.CasosDeUso.Metricas;
 public static class DependencyInjection
 {
     public static IServiceCollection AddMetricasUseCases(this IServiceCollection services) => services
-        .AddScoped<IQueryHandler<ObtenerCumplimientoQuery, CumplimientoDto>, ObtenerCumplimientoQueryHandler>();
+        .AddScoped<IQueryHandler<ObtenerCumplimientoQuery, CumplimientoDto>, ObtenerCumplimientoQueryHandler>()
+        .AddScoped<IQueryHandler<ObtenerKpisPilotoQuery, KpisPilotoDto>, ObtenerKpisPilotoQueryHandler>();
 }

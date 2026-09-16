@@ -81,6 +81,14 @@ public class LineaSolicitud : IAuditable
 
     public EstadoLinea EstadoLinea { get; set; } = EstadoLinea.PorCostear;
 
+    /// <summary>
+    /// Por qué la línea sigue en PorCostear: sin tarifa válida (requiere al Administrador
+    /// de Tarifas) o una fuente que falló. Se muestra al usuario, no es para depurar. Nulo
+    /// mientras no se haya intentado costear, y se limpia cuando la línea queda resuelta.
+    /// </summary>
+    [MaxLength(500)]
+    public string? MotivoPendiente { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 }

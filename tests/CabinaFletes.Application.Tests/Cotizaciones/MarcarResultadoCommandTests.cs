@@ -21,11 +21,12 @@ public class MarcarResultadoCommandTests
     private readonly Mock<IAuditoriaPort> _auditoria = new();
     private readonly Mock<ICurrentUserPort> _usuarioActual = new();
     private readonly FakeTimeProvider _clock = new();
+    private readonly Mock<IPublicadorDeMensajes> _publicador = new();
     private readonly Mock<IUnitOfWork> _uow = new();
 
     private MarcarResultadoCommandHandler Handler() => new(
         _cotizaciones.Object, _solicitudes.Object, _tarifasHistoricas.Object,
-        _auditoria.Object, _usuarioActual.Object, _clock, _uow.Object);
+        _auditoria.Object, _usuarioActual.Object, _clock, _publicador.Object, _uow.Object);
 
     private static Cotizacion Entregada(Guid solicitudId, ResultadoCotizacion resultado = ResultadoCotizacion.SinDefinir) => new()
     {

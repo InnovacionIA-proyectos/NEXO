@@ -16,6 +16,7 @@ using CabinaFletes.Domain.Solicitudes.Entidades;
 using CabinaFletes.Infrastructure.External;
 using CabinaFletes.Infrastructure.Persistence;
 using CabinaFletes.Infrastructure.ReglasSoloSicetac.Repositorios;
+using CabinaFletes.Mensajes.Notificaciones;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
@@ -46,13 +47,14 @@ public sealed class PropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuestaDeL
     private readonly IAjustesVigenciaPlazaRepository _ajustes;
     private readonly IClavesSoloSicetacPort _reglas;
     private readonly ISapTarifaFleteEnVivoPort _sapEnVivo;
+    private readonly IPublicadorDeMensajes _publicador;
     private readonly bool _dwConfigurado;
     private readonly bool _dcConfigurado;
 
     public PropuestaTarifaAdapter(
         CabinaFletesDbContext db, IServiceProvider sp, IServiceScopeFactory scopes,
         IMemoryCache cache, TimeProvider clock, IAjustesVigenciaPlazaRepository ajustes,
-        IClavesSoloSicetacPort reglas, ISapTarifaFleteEnVivoPort sapEnVivo)
+        IClavesSoloSicetacPort reglas, ISapTarifaFleteEnVivoPort sapEnVivo, IPublicadorDeMensajes publicador)
     {
         _db = db;
         _scopes = scopes;
@@ -63,6 +65,7 @@ public sealed class PropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuestaDeL
         _ajustes = ajustes;
         _reglas = reglas;
         _sapEnVivo = sapEnVivo;
+        _publicador = publicador;
     }
 
     /// <summary>
@@ -90,7 +93,29 @@ public sealed class PropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuestaDeL
         var tarifario = scope.ServiceProvider.GetRequiredService<ITarifarioSapPort>();
 
         var dto = await ProponerLineaAsync(dw, dc, tarifario, linea, ajustes, soloSice, ct);
+        await PublicarVencidaSiAplicaAsync(dto, ct);
         return new ResultadoDeCosteo(dto.ValorPropuesto, dto.FuentePropuesta, dto.Justificacion);
+    }
+
+    /// <summary>
+    /// Sección 9 del documento de entendimiento: alerta de urgencia Alta cuando el
+    /// costeo descarta una tarifa de plaza por vencida (RN-02). Solo desde el camino
+    /// por línea (ProponerParaLineaAsync), nunca desde el camino por solicitud
+    /// (ProponerAsync): ese último corre sus grupos en paralelo sobre el MISMO
+    /// DbContext, y el publicador de mensajes escribe en él — hacerlo ahí sería una
+    /// carrera de datos. Deduplicado por día: un pliego con 300 líneas de la misma
+    /// ruta vencida no debe mandar 300 correos.
+    /// </summary>
+    private async Task PublicarVencidaSiAplicaAsync(PropuestaLineaDto dto, CancellationToken ct)
+    {
+        if (!dto.Vencida) return;
+
+        var clave = $"tarifa-vencida-avisada:{dto.Ruta}|{dto.Vehiculo}|{_clock.GetUtcNow():yyyy-MM-dd}";
+        if (_cache.TryGetValue(clave, out _)) return;
+        _cache.Set(clave, true, TimeSpan.FromHours(24));
+
+        await _publicador.PublicarAsync(
+            new TarifaVencidaDetectada(dto.LineaId, dto.Justificacion, _clock.GetUtcNow()), ct);
     }
 
     public async Task<PropuestaSolicitudDto> ProponerAsync(Guid solicitudId, CancellationToken ct = default)
@@ -129,6 +154,18 @@ public sealed class PropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuestaDeL
                 var tarifario = scope.ServiceProvider.GetRequiredService<ITarifarioSapPort>();
                 var dto = await ProponerLineaAsync(dw, dc, tarifario, grupo.First(), ajustes, soloSice, ct);
                 return grupo.Select(l => dto with { LineaId = l.Id }).ToList();
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+            {
+                // Regla inviolable 6: un grupo que falla (fuente caída, timeout) NO puede
+                // llevarse los demás. Task.WhenAll falla rápido y descarta hasta los grupos
+                // que ya habían terminado bien si uno solo lanza — por eso el catch va AQUÍ,
+                // por grupo, y no alrededor del WhenAll. Issue #131.
+                var primera = grupo.First();
+                var justificacion = $"No se pudo consultar la Biblioteca para esta línea: {ex.Message}";
+                return grupo.Select(l => new PropuestaLineaDto(
+                    l.Id, $"{primera.Ruta?.Origen} → {primera.Ruta?.Destino}", primera.ConfiguracionVehiculo?.TipoVehiculo,
+                    l.Peso, null, null, null, null, null, justificacion)).ToList();
             }
             finally
             {
@@ -236,7 +273,8 @@ public sealed class PropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuestaDeL
             linea.Peso,
             sicetac, plaza, historico,
             valor, fuente, justificacion,
-            oficial?.Retorno);
+            oficial?.Retorno,
+            Vencida: vencida);
     }
 
     // La decisión vive en Domain (Costeo/Reglas/ReglaDeCosteo): son invariantes del

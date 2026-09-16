@@ -60,10 +60,10 @@ public sealed class CapturarSolicitudCommandHandler(
         var clienteId = await ResolverClienteAsync(command, ct);
 
         var rutas = await rutasCatalogo.ListarAsync(ct);
-        var rutasPorClave = rutas.GroupBy(r => ClaveRuta(r.Origen, r.Destino)).ToDictionary(g => g.Key, g => g.First());
+        var rutasPorClave = rutas.GroupBy(r => ResolucionDeCatalogos.ClaveRuta(r.Origen, r.Destino)).ToDictionary(g => g.Key, g => g.First());
 
         var vehiculos = await vehiculosCatalogo.ListarAsync(ct);
-        var vehiculosPorClave = vehiculos.GroupBy(v => ClaveVehiculo(v.TipoVehiculo, v.Carroceria)).ToDictionary(g => g.Key, g => g.First());
+        var vehiculosPorClave = vehiculos.GroupBy(v => ResolucionDeCatalogos.ClaveVehiculo(v.TipoVehiculo, v.Carroceria)).ToDictionary(g => g.Key, g => g.First());
 
         var rutasCreadas = 0;
         var vehiculosCreados = 0;
@@ -86,33 +86,17 @@ public sealed class CapturarSolicitudCommandHandler(
             numeroLinea++;
             var peso = CapturarSolicitudValidador.PesoResuelto(lr);
 
-            var claveRuta = ClaveRuta(lr.Origen, lr.Destino);
-            if (!rutasPorClave.TryGetValue(claveRuta, out var ruta))
-            {
-                ruta = new Ruta { Origen = Limpiar(lr.Origen)!, Destino = Limpiar(lr.Destino)! };
-                rutasCatalogo.Agregar(ruta);
-                rutasPorClave[claveRuta] = ruta;
-                rutasCreadas++;
-            }
+            var (ruta, rutaCreada) = ResolucionDeCatalogos.ResolverRuta(lr.Origen, lr.Destino, rutasPorClave, rutasCatalogo);
+            if (rutaCreada) rutasCreadas++;
 
-            ConfiguracionVehiculo? vehiculo = null;
-            if (!string.IsNullOrWhiteSpace(lr.TipoVehiculo))
-            {
-                var claveVeh = ClaveVehiculo(lr.TipoVehiculo, lr.Carroceria);
-                if (!vehiculosPorClave.TryGetValue(claveVeh, out vehiculo))
-                {
-                    vehiculo = new ConfiguracionVehiculo { TipoVehiculo = Limpiar(lr.TipoVehiculo)!, Carroceria = Limpiar(lr.Carroceria) };
-                    vehiculosCatalogo.Agregar(vehiculo);
-                    vehiculosPorClave[claveVeh] = vehiculo;
-                    vehiculosCreados++;
-                }
-            }
+            var (vehiculo, vehiculoCreado) = ResolucionDeCatalogos.ResolverVehiculo(lr.TipoVehiculo, lr.Carroceria, vehiculosPorClave, vehiculosCatalogo);
+            if (vehiculoCreado) vehiculosCreados++;
 
-            var ciudadLevante = Limpiar(lr.CiudadLevanteContenedor);
-            var levanteDiferente = ciudadLevante is not null && Normalizar(ciudadLevante) != Normalizar(lr.Origen);
+            var ciudadLevante = ResolucionDeCatalogos.Limpiar(lr.CiudadLevanteContenedor);
+            var levanteDiferente = ciudadLevante is not null && ResolucionDeCatalogos.Normalizar(ciudadLevante) != ResolucionDeCatalogos.Normalizar(lr.Origen);
             if (!levanteDiferente) ciudadLevante = null;
 
-            var ciudadDevolucion = Limpiar(lr.CiudadDevolucionContenedor);
+            var ciudadDevolucion = ResolucionDeCatalogos.Limpiar(lr.CiudadDevolucionContenedor);
 
             solicitud.Lineas.Add(new LineaSolicitud
             {
@@ -209,11 +193,13 @@ public sealed class CapturarSolicitudCommandHandler(
                         },
                     });
                     linea.EstadoLinea = EstadoLinea.AutoResuelta;
+                    linea.MotivoPendiente = null;
                     fletes++;
                 }
                 else
                 {
                     linea.EstadoLinea = EstadoLinea.PorCostear;
+                    linea.MotivoPendiente = p?.Justificacion;
                 }
             }
 
@@ -227,9 +213,15 @@ public sealed class CapturarSolicitudCommandHandler(
             await unitOfWork.SaveChangesAsync(ct);
             return (fletes, solicitud.Lineas.Count - fletes);
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            // Best-effort: si la Biblioteca falla (503/timeout), todo queda por costear.
+            // Última red de seguridad: solo se llega aquí si ProponerAsync falla ANTES de
+            // devolver nada (p. ej. la propia Solicitud no se pudo leer), no por una fuente
+            // caída en una línea puntual — eso ya lo aísla ProponerAsync internamente
+            // (ver PropuestaTarifaAdapter.ProponerAsync, por-grupo). Aun así se deja un
+            // motivo explícito en vez de un PorCostear mudo (issue #131).
+            foreach (var linea in solicitud.Lineas)
+                linea.MotivoPendiente = $"No se pudo consultar la Biblioteca: {ex.Message}";
             return (0, solicitud.Lineas.Count);
         }
     }
@@ -303,19 +295,6 @@ public sealed class CapturarSolicitudCommandHandler(
         return System.Text.Json.JsonSerializer.Serialize(condiciones, CondicionesServicioDto.Json);
     }
 
-    private static string? Limpiar(string? s)
-    {
-        if (string.IsNullOrWhiteSpace(s)) return null;
-        var colapsado = string.Join(' ', s.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
-        return System.Text.RegularExpressions.Regex.Replace(colapsado, @"\s+([.,])", "$1");
-    }
-
-    private static string Normalizar(string? s) => (Limpiar(s) ?? string.Empty).ToUpperInvariant();
-
-    private static string ClaveRuta(string origen, string destino) => $"{Normalizar(origen)}|{Normalizar(destino)}";
-
-    private static string ClaveVehiculo(string tipo, string? carroceria) => $"{Normalizar(tipo)}|{Normalizar(carroceria)}";
-
     // El validador ya garantizó que parsea; aquí solo se convierte.
     private static ModalidadSolicitud? ParseModalidad(string? valor) =>
         string.IsNullOrWhiteSpace(valor) ? null : Enum.Parse<ModalidadSolicitud>(valor, ignoreCase: true);
@@ -323,7 +302,7 @@ public sealed class CapturarSolicitudCommandHandler(
     private static TipologiaCarga? ParseTipologia(string? valor)
     {
         if (string.IsNullOrWhiteSpace(valor)) return null;
-        var normalizado = SinTildes(valor).Replace(" ", "").Replace("/", "").Replace("-", "").Replace("_", "");
+        var normalizado = ResolucionDeCatalogos.SinTildes(valor).Replace(" ", "").Replace("/", "").Replace("-", "").Replace("_", "");
         foreach (var t in Enum.GetValues<TipologiaCarga>())
             if (normalizado.Contains(t.ToString(), StringComparison.OrdinalIgnoreCase))
                 return t;
@@ -333,7 +312,7 @@ public sealed class CapturarSolicitudCommandHandler(
     private static LineaNegocio? ParseLineaNegocio(string? valor)
     {
         if (string.IsNullOrWhiteSpace(valor)) return null;
-        var n = SinTildes(valor).Replace(" ", "").Replace("/", "").Replace("-", "").Replace("_", "").ToUpperInvariant();
+        var n = ResolucionDeCatalogos.SinTildes(valor).Replace(" ", "").Replace("/", "").Replace("-", "").Replace("_", "").ToUpperInvariant();
         if (n.Contains("DEVOLUCION")) return LineaNegocio.DevolucionContenedor;
         if (n.Contains("ANDINO")) return LineaNegocio.Andino;
         if (n.Contains("LICITACION")) return LineaNegocio.Licitaciones;
@@ -346,7 +325,7 @@ public sealed class CapturarSolicitudCommandHandler(
     private static ClaseViaje? ParseClaseViaje(string? valor)
     {
         if (string.IsNullOrWhiteSpace(valor)) return null;
-        var n = SinTildes(valor).Replace(" ", "").Replace("/", "").Replace("-", "").Replace("_", "").ToUpperInvariant();
+        var n = ResolucionDeCatalogos.SinTildes(valor).Replace(" ", "").Replace("/", "").Replace("-", "").Replace("_", "").ToUpperInvariant();
         if (n.Contains("EXTRADIMENSION")) return ClaseViaje.Extradimensionado;
         if (n.Contains("CONTENEDOR")) return ClaseViaje.Contenedor;
         if (n.Contains("CUPO")) return ClaseViaje.Cupo;
@@ -358,21 +337,11 @@ public sealed class CapturarSolicitudCommandHandler(
 
     private static string? ParseClaseContenedor(string? valor)
     {
-        var limpio = Limpiar(valor);
+        var limpio = ResolucionDeCatalogos.Limpiar(valor);
         if (limpio is null) return null;
         var n = limpio.ToUpperInvariant().Replace(" ", "").Replace(".", "").Replace("-", "").Replace("_", "");
         foreach (var c in ClasesContenedor)
             if (n.Contains(c.Replace(".", ""))) return c;
         return limpio.Length <= 20 ? limpio : limpio[..20];
-    }
-
-    private static string SinTildes(string s)
-    {
-        var d = s.Normalize(NormalizationForm.FormD);
-        var sb = new StringBuilder(d.Length);
-        foreach (var ch in d)
-            if (CharUnicodeInfo.GetUnicodeCategory(ch) != UnicodeCategory.NonSpacingMark)
-                sb.Append(ch);
-        return sb.ToString().Normalize(NormalizationForm.FormC);
     }
 }

@@ -89,6 +89,25 @@ public class CapturaLineaRequest
     public List<CapturaPosicionRequest>? Posiciones { get; set; }
 }
 
+/// <summary>
+/// Una línea de texto libre a resolver contra el catálogo (sin crear ninguna solicitud):
+/// entrada de POST /api/solicitudes/resolver-catalogos.
+/// </summary>
+public class ResolverCatalogoLineaRequest
+{
+    [Required, MaxLength(150)]
+    public string Origen { get; set; } = null!;
+
+    [Required, MaxLength(150)]
+    public string Destino { get; set; } = null!;
+
+    [MaxLength(100)]
+    public string? TipoVehiculo { get; set; }
+
+    [MaxLength(100)]
+    public string? Carroceria { get; set; }
+}
+
 /// <summary>Una pieza/bulto a transportar, con dimensiones en centímetros.</summary>
 public class CapturaPosicionRequest
 {

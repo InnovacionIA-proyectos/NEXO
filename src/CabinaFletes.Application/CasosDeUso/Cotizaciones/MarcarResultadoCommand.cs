@@ -12,6 +12,7 @@ using CabinaFletes.Domain.BibliotecaTarifas.Entidades;
 using CabinaFletes.Domain.Enums;
 using CabinaFletes.Domain.Reglas;
 using CabinaFletes.Domain.Solicitudes.Entidades;
+using CabinaFletes.Mensajes.Notificaciones;
 
 namespace CabinaFletes.Application.CasosDeUso.Cotizaciones;
 
@@ -26,6 +27,7 @@ public sealed class MarcarResultadoCommandHandler(
     IAuditoriaPort auditoria,
     Common.ICurrentUserPort usuarioActual,
     TimeProvider clock,
+    IPublicadorDeMensajes publicador,
     IUnitOfWork uow)
     : ICommandHandler<MarcarResultadoCommand, CotizacionDto>
 {
@@ -111,6 +113,13 @@ public sealed class MarcarResultadoCommandHandler(
 
         auditoria.Registrar(usuarioActual.Id, "cotizaciones", c.Id, "marcar_resultado",
             JsonSerializer.Serialize(new { resultado = resultado.ToString(), motivo = command.Motivo, comentario = command.Comentario }));
+
+        // Sección 9 del documento de entendimiento: alerta de urgencia Baja al
+        // Administrador de Reglas. Solo al pasar A ganada por primera vez, igual que la
+        // realimentación de la Biblioteca de arriba.
+        if (esNuevaGanada)
+            await publicador.PublicarAsync(new CotizacionMarcadaGanada(c.Id, c.SolicitudId, clock.GetUtcNow()), ct);
+
         await uow.SaveChangesAsync(ct);
         return c.ToDto();
     }

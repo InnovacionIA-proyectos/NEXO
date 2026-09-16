@@ -167,6 +167,7 @@ public static class DependencyInjection
             services.AddScoped<ICorreoPort, SmtpCorreoAdapter>();
         }
         services.AddSingleton<IExportadorCotizacionExcelPort, ExportadorCotizacionExcelClosedXml>(); // sin estado
+        services.AddScoped<IDestinatariosDeAlertaPort, DestinatariosDeAlertaAdapter>();
 
         // Reglas "solo SICE-TAC" (el mismo repositorio implementa el puerto de lectura
         // cacheada que consume Biblioteca).
