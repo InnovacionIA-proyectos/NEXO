@@ -51,6 +51,7 @@ Todos los notebooks leen desde `datos/interim/viajes_btura_tipado.parquet` (gene
 ## Alcance y limitaciones clave (resumen — ver `limitaciones.md` para el detalle)
 
 - Este set cubre **únicamente viajes con origen o destino en Buenaventura** — no representa la operación nacional completa (esa se evaluará con otro dataset en un trabajo posterior).
-- El set solo contiene FOs en estado `Concluido`/`Ejecutado` (sesgo de selección y supervivencia confirmado) — no sirve para analizar cancelaciones ni viajes en curso.
+- El set solo contiene FOs en estado `Concluido`/`Ejecutado` (sesgo de selección y supervivencia confirmado) — no sirve para analizar cancelaciones ni viajes en curso. Ya se identificaron las columnas de Estado en `FactFWOFUFO` que resolverían esto en una extracción futura (ver `limitaciones.md`, L-03/L-04).
 - `Tarifa Venta al Cliente` **no es confiable** en este extracto (72,2% de las filas son idénticas a `Flete Producción FO`) — cualquier análisis de margen/rentabilidad queda descartado; el foco del EDA y del futuro modelo predictivo es `Flete Producción FO`.
 - `FO` no es clave única — una fila no equivale a un viaje; ver `hallazgos.md` (H-001) para la clave compuesta práctica.
+- Este corredor representa **≈54,1%** de todo lo `Concluido`/`Ejecutado` de la compañía en la misma ventana (ver `limitaciones.md`, L-11) — es una porción grande de la operación total, no un caso marginal.

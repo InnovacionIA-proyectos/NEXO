@@ -1,0 +1,11 @@
+"ID","CODIGO","DESCRIPCION","FECHACREACION","ESTADO"
+1,"3S3",Tractomula,2023-01-17 10:48:30.037,1
+2,"2S2",Minimula,2023-01-17 10:48:30.037,1
+4,C2,"Rígidos, Turbo o Sencillo",2023-01-17 10:48:30.037,0
+5,"2S3",Mini Mula Poderosa,2023-01-17 10:48:30.037,1
+6,C3,Dobletroque,2023-01-17 10:48:30.037,1
+7,C4,RÍGIDOS 4 MANOS,2023-01-17 10:48:30.037,0
+8,"2L3",Liviano (capacidad 4 ton),2025-09-10 12:51:16.963,0
+9,"2L2",Liviano (Capacidad 4 ton),2025-09-10 12:51:16.963,1
+10,"2L1",Liviano entre 9 y 10.5 ton (capacidad 6 ton),2025-09-10 12:51:16.963,0
+11,"2",Liviano mas 10.5 ton (capacidad 8.5 ton),2025-09-10 12:51:16.963,1
