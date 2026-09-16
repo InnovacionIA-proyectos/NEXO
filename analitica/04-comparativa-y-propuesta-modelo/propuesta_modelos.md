@@ -1,6 +1,8 @@
 # Propuesta de modelo(s) — S2-HU-11 parte 3
 
-Tres propuestas de modelo, cada una con objetivo, grano, features y supuestos — **ningún modelo se construye este sprint**. Cada ficha declara explícitamente sus limitaciones conocidas y qué falta resolver antes de poder entrenar en serio. Ver [`informe_comparativo.md`](informe_comparativo.md) para la comparativa que sustenta estas propuestas, y `hallazgos.md`/`limitaciones.md` de ambos EDA para la evidencia citada (H-0xx/L-0x).
+Dos propuestas de modelo, cada una con objetivo, grano, features y supuestos — **ningún modelo se construye este sprint**. Cada ficha declara explícitamente sus limitaciones conocidas y qué falta resolver antes de poder entrenar en serio. Ver [`informe_comparativo.md`](informe_comparativo.md) para la comparativa que sustenta estas propuestas, y `hallazgos.md`/`limitaciones.md` de ambos EDA para la evidencia citada (H-0xx/L-0x).
+
+**Nota:** originalmente se había planteado aquí un "Modelo 2" para `Flete Producción FO` vía Tarifario SAP. Al analizarlo más a fondo, no es un modelo predictivo — es una **verificación** de si la regla de precio que CabinaFletes ya automatiza (`ReglaDeCosteo`) también explica el histórico real de la empresa. Se movió a [`recomendacion_captura_datos.md`](recomendacion_captura_datos.md) §7, como recomendación de una HU de validación futura, no como propuesta de modelo.
 
 ---
 
@@ -26,6 +28,27 @@ Una fila = una combinación **ruta (`NOMBRERUTA`/`ORIGEN`-`DESTINO`) × `CONFIGU
 - Eventos de paro camionero (variable binaria/intensidad) — **no existe en ningún extracto actual, requiere curar una fuente de noticias/eventos aparte**
 - Tipo de vehículo/carga, para no mezclar dinámicas de segmentos distintos
 
+### Datos adicionales necesarios y cómo se van a tratar
+
+**¿Qué falta conseguir, además del histórico de SICE-TAC?**
+
+| Dato | ¿Ya lo tenemos? | Cómo se extrae |
+|---|---|---|
+| Histórico SICE-TAC (`VALOR`/`VALORHORA` por ruta/vehículo/carga/período) | ✅ Sí — 27 excels en `Historicos_SICE/` (enero 2025 a septiembre 2026), formato ya confirmado (cubo `WF_CUBO1_26S` completo, ~2 millones de filas por archivo). El mecanismo de cálculo se validó exacto (100%) para el período de agosto 2026 | Ya descargados de la página oficial de SICE-TAC. Falta procesar los otros 26 con el mismo método (ver abajo) |
+| Salario mínimo histórico (mensual) | ❌ No | Decretos oficiales de MinTrabajo/Presidencia — serie corta y pública, se puede tabular a mano (1 valor por año, más los decretos de ajuste intermedio) |
+| Precio de combustible (ACPM) histórico | ❌ No | Boletines del Ministerio de Minas y Energía. Antes de salir a buscarlo aparte, revisar si la metodología oficial de SICE-TAC ya publica el valor de ACPM que usa como insumo de su propia fórmula |
+| Peajes | ❌ No, y probablemente fuera de alcance inicial | Sin fuente clara identificada — la tarifa de peaje depende del corredor específico, no del par origen-destino a este nivel de agregación. Se deja como deseable, no bloqueante |
+| Eventos de paro camionero (fecha, duración, intensidad) | ❌ No | No hay fuente oficial automatizada — se cura a mano desde prensa o gremios de transporte (reportes de paros) |
+| Estacionalidad | ✅ Se deriva de `PERIODO`, sin fuente externa | Feature engineering directo (mes del año, variables estacionales) |
+
+**Cómo se van a tratar los 27 excels de SICE-TAC:**
+
+1. Para cada uno de los 27 archivos, extraer las mismas columnas ya identificadas en el período de agosto 2026 (`ID`, `PERIODO`, `CONFIGURACION`, `VALOR`, `NOMBRERUTA`, `NOMBRETIPOCARGA`, `NOMBREUNIDADTRANSPORTE`, `ORIGEN`, `DESTINO`, `VALORHORA`, `HORASRECORRIDO`, `HORASPACTADAS`, `CONDICIONCARGA`, `VIAESTANDAR`).
+2. Calcular `VALORSICECONHORA` con la fórmula ya confirmada (`VALOR + VALORHORA × HORASPACTADAS`), si no viene directo.
+3. Aplicar la misma regla de selección ya validada (prioriza vía estándar + menos horas + menor valor) para resolver la ambigüedad de varias tarifas "vigentes" simultáneas para la misma combinación dentro de un mismo período (el mismo problema ya documentado de los 567 candidatos).
+4. Consolidar los 27 períodos en una sola tabla larga — una fila = combinación ruta+vehículo+carga × período. Esa es la serie de tiempo base para entrenar el Modelo 1.
+5. **Nota de escala:** cada archivo pesa ~100-170 MB (~2 millones de filas) — 27 archivos son del orden de 50+ millones de filas en total. No es un `pd.read_excel` casual — necesita procesamiento por lotes o una herramienta pensada para ese volumen, no cargar todo en memoria de una vez.
+
 ### Modelo de ML propuesto (2 opciones)
 
 **Opción A — Gradient Boosting (LightGBM o XGBoost) con features de rezago.** Se trata el pronóstico como regresión supervisada (valor del mes siguiente, dado valores de meses anteriores + salario mínimo + combustible + temporada + paros), entrenado con **todas las combinaciones ruta×vehículo×carga a la vez** (modelo global). Ventaja: aprende patrones compartidos entre combinaciones parecidas, no depende de que cada una tenga suficiente historia propia — relevante porque hay muchas combinaciones y poca historia individual. Desventaja: menos transparente en cómo separa tendencia de estacionalidad; necesita buen trabajo de features de rezago.
@@ -36,15 +59,16 @@ Una fila = una combinación **ruta (`NOMBRERUTA`/`ORIGEN`-`DESTINO`) × `CONFIGU
 
 ### Supuestos
 
-- Que el histórico oficial descargado (excels de la página de SICE-TAC) trae series de tiempo reales, no otra "foto única" con otro nombre — **pendiente de verificar** (ver prompt de evaluación ya entregado).
 - Que los factores exógenos (salario mínimo, combustible) mantienen una relación razonablemente estable con SICE-TAC en el tiempo.
 - Que la señal de "paros camioneros" se puede construir a partir de una fuente externa curada a mano — no viene lista en ningún dataset.
+- Que la regla de selección ya validada (vía estándar + menos horas + menor valor) resuelve la ambigüedad de tarifas simultáneas de forma consistente en los 26 períodos todavía sin procesar, igual que en agosto 2026.
 
 ### Limitaciones conocidas
 
-- Profundidad histórica real de los excels descargados: sin confirmar (L-07 EDA-2 — la única muestra que se tenía antes era una sola foto de `202608`).
-- Ambigüedad de "tarifa vigente única": puede haber varias filas vigentes simultáneas para la misma combinación (hasta 567 candidatos documentados, L-04 EDA-2) — hace falta un criterio de desempate antes de poder tratar cada combinación como una serie de tiempo limpia.
+- Profundidad histórica real: **ya no es una limitación** — confirmado que existen 27 períodos reales (`Historicos_SICE/`, enero 2025 a septiembre 2026); solo falta procesar 26 de los 27 con el método ya validado (ver "Datos adicionales" arriba).
+- Ambigüedad de "tarifa vigente única": puede haber varias filas vigentes simultáneas para la misma combinación dentro de un mismo período (hasta 567 candidatos documentados, L-04 EDA-2) — ya hay una regla de selección validada (vía estándar + menos horas + menor valor, confirmada 100% exacta en agosto 2026), pero falta confirmar que se sostiene igual de bien en los demás períodos.
 - La variable de paros camioneros es trabajo de captura nuevo, no dato ya disponible.
+- El volumen de datos (27 archivos, ~50+ millones de filas en total) requiere procesamiento por lotes, no un análisis casual en memoria.
 
 ### Reentrenamiento (diseñado, no ejecutado este sprint)
 
@@ -55,58 +79,7 @@ Una fila = una combinación **ruta (`NOMBRERUTA`/`ORIGEN`-`DESTINO`) × `CONFIGU
 
 ---
 
-## Modelo 2 — `Flete Producción FO` (reconstrucción por reglas + corrección residual)
-
-### Objetivo
-
-Predecir/reconstruir `Flete Producción FO` (el histórico ejecutado, `FactFWOFUFO`) para cualquier viaje, replicando la regla de negocio **confirmada directamente por el usuario**: el precio real se fija manualmente como **MAX(piso SICE-TAC vigente, tarifa SAP vigente)** para esa ruta+vehículo+peso — la misma regla que el motor de CabinaFletes (`ReglaDeCosteo`) ya automatiza para cotizaciones nuevas, aplicada históricamente a mano por una persona. Se usa un modelo estadístico solo para corregir el residual en los casos donde la regla sola no baste.
-
-### Grano
-
-`FO` + `BP Cliente` + `Peso Neto` + `Destino` — el grano viaje-cliente confirmado (H-001 EDA-1), no `FO` crudo.
-
-### Arquitectura propuesta (2 capas)
-
-1. **Capa de reglas:** para cada viaje histórico, calcular el candidato SICE-TAC (piso vigente a la fecha del viaje) y el candidato SAP (tarifa vigente a la fecha, filtrando por vehículo+peso+ruta exactos), y tomar el máximo — reproduciendo la misma regla que ya se validó parcialmente en H-005 de EDA-2 (62,5% de coincidencia exacta en las 32 líneas de CabinaFletes).
-2. **Capa residual:** un modelo (regresión / gradient boosting) entrenado sobre la **diferencia** entre el valor real y el valor reconstruido por reglas, usando las variables ya identificadas en EDA-1 (peso, distancia/zona, tipo de vehículo, flota, línea de negocio, componente temporal) — para absorber los casos de negociación manual pura o vigencia histórica desconocida que la regla no explica.
-
-### Features
-
-- **Capa de reglas:** ruta→zona SAP (`tblSAPDANE`/`tblZonasTarificacionRelacion`), tipo de vehículo→SAP (`tblSAPTiposVehiculoTarifario`, requiere mapear el esquema propio de EDA-1 al de SAP), peso, fecha del viaje (para resolver vigencia), línea de negocio (`LineaNegocio`/`ClaseViaje`/`ClaseContenedor`, traducciones ya confirmadas en EDA-2).
-- **Capa residual:** las mismas variables candidatas ya propuestas en `informe_comparativo.md` §6 (peso, distancia/zona, tipo de vehículo, flota, línea de negocio, componente temporal).
-
-### Modelo de ML propuesto (2 opciones para la capa residual)
-
-La capa de reglas **no es machine learning** — es la fórmula de negocio (MAX) replicada tal cual, sin entrenar nada. Las 2 opciones de abajo son para la capa residual (corregir lo que la regla no explica):
-
-**Opción A — Gradient Boosting (XGBoost, LightGBM o CatBoost).** La elección estándar para datos tabulares con mezcla de categóricas (ruta, tipo de vehículo, línea de negocio) y numéricas (peso, distancia), a esta escala (~41.000 filas). Ventaja: maneja categóricas sin mucho preprocesamiento, captura interacciones entre variables automáticamente (ej. cómo el tipo de vehículo cambia el efecto de la distancia), robusto a outliers. Desventaja: menos transparente por defecto — necesita SHAP o similar para explicar una predicción puntual a negocio.
-
-**Opción B — Regresión lineal regularizada (Ridge/Lasso) con categóricas codificadas.** Ventaja: cada coeficiente tiene un significado directo y auditable ("por cada 1.000 kg más, el residual sube en $X") — más fácil de explicar y de que negocio confíe en el resultado. Desventaja: no captura interacciones entre variables a menos que se agreguen a mano, probablemente con menor precisión si las relaciones reales no son lineales.
-
-**Recomendación inicial:** Opción A como modelo principal (mejor precisión esperada), Opción B como comparación obligatoria — si Ridge da un resultado casi igual de bueno, es señal de que no vale la pena la complejidad extra de Gradient Boosting.
-
-### Supuestos
-
-- Que la regla MAX(SICE-TAC, SAP) confirmada para el proceso manual aplica de forma consistente a la mayoría de los viajes históricos de `FactFWOFUFO` — **validado solo en 32 casos de CabinaFletes, pendiente de validar a la escala completa de EDA-1 (41.237 filas)**.
-- Que se puede conseguir la vigencia histórica real (no solo el valor actual) tanto de SAP como de SICE-TAC.
-- Que una fracción de los datos son fletes manuales sin ninguna marca que los identifique (a diferencia de `cotizacion_lineas.Fuente`, `FactFWOFUFO` no tiene un campo equivalente) — se acepta como ruido irreducible en la capa residual, no se intenta clasificar de antemano.
-
-### Limitaciones conocidas / preguntas abiertas (pendientes de negocio o de datos)
-
-| # | Pregunta | Tipo |
-|---|---|---|
-| 1 | ¿La regla se aplica a todos los viajes históricos, en todas las líneas de negocio y regiones, o solo a un subconjunto? | Negocio |
-| 2 | ¿A qué grano decide el precio la persona — por `FO` completo o por `FWO` (cada cliente dentro de una carga consolidada)? | Negocio |
-| 3 | ¿Qué pasa cuando ni SICE-TAC ni SAP tienen tarifa vigente para esa ruta/vehículo? (Esos casos no son reconstruibles por regla) | Negocio |
-| 4 | Vigencia histórica real ausente tanto en SAP (`AjusteVigenciaPlaza`, L-02 EDA-2) como en SICE-TAC (solo una foto de 151 filas, L-07 EDA-2) | Dato |
-| 5 | Traducción de los códigos propios de EDA-1 (`ID Medio Transporte FO`, `Clase Equipo FOP`, nombres de ciudad) a los catálogos SAP reales — esquema de nombres distinto al de EDA-2, no es un cruce automático | Dato |
-| 6 | Fletes manuales sin ninguna marca que los identifique en `FactFWOFUFO` — no hay forma de aislarlos de antemano, solo detectarlos después por desviación fuerte de ambas referencias | Dato/Metodología |
-| 7 | Si se amplía más allá de Buenaventura (ya confirmado que es correcto hacerlo): ¿la regla del "MAX" es uniforme en todo el país, o varía por región/línea de negocio? | Negocio |
-| 8 | Posible desfase de tiempo entre cuándo se actualiza la tarifa oficial y cuándo se empieza a aplicar en la operación real (indicio: H-011 EDA-2, el salto de marzo 2026 no se replicó limpio en `historico-sap`) | Dato/Negocio |
-
----
-
-## Modelo 3 — Recomendador de tarifa con mayor probabilidad de ser "ganada" (`tarifas_historicas`)
+## Modelo 2 — Recomendador de tarifa con mayor probabilidad de ser "ganada" (`tarifas_historicas`)
 
 ### Objetivo
 

@@ -13,8 +13,8 @@ HU. **Ningún modelo se construye este sprint.**
 | Documento | Contenido | Estado |
 |---|---|---|
 | [`informe_comparativo.md`](informe_comparativo.md) | Qué aporta cada fuente, métricas de calidad lado a lado, viabilidad de cada objetivo de predicción (con evidencia), grano recomendado, variables candidatas, limitaciones consolidadas | ✅ Primer borrador |
-| [`propuesta_modelos.md`](propuesta_modelos.md) | 3 fichas de modelo (SICE-TAC, Flete Producción FO, recomendador de tarifa ganada) con objetivo, grano, features, supuestos y limitaciones — más el diseño de reentrenamiento del modelo de SICE-TAC | ✅ Primer borrador |
-| [`recomendacion_captura_datos.md`](recomendacion_captura_datos.md) | Qué ya se consiguió este sprint, qué falta pedir, qué falta mapear/traducir, qué falta confirmar con negocio, y qué fuentes nuevas hay que curar — con prioridad sugerida | ✅ Primer borrador |
+| [`propuesta_modelos.md`](propuesta_modelos.md) | Modelo 1 (pronóstico SICE-TAC) y Modelo 2 (recomendador de tarifa ganada) — objetivo, grano, features, supuestos y limitaciones de cada uno, más el diseño de reentrenamiento del modelo de SICE-TAC | ✅ Primer borrador |
+| [`recomendacion_captura_datos.md`](recomendacion_captura_datos.md) | Qué ya se consiguió este sprint, qué falta pedir, qué falta mapear/traducir, qué falta confirmar con negocio, qué fuentes nuevas hay que curar, y la recomendación de una HU de validación de la regla de precio (§7) — con prioridad sugerida | ✅ Primer borrador |
 | [`declaracion_no_viabilidad.md`](declaracion_no_viabilidad.md) | Los 3 objetivos donde el dato no soporta predicción útil, con evidencia, más el matiz del objetivo de contexto de mercado (no es "no viable por dato", es cobertura de procesamiento pendiente) | ✅ Primer borrador |
 
 ## Criterio de cierre de la HU (referencia)
