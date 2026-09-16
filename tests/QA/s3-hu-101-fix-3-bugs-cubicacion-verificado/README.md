@@ -11,6 +11,17 @@ evidencia del autor.
 
 Rama ya estaba al día con `QA` (merge-base = tip). Sin cambios en `.NET`.
 
+## Scripts de esta carpeta
+
+Los mismos 3 escenarios de la carpeta original, re-ejecutados contra el código ya
+corregido (por eso reportan "OK: bug corregido" en vez de "BUG PRESENTE"):
+
+| Script | Verifica el cierre de |
+|---|---|
+| [`verify-fix-worker-atascado.mjs`](verify-fix-worker-atascado.mjs) | Bug 1 (issue #131) |
+| [`verify-fix-sku-nulo.mjs`](verify-fix-sku-nulo.mjs) | Bug 2 (issue #132) |
+| [`verify-fix-eliminar-plan-optimizado.mjs`](verify-fix-eliminar-plan-optimizado.mjs) | Bug 3 (issue #133) |
+
 ## Suites automatizadas
 
 | Suite | Resultado |

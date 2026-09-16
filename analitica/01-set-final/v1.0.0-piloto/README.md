@@ -29,7 +29,7 @@ analitica/01-set-final/v1.0.0-piloto/
 ├── diccionario-y-linaje.md        (qué es cada columna, de dónde viene, en qué unidad)
 ├── reporte-inconsistencias.md     (hallazgos de calidad, con causa)
 └── datos/                         (copia congelada, idéntica a la de 00-fuentes en 2026-09-01)
-    ├── bd-propia/                 (13 CSV, S2-HU-10.1/10.3)
+    ├── bd-propia/                 (13 CSV, S2-HU-10.1/10.3 + DICCIONARIO_DATOS.md)
     └── fuentes-corporativas/      (4 CSV, S2-HU-10.2)
 ```
 
@@ -72,9 +72,18 @@ Ver `reporte-inconsistencias.md` para el detalle completo. Resumen:
 |---|---|
 | Entregado a | Equipo de datos (autoentrega — mismo responsable de esta extracción) |
 | Fecha de entrega | 2026-09-01 |
-| Contenido entregado | Este directorio (`README.md`, `diccionario-y-linaje.md`, `reporte-inconsistencias.md`) + los datos crudos en `./datos/bd-propia/` (13 archivos) y `./datos/fuentes-corporativas/` (4 archivos) |
+| Contenido entregado | Este directorio (`README.md`, `diccionario-y-linaje.md`, `reporte-inconsistencias.md`) + los datos crudos en `./datos/bd-propia/` (13 CSV + `DICCIONARIO_DATOS.md`, agregado el 2026-09-10 al detectarse que faltaba — ver nota abajo) y `./datos/fuentes-corporativas/` (4 archivos) |
 | Versión | v1.0.0 (provisional — ver sección Versión) |
 | Vía de entrega | Repositorio, rama de esta HU, PR a QA |
+
+**Corrección post-entrega (2026-09-10):** `diccionario-y-linaje.md` referenciaba
+`./datos/bd-propia/DICCIONARIO_DATOS.md` para el detalle de los 5 catálogos,
+pero ese archivo nunca se copió a este snapshot congelado — solo existía en
+`00-fuentes/bd-propia/`, rompiendo la promesa de que esta carpeta es
+autocontenida. Detectado durante el EDA-2 (S2-HU-11 parte 2) al necesitar
+tipar las columnas de los catálogos. Se copió el archivo tal cual estaba
+(sin cambios desde su creación el 2026-09-01) — no se modificó ningún dato
+ya entregado, solo se completó una referencia rota.
 
 ## Flujo de ramas
 
