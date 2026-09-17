@@ -42,6 +42,15 @@ API = os.environ.get("API_BASE", "http://api:8080")
 SEP = "\x1e"
 ADMIN = ("X-Rol", "Admin")
 
+# S2-HU-03.3 retiró X-Rol (ver IdentidadPortalAuthenticationHandler) en favor de
+# X-Portal-Usuario-Id + ResolverIdentidadPortalLocalAdapter, que resuelve contra un
+# usuario REAL ya sembrado en la tabla Usuarios (no hay rol declarable por header).
+# El resto de este script sigue en X-Rol (hallazgo aparte, fuera del alcance de
+# S3-HU-02.4/issue #106: recorrido.py entero quedó desactualizado con ese cambio y
+# nadie lo volvió a correr) — solo `probar_comandos_escritura_plan_cargue()` usa el
+# esquema nuevo. 1005 = Paola Restrepo, rol Admin (seed de Database__SeedOnStartup).
+ADMIN_PORTAL = ("X-Portal-Usuario-Id", "1005")
+
 fallos = []
 paso_actual = ["(inicio)"]
 
@@ -63,6 +72,10 @@ def dato(texto):
 
 
 def pedir(ruta, cuerpo=None, metodo=None, rol=ADMIN, esperado=None):
+    return _pedir_base(ruta, cuerpo, metodo, rol, esperado)
+
+
+def _pedir_base(ruta, cuerpo=None, metodo=None, rol=ADMIN, esperado=None):
     datos = json.dumps(cuerpo).encode() if cuerpo is not None else None
     req = urllib.request.Request(
         f"{API}{ruta}", data=datos,
@@ -205,6 +218,131 @@ class ClienteDelHub:
             urllib.request.urlopen(req, timeout=5)
         except Exception:
             pass
+
+
+def _vehiculo_de_prueba():
+    return {
+        "nombre": "QA E2E Vehiculo", "descripcion": "Vehiculo de prueba automatizada S3-HU-02.4",
+        "largoInternoMm": 6200, "anchoInternoMm": 2200, "altoInternoMm": 2200,
+        "capacidadKg": 8000, "taraKg": 3000,
+        "puertaAnchoMm": 2200, "puertaAltoMm": 2100, "puertaPosicion": "trasera",
+        "ejes": [{"posicionMm": 1200, "capacidadKg": 4000}, {"posicionMm": 4800, "capacidadKg": 4000}],
+        "toleranciaParedesMm": 20, "toleranciaEntreUnidadesMm": 10,
+    }
+
+
+def _item_de_prueba(sku, secuencia):
+    return {
+        "sku": sku, "descripcion": "Caja de prueba E2E", "pedido": None, "cliente": None, "destino": None,
+        "secuenciaEntrega": secuencia, "largoMm": 500, "anchoMm": 500, "altoMm": 500, "pesoKg": 50, "cantidad": 1,
+        "color": None, "prioridad": 1, "tipoEmbalaje": None, "apilable": True, "maxNiveles": 2,
+        "maxPesoEncimaKg": 100, "rotable": True, "mantenerVertical": False, "fragil": False, "peligroso": False,
+        "refrigerado": False, "grupoCompatibilidad": None, "observaciones": None,
+    }
+
+
+def probar_comandos_escritura_plan_cargue():
+    """
+    S3-HU-02.4 (issue #106): un test por cada uno de los 9 comandos de escritura del plan
+    de cargue (docs/mensajeria/CUBICACION.md sección 6) contra RabbitMQ real y ambas bases
+    reales (NEXO y Cubicador) — nada de mocks, cada paso confirma el efecto releyendo la
+    proyección local, nunca el 202 solo.
+
+    El tercer criterio de cierre del issue (reintentos 1s/5s/15s/60s + DLQ + alerta,
+    "también para estos 8 comandos, no solo optimizar") NO se repite acá comando por
+    comando: `cubicador/worker/main.py::_procesar()` es un único despachador genérico que
+    envuelve los 9 tipos en el MISMO try/except de reintento/DLQ/alerta (no hay lógica
+    duplicada por tipo) — verificado leyendo el código. Ese mismo mecanismo ya se demostró
+    en vivo dos veces con tipos distintos: para `optimizar` (suite original de S2-HU-08) y
+    para `guardar_item` (tests/QA/fix-worker-sesion-envenenada/, sesión envenenada del
+    worker). Repetirlo para los 7 tipos restantes solo repetiría la misma prueba de
+    infraestructura ya confirmada, sin verificar nada nuevo de cada comando.
+    """
+    def pedir(ruta, cuerpo=None, metodo=None, esperado=None):
+        return _pedir_base(ruta, cuerpo, metodo, rol=ADMIN_PORTAL, esperado=esperado)
+
+    paso("S3-HU-02.4 (issue #106): guardar_vehiculo (1/9)")
+    codigo, r = pedir("/api/vehiculos", _vehiculo_de_prueba(), "POST", esperado=202)
+    vehiculo_id = r["correlationId"]
+    dato(f"vehiculoId = {vehiculo_id}")
+    ok(esperar(lambda: any(v["id"] == vehiculo_id for v in (pedir("/api/vehiculos")[1] or [])),
+               "guardar_vehiculo: aparece en GET /api/vehiculos (proyección vehiculo.creado)"),
+       "guardar_vehiculo: la lectura ve el vehículo nuevo")
+
+    paso("S3-HU-02.4 (issue #106): crear_plan (2/9)")
+    codigo, r = pedir("/api/planes-cargue", {"nombre": "QA E2E Plan", "vehiculoId": vehiculo_id},
+                      "POST", esperado=202)
+    plan_id = r["planCargueId"]
+    dato(f"planId = {plan_id}")
+    ok(r["estado"] == "procesando", f"crear_plan: fila espejo nace en 'procesando' (llegó '{r['estado']}')")
+    ok(esperar(lambda: (pedir(f"/api/planes-cargue/{plan_id}")[1] or {}).get("estado") != "procesando",
+               "crear_plan: Cubicador confirma y el estado deja 'procesando'"),
+       "crear_plan: confirmado por la proyección")
+
+    paso("S3-HU-02.4 (issue #106): guardar_item (3/9)")
+    pedir(f"/api/planes-cargue/{plan_id}/items", _item_de_prueba("QA-E2E-001", 1), "POST", esperado=202)
+    ok(esperar(lambda: (pedir(f"/api/planes-cargue/{plan_id}")[1] or {}).get("totalItems") == 1,
+               "guardar_item: TotalItems pasa a 1"), "guardar_item: reflejado en la proyección")
+
+    paso("S3-HU-02.4 (issue #106): importar_items (4/9)")
+    items_extra = [_item_de_prueba("QA-E2E-002", 2), _item_de_prueba("QA-E2E-003", 3)]
+    pedir(f"/api/planes-cargue/{plan_id}/items/importar", {"items": items_extra}, "POST", esperado=202)
+    ok(esperar(lambda: (pedir(f"/api/planes-cargue/{plan_id}")[1] or {}).get("totalItems") == 3,
+               "importar_items: TotalItems pasa a 3"), "importar_items: 2 ítems en bloque reflejados")
+
+    paso("S3-HU-02.4 (issue #106): eliminar_item (5/9)")
+    _, resultado = pedir(f"/api/planes-cargue/{plan_id}/resultado", esperado=200)
+    items = resultado["plan"]["items"]
+    ok(len(items) == 3, f"resultado: 3 ítems visibles ({len(items)})")
+    item_a_borrar = next(i["id"] for i in items if i["sku"] == "QA-E2E-003")
+    pedir(f"/api/planes-cargue/{plan_id}/items/{item_a_borrar}", None, "DELETE", esperado=202)
+    ok(esperar(lambda: (pedir(f"/api/planes-cargue/{plan_id}")[1] or {}).get("totalItems") == 2,
+               "eliminar_item: TotalItems vuelve a 2"), "eliminar_item: borrado reflejado")
+
+    paso("S3-HU-02.4 (issue #106): crear_plan_demo (6/9)")
+    ids_antes = {p["id"] for p in (pedir("/api/planes-cargue")[1] or [])}
+    codigo, r_demo = pedir("/api/planes-cargue/demo", {}, "POST", esperado=202)
+    ok("correlationId" in r_demo, "crear_plan_demo: 202 con CorrelationId")
+    nuevo = esperar(lambda: (set(p["id"] for p in (pedir("/api/planes-cargue")[1] or [])) - ids_antes) or None,
+                     "crear_plan_demo: aparece un plan nuevo en el listado")
+    ok(bool(nuevo), f"crear_plan_demo: plan demo confirmado ({nuevo})")
+
+    paso("S3-HU-02.4 (issue #106): ajustar_colocacion (7/9)")
+    codigo, _ = pedir(f"/api/planes-cargue/{plan_id}/optimizar", {}, "POST")
+    if codigo == 503:
+        dato("optimizar -> 503: la compuerta Cubicacion:ParidadVerificada está cerrada (default de "
+             "despliegue, decisión de negocio pendiente — ver HALLAZGOS-QA-CICD.md). Sin colocaciones "
+             "reales no se puede probar ajustar_colocacion de punta a punta en esta corrida; ya se "
+             "verificó manualmente con la compuerta abierta solo para esa verificación puntual (ver "
+             "README de esta carpeta) — no se toca el default del repo.")
+    else:
+        ok(codigo == 202, f"optimizar -> {codigo} (esperado 202 con la compuerta abierta)")
+        resultado_opt = esperar(
+            lambda: (lambda rr: rr if rr and rr.get("colocaciones") else None)(
+                pedir(f"/api/planes-cargue/{plan_id}/resultado")[1]),
+            "optimizar: aparecen colocaciones reales")
+        ok(bool(resultado_opt), "optimizar: al menos una colocación real")
+        if resultado_opt:
+            colocacion_id = resultado_opt["colocaciones"][0]["id"]
+            pedir(f"/api/planes-cargue/{plan_id}/colocaciones/{colocacion_id}",
+                  {"bloqueada": True}, "PATCH", esperado=202)
+            ok(esperar(lambda: any(
+                    c["id"] == colocacion_id and c["bloqueada"]
+                    for c in (pedir(f"/api/planes-cargue/{plan_id}/resultado")[1] or {}).get("colocaciones", [])),
+                "ajustar_colocacion: Bloqueada=true reflejado"),
+               "ajustar_colocacion: ajuste manual reflejado en la proyección")
+
+    paso("S3-HU-02.4 (issue #106): eliminar_plan (8/9)")
+    pedir(f"/api/planes-cargue/{plan_id}", None, "DELETE", esperado=202)
+    ok(esperar(lambda: pedir(f"/api/planes-cargue/{plan_id}")[0] == 404,
+               "eliminar_plan: GET al plan borrado -> 404 (borrado optimista)"),
+       "eliminar_plan: confirmado")
+
+    paso("S3-HU-02.4 (issue #106): eliminar_vehiculo (9/9)")
+    pedir(f"/api/vehiculos/{vehiculo_id}", None, "DELETE", esperado=202)
+    ok(esperar(lambda: not any(v["id"] == vehiculo_id for v in (pedir("/api/vehiculos")[1] or [])),
+               "eliminar_vehiculo: desaparece de GET /api/vehiculos"),
+       "eliminar_vehiculo: borrado reflejado en la proyección")
 
 
 def main():
@@ -403,6 +541,8 @@ def main():
     scores = [f["scorePrioridad"] for f in filas]
     ok(scores == sorted(scores, reverse=True), f"orden descendente ({len(scores)} filas)")
     ok(any(f["id"] == solicitud for f in filas), "la solicitud del recorrido aparece")
+
+    probar_comandos_escritura_plan_cargue()
 
     paso("Dejar los parámetros como estaban")
     pedir("/api/priorizacion/parametros", parametros(240), "PUT", esperado=200)
