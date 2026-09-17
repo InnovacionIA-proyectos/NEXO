@@ -44,7 +44,7 @@ quedó documentado aparte en la sección 3, como error propio corregido).
 | 12 | Manizales→Medellín | Sicetac (nunca existió plaza para LN=Andino/CV=Cupo, 0 filas en toda la historia) | $960.937 | Sicetac | $960.937 | **Sí** | Ninguna |
 | 13 | Bogotá→Santa Marta | Sicetac (nunca existió plaza para este combo, 0 filas en toda la historia) | $2.442.568 | **Ausente del PDF** | — | **No** | **Real (Desviación 2):** piso disponible, la línea no aparece |
 | 14 | Ibagué→Buenaventura (dev.) | Sicetac (plaza vencida hace 13 días) | $1.132.431 | Sicetac | $1.132.431 | **Sí** | Ninguna |
-| 15 | Neiva→Bogotá | Sicetac (nunca existió plaza para LN=Licitaciones/CV=CargaSuelta, 0 filas en toda la historia) | $1.104.014 | **Ausente del PDF** | — | **No** | **Real (Desviación 2):** piso disponible, la línea no aparece |
+| 15 | Neiva→Bogotá | Sicetac (nunca existió plaza para LN=Licitaciones/CV=CargaSuelta, 0 filas en toda la historia) | ~$1.104.014 (**pendiente de reconfirmar con `CONFIGURACION='CA'`** — ver `consultas/04-confirmar-linea-15-CA.sql`) | **Ausente del PDF** | — | **No** | **Real (Desviación 2):** piso disponible, la línea no aparece |
 
 **8 de 15 líneas exactas (4, 5, 6, 7, 9, 10, 12, 14) — todas las que no
 tenían una plaza vigente APLICABLE compitiendo, salieron perfectas.** Ojo
@@ -167,7 +167,7 @@ real bajo `CONFIGURACION='CA'`, `NOMBRETIPOCARGA='General'`:
 |---|---|---|
 | 8 | Cúcuta→Bogotá | ~$1.822.684 - $1.829.479 |
 | 13 | Bogotá→Santa Marta | ~$2.432.085 - $2.442.568 |
-| 15 | Neiva→Bogotá | ~$1.101.642 - $1.104.014 |
+| 15 | Neiva→Bogotá | ~$1.104.014 (pendiente de reconfirmar con código `CA`) |
 
 Ninguna de las 3 aparece en el PDF de la cotización final — ni con valor
 propuesto, ni marcada visiblemente como pendiente de costeo/atención

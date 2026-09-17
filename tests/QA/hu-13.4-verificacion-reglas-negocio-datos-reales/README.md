@@ -35,13 +35,14 @@ contra operación real.
 ## Metodología
 
 Acceso a datos reales: `sqlcmd` (Windows Auth, `-C` para el certificado
-interno) sí permite conexión directa a **`dbSolucionesTI`** (servidor
-`tbsdatacenter`) desde este entorno — se usó para correr casi todas las
-consultas de tarifa SAP de esta sesión. **`DWSice`** (piso SICE-TAC) vive en
-otro servidor al que no se encontró acceso directo; esas consultas las corrió
-el usuario por su conexión `consultascubos` en DBeaver. La base propia de la
-app (`CabinaFletes`) tampoco se probó todavía en directo — pendiente. Las
-consultas de la carpeta [`consultas/`](consultas/) documentan ambos caminos.
+interno) permite conexión directa desde este entorno a **3 bases**, todas en
+el servidor `tbsdatacenter`: **`dbSolucionesTI`** (tarifa SAP — usada para
+casi todas las consultas de plaza de esta sesión), y **`dbInformesAutomatizados_Pruebas`**,
+schema `dbo_NEXO_prueba` (la base propia de la app CabinaFletes — usada para
+verificar Reglas 3, 5, 6 y 7 directamente). **`DWSice`** (piso SICE-TAC) vive
+en otro servidor al que no se encontró acceso directo; esas consultas las
+corrió el usuario por su conexión `consultascubos` en DBeaver. Las consultas
+de la carpeta [`consultas/`](consultas/) documentan los 2 primeros caminos.
 
 **Lecciones de esta sesión, para no repetir el tanteo:** `TIPOVEHICULO` en
 `tblSAPTarifas` guarda el **ID numérico** del catálogo (`tblSAPTiposVehiculoTarifario.ID`),
@@ -67,12 +68,14 @@ que la reconstrucción manual porque ejercita el código real de punta a punta
 (`ExcelSolicitudesAdapter` → `PropuestaTarifaAdapter` → `ReglaDeCosteo`).
 
 **Orden seguido (a ciegas, para que la comparación no estuviera sesgada):**
-1. Correr [`consultas/07-pliego-licitacion-esperado.sql`](consultas/07-pliego-licitacion-esperado.sql)
+1. Correr [`consultas/01-pliego-licitacion-esperado.sql`](consultas/01-pliego-licitacion-esperado.sql)
    — documento único y final (consolida lo que antes eran varios archivos de
    diagnóstico 07b-07h, ya eliminados): Parte A (tarifa de plaza SAP, 15
    líneas), Parte B (piso SICE-TAC, 15 líneas), Parte C (regla "solo
-   SICE-TAC" — **pendiente de correr todavía**). Cada consulta trae su
-   resultado real ya documentado como comentario.
+   SICE-TAC" — ya corrida contra `dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.reglas_solo_sicetac`:
+   existen 3 reglas configuradas, ninguna coincide con las 15 líneas del
+   pliego). Cada consulta trae su resultado real ya documentado como
+   comentario.
 2. Con esos resultados se completó el "esperado" — ver
    [`esperado-final-pliego.md`](../esperado-final-pliego.md) para la tabla
    final lista para comparar (Fuente + Valor por línea).
@@ -81,76 +84,36 @@ que la reconstrucción manual porque ejercita el código real de punta a punta
 4. Comparar fila por fila contra `esperado-final-pliego.md`.
 
 Esta prueba también cubre de paso: la Regla 3 (Parte C revisa si alguna de
-las 15 rutas ya tiene "solo SICE-TAC" activo — pendiente) y da 3 casos reales
-de devolución de contenedor vacío (líneas 3, 4, 14) más un caso de
-extradimensionado (línea 13) y uno de carga consolidada (línea 5) — variedad
-que no tenía la muestra genérica de `01-regla-del-mayor-muestra-lineas.sql`.
+las 15 rutas ya tiene "solo SICE-TAC" activo — ninguna coincide, ver sección
+de Reglas más abajo) y da 3 casos reales de devolución de contenedor vacío
+(líneas 3, 4, 14) más un caso de extradimensionado (línea 13) y uno de carga
+consolidada (línea 5) — buena variedad de casos borde en un solo pliego.
 
-### Resultado del "esperado" — las 15 líneas, ya calculado a ciegas (antes de subir el Excel)
+### Resultado del "esperado" — las 15 líneas
 
-**Hallazgo grande de esta sesión, más importante que cualquier línea
-individual: 11 de las 15 líneas (73%) no tienen tarifa de plaza SAP vigente
-para su combinación real de ruta+línea de negocio+clase de viaje+peso.**
-Coherente con el 95,8% de vigencias ya vencidas medido en la sesión de
-HU-09.2 sobre toda la tabla (`docs/tarifas-plaza-provisionales/README.md`).
+**Nota:** el primer cálculo manual de esta sección (dos vueltas, con
+`CONFIGURACION` del vehículo y luego con código `2`) resultó equivocado en
+el mecanismo — se descartó por completo, no quedan sus números aquí para
+evitar confusión. El detalle de qué se asumió mal y por qué está en
+[`esperado-final-pliego.md`](../esperado-final-pliego.md) sección 3
+("Recomendaciones para leer/verificar este código").
 
-**Verificado a fondo, no es ausencia de dato — son tarifas que existieron y
-vencieron hace poco, ni siquiera en corredores raros.** El usuario cuestionó
-correctamente que rutas tan comunes como Bucaramanga→Bogotá no tuvieran
-ninguna tarifa. Importante no confundir esto con el mecanismo real: el
-"esperado" de la tabla de arriba se calculó **solo** contra `tblSAPTarifas`
-(el tarifario vigente, resuelto por zona de tarificación — igual que hace el
-motor real, `PropuestaTarifaAdapter.CandidatoSapAsync`, que filtra
-`Vigencia >= hoy` y nunca consulta el histórico para decidir un precio
-nuevo). `tblSAPTarifasLog` (histórico) se consultó aparte, solo como
-evidencia de contexto para responder "¿esta ruta tan común de verdad nunca
-tuvo tarifa?" — no participa del cálculo del "esperado" ni de la decisión
-real de la app. Con esa aclaración: las 5 rutas de "atención manual" SÍ
-tienen historial real en el Log (15 a 31 filas cada una) — la más reciente de
-cada una ya venció:
-
-| Ruta | Última tarifa SAP, vigencia | Venció hace |
-|---|---|---|
-| Bogotá→Villavicencio | 2026-08-31 | 16 días |
-| Manizales→Medellín | 2026-09-03 | 13 días |
-| Bucaramanga→Bogotá | 2026-09-10 | 6 días |
-| Cúcuta→Bogotá | 2026-08-10 | 37 días |
-| Neiva→Bogotá | 2026-02-10 | 7 meses |
-
-En la práctica, para la mayoría de rutas reales de este pliego la Regla 1 se
-reduce a "gobierna el piso SICE-TAC en solitario" — no porque falte el dato
-de origen, sino porque el proceso de renovar tarifas SAP no está al día,
-incluso en corredores muy transitados.
-
-**Corrección tras seguir investigando (el código de vehículo de SICE-TAC no
-es el mismo que el de SAP):** para las líneas 6, 8 y 15 había concluido
-"tampoco hay piso SICE-TAC", pero era el mismo error que ya se había
-corregido para 9 y 11 — usé el código de SAP (`C2`, `Turbo`) en vez del
-código oficial de SICE-TAC. El catálogo real de SICE-TAC para estas rutas es
-distinto (`2, 2_7, 2_8, 2L1, 2L2, 2L3, 2S2, 2S3, 3, 3S2, 3S3, CA, V2, V3, V4`)
-— **el código SAP `C2` ("Rígidos, Turbo o Sencillo") corresponde al código
-`2` de SICE-TAC** (camión rígido de 2 ejes, sin sufijo). Con el código
-correcto, las 3 rutas SÍ tienen piso real:
-
-| Línea | Piso SICE-TAC (código `2`, General) |
-|---|---|
-| 6 | $2.107.491 |
-| 8 | $3.015.093 |
-| 15 | $1.719.671 |
-
-Esto deja **solo 2 líneas (9 y 12) genuinamente sin ninguna fuente** —
-confirmadas dos veces sin ningún código de vehículo disponible, no es tema
-de código mal buscado.
-
-**IMPORTANTE — este cálculo manual (tabla que estaba aquí) resultó
-INCORRECTO en el mecanismo, y ya se reemplazó.** Se subió el Excel a la app
-real, se comparó contra el PDF real de cotización obtenido
+**Lo confirmado y vigente:** se subió el Excel a la app real, se comparó
+contra el PDF real de cotización obtenido
 (`cotizacion-agencia-de-aduanas-jf-asociados-s-a-s-nivel-1-7667da46.pdf`), y
-los valores no coincidían. Investigando por qué, se encontró y confirmó
-(código real + valor exacto verificado en la base, 12/12 coincidencias) que
-el piso SICE-TAC real usado por la app **no depende del vehículo/tipología
-de la línea** — siempre resuelve `CONFIGURACION='CA'`, `NOMBRETIPOCARGA='General'`,
-`VIAESTANDAR='SI'` en `tblRutasSicetac`, vía `TarifarioSapAdapter.SicetacOficialAsync`.
+se confirmó (código real + valor exacto verificado en la base, 12/12
+coincidencias) que el piso SICE-TAC real usado por la app **no depende del
+vehículo/tipología de la línea** — siempre resuelve `CONFIGURACION='CA'`,
+`NOMBRETIPOCARGA='General'`, `VIAESTANDAR='SI'` en `tblRutasSicetac`, vía
+`TarifarioSapAdapter.SicetacOficialAsync`. También se confirmó que 5 rutas
+comunes (Bucaramanga→Bogotá, Bogotá→Villavicencio, entre otras) sí tuvieron
+tarifa de plaza SAP en el pasado — coherente con el 95,8% de vigencias ya
+vencidas medido en HU-09.2 — pero para 3 de esas 5 (Cúcuta→Bogotá,
+Manizales→Medellín, Neiva→Bogotá) la vencida que se encontró en un primer
+chequeo era de otra combinación Línea de Negocio+Clase de Viaje, no la que
+usa el dominio — con el combo correcto, esas 3 en realidad **nunca tuvieron
+plaza** para su combinación exacta (ver el detalle línea por línea en
+`esperado-final-pliego.md`, que es la fuente autoritativa de estos números).
 
 **Ver [`../esperado-final-pliego.md`](../esperado-final-pliego.md) para la
 tabla final correcta (caso — obtenido — comparación) y las 2 desviaciones
@@ -169,45 +132,57 @@ reales encontradas:**
 
 ## Tabla de la muestra (caso — esperado — obtenido)
 
-> El "obtenido" de las 15 líneas del pliego se llena en la sección de arriba
-> una vez se suba `docs/ejemplo_licitacion.xlsx` a la app real. Las tablas de
-> abajo son para evidencia adicional más allá del pliego (otras líneas reales
-> ya costeadas, regla por regla).
-
-### Regla 1 — regla del mayor (evidencia adicional, más allá del pliego)
-| caso (CotizacionLineaId) | piso SICE-TAC | tarifa plaza | esperado (MAX) | obtenido (ValorFlete real) | ¿coincide? |
+### Regla 1 — regla del mayor
+| caso (línea del pliego) | piso SICE-TAC | tarifa plaza | esperado (MAX) | obtenido (ValorFlete real) | ¿coincide? |
 |---|---|---|---|---|---|
-| _pendiente_ | | | | | |
+| 1: Buenaventura→Bogotá | $1.556.503 | $6.000.000 / $6.400.000 (vigente) | Tarifario, $6,0-6,4M | Sicetac, $1.556.503 | **No** — ver Desviación 1 |
+| 4: Bogotá→Buenaventura (dev.) | $1.613.856 | sin plaza | Sicetac, $1.613.856 | Sicetac, $1.613.856 | Sí |
+
+Ver [`esperado-final-pliego.md`](../esperado-final-pliego.md) sección 2 para
+las 15 líneas completas.
 
 ### Regla 2 — piso inviolable
 | caso | piso SICE-TAC vigente | ValorFlete real | ¿ValorFlete >= piso? |
 |---|---|---|---|
-| _pendiente_ | | | |
+| 5: Cali→Cartagena | $3.118.351 | $3.118.351 | Sí (igual al piso) |
+| 10: Pereira→Buenaventura | $917.268 | $917.268 | Sí (igual al piso) |
+
+Cumplido en las 12 líneas cotizadas del pliego — ninguna por debajo del piso.
 
 ### Regla 3 — solo SICE-TAC
-| caso (ruta con regla activa) | tarifa de plaza existente | ValorFlete real | Fuente real | ¿ignoró la plaza? |
-|---|---|---|---|---|
-| _pendiente_ | | | | |
+**Sin caso disponible en el pliego actual.** `reglas_solo_sicetac` (base de
+la app) tiene 3 reglas configuradas (Medellín→Bogotá 3S3; Cali→Medellín 3S3;
+Barranquilla→Pereira 2S3) — ninguna coincide con las 15 líneas ya subidas.
+Pendiente un caso de prueba dedicado con una de estas 3 rutas.
 
 ### Regla 4 — tarifas vencidas
-| caso | tarifa SAP vencida (valor, vigencia) | ValorFlete real posterior al vencimiento | ¿usó la vencida? |
+| caso | tarifa SAP vencida (valor, vigencia) | ValorFlete real | ¿usó la vencida? |
 |---|---|---|---|
-| _pendiente_ | | | |
+| 9: Bogotá→Villavicencio | $1.300.000, venció 2026-08-31 | Sicetac, $867.043 | No |
+| 6: Bucaramanga→Bogotá | $2.000.000, venció 2026-09-10 (6 días antes) | Sicetac, $1.271.020 | No |
 
 ### Regla 5 — Ganada archiva tarifa
 | CotizacionId | NumLineas | NumTarifasArchivadas | ¿coincide 1:1? |
 |---|---|---|---|
-| _pendiente_ | | | |
+| 6113EF1E-A0EE-4916-9CAA-01AE2D74A860 | 1 | 1 | Sí |
+| 16F96485-03D7-4689-845A-062CB8724D0A | 1 | 1 | Sí |
+
+Confirmado en **las 54 cotizaciones reales marcadas "Ganada"** que existen
+en la base — las 54 con 1:1 exacto, ninguna desincronizada.
 
 ### Regla 6 — ajuste auditado
 | AjusteId | AjustadoPor | Motivo | ¿autoría real presente? |
 |---|---|---|---|
-| _pendiente_ | | | |
+| A8B757DE-C7EF-40EF-AEAC-E7D3A6DE2AE6 | Brayan Quintero (bquintero@boterosoto.com.co, rol AdminTarifas) | "prueba QA" | Sí — con entrada correspondiente en `audit_log` (acción "ajustar") |
+
+Es el único ajuste real que existe en la base (1 fila).
 
 ### Regla 7 — recálculo de conexos
-| CotizacionId | Total antes | Total después del conexo | ¿se recalculó? |
-|---|---|---|---|
-| _pendiente_ | | | |
+| CotizacionId | Suma líneas | Suma conexos | Total real | ¿se recalculó bien? |
+|---|---|---|---|---|
+| C1A463AF-FC53-49D2-8934-18122E493309 | $1.850.000 | $2.000 | $1.852.000 | Sí, exacto |
+| 2E2CCA35-20F9-43AD-9BC4-25CB4A19DDB3 | $21.003.583 | $85.000 | $21.088.583 | Sí, exacto |
+| 3C4C29D9-367D-4F87-AD5C-9BE796965831 | $1.476.620 | $18.000 | $1.494.620 | Sí, exacto |
 
 ## Invariante de piso (criterio de cierre: cero propuestas bajo el piso vigente)
 
@@ -253,10 +228,22 @@ existe hoy en el código.
 ## Alcance real vs plan aprobado (Hotspot H3)
 
 2 semanas ejecutadas vs 8-12 semanas estimadas en el plan original aprobado.
-Con ese tiempo se priorizó cobertura pareja (una muestra real por cada una de
-las 7 reglas, 3-5 casos) en vez de profundidad exhaustiva en unas pocas. No
-se llegó a: [completar tras la ejecución — qué quedó fuera, con cuánta
-profundidad se cubrió cada regla].
+Con ese tiempo se priorizó cobertura pareja entre las 7 reglas en vez de
+profundidad exhaustiva en unas pocas. Resultado real:
+
+- **Reglas 2, 4, 5, 6, 7:** verificadas con evidencia real, cero
+  desviaciones encontradas.
+- **Regla 1:** verificada parcialmente — confirmado que el piso SICE-TAC se
+  calcula y usa bien cuando es la única fuente (8/12 líneas del pliego); 1
+  desviación real candidata cuando compite contra una plaza vigente (4/12
+  líneas) — ver Desviaciones.
+- **Regla 3:** no se pudo verificar — las 3 reglas "solo SICE-TAC"
+  configuradas en el sistema no coinciden con ninguna línea del pliego de
+  prueba usado. Requeriría un caso de prueba dedicado (una línea nueva con
+  una de esas 3 rutas), no ejecutado por tiempo.
+- No se llegó a: profundizar más de 3-5 casos por regla (ej. probar la
+  Regla 5/7 con más de 3 cotizaciones, aunque el universo real permitía
+  hacerlo — 54 y 35 respectivamente).
 
 ## Insumo Gherkin
 
@@ -266,8 +253,15 @@ instalado en este proyecto, igual que `docs/contrato-integracion/escenarios.feat
 
 ## Fuera de alcance (declarado)
 
-- No se montó ningún test de integración automatizado contra la BD
-  corporativa real (mismo bloqueo de acceso que issue #3/#4 — este entorno de
-  desarrollo no tiene conectividad a `DwSice`/`DwCubos`/`dbSolucionesTI`).
+- No se montó ningún test de integración **automatizado** (xUnit u otro
+  arnés que corra en CI) contra la BD corporativa real — toda la
+  verificación de esta HU se hizo con consultas SQL manuales/dirigidas, no
+  con una suite repetible. Sí se logró conectividad directa real a
+  `dbSolucionesTI` y a la base propia de la app
+  (`dbInformesAutomatizados_Pruebas`) — el bloqueo original de la issue #3
+  quedó superado para esas 2 bases; `DWSice` sigue sin acceso directo desde
+  este entorno.
 - No se persiguió el 100% de profundidad en ninguna regla individual (ver
   Hotspot H3 arriba).
+- La Regla 3 quedó sin verificar (ninguna línea del pliego coincide con las
+  3 rutas "solo SICE-TAC" configuradas).

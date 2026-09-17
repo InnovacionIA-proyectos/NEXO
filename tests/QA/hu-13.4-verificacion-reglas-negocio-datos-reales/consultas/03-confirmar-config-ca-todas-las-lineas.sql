@@ -1,7 +1,19 @@
+-- ============================================================
 -- Base de datos: DWSice
--- Hipótesis confirmada en 4/4 líneas probadas (1, 5, 6, 9): el piso SICE-TAC
--- real usa CONFIGURACION='CA' y NOMBRETIPOCARGA='General' sin importar el
--- vehículo de la línea. Confirmar para las 11 líneas restantes.
+--
+-- Confirmación de la hipótesis CONFIGURACION='CA' / NOMBRETIPOCARGA='General'
+-- (establecida en 02-reversar-obtenido-real.sql sobre 4 líneas) para las 11
+-- líneas restantes del pliego de prueba. Resultado consolidado: ver
+-- ../esperado-final-pliego.md sección 4 y 01-pliego-licitacion-esperado.sql
+-- Parte B, que ya incorpora los valores confirmados con el filtro exacto de
+-- NOMBRERUTA (esta versión usa LIKE por ciudad, más permisivo, útil en su
+-- momento para no descartar variantes de redacción del nombre de ruta).
+--
+-- Para las líneas de devolución (3, 4, 14) no se restringió por
+-- NOMBRETIPOCARGA, para observar directamente qué tipo de carga trae la fila
+-- con CONFIGURACION='CA' — el resultado confirmó que también resuelven a
+-- 'General', no a un tipo específico de contenedor vacío.
+-- ============================================================
 
 SELECT 2 AS Linea, NOMBRERUTA, CONFIGURACION, NOMBRETIPOCARGA, VALORSICECONHORA, VIAESTANDAR
 FROM dbo.tblRutasSicetac
@@ -68,8 +80,3 @@ FROM dbo.tblRutasSicetac
 WHERE NOMBRERUTA LIKE '%Neiva%' AND NOMBRERUTA LIKE '%Bogot%'
   AND CONFIGURACION = 'CA' AND NOMBRETIPOCARGA = 'General' AND CONDICIONCARGA = 'CARGADO' AND VIAESTANDAR = 'SI'
   AND PERIODO = 202609;
-
--- Nota: para las líneas de devolución (3, 4, 14) no filtro por NOMBRETIPOCARGA
--- todavía — quiero ver qué tipo de carga trae de verdad la fila con CONFIGURACION='CA'
--- para esas, ya que "Contenedor vacío" fue lo que usé antes y puede que la app
--- tampoco lo use igual.
