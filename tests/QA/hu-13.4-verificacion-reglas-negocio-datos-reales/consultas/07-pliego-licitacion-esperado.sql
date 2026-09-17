@@ -1,297 +1,315 @@
 -- Insumo: docs/ejemplo_licitacion.xlsx (15 líneas reales, pliego de prueba
 -- "LIC-2026-0091", fecha 2026-09-16). Objetivo: calcular el valor ESPERADO
 -- (piso SICE-TAC + tarifa de plaza SAP, regla del mayor) para cada línea
--- ANTES de subir el Excel a la app — así la comparación contra lo que la app
--- realmente proponga es a ciegas, no ajustada después de ver el resultado.
+-- ANTES de subir el Excel a la app, para comparar a ciegas contra lo que
+-- realmente proponga CabinaFletes.
 --
--- Las 15 líneas ya vienen traducidas abajo con sus códigos de negocio fijos
--- (verificados en la sesión de EDA-2, no hace falta consultarlos):
+-- Documento único y final (reemplaza los archivos de diagnóstico 07b-07h,
+-- que ya cumplieron su propósito y se eliminaron). El resultado final de
+-- cada consulta ya está en el README.md de esta carpeta y en
+-- ../esperado-final-pliego.md — este archivo queda como referencia
+-- reproducible de cómo se obtuvo cada valor.
+--
+-- Líneas de negocio y clase de viaje ya traducidas a los códigos SAP fijos
+-- (verificados en la sesión de EDA-2, Habilitador B8):
 --   LineaNegocio:  PuertoAInterior=1  InteriorAPuerto=2  Nacional=4
 --                  DevolucionContenedor=6  Andino=7  Licitaciones=8
 --   ClaseViaje:    Contenedor=1  Cupo=2  CargaSuelta=4  Extradimensionado=5
 --
--- Lo que SÍ hace falta resolver contra el ambiente real (pasos 1 y 2 abajo)
--- antes de poder correr las 15 consultas del paso 3: el código de zona SAP
--- de cada ciudad, y el código numérico de cada tipo de vehículo.
+-- Lecciones clave de esta sesión (para no repetir el tanteo):
+--   1. TIPOVEHICULO en tblSAPTarifas guarda el ID numérico del catálogo
+--      (tblSAPTiposVehiculoTarifario.ID), no el texto de CODIGO — y viene
+--      BLANCO para LineaNegocio Puerto↔Interior (1, 2) y DevolucionContenedor
+--      (6): esas tarifican solo por rango de peso, no filtrar por vehículo.
+--   2. Bogotá y Medellín son zonas de GRUPO en tblSAPTarifas: ZTC_BOGOTA /
+--      ZTC_NORTE_BOGOTA (Bogotá), ZTC_VABURRA (Medellín) — no existe
+--      ZC_BOGOTA como valor real. La mayoría de las demás ciudades sí usan
+--      su zona de grupo directo (ZTC_<ciudad>): Cali, Bucaramanga,
+--      Barranquilla, Pereira, Manizales, Neiva. Cúcuta, Cartagena y
+--      Villavicencio tienen AMBAS formas (ZC_ y ZTC_) coexistiendo.
+--      Buenaventura, Santa Marta e Ibagué son zona individual (ZC_) sin
+--      forma de grupo.
+--   3. En SICE-TAC (tblRutasSicetac), filtrar siempre por
+--      NOMBRETIPOCARGA = 'General' (o 'Contenedor vacío' para líneas de
+--      devolución) — sin ese filtro trae todos los tipos de carga mezclados.
+--   4. El código de vehículo de SICE-TAC (columna CONFIGURACION) es un
+--      catálogo DISTINTO al de SAP: el código SAP "C2" (Rígidos, Turbo o
+--      Sencillo) corresponde al código SICE-TAC "2" (sin sufijo, camión
+--      rígido de 2 ejes) — no asumir que los códigos de un sistema sirven
+--      en el otro.
+--   5. `tblSAPTarifasLog` (histórico) NO participa del cálculo del
+--      "esperado" ni de la decisión real de la app (`CandidatoSapAsync`
+--      solo lee `tblSAPTarifas` con `Vigencia >= hoy`) — se usa solo como
+--      evidencia de contexto para confirmar si una ruta tuvo tarifa antes.
 
 -- ============================================================
--- PASO 1 — Resolver ciudad -> zona SAP.
--- Base de datos: dbsolucionesTI (confirmado en el código,
--- DbSolucionesTiDbContext — la misma que tiene tblSAPTarifas).
--- ============================================================
--- Ciudades únicas del pliego: Buenaventura, Bogotá, Medellín, Cali, Cartagena,
--- Bucaramanga, Barranquilla, Cúcuta, Villavicencio, Pereira, Manizales,
--- Santa Marta, Ibagué, Neiva.
-
-SELECT d.CODIGOCENTROPOBLADO, d.NOMBREMUNICIPIO, d.NOMBREMOSTRAR,
-       z.IDZONATARIFICACION, z.IDZONATRANSPORTE
-FROM dbo.tblsapdane d
-LEFT JOIN dbo.tblZonasTarificacionRelacion z ON z.IDZONATRANSPORTE = d.CODIGOCENTROPOBLADO
-WHERE d.NOMBREMUNICIPIO IN (
-    'Buenaventura','Bogota','Medellin','Cali','Cartagena','Bucaramanga',
-    'Barranquilla','Cucuta','Villavicencio','Pereira','Manizales',
-    'Santa Marta','Ibague','Neiva'
-);
--- (ajustar tildes/mayúsculas según cómo estén guardadas realmente — probar
--- sin tilde primero, es lo que se confirmó como normalización real en EDA-2)
-
--- ============================================================
--- PASO 2 — Resolver nombre de vehículo -> código SAP.
--- Misma base: dbsolucionesTI, tabla tblSAPTiposVehiculoTarifario
--- (columnas confirmadas en el código: ID, CODIGO, DESCRIPCION, ESTADO).
--- ============================================================
--- Vehículos únicos del pliego: Tractomula 3S3, Tractomula 3S2, Mini Mula 2S2,
--- Mini Mula 2S3, Sencillo C2, Turbo, Camioneta, Doble Troque.
-
-SELECT ID, CODIGO, DESCRIPCION, ESTADO
-FROM dbo.tblSAPTiposVehiculoTarifario
-WHERE DESCRIPCION LIKE '%3S3%' OR DESCRIPCION LIKE '%3S2%' OR DESCRIPCION LIKE '%2S2%'
-   OR DESCRIPCION LIKE '%2S3%' OR DESCRIPCION LIKE '%Sencillo%' OR DESCRIPCION LIKE '%Turbo%'
-   OR DESCRIPCION LIKE '%Camioneta%' OR DESCRIPCION LIKE '%Doble%'
-   OR CODIGO LIKE '%3S3%' OR CODIGO LIKE '%3S2%' OR CODIGO LIKE '%2S2%' OR CODIGO LIKE '%2S3%';
-
--- ============================================================
--- PASO 3 — Tarifa de plaza SAP vigente por línea (dbSolucionesTI)
--- Reemplazar <<ZONA_...>> y <<VEHCOD_...>> con lo que salga de los pasos 1 y 2.
+-- PARTE A — Tarifa de plaza SAP vigente (base: dbSolucionesTI)
 -- ============================================================
 
--- Línea 1: Buenaventura->Bogotá | LineaNegocio=1 | ClaseViaje=1 | Peso=24500 | Tractomula 3S3
-SELECT 1 AS Linea, ID, ORIGEN, DESTINO, VALOR, VIGENCIA, RANGOPESOINF, RANGOPESOSUP, TIPOVEHICULO
+-- Línea 1: Buenaventura->Bogotá | LN=1 CV=1 | Peso=24500 | sin filtro de vehículo (blanco)
+-- Resultado: $6.000.000 (ZTC_BOGOTA) / $6.400.000 (ZTC_NORTE_BOGOTA) — ambigüedad de zona conocida
+SELECT 1 AS Linea, ID, ORIGEN, DESTINO, VALOR, VIGENCIA, RANGOPESOINF, RANGOPESOSUP
 FROM dbo.tblSAPTarifas
-WHERE ORIGEN = '<<ZONA_BUENAVENTURA>>' AND DESTINO = '<<ZONA_BOGOTA>>'
+WHERE ORIGEN = 'ZC_BUENAVENTURA' AND DESTINO IN ('ZTC_BOGOTA', 'ZTC_NORTE_BOGOTA')
   AND LINEANEGOCIO = 1 AND CLASEVIAJE = 1
   AND 24500 BETWEEN RANGOPESOINF AND RANGOPESOSUP
-  AND TIPOVEHICULO = '<<VEHCOD_3S3>>' AND VIGENCIA >= '2026-09-16';
+  AND VIGENCIA >= '2026-09-16';
 
--- Línea 2: Buenaventura->Medellín | LineaNegocio=1 | ClaseViaje=1 | Peso=18200 | Tractomula 3S2
-SELECT 2 AS Linea, ID, ORIGEN, DESTINO, VALOR, VIGENCIA, RANGOPESOINF, RANGOPESOSUP, TIPOVEHICULO
+-- Línea 2: Buenaventura->Medellín | LN=1 CV=1 | Peso=18200 | sin filtro de vehículo
+-- Resultado: $5.000.000
+SELECT 2 AS Linea, ID, ORIGEN, DESTINO, VALOR, VIGENCIA, RANGOPESOINF, RANGOPESOSUP
 FROM dbo.tblSAPTarifas
-WHERE ORIGEN = '<<ZONA_BUENAVENTURA>>' AND DESTINO = '<<ZONA_MEDELLIN>>'
+WHERE ORIGEN = 'ZC_BUENAVENTURA' AND DESTINO IN ('ZTC_VABURRA', 'ZC_MEDELLIN')
   AND LINEANEGOCIO = 1 AND CLASEVIAJE = 1
   AND 18200 BETWEEN RANGOPESOINF AND RANGOPESOSUP
-  AND TIPOVEHICULO = '<<VEHCOD_3S2>>' AND VIGENCIA >= '2026-09-16';
+  AND VIGENCIA >= '2026-09-16';
 
--- Línea 3: Medellín->Buenaventura | LineaNegocio=6 (DevolucionContenedor) | ClaseViaje=1 | Peso=3800 | Mini Mula 2S2
-SELECT 3 AS Linea, ID, ORIGEN, DESTINO, VALOR, VIGENCIA, RANGOPESOINF, RANGOPESOSUP, TIPOVEHICULO
+-- Línea 3: Medellín->Buenaventura (devolución) | LN=6 CV=1 | CNT40.HC | sin filtro de vehículo
+-- OJO: el peso real del pliego (3800) es ruido para esta línea — el rango
+-- real está fijo en 4000-4000 (tara del contenedor de 40'), no se filtra por
+-- el peso declarado.
+-- Resultado: $2.454.000
+SELECT 3 AS Linea, ID, ORIGEN, DESTINO, VALOR, VIGENCIA, RANGOPESOINF, RANGOPESOSUP
 FROM dbo.tblSAPTarifas
-WHERE ORIGEN = '<<ZONA_MEDELLIN>>' AND DESTINO = '<<ZONA_BUENAVENTURA>>'
+WHERE ORIGEN IN ('ZTC_VABURRA', 'ZC_MEDELLIN') AND DESTINO = 'ZC_BUENAVENTURA'
   AND LINEANEGOCIO = 6 AND CLASEVIAJE = 1
-  AND 3800 BETWEEN RANGOPESOINF AND RANGOPESOSUP
-  AND TIPOVEHICULO = '<<VEHCOD_2S2>>' AND VIGENCIA >= '2026-09-16';
+  AND VIGENCIA >= '2026-09-16';
 
--- Línea 4: Bogotá->Buenaventura | LineaNegocio=6 | ClaseViaje=1 | Peso=3200 | Mini Mula 2S3
-SELECT 4 AS Linea, ID, ORIGEN, DESTINO, VALOR, VIGENCIA, RANGOPESOINF, RANGOPESOSUP, TIPOVEHICULO
+-- Línea 4: Bogotá->Buenaventura (devolución) | LN=6 CV=1 | CNT20.ST
+-- Resultado: sin tarifa (0 filas, confirmado sin filtro de peso también)
+SELECT 4 AS Linea, ID, ORIGEN, DESTINO, VALOR, VIGENCIA, RANGOPESOINF, RANGOPESOSUP
 FROM dbo.tblSAPTarifas
-WHERE ORIGEN = '<<ZONA_BOGOTA>>' AND DESTINO = '<<ZONA_BUENAVENTURA>>'
+WHERE ORIGEN IN ('ZTC_BOGOTA', 'ZTC_NORTE_BOGOTA') AND DESTINO = 'ZC_BUENAVENTURA'
   AND LINEANEGOCIO = 6 AND CLASEVIAJE = 1
-  AND 3200 BETWEEN RANGOPESOINF AND RANGOPESOSUP
-  AND TIPOVEHICULO = '<<VEHCOD_2S3>>' AND VIGENCIA >= '2026-09-16';
+  AND VIGENCIA >= '2026-09-16';
 
--- Línea 5: Cali->Cartagena | LineaNegocio=2 (InteriorAPuerto) | ClaseViaje=4 (CargaSuelta) | Peso=32000 | Tractomula 3S3 | Consolidado
-SELECT 5 AS Linea, ID, ORIGEN, DESTINO, VALOR, VIGENCIA, RANGOPESOINF, RANGOPESOSUP, TIPOVEHICULO
+-- Línea 5: Cali->Cartagena | LN=2 CV=1 (el pliego decía CV=4, la data real usa CV=1) | Peso=32000
+-- Resultado: sin tarifa para el combo real (los candidatos que sí existen
+-- tienen rangos de peso 18001-22000, muy por debajo de 32000)
+SELECT 5 AS Linea, ID, ORIGEN, DESTINO, VALOR, VIGENCIA, RANGOPESOINF, RANGOPESOSUP
 FROM dbo.tblSAPTarifas
-WHERE ORIGEN = '<<ZONA_CALI>>' AND DESTINO = '<<ZONA_CARTAGENA>>'
-  AND LINEANEGOCIO = 2 AND CLASEVIAJE = 4
+WHERE ORIGEN = 'ZTC_CALI' AND DESTINO IN ('ZTC_CARTAGENA', 'ZC_CARTAGENA (BOL)')
+  AND LINEANEGOCIO = 2 AND CLASEVIAJE = 1
   AND 32000 BETWEEN RANGOPESOINF AND RANGOPESOSUP
-  AND TIPOVEHICULO = '<<VEHCOD_3S3>>' AND VIGENCIA >= '2026-09-16';
+  AND VIGENCIA >= '2026-09-16';
 
--- Línea 6: Bucaramanga->Bogotá | LineaNegocio=4 (Nacional) | ClaseViaje=2 (Cupo) | Peso=8500 | Sencillo C2
-SELECT 6 AS Linea, ID, ORIGEN, DESTINO, VALOR, VIGENCIA, RANGOPESOINF, RANGOPESOSUP, TIPOVEHICULO
+-- Línea 6: Bucaramanga->Bogotá | LN=4 CV=2 | TIPOVEHICULO=4 (C2) | Peso=8500
+-- Resultado: sin tarifa VIGENTE — existió, venció 2026-09-10 (6 días antes)
+SELECT 6 AS Linea, ID, ORIGEN, DESTINO, VALOR, VIGENCIA, RANGOPESOINF, RANGOPESOSUP
 FROM dbo.tblSAPTarifas
-WHERE ORIGEN = '<<ZONA_BUCARAMANGA>>' AND DESTINO = '<<ZONA_BOGOTA>>'
-  AND LINEANEGOCIO = 4 AND CLASEVIAJE = 2
+WHERE ORIGEN = 'ZTC_BUCARAMANGA' AND DESTINO IN ('ZTC_BOGOTA', 'ZTC_NORTE_BOGOTA')
+  AND LINEANEGOCIO = 4 AND CLASEVIAJE = 2 AND TIPOVEHICULO = 4
   AND 8500 BETWEEN RANGOPESOINF AND RANGOPESOSUP
-  AND TIPOVEHICULO = '<<VEHCOD_C2>>' AND VIGENCIA >= '2026-09-16';
--- OJO: esta ruta ya se vio antes con 2 tablas de precio paralelas (Bogotá
--- normal vs ZTC_NORTE_BOGOTA) — si no aparece nada bajo la zona normal,
--- probar también con la zona Norte antes de concluir "sin tarifa".
+  AND VIGENCIA >= '2026-09-16';
 
--- Línea 7: Barranquilla->Buenaventura | LineaNegocio=2 | ClaseViaje=1 | Peso=21000 | Tractomula 3S3 | Exclusivo
-SELECT 7 AS Linea, ID, ORIGEN, DESTINO, VALOR, VIGENCIA, RANGOPESOINF, RANGOPESOSUP, TIPOVEHICULO
+-- Línea 7: Barranquilla->Buenaventura | LN=2 CV=1 | Peso=21000 | sin filtro de vehículo
+-- Resultado: sin tarifa (0 filas, confirmado sin filtro de negocio/peso también)
+SELECT 7 AS Linea, ID, ORIGEN, DESTINO, VALOR, VIGENCIA, RANGOPESOINF, RANGOPESOSUP
 FROM dbo.tblSAPTarifas
-WHERE ORIGEN = '<<ZONA_BARRANQUILLA>>' AND DESTINO = '<<ZONA_BUENAVENTURA>>'
+WHERE ORIGEN = 'ZTC_BARRANQUILLA' AND DESTINO = 'ZC_BUENAVENTURA'
   AND LINEANEGOCIO = 2 AND CLASEVIAJE = 1
   AND 21000 BETWEEN RANGOPESOINF AND RANGOPESOSUP
-  AND TIPOVEHICULO = '<<VEHCOD_3S3>>' AND VIGENCIA >= '2026-09-16';
+  AND VIGENCIA >= '2026-09-16';
 
--- Línea 8: Cúcuta->Bogotá | LineaNegocio=7 (Andino) | ClaseViaje=4 | Peso=6800 | Turbo
-SELECT 8 AS Linea, ID, ORIGEN, DESTINO, VALOR, VIGENCIA, RANGOPESOINF, RANGOPESOSUP, TIPOVEHICULO
+-- Línea 8: Cúcuta->Bogotá | LN=7 CV=4 | Peso=6800 | "Turbo" comparte código C2=4
+-- Resultado: sin tarifa VIGENTE — existió, venció 2026-08-10 (37 días antes)
+SELECT 8 AS Linea, ID, ORIGEN, DESTINO, VALOR, VIGENCIA, RANGOPESOINF, RANGOPESOSUP
 FROM dbo.tblSAPTarifas
-WHERE ORIGEN = '<<ZONA_CUCUTA>>' AND DESTINO = '<<ZONA_BOGOTA>>'
-  AND LINEANEGOCIO = 7 AND CLASEVIAJE = 4
+WHERE ORIGEN IN ('ZC_CUCUTA', 'ZTC_CUCUTA') AND DESTINO IN ('ZTC_BOGOTA', 'ZTC_NORTE_BOGOTA')
+  AND LINEANEGOCIO = 7 AND CLASEVIAJE = 4 AND TIPOVEHICULO = 4
   AND 6800 BETWEEN RANGOPESOINF AND RANGOPESOSUP
-  AND TIPOVEHICULO = '<<VEHCOD_TURBO>>' AND VIGENCIA >= '2026-09-16';
--- Esta ruta ya se documentó antes con 4 líneas de captura MANUAL desde Excel
--- (no reproducible por el algoritmo) — si no aparece nada, no forzar, puede
--- ser el mismo caso conocido.
+  AND VIGENCIA >= '2026-09-16';
 
--- Línea 9: Bogotá->Villavicencio | LineaNegocio=4 | ClaseViaje=2 | Peso=4200 | Camioneta
-SELECT 9 AS Linea, ID, ORIGEN, DESTINO, VALOR, VIGENCIA, RANGOPESOINF, RANGOPESOSUP, TIPOVEHICULO
+-- Línea 9: Bogotá->Villavicencio | LN=4 CV=2 | Peso=4200 | "Camioneta" (código sin confirmar en catálogo SAP, no aplica igual)
+-- Resultado: sin tarifa VIGENTE — existió, venció 2026-08-31 (16 días antes)
+SELECT 9 AS Linea, ID, ORIGEN, DESTINO, VALOR, VIGENCIA, RANGOPESOINF, RANGOPESOSUP
 FROM dbo.tblSAPTarifas
-WHERE ORIGEN = '<<ZONA_BOGOTA>>' AND DESTINO = '<<ZONA_VILLAVICENCIO>>'
+WHERE ORIGEN IN ('ZTC_BOGOTA', 'ZTC_NORTE_BOGOTA') AND DESTINO IN ('ZC_VILLAVICENCIO', 'ZTC_VILLAVICENCIO')
   AND LINEANEGOCIO = 4 AND CLASEVIAJE = 2
   AND 4200 BETWEEN RANGOPESOINF AND RANGOPESOSUP
-  AND TIPOVEHICULO = '<<VEHCOD_CAMIONETA>>' AND VIGENCIA >= '2026-09-16';
+  AND VIGENCIA >= '2026-09-16';
 
--- Línea 10: Pereira->Buenaventura | LineaNegocio=2 | ClaseViaje=1 | Peso=19500 | Tractomula 3S2
-SELECT 10 AS Linea, ID, ORIGEN, DESTINO, VALOR, VIGENCIA, RANGOPESOINF, RANGOPESOSUP, TIPOVEHICULO
+-- Línea 10: Pereira->Buenaventura | LN=2 CV=1 | Peso=19500 | sin filtro de vehículo
+-- Resultado: sin tarifa para el combo real (solo existe una tarifa de
+-- devolución de contenedor para esta ruta, no la de carga normal)
+SELECT 10 AS Linea, ID, ORIGEN, DESTINO, VALOR, VIGENCIA, RANGOPESOINF, RANGOPESOSUP
 FROM dbo.tblSAPTarifas
-WHERE ORIGEN = '<<ZONA_PEREIRA>>' AND DESTINO = '<<ZONA_BUENAVENTURA>>'
+WHERE ORIGEN = 'ZTC_PEREIRA' AND DESTINO = 'ZC_BUENAVENTURA'
   AND LINEANEGOCIO = 2 AND CLASEVIAJE = 1
   AND 19500 BETWEEN RANGOPESOINF AND RANGOPESOSUP
-  AND TIPOVEHICULO = '<<VEHCOD_3S2>>' AND VIGENCIA >= '2026-09-16';
+  AND VIGENCIA >= '2026-09-16';
 
--- Línea 11: Buenaventura->Cali | LineaNegocio=1 | ClaseViaje=1 | Peso=25800 | Doble Troque
-SELECT 11 AS Linea, ID, ORIGEN, DESTINO, VALOR, VIGENCIA, RANGOPESOINF, RANGOPESOSUP, TIPOVEHICULO
+-- Línea 11: Buenaventura->Cali | LN=1 CV=1 | Peso=25800 | sin filtro de vehículo
+-- Resultado: $2.400.000
+SELECT 11 AS Linea, ID, ORIGEN, DESTINO, VALOR, VIGENCIA, RANGOPESOINF, RANGOPESOSUP
 FROM dbo.tblSAPTarifas
-WHERE ORIGEN = '<<ZONA_BUENAVENTURA>>' AND DESTINO = '<<ZONA_CALI>>'
+WHERE ORIGEN = 'ZC_BUENAVENTURA' AND DESTINO = 'ZTC_CALI'
   AND LINEANEGOCIO = 1 AND CLASEVIAJE = 1
   AND 25800 BETWEEN RANGOPESOINF AND RANGOPESOSUP
-  AND TIPOVEHICULO = '<<VEHCOD_DOBLETROQUE>>' AND VIGENCIA >= '2026-09-16';
+  AND VIGENCIA >= '2026-09-16';
 
--- Línea 12: Manizales->Medellín | LineaNegocio=7 | ClaseViaje=2 | Peso=7200 | Sencillo C2
-SELECT 12 AS Linea, ID, ORIGEN, DESTINO, VALOR, VIGENCIA, RANGOPESOINF, RANGOPESOSUP, TIPOVEHICULO
+-- Línea 12: Manizales->Medellín | LN=7 CV=2 | TIPOVEHICULO=4 (C2) | Peso=7200
+-- Resultado: sin tarifa VIGENTE — existió, venció 2026-09-03 (13 días antes)
+SELECT 12 AS Linea, ID, ORIGEN, DESTINO, VALOR, VIGENCIA, RANGOPESOINF, RANGOPESOSUP
 FROM dbo.tblSAPTarifas
-WHERE ORIGEN = '<<ZONA_MANIZALES>>' AND DESTINO = '<<ZONA_MEDELLIN>>'
-  AND LINEANEGOCIO = 7 AND CLASEVIAJE = 2
+WHERE ORIGEN = 'ZTC_MANIZALES' AND DESTINO IN ('ZTC_VABURRA', 'ZC_MEDELLIN')
+  AND LINEANEGOCIO = 7 AND CLASEVIAJE = 2 AND TIPOVEHICULO = 4
   AND 7200 BETWEEN RANGOPESOINF AND RANGOPESOSUP
-  AND TIPOVEHICULO = '<<VEHCOD_C2>>' AND VIGENCIA >= '2026-09-16';
+  AND VIGENCIA >= '2026-09-16';
 
--- Línea 13: Bogotá->Santa Marta | LineaNegocio=4 | ClaseViaje=5 (Extradimensionado) | Peso=34000 | Tractomula 3S3 | Exclusivo
-SELECT 13 AS Linea, ID, ORIGEN, DESTINO, VALOR, VIGENCIA, RANGOPESOINF, RANGOPESOSUP, TIPOVEHICULO
+-- Línea 13: Bogotá->Santa Marta | LN=4 CV=5 (Extradimensionado) | Peso=34000
+-- Resultado: sin tarifa (ruta poco frecuente, confirmado sin filtro de negocio/peso también)
+SELECT 13 AS Linea, ID, ORIGEN, DESTINO, VALOR, VIGENCIA, RANGOPESOINF, RANGOPESOSUP
 FROM dbo.tblSAPTarifas
-WHERE ORIGEN = '<<ZONA_BOGOTA>>' AND DESTINO = '<<ZONA_SANTAMARTA>>'
+WHERE ORIGEN IN ('ZTC_BOGOTA', 'ZTC_NORTE_BOGOTA') AND DESTINO = 'ZC_SANTA MARTA'
   AND LINEANEGOCIO = 4 AND CLASEVIAJE = 5
   AND 34000 BETWEEN RANGOPESOINF AND RANGOPESOSUP
-  AND TIPOVEHICULO = '<<VEHCOD_3S3>>' AND VIGENCIA >= '2026-09-16';
--- Candidato fuerte a "sin tarifa de plaza" (extradimensionado es infrecuente)
--- — si no aparece nada, no es un error, gobierna el piso SICE-TAC en solitario
--- o queda para atención manual si tampoco hay piso.
+  AND VIGENCIA >= '2026-09-16';
 
--- Línea 14: Ibagué->Buenaventura | LineaNegocio=6 | ClaseViaje=1 | Peso=3500 | Mini Mula 2S2
-SELECT 14 AS Linea, ID, ORIGEN, DESTINO, VALOR, VIGENCIA, RANGOPESOINF, RANGOPESOSUP, TIPOVEHICULO
+-- Línea 14: Ibagué->Buenaventura (devolución) | LN=6 CV=1 | CNT20.ST
+-- Resultado: sin tarifa (0 filas, confirmado sin filtro de peso también)
+SELECT 14 AS Linea, ID, ORIGEN, DESTINO, VALOR, VIGENCIA, RANGOPESOINF, RANGOPESOSUP
 FROM dbo.tblSAPTarifas
-WHERE ORIGEN = '<<ZONA_IBAGUE>>' AND DESTINO = '<<ZONA_BUENAVENTURA>>'
+WHERE ORIGEN = 'ZC_IBAGUE' AND DESTINO = 'ZC_BUENAVENTURA'
   AND LINEANEGOCIO = 6 AND CLASEVIAJE = 1
-  AND 3500 BETWEEN RANGOPESOINF AND RANGOPESOSUP
-  AND TIPOVEHICULO = '<<VEHCOD_2S2>>' AND VIGENCIA >= '2026-09-16';
+  AND VIGENCIA >= '2026-09-16';
 
--- Línea 15: Neiva->Bogotá | LineaNegocio=8 (Licitaciones) | ClaseViaje=4 | Peso=9800 | Turbo
-SELECT 15 AS Linea, ID, ORIGEN, DESTINO, VALOR, VIGENCIA, RANGOPESOINF, RANGOPESOSUP, TIPOVEHICULO
+-- Línea 15: Neiva->Bogotá | LN=8 CV=4 (Licitaciones) | Peso=9800 | "Turbo" comparte código C2=4
+-- Resultado: sin tarifa VIGENTE — existió, venció 2026-02-10 (7 meses antes)
+SELECT 15 AS Linea, ID, ORIGEN, DESTINO, VALOR, VIGENCIA, RANGOPESOINF, RANGOPESOSUP
 FROM dbo.tblSAPTarifas
-WHERE ORIGEN = '<<ZONA_NEIVA>>' AND DESTINO = '<<ZONA_BOGOTA>>'
-  AND LINEANEGOCIO = 8 AND CLASEVIAJE = 4
+WHERE ORIGEN = 'ZTC_NEIVA' AND DESTINO IN ('ZTC_BOGOTA', 'ZTC_NORTE_BOGOTA')
+  AND LINEANEGOCIO = 8 AND CLASEVIAJE = 4 AND TIPOVEHICULO = 4
   AND 9800 BETWEEN RANGOPESOINF AND RANGOPESOSUP
-  AND TIPOVEHICULO = '<<VEHCOD_TURBO>>' AND VIGENCIA >= '2026-09-16';
+  AND VIGENCIA >= '2026-09-16';
 
 -- ============================================================
--- PASO 4 — Piso SICE-TAC vigente por línea (DWSice, tblRutasSicetac)
--- SICE-TAC usa nombre de ciudad en texto libre (NOMBRERUTA) y CONFIGURACION
--- suele coincidir con el código que ya trae el nombre del vehículo
--- (ej. "3S3", "2S2") — para Turbo/Camioneta buscar la categoría "Liviano"
--- con descripción pegada (match por prefijo, no igualdad exacta).
--- PERIODO real más reciente disponible: usar el que arroje
--- `SELECT MAX(PERIODO) FROM dbo.tblRutasSicetac` (probablemente 202609).
+-- PARTE B — Piso SICE-TAC vigente (base: DWSice)
+-- Filtrar SIEMPRE por NOMBRETIPOCARGA ('General' o 'Contenedor vacío' para
+-- devoluciones) y por el PERIODO más reciente disponible.
 -- ============================================================
 
-SELECT 1 AS Linea, NOMBRERUTA, CONFIGURACION, NOMBRETIPOCARGA, VALORSICECONHORA, VIAESTANDAR
+SELECT 1 AS Linea, NOMBRERUTA, CONFIGURACION, VALORSICECONHORA, VIAESTANDAR
 FROM dbo.tblRutasSicetac
 WHERE NOMBRERUTA LIKE '%Buenaventura%' AND NOMBRERUTA LIKE '%Bogot%'
-  AND CONFIGURACION = '3S3' AND PERIODO = (SELECT MAX(PERIODO) FROM dbo.tblRutasSicetac)
+  AND CONFIGURACION = '3S3' AND NOMBRETIPOCARGA = 'General'
+  AND PERIODO = (SELECT MAX(PERIODO) FROM dbo.tblRutasSicetac)
 ORDER BY VIAESTANDAR DESC, VALORSICECONHORA ASC;
+-- Resultado: $4.907.956 (Buenaventura->Bogotá)
 
-SELECT 2 AS Linea, NOMBRERUTA, CONFIGURACION, NOMBRETIPOCARGA, VALORSICECONHORA, VIAESTANDAR
+SELECT 2 AS Linea, NOMBRERUTA, CONFIGURACION, VALORSICECONHORA, VIAESTANDAR
 FROM dbo.tblRutasSicetac
 WHERE NOMBRERUTA LIKE '%Buenaventura%' AND NOMBRERUTA LIKE '%Medell%'
-  AND CONFIGURACION = '3S2' AND PERIODO = (SELECT MAX(PERIODO) FROM dbo.tblRutasSicetac)
+  AND CONFIGURACION = '3S2' AND NOMBRETIPOCARGA = 'General'
+  AND PERIODO = (SELECT MAX(PERIODO) FROM dbo.tblRutasSicetac)
 ORDER BY VIAESTANDAR DESC, VALORSICECONHORA ASC;
+-- Resultado: $4.675.605 (Buenaventura->Medellín)
 
-SELECT 3 AS Linea, NOMBRERUTA, CONFIGURACION, NOMBRETIPOCARGA, VALORSICECONHORA, VIAESTANDAR
+SELECT 3 AS Linea, NOMBRERUTA, CONFIGURACION, VALORSICECONHORA, VIAESTANDAR
 FROM dbo.tblRutasSicetac
 WHERE NOMBRERUTA LIKE '%Medell%' AND NOMBRERUTA LIKE '%Buenaventura%'
-  AND CONFIGURACION = '2S2' AND PERIODO = (SELECT MAX(PERIODO) FROM dbo.tblRutasSicetac)
+  AND CONFIGURACION = '2S2' AND NOMBRETIPOCARGA = 'Contenedor vacío'
+  AND PERIODO = (SELECT MAX(PERIODO) FROM dbo.tblRutasSicetac)
 ORDER BY VIAESTANDAR DESC, VALORSICECONHORA ASC;
+-- Resultado: $2.454.868 (Medellín->Buenaventura, casi empate con plaza)
 
-SELECT 4 AS Linea, NOMBRERUTA, CONFIGURACION, NOMBRETIPOCARGA, VALORSICECONHORA, VIAESTANDAR
+SELECT 4 AS Linea, NOMBRERUTA, CONFIGURACION, VALORSICECONHORA, VIAESTANDAR
 FROM dbo.tblRutasSicetac
 WHERE NOMBRERUTA LIKE '%Bogot%' AND NOMBRERUTA LIKE '%Buenaventura%'
-  AND CONFIGURACION = '2S3' AND PERIODO = (SELECT MAX(PERIODO) FROM dbo.tblRutasSicetac)
+  AND CONFIGURACION = '2S3' AND NOMBRETIPOCARGA = 'Contenedor vacío'
+  AND PERIODO = (SELECT MAX(PERIODO) FROM dbo.tblRutasSicetac)
 ORDER BY VIAESTANDAR DESC, VALORSICECONHORA ASC;
+-- Resultado: $2.656.946 (Bogotá->Buenaventura)
 
-SELECT 5 AS Linea, NOMBRERUTA, CONFIGURACION, NOMBRETIPOCARGA, VALORSICECONHORA, VIAESTANDAR
+SELECT 5 AS Linea, NOMBRERUTA, CONFIGURACION, VALORSICECONHORA, VIAESTANDAR
 FROM dbo.tblRutasSicetac
 WHERE NOMBRERUTA LIKE '%Cali%' AND NOMBRERUTA LIKE '%Cartagena%'
-  AND CONFIGURACION = '3S3' AND PERIODO = (SELECT MAX(PERIODO) FROM dbo.tblRutasSicetac)
+  AND CONFIGURACION = '3S3' AND NOMBRETIPOCARGA = 'General'
+  AND PERIODO = (SELECT MAX(PERIODO) FROM dbo.tblRutasSicetac)
 ORDER BY VIAESTANDAR DESC, VALORSICECONHORA ASC;
+-- Resultado: $9.841.527 (Cali->Cartagena)
 
-SELECT 6 AS Linea, NOMBRERUTA, CONFIGURACION, NOMBRETIPOCARGA, VALORSICECONHORA, VIAESTANDAR
+SELECT 6 AS Linea, NOMBRERUTA, CONFIGURACION, VALORSICECONHORA, VIAESTANDAR
 FROM dbo.tblRutasSicetac
 WHERE NOMBRERUTA LIKE '%Bucaramanga%' AND NOMBRERUTA LIKE '%Bogot%'
-  AND CONFIGURACION = 'C2' AND PERIODO = (SELECT MAX(PERIODO) FROM dbo.tblRutasSicetac)
+  AND CONFIGURACION = '2' AND NOMBRETIPOCARGA = 'General'
+  AND PERIODO = (SELECT MAX(PERIODO) FROM dbo.tblRutasSicetac)
 ORDER BY VIAESTANDAR DESC, VALORSICECONHORA ASC;
+-- Resultado: $2.107.491 (Bucaramanga->Bogotá) — código '2', no 'C2' (catálogo SICE-TAC distinto al de SAP)
 
-SELECT 7 AS Linea, NOMBRERUTA, CONFIGURACION, NOMBRETIPOCARGA, VALORSICECONHORA, VIAESTANDAR
+SELECT 7 AS Linea, NOMBRERUTA, CONFIGURACION, VALORSICECONHORA, VIAESTANDAR
 FROM dbo.tblRutasSicetac
 WHERE NOMBRERUTA LIKE '%Barranquilla%' AND NOMBRERUTA LIKE '%Buenaventura%'
-  AND CONFIGURACION = '3S3' AND PERIODO = (SELECT MAX(PERIODO) FROM dbo.tblRutasSicetac)
+  AND CONFIGURACION = '3S3' AND NOMBRETIPOCARGA = 'General'
+  AND PERIODO = (SELECT MAX(PERIODO) FROM dbo.tblRutasSicetac)
 ORDER BY VIAESTANDAR DESC, VALORSICECONHORA ASC;
+-- Resultado: $10.419.069 (Barranquilla->Buenaventura)
 
-SELECT 8 AS Linea, NOMBRERUTA, CONFIGURACION, NOMBRETIPOCARGA, VALORSICECONHORA, VIAESTANDAR
+SELECT 8 AS Linea, NOMBRERUTA, CONFIGURACION, VALORSICECONHORA, VIAESTANDAR
 FROM dbo.tblRutasSicetac
 WHERE NOMBRERUTA LIKE '%C%cuta%' AND NOMBRERUTA LIKE '%Bogot%'
-  AND CONFIGURACION LIKE 'Turbo%'
+  AND CONFIGURACION = '2' AND NOMBRETIPOCARGA = 'General'
   AND PERIODO = (SELECT MAX(PERIODO) FROM dbo.tblRutasSicetac)
 ORDER BY VIAESTANDAR DESC, VALORSICECONHORA ASC;
+-- Resultado: $3.015.093 (Cúcuta->Bogotá)
 
-SELECT 9 AS Linea, NOMBRERUTA, CONFIGURACION, NOMBRETIPOCARGA, VALORSICECONHORA, VIAESTANDAR
+SELECT 9 AS Linea, NOMBRERUTA, CONFIGURACION, VALORSICECONHORA, VIAESTANDAR
 FROM dbo.tblRutasSicetac
 WHERE NOMBRERUTA LIKE '%Bogot%' AND NOMBRERUTA LIKE '%Villavicencio%'
-  AND CONFIGURACION LIKE '%Liviano%'
-  AND PERIODO = (SELECT MAX(PERIODO) FROM dbo.tblRutasSicetac)
-ORDER BY VIAESTANDAR DESC, VALORSICECONHORA ASC;
--- ("Camioneta" — probar CONFIGURACION LIKE '2L%' si 'Liviano' no trae nada)
+  AND PERIODO = (SELECT MAX(PERIODO) FROM dbo.tblRutasSicetac);
+-- Resultado: SIN FILAS EN ABSOLUTO para esta ruta (confirmado dos veces, sin
+-- ningún filtro de vehículo/tipo de carga) — única línea junto con la 12 sin
+-- ninguna fuente real. Requiere atención manual.
 
-SELECT 10 AS Linea, NOMBRERUTA, CONFIGURACION, NOMBRETIPOCARGA, VALORSICECONHORA, VIAESTANDAR
+SELECT 10 AS Linea, NOMBRERUTA, CONFIGURACION, VALORSICECONHORA, VIAESTANDAR
 FROM dbo.tblRutasSicetac
 WHERE NOMBRERUTA LIKE '%Pereira%' AND NOMBRERUTA LIKE '%Buenaventura%'
-  AND CONFIGURACION = '3S2' AND PERIODO = (SELECT MAX(PERIODO) FROM dbo.tblRutasSicetac)
+  AND CONFIGURACION = '3S2' AND NOMBRETIPOCARGA = 'General'
+  AND PERIODO = (SELECT MAX(PERIODO) FROM dbo.tblRutasSicetac)
 ORDER BY VIAESTANDAR DESC, VALORSICECONHORA ASC;
+-- Resultado: $2.624.742 (Pereira->Buenaventura)
 
-SELECT 11 AS Linea, NOMBRERUTA, CONFIGURACION, NOMBRETIPOCARGA, VALORSICECONHORA, VIAESTANDAR
+SELECT 11 AS Linea, NOMBRERUTA, CONFIGURACION, VALORSICECONHORA, VIAESTANDAR
 FROM dbo.tblRutasSicetac
 WHERE NOMBRERUTA LIKE '%Buenaventura%' AND NOMBRERUTA LIKE '%Cali%'
-  AND CONFIGURACION LIKE '%C3%' -- "Doble Troque" — confirmar código exacto en catálogo, no asumir
-  AND PERIODO = (SELECT MAX(PERIODO) FROM dbo.tblRutasSicetac)
-ORDER BY VIAESTANDAR DESC, VALORSICECONHORA ASC;
+  AND PERIODO = (SELECT MAX(PERIODO) FROM dbo.tblRutasSicetac);
+-- Resultado: SIN FILAS EN ABSOLUTO (confirmado dos veces) — gobierna la
+-- plaza en solitario, $2.400.000 (ver Parte A, línea 11).
 
-SELECT 12 AS Linea, NOMBRERUTA, CONFIGURACION, NOMBRETIPOCARGA, VALORSICECONHORA, VIAESTANDAR
+SELECT 12 AS Linea, NOMBRERUTA, CONFIGURACION, VALORSICECONHORA, VIAESTANDAR
 FROM dbo.tblRutasSicetac
 WHERE NOMBRERUTA LIKE '%Manizales%' AND NOMBRERUTA LIKE '%Medell%'
-  AND CONFIGURACION = 'C2' AND PERIODO = (SELECT MAX(PERIODO) FROM dbo.tblRutasSicetac)
-ORDER BY VIAESTANDAR DESC, VALORSICECONHORA ASC;
+  AND PERIODO = (SELECT MAX(PERIODO) FROM dbo.tblRutasSicetac);
+-- Resultado: SIN FILAS EN ABSOLUTO — junto con la 9, la única sin ninguna
+-- fuente real. Requiere atención manual.
 
-SELECT 13 AS Linea, NOMBRERUTA, CONFIGURACION, NOMBRETIPOCARGA, VALORSICECONHORA, VIAESTANDAR
+SELECT 13 AS Linea, NOMBRERUTA, CONFIGURACION, VALORSICECONHORA, VIAESTANDAR
 FROM dbo.tblRutasSicetac
 WHERE NOMBRERUTA LIKE '%Bogot%' AND NOMBRERUTA LIKE '%Santa Marta%'
-  AND CONFIGURACION = '3S3' AND PERIODO = (SELECT MAX(PERIODO) FROM dbo.tblRutasSicetac)
-ORDER BY VIAESTANDAR DESC, VALORSICECONHORA ASC;
-
-SELECT 14 AS Linea, NOMBRERUTA, CONFIGURACION, NOMBRETIPOCARGA, VALORSICECONHORA, VIAESTANDAR
-FROM dbo.tblRutasSicetac
-WHERE NOMBRERUTA LIKE '%Ibagu%' AND NOMBRERUTA LIKE '%Buenaventura%'
-  AND CONFIGURACION = '2S2' AND PERIODO = (SELECT MAX(PERIODO) FROM dbo.tblRutasSicetac)
-ORDER BY VIAESTANDAR DESC, VALORSICECONHORA ASC;
-
-SELECT 15 AS Linea, NOMBRERUTA, CONFIGURACION, NOMBRETIPOCARGA, VALORSICECONHORA, VIAESTANDAR
-FROM dbo.tblRutasSicetac
-WHERE NOMBRERUTA LIKE '%Neiva%' AND NOMBRERUTA LIKE '%Bogot%'
-  AND CONFIGURACION LIKE 'Turbo%'
+  AND CONFIGURACION = '3S3' AND NOMBRETIPOCARGA = 'General'
   AND PERIODO = (SELECT MAX(PERIODO) FROM dbo.tblRutasSicetac)
 ORDER BY VIAESTANDAR DESC, VALORSICECONHORA ASC;
+-- Resultado: $7.683.100 (Bogotá->Santa Marta)
+
+SELECT 14 AS Linea, NOMBRERUTA, CONFIGURACION, VALORSICECONHORA, VIAESTANDAR
+FROM dbo.tblRutasSicetac
+WHERE NOMBRERUTA LIKE '%Ibagu%' AND NOMBRERUTA LIKE '%Buenaventura%'
+  AND CONFIGURACION = '2S2' AND NOMBRETIPOCARGA = 'Contenedor vacío'
+  AND PERIODO = (SELECT MAX(PERIODO) FROM dbo.tblRutasSicetac)
+ORDER BY VIAESTANDAR DESC, VALORSICECONHORA ASC;
+-- Resultado: $1.575.917 (Ibagué->Buenaventura)
+
+SELECT 15 AS Linea, NOMBRERUTA, CONFIGURACION, VALORSICECONHORA, VIAESTANDAR
+FROM dbo.tblRutasSicetac
+WHERE NOMBRERUTA LIKE '%Neiva%' AND NOMBRERUTA LIKE '%Bogot%'
+  AND CONFIGURACION = '2' AND NOMBRETIPOCARGA = 'General'
+  AND PERIODO = (SELECT MAX(PERIODO) FROM dbo.tblRutasSicetac)
+ORDER BY VIAESTANDAR DESC, VALORSICECONHORA ASC;
+-- Resultado: $1.719.671 (Neiva->Bogotá)
 
 -- ============================================================
--- PASO 5 — Regla "solo SICE-TAC": ¿alguna de estas 15 rutas ya tiene la
--- regla activa? (app DB, CabinaFletes)
+-- PARTE C — Regla 3 (solo SICE-TAC): ¿alguna de las 15 rutas ya tiene la
+-- regla activa? (base: CabinaFletes, la app) — PENDIENTE DE CORRER
 -- ============================================================
 SELECT * FROM dbo.reglas_solo_sicetac
 WHERE (Origen, Destino) IN (

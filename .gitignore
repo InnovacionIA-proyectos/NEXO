@@ -21,6 +21,9 @@ appsettings.*.local.json
 # Configuración local de Claude Code (permisos, hosts internos) — no versionar
 .claude/settings.json
 
+# Override local de Docker Compose (puertos/ajustes propios de una máquina) — no versionar
+docker-compose.override.yml
+
 # Logs y temporales
 *.log
 *.tmp
