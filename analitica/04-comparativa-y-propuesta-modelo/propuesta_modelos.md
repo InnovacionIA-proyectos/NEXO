@@ -2,7 +2,7 @@
 
 Dos propuestas de modelo, cada una con objetivo, grano, features y supuestos — **ningún modelo se construye este sprint**. Cada ficha declara explícitamente sus limitaciones conocidas y qué falta resolver antes de poder entrenar en serio. Ver [`informe_comparativo.md`](informe_comparativo.md) para la comparativa que sustenta estas propuestas, y `hallazgos.md`/`limitaciones.md` de ambos EDA para la evidencia citada (H-0xx/L-0x).
 
-**Nota:** originalmente se había planteado aquí un "Modelo 2" para `Flete Producción FO` vía Tarifario SAP. Al analizarlo más a fondo, no es un modelo predictivo — es una **verificación** de si la regla de precio que CabinaFletes ya automatiza (`ReglaDeCosteo`) también explica el histórico real de la empresa. Se movió a [`recomendacion_captura_datos.md`](recomendacion_captura_datos.md) §7, como recomendación de una HU de validación futura, no como propuesta de modelo.
+**Nota:** originalmente se había planteado aquí un modelo para `Flete Producción FO` vía Tarifario SAP, entendido como comparación contra la regla de precio. Al analizarlo más a fondo, esa comparación específica no es un modelo predictivo — es una **verificación** de si la regla que CabinaFletes ya automatiza (`ReglaDeCosteo`, MAX(SICE-TAC, SAP)) también explica el histórico real de la empresa. Esa verificación se movió a [`recomendacion_captura_datos.md`](recomendacion_captura_datos.md) §7, como recomendación de una HU de validación futura, no como propuesta de modelo. Es un objetivo **distinto** del Modelo 2 de abajo: el Modelo 2 no compara contra la regla de precio, predice `Flete Producción FO` directamente a partir de variables operativas del viaje — el objetivo 1 de `informe_comparativo.md` §4, ya declarado viable con el dato de hoy.
 
 ---
 
@@ -79,7 +79,88 @@ Una fila = una combinación **ruta (`NOMBRERUTA`/`ORIGEN`-`DESTINO`) × `CONFIGU
 
 ---
 
-## Modelo 2 — Recomendador de tarifa con mayor probabilidad de ser "ganada" (`tarifas_historicas`)
+## Modelo 2 — Predicción de `Flete Producción FO` (tarifa de techo) con variables operativas
+
+### Objetivo
+
+Predecir `Flete Producción FO` —el valor real pagado al transportista, el techo de tarifa que efectivamente rige la operación— a partir de las variables operativas propias del viaje (peso, zona/distancia, tipo de vehículo, flota, línea de negocio, componente temporal), usando `FactFWOFUFO` como fuente. Corresponde al objetivo 1 de `informe_comparativo.md` §4, ya declarado **viable hoy** con el dato disponible.
+
+**Alcance confirmado por negocio:** sin filtrar por corredor — se entrena con **todas** las rutas de `FactFWOFUFO` a nivel nacional, no solo el corredor Buenaventura (confirmado por el usuario, ver `recomendacion_captura_datos.md` §6). El único filtro que se conserva es el que la extracción ya trae por diseño: **solo viajes en estado `Concluido`/`Ejecutado`**. El modelo predice la tarifa esperada para viajes que efectivamente se completan; no intenta cubrir `Anulado`/`En tratamiento` — eso es un objetivo distinto (probabilidad de cancelación), declarado no viable aparte (`declaracion_no_viabilidad.md`, objetivo 2).
+
+### Grano
+
+**`FO` + `BP Cliente` + `Peso Neto` + `Destino`** — mismo grano recomendado en `informe_comparativo.md` §5, correspondiente al nivel `FWO` (el contrato real con el cliente dentro de un `FO` que puede agrupar carga consolidada de varios clientes, confirmado contra `FactFWOFUFO`, H-001 EDA-1). No se entrena a nivel `FO` crudo porque esa clave no es única (128 valores repetidos).
+
+### Features candidatas
+
+Mismas variables ya identificadas en `informe_comparativo.md` §6:
+
+- `Peso Neto` (confirmado en KG contra `FactFWOFUFO`)
+- `Distancia Total` — válida como variable de tarifa/zona, no como medición real del viaje (H-011 EDA-1)
+- Zona de tarificación de origen/destino, agrupando ciudades satélite en vez de la ciudad cruda (~113/122 ciudades → ~15-20 zonas, H-008 EDA-1) — pendiente completar el mapeo para ciudades fuera del corredor actual
+- Tipo de vehículo: `ID Medio Transporte FO` + `Clase Equipo FOP` (las 2 dimensiones reales, tras eliminar la redundancia de las 5 columnas de vehículo/equipo, H-007 EDA-1)
+- Flota (Propio/Tercero)
+- Línea de negocio / Clase Expedición FWO
+- Componente temporal explícito (mes, o régimen antes/después de marzo 2026 — necesario por el salto de +16,7% confirmado en esa fecha, H-003 EDA-1)
+
+**Deseable a futuro, no bloqueante para la primera versión:** contexto de mercado vigente por fecha (piso SICE-TAC / plaza SAP) — el mecanismo de cruce ya está confirmado exacto en ambos lados (H-005 EDA-2), pero incorporarlo como feature depende de terminar de procesar los 27 períodos históricos de SICE-TAC a la escala de los 13 meses de EDA-1 (objetivo 2 de `informe_comparativo.md` §4, L-07 EDA-2) — se puede sumar en una iteración posterior.
+
+**Mismas variables exógenas candidatas que el Modelo 1**, porque presionan el costo real de operar el viaje igual que presionan el piso SICE-TAC:
+
+- Salario mínimo vigente (con rezago de 1-3 meses, mismo patrón confirmado en EDA-1, H-003)
+- Precio del combustible (ACPM) — componente directo del costo de operación del transportista
+- Peajes, si hay fuente disponible
+- Eventos de paro camionero (variable binaria/intensidad) — mismo insumo que el Modelo 1, no existe en ningún extracto actual
+
+Aplican con la misma salvedad que en el Modelo 1: se agregan como features candidatas, no como variables ya disponibles — ver la tabla de abajo para qué falta conseguir de cada una.
+
+### Datos adicionales necesarios
+
+| Dato | ¿Ya lo tenemos? | Cómo se extrae |
+|---|---|---|
+| `FactFWOFUFO` ampliado a nivel nacional | ❌ No — hoy solo se tiene el corredor Buenaventura (41.237 filas, 13 meses) | Nueva extracción, ya confirmada como correcta por negocio (`recomendacion_captura_datos.md` §6); mismo formato y columnas del extracto actual |
+| Mapeo ciudad→zona de tarificación completo | Parcial — resuelto para 21/24 ciudades de la muestra actual | Completar contra `tblSAPDANE`/`tblZonasTarificacionRelacion` para las ciudades nuevas del extracto nacional |
+| Salario mínimo histórico (mensual) | ❌ No | Mismo insumo que el Modelo 1 — decretos oficiales de MinTrabajo/Presidencia, serie corta y pública |
+| Precio de combustible (ACPM) histórico | ❌ No | Mismo insumo que el Modelo 1 — boletines del Ministerio de Minas y Energía |
+| Eventos de paro camionero (fecha, duración, intensidad) | ❌ No | Mismo insumo que el Modelo 1 — se cura a mano desde prensa o gremios de transporte (ver `recomendacion_captura_datos.md` §5) |
+
+### Modelo de ML propuesto (2 opciones)
+
+**Opción A — Gradient Boosting (LightGBM o XGBoost), modelo único a nivel nacional.** Regresión supervisada de `Flete Producción FO` sobre las features operativas, entrenado con todas las combinaciones ruta×vehículo×línea de negocio a la vez. Ventaja: aprovecha el volumen nacional completo y comparte patrones entre zonas parecidas — relevante para zonas nuevas (fuera de Buenaventura) con poca historia propia. Desventaja: puede diluir efectos muy locales de una zona específica si la zona no entra como feature categórica de buena calidad.
+
+**Opción B — Modelo jerárquico/segmentado por zona o línea de negocio.** Un modelo (o una capa de ajuste) por zona de tarificación o línea de negocio, en vez de uno global. Ventaja: más fácil de auditar por segmento ("¿por qué el techo de Buenaventura es distinto al del Caribe?"), y aísla mejor el salto de régimen de marzo 2026 si no afecta igual a todas las zonas. Desventaja: necesita volumen suficiente por segmento — riesgo real en zonas nuevas del extracto nacional que hoy no se conocen.
+
+**Recomendación inicial:** empezar con la Opción A sobre el extracto nacional completo, con zona y línea de negocio como features categóricas fuertes, y usar la Opción B como diagnóstico para detectar si algún segmento se comporta sistemáticamente distinto (candidato a submodelo propio).
+
+### Supuestos
+
+- Que restringir el entrenamiento a viajes `Concluido`/`Ejecutado` es el alcance aceptado por negocio para este modelo — confirmado ahora, a diferencia del objetivo de cancelación (declarado no viable aparte).
+- Que las relaciones entre variables operativas y `Flete Producción FO` observadas en el corredor Buenaventura (bivariado ya explorado en EDA-1) se mantienen razonablemente al extender a nivel nacional — pendiente confirmar cuando llegue el extracto ampliado.
+- Que el salto de régimen de marzo 2026 (+16,7%) se puede modelar como variable temporal explícita, sin necesitar un modelo separado por período.
+
+### Limitaciones conocidas
+
+- Sesgo de selección: el modelo solo aprende de viajes que llegan a concluirse — no es válido para estimar la probabilidad de que un viaje se concrete (H-004 EDA-1; ese objetivo queda declarado no viable aparte, `declaracion_no_viabilidad.md` objetivo 2).
+- Hasta que llegue el extracto nacional ampliado, el único dato de entrenamiento disponible sigue siendo el corredor Buenaventura (41.237 filas, 13 meses) — el alcance nacional es el objetivo confirmado, no el estado actual del dato.
+- Contexto de mercado (piso SICE-TAC / plaza SAP vigente por fecha) no está aún incorporado como feature — sigue bloqueado por escala de procesamiento, no por el mecanismo (objetivo 2, L-07 EDA-2).
+- Mapeo completo de ciudad→zona de tarificación pendiente para las ciudades nuevas que traiga el extracto nacional (H-008 EDA-1).
+- `Distancia Total` es valor de tabla/zona, no medición real del viaje — se usa como variable de tarifa, no de logística real (H-011 EDA-1).
+- Las variables exógenas (salario mínimo, combustible, paros) son, igual que en el Modelo 1, trabajo de captura nuevo — hoy no existen en ningún extracto disponible, así que la primera versión del modelo se entrena solo con variables operativas y suma las exógenas cuando estén curadas.
+
+### Reentrenamiento (diseñado, no ejecutado este sprint)
+
+- **Disparador:** cadencia fija de **3 días**, a diferencia del Modelo 1 (que depende de la publicación oficial de un nuevo `PERIODO` de SICE-TAC, con cadencia mensual). Tiene sentido una cadencia corta y fija acá porque `FactFWOFUFO` se alimenta de viajes que se van completando de forma continua, no de una publicación periódica externa — cada ciclo de 3 días simplemente sí o sí incorpora los viajes `Concluido`/`Ejecutado` nuevos desde el ciclo anterior.
+- **Proceso:** agregar los viajes nuevos del ciclo, reentrenar, comparar el error contra el modelo vigente sobre una ventana de validación reciente (igual que Modelo 1).
+- **Métrica de error:** **MAPE** (error porcentual promedio) como métrica principal — más interpretable para negocio que un error en pesos crudos, dado que el valor de `Flete Producción FO` varía en órdenes de magnitud muy distintos entre rutas cortas y largas. **MAE** en pesos como métrica secundaria, para dimensionar el costo absoluto del error. No se fija un umbral numérico de aceptación todavía — no hay evidencia real para defender un número específico sin haber corrido el modelo al menos una vez; se define comparando siempre contra el error del modelo vigente, no contra un umbral absoluto inventado.
+- **Ventana de validación:** propuesta inicial — últimos **15 días** de viajes concluidos (ventana rodante, ~5 ciclos de reentrenamiento), como holdout para decidir si el modelo nuevo reemplaza al vigente. Ajustable una vez se vea el volumen real de viajes completados por ciclo.
+- **Actualización de variables exógenas dentro del ciclo:** las exógenas (salario mínimo, combustible, paros) no cambian a la misma cadencia que el reentrenamiento — cada ciclo de 3 días usa el valor vigente más reciente de cada una, no vuelve a consultar la fuente externa en cada ciclo (salario mínimo es ~anual, combustible más frecuente, paros es por evento).
+- **Versionado y regla de reemplazo:** mismos criterios que Modelo 1 (manifiesto con fecha + métricas + rango de datos, nunca el artefacto pesado; el modelo nuevo solo reemplaza al vigente si iguala o mejora el MAPE de validación — nunca se reemplaza automáticamente sin ese chequeo).
+- **Dueño del proceso:** pendiente de asignar — no se define responsable operativo (equipo de datos/MLOps vs. automatizado) hasta que el modelo entre en producción.
+- **Pendiente de confirmar con negocio:** si 3 días es una cadencia realista dado el volumen real de viajes nuevos que se completan en ese lapso (si el volumen por ciclo es muy bajo, reentrenar cada 3 días puede no cambiar el modelo de forma significativa frente a, por ejemplo, una cadencia semanal).
+
+---
+
+## Modelo 3 — Recomendador de tarifa con mayor probabilidad de ser "ganada" (`tarifas_historicas`)
 
 ### Objetivo
 
