@@ -23,6 +23,7 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<RechazarSolicitudCommand, Unit>, RechazarSolicitudCommandHandler>();
         services.AddScoped<ICommandHandler<RecalcularScoreCommand, DesgloseScoreDto>, RecalcularScoreCommandHandler>();
         services.AddScoped<ICommandHandler<CapturarSolicitudCommand, CapturaResultDto>, CapturarSolicitudCommandHandler>();
+        services.AddScoped<ICommandHandler<ResolverCatalogosDeLineasCommand, IReadOnlyList<CatalogoLineaResueltoDto>>, ResolverCatalogosDeLineasCommandHandler>();
 
         services.AddScoped<IQueryHandler<ObtenerBandejaQuery, IReadOnlyList<BandejaItemDto>>, ObtenerBandejaQueryHandler>();
         services.AddScoped<IQueryHandler<ObtenerCosteoQuery, SolicitudCosteoDto>, ObtenerCosteoQueryHandler>();

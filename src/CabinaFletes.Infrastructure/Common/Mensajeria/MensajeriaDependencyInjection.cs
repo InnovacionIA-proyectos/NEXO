@@ -131,6 +131,15 @@ public static class MensajeriaDependencyInjection
             // notificación perdida no se recupera consultando nada y nadie se enteraría.
             x.AddConsumer<NotificarEntregaConsumer>();
 
+            // Las 3 alertas de negocio de la sección 9 del documento de entendimiento
+            // (issue #131): tarifa vencida, línea sin costear por falla técnica, y
+            // cotización ganada. Mismo criterio que arriba: la excepción sube.
+            x.AddConsumer<NotificarTarifaVencidaConsumer>();
+            x.AddConsumer<NotificarLineaFalloTecnicoConsumer>();
+            x.AddConsumer<NotificarCotizacionGanadaConsumer>();
+            x.AddConsumer<AlertaDeFalloConsumer<TarifaVencidaDetectada>>();
+            x.AddConsumer<AlertaDeFalloConsumer<CotizacionMarcadaGanada>>();
+
             // La saga se persiste en la misma base que los datos del negocio. Su estado
             // ES la respuesta al cliente que preguntó por su trabajo, así que un
             // reinicio no puede borrarlo.
@@ -358,6 +367,8 @@ public static class MensajeriaDependencyInjection
         services.AddScoped<IValidadorDeMensaje<RecalcularScoresSolicitado>, RecalcularScoresSolicitadoValidador>();
         services.AddScoped<IValidadorDeMensaje<BandejaCambio>, BandejaCambioValidador>();
         services.AddScoped<IValidadorDeMensaje<CotizacionEntregada>, CotizacionEntregadaValidador>();
+        services.AddScoped<IValidadorDeMensaje<TarifaVencidaDetectada>, TarifaVencidaDetectadaValidador>();
+        services.AddScoped<IValidadorDeMensaje<CotizacionMarcadaGanada>, CotizacionMarcadaGanadaValidador>();
 
         return services;
     }

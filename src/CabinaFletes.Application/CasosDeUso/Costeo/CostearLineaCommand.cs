@@ -44,6 +44,8 @@ public sealed class CostearLineaCommandHandler(
                 command.TrabajoId, command.SolicitudId, command.LineaId,
                 TipoPendienteDeCosteo.Manual, resultado.Justificacion, ct);
 
+            await lineas.MarcarPendienteAsync(command.LineaId, resultado.Justificacion, ct);
+
             await publicador.PublicarAsync(new LineaRequiereTarifaManual(
                 command.TrabajoId, command.SolicitudId, command.LineaId, resultado.Justificacion), ct);
 

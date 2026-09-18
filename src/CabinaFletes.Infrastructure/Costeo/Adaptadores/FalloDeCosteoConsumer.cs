@@ -1,3 +1,4 @@
+using CabinaFletes.Application.CasosDeUso.Costeo.Interfaces;
 using CabinaFletes.Application.CasosDeUso.Trabajos.Interfaces;
 using CabinaFletes.Application.Common.Abstractions;
 using CabinaFletes.Domain.Enums;
@@ -23,6 +24,7 @@ namespace CabinaFletes.Infrastructure.Costeo.Adaptadores;
 /// </summary>
 public sealed class FalloDeCosteoConsumer(
     IPendientesDeCosteoPort pendientes,
+    ILineasCosteadasPort lineas,
     IUnitOfWork uow)
     : IConsumer<Fault<CostearLineaSolicitada>>
 {
@@ -37,6 +39,8 @@ public sealed class FalloDeCosteoConsumer(
         await pendientes.RegistrarAsync(
             original.TrabajoId, original.SolicitudId, original.LineaId,
             TipoPendienteDeCosteo.Tecnica, motivo, contexto.CancellationToken);
+
+        await lineas.MarcarPendienteAsync(original.LineaId, motivo, contexto.CancellationToken);
 
         await uow.SaveChangesAsync(contexto.CancellationToken);
 

@@ -15,7 +15,8 @@ public class SolicitudesController(
     ICommandHandler<CrearSolicitudCommand, Guid> crear,
     ICommandHandler<CargarLineasBulkCommand, Guid> cargarLineas,
     ICommandHandler<RechazarSolicitudCommand, Unit> rechazar,
-    ICommandHandler<RecalcularScoreCommand, DesgloseScoreDto> recalcular)
+    ICommandHandler<RecalcularScoreCommand, DesgloseScoreDto> recalcular,
+    ICommandHandler<ResolverCatalogosDeLineasCommand, IReadOnlyList<CatalogoLineaResueltoDto>> resolverCatalogos)
     : ControllerBase
 {
     /// <summary>
@@ -44,6 +45,21 @@ public class SolicitudesController(
         var linea = req.Linea is null ? null : new CrearLineaInput(req.Linea.RutaId, req.Linea.ConfigVehiculoId, req.Linea.Tipologia, req.Linea.Peso, req.Linea.ValorMercancia);
         var id = await crear.Handle(new CrearSolicitudCommand(req.ClienteId, req.Tipo, req.Modalidad, req.Deadline, req.ValorEstimado, req.ProbabilidadCierre, linea), ct);
         return Created($"/api/solicitudes/{id}", new { id });
+    }
+
+    /// <summary>
+    /// Resuelve texto libre (origen/destino/tipo de vehículo) a RutaId/ConfigVehiculoId,
+    /// creando lo que falte en el catálogo. NO crea ninguna solicitud: es el paso previo
+    /// para que un formulario de captura pueda alimentar a lineas:bulk, que ya exige esos
+    /// IDs resueltos y no los resuelve por su cuenta (issue #131).
+    /// </summary>
+    [HttpPost("resolver-catalogos")]
+    [Authorize(Roles = "Comercial,CoordinadorFletes,Admin")]
+    public async Task<ActionResult<IReadOnlyList<CatalogoLineaResueltoDto>>> ResolverCatalogos(
+        [FromBody] List<ResolverCatalogoLineaRequest> req, CancellationToken ct = default)
+    {
+        var lineas = req.Select(lr => new ResolverCatalogoLineaInput(lr.Origen, lr.Destino, lr.TipoVehiculo, lr.Carroceria)).ToList();
+        return Ok(await resolverCatalogos.Handle(new ResolverCatalogosDeLineasCommand(lineas), ct));
     }
 
     /// <summary>

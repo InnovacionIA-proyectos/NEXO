@@ -23,7 +23,8 @@ public record PropuestaLineaDto(
     decimal? ValorPropuesto,
     string? FuentePropuesta,
     string Justificacion,
-    CandidatoTarifaDto? RetornoContenedor = null);
+    CandidatoTarifaDto? RetornoContenedor = null,
+    bool Vencida = false);
 
 public record PropuestaSolicitudDto(
     Guid SolicitudId,

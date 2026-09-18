@@ -296,6 +296,136 @@ Probado en vivo contra esa URL:
 | 3 | Build desatualizado por disco lleno en el host | **Resuelto** — redeploy trajo los 16 endpoints, verificados funcionando en vivo |
 | 4 | Confirmar `Cubicador3D__InboundApiKey` == `NEXO_CALLBACK_API_KEY` en Dokploy (no en local) | **Pendiente de confirmar** — no verificable desde afuera sin el secreto real de producción |
 
+## 13. `POST /api/cubicacion` configurado y verificado en producción (2026-09-14, noche)
+
+Configuradas en Dokploy (app de NEXO) `Cubicador3D__OutboundBaseUrl` y
+`Cubicador3D__OutboundApiKey`, con 3 errores de configuración reales
+encontrados y corregidos en el camino (documentados porque el próximo que
+toque esto se puede topar con los mismos):
+
+1. **`Invalid URI: The format of the URI could not be determined`** —
+   faltaba el esquema (`http://`) en `Cubicador3D__OutboundBaseUrl`.
+2. **`The 'hhtp' scheme is not supported`** — typo literal (`hhtp` en vez
+   de `http`) al corregir el punto anterior.
+3. **`503 CUBICADOR_CREDENCIAL_INVALIDA`** — `Cubicador3D__OutboundApiKey`
+   (app NEXO) no coincidía con `CUBICADOR_API_KEY` (app **Cubicador API**,
+   no la del worker — el worker no expone HTTP, así que no valida esta
+   clave). Confusión real en el camino: no es la misma pareja que
+   `NEXO_CALLBACK_API_KEY`/`Cubicador3D__InboundApiKey` (esa es para el
+   sentido Cubicador→NEXO); esta es para NEXO→Cubicador.
+
+**Verificado, `200 OK`**: `POST /api/cubicacion` con 2 ítems reales →
+matrices de evaluación completas para 9 tipos de vehículo/contenedor,
+banda `compatible`, sugerencia de unidad — idéntico a lo que ya se había
+probado en local (sección 11.3).
+
+Con esto, **no queda ningún pendiente técnico conocido** en la integración
+NEXO ↔ Cubicador para este ambiente de Dokploy.
+
+## 12. Incidente real en Dokploy: worker de Cubicador atascado, resuelto (2026-09-14, noche)
+
+Tras redesplegar la app de NEXO en Dokploy con el código de la sección 11
+(que incluye el fix `774de8c`), el flujo dejó de funcionar: `POST
+/demo` respondía `202` pero ningún plan llegaba nunca a `borrador` ni a
+`optimizado` — ni el mío ni el de nadie más, esperando varios minutos.
+
+**Diagnóstico** (logs de la app **worker** de Cubicador en Dokploy, no la
+de NEXO): la excepción `PendingRollbackError` (sesión de SQLAlchemy
+envenenada por una FK violada en `guardar_item`) se propagaba **sin
+capturar** — exactamente el bug que `774de8c` debía resolver. Esto
+confirmó que **la app `worker` de Cubicador seguía corriendo el código
+viejo**: el redeploy anterior solo había tocado la app de NEXO, no la de
+Cubicador (son apps separadas en Dokploy, cada una necesita su propio
+redeploy).
+
+Peor aún: los logs de Postgres mostraron **2 mensajes atascados desde las
+19:09** (`plan_cargue_id` `ec39a131...` y `7404a9dc...`, de comandos
+`guardar_item` contra planes que ya no existen) reintentándose cada ~30
+minutos y fallando igual cada vez — con `prefetch_count=2`, esos 2
+mensajes bastaban para bloquear el worker completo indefinidamente.
+
+**Resuelto**: se redesplegó la app **`worker`** de Cubicador en Dokploy
+(aparte de la de NEXO). Con el fix real corriendo, el worker procesó los 2
+mensajes atascados correctamente (rollback + ack en `finally`) y volvió a
+consumir con normalidad — confirmado con un ciclo completo nuevo:
+
+```
+POST /demo (202) → borrador (21:30:30) → POST /optimizar (202)
+  → GET /{id}: estado=optimizado, puntaje=59.00, 59 colocaciones (21:30:59)
+```
+
+`GET /colocaciones` y `GET /por-linea` también verificados en este mismo
+pase, con datos reales.
+
+**Lección operativa**: en Dokploy, NEXO y Cubicador (`api` + `worker`) son
+**tres apps independientes** — un redeploy de una no implica que las otras
+tengan el código nuevo. Cuando algo deja de funcionar después de un
+redeploy parcial, conviene revisar los logs de la app específica
+involucrada (en este caso, el worker, no la API) antes de asumir que el
+problema está en la que sí se redesplegó.
+
+## 11. Verificación local tras cerrar S3-HU-04.3 al 20/20 (2026-09-14, noche)
+
+Nuevos commits desde la sección 10: `774de8c` (fix real de producción: el
+worker de Cubicador podía atascarse por completo) y `dce27f8` (agrega
+`POST /api/cubicacion` en NEXO — el último de los 20/20 endpoints).
+
+### 11.1 Build y tests (antes de Docker)
+
+- `dotnet build` → sin errores.
+- `dotnet test` Domain (127/127) y Application (140/140, +1 nuevo:
+  `CubicarRapidoQueryHandlerTests`).
+- `pytest tests/worker` (Cubicador, contenedor efímero) → **36/36 passed**,
+  incluidos los 6 tests nuevos de `test_reporte_de_error_no_atasca.py` que
+  reproducen exactamente el incidente real documentado en el propio commit
+  (una sesión de SQLAlchemy envenenada por una FK violada podía impedir el
+  `ack()` del mensaje y congelar el worker entero con solo 2 mensajes así,
+  dado `prefetch_count=2`). No se corrió `Api.Tests` (necesita su propia BD
+  SQL Server de pruebas, fuera de alcance de esta pasada).
+
+### 11.2 Bug real encontrado y corregido: `docker-compose.yml` no pasaba las variables nuevas
+
+`dce27f8` agregó `Cubicador3D:OutboundBaseUrl`/`OutboundApiKey` (única
+llamada HTTP saliente NEXO → Cubicador) y las documentó en `.env.example`,
+pero **nunca actualizó `docker-compose.yml`** para pasarlas al contenedor
+`api` — exactamente la misma clase de gap que `CUBICADOR3D_INBOUND_API_KEY`
+en la sección 10.3 de este documento (que a su vez viene de la conversación
+sobre Dokploy). Sin el fix, las claves quedan documentadas pero nunca
+llegan al proceso.
+
+**Corregido**: se agregaron las dos líneas en `docker-compose.yml` (mismo
+patrón que `Cubicador3D__InboundApiKey`) y los nombres planos
+`CUBICADOR3D_OUTBOUND_BASE_URL`/`CUBICADOR3D_OUTBOUND_API_KEY` en
+`.env.example` y en el `.env` local.
+
+**Valor local usado**, con la misma prevención de la sección 10.3 (el
+hostname `api` es ambiguo entre los dos proyectos Compose):
+
+```
+Cubicador3D__OutboundBaseUrl=http://cubicador-api-1:8000/
+Cubicador3D__OutboundApiKey=<igual a CUBICADOR_API_KEY de cubicador/.env>
+```
+
+### 11.3 `POST /api/cubicacion`, probado de punta a punta contra el Cubicador real
+
+- Sin `X-Portal-Usuario-Id` → `401`.
+- Con rol sin permiso (LiderProceso) → `403`.
+- Con rol válido (Comercial) y 2 ítems reales → **`200`**, matrices de
+  evaluación completas para 9 tipos de vehículo/contenedor (criterios,
+  banda `compatible`, disposición con colocaciones, sugerencia de
+  unidad) — el llamado HTTP real NEXO → Cubicador funciona.
+- Con `items: []` → `200` con resultado degenerado (0 kg, banda igual
+  `compatible`) en vez de `400`. **Observación, no bug**: no bloquea nada,
+  pero vale la pena que alguien confirme si un carrito vacío debería
+  rechazarse en el validador en vez de evaluarse contra la flota.
+
+### 11.4 Regresión general — sigue todo en verde
+
+Salud, los 6 roles, `demo → optimizar → optimizado` con métricas reales, y
+`GET /colocaciones` sobre el plan real: todo repetido sin cambios. RabbitMQ
+al final: **0 mensajes en todas las colas, incluida `cubicacion.dlq`**, sin
+colas `_error`.
+
 ## 10. Verificación local tras S3-HU-04.3 (2026-09-14, tarde-noche) — nuevos endpoints + bug real encontrado y corregido
 
 Se pidió repetir la verificación local completa después de varios commits
