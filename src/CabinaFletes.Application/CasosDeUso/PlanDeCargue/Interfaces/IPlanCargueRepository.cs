@@ -46,4 +46,12 @@ public interface IPlanCargueRepository
     /// Lista vacía si ningún plan de esa línea ha llegado todavía — nunca null.
     /// </summary>
     Task<IReadOnlyList<PlanCargue>> ObtenerPorLineaAsync(Guid lineaSolicitudId, CancellationToken ct);
+
+    /// <summary>
+    /// Issue #155: DELETE /api/vehiculos/{id} necesita saber, ANTES de publicar
+    /// "eliminar_vehiculo", si algún <see cref="PlanCargue"/> todavía referencia ese
+    /// vehículo — la fila espejo de PlanCargue SÍ vive en esta base (a diferencia del
+    /// catálogo de vehículos), así que esto no requiere preguntarle nada a Cubicador.
+    /// </summary>
+    Task<bool> ExisteConVehiculoAsync(Guid vehiculoId, CancellationToken ct);
 }

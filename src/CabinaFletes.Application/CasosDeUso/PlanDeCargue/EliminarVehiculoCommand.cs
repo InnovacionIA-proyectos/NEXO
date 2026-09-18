@@ -1,5 +1,7 @@
 using CabinaFletes.Application.CasosDeUso.PlanDeCargue.DTOs;
+using CabinaFletes.Application.CasosDeUso.PlanDeCargue.Interfaces;
 using CabinaFletes.Application.Common.Abstractions;
+using CabinaFletes.Application.Common.Exceptions;
 using CabinaFletes.Application.Common.Ports;
 using CabinaFletes.Mensajes.Cubicacion;
 
@@ -19,19 +21,28 @@ namespace CabinaFletes.Application.CasosDeUso.PlanDeCargue;
 /// el catálogo de vehículos vive únicamente en Cubicador (ver issue #108). Este comando
 /// solo publica y responde 202.
 ///
-/// Cubicador puede rechazarlo con VEHICULO_EN_USO si el vehículo tiene planes de cargue
-/// asociados. Es un rechazo de negocio: llega por `cubicacion.rechazada` y no se
-/// reintenta. A propósito NO se anticipa esa validación acá — NEXO no mantiene espejo del
-/// catálogo, así que no puede saberlo sin preguntarle a Cubicador, y preguntarle sería el
-/// HTTP directo que esta arquitectura evita.
+/// Issue #155: Cubicador rechaza con VEHICULO_EN_USO si el vehículo tiene planes de
+/// cargue asociados, pero ese rechazo llega async por `cubicacion.rechazada` con el
+/// VehiculoId viajando en el campo PlanId del sobre — el consumer de ese evento busca por
+/// PlanId en PlanesCargue, nunca encuentra fila (porque el id es de un vehículo, no de un
+/// plan) y descarta el mensaje en silencio: el comando queda "procesando" para siempre
+/// sin que nadie se entere. En vez de arreglar esa correlación async, se valida acá,
+/// síncrono, ANTES de publicar: la fila espejo de PlanCargue (a diferencia del catálogo de
+/// vehículos) sí vive en esta base, así que preguntar "¿hay algún plan con este
+/// VehiculoId?" no requiere ida y vuelta a Cubicador.
 /// </summary>
 public sealed record EliminarVehiculoCommand(Guid VehiculoId) : ICommand<ComandoAceptadoDto>;
 
-public sealed class EliminarVehiculoCommandHandler(ICubicacionPort cubicacion, IUnitOfWork uow)
+public sealed class EliminarVehiculoCommandHandler(
+    ICubicacionPort cubicacion, IPlanCargueRepository planes, IUnitOfWork uow)
     : ICommandHandler<EliminarVehiculoCommand, ComandoAceptadoDto>
 {
     public async Task<ComandoAceptadoDto> Handle(EliminarVehiculoCommand command, CancellationToken ct = default)
     {
+        if (await planes.ExisteConVehiculoAsync(command.VehiculoId, ct))
+            throw new ConflictException(
+                "VEHICULO_EN_USO", "El vehículo tiene planes de cargue asociados y no puede eliminarse.");
+
         await cubicacion.PublicarComandoAsync(
             "eliminar_vehiculo", command.VehiculoId.ToString(), new EliminarVehiculoInput(), ct);
 

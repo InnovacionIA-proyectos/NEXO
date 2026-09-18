@@ -64,7 +64,15 @@ class OptimizadorExtremePoints(ABC):
     ) -> tuple[list[Colocacion], list[Rechazo]]:
         colocadas: list[Colocacion] = list(fijas or [])
         rechazos: list[Rechazo] = []
-        puntos: list[PuntoExtremo] = [PuntoExtremo(0, 0, 0)]
+        # Issue #158: el punto extremo inicial es la primera esquina candidata
+        # que `dentro_de_limites` puede aceptar. Esa funcion exige x >= t / y >= t
+        # (tolerancia_paredes_mm) - sembrar el origen en (0,0,0) cuando t > 0 deja
+        # ese punto SIEMPRE invalido, y como ningun item llega a colocarse nunca se
+        # generan mas puntos (`_agregar_puntos` solo parte de colocaciones reales):
+        # el vehiculo queda inutilizable por completo, vacio o no. Con t = 0
+        # (todos los presets/demo) el punto es identico a antes.
+        t = cont.tolerancia_paredes_mm
+        puntos: list[PuntoExtremo] = [PuntoExtremo(t, t, 0)]
         for f in colocadas:
             _agregar_puntos(puntos, f)
 
@@ -205,8 +213,27 @@ def _acumular_peso_encima(soportes, peso_kg: float, colocadas: list[Colocacion])
             visitados += 1
 
 
+def _cabe_en_alguna_orientacion(item: ItemCarga, cont: Contenedor) -> bool:
+    """Issue #152: ¿alguna orientacion del item entra en las dimensiones internas
+    del vehiculo, sin importar colocadas/tolerancias? Si NINGUNA entra, el
+    rechazo no tiene nada que ver con fragmentacion - el item no cabria ni en
+    un vehiculo completamente vacio."""
+    return any(
+        o.largo_mm <= cont.largo_mm and o.ancho_mm <= cont.ancho_mm and o.alto_mm <= cont.alto_mm
+        for o in orientaciones_de(item)
+    )
+
+
 def _razon_sin_espacio(item: ItemCarga, cont: Contenedor, colocadas: list[Colocacion]) -> str:
-    """Razon util cuando no hubo posicion: distingue volumen agotado de fragmentacion."""
+    """Razon util cuando no hubo posicion: distingue volumen agotado, la unidad
+    excediendo el vehiculo completo, o fragmentacion real."""
+    if not _cabe_en_alguna_orientacion(item, cont):
+        o = orientaciones_de(item)[0]
+        return (
+            f"La unidad de {o.largo_mm:.0f}x{o.ancho_mm:.0f}x{o.alto_mm:.0f} mm excede las dimensiones "
+            f"internas del vehiculo ({cont.largo_mm:.0f}x{cont.ancho_mm:.0f}x{cont.alto_mm:.0f} mm) en todas "
+            "sus orientaciones posibles: no cabria aunque el vehiculo estuviera completamente vacio."
+        )
     volumen_libre = cont.volumen_util_mm3 - sum(c.volumen_mm3 for c in colocadas)
     if volumen_libre < item.volumen_mm3:
         return (

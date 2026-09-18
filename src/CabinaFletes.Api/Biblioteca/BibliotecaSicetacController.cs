@@ -23,6 +23,14 @@ public class BibliotecaSicetacController(
     /// <summary>
     /// Consulta la matriz del periodo indicado (por defecto el más reciente),
     /// con filtros por texto de ruta, configuración y condición de carga.
+    ///
+    /// Issue #156: medido en vivo, la matriz tiene ~2,15 M de filas por periodo
+    /// filtrado y "top" nunca dejaba ver más allá de las primeras 50-200 — sin
+    /// aviso de que el resto existía, aunque `total` ya viajaba en la respuesta.
+    /// "page" (1-based, opcional, default 1) agrega el `Skip` que faltaba;
+    /// "top" sigue siendo el tamaño de página. Mismo shape de respuesta que
+    /// siempre (`{ periodo, total, items }`) — cambio aditivo, no rompe a quien
+    /// ya consume esto sin "page".
     /// </summary>
     [HttpGet]
     public async Task<ActionResult<MatrizSicetacResultDto>> Get(
@@ -34,8 +42,9 @@ public class BibliotecaSicetacController(
         [FromQuery] string? condicionCarga,
         [FromQuery] string? viaEstandar,
         [FromQuery, Range(1, 500)] int top = 50,
+        [FromQuery, Range(1, int.MaxValue)] int page = 1,
         CancellationToken ct = default)
-        => Ok(await buscar.Handle(new BuscarMatrizSicetacQuery(q, periodo, configuracion, tipoCarga, unidadTransporte, condicionCarga, viaEstandar, top), ct));
+        => Ok(await buscar.Handle(new BuscarMatrizSicetacQuery(q, periodo, configuracion, tipoCarga, unidadTransporte, condicionCarga, viaEstandar, top, page), ct));
 
     /// <summary>Periodos disponibles en el DW (los 12 más recientes).</summary>
     [HttpGet("periodos")]

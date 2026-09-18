@@ -70,4 +70,7 @@ public sealed class EfPlanCargueRepository(CabinaFletesDbContext db) : IPlanCarg
             .Include(p => p.Colocaciones)
             .OrderBy(p => p.NumeroVehiculo)
             .ToListAsync(ct);
+
+    public Task<bool> ExisteConVehiculoAsync(Guid vehiculoId, CancellationToken ct) =>
+        db.PlanesCargue.AsNoTracking().AnyAsync(p => p.VehiculoId == vehiculoId, ct);
 }

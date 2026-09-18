@@ -73,8 +73,20 @@ enum real en PascalCase (`"Ganada"`, `"Spot"`, `"Sicetac"`). Son:
 
 ### Paginación
 
-Donde existe (solo Servicios Conexos hoy) es `page` (1-based) + `pageSize`, y
-la respuesta trae `{ items, total }`.
+Donde existe es `page` (1-based) + `pageSize`/`top` (según el endpoint), y la
+respuesta trae `{ items, total }` (o el equivalente propio del endpoint, ver
+cada sección). Hoy paginan: Servicios Conexos (`page`+`pageSize`), Biblioteca
+SICE-TAC y Biblioteca plaza SAP (`page`+`top`, agregado en issue #156 — medido
+en vivo, ~2,15 M y ~22,8 K filas respectivamente, truncaban en la primera
+página sin forma de pedir la siguiente aunque `total` ya viajaba en la
+respuesta). `page` es opcional (default 1) en los tres — omitirlo no cambia el
+comportamiento previo.
+
+Los otros 6 endpoints de listado revisados en la misma issue (`solicitudes`,
+`tarifas-historicas`, `reglas-solo-sicetac`, `planes-cargue`, `vehiculos`, y
+`biblioteca-sap-historico`) se dejaron SIN paginar por bajo volumen medido —
+ver `docs/decisiones/paginacion-endpoints-listado.md` para el detalle y los
+números que respaldan cada decisión.
 
 ### Carga de archivos Excel
 
@@ -356,7 +368,7 @@ Detalle completo del flujo en
 
 ### Biblioteca SICE-TAC (matriz oficial, solo lectura) — `/api/biblioteca-sicetac` (`[Authorize]`)
 
-- `GET` — `Query: q?, periodo?, configuracion?, tipoCarga?, unidadTransporte?, condicionCarga?, viaEstandar?, top? (1-500, def. 50)` → `200 MatrizSicetacResultDto`
+- `GET` — `Query: q?, periodo?, configuracion?, tipoCarga?, unidadTransporte?, condicionCarga?, viaEstandar?, top? (1-500, def. 50), page? (>=1, def. 1)` → `200 MatrizSicetacResultDto`
 - `GET /periodos` → `200 number[]` (los 12 más recientes)
 - `GET /filtros` → `200 SicetacFiltrosDto`
 
@@ -367,7 +379,7 @@ Detalle completo del flujo en
 
 ### Biblioteca plaza SAP (solo lectura) — `/api/biblioteca-sap-plaza` (`[Authorize]`)
 
-- `GET` — mismos parámetros que el histórico → `200 SapHistoricoResultDto`
+- `GET` — mismos parámetros que el histórico + `page? (>=1, def. 1)` (issue #156: ~22,8 K filas medidas en vivo, este SÍ pagina; el histórico NO — ver nota de la sección de Paginación) → `200 SapHistoricoResultDto`
 - `GET /filtros` → `200 SapHistoricoFiltrosDto`
 - Ajuste **local** de vigencia sobre esta misma ruta (`AdminTarifas, CoordinadorFletes, Admin`):
   - `PATCH /{tarifaId}/vigencia` — `Body: { nuevaVigencia, motivo? }` → `204`
