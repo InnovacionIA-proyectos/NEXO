@@ -28,8 +28,10 @@ public interface IPlanCargueRepository
     Task EliminarSiExisteAsync(Guid id, CancellationToken ct);
 
     /// <summary>S3-HU-03 (issue #112): GET /api/planes-cargue — listado contra la
-    /// proyección local, sin ítems/colocaciones (sería demasiado para un listado).</summary>
-    Task<IReadOnlyList<PlanCargue>> ListarRecientesAsync(int top, CancellationToken ct);
+    /// proyección local, sin ítems/colocaciones (sería demasiado para un listado).
+    /// Issue #166: page 1-based + pageSize, reemplaza el tope fijo de 100 por
+    /// paginación real.</summary>
+    Task<(IReadOnlyList<PlanCargue> Items, int Total)> ListarRecientesAsync(int page, int pageSize, CancellationToken ct);
 
     /// <summary>S3-HU-03 (issue #112): GET /api/planes-cargue/{id}/flota — los planes
     /// (vehículos) que comparten la MISMA LineaSolicitudId que <paramref name="planId"/>,

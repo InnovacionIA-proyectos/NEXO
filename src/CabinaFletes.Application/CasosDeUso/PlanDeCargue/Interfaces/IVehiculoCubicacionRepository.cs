@@ -10,7 +10,9 @@ namespace CabinaFletes.Application.CasosDeUso.PlanDeCargue.Interfaces;
 /// </summary>
 public interface IVehiculoCubicacionRepository
 {
-    Task<IReadOnlyList<VehiculoCubicacion>> ListarAsync(CancellationToken ct);
+    /// <summary>Issue #166: page 1-based. Devuelve la página pedida + el total
+    /// real de filas que cumplen (sin filtro alguno hoy: es el catálogo completo).</summary>
+    Task<(IReadOnlyList<VehiculoCubicacion> Items, int Total)> ListarAsync(int page, int pageSize, CancellationToken ct);
 
     Task<VehiculoCubicacion?> ObtenerAsync(Guid id, CancellationToken ct);
 }

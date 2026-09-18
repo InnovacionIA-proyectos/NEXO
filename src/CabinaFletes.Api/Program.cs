@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using CabinaFletes.Api.Common.Auth;
 using CabinaFletes.Api.Common.Errors;
 using CabinaFletes.Api.Common.Middleware;
+using CabinaFletes.Api.Common.RateLimiting;
 using CabinaFletes.Api.Bandeja;
 using CabinaFletes.Api.PlanDeCargue;
 using CabinaFletes.Api.Priorizacion;
@@ -148,6 +149,10 @@ builder.Services.Configure<ForwardedHeadersOptions>(o =>
     o.KnownProxies.Clear();
 });
 
+// Issue #168: rate limiting básico (por rol/IP) en los endpoints de listado más
+// pesados - ver RateLimitingExtensions para el detalle de las dos políticas.
+builder.Services.AddRateLimitingNexo();
+
 // --------------------------------------------------------------- Controllers + JSON
 builder.Services.AddControllers()
     .AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()))
@@ -232,6 +237,10 @@ app.UseMiddleware<ErrorHandlingMiddleware>();
 app.UseCors(ClientesCors);
 app.UseAuthentication();
 app.UseAuthorization();
+// Después de Authorization: el particionado por rol (RateLimitingExtensions)
+// necesita que User.FindFirst(ClaimTypes.Role) ya esté resuelto. Antes de
+// MapControllers para que el 429 se decida sin llegar a ningún handler.
+app.UseRateLimiter();
 
 app.MapControllers();
 

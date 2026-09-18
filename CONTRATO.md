@@ -75,18 +75,42 @@ enum real en PascalCase (`"Ganada"`, `"Spot"`, `"Sicetac"`). Son:
 
 Donde existe es `page` (1-based) + `pageSize`/`top` (según el endpoint), y la
 respuesta trae `{ items, total }` (o el equivalente propio del endpoint, ver
-cada sección). Hoy paginan: Servicios Conexos (`page`+`pageSize`), Biblioteca
-SICE-TAC y Biblioteca plaza SAP (`page`+`top`, agregado en issue #156 — medido
-en vivo, ~2,15 M y ~22,8 K filas respectivamente, truncaban en la primera
-página sin forma de pedir la siguiente aunque `total` ya viajaba en la
-respuesta). `page` es opcional (default 1) en los tres — omitirlo no cambia el
-comportamiento previo.
+cada sección). `page`/`pageSize` son opcionales (default `page=1`,
+`pageSize=50` salvo donde se indique otro) — omitirlos no cambia el
+comportamiento de un cliente existente.
 
-Los otros 6 endpoints de listado revisados en la misma issue (`solicitudes`,
-`tarifas-historicas`, `reglas-solo-sicetac`, `planes-cargue`, `vehiculos`, y
-`biblioteca-sap-historico`) se dejaron SIN paginar por bajo volumen medido —
-ver `docs/decisiones/paginacion-endpoints-listado.md` para el detalle y los
-números que respaldan cada decisión.
+Historial:
+- Issue #156: Servicios Conexos (`page`+`pageSize`, patrón original), Biblioteca
+  SICE-TAC y Biblioteca plaza SAP (`page`+`top`) — medido en vivo, ~2,15 M y
+  ~22,8 K filas respectivamente, truncaban en la primera página sin forma de
+  pedir la siguiente aunque `total` ya viajaba en la respuesta.
+- Issue #166 (S4-HU-02): se agrega `page`/`pageSize` al resto de los listados
+  — `solicitudes` (Bandeja Priorizada), `tarifas-historicas` (rama "buscar"),
+  `vehiculos`, `planes-cargue` — reemplazando los topes fijos que tenían antes
+  (`Take(50)`, `Take(100)`, sin tope en `solicitudes`). Todos responden
+  `{ items, total }`. `biblioteca-sap-historico` y `reglas-solo-sicetac`
+  siguen SIN paginar (bajo volumen medido, ver
+  `docs/decisiones/paginacion-endpoints-listado.md`).
+- Issue #167: el timeout real de `biblioteca-sicetac` (causa: falta de índice
+  en la tabla del Data Warehouse externo, fuera del alcance de este repo) se
+  mitigó con un `CommandTimeout` más generoso y un caché más largo — ver
+  `docs/decisiones/timeout-biblioteca-sicetac.md`.
+
+### Rate limiting (issue #168)
+
+Los endpoints de listado tienen rate limiting básico (`Microsoft.AspNetCore.
+RateLimiting`, nativo del framework), particionado por rol del usuario
+autenticado (o IP si no hay rol resuelto). Al exceder el límite responden
+`429` con el mismo shape de error que el resto de la API
+(`{ code: "DEMASIADAS_SOLICITUDES", message, timestamp }`) y un header
+`Retry-After: 30`.
+
+- **Política estricta** (`biblioteca-sicetac`, `biblioteca-sap-plaza` — bases
+  externas compartidas con otros consumidores corporativos): 20 solicitudes/min
+  por rol (60 para `Admin`/`AdminTarifas`), ventana deslizante.
+- **Política estándar** (resto de los listados — `solicitudes`,
+  `planes-cargue`, `vehiculos`, `tarifas-historicas`, `reglas-solo-sicetac`,
+  `biblioteca-sap-historico`): 120 solicitudes/min, ventana fija.
 
 ### Carga de archivos Excel
 
@@ -321,8 +345,8 @@ Detalle completo del flujo en
 ### Bandeja y Solicitudes — `/api/solicitudes` (`[Authorize]`)
 
 - `GET /api/solicitudes` — Bandeja Priorizada.
-  `Query: estado?, atencion? ("pendientes"|"automatico"|"administrador"|"atendidas"|"todas"), desde?, hasta?, vigencia? ("vigente"|"vencida")`
-  → `200 BandejaItemDto[]`
+  `Query: estado?, atencion? ("pendientes"|"automatico"|"administrador"|"atendidas"|"todas"), desde?, hasta?, vigencia? ("vigente"|"vencida"), page? (>=1, def. 1), pageSize? (1-200, def. 50)`
+  → `200 { items: BandejaItemDto[], total }` (issue #166 — antes devolvía el array completo sin tope; el orden por score se recalcula en memoria y la paginación se aplica después, no reduce el trabajo del backend pero sí el tamaño de la respuesta)
 - `GET /api/solicitudes/{id}` — costeo pre-armado (SICE-TAC + históricos) por línea → `200 SolicitudCosteoDto`
 - `POST /api/solicitudes` — `CoordinadorFletes, Admin`. Alta spot (o cabecera de licitación).
   `Body: { clienteId, tipo: "spot"|"licitacion", modalidad?, deadline?, valorEstimado?, probabilidadCierre?, linea?: { rutaId?, configVehiculoId?, tipologia?, peso?, valorMercancia? } }`
@@ -405,8 +429,9 @@ Detalle completo del flujo en
 
 ### Tarifas Ganadas (biblioteca propia, solo lectura) — `/api/tarifas-historicas` (`[Authorize]`)
 
-- `GET` — con `ruta` o `vehiculo` → sugerencias para el costeo; con `q`/`mercancia`/`vigencia`/`origen` → búsqueda filtrada; sin nada → las más recientes.
-  `Query: q?, ruta? (uuid), vehiculo? (uuid), mercancia?, vigencia?, origen? ("ganada"|"legado")` → `200 BibliotecaItemDto[]`
+- `GET` — con `ruta` o `vehiculo` → sugerencias para el costeo (siempre las 10 más recientes, sin paginar); con `q`/`mercancia`/`vigencia`/`origen` → búsqueda filtrada, PAGINADA; sin nada → las más recientes sin paginar.
+  `Query: q?, ruta? (uuid), vehiculo? (uuid), mercancia?, vigencia?, origen? ("ganada"|"legado"), page? (>=1, def. 1, solo aplica a la búsqueda filtrada), pageSize? (1-200, def. 50, ídem)`
+  → `200 BibliotecaItemDto[]` (sugerencias/recientes) **o** `200 { items: BibliotecaItemDto[], total }` (búsqueda filtrada, issue #166 — antes `Take(50)` fijo sin `total` ni forma de pedir más)
 
 ### Tarifas SICE-TAC (caché local admin) — `/api/tarifas-sicetac` (`[Authorize]`)
 
@@ -430,6 +455,9 @@ Cambiar esto reordena la bandeja de todo el mundo — ver
 
 ### Plan de cargue (cubicación 3D) — `/api/planes-cargue`
 
+- `GET` — `[Authorize]`. Listado contra la proyección local.
+  `Query: page? (>=1, def. 1), pageSize? (1-200, def. 50)` → `200 { items: PlanCargueDto[], total }`
+  (issue #166 — antes tope fijo de 100 sin `total` ni forma de pedir más)
 - `POST /{id}/optimizar` — `Comercial, CoordinadorFletes, Admin`. No bloquea; `503 CUBICACION_EN_VERIFICACION` si la compuerta de paridad está cerrada, `409` si ya está procesando.
   `Body?: { estrategia?, algoritmo?, semilla?, respetarBloqueadas? }` → `202 SolicitudDeCubicacionAceptadaDto`
 - `GET /{id}` — `[Authorize]`. Consulta de respaldo → `200 PlanCargueDto` / `404`
@@ -449,6 +477,15 @@ Cambiar esto reordena la bandeja de todo el mundo — ver
   y rechazadas — a diferencia de `.../no-cargadas` (sección 7.2 de `docs/mensajeria/CUBICACION.md`), que
   filtra por `Cargada = false`. `404` si el plan no existe.
   → `200 ColocacionCargueDto[]`
+
+### Catálogo de vehículos (Cubicador) — `/api/vehiculos`
+
+- `GET` — `[Authorize]`. Catálogo contra la proyección local (issue #112) — nunca llama a Cubicador.
+  `Query: page? (>=1, def. 1), pageSize? (1-200, def. 50)` → `200 { items: VehiculoCubicacionDto[], total }`
+  (issue #166 — antes devolvía el array completo sin tope; catálogo hoy chico, pagina igual por consistencia)
+- `POST` — `Comercial, CoordinadorFletes, Admin`. Alta/edición, publica por cola. → `202 ComandoAceptadoDto`
+- `DELETE /{id}` — `Admin`. `409 VEHICULO_EN_USO` si algún plan de cargue todavía lo referencia (issue #155).
+  → `202 ComandoAceptadoDto`
 
 ### Trabajos — `/api/trabajos` (`[Authorize]`)
 

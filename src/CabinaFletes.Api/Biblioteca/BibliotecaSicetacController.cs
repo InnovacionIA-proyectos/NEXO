@@ -1,9 +1,11 @@
 using System.ComponentModel.DataAnnotations;
+using CabinaFletes.Api.Common.RateLimiting;
 using CabinaFletes.Application.CasosDeUso.Biblioteca;
 using CabinaFletes.Application.CasosDeUso.Biblioteca.DTOs;
 using CabinaFletes.Application.Common.Abstractions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace CabinaFletes.Api.Biblioteca;
 
@@ -33,6 +35,7 @@ public class BibliotecaSicetacController(
     /// ya consume esto sin "page".
     /// </summary>
     [HttpGet]
+    [EnableRateLimiting(RateLimitingExtensions.PoliticaListadosPesados)]
     public async Task<ActionResult<MatrizSicetacResultDto>> Get(
         [FromQuery] string? q,
         [FromQuery] int? periodo,

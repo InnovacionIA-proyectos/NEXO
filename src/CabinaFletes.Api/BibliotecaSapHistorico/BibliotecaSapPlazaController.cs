@@ -1,10 +1,12 @@
 using System.ComponentModel.DataAnnotations;
 using CabinaFletes.Api.AjustesVigenciaPlaza;
+using CabinaFletes.Api.Common.RateLimiting;
 using CabinaFletes.Application.CasosDeUso.BibliotecaSapHistorico;
 using CabinaFletes.Application.CasosDeUso.BibliotecaSapHistorico.DTOs;
 using CabinaFletes.Application.Common.Abstractions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace CabinaFletes.Api.BibliotecaSapHistorico;
 
@@ -37,6 +39,7 @@ public class BibliotecaSapPlazaController(
     /// quien ya consume esto sin "page".
     /// </summary>
     [HttpGet]
+    [EnableRateLimiting(RateLimitingExtensions.PoliticaListadosPesados)]
     public async Task<ActionResult<SapHistoricoResultDto>> Get(
         [FromQuery] string? q,
         [FromQuery] int? lineaNegocio,

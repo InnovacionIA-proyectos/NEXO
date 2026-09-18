@@ -15,7 +15,10 @@ public class SolicitudesTests
     [Fact]
     public async Task Bandeja_devuelve_solicitudes_ordenadas_por_score()
     {
-        var items = await _fx.Client().GetFromJsonAsync<JsonElement>("/api/solicitudes?orderBy=score");
+        // Issue #166: respuesta paginada { items, total }, ya no un array plano.
+        var pagina = await _fx.Client().GetFromJsonAsync<JsonElement>("/api/solicitudes?orderBy=score");
+        var items = pagina.GetProperty("items");
+        Assert.True(pagina.GetProperty("total").GetInt32() > 0);
         Assert.True(items.GetArrayLength() > 0);
         decimal prev = decimal.MaxValue;
         foreach (var it in items.EnumerateArray())

@@ -1,6 +1,7 @@
 using CabinaFletes.Application.CasosDeUso.Solicitudes.DTOs;
 using CabinaFletes.Application.CasosDeUso.Solicitudes.Interfaces;
 using CabinaFletes.Application.Common.Abstractions;
+using CabinaFletes.Application.Common.Dtos;
 using CabinaFletes.Domain.Catalogos.Entidades;
 using CabinaFletes.Domain.Enums;
 using CabinaFletes.Domain.Priorizacion.Reglas;
@@ -12,13 +13,21 @@ namespace CabinaFletes.Application.CasosDeUso.Solicitudes;
 /// Bandeja Priorizada (anti-FIFO): la cola se sirve por score descendente, no por
 /// orden de llegada. Por defecto (atención 'pendientes') es la COLA DE TRABAJO:
 /// solo solicitudes con líneas SIN flete.
+///
+/// Issue #166: pagina (page 1-based, pageSize) - a diferencia de los listados
+/// paginados en SQL (Skip/Take antes de traer las filas), acá el score se
+/// recalcula en memoria por fila con "ahora" (el score persistido se congela al
+/// capturar), así que la paginación se aplica DESPUÉS de traer y ordenar todo lo
+/// que cumple el filtro. No reduce el trabajo del backend (eso exigiría poder
+/// calcular el score en SQL, fuera de alcance de este fix), pero sí acota el
+/// tamaño de la respuesta - que es el síntoma que reportó el frontend.
 /// </summary>
-public sealed record ObtenerBandejaQuery(BandejaFiltro Filtro) : IQuery<IReadOnlyList<BandejaItemDto>>;
+public sealed record ObtenerBandejaQuery(BandejaFiltro Filtro, int Page = 1, int PageSize = 50) : IQuery<PaginaDto<BandejaItemDto>>;
 
 public sealed class ObtenerBandejaQueryHandler(ISolicitudesRepository solicitudes, TimeProvider clock)
-    : IQueryHandler<ObtenerBandejaQuery, IReadOnlyList<BandejaItemDto>>
+    : IQueryHandler<ObtenerBandejaQuery, PaginaDto<BandejaItemDto>>
 {
-    public async Task<IReadOnlyList<BandejaItemDto>> Handle(ObtenerBandejaQuery query, CancellationToken ct = default)
+    public async Task<PaginaDto<BandejaItemDto>> Handle(ObtenerBandejaQuery query, CancellationToken ct = default)
     {
         var filtro = query.Filtro;
         var parametros = await solicitudes.ParametrosScoreAsync(ct);
@@ -39,7 +48,7 @@ public sealed class ObtenerBandejaQueryHandler(ISolicitudesRepository solicitude
         // El score persistido se congela al capturar; la urgencia depende del "ahora",
         // así que se recalcula al servir la bandeja para que el orden anti-FIFO no se
         // degrade (una licitación urgente debe subir a medida que se acerca su deadline).
-        return filas
+        var ordenadas = filas
             .Select(f =>
             {
                 var stub = new Solicitud { Tipo = f.Tipo, Deadline = f.Deadline, ValorEstimado = f.ValorEstimado, ProbabilidadCierre = f.ProbabilidadCierre };
@@ -56,5 +65,8 @@ public sealed class ObtenerBandejaQueryHandler(ISolicitudesRepository solicitude
             .OrderByDescending(x => x.ScorePrioridad)
             .ThenBy(x => x.Deadline)
             .ToList();
+
+        var pagina = ordenadas.Skip((query.Page - 1) * query.PageSize).Take(query.PageSize).ToList();
+        return new PaginaDto<BandejaItemDto>(pagina, ordenadas.Count);
     }
 }

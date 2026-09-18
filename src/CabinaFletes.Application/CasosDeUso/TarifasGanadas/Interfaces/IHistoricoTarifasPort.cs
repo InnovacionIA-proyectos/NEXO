@@ -12,6 +12,9 @@ public interface IHistoricoTarifasPort
     /// <summary>Las 10 más recientes que calzan con ruta/vehículo/mercancía (sugerencia de costeo).</summary>
     Task<IReadOnlyList<BibliotecaItemDto>> SugerirAsync(Guid? rutaId, Guid? vehiculoId, string? mercancia, CancellationToken ct);
 
-    /// <summary>Búsqueda filtrada de la Biblioteca (hasta 50 resultados).</summary>
-    Task<IReadOnlyList<BibliotecaItemDto>> BuscarAsync(string? q, string? mercancia, string? vigencia, bool? deGanada, CancellationToken ct);
+    /// <summary>Búsqueda filtrada de la Biblioteca. Issue #166: page 1-based +
+    /// pageSize, reemplaza el tope fijo de 50 (que no exponía el total real ni
+    /// dejaba pedir más) por paginación real.</summary>
+    Task<(IReadOnlyList<BibliotecaItemDto> Items, int Total)> BuscarAsync(
+        string? q, string? mercancia, string? vigencia, bool? deGanada, int page, int pageSize, CancellationToken ct);
 }
