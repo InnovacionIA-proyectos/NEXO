@@ -368,10 +368,12 @@ La migración incluye tres proyectos de test bajo `tests/`, alineados con las
 capas que tiene sentido probar de forma distinta:
 
 - **`CabinaFletes.Domain.Tests`** — unitarios puros, sin dependencias.
-  Cubren `ScorePrioridadCalculator` (confirma que el score total es
-  exclusivamente el componente de urgencia por deadline, no una suma
-  ponderada), `Texto` (normalización de tildes/mayúsculas, partición de
-  rutas) e `ImporteParser` (formato colombiano vs. invariante).
+  Cubren `ScorePrioridadCalculator` (confirma que el score total es la suma
+  ponderada de los 4 componentes documentados — urgencia, valor, probabilidad
+  y tipo, con los pesos de `ParametrosScore` — ver
+  `docs/decisiones/score-prioridad-4-pesos-vs-solo-urgencia.md`), `Texto`
+  (normalización de tildes/mayúsculas, partición de rutas) e `ImporteParser`
+  (formato colombiano vs. invariante).
 - **`CabinaFletes.Application.Tests`** — unitarios con Moq, Ports mockeados
   (`ICotizacionRepository`, `ISolicitudesPort`, `IAuditoriaPort`,
   `ICurrentUserPort`, `IUnitOfWork`, etc.). Cubren los Command Handlers con

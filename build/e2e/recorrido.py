@@ -401,7 +401,10 @@ def main():
     # Escucha desde ya y sin parar: con long polling, dejar de sondear es desconectarse.
     avisos_bandeja = bandeja_hub.escuchar_en_segundo_plano("bandeja")
     # 30 días = 720 horas. Con horizonte 240 queda fuera y el puntaje es 0; el paso final
-    # sube el horizonte a 4000 y tiene que pasar a 82 = 100*(1 - 720/4000).
+    # sube el horizonte a 4000 y la urgencia pasa a 82 = 100*(1 - 720/4000). Desde el fix
+    # de issue #173 el total ya NO es solo la urgencia: esta solicitud no tiene valor ni
+    # probabilidad (usa los defaults 30 y 50) y es licitación (tipo=100), así que con los
+    # pesos por defecto (0.40/0.30/0.20/0.10) el total es 61.8, no 82.
     deadline = (datetime.now(timezone.utc) + timedelta(days=30)).strftime("%Y-%m-%dT%H:%M:%SZ")
     _, creada = pedir("/api/solicitudes",
                       {"clienteId": cliente, "tipo": "licitacion", "deadline": deadline},
@@ -523,17 +526,18 @@ def main():
     # valor persistido lo refresca el consumidor aparte; aquí se afirma el efecto visible.
     nuevo = esperar(lambda: (lambda s: s if s and s > 0 else None)(score_de(vigilada)),
                     "el puntaje sube al ampliar el horizonte")
-    ok(nuevo == 82, f"puntaje con horizonte 4000 = {nuevo} (esperado 82 = 100*(1-720/4000))")
+    ok(nuevo == 61.8, f"puntaje con horizonte 4000 = {nuevo} (esperado 61.8 = 0.40*82 + 0.30*30 + 0.20*50 + 0.10*100)")
 
-    paso("Priorización: cambiar un peso NO mueve el puntaje")
-    # Los cuatro pesos son configuración dormida: el total es solo la urgencia por
-    # deadline. Está documentado en docs/contrato-integracion; esto lo fija.
+    paso("Priorización: cambiar un peso SI mueve el puntaje")
+    # Desde el fix de issue #173 (docs/decisiones/score-prioridad-4-pesos-vs-solo-urgencia.md)
+    # los 4 pesos entran en el total, así que recalibrarlos sí debe mover el puntaje.
     antes = score_de(vigilada)
     pedir("/api/priorizacion/parametros",
           parametros(4000, 0.60, 0.20, 0.15, 0.05), "PUT", esperado=200)
     time.sleep(8)
-    ok(score_de(vigilada) == antes,
-       f"el puntaje sigue en {antes} después de cambiar los pesos")
+    despues = score_de(vigilada)
+    ok(despues == 67.7,
+       f"puntaje tras recalibrar pesos = {despues} (esperado 67.7 = 0.60*82 + 0.20*30 + 0.15*50 + 0.05*100, antes {antes})")
 
     paso("Bandeja: recalibrar avisa por el canal (HU-05.2)")
     antes = len(avisos_bandeja)
