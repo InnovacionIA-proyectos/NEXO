@@ -134,6 +134,11 @@ insertar una fila a mano. Vale la pena sembrar 1 usuario de cada uno para la pr�
 HU que toque esos roles — no es un defecto de esta PR, es una recomendación de cara
 al trabajo que sigue.
 
+**Actualización 2026-09-18 (S4-HU-08.5, issue #187):** sembrado un usuario `Comercial`
+(`IdentidadPortalId` 1007, Mariana Ospina) — motivado por los comandos de escritura de
+S3-HU-02 (plan de cargue), que en su mayoría exigen ese rol. `AdminTarifas` sigue sin
+usuario sembrado; la recomendación de arriba sigue vigente para ese rol.
+
 ## Cobertura por tipo de prueba
 
 | Tipo | Resultado |

@@ -27,7 +27,20 @@ namespace CabinaFletes.Api.Tests.Mensajeria;
 /// El transporte va en memoria a propósito. Lo que está bajo prueba es la frontera
 /// base-de-datos ↔ tabla de salida; meter RabbitMQ agregaría una dependencia que no
 /// cambia lo que se afirma.
+///
+/// Issue #185: esta clase NO usa <see cref="ApiFixture"/> (arma su propio
+/// ServiceProvider liviano, sin el host completo), pero SÍ vive en la misma colección
+/// xUnit "api". No es un acoplamiento accidental: xUnit garantiza que el fixture de una
+/// colección se construye una sola vez, ANTES de correr cualquier test de esa colección,
+/// y que las clases de una misma colección no corren en paralelo entre sí. Antes, sin
+/// colección declarada, esta clase corría en su PROPIA colección implícita — en
+/// paralelo con "api" — y su propio MigrateAsync() (abajo) competía por migrar la misma
+/// BD nueva contra el que hace ApiFixture en su constructor: el que perdía la carrera
+/// fallaba con "Database ... already exists" (intermitente, no siempre reproducible).
+/// Compartir la colección hace que ApiFixture migre primero siempre, así que esta clase
+/// ya no necesita (ni debe) migrar por su cuenta.
 /// </summary>
+[Collection("api")]
 [Trait("Categoria", "Integracion")]
 public class OutboxConsistenciaTests : IAsyncLifetime
 {
@@ -69,11 +82,10 @@ public class OutboxConsistenciaTests : IAsyncLifetime
         using (var alcance = _servicios.CreateScope())
         {
             var db = alcance.ServiceProvider.GetRequiredService<CabinaFletesDbContext>();
-            // Mismo criterio que ApiFixture (S3-HU-11.1, issue #134): NO migra por
-            // defecto contra la base real — el login de prueba no tiene permisos de
-            // DDL, y no debe tenerlos. El esquema ya debe estar desplegado ahí.
-            if (Environment.GetEnvironmentVariable("TEST_DB_MIGRATE_ON_STARTUP") == "true")
-                await db.Database.MigrateAsync();
+            // Issue #185: la migración YA la hizo ApiFixture, antes de que cualquier
+            // test de la colección "api" (incluida esta clase, ver comentario de
+            // arriba) llegara a correr — migrarla de nuevo aquí era exactamente la
+            // llamada que competía en paralelo con la de ApiFixture.
             // Arranca limpio: otra corrida pudo dejar mensajes sin entregar.
             //
             // ExecuteDeleteAsync en vez de SQL crudo a propósito: un "DELETE FROM
