@@ -153,6 +153,12 @@ class SqlPlanCargueRepository:
             fila.peso_encima_kg = col.peso_encima_kg
             fila.estado_estabilidad = col.estado_estabilidad
             fila.accesibilidad = col.accesibilidad
+            # Issue #151: cada reoptimizacion borra TODAS las filas y las
+            # reconstruye desde resultado.colocaciones (incluidas las `fijas` que
+            # entraron con bloqueada=True desde optimizar.py). Sin esta linea la
+            # fila nueva se queda en el default=False del modelo y el flag se
+            # pierde en cada ciclo de "Reoptimizar (respetar bloqueadas)".
+            fila.bloqueada = col.bloqueada
             filas_por_clave[col.item.id] = fila
             self._s.add(fila)
 
