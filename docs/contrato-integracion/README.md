@@ -453,28 +453,27 @@ pantalla, es política de operación.
 }
 ```
 
-### Cuidado: hoy solo `horizonteHoras` mueve el puntaje
+### Los 4 pesos mueven el puntaje (fix issue #173)
 
-Esto hay que saberlo antes de construir la pantalla, porque si no el Admin va a mover un
-peso, no va a pasar nada, y va a reportar un defecto que no existe.
-
-Por decisión de negocio, el puntaje total es **exclusivamente la urgencia por deadline**.
-Los otros tres componentes se calculan y se muestran en el desglose, pero no se ponderan
-en el total. Consecuencia directa:
+Hasta issue #173 el puntaje total era exclusivamente la urgencia por deadline y los
+pesos eran configuración dormida (ver
+`docs/decisiones/score-prioridad-4-pesos-vs-solo-urgencia.md`). Eso ya no es así: el
+total es la suma ponderada de los 4 componentes, así que mover cualquier peso sí cambia
+el puntaje de cualquier solicitud cuyos componentes no sean todos iguales.
 
 | Parámetro | ¿Mueve el puntaje? |
 |---|---|
-| `horizonteHoras` | **Sí.** Es la rampa: vencido = 100, fuera del horizonte = 0 |
-| `pesoUrgencia`, `pesoValor`, `pesoProbabilidad`, `pesoTipo` | No. Configuración dormida |
-| `valorReferencia`, `puntajeLicitacion`, `puntajeSpot`, y los dos por defecto | No en el total; sí en el desglose de una solicitud |
+| `horizonteHoras` | **Sí.** Es la rampa del componente urgencia: vencido = 100, fuera del horizonte = 0 |
+| `pesoUrgencia`, `pesoValor`, `pesoProbabilidad`, `pesoTipo` | **Sí.** Ponderan directamente el total |
+| `valorReferencia`, `puntajeLicitacion`, `puntajeSpot`, y los dos por defecto | Mueven su componente (valor/tipo/probabilidad), y por lo tanto el total según su peso |
 
-Medido contra el backend corriendo: subir `pesoUrgencia` de 0.40 a 0.60 recalculó las 12
-solicitudes activas y actualizó **cero**. Subir `horizonteHoras` de 240 a 4000 llevó una
-solicitud a 30 días de su deadline de **0.00 a 82.00**.
+Ejemplo con los defaults (`pesoUrgencia=0.40, pesoValor=0.30, pesoProbabilidad=0.20,
+pesoTipo=0.10`): una licitación sin valor/probabilidad estimados, a 720 horas de su
+deadline con `horizonteHoras=4000`, da urgencia=82, valor=30 (default), probabilidad=50
+(default), tipo=100 → total = 0.40·82 + 0.30·30 + 0.20·50 + 0.10·100 = **61.8**, no 82.
 
-**Los cuatro pesos deben sumar 1.0** de todas formas, y la respuesta es
-`400 PARAMETROS_SCORE_INVALIDOS` si no. No porque hoy importen, sino para que el día que
-el total vuelva a ser una suma ponderada no arranque con una configuración torcida.
+**Los cuatro pesos deben sumar 1.0**, y la respuesta es `400 PARAMETROS_SCORE_INVALIDOS`
+si no — de lo contrario el total dejaría de estar en escala 0–100.
 
 **El `PUT` responde de inmediato y no espera el recálculo.** Guardar los pesos y refrescar
 el score de todas las solicitudes activas son dos cosas: la segunda corre aparte, con sus

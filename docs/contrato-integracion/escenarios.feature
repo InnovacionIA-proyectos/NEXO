@@ -274,11 +274,11 @@ Característica: Identidad e integración con el portal de la Administración
     Y una solicitud a 30 días de su deadline pasa de 0 a 82
 
   @hu-051 @priorizacion
-  Escenario: Cambiar un peso no mueve ningún puntaje
-    Dado que el total del puntaje es solo la urgencia por deadline
+  Escenario: Cambiar un peso mueve el puntaje
+    Dado que el total del puntaje es la suma ponderada de urgencia, valor, probabilidad y tipo
     Cuando el Admin cambia el peso de urgencia de 0.40 a 0.60
     Entonces se revisan todas las solicitudes activas
-    Y no se actualiza ninguna
+    Y las que no tienen los 4 componentes iguales quedan con un puntaje distinto
 
   @hu-051 @priorizacion
   Escenario: Pesos que no suman uno se rechazan
