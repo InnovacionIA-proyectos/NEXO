@@ -21,9 +21,10 @@ public sealed class BibliotecaSicetacAdapter(DwSiceDbContext dw, IMemoryCache ca
 
     public async Task<MatrizSicetacResultDto> BuscarAsync(
         string? q, int? periodo, string? configuracion, string? tipoCarga, string? unidadTransporte,
-        string? condicionCarga, string? viaEstandar, int top, CancellationToken ct = default)
+        string? condicionCarga, string? viaEstandar, int top, int page = 1, CancellationToken ct = default)
     {
         top = Math.Clamp(top, 1, MaxTop);
+        page = Math.Max(1, page);
         var periodoEfectivo = periodo ?? await PeriodoMasRecienteAsync(ct);
 
         var query = dw.RutasSicetac.Where(r => r.Periodo == periodoEfectivo);
@@ -47,6 +48,7 @@ public sealed class BibliotecaSicetacAdapter(DwSiceDbContext dw, IMemoryCache ca
         var total = await query.CountAsync(ct);
         var items = await query
             .OrderBy(r => r.NombreRuta).ThenBy(r => r.Configuracion).ThenBy(r => r.NombreUnidadTransporte)
+            .Skip((page - 1) * top)
             .Take(top)
             .Select(r => new RutaSicetacItemDto(
                 r.Id, r.Periodo, r.NombreRuta, r.Origen, r.Destino,

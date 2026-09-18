@@ -34,10 +34,10 @@ public sealed class SapHistoricoAdapter(
 
     public async Task<SapHistoricoResultDto> BuscarPlazaAsync(
         string? q, int? lineaNegocio, string? tipoVehiculo, string? tipoCarroseria, int? claseViaje,
-        int top, CancellationToken ct = default)
+        int top, int page = 1, CancellationToken ct = default)
     {
         var mapaAjustes = await ajustes.MapaAsync(ct);
-        return await BuscarCoreAsync(db.TarifasPlazaSap, mapaAjustes, q, lineaNegocio, tipoVehiculo, tipoCarroseria, claseViaje, top, ct);
+        return await BuscarCoreAsync(db.TarifasPlazaSap, mapaAjustes, q, lineaNegocio, tipoVehiculo, tipoCarroseria, claseViaje, top, ct, page);
     }
 
     public Task<SapHistoricoFiltrosDto> FiltrosAsync(CancellationToken ct = default)
@@ -49,9 +49,10 @@ public sealed class SapHistoricoAdapter(
     private async Task<SapHistoricoResultDto> BuscarCoreAsync<T>(
         IQueryable<T> origen, IReadOnlyDictionary<int, DateTime> ajustesVigencia,
         string? q, int? lineaNegocio, string? tipoVehiculo, string? tipoCarroseria, int? claseViaje,
-        int top, CancellationToken ct) where T : SapTarifaBase
+        int top, CancellationToken ct, int page = 1) where T : SapTarifaBase
     {
         top = Math.Clamp(top, 1, MaxTop);
+        page = Math.Max(1, page);
 
         var query = origen.AsQueryable();
 
@@ -73,6 +74,7 @@ public sealed class SapHistoricoAdapter(
         var total = await query.CountAsync(ct);
         var filas = await query
             .OrderByDescending(t => t.Vigencia).ThenByDescending(t => t.FechaCreacion)
+            .Skip((page - 1) * top)
             .Take(top)
             .ToListAsync(ct);
 

@@ -11,7 +11,7 @@ public interface IBibliotecaSicetacPort
 {
     Task<MatrizSicetacResultDto> BuscarAsync(
         string? q, int? periodo, string? configuracion, string? tipoCarga, string? unidadTransporte,
-        string? condicionCarga, string? viaEstandar, int top, CancellationToken ct = default);
+        string? condicionCarga, string? viaEstandar, int top, int page = 1, CancellationToken ct = default);
 
     Task<IReadOnlyList<int>> PeriodosAsync(CancellationToken ct = default);
 
