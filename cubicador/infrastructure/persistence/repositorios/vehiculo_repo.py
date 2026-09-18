@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from typing import TYPE_CHECKING
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,10 +12,17 @@ from application.plan_cargue.vehiculos import presets
 from domain.entidades.entidades import EjeVehiculoRow, VehiculoCubicacion
 from infrastructure.persistence.modelos import PlanCargueModel, VehiculoCubicacionModel
 
+if TYPE_CHECKING:
+    from infrastructure.mensajeria.rabbitmq import RabbitMqEventosPublisher
+
 
 class SqlVehiculoCubicacionRepository:
-    def __init__(self, sesion: AsyncSession) -> None:
+    def __init__(self, sesion: AsyncSession, publisher: "RabbitMqEventosPublisher | None" = None) -> None:
         self._s = sesion
+        # Issue #162: opcional a proposito - sin publisher (scripts/tests que
+        # no lo necesitan) la siembra sigue funcionando exactamente igual que
+        # siempre, solo que no publica nada.
+        self._publisher = publisher
 
     async def listar_con_siembra(self) -> list[VehiculoCubicacion]:
         # Siembra por NOMBRE: si el catalogo de presets crece, los faltantes
@@ -24,9 +32,32 @@ class SqlVehiculoCubicacionRepository:
         if faltantes:
             self._s.add_all([_a_modelo(p) for p in faltantes])
             await self._s.commit()
+            # Issue #162: sin esto, un preset sembrado aca nace invisible para
+            # NEXO para siempre - era la UNICA escritura del catalogo que no
+            # pasaba por "guardar_vehiculo" (worker/main.py), que si publica
+            # vehiculo.creado. El consumer de NEXO (VehiculoCatalogoConsumer)
+            # hace upsert por Id, asi que publicar de mas nunca duplica ni
+            # corrompe la proyeccion - agregar un preset nuevo al codigo y
+            # levantar Cubicador ahora lo hace aparecer solo en NEXO.
+            if self._publisher is not None:
+                for nuevo in faltantes:
+                    await self._publisher.publicar_vehiculo_creado(nuevo.id, _a_evento_payload(nuevo))
 
         filas = (await self._s.execute(select(VehiculoCubicacionModel).order_by(VehiculoCubicacionModel.nombre))).scalars().all()
         return [_a_entidad(f) for f in filas]
+
+    async def republicar_todos(self) -> list[VehiculoCubicacion]:
+        """Issue #162: repara la desincronizacion YA EXISTENTE al momento de
+        reportarse (20 vehiculos en Cubicador - 9 presets + 11 creados por
+        cola - contra 13 en NEXO): republica vehiculo.creado para TODO el
+        catalogo actual, no solo los nuevos. Seguro de correr mas de una vez
+        (el consumer de NEXO hace upsert por Id) - pensado como reparacion
+        manual, no se llama desde ningun flujo automatico."""
+        vehiculos = await self.listar_con_siembra()
+        if self._publisher is not None:
+            for v in vehiculos:
+                await self._publisher.publicar_vehiculo_creado(v.id, _a_evento_payload(v))
+        return vehiculos
 
     async def obtener(self, id: str) -> VehiculoCubicacion | None:
         fila = await self._s.get(VehiculoCubicacionModel, id)
@@ -76,6 +107,17 @@ def _a_modelo(v: VehiculoCubicacion) -> VehiculoCubicacionModel:
         tolerancia_paredes_mm=v.tolerancia_paredes_mm, tolerancia_entre_unidades_mm=v.tolerancia_entre_unidades_mm,
         es_preset=v.es_preset, created_at=v.created_at, updated_at=v.updated_at,
     )
+
+
+def _a_evento_payload(v: VehiculoCubicacion) -> dict:
+    """Mismo shape que arma worker/main.py para vehiculo.creado/actualizado
+    (VehiculoCubicacionDto.model_validate(...).model_dump(mode="json",
+    by_alias=True)) - se reusa el DTO a proposito, mismo criterio ya
+    documentado para que el worker importe de api/dtos: evitar una segunda
+    definicion del contrato del evento que pueda divergir con el tiempo."""
+    from api.dtos.plan_cargue import VehiculoCubicacionDto
+
+    return VehiculoCubicacionDto.model_validate(v).model_dump(mode="json", by_alias=True)
 
 
 def _a_entidad(f: VehiculoCubicacionModel) -> VehiculoCubicacion:

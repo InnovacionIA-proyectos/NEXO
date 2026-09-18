@@ -214,8 +214,9 @@ class DeteccionExtradimensionDto(ApiModel):
 
 | Método | Ruta | Notas |
 |---|---|---|
-| GET/POST | `/vehiculos` | catálogo de tipos de vehículo (siembra los 9 presets en el primer GET) |
+| GET/POST | `/vehiculos` | catálogo de tipos de vehículo (siembra los 9 presets en el primer GET; issue #162: cada preset sembrado publica `vehiculo.creado`, igual que un alta normal, para que la proyección de NEXO no vuelva a quedarse atrás) |
 | DELETE | `/vehiculos/{id}` | `409 VEHICULO_EN_USO` si tiene planes asociados |
+| POST | `/vehiculos/republicar-catalogo` | issue #162: reparo manual — republica `vehiculo.creado` para TODO el catálogo actual (no solo lo nuevo). Idempotente del lado NEXO (upsert por Id); no forma parte de ningún flujo automático, se invoca a mano si la proyección de NEXO vuelve a desincronizarse |
 | GET/POST | `` (raíz) | listar / crear plan vacío |
 | GET | `/{id}` | plan con sus ítems |
 | GET | `/{id}/flota` | vehículos (planes) de la misma flota |

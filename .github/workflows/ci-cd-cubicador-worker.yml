@@ -68,3 +68,12 @@ jobs:
             -H "Content-Type: application/json" ^
             -H "X-GitHub-Event: push" ^
             -d "{\"ref\":\"${{ github.ref }}\",\"repository\":{\"full_name\":\"${{ github.repository }}\"}}"
+
+      # Issue #163: a diferencia de ci-cd-api.yml/ci-cd-cubicador-api.yml, este
+      # servicio NO tiene ningun endpoint HTTP (sin healthcheck propio, ver
+      # cubicador/docker-compose.yml) - no hay nada contra que hacer polling
+      # desde aca para confirmar que el redeploy real ocurrio. Mismo hueco que
+      # ya reportaba cubicador/docker-compose.yml sobre este servicio: "el
+      # candidato mas probable a que todo se quede y nunca vuelva a salir, sin
+      # que nada lo notifique". Verificacion real pendiente de que Dokploy
+      # exponga un endpoint de estado de despliegue por app (fuera del repo).
