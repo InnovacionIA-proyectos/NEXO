@@ -202,7 +202,7 @@ public sealed class TarifarioSapAdapter : ITarifarioSapPort
             (vehiculoIdStr is null || t.TipoVehiculo.Trim() == vehiculoIdStr) &&
             (carroceriaCod is null || t.TipoCarroseria.Trim() == carroceriaCod);
 
-        CandidatoTarifaDto? Candidato(SapTarifaPlaza t, string regla)
+        CandidatoTarifaDto? Candidato(SapTarifaPlaza t, string regla, string? advertencia = null)
         {
             var valor = ParseValor(t.Valor);
             if (valor is not > 0) return null;
@@ -210,7 +210,7 @@ public sealed class TarifarioSapAdapter : ITarifarioSapPort
                 "plaza", valor.Value,
                 $"{t.Origen.Trim()} → {t.Destino.Trim()} · vigencia {t.Vigencia:yyyy-MM-dd}" +
                     (t.DetallesTarifa is { Length: > 0 } det ? $" · {det}" : ""),
-                $"{regla} · {criterio}", candidatas.Count);
+                $"{regla} · {criterio}", candidatas.Count, advertencia);
         }
 
         foreach (var t in candidatas)
@@ -269,9 +269,37 @@ public sealed class TarifarioSapAdapter : ITarifarioSapPort
             .Where(x => x.Valor is > 0)
             .OrderByDescending(x => x.Valor)
             .FirstOrDefault();
-        return fallback.Fila is null
-            ? (null, false)
-            : (Candidato(fallback.Fila, "fallback · mayor valor vigente"), false);
+        if (fallback.Fila is null) return (null, false);
+
+        // Issue #169: verificado con datos reales (control A/B) que este fallback
+        // proponía "la tarifa vigente de mayor valor" en silencio incluso cuando el
+        // peso de la línea excedía el límite de TODAS las tarifas para ese vehículo, o
+        // cuando el vehículo no resolvió en el catálogo SAP - sin distinguir esos casos
+        // de un match exacto real. La línea sigue cotizándose con este candidato (no se
+        // descarta), pero ahora con una advertencia explícita que el frontend puede
+        // mostrarle al Administrador de Fletes/cliente antes de confirmar.
+        string advertencia;
+        if (claseViajeId == 2 && vehiculoIdStr is null)
+        {
+            advertencia = "No se pudo identificar el tipo de vehículo de esta línea en el catálogo de tarifas " +
+                "SAP: se propone la tarifa de plaza vigente de mayor valor para la ruta como referencia, sin " +
+                "garantía de que corresponda al vehículo real. Verifique manualmente antes de confirmar.";
+        }
+        else if (claseViajeId == 2 && vehiculoIdStr is not null && c.Peso is { } pesoConsulta &&
+                 !candidatas.Any(x => x.Vigencia >= hoy && CupoCoincide(x) && ParsePeso(x.PesoLimite) is { } limDisponible && pesoConsulta <= limDisponible))
+        {
+            advertencia = $"El peso de esta línea ({pesoConsulta:N0} kg) excede el límite de todas las tarifas " +
+                "de plaza vigentes para este vehículo en la ruta: se propone la tarifa vigente de mayor valor " +
+                "como referencia, sin garantía de que cubra este peso. Verifique manualmente antes de confirmar.";
+        }
+        else
+        {
+            advertencia = "No se encontró una tarifa de plaza que calce exactamente con las condiciones de " +
+                "esta línea (vehículo, peso o tipo de viaje): se propone la tarifa vigente de mayor valor de " +
+                "la ruta como referencia. Verifique manualmente antes de confirmar.";
+        }
+
+        return (Candidato(fallback.Fila, "fallback · mayor valor vigente", advertencia), false);
     }
 
     internal static decimal ValorMasCercano(IReadOnlyList<decimal> ordenados, decimal entrada)
