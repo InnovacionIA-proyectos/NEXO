@@ -1,6 +1,5 @@
 using System.Text.Json;
 using CabinaFletes.Application.CasosDeUso.Cotizaciones.DTOs;
-using CabinaFletes.Application.CasosDeUso.Cotizaciones.Excepciones;
 using CabinaFletes.Application.CasosDeUso.Cotizaciones.Interfaces;
 using CabinaFletes.Application.CasosDeUso.Cotizaciones.Mappers;
 using CabinaFletes.Application.CasosDeUso.Cotizaciones.Validadores;
@@ -50,22 +49,17 @@ public sealed class MarcarResultadoCommandHandler(
             throw new ConflictException("RESULTADO_YA_DEFINIDO",
                 $"La cotización ya está marcada como {c.Resultado} y no puede cambiarse a {resultado}.");
 
-        // La mesa del comercial permite marcar el resultado directo desde el borrador:
-        // se registra una entrega implícita (sin correo) para conservar la trazabilidad.
-        if (c.Estado == EstadoCotizacion.Borrador)
-        {
-            if (c.Lineas.Count == 0)
-                throw new CotizacionSinFleteException("marcar el resultado de");
-            CotizacionCalculos.Recalcular(c);
-            c.Estado = EstadoCotizacion.Entregada;
-            c.EntregadaPor = usuarioActual.Id;
-            c.EntregadaAt = clock.GetUtcNow();
-            auditoria.Registrar(usuarioActual.Id, "cotizaciones", c.Id, "entrega_implicita", $"{{\"total\":{c.Total}}}");
-        }
-        else if (c.Estado != EstadoCotizacion.Entregada)
-        {
+        // Issue #171: ANTES, la mesa del comercial podía marcar el resultado directo
+        // desde el borrador, y este comando registraba una "entrega implícita" (sin
+        // correo, sin evento CotizacionEntregada) solo para conservar la trazabilidad
+        // - eso ponía EntregadaAt sin que nadie hubiera llamado a /entregar de verdad,
+        // contaminando entregadaAt/cumplimiento de SLA/cotizaciones emitidas en el
+        // tablero de KPIs del piloto (S4-HU-05). Por decisión del negocio, esa entrega
+        // implícita se elimina: SOLO EntregarCotizacionCommand (POST /entregar) puede
+        // marcar la entrega, sin excepciones - una cotización en Borrador (con o sin
+        // líneas) exige pasar por /entregar antes de poder marcar su resultado.
+        if (c.Estado != EstadoCotizacion.Entregada)
             throw new ConflictException("COTIZACION_NO_ENTREGADA", "Solo se puede marcar el resultado de una cotización entregada.");
-        }
 
         var esNuevaGanada = resultado == ResultadoCotizacion.Ganada && c.Resultado != ResultadoCotizacion.Ganada;
         c.Resultado = resultado;
