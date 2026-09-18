@@ -10,7 +10,7 @@ namespace CabinaFletes.Infrastructure.ReglasSoloSicetac.Repositorios;
 public sealed class EfReglasSoloSicetacRepository(CabinaFletesDbContext db, IMemoryCache cache)
     : IReglasSoloSicetacRepository, IClavesSoloSicetacPort
 {
-    private const string CacheKeyClaves = "reglas-solo-sicetac:claves";
+    private const string CacheKeyClaves = "reglas-solo-sicetac:claves-ruta-vehiculo";
     private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(2);
 
     public async Task<IReadOnlyList<ReglaSoloSicetac>> ListarAsync(CancellationToken ct) =>
@@ -43,18 +43,20 @@ public sealed class EfReglasSoloSicetacRepository(CabinaFletesDbContext db, IMem
     }
 
     /// <summary>
-    /// Claves por RUTA (sin el vehículo) en la forma canónica de Domain — puerto de
-    /// lectura para Biblioteca.
+    /// Claves por RUTA + TIPO DE VEHÍCULO en la forma canónica de Domain — puerto de
+    /// lectura para el motor de propuesta de tarifa (RN-01).
     ///
-    /// Se reconstruye con Texto.ClaveRuta en vez de concatenar lo almacenado: aunque hoy
-    /// se guarda ya normalizado, reconstruirla hace la coincidencia inmune a una fila
-    /// vieja o cargada por otra vía.
+    /// Issue #17: antes proyectaba solo Origen/Destino, descartando TipoVehiculo -
+    /// marcar un único tipo de vehículo como excepción apagaba la comparación contra
+    /// plaza para TODOS los tipos de esa ruta. Se reconstruye con Texto.ClaveRutaVehiculo
+    /// en vez de concatenar lo almacenado: aunque hoy se guarda ya normalizado,
+    /// reconstruirla hace la coincidencia inmune a una fila vieja o cargada por otra vía.
     /// </summary>
-    public async Task<IReadOnlySet<string>> ClavesRutaAsync(CancellationToken ct = default) =>
+    public async Task<IReadOnlySet<string>> ClavesRutaVehiculoAsync(CancellationToken ct = default) =>
         (await cache.GetOrCreateAsync(CacheKeyClaves, async e =>
         {
             e.AbsoluteExpirationRelativeToNow = CacheTtl;
-            var filas = await db.ReglasSoloSicetac.AsNoTracking().Select(r => new { r.Origen, r.Destino }).ToListAsync(ct);
-            return (IReadOnlySet<string>)filas.Select(r => Texto.ClaveRuta(r.Origen, r.Destino)).ToHashSet();
+            var filas = await db.ReglasSoloSicetac.AsNoTracking().Select(r => new { r.Origen, r.Destino, r.TipoVehiculo }).ToListAsync(ct);
+            return (IReadOnlySet<string>)filas.Select(r => Texto.ClaveRutaVehiculo(r.Origen, r.Destino, r.TipoVehiculo)).ToHashSet();
         }))!;
 }

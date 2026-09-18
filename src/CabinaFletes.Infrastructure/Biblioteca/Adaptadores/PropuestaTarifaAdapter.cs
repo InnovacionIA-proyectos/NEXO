@@ -85,7 +85,7 @@ public sealed class PropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuestaDeL
             ?? throw new NotFoundException("LINEA_NO_ENCONTRADA", "Línea de solicitud no encontrada.");
 
         var ajustes = await _ajustes.MapaAsync(ct);
-        var soloSice = await _reglas.ClavesRutaAsync(ct);
+        var soloSice = await _reglas.ClavesRutaVehiculoAsync(ct);
 
         using var scope = _scopes.CreateScope();
         var dw = _dwConfigurado ? scope.ServiceProvider.GetService<DwSiceDbContext>() : null;
@@ -133,7 +133,7 @@ public sealed class PropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuestaDeL
         var lineas = solicitud.Lineas.ToList();
 
         var ajustes = await _ajustes.MapaAsync(ct);
-        var soloSice = await _reglas.ClavesRutaAsync(ct);
+        var soloSice = await _reglas.ClavesRutaVehiculoAsync(ct);
 
         static string Huella(LineaSolicitud l) => string.Join('|',
             l.Ruta?.Origen, l.Ruta?.Destino, l.ConfiguracionVehiculo?.TipoVehiculo, l.ConfiguracionVehiculo?.Carroceria,
@@ -197,7 +197,11 @@ public sealed class PropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuestaDeL
         // repositorio que las lee. Antes se comparaban los valores crudos de la ruta
         // contra claves ya normalizadas, y la regla no se aplicaba en silencio: ver
         // ClaveDeRutaTests en Domain.Tests y el comentario de cierre de la issue #16.
-        if (soloSice.Contains(Texto.ClaveRuta(linea.Ruta.Origen, linea.Ruta.Destino)))
+        //
+        // Issue #17: las 3 llaves (ruta + tipo de vehículo), no solo las 2 de la ruta -
+        // antes, marcar un único tipo de vehículo como "solo SICE-TAC" apagaba la
+        // comparación contra plaza para TODOS los tipos de vehículo de esa ruta.
+        if (soloSice.Contains(Texto.ClaveRutaVehiculo(linea.Ruta.Origen, linea.Ruta.Destino, vehiculo)))
         {
             var sice = dw is null ? null : await CandidatoSicetacAsync(dw, origen, destino, vehiculo, linea.Tipologia, linea.ConfiguracionVehiculo?.Carroceria, ct);
             var justif = sice is not null
@@ -260,6 +264,13 @@ public sealed class PropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuestaDeL
         var decision = ReglaDeCosteo.DecidirConTarifario(
             ADominio(sicetac), ADominio(plaza), ADominio(historico), vencida);
         var (valor, fuente, justificacion) = (decision.Valor, decision.Fuente, decision.Justificacion);
+
+        // Issue #169: cuando la propuesta final es plaza y ese candidato viene del
+        // fallback conservador (no un match exacto por vehículo/peso), la advertencia
+        // se anexa a la MISMA justificación que ya se le muestra al usuario - no hace
+        // falta que el frontend sepa leer un campo aparte para enterarse.
+        if (fuente == "plaza" && plaza?.Advertencia is { } advertenciaPlaza)
+            justificacion += $" ⚠ {advertenciaPlaza}";
 
         if (oficial?.Retorno is { } retorno)
             justificacion += $" Retorno del contenedor a {linea.CiudadDevolucionContenedor}: {retorno.Valor:C0} (línea devolución, exclusivo).";
