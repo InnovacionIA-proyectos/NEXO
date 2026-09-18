@@ -231,6 +231,16 @@ def _vehiculo_de_prueba():
     }
 
 
+def _items(respuesta):
+    """Issue #166: GET /api/vehiculos y GET /api/planes-cargue dejaron de ser un
+    array plano y ahora paginan (`{items, total}`, PR #192) — este helper lee la
+    lista sin importar cuál forma llegó, así el resto de este archivo no rompe si
+    la forma vuelve a cambiar."""
+    if isinstance(respuesta, dict):
+        return respuesta.get("items") or []
+    return respuesta or []
+
+
 def _item_de_prueba(sku, secuencia):
     return {
         "sku": sku, "descripcion": "Caja de prueba E2E", "pedido": None, "cliente": None, "destino": None,
@@ -265,7 +275,7 @@ def probar_comandos_escritura_plan_cargue():
     codigo, r = pedir("/api/vehiculos", _vehiculo_de_prueba(), "POST", esperado=202)
     vehiculo_id = r["correlationId"]
     dato(f"vehiculoId = {vehiculo_id}")
-    ok(esperar(lambda: any(v["id"] == vehiculo_id for v in (pedir("/api/vehiculos")[1] or [])),
+    ok(esperar(lambda: any(v["id"] == vehiculo_id for v in _items(pedir("/api/vehiculos")[1])),
                "guardar_vehiculo: aparece en GET /api/vehiculos (proyección vehiculo.creado)"),
        "guardar_vehiculo: la lectura ve el vehículo nuevo")
 
@@ -300,10 +310,10 @@ def probar_comandos_escritura_plan_cargue():
                "eliminar_item: TotalItems vuelve a 2"), "eliminar_item: borrado reflejado")
 
     paso("S3-HU-02.4 (issue #106): crear_plan_demo (6/9)")
-    ids_antes = {p["id"] for p in (pedir("/api/planes-cargue")[1] or [])}
+    ids_antes = {p["id"] for p in _items(pedir("/api/planes-cargue")[1])}
     codigo, r_demo = pedir("/api/planes-cargue/demo", {}, "POST", esperado=202)
     ok("correlationId" in r_demo, "crear_plan_demo: 202 con CorrelationId")
-    nuevo = esperar(lambda: (set(p["id"] for p in (pedir("/api/planes-cargue")[1] or [])) - ids_antes) or None,
+    nuevo = esperar(lambda: (set(p["id"] for p in _items(pedir("/api/planes-cargue")[1])) - ids_antes) or None,
                      "crear_plan_demo: aparece un plan nuevo en el listado")
     ok(bool(nuevo), f"crear_plan_demo: plan demo confirmado ({nuevo})")
 
@@ -340,7 +350,7 @@ def probar_comandos_escritura_plan_cargue():
 
     paso("S3-HU-02.4 (issue #106): eliminar_vehiculo (9/9)")
     pedir(f"/api/vehiculos/{vehiculo_id}", None, "DELETE", esperado=202)
-    ok(esperar(lambda: not any(v["id"] == vehiculo_id for v in (pedir("/api/vehiculos")[1] or [])),
+    ok(esperar(lambda: not any(v["id"] == vehiculo_id for v in _items(pedir("/api/vehiculos")[1])),
                "eliminar_vehiculo: desaparece de GET /api/vehiculos"),
        "eliminar_vehiculo: borrado reflejado en la proyección")
 
