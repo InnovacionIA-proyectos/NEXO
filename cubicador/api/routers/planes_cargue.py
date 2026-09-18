@@ -70,6 +70,17 @@ async def eliminar_vehiculo(id: str, repo=Depends(obtener_vehiculo_repo)):
     await vehiculos_uc.eliminar_vehiculo(repo, id)
 
 
+@router.post("/vehiculos/republicar-catalogo", response_model=list[VehiculoCubicacionDto])
+async def republicar_catalogo_vehiculos(repo=Depends(obtener_vehiculo_repo)):
+    """Issue #162: reparo manual, una sola vez, de la desincronizacion entre
+    el catalogo de Cubicador y la proyeccion de NEXO (20 vehiculos en
+    Cubicador contra 13 en NEXO al momento de reportarse). Republica
+    vehiculo.creado para TODO el catalogo actual - seguro de correr mas de
+    una vez, el consumer de NEXO hace upsert por Id. No es parte de ningun
+    flujo automatico; se invoca a mano cuando haga falta re-sincronizar."""
+    return [VehiculoCubicacionDto.model_validate(v) for v in await vehiculos_uc.republicar_catalogo(repo)]
+
+
 # ------------------------------------------------------------- planes
 
 

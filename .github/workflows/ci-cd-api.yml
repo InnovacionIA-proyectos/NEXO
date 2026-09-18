@@ -142,3 +142,36 @@ jobs:
             -H "Content-Type: application/json" ^
             -H "X-GitHub-Event: push" ^
             -d "{\"ref\":\"${{ github.ref }}\",\"repository\":{\"full_name\":\"${{ github.repository }}\"}}"
+
+      # Issue #163: el webhook de arriba solo confirma que Dokploy RECIBIO la
+      # orden (curl -f en verde con cualquier 2xx) - nunca que el build/deploy
+      # real termino. Ya paso una vez (docs/VERIFICACION_NEXO_CUBICADOR_2026-09-14.md):
+      # el build fallo por disco lleno y Dokploy siguio sirviendo la imagen
+      # vieja en silencio, con el job de este mismo workflow en verde. Este
+      # paso al menos detecta "el contenedor nuevo nunca volvio a responder"
+      # (crash/timeout de arranque) con reintentos durante ~2 minutos.
+      #
+      # Limite conocido, a proposito no resuelto aca: un health-check simple
+      # NO distingue "se redesplego bien" de "el contenedor VIEJO sigue sano
+      # sirviendo codigo viejo" (exactamente lo que paso en el incidente de
+      # disco lleno) - eso exigiria exponer el commit SHA desplegado (via
+      # /health o un /version nuevo) y comparar contra github.sha, que es un
+      # cambio mas grande (toca el Dockerfile y Program.cs) pendiente de
+      # decidir aparte.
+      - name: Verificar que el servicio respondio saludable tras el despliegue
+        shell: cmd
+        run: |
+          set INTENTOS=0
+          :verificar
+          curl -f -s -o NUL "${{ secrets.HEALTH_CHECK_URL_API }}/health"
+          if not errorlevel 1 goto exito
+          set /a INTENTOS+=1
+          if %INTENTOS% GEQ 12 goto fallo
+          timeout /t 10 /nobreak >NUL
+          goto verificar
+          :exito
+          echo Servicio respondio saludable tras el despliegue.
+          exit /b 0
+          :fallo
+          echo El servicio NO respondio saludable tras 12 intentos ^(~2 minutos^) - el despliegue no se confirma.
+          exit /b 1

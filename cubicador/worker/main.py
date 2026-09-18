@@ -238,7 +238,11 @@ async def _procesar(mensaje: aio_pika.IncomingMessage, publisher: RabbitMqEvento
 
     async with SessionLocal() as sesion:
         planes = SqlPlanCargueRepository(sesion)
-        vehiculos = SqlVehiculoCubicacionRepository(sesion)
+        # Issue #162: mismo publisher que el resto del worker, para que
+        # listar_con_siembra() pueda publicar vehiculo.creado por cada preset
+        # nuevo que siembre (p.ej. si el primer request tras un arranque llega
+        # por cola en vez de por GET /vehiculos).
+        vehiculos = SqlVehiculoCubicacionRepository(sesion, publisher)
         try:
             plan_id = await _ejecutar_solicitud(cuerpo, planes, vehiculos, publisher)
             # S3-HU-02 (issue #105): "guardar_vehiculo" no tiene plan que reportar y
