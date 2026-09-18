@@ -78,6 +78,42 @@ total = PesoUrgencia × urgencia + PesoValor × valor + PesoProbabilidad × prob
 Con los defaults actuales de `ParametrosScore` (0.40 / 0.30 / 0.20 / 0.10, que
 ya suman 1.0), el total queda en la misma escala 0-100 que tenía antes.
 
+## Verificación #174 — contra las 409 solicitudes reales de `dbInformesAutomatizados_Pruebas`
+
+Corrido `tests/QA/s4-hu-06.3-score-4-pesos-387-solicitudes/verify-score-4-pesos.sql`
+(2026-09-18, solo lectura) contra el dataset real (409 solicitudes al momento de correr,
+más que las 387 del issue porque el dataset crece con el tiempo).
+
+**La prueba puntual del issue queda confirmada:** las oportunidades de $9.000.000 y
+$3.900.000, que antes compartían score 100.00, ahora quedan en **86.08** y **80.72**
+respectivamente — distintas, como pide el criterio de aceptación.
+
+**El empate exacto en 50/100 desaparece** (0 solicitudes en esos valores con la fórmula
+nueva, contra 352 en 50.00 y 47 en 100.00 con la vieja).
+
+**Pero aparece un empate igual de grande en otros dos valores, por una razón distinta:**
+
+| | Antes (solo urgencia) | Después (4 pesos) |
+|---|---|---|
+| Score más repetido | 50.00 → 352/409 (86%) | 44.0 → 293/409 (72%) |
+| Segundo más repetido | 100.00 → 47/409 (11%) | 49.0 → 61/409 (15%) |
+
+44.0 = 0.40·**50** + 0.30·**30** + 0.20·**50** + 0.10·50 (Spot), y 49.0 es la misma
+cuenta con Tipo=Licitación (peso 100 en vez de 50). Esos números (50/30/50) son
+exactamente `ComponenteUrgencia` sin deadline, `ValorPorDefectoSinValor` y
+`ProbabilidadPorDefecto` — es decir, esas 354 solicitudes (87% del dataset) tienen
+**Deadline, ValorEstimado y ProbabilidadCierre en NULL**. Se diferencian solo por Tipo
+porque es el único de los 4 componentes que sí tienen capturado.
+
+**Conclusión:** el fix de #173 funciona como se documentó — los 4 pesos ya ponderan el
+total, y por eso el ejemplo puntual del issue ($9M vs $3.9M) y el empate exacto en
+50/100 quedan resueltos. Pero la mayoría de las solicitudes en este dataset nunca
+tuvieron deadline/valor/probabilidad capturados, así que ninguna fórmula (ni esta ni
+ninguna otra) puede diferenciarlas mientras esos 3 campos falten en el origen. Ese es un
+problema de captura de datos aguas arriba (en `CrearSolicitudCommand` o en el flujo que
+alimenta esos campos), no un defecto de `ScorePrioridadCalculator` — recomendado abrir un
+issue aparte para decidir si esos campos deben ser obligatorios o tener otro fallback.
+
 ## Por qué no la otra versión
 
 La versión "solo urgencia" no tiene ningún respaldo textual propio — ni un
