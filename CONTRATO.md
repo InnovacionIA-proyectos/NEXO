@@ -390,7 +390,10 @@ Detalle completo del flujo en
   [nota sobre el correo asíncrono](docs/contrato-integracion/README.md#53-entregar-una-cotización-ya-no-espera-al-correo).
   `multipart/form-data: formato?` (PDF, opcional, máx. 10 MB) → `200 EntregarCotizacionResultDto`
 - `POST /api/cotizaciones/{id}/resultado` — `Comercial, AdminTarifas, CoordinadorFletes, Admin`. Realimenta Tarifas Ganadas si `resultado="ganada"`.
-  `Body: { resultado: "ganada"|"perdida", motivo?, comentario? }` → `200 CotizacionDto`
+  `Body: { resultado: "ganada"|"perdida", motivo?, comentario? }` → `200 CotizacionDto` / `409 COTIZACION_NO_ENTREGADA`
+  si la cotización no está en estado `Entregada` — issue #171: antes se permitía marcar resultado directo desde
+  `Borrador` ("entrega implícita", sin correo ni evento), lo que ponía `entregadaAt` sin haber pasado por
+  `/entregar` y contaminaba el tablero de KPIs del piloto. Ahora **siempre** hay que entregar primero.
 - `GET /api/cotizaciones/{id}/exportar-excel` → `200`, `Content-Disposition: attachment` (binario .xlsx)
 
 ### Biblioteca SICE-TAC (matriz oficial, solo lectura) — `/api/biblioteca-sicetac` (`[Authorize]`)
