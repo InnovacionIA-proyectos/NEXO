@@ -1,10 +1,10 @@
-# Recomendación de captura de datos futura — S2-HU-11 parte 3
+# Recomendación de captura de datos futura
 
 Consolida en un solo documento todo lo que se identificó como necesario a lo largo de ambos EDA y de la propuesta de modelos — qué ya se consiguió, qué falta pedir, qué falta mapear/traducir, y qué falta confirmar con negocio. Ver `hallazgos.md`/`limitaciones.md` de ambos EDA y `propuesta_modelos.md` para el detalle y la evidencia de cada punto (H-0xx/L-0x).
 
 ---
 
-## 1. Ya conseguido en este sprint — no volver a pedirlo
+## 1. Ya conseguido hasta ahora — no volver a pedirlo
 
 | Tabla/catálogo | Para qué sirve | Estado |
 |---|---|---|
@@ -55,7 +55,7 @@ Todo lo que sigue son **conversaciones, no extracciones de datos** — se resuel
 | 5 | ¿Hay un rezago conocido entre cuándo se actualiza/fija una tarifa SAP (`VIGENCIA`) y cuándo esa persona empieza a aplicarla en la operación real? | Indicio de que sí lo hay: el salto de precio de marzo 2026 (EDA-1) no se replicó limpio en `historico-sap` por mes (H-011/L-09 EDA-2) |
 | 6 | Fletes manuales sin ninguna marca que los identifique en `FactFWOFUFO` — ¿hay alguna pista indirecta (línea de negocio, tipo de cliente) que ayude a anticiparlos? | No hay forma de aislarlos de antemano, solo detectarlos después por no coincidir con ningún candidato reconstruido |
 
-### 4.2 Sobre definiciones de datos (heredadas de EDA-1, algunas desde HU-10.2/10.3)
+### 4.2 Sobre definiciones de datos (heredadas de EDA-1, algunas desde la extracción de fuentes corporativas y el set final)
 
 | # | Pregunta | Por qué importa |
 |---|---|---|

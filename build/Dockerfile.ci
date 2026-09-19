@@ -5,9 +5,8 @@
 # src/Nexo.Api/Dockerfile, que publica únicamente el proyecto Api.
 #
 # Aquí se compila la SOLUCIÓN COMPLETA — las 4 capas más los 3 proyectos de
-# test — para que el criterio de cierre de la issue #1 ("dotnet build termina
-# sin errores") sea verificable por cualquiera del equipo sin depender del SDK
-# instalado en su máquina.
+# test — para verificar que "dotnet build termina sin errores" sin depender
+# del SDK instalado en la máquina de quien lo corre.
 #
 # Contexto de build esperado: la RAÍZ del repositorio.
 #   docker compose -f docker-compose.ci.yml build
@@ -40,11 +39,10 @@ RUN dotnet restore "Nexo.Clean.sln"
 COPY src/       src/
 COPY tests/     tests/
 COPY docs/      docs/
-# ContratoMessageTypeTests.cs (S3-HU-06.2/#121) lee cubicador/infrastructure/
-# mensajeria/rabbitmq.py y cubicador/worker/main.py directo del disco para
-# derivar el messageType/tipo real que publica Cubicador — sin esta carpeta,
-# esos 5 tests fallan con FileNotFoundException dentro de este contenedor
-# (hallazgo de QA en NEXO#128, S3-HU-11.1/#134). No hace falta para compilar
+# ContratoMessageTypeTests.cs lee cubicador/infrastructure/mensajeria/rabbitmq.py
+# y cubicador/worker/main.py directo del disco para derivar el messageType/tipo
+# real que publica Cubicador — sin esta carpeta, esos 5 tests fallan con
+# FileNotFoundException dentro de este contenedor. No hace falta para compilar
 # ni para correr el resto de la suite: solo para que ESTOS tests encuentren
 # su fuente de verdad Python.
 COPY cubicador/ cubicador/

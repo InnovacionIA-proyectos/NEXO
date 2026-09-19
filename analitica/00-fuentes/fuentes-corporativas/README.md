@@ -1,15 +1,14 @@
-# S2-HU-10 · Habilitador B8 (parte 1) — Contexto de mercado, extracción puntual
+# Habilitador B8 (parte 1) — Contexto de mercado, extracción puntual
 
 Extracción **puntual** (una sola vez, no sincronización) desde los 4 data warehouses
 de solo lectura de la compañía, para dar contexto de mercado al histórico propio de
 Nexo (el otro lado de este cruce es
-`../bd-propia/DICCIONARIO_DATOS.md`, S2-HU-10.1 / issue #35). El EDA de
-S2-HU-11 se hace sobre ambos sets. El set final que une ambos lados vive en
+`../bd-propia/DICCIONARIO_DATOS.md`). El EDA se hace sobre ambos sets. El set final que une ambos lados vive en
 `../../01-set-final/`.
 
-**Qué es esto y qué NO es:** al igual que su HU hermana, esto es una foto única,
+**Qué es esto y qué NO es:** al igual que la extracción de BD propia, esto es una foto única,
 cruda y documentada — no un DW ni un cubo propio, y no impone grano ni variable
-objetivo. Esas decisiones son del EDA (S2-HU-11).
+objetivo. Esas decisiones son del EDA.
 
 ## Fecha de corte y volumen (criterio de cierre)
 
@@ -28,7 +27,7 @@ frente al corte original (2026-09-01) porque son tablas compartidas en
 producción que siguen recibiendo escrituras en vivo, no por error de la
 extracción.
 
-## Corrección de comillas RFC4180 (hallazgo real de QA, S2-HU-10.2)
+## Corrección de comillas RFC4180 (hallazgo real de QA)
 
 **El problema, encontrado por QA:** 3 de los 4 CSV (`tarifa-plaza`,
 `historico-sap`, `catalogo-clientes`) se generaron originalmente con `sqlcmd`
@@ -88,7 +87,7 @@ con `sqlcmd`.
 | `NOMBREUNIDADTRANSPORTE` | Unidad de transporte (Estibas, Furgón, Estacas, Plataforma, Furgón refrigerado, Volco, Portacontenedores, Tanque) |
 | `ORIGEN` / `DESTINO` | Código de municipio DANE de origen y destino |
 | `VALORHORA` | Componente del valor que se cobra por hora de recorrido (0 cuando la tarifa es fija) |
-| `VALORSICECONHORA` | **El valor que efectivamente se cotiza** — `VALOR` + el componente por hora. Verificado en S2-HU-10.3 cruzando cotizaciones reales: el motor usa este campo, no `VALOR` |
+| `VALORSICECONHORA` | **El valor que efectivamente se cotiza** — `VALOR` + el componente por hora. Verificado cruzando cotizaciones reales: el motor usa este campo, no `VALOR` |
 | `HORASRECORRIDO` / `HORASPACTADAS` | Horas reales estimadas de viaje vs. horas pactadas contractualmente |
 | `CONDICIONCARGA` | `CARGADO` o `VACIO` |
 | `VIAESTANDAR` | Si la vía es estándar (`SI`) o no (`NO`) — afecta el valor |
@@ -183,7 +182,7 @@ A diferencia del piso SICE-TAC, estas dos sí tienen profundidad histórica real
 (`VIGENCIA` desde 2024-01-31) y son de un tamaño manejable (23K y 25K filas), así
 que se extrajeron **completas** dentro de la ventana de 4 años solicitada — que en
 la práctica cubre el 100% de ambas tablas, porque ninguna tiene registros
-anteriores a 2024-01-31 (hallazgo ya documentado en la HU-09.2 anterior).
+anteriores a 2024-01-31 (hallazgo ya documentado previamente, ver `../../../docs/tarifas-plaza-provisionales/README.md`).
 
 **Vigencia cruda**: se extrajo la columna `VIGENCIA` tal cual la trae SAP, **sin
 aplicar la corrección local** `AjusteVigenciaPlaza` (mecanismo de Nexo que
@@ -199,7 +198,7 @@ a un envío** ("tarifa ganada") o si es simplemente un registro de auditoría de
 cada vez que se edita el catálogo `tblSAPTarifas`. El código solo confirma que
 `tblSAPTarifasLog` es la fuente que el sistema usa y etiqueta explícitamente como
 `"historico_sap"` (`PropuestaTarifaAdapter.cs:198`), y que un análisis previo del
-equipo (HU-09.2) la usó como proxy de frecuencia real de uso por ruta — pero el
+equipo la usó como proxy de frecuencia real de uso por ruta — pero el
 motivo de negocio detrás de cada inserción no está confirmado.
 
 ## Catálogo de clientes — solo organizaciones
@@ -207,14 +206,14 @@ motivo de negocio detrás de cada inserción no está confirmado.
 De los 130.933 socios de negocio en `BUT000`, se extrajeron solo los 38.985 con
 `TYPE='2'` (organización/empresa). Se excluyeron los 91.701 de `TYPE='1'` (persona
 natural — en su mayoría conductores/contactos individuales, sin valor como
-"cliente" para el contexto de mercado que pide esta HU) y los 31 de `TYPE='3'`
+"cliente" para el contexto de mercado que se busca aquí) y los 31 de `TYPE='3'`
 (grupo).
 
 ## Llaves de cruce contra el histórico propio (criterio de cierre)
 
 | Dimensión | Cómo cruza | Confiabilidad |
 |---|---|---|
-| **Cliente** | `BUT000.TAXNUM` (NIT) ↔ NIT del catálogo `analitica.clientes` (S2-HU-10.1) | Alta — mismo dato (NIT), sin normalización necesaria |
+| **Cliente** | `BUT000.TAXNUM` (NIT) ↔ NIT del catálogo `analitica.clientes` | Alta — mismo dato (NIT), sin normalización necesaria |
 | **Vehículo/servicio** | `tblSAPTarifas.LINEANEGOCIO` / `CLASEVIAJE` / `CLASECONTENEDOR` ↔ los mismos campos en `analitica.lineas_solicitud` | Alta — esos campos en Nexo ya se capturan como "catálogo replicado de SAP TM" (confirmado en `../bd-propia/DICCIONARIO_DATOS.md`), son los mismos códigos |
 | **Ruta** | `tblSAPTarifas.ORIGEN`/`DESTINO` usa código DANE o texto de zona (`ZC_`/`ZTC_`); `tblRutasSicetac.NOMBRERUTA` es texto libre `"ORIGEN - DESTINO"`; `analitica.rutas` (propio) también es texto libre sin código DANE | Media — no hay atajo: cualquier cruce de ruta necesita la misma normalización de nombre de municipio → código DANE que ya usa `TarifarioSapAdapter.CodigosDaneAsync` en el motor de producción. No se replicó esa lógica aquí (decisión: extraer crudo, documentar, dejar el cruce al EDA) |
 | **Período** | `tblSAPTarifas`/`tblSAPTarifasLog.VIGENCIA` (fecha) vs `tblRutasSicetac.PERIODO` (entero `AAAAMM`, un solo valor: `202608`) vs fechas de `analitica.cotizaciones`/`analitica.tarifas_historicas` | Alta para SAP (fecha real comparable). Limitada para SICE-TAC: solo se puede cruzar contra situaciones de **agosto 2026** exactamente, no contra períodos anteriores |
@@ -291,7 +290,7 @@ FROM dbo.BUT000 WHERE TYPE = '2';
 
 - No se replicó la lógica de matching de zonas/DANE de `TarifarioSapAdapter` — se
   documentó cómo funciona más arriba en este documento, pero el cruce real entre
-  fuentes es trabajo del EDA (S2-HU-11).
+  fuentes es trabajo del EDA.
 - No se aplicó `AjusteVigenciaPlaza` — se entrega `VIGENCIA` cruda, a propósito.
 - No se resolvió si `tblSAPTarifasLog` es "tarifa ganada" o "log de auditoría del
   catálogo" — queda pendiente de confirmar con negocio.

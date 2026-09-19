@@ -1,4 +1,4 @@
-# EDA — Viajes Buenaventura 2025-2026 (S2-HU-11)
+# EDA — Viajes Buenaventura 2025-2026
 
 Análisis exploratorio sobre el set de viajes de Buenaventura ya entregado al equipo de datos (Habilitador B8). El plan completo, con todas las fases, hallazgos previos y anexos, vive en [`PLAN_EDA_Viajes_Btura.md`](PLAN_EDA_Viajes_Btura.md) — este README es solo la guía para correrlo.
 

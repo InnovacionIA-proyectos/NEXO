@@ -1,6 +1,6 @@
-# Declaración: objetivos donde el dato no soporta predicción útil — S2-HU-11 parte 3
+# Declaración: objetivos donde el dato no soporta predicción útil
 
-Entregable propio que exige el criterio de cierre de la HU y el escenario Gherkin "El dato no soporta una predicción útil". Formaliza, con evidencia citada, cuáles de los objetivos de predicción evaluados en [`informe_comparativo.md`](informe_comparativo.md) §4 **no son viables con el dato disponible hoy** — y por qué no es un problema de mecanismo o de metodología, sino de que el dato en sí no alcanza.
+Entregable propio que exige el criterio de cierre de esta etapa y el escenario Gherkin "El dato no soporta una predicción útil". Formaliza, con evidencia citada, cuáles de los objetivos de predicción evaluados en [`informe_comparativo.md`](informe_comparativo.md) §4 **no son viables con el dato disponible hoy** — y por qué no es un problema de mecanismo o de metodología, sino de que el dato en sí no alcanza.
 
 ---
 

@@ -5,12 +5,12 @@ Todo lo que produce y consume el equipo de datos vive aquí, separado de
 proyecto Python al lado de `src/`, esto es su propio espacio para datos,
 análisis y (más adelante) modelos.
 
-Las carpetas están numeradas por **etapa del flujo**, no por HU — las HU van
-a seguir apareciendo (10.4, 11, 12...) pero el orden fuentes → set final →
-EDA → modelo es estable.
+Las carpetas están numeradas por **etapa del flujo**, no por el orden en que
+se fue haciendo el trabajo — se van a seguir agregando etapas nuevas con el
+tiempo, pero el orden fuentes → set final → EDA → modelo es estable.
 
 > **Nota (2026-09-10):** el plan original esperaba un solo `02-eda/` que
-> analizara `01-set-final/`. En la práctica, S2-HU-11 resultó ser un "EDA
+> analizara `01-set-final/`. En la práctica, el análisis resultó ser un "EDA
 > doble": primero se analizó el histórico crudo de Viajes-Btura (que no se
 > deriva de `01-set-final/`, es un insumo paralelo), y después sí el set
 > consolidado de 4 fuentes. Por eso hay dos carpetas de EDA
@@ -18,9 +18,9 @@ EDA → modelo es estable.
 > `03-modelo/` se corrió a `04-modelo/` para dejarle el número 3 a la
 > segunda.
 >
-> **Nota (2026-09-11):** S2-HU-11 cierra con un tercer entregable —
-> comparativa de ambos EDA + propuesta de modelo(s) (issue #41), sin
-> construir ningún modelo este sprint. Ese documento vive aparte de ambos EDA
+> **Nota (2026-09-11):** Este trabajo cierra con un tercer entregable —
+> comparativa de ambos EDA + propuesta de modelo(s), sin construir ningún
+> modelo en esta etapa. Ese documento vive aparte de ambos EDA
 > (`04-comparativa-y-propuesta-modelo/`), así que `04-modelo/` se corrió a
 > `05-modelo/` para dejarle el número 4 a la comparativa.
 
@@ -31,25 +31,25 @@ analitica/
 ├── 00-fuentes/                     Extracción cruda, inmutable. Nunca se
 │   │                               sobreescribe: cada corrida nueva se
 │   │                               agrega con su propia fecha.
-│   ├── bd-propia/                  BD transaccional Nexo (S2-HU-10.1, issue #35)
-│   └── fuentes-corporativas/       Los 4 DW externos de solo lectura (S2-HU-10.2, issue #36)
+│   ├── bd-propia/                  BD transaccional Nexo
+│   └── fuentes-corporativas/       Los 4 DW externos de solo lectura
 │
 ├── 01-set-final/                   Snapshot autocontenido que UNE ambas fuentes
-│   └── v1.0.0-piloto/              (S2-HU-10.3): su propia copia de los datos +
+│   └── v1.0.0-piloto/              su propia copia de los datos +
 │                                   diccionario + linaje + control de calidad.
 │                                   Versionado por carpeta, cada una congelada.
 │
-├── 02-eda-viajes-btura/            EDA-1 (S2-HU-11 parte 1, issue #39): histórico
+├── 02-eda-viajes-btura/            EDA-1: histórico
 │                                   crudo de viajes Buenaventura, entregado
 │                                   directamente por el negocio. ✅ Completo.
 │
-├── 03-eda-extraccion-4-fuentes/    EDA-2 (S2-HU-11 parte 2, issue #40): el set
+├── 03-eda-extraccion-4-fuentes/    EDA-2: el set
 │                                   consolidado de 01-set-final/ (BD propia +
 │                                   SICE-TAC + SAP + clientes). ⏳ En curso.
 │
 ├── 04-comparativa-y-propuesta-modelo/  Comparativa de ambos EDA + propuesta
-│                                       de modelo(s) (S2-HU-11 parte 3, issue
-│                                       #41). Ningún modelo se construye acá.
+│                                       de modelo(s). Ningún modelo se
+│                                       construye acá.
 │
 ├── 05-modelo/                      Reservado para features/entrenamiento/
 │                                   artefactos del modelo predictivo. Sin
@@ -106,8 +106,8 @@ analitica/
 | `00-fuentes/bd-propia/` | ✅ Poblada — 13 archivos, filtrados a datos reales (no seeder) |
 | `00-fuentes/fuentes-corporativas/` | ✅ Poblada — 4 archivos |
 | `01-set-final/v1.0.0-piloto/` | ✅ Entregado (ver su `README.md` para el acta) |
-| `02-eda-viajes-btura/` | ✅ Completo — EDA-1 (S2-HU-11 parte 1) |
-| `03-eda-extraccion-4-fuentes/` | ✅ Completo — EDA-2 (S2-HU-11 parte 2) |
-| `04-comparativa-y-propuesta-modelo/` | ⏳ En curso — S2-HU-11 parte 3 |
+| `02-eda-viajes-btura/` | ✅ Completo — EDA-1 |
+| `03-eda-extraccion-4-fuentes/` | ✅ Completo — EDA-2 |
+| `04-comparativa-y-propuesta-modelo/` | ⏳ En curso |
 | `05-modelo/` | ⏳ Reservada, sin contenido |
 | `pipeline/` | ⏳ Reservada, sin contenido |

@@ -3,7 +3,7 @@
 Estas 31 reglas estaban codificadas como tests xUnit en
 `cabinaFletes/src/CabinaFletes.Tests/{MotorCubicacion3DTests.cs,ApilamientoMultiSoporteTests.cs}`
 — las 26 de `MotorCubicacion3DTests.cs` son, método por método, los "26
-casos dorados" que pide el criterio de cierre de S2-HU-072; las otras 5 (de
+casos dorados" que pide el criterio de cierre; las otras 5 (de
 `ApilamientoMultiSoporteTests.cs`) cubren apilamiento multi-soporte. No son
 una comparación EN VIVO entre dos motores corriendo lado a lado (eso sí se
 descartó, ver DECISIONES_TECNICAS.md #3) — son las reglas geométricas/de

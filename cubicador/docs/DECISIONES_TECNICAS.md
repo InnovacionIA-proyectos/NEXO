@@ -127,7 +127,7 @@ se diseñó esto mismo en NEXO (`ValidarAjusteAsync` se resuelve siempre local
 ahí, por la misma razón). Aquí ni siquiera hace falta un puerto separado para
 lograrlo: `ajustar.py` llama directo a `domain.motor.validadores` en memoria.
 
-**Eventos** (ya nombrados en la historia de usuario original, se usan tal
+**Eventos** (ya nombrados desde el diseño original, se usan tal
 cual): `CubicaciónSolicitada`, `PlanDeCargueGenerado`, `CubicaciónRechazada`.
 (`PlanDeCargueAjustado`, nombrado originalmente acá como reservado, nunca se
 implementó — ver la actualización siguiente.)

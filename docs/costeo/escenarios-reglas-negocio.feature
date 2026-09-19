@@ -7,8 +7,7 @@
 # no se ejecutan solos, se verifican por muestreo contra datos reales.
 #
 # Evidencia real de cada escenario (tabla caso/esperado/obtenido): ver
-# tests/QA/hu-13.4-verificacion-reglas-negocio-datos-reales/README.md
-# (issue #43, S2-HU-13.4).
+# tests/QA/hu-13.4-verificacion-reglas-negocio-datos-reales/README.md.
 
 Característica: Reglas de negocio del costeo verificadas contra datos reales en producción
 
@@ -21,9 +20,9 @@ Característica: Reglas de negocio del costeo verificadas contra datos reales en
   # Evidencia real: tests/QA/hu-13.4-verificacion-reglas-negocio-datos-reales/esperado-final-pliego.md
   # NO se cumplió en 4 de 12 líneas reales cotizadas (1, 2, 3, 11): había
   # plaza SAP vigente y mayor, y la app propuso el piso SICE-TAC (menor) en
-  # su lugar — ver "Desviación 1" en ese documento, candidata a issue.
+  # su lugar — ver "Desviación 1" en ese documento, pendiente de revisión.
 
-  @hu-13.4 @regla-del-mayor
+  @regla-del-mayor
   Escenario: La propuesta de flete nunca es menor al mayor entre el piso SICE-TAC y la tarifa de plaza
     Dado una línea real con piso SICE-TAC vigente y tarifa de plaza vigente para su ruta
     Cuando el sistema calcula la propuesta de flete
@@ -36,7 +35,7 @@ Característica: Reglas de negocio del costeo verificadas contra datos reales en
   # lado "plaza nunca por debajo del piso" porque ninguna línea real salió
   # con Fuente=Tarifario (ver Desviación 1, arriba).
 
-  @hu-13.4 @piso-inviolable
+  @piso-inviolable
   Escenario: Ninguna propuesta real queda por debajo del piso SICE-TAC vigente
     Dado el universo de líneas reales costeadas accesible en el ambiente
     Cuando se compara cada propuesta contra el piso SICE-TAC vigente de su ruta y fecha
@@ -48,7 +47,7 @@ Característica: Reglas de negocio del costeo verificadas contra datos reales en
   # 3S3, Barranquilla→Pereira 2S3) no coinciden con ninguna línea del pliego
   # de prueba usado. Ver README.md, sección "Estado de las reglas".
 
-  @hu-13.4 @solo-sicetac
+  @solo-sicetac
   Escenario: Una ruta marcada "solo SICE-TAC" ignora la tarifa de plaza aunque exista
     Dado una ruta real con la regla "solo SICE-TAC" activa
     Y que existe una tarifa de plaza vigente para esa ruta, mayor al piso SICE-TAC
@@ -61,7 +60,7 @@ Característica: Reglas de negocio del costeo verificadas contra datos reales en
   # todas con plaza vencida o inexistente, ninguna se propuso. Ver
   # esperado-final-pliego.md, sección 6 (Regla 4).
 
-  @hu-13.4 @tarifas-vencidas
+  @tarifas-vencidas
   Escenario: Una tarifa de plaza vencida nunca se propone, aunque sea la más alta
     Dado una tarifa de plaza real cuya vigencia ya venció a la fecha de la línea
     Cuando el sistema calcula la propuesta de flete
@@ -73,7 +72,7 @@ Característica: Reglas de negocio del costeo verificadas contra datos reales en
   # "Ganada" en `dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.cotizaciones`
   # — las 54 con exactamente 1 tarifa histórica por línea, 0 desincronizadas.
 
-  @hu-13.4 @ganada-archiva-tarifa
+  @ganada-archiva-tarifa
   Escenario: Marcar una cotización real como Ganada archiva su tarifa
     Dado una cotización real marcada como Ganada
     Cuando se revisa el archivo de tarifas históricas
@@ -85,7 +84,7 @@ Característica: Reglas de negocio del costeo verificadas contra datos reales en
   # (`ajustes_vigencia_plaza`) — autoría de Brayan Quintero (rol
   # AdminTarifas), con entrada correspondiente en `audit_log`.
 
-  @hu-13.4 @ajuste-auditado
+  @ajuste-auditado
   Escenario: Un ajuste manual de vigencia de plaza queda auditado con autoría real
     Dado un ajuste real de vigencia de tarifa de plaza en el ambiente
     Cuando se revisa el registro del ajuste
@@ -97,7 +96,7 @@ Característica: Reglas de negocio del costeo verificadas contra datos reales en
   # líneas + suma de conexos, exacto en las 3 (ej. $1.850.000 + $2.000 =
   # $1.852.000). Ver esperado-final-pliego.md, sección 6 (Regla 7).
 
-  @hu-13.4 @recalculo-conexos
+  @recalculo-conexos
   Escenario: Agregar un conexo a una cotización real recalcula su total
     Dado una cotización real con un Total ya calculado
     Cuando se agrega un servicio conexo a esa cotización

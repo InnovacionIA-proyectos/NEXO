@@ -1,6 +1,6 @@
-# Modelo predictivo — reservado, sin HU asignada todavía
+# Modelo predictivo — reservado, trabajo futuro
 
-Sin contenido todavía. Parte de las conclusiones de los dos EDA de S2-HU-11 y
+Sin contenido todavía. Parte de las conclusiones de los dos EDA y
 de la comparativa que los contrasta:
 [`../02-eda-viajes-btura/`](../02-eda-viajes-btura/) (grano y variable
 objetivo — predecir `Flete Producción FO` — se deciden ahí),
@@ -9,7 +9,7 @@ de contexto de mercado: piso SICE-TAC, plaza SAP) y
 [`../04-comparativa-y-propuesta-modelo/`](../04-comparativa-y-propuesta-modelo/)
 (la propuesta de modelo(s) con su objetivo, grano, features y supuestos).
 
-Estructura esperada (a confirmar cuando exista la HU):
+Estructura esperada (a confirmar cuando arranque este trabajo):
 
 ```
 05-modelo/

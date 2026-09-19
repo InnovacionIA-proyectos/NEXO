@@ -1,4 +1,4 @@
-# Hallazgos del EDA — Extracción que cruza las 4 fuentes (S2-HU-11 parte 2)
+# Hallazgos del EDA — Extracción que cruza las 4 fuentes
 
 Cada hallazgo con su ficha estándar (§13.1 del plan), seguido del log de supuestos. Ver `limitaciones.md` para lo que este set no puede responder. Los números marcados 🔎 se verificaron contra el código fuente del backend (`src/`) o contra la base de datos operativa, no son reproducibles desde una celda del notebook — la evidencia es la consulta/archivo documentado aquí.
 
@@ -43,7 +43,7 @@ Ejemplo:       lineas_solicitud con LineaNegocio="Andino" vs. tarifa-plaza.linea
 Hipótesis:     N/A — confirmado en el código fuente del backend y, para ClaseContenedor, también contra el catálogo real y los datos.
 Verificación:  Lectura directa de src/Nexo.Infrastructure/Biblioteca/Adaptadores/TarifarioSapAdapter.cs. 🔎 ClaseContenedor verificado además con `tblSAPClaseContenedor_202609142051.csv`, notebook 06 Paso 3c.
 Severidad:     Baja (ya resuelto)
-Impacto:       diccionario-y-linaje.md (HU-10.3) afirma que estas columnas son "la misma llave" — en la práctica es incorrecto/incompleto sin esta traducción, aunque ya está resuelta y documentada. `ClaseContenedor` ya no es "no verificable con este set" — se cerró con el catálogo real (ver limitaciones.md L-03).
+Impacto:       diccionario-y-linaje.md (del set final) afirma que estas columnas son "la misma llave" — en la práctica es incorrecto/incompleto sin esta traducción, aunque ya está resuelta y documentada. `ClaseContenedor` ya no es "no verificable con este set" — se cerró con el catálogo real (ver limitaciones.md L-03).
 Recomendación: Corregir diccionario-y-linaje.md para aclarar que se necesita traducción (ya no falta ninguna tabla para hacerlo).
 ```
 
@@ -111,10 +111,10 @@ Recomendación: Usar las tablas reales para ubicar ciudades en su zona, no la ap
 ID:            H-007
 Título:        Fuente=Tarifario reconfirmado 100% (32/32); Fuente=Sicetac no verificable con este extracto
 Dimensión:     Consistencia
-Evidencia:     Reproducción con código propio del hallazgo de HU-10.3: 32/32 líneas Fuente=Tarifario encuentran su ValorFlete exacto en tarifa-plaza.VALOR. Las 13 líneas Fuente=Sicetac dan 0/13 — pero los 7 valores únicos buscados coinciden en cantidad exacta con "6 verificables + 1 malformada" del reporte original de HU-10.3.
+Evidencia:     Reproducción con código propio del hallazgo del set final: 32/32 líneas Fuente=Tarifario encuentran su ValorFlete exacto en tarifa-plaza.VALOR. Las 13 líneas Fuente=Sicetac dan 0/13 — pero los 7 valores únicos buscados coinciden en cantidad exacta con "6 verificables + 1 malformada" del reporte original del set final.
 Ejemplo:       Notebook 03, Paso 2.
 Hipótesis:     N/A.
-Verificación:  Búsqueda de valor exacto en piso-sicetac (151 filas) vs. la tabla completa de SICE-TAC (~2 millones de filas, usada en la verificación original de HU-10.3).
+Verificación:  Búsqueda de valor exacto en piso-sicetac (151 filas) vs. la tabla completa de SICE-TAC (~2 millones de filas, usada en la verificación original del set final).
 Severidad:     Media
 Impacto:       No es que el motor falle — es que nuestra muestra de 151 filas no fue diseñada para incluir las rutas de estas 13 solicitudes. Confirmado también con una consulta 🔎 directa contra la tabla viva de SICE-TAC (ver nota en notebook 03): de los 6 valores de `Fuente=Sicetac` verificables, solo 1 aparece hoy — consistente con que el período ya avanzó de agosto (`202608`) a septiembre (`202609`), no con que el motor fallara en su momento. El hallazgo original (6/6 contra la foto de agosto) se mantiene válido, solo no reproducible aquí. **Actualización (H-005, notebook 05 Paso 1g):** conseguido el extracto real completo de SICE-TAC de agosto 2026, sí se pudo reproducir el mecanismo real para las 12 líneas Sicetac válidas — 12/12 coinciden exacto. Confirma que el motor nunca falló; la limitación era 100% de la muestra de 151 filas, ahora superada para este período específico.
 Recomendación: Ninguna acción sobre el sistema — documentar la limitación de muestra.

@@ -67,7 +67,7 @@ está en la sección 2.8.
 | `test_mover_a_dlq_dispara_la_alerta` | `worker/main.py::_mover_a_dlq` llama a `alertar_mensaje_en_dlq(tipo, error, intentos)` con los valores correctos, y publica el mensaje crudo a `cubicacion.dlq` con los headers esperados — publisher y mensaje son dobles de prueba. |
 | `test_alertar_mensaje_en_dlq_degrada_sin_smtp_configurado` | `alertar_mensaje_en_dlq` no lanza excepción (solo loggea un warning) si `ALERTAS_SMTP_HOST` está vacío — un correo que no sale no debe tumbar el worker. |
 
-## 1.3 Los 3 bugs de QA (S3-HU-10, issues #131/#132/#133)
+## 1.3 Los 3 bugs de QA
 
 Guardas de regresión de los 3 bugs que la verificación de QA de los PR #122/#126
 encontró. Para los tres se escribió el test primero y **se comprobó que fallara**
@@ -76,7 +76,7 @@ fallaron 7 tests.
 
 | Archivo | Qué verifica |
 |---|---|
-| `tests/worker/test_mensaje_malformado.py` (8) | Que un mensaje malformado **se ackee** — el síntoma del bug no era la excepción, era el mensaje sin confirmar que ocupa un hueco del `prefetch_count=2` para siempre. Cubre el caso de la issue (sin `planId`) y los 4 que fallaban *antes* del bloque de manejo de errores: body ilegible, JSON que no es un objeto, sin `correlationId`, cabecera `x-intentos` corrupta. Más el escenario del bloqueo: dos mensajes seguidos, ninguno sin ackear. |
+| `tests/worker/test_mensaje_malformado.py` (8) | Que un mensaje malformado **se ackee** — el síntoma del bug no era la excepción, era el mensaje sin confirmar que ocupa un hueco del `prefetch_count=2` para siempre. Cubre el caso original (sin `planId`) y los 4 que fallaban *antes* del bloque de manejo de errores: body ilegible, JSON que no es un objeto, sin `correlationId`, cabecera `x-intentos` corrupta. Más el escenario del bloqueo: dos mensajes seguidos, ninguno sin ackear. |
 | `tests/api/test_item_sin_sku.py` (7) | Que un `"sku": null` **explícito** se acepte y se normalice a `""`, y que el plan no quede en `error`. Cubre por separado "clave ausente" y "clave presente en null": esa distinción **es** el bug (el default de Pydantic solo aplica si la clave falta). |
 | `tests/worker/test_eliminar_plan_optimizado.py` (4) | Que borrar un plan **ya optimizado** no deje filas huérfanas, ni por `eliminar()` ni por `eliminar_planes_de_linea()`. |
 
@@ -295,7 +295,7 @@ reales configurados (`TIMEOUT_PROCESANDO_MINUTOS`):
    tener que esperar) → devolvió `marcados: 1`.
 4. `GET /{id}` confirmó `estado: "error"` en el plan.
 
-> **Actualizado en S3-HU-06.1.** Ese método ya no existe: se partió en
+> **Actualización posterior.** Ese método ya no existe: se partió en
 > `obtener_atascados(limite)` (solo consulta) más el `marcar_error` que ya
 > había, y el vigilante ahora además **publica `cubicacion.rechazada` con
 > `codigo: "TIMEOUT_PROCESAMIENTO"` antes** de marcar el plan (ver CONTRATO.md
@@ -597,8 +597,8 @@ el runner de CI no tiene o una topología más compleja de simular:
 
 - **El vigilante de timeout, de punta a punta** (sección 2.4, punto c):
   requiere detener el contenedor `worker` a mitad de un mensaje y llamar a
-  `_revisar_timeouts` directo contra la base — sigue siendo manual. Desde
-  S3-HU-06.1 su *lógica* sí está automatizada con dobles de prueba
+  `_revisar_timeouts` directo contra la base — sigue siendo manual. Su
+  *lógica* sí está automatizada con dobles de prueba
   (`tests/worker/test_vigilante_timeouts.py`), incluido el caso de RabbitMQ
   caído; lo que queda manual es el recorrido real contra los dos contenedores.
 - **`crear_plan_desde_linea` de punta a punta contra NEXO real** (secciones
