@@ -26,5 +26,5 @@ public sealed class clsFormateadorNombresSinPrefijoCls : IEndpointNameFormatter
     public string CompensateActivity<T, TLog>() where T : class, ICompensateActivity<TLog> where TLog : class =>
         SinPrefijo(Base.CompensateActivity<T, TLog>());
     public string SanitizeName(string name) => Base.SanitizeName(name);
-    public string TemporaryEndpoint() => Base.TemporaryEndpoint();
+    public string TemporaryEndpoint(string tag) => Base.TemporaryEndpoint(tag);
 }
