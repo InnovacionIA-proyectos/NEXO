@@ -6,10 +6,9 @@ using Microsoft.EntityFrameworkCore;
 namespace Nexo.Infrastructure.Cubicacion;
 
 /// <summary>
-/// S3-HU-03 (issue #110/#111): consume vehiculo.creado/vehiculo.actualizado y mantiene
-/// sincronizado el catálogo de vehículos en la proyección de NEXO
-/// (<c>VehiculosCubicacion</c>) — sin esto, GET /api/vehiculos (issue #112) tendría que
-/// llamar a Cubicador en caliente, justo lo que la HU prohíbe.
+/// Consume vehiculo.creado/vehiculo.actualizado y mantiene sincronizado el catálogo
+/// de vehículos en la proyección de NEXO (<c>VehiculosCubicacion</c>) — sin esto,
+/// GET /api/vehiculos tendría que llamar a Cubicador en caliente.
 ///
 /// Una sola clase para los 2 tipos (en vez de dos consumers casi idénticos): el upsert es
 /// exactamente el mismo, "creado" vs "actualizado" solo importa para la topología/routing
@@ -19,8 +18,8 @@ namespace Nexo.Infrastructure.Cubicacion;
 ///
 /// IConsumer&lt;T&gt; real de MassTransit: hereda la misma tubería de reintentos/DLQ/alerta
 /// que <see cref="clsPlanDeCargueGeneradoConsumer"/> (ver clsMensajeriaDependencyInjection.cs).
-/// NO hace ninguna llamada saliente a Cubicador (criterio de cierre de S3-HU-03,
-/// issue #111): todo lo que escribe viene del propio evento.
+/// NO hace ninguna llamada saliente a Cubicador: todo lo que escribe viene del
+/// propio evento.
 /// </summary>
 public sealed class clsVehiculoCatalogoConsumer(clsNexoDbContext db)
     : IConsumer<clsVehiculoCreado>, IConsumer<clsVehiculoActualizado>, IConsumer<clsVehiculoEliminado>

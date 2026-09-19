@@ -7,10 +7,10 @@ namespace Nexo.Infrastructure.Persistence.Migrations
     /// <summary>
     /// Reemplaza a `20260901201038_QuitarNolockVistasAnalitica` (commit
     /// cd17068), retirada de esta rama por quedar desactualizada: fue escrita
-    /// antes del rename de esquema `dbo` → `dbo_NEXO_prueba` (issue #93,
-    /// `clsRecrearVistasAnaliticaEnDboNexoPrueba`, ya en QA) y por eso reventaba
+    /// antes del rename de esquema `dbo` → `dbo_NEXO_prueba`
+    /// (`clsRecrearVistasAnaliticaEnDboNexoPrueba`, ya en QA) y por eso reventaba
     /// contra QA con "Invalid object name 'dbo.clientes'" — hallazgo de
-    /// revisión de esta PR.
+    /// revisión de código.
     ///
     /// El objetivo original sigue vigente: RCSI ya está activo en esta base
     /// (sys.databases.is_read_committed_snapshot_on = 1), así que las 13

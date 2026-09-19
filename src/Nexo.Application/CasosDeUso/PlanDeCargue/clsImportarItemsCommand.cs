@@ -17,10 +17,10 @@ public sealed record clsItemAImportar(
     string? Observaciones);
 
 /// <summary>
-/// S3-HU-02 (issue #104): importación masiva de ítems (1-2.000) — POST
+/// Importación masiva de ítems (1-2.000) — POST
 /// /api/planes-cargue/{id}/items/importar. NEXO valida el rango temprano (400 rápido, sin
-/// encolar) — Cubicador vuelve a validarlo del lado del worker (issue #105), que es quien
-/// manda si algo se cuela.
+/// encolar) — Cubicador vuelve a validarlo del lado del worker, que es quien manda si
+/// algo se cuela.
 /// </summary>
 public sealed record clsImportarItemsCommand(Guid PlanCargueId, IReadOnlyList<clsItemAImportar> Items)
     : ICommand<clsComandoAceptadoDto>;

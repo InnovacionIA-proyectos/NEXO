@@ -8,7 +8,7 @@ using Nexo.Mensajes.Cubicacion;
 namespace Nexo.Application.CasosDeUso.PlanDeCargue;
 
 /// <summary>
-/// S3-HU-02 (issue #104, criterio 3): ajuste manual de una colocación — PATCH
+/// Ajuste manual de una colocación — PATCH
 /// /api/planes-cargue/{id}/colocaciones/{colocacionId}. Deja de ser un PATCH síncrono
 /// contra Cubicador: ahora es un comando async, igual que el resto — si Cubicador lo
 /// rechaza (posición inválida, colisión, soporte insuficiente...), el aviso de
@@ -16,7 +16,7 @@ namespace Nexo.Application.CasosDeUso.PlanDeCargue;
 /// frontend reconcilie su UI optimista.
 ///
 /// Decisión completa (UI optimista + camino de reconciliación) en
-/// docs/decisiones/ADR-ajuste-manual-async.md (issue #101, S3-HU-01.1).
+/// docs/decisiones/ADR-ajuste-manual-async.md.
 /// </summary>
 public sealed record clsAjustarColocacionCommand(
     Guid PlanCargueId,

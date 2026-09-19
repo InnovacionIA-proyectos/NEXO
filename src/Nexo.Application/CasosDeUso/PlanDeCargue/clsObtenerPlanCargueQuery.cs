@@ -6,7 +6,7 @@ using Nexo.Application.Common.Exceptions;
 namespace Nexo.Application.CasosDeUso.PlanDeCargue;
 
 /// <summary>
-/// Consulta de respaldo del contrato (S2-HU-08.1): reconstruye estado/resultado sin
+/// Consulta de respaldo del contrato: reconstruye estado/resultado sin
 /// haber recibido ningún aviso por SignalR — la conexión se cae, el navegador se
 /// duerme, y la verdad sigue estando acá.
 /// </summary>

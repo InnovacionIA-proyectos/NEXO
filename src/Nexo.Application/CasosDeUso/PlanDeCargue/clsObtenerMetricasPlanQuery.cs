@@ -6,7 +6,7 @@ using Nexo.Mensajes.Cubicacion;
 
 namespace Nexo.Application.CasosDeUso.PlanDeCargue;
 
-/// <summary>S3-HU-03 (issue #112): GET /api/planes-cargue/{id}/metricas — subconjunto de
+/// <summary>GET /api/planes-cargue/{id}/metricas — subconjunto de
 /// /resultado. <c>null</c> si el plan existe pero nunca se optimizó (mismo criterio que
 /// Cubicador: sin colocaciones no hay métricas que calcular).</summary>
 public sealed record clsObtenerMetricasPlanQuery(Guid PlanCargueId) : IQuery<clsMetricasCubicacionEvento?>;

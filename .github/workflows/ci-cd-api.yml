@@ -1,6 +1,6 @@
 name: CI/CD API
 
-# S3-HU-11.1 (issue #134): dispara SOLO por cambios que puedan afectar al
+# Dispara SOLO por cambios que puedan afectar al
 # servicio API (.NET) — nunca por cambios exclusivos de cubicador/ (ese
 # servicio tiene sus propios workflows, ver ci-cd-cubicador-api.yml/
 # ci-cd-cubicador-worker.yml). Ver docs/CI_CD_RUTAS_COMPARTIDAS.md para la
@@ -70,8 +70,8 @@ jobs:
         run: dotnet build Nexo.Clean.sln -c Release --no-restore
 
       # Nexo.Api.Tests corre contra dbInformesAutomatizados_Pruebas —
-      # la BD de pruebas REAL de la red corporativa (issue #134, criterio de
-      # cierre de NEXO#3/NEXO#128), NUNCA un contenedor efímero. TEST_DB_CONNECTION
+      # la BD de pruebas REAL de la red corporativa, NUNCA un contenedor
+      # efímero. TEST_DB_CONNECTION
       # es un secreto de GitHub (el mismo valor que ConnectionStrings__Nexo
       # en el .env raíz, o el que corresponda a esa base de pruebas) — nunca un
       # valor en el repo. Domain.Tests/Application.Tests no tocan ninguna base —
@@ -82,7 +82,7 @@ jobs:
       # CRÍTICO — no tocar sin leer esto: ApiFixture.cs (tests/Nexo.
       # Api.Tests/Infra/ApiFixture.cs) NUNCA debe volver a llamar
       # Database.EnsureDeleted() mientras TEST_DB_CONNECTION apunte a esta base
-      # — se retiró a propósito en esta misma HU (S3-HU-11.1) precisamente para
+      # — se retiró a propósito precisamente para
       # que este workflow no la borre. Migrate() es aditivo y DataSeeder.SeedAsync
       # ya es idempotente (no-op si ya hay datos), así que correr esto repetidas
       # veces contra la MISMA base es seguro en cuanto al esquema/semilla — lo
@@ -93,7 +93,7 @@ jobs:
       #
       # Sin service container de SQL Server acá: esta base ya está corriendo,
       # alcanzable directo desde este runner — no hay contenedor que esperar
-      # ("Recovery is complete"). Ese detalle de NEXO#128 sigue siendo real SI
+      # ("Recovery is complete"). Ese detalle sigue siendo real SI
       # algún día se vuelve a levantar SQL Server como contenedor efímero para
       # otro propósito (ver docker-compose.ci.yml, que sí usa uno).
       #
@@ -143,7 +143,7 @@ jobs:
             -H "X-GitHub-Event: push" ^
             -d "{\"ref\":\"${{ github.ref }}\",\"repository\":{\"full_name\":\"${{ github.repository }}\"}}"
 
-      # Issue #163: el webhook de arriba solo confirma que Dokploy RECIBIO la
+      # El webhook de arriba solo confirma que Dokploy RECIBIO la
       # orden (curl -f en verde con cualquier 2xx) - nunca que el build/deploy
       # real termino. Ya paso una vez (docs/VERIFICACION_NEXO_CUBICADOR_2026-09-14.md):
       # el build fallo por disco lleno y Dokploy siguio sirviendo la imagen

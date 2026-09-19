@@ -5,8 +5,8 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace Nexo.Infrastructure.Persistence.Migrations
 {
     /// <summary>
-    /// Issue #93 (hallazgo de QA sobre el PR #90): las 13 vistas `analitica.*`
-    /// (S2-HU-10.1, `clsVistasAnaliticaSoloLectura`) se crearon con SQL crudo
+    /// Hallazgo de QA: las 13 vistas `analitica.*`
+    /// (`clsVistasAnaliticaSoloLectura`) se crearon con SQL crudo
     /// `FROM dbo.&lt;tabla&gt;` — un `string`, no una referencia que EF Core rastree.
     /// `clsMoverEsquemaDboNexoPrueba` solo hace `RenameTable` sobre las 27 tablas base;
     /// no reescribe el texto de vistas que las referencian desde fuera del modelo, así

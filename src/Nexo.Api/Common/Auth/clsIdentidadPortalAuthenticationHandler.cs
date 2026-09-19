@@ -9,12 +9,12 @@ using Microsoft.Extensions.Options;
 namespace Nexo.Api.Common.Auth;
 
 /// <summary>
-/// S2-HU-03.1/03.2: valida en CADA petición el artefacto de sesión que define el
-/// contrato de integración con el portal (docs/contrato-integracion, D6) — el
-/// encabezado X-Portal-clsUsuario-Id — y resuelve la identidad real contra
-/// <see cref="IResolverIdentidadPortalPort"/>. Reemplaza a DevAuthenticationHandler y al
-/// esquema JwtBearer de Azure AD, retirados en S2-HU-03.3: no hay más rol declarado por
-/// el cliente (X-Rol) ni credenciales de ningún tipo pasando por Nexo.
+/// Valida en CADA petición el artefacto de sesión que define el contrato de
+/// integración con el portal (docs/contrato-integracion, D6) — el encabezado
+/// X-Portal-clsUsuario-Id — y resuelve la identidad real contra
+/// <see cref="IResolverIdentidadPortalPort"/>. Reemplaza a DevAuthenticationHandler
+/// y al esquema JwtBearer de Azure AD: no hay más rol declarado por el cliente
+/// (X-Rol) ni credenciales de ningún tipo pasando por Nexo.
 ///
 /// Autenticación vs. autorización, a propósito separadas: esta clase decide si la
 /// IDENTIDAD es válida (401 si no). Que tenga un rol de Nexo válido lo exige la
@@ -67,7 +67,7 @@ public class clsIdentidadPortalAuthenticationHandler(
 
     /// <summary>401: sin identidad utilizable. Nunca dice si el id existe o no en la
     /// tabla del portal (docs/contrato-integracion, sección 6) — mismo mensaje genérico
-    /// siempre, para no filtrar información del sistema (S2-HU-03.1).</summary>
+    /// siempre, para no filtrar información del sistema.</summary>
     protected override Task HandleChallengeAsync(AuthenticationProperties properties) =>
         clsErrorHandlingMiddleware.WriteAsync(Context, StatusCodes.Status401Unauthorized,
             "SESION_INVALIDA", "La sesión no es válida. Ingrese nuevamente desde el portal.");

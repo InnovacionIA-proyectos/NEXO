@@ -14,7 +14,7 @@ namespace Nexo.Application.CasosDeUso.Cotizaciones;
 /// <summary>
 /// Entregar la cotización a Comercial.
 ///
-/// NO MANDA EL CORREO, y ese es el cambio de la HU-06.1. Marca la entrega, publica el
+/// NO MANDA EL CORREO: marca la entrega, publica el
 /// evento y responde. El correo lo manda un consumidor aparte.
 ///
 /// Antes el envío ocurría aquí mismo, después de guardar. Ya era best-effort —un fallo no

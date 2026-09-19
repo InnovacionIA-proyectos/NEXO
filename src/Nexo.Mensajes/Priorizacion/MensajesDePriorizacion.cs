@@ -57,8 +57,8 @@ public sealed record clsParametrosDePriorizacionCambiaron(
 ///
 /// El trabajo de verdad. Lo publica la saga —por reloj o por cambio de parámetros— y
 /// lo atiende un consumidor con reintentos escalonados. Si los agota, va a la cola de
-/// error y de ahí sale la alerta al equipo (#13): un recálculo caído no puede tumbar
-/// el API ni pasar inadvertido.
+/// error y de ahí sale la alerta al equipo: un recálculo caído no puede tumbar el API
+/// ni pasar inadvertido.
 /// </summary>
 /// <param name="CadenaId">La cadena que lo pidió. Para trazar, no para correlacionar.</param>
 /// <param name="Motivo">Reloj o cambio de parámetros. Va al log.</param>

@@ -9,7 +9,7 @@ using Microsoft.Extensions.Logging;
 namespace Nexo.Infrastructure.Cubicacion.Adaptadores;
 
 /// <summary>
-/// [S3-HU-04.3, issue #78] Único cliente HTTP saliente de NEXO hacia Cubicador — ver
+/// Único cliente HTTP saliente de NEXO hacia Cubicador — ver
 /// <see cref="ICubicacionRapidaPort"/> para por qué esta operación concreta es una
 /// excepción declarada al "solo colas" del resto de Cubicación.
 ///

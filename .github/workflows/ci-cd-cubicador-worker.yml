@@ -1,7 +1,5 @@
 name: CI/CD Cubicador-Worker
 
-# S3-HU-11.3/11.5 (issues #136/#138).
-#
 # Los `paths` de este workflow y los de ci-cd-cubicador-api.yml son IDENTICOS
 # a proposito — el razonamiento completo esta en el encabezado de ese archivo
 # y en docs/CI_CD_RUTAS_COMPARTIDAS.md. En dos lineas: el job de pruebas es
@@ -13,8 +11,9 @@ name: CI/CD Cubicador-Worker
 # Para este workflow en particular: el filtro anterior (cubicador/worker/** +
 # domain/application/infrastructure) dejaba afuera cubicador/api/, y el worker
 # SI importa de ahi — worker/main.py toma `api.dependencias` y
-# `api.dtos.plan_cargue`. Ese es exactamente el archivo del bug 10.2 (#132):
-# un cambio bajo cubicador/api/ que rompia al worker mandando items a la DLQ.
+# `api.dtos.plan_cargue`. Ese es exactamente el archivo del bug 2 (ver
+# docs/CI_CD_RUTAS_COMPARTIDAS.md): un cambio bajo cubicador/api/ que rompia
+# al worker mandando items a la DLQ.
 # Con el filtro anterior ese arreglo habria desplegado solo la API, dejando al
 # worker con el codigo roto.
 on:
@@ -69,7 +68,7 @@ jobs:
             -H "X-GitHub-Event: push" ^
             -d "{\"ref\":\"${{ github.ref }}\",\"repository\":{\"full_name\":\"${{ github.repository }}\"}}"
 
-      # Issue #163: a diferencia de ci-cd-api.yml/ci-cd-cubicador-api.yml, este
+      # A diferencia de ci-cd-api.yml/ci-cd-cubicador-api.yml, este
       # servicio NO tiene ningun endpoint HTTP (sin healthcheck propio, ver
       # cubicador/docker-compose.yml) - no hay nada contra que hacer polling
       # desde aca para confirmar que el redeploy real ocurrio. Mismo hueco que

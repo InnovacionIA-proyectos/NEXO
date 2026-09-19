@@ -22,7 +22,7 @@ public sealed record clsResolverCatalogosDeLineasCommand(IReadOnlyList<clsResolv
 /// Antes esta resolución solo existía dentro de clsCapturarSolicitudCommand, mezclada con
 /// "crear la solicitud completa". lineas:bulk (clsCargarLineasBulkCommand) YA exige estos IDs
 /// resueltos y no los resuelve por su cuenta: sin este caso de uso, un formulario de texto
-/// libre no tenía cómo alimentarlo. Issue #131.
+/// libre no tenía cómo alimentarlo.
 /// </summary>
 public sealed class clsResolverCatalogosDeLineasCommandHandler(
     IRutasCatalogoPort rutasCatalogo, IConfiguracionesVehiculoPort vehiculosCatalogo, IUnitOfWork uow)

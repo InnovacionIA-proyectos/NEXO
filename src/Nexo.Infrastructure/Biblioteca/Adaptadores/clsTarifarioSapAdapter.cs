@@ -271,13 +271,13 @@ public sealed class clsTarifarioSapAdapter : ITarifarioSapPort
             .FirstOrDefault();
         if (fallback.Fila is null) return (null, false);
 
-        // Issue #169: verificado con datos reales (control A/B) que este fallback
-        // proponía "la tarifa vigente de mayor valor" en silencio incluso cuando el
-        // peso de la línea excedía el límite de TODAS las tarifas para ese vehículo, o
-        // cuando el vehículo no resolvió en el catálogo SAP - sin distinguir esos casos
-        // de un match exacto real. La línea sigue cotizándose con este candidato (no se
-        // descarta), pero ahora con una advertencia explícita que el frontend puede
-        // mostrarle al Administrador de Fletes/cliente antes de confirmar.
+        // Verificado con datos reales (control A/B) que este fallback proponía "la
+        // tarifa vigente de mayor valor" en silencio incluso cuando el peso de la
+        // línea excedía el límite de TODAS las tarifas para ese vehículo, o cuando el
+        // vehículo no resolvió en el catálogo SAP - sin distinguir esos casos de un
+        // match exacto real. La línea sigue cotizándose con este candidato (no se
+        // descarta), pero ahora con una advertencia explícita para el Administrador
+        // de Fletes/cliente antes de confirmar.
         string advertencia;
         if (claseViajeId == 2 && vehiculoIdStr is null)
         {

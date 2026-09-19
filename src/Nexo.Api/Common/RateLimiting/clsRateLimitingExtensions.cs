@@ -7,8 +7,8 @@ using Microsoft.AspNetCore.RateLimiting;
 namespace Nexo.Api.Common.RateLimiting;
 
 /// <summary>
-/// Issue #168: rate limiting básico (por rol, con IP como respaldo para quien no
-/// tiene identidad resuelta) en los endpoints de listado más pesados. Usa el
+/// Rate limiting básico (por rol, con IP como respaldo para quien no tiene
+/// identidad resuelta) en los endpoints de listado más pesados. Usa el
 /// middleware nativo de ASP.NET Core (`Microsoft.AspNetCore.RateLimiting`, parte
 /// del framework desde .NET 7 — no agrega ningún paquete NuGet nuevo).
 ///

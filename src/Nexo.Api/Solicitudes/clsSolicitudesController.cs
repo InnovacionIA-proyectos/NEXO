@@ -27,7 +27,7 @@ public class clsSolicitudesController(
     /// Bandeja Priorizada (anti-FIFO). Filtros: estado de la solicitud, atención
     /// (pendientes | automatico | administrador | atendidas | todas) y rango de fecha
     /// de captura (desde/hasta). Sin filtros muestra la cola de pendientes.
-    /// Issue #166: pagina (page/pageSize, respuesta `{ items, total }`).
+    /// Pagina (page/pageSize, respuesta `{ items, total }`).
     /// </summary>
     [HttpGet]
     [EnableRateLimiting(clsRateLimitingExtensions.PoliticaListadosEstandar)]
@@ -58,8 +58,8 @@ public class clsSolicitudesController(
     /// <summary>
     /// Resuelve texto libre (origen/destino/tipo de vehículo) a RutaId/ConfigVehiculoId,
     /// creando lo que falte en el catálogo. NO crea ninguna solicitud: es el paso previo
-    /// para que un formulario de captura pueda alimentar a lineas:bulk, que ya exige esos
-    /// IDs resueltos y no los resuelve por su cuenta (issue #131).
+    /// para que un formulario de captura pueda alimentar a lineas:bulk, que ya exige
+    /// esos IDs resueltos y no los resuelve por su cuenta.
     /// </summary>
     [HttpPost("resolver-catalogos")]
     [Authorize(Roles = "Comercial,CoordinadorFletes,Admin")]
@@ -75,7 +75,7 @@ public class clsSolicitudesController(
     ///
     /// Responde 202 con el identificador del trabajo, no con el resultado: las líneas
     /// quedan guardadas y el costeo se hace en segundo plano. El avance se consulta
-    /// con ese identificador (issue #15). Contrato en docs/contrato-integracion.
+    /// con ese identificador. Contrato en docs/contrato-integracion.
     /// </summary>
     [HttpPost("{id:guid}/lineas:bulk")]
     [Authorize(Roles = "CoordinadorFletes,Admin")]

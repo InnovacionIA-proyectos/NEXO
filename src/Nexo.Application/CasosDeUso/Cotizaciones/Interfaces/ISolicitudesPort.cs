@@ -15,7 +15,7 @@ public interface ISolicitudesPort
     Task<clsSolicitud?> ObtenerBasicoAsync(Guid id, CancellationToken ct);
 
     /// <summary>Tracked, con clsCliente y Creador. Para Entregar y MarcarResultado (transiciona
-    /// Estado); Creador lo usa además clsNotificarEntregaCommand (S2-HU-06.2): quien pidió la
+    /// Estado); Creador lo usa además clsNotificarEntregaCommand: quien pidió la
     /// consulta de flete, no el cliente ni un responsable comercial del DW.</summary>
     Task<clsSolicitud?> ObtenerConClienteAsync(Guid id, CancellationToken ct);
 

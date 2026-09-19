@@ -1,4 +1,4 @@
-"""Verifica la convencion de rutas de CI/CD (S3-HU-11.5, issue #138).
+"""Verifica la convencion de rutas de CI/CD.
 
 Responde una sola pregunta, sin tener que empujar un commit a GitHub para
 averiguarlo: **si cambio este archivo, que pipelines se disparan?**
@@ -12,8 +12,7 @@ deberia pasar.
 
 Sale con codigo 1 si alguna expectativa de la convencion de Cubicador falla.
 Los huecos conocidos en los OTROS dos pipelines se reportan como avisos, no
-como fallas: estan documentados en las issues #134 y #137 y no son parte de
-S3-HU-11.2/11.3.
+como fallas: son limitaciones aceptadas, no errores a corregir.
 """
 from __future__ import annotations
 
@@ -68,15 +67,15 @@ API, WORKER = "ci-cd-cubicador-api", "ci-cd-cubicador-worker"
 # (ruta que cambia, dispara API?, dispara WORKER?, por que)
 CONVENCION = [
     ("cubicador/api/dtos/plan_cargue.py", True, True,
-     "bug 10.2 (#132): vive en api/ pero worker/main.py lo importa"),
+     "bug 2: vive en api/ pero worker/main.py lo importa"),
     ("cubicador/api/dependencias.py", True, True,
      "worker/main.py importa NEXO_BASE_URL y NEXO_CALLBACK_API_KEY de aca"),
     ("cubicador/api/routers/planes_cargue.py", True, True,
      "solo lo usa la API, pero COPY . . lo mete en las dos imagenes"),
     ("cubicador/worker/main.py", True, True,
-     "bug 10.1 (#131); ademas tests/worker/ corre en el gate de los DOS"),
+     "bug 1; ademas tests/worker/ corre en el gate de los DOS"),
     ("cubicador/infrastructure/persistence/repositorios/plan_cargue_repo.py", True, True,
-     "bug 10.3 (#133): compartido de manera evidente"),
+     "bug 3: compartido de manera evidente"),
     ("cubicador/domain/motor/empaquetado.py", True, True, "motor compartido"),
     ("cubicador/application/plan_cargue/optimizar.py", True, True, "caso de uso compartido"),
     ("cubicador/tests/worker/test_mensaje_malformado.py", True, True,
@@ -101,15 +100,15 @@ CONVENCION = [
     ("tests/Nexo.Api.Tests/Infra/ApiFixture.cs", False, False, "idem"),
 ]
 
-# Huecos ya identificados en los pipelines de las issues #134 y #137. Se
-# reportan, no se exigen: corregirlos no es parte de S3-HU-11.2/11.3.
+# Huecos ya identificados en los pipelines de ci-cd-api y ci-cd-rabbitmq. Se
+# reportan, no se exigen: son limitaciones aceptadas.
 AVISOS = [
     ("ci-cd-api", "docker-compose.yml", True,
-     "define el servicio `api` (.NET) pero solo dispara ci-cd-rabbitmq (#134)"),
+     "define el servicio `api` (.NET) pero solo dispara ci-cd-rabbitmq"),
     ("ci-cd-api", "tests/QA/una-hu/README.md", False,
-     "`tests/**` incluye la documentacion de QA: un README despliega el API (#134)"),
+     "`tests/**` incluye la documentacion de QA: un README despliega el API"),
     ("ci-cd-rabbitmq", "scripts/rabbitmq_smoke.py", True,
-     "el workflow ejecuta este script pero no lo escucha (#137)"),
+     "el workflow ejecuta este script pero no lo escucha"),
 ]
 
 
@@ -118,7 +117,7 @@ def main() -> int:
 
     exclusivos = set(api) ^ set(worker)
     esperados = {f".github/workflows/{API}.yml", f".github/workflows/{WORKER}.yml"}
-    print("Convencion de Cubicador (S3-HU-11.2/11.3/11.5)")
+    print("Convencion de Cubicador")
     print(f"  Los dos pipelines comparten {len(set(api) & set(worker))} patrones y se")
     print(f"  diferencian solo en el nombre de su propio archivo: {exclusivos == esperados}")
     print()
@@ -136,7 +135,7 @@ def main() -> int:
             print(f"    esperado: API={esp_api} WORKER={esp_wkr} — {motivo}")
 
     print()
-    print("Avisos (otros pipelines, issues #134 y #137 — no son parte de esta HU)")
+    print("Avisos (otros pipelines — limitaciones conocidas, no errores)")
     for workflow, ruta, esperado, motivo in AVISOS:
         real = dispara(paths_de(workflow), ruta)
         estado = "ok" if real == esperado else "PENDIENTE"

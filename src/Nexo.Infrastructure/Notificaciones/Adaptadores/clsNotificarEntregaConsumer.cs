@@ -13,12 +13,12 @@ namespace Nexo.Infrastructure.Notificaciones.Adaptadores;
 /// Delgado a propósito: aquí no hay ninguna decisión. Quién recibe el correo, qué dice y
 /// cuándo no hay a quién escribirle son preguntas de negocio y viven en Application.
 ///
-/// LA EXCEPCIÓN SUBE. Es lo contrario de los consumidores de avisos (#17, #20), donde un
+/// LA EXCEPCIÓN SUBE. Es lo contrario de los consumidores de avisos, donde un
 /// navegador desconectado no es una avería y el fallo se registra y se sigue. Aquí sí lo
 /// es: una notificación perdida no se recupera consultando nada, no hay pantalla que la
 /// muestre, y nadie se enteraría. Dejándola subir, el bus reintenta las fallas pasajeras
 /// y manda a la cola de error las que no tienen arreglo — que es de donde sale la alerta
-/// al equipo (#13).
+/// al equipo.
 /// </summary>
 public sealed class clsNotificarEntregaConsumer(
     ICommandHandler<clsNotificarEntregaCommand, clsResultadoDeNotificacionDto> notificar,

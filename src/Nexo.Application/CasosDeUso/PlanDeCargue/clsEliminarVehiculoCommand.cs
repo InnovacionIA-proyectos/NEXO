@@ -8,20 +8,20 @@ using Nexo.Mensajes.Cubicacion;
 namespace Nexo.Application.CasosDeUso.PlanDeCargue;
 
 /// <summary>
-/// S3-HU-02: baja de un vehículo/contenedor del catálogo — DELETE /api/vehiculos/{id}.
+/// Baja de un vehículo/contenedor del catálogo — DELETE /api/vehiculos/{id}.
 /// Cierra el par de <see cref="clsGuardarVehiculoCommand"/>.
 ///
 /// Por qué existe, ya que no venía en la lista original de 8: el frontend llama
 /// <c>eliminarVehiculo()</c> (cubicador-api.service.ts) directo contra Cubicador con la
 /// API key del bundle. Toda escritura del navegador tiene que tener camino por NEXO o
-/// S3-HU-05 no puede cerrar — retirar el CORS y rotar la clave exige CERO llamadas de
+/// esa migración no puede cerrar — retirar el CORS y rotar la clave exige CERO llamadas de
 /// navegador a Cubicador, y esta era la única escritura que quedaba sin equivalente.
 ///
 /// No hay fila propia que borrar en NEXO: igual que <see cref="clsGuardarVehiculoCommand"/>,
-/// el catálogo de vehículos vive únicamente en Cubicador (ver issue #108). Este comando
+/// el catálogo de vehículos vive únicamente en Cubicador. Este comando
 /// solo publica y responde 202.
 ///
-/// Issue #155: Cubicador rechaza con VEHICULO_EN_USO si el vehículo tiene planes de
+/// Cubicador rechaza con VEHICULO_EN_USO si el vehículo tiene planes de
 /// cargue asociados, pero ese rechazo llega async por `cubicacion.rechazada` con el
 /// VehiculoId viajando en el campo PlanId del sobre — el consumer de ese evento busca por
 /// PlanId en PlanesCargue, nunca encuentra fila (porque el id es de un vehículo, no de un

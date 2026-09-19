@@ -7,7 +7,7 @@ namespace Nexo.Domain.Priorizacion.Reglas;
 /// <summary>
 /// Calcula el score de priorización (0–100) que reemplaza el FIFO.
 ///
-/// Score = suma ponderada de 4 componentes (issue #172/#173 — decisión documentada en
+/// Score = suma ponderada de 4 componentes (decisión documentada en
 /// docs/decisiones/score-prioridad-4-pesos-vs-solo-urgencia.md tras encontrar que el
 /// repo se contradecía a sí mismo: el código calculaba los 4 componentes pero el total
 /// descartaba 3 de ellos, dejando <see cref="clsParametrosScore"/> con 4 pesos editables

@@ -160,7 +160,7 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
                 // Regla inviolable 6: un grupo que falla (fuente caída, timeout) NO puede
                 // llevarse los demás. Task.WhenAll falla rápido y descarta hasta los grupos
                 // que ya habían terminado bien si uno solo lanza — por eso el catch va AQUÍ,
-                // por grupo, y no alrededor del WhenAll. Issue #131.
+                // por grupo, y no alrededor del WhenAll.
                 var primera = grupo.First();
                 var justificacion = $"No se pudo consultar la Biblioteca para esta línea: {ex.Message}";
                 return grupo.Select(l => new clsPropuestaLineaDto(
@@ -195,12 +195,11 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
 
         // Clave canónica de Domain, la MISMA que usan quien guarda la regla y el
         // repositorio que las lee. Antes se comparaban los valores crudos de la ruta
-        // contra claves ya normalizadas, y la regla no se aplicaba en silencio: ver
-        // clsClaveDeRutaTests en Domain.Tests y el comentario de cierre de la issue #16.
-        //
-        // Issue #17: las 3 llaves (ruta + tipo de vehículo), no solo las 2 de la ruta -
-        // antes, marcar un único tipo de vehículo como "solo SICE-TAC" apagaba la
-        // comparación contra plaza para TODOS los tipos de vehículo de esa ruta.
+        // contra claves ya normalizadas y la regla no se aplicaba en silencio (ver
+        // clsClaveDeRutaTests en Domain.Tests). La clave usa las 3 llaves (ruta + tipo
+        // de vehículo), no solo las 2 de la ruta: antes, marcar un único tipo de
+        // vehículo como "solo SICE-TAC" apagaba la comparación contra plaza para
+        // TODOS los tipos de vehículo de esa ruta.
         if (soloSice.Contains(clsTexto.ClaveRutaVehiculo(linea.clsRuta.Origen, linea.clsRuta.Destino, vehiculo)))
         {
             var sice = dw is null ? null : await CandidatoSicetacAsync(dw, origen, destino, vehiculo, linea.Tipologia, linea.clsConfiguracionVehiculo?.Carroceria, ct);
@@ -234,32 +233,31 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
             plaza = dc is null ? null : await CandidatoSapAsync(dc, dc.TarifasPlazaSap, "plaza", origen, destino, vehiculo, linea.Peso, soloVigentes: true, ajustesVigencia, ct);
         }
 
-        // Issue #175/#176: clsTarifarioSapAdapter.SicetacOficialAsync (réplica 1:1 de la
-        // lógica SAP legada) exige match exacto de Configuracion/TipoCarga/
-        // UnidadTransporte/ViaEstandar sin fallback, y solo aplica a Contenedor/Cupo
-        // (nunca a CargaSuelta/Extradimensionado) - eso deja sin piso automático rutas
-        // que sí existen y son encontrables (reproducido con Medellín-Guarne),
-        // obligando a marcar "Solo SICE-TAC" a mano para que aparezcan (la ruta
-        // siempre fue encontrable: esa marca usa CandidatoSicetacAsync, el selector
-        // tolerante de abajo). Si el camino oficial no encuentra nada, se reintenta con
-        // ESE MISMO selector antes de rendirse, así el camino normal encuentra como
-        // mínimo lo mismo que "Solo SICE-TAC". El camino oficial se prueba primero y no
-        // se toca: sigue gobernando sin cambios cuando sí encuentra algo (verificado
-        // contra datos reales en tests/QA/hu-13.4-verificacion-reglas-negocio-datos-reales).
+        // clsTarifarioSapAdapter.SicetacOficialAsync (réplica 1:1 de la lógica SAP
+        // legada) exige match exacto de Configuracion/TipoCarga/UnidadTransporte/
+        // ViaEstandar sin fallback, y solo aplica a Contenedor/Cupo (nunca a
+        // CargaSuelta/Extradimensionado) - eso deja sin piso automático rutas que sí
+        // existen y son encontrables (reproducido con Medellín-Guarne), obligando a
+        // marcar "Solo SICE-TAC" a mano para que aparezcan (esa marca usa
+        // CandidatoSicetacAsync, el selector tolerante de abajo). Si el camino oficial
+        // no encuentra nada, se reintenta con ESE MISMO selector antes de rendirse. El
+        // camino oficial se prueba primero y no se toca: sigue gobernando sin cambios
+        // cuando sí encuentra algo (verificado contra datos reales en pruebas de QA de
+        // reglas de negocio).
         var sicetac = oficial?.SicetacOficial;
         if (sicetac is null && dw is not null)
             sicetac = await CandidatoSicetacAsync(dw, origen, destino, vehiculo, linea.Tipologia, linea.clsConfiguracionVehiculo?.Carroceria, ct);
 
         var historico = dc is null ? null : await CandidatoSapAsync(dc, dc.TarifasLogSap, "historico_sap", origen, destino, vehiculo, linea.Peso, soloVigentes: false, ajustesVigencia, ct);
 
-        // S2-HU-09.1/09.3 (#31/#33): conexión SAP NUEVA (plaza en vivo), todavía no
-        // construida por "el equipo de conexiones". Con SapTarifaFleteEnVivo:Modo en
-        // Deshabilitado (default) o Real-sin-adaptador-todavía, _sapEnVivo.Configurado
-        // es false y esta rama nunca corre — la ruta de arriba (dc.TarifasPlazaSap, la
-        // fuente REAL) queda exactamente igual que antes de esta HU. Solo con
-        // Modo=Mock (u, en el futuro, un adaptador real) se sustituye la plaza — nunca
-        // el piso SICE-TAC ni el histórico, y "vencida" no aplica a una consulta en
-        // vivo (su propio contrato: la respuesta siempre es la vigente ahora).
+        // Conexión SAP nueva (plaza en vivo), todavía no construida por "el equipo de
+        // conexiones". Con SapTarifaFleteEnVivo:Modo en Deshabilitado (default) o
+        // Real-sin-adaptador-todavía, _sapEnVivo.Configurado es false y esta rama
+        // nunca corre — la ruta de arriba (dc.TarifasPlazaSap, la fuente REAL) queda
+        // exactamente igual que antes. Solo con Modo=Mock (u, en el futuro, un
+        // adaptador real) se sustituye la plaza — nunca el piso SICE-TAC ni el
+        // histórico, y "vencida" no aplica a una consulta en vivo (su propio
+        // contrato: la respuesta siempre es la vigente ahora).
         if (_sapEnVivo.Configurado)
         {
             var enVivo = await _sapEnVivo.ConsultarPlazaAsync(new clsConsultaTarifarioSap(
@@ -279,10 +277,10 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
             ADominio(sicetac), ADominio(plaza), ADominio(historico), vencida);
         var (valor, fuente, justificacion) = (decision.Valor, decision.Fuente, decision.Justificacion);
 
-        // Issue #169: cuando la propuesta final es plaza y ese candidato viene del
-        // fallback conservador (no un match exacto por vehículo/peso), la advertencia
-        // se anexa a la MISMA justificación que ya se le muestra al usuario - no hace
-        // falta que el frontend sepa leer un campo aparte para enterarse.
+        // Cuando la propuesta final es plaza y ese candidato viene del fallback
+        // conservador (no un match exacto por vehículo/peso), la advertencia se anexa
+        // a la MISMA justificación que ya se le muestra al usuario - no hace falta que
+        // el frontend sepa leer un campo aparte para enterarse.
         if (fuente == "plaza" && plaza?.Advertencia is { } advertenciaPlaza)
             justificacion += $" ⚠ {advertenciaPlaza}";
 

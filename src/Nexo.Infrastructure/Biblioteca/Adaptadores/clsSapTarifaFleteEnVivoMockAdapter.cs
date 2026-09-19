@@ -6,11 +6,11 @@ using Nexo.Domain.Common;
 namespace Nexo.Infrastructure.Biblioteca.Adaptadores;
 
 /// <summary>
-/// S2-HU-09.3 (#33): dataset PROVISIONAL de plaza mientras la conexión SAP en vivo
-/// (S2-HU-09.1, #31) no exista. Valores representativos de fletes reales de Botero
-/// Soto para las rutas más frecuentes — PENDIENTE de validación formal por negocio
-/// (S2-HU-09.2): no son un promedio calculado, son estimaciones razonables a partir
-/// de las tarifas ya sembradas en clsDataSeeder.cs para las mismas rutas.
+/// Dataset PROVISIONAL de plaza mientras la conexión SAP en vivo no exista. Valores
+/// representativos de fletes reales de Botero Soto para las rutas más frecuentes —
+/// PENDIENTE de validación formal por negocio: no son un promedio calculado, son
+/// estimaciones razonables a partir de las tarifas ya sembradas en clsDataSeeder.cs
+/// para las mismas rutas.
 ///
 /// Se activa SOLO por configuración (`SapTarifaFleteEnVivo:Modo=Mock`,
 /// DependencyInjection.cs) — nunca reemplaza a <see cref="ITarifarioSapPort"/> (la
@@ -53,7 +53,7 @@ public sealed class clsSapTarifaFleteEnVivoMockAdapter : ISapTarifaFleteEnVivoPo
 
         return Task.FromResult<clsCandidatoTarifaDto?>(new clsCandidatoTarifaDto(
             "sap_en_vivo_mock", valor,
-            $"{consulta.Origen} → {consulta.Destino} · dataset provisional (S2-HU-09.3, pendiente de validación formal por negocio)",
+            $"{consulta.Origen} → {consulta.Destino} · dataset provisional, pendiente de validación formal por negocio",
             $"mock: ruta {clave}, factor de peso {factor:0.00}", 1));
     }
 }

@@ -11,9 +11,9 @@ namespace Nexo.Infrastructure.Common.Mensajeria;
 /// activo, publicar NO manda nada al broker: escribe una fila en la tabla de salida
 /// dentro de la transacción en curso. El despachador la entrega después del commit.
 ///
-/// De ahí las dos garantías que pide la issue: si la transacción no confirma el
-/// mensaje no existe, y si confirma se entrega aunque RabbitMQ esté caído en ese
-/// instante — se entregará cuando vuelva.
+/// De ahí las dos garantías clave: si la transacción no confirma el mensaje no
+/// existe, y si confirma se entrega aunque RabbitMQ esté caído en ese instante —
+/// se entregará cuando vuelva.
 /// </summary>
 public sealed class clsMassTransitPublicador(IPublishEndpoint publicador) : IPublicadorDeMensajes
 {

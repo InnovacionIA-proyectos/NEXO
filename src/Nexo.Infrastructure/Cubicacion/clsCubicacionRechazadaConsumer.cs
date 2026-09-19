@@ -9,8 +9,8 @@ using Microsoft.Extensions.Logging;
 namespace Nexo.Infrastructure.Cubicacion;
 
 /// <summary>
-/// Consume el rechazo de una cubicación (issue #28, S2-HU-075) y marca el
-/// <c>clsPlanCargue</c> correspondiente como <c>error</c> (S2-HU-08.1: aviso claro, el
+/// Consume el rechazo de una cubicación y marca el
+/// <c>clsPlanCargue</c> correspondiente como <c>error</c> (aviso claro: el
 /// usuario puede reintentar desde el estado "error"). Ver
 /// <see cref="clsPlanDeCargueGeneradoConsumer"/> para el porqué de la topología.
 /// </summary>

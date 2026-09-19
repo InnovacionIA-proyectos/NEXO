@@ -49,15 +49,13 @@ public sealed class clsMarcarResultadoCommandHandler(
             throw new clsConflictException("RESULTADO_YA_DEFINIDO",
                 $"La cotización ya está marcada como {c.Resultado} y no puede cambiarse a {resultado}.");
 
-        // Issue #171: ANTES, la mesa del comercial podía marcar el resultado directo
-        // desde el borrador, y este comando registraba una "entrega implícita" (sin
-        // correo, sin evento clsCotizacionEntregada) solo para conservar la trazabilidad
-        // - eso ponía EntregadaAt sin que nadie hubiera llamado a /entregar de verdad,
-        // contaminando entregadaAt/cumplimiento de SLA/cotizaciones emitidas en el
-        // tablero de KPIs del piloto (S4-HU-05). Por decisión del negocio, esa entrega
-        // implícita se elimina: SOLO clsEntregarCotizacionCommand (POST /entregar) puede
-        // marcar la entrega, sin excepciones - una cotización en Borrador (con o sin
-        // líneas) exige pasar por /entregar antes de poder marcar su resultado.
+        // Antes este comando permitía marcar el resultado directo desde el borrador,
+        // registrando una "entrega implícita" solo para conservar la trazabilidad. Eso
+        // ponía EntregadaAt sin que nadie hubiera llamado a /entregar de verdad,
+        // contaminando el cumplimiento de SLA y las cotizaciones emitidas del tablero de
+        // KPIs. Por decisión del negocio esa entrega implícita se elimina: SOLO
+        // clsEntregarCotizacionCommand (POST /entregar) puede marcar la entrega, sin
+        // excepciones.
         if (c.Estado != EstadoCotizacion.Entregada)
             throw new clsConflictException("COTIZACION_NO_ENTREGADA", "Solo se puede marcar el resultado de una cotización entregada.");
 

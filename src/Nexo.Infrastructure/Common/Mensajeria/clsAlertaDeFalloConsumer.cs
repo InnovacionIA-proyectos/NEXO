@@ -8,7 +8,7 @@ namespace Nexo.Infrastructure.Common.Mensajeria;
 
 /// <summary>
 /// Alerta al equipo cuando CUALQUIER mensaje agota sus reintentos y MassTransit
-/// lo mueve a la cola de error (issue #13).
+/// lo mueve a la cola de error.
 ///
 /// Es un consumer de TIPO ABIERTO (<c>AddConsumer(typeof(clsAlertaDeFalloConsumer&lt;&gt;))</c>):
 /// se engancha una sola vez para todos los tipos de mensaje presentes y futuros,

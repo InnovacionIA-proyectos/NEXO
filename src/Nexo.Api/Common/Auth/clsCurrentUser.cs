@@ -10,7 +10,7 @@ namespace Nexo.Api.Common.Auth;
 ///
 /// Lee directo los claims que deja clsIdentidadPortalAuthenticationHandler
 /// (NameIdentifier/Name/Role, ya resueltos contra la tabla del portal en esta misma
-/// petición — S2-HU-03.1/03.2). Sin fallback a un usuario de sistema: el fail-closed de
+/// petición). Sin fallback a un usuario de sistema: el fail-closed de
 /// clsProgram.cs garantiza que si se llegó hasta un Handler, la petición ya tiene una
 /// identidad real.
 /// </summary>

@@ -3,9 +3,9 @@
 Microservicio propio y contenerizado que vive dentro de este mismo repo
 (`NEXO/cubicador/`), como carpeta separada — no es parte de la solución
 .NET (`Nexo.Clean.sln`), ni comparte proceso ni base de datos con el
-backend C#. Construido para S2-HU-072 ("portar el motor de cubicación a
-Python, servicio contenerizado") y S2-HU-07.3 ("paridad automatizada con
-los 26 casos dorados en CI"): trae **completo** el cubicador que
+backend C#. Construido para portar el motor de cubicación a Python como
+servicio contenerizado, con paridad automatizada con los 26 casos dorados
+en CI: trae **completo** el cubicador que
 originalmente vivía en `cabinaFletes` (C#) — el cubicador rápido (evaluador
 SICCE por criterios/veto) y el motor de bin-packing 3D (planes de cargue,
 optimización, ajuste manual) — con su propia persistencia, y una suite que
@@ -43,7 +43,7 @@ Ver:
 - **FastAPI** — API síncrona (`/api/cubicacion`, `/api/planes-cargue`)
 - **SQLAlchemy 2.0 (async)** — persistencia propia; `DATABASE_URL` apunta a SQLite en desarrollo o PostgreSQL en producción (mismo código, solo cambia la URL)
 - **aio-pika (RabbitMQ)** — worker consumidor separado, para `optimizar` y `crear-desde-línea`
-- **pytest** — 103 pruebas: 33 de reglas de negocio del motor (28 casos dorados de `MotorCubicacion3DTests.cs` + 5 de apilamiento multi-soporte) + **27 de paridad cross-motor** (los mismos casos, comparados contra la salida real del motor C#, no contra un valor transcrito a mano) + 4 de humo end-to-end de la API + 12 de regresión del worker (los 9 comandos por cola + el puente desde línea) + 4 del vigilante de timeouts + 2 del registro de algoritmos intercambiables + 2 de la alerta al equipo cuando un mensaje cae a `cubicacion.dlq` + **19 guardas de los 3 bugs de QA** (S3-HU-10: mensaje malformado que atascaba el worker, ítem sin SKU, borrado de plan optimizado)
+- **pytest** — 103 pruebas: 33 de reglas de negocio del motor (28 casos dorados de `MotorCubicacion3DTests.cs` + 5 de apilamiento multi-soporte) + **27 de paridad cross-motor** (los mismos casos, comparados contra la salida real del motor C#, no contra un valor transcrito a mano) + 4 de humo end-to-end de la API + 12 de regresión del worker (los 9 comandos por cola + el puente desde línea) + 4 del vigilante de timeouts + 2 del registro de algoritmos intercambiables + 2 de la alerta al equipo cuando un mensaje cae a `cubicacion.dlq` + **19 guardas de los 3 bugs de QA encontrados** (mensaje malformado que atascaba el worker, ítem sin SKU, borrado de plan optimizado)
 
 ## Estado actual (léelo antes de asumir que algo funciona)
 
@@ -114,7 +114,7 @@ Ver:
   `worker/main.py`.
 
 **Cambios al traer este servicio de su repo standalone a `NEXO/cubicador/`**
-(validados contra los criterios de cierre de S2-HU-072):
+(validados contra los criterios de cierre del port):
 - Los 26 casos dorados de `cabinaFletes/src/CabinaFletes.Tests/MotorCubicacion3DTests.cs`
   ya estaban portados 1:1 (mismo nombre/orden) en `tests/domain/test_motor.py`
   — confirmado, no hubo que tocar nada del motor.
@@ -142,7 +142,7 @@ Ver:
   Network tab). Cambiado a `fastapi.security.HTTPBearer` — ahora Swagger
   muestra el botón "Authorize" real.
 
-**Paridad automatizada contra el motor C# real (S2-HU-07.3, hotspot H5):**
+**Paridad automatizada contra el motor C# real:**
 - `herramientas/generador_casos_dorados/` — harness .NET que referencia el
   `.csproj` real de `cabinaFletes` (sin modificarlo) y corre los 26 casos de
   `MotorCubicacion3DTests.cs` contra el motor C# de verdad, grabando su
@@ -152,12 +152,12 @@ Ver:
   coinciden exacto**, sin haber tenido que ajustar el port. Falla el build
   con el esperado/obtenido exactos si algún caso deja de coincidir — ver
   `docs/DECISIONES_TECNICAS.md` #3 (la decisión de no construir esto se
-  revirtió cuando la HU lo pidió explícitamente).
+  revirtió después).
 
 **Unificación de RabbitMQ con el broker compartido de NEXO (2026-08-27):**
 - Este servicio ya NO trae su propio contenedor RabbitMQ — `api`/`worker` se
-  conectan al `rabbit` del `docker-compose.yml` raíz de NEXO (issue
-  #13/S2-HU-041) enganchándose a su red Docker por nombre externo. La base de
+  conectan al `rabbit` del `docker-compose.yml` raíz de NEXO enganchándose
+  a su red Docker por nombre externo. La base de
   datos (Postgres) sigue siendo propia. Ver `docs/DECISIONES_TECNICAS.md` #9
   (documenta por qué se revirtió la decisión original de un broker propio) y
   la sección "Puesta en marcha" más abajo (ahora requiere levantar el
@@ -316,12 +316,12 @@ pytest
 - **Actualización**: la paridad automatizada cross-motor que decía "no se
   construye" ya se construyó — ver la sección "Estado actual" más arriba y
   `tests/paridad/`. `docs/DECISIONES_TECNICAS.md` #3 documenta por qué se
-  revirtió esa decisión (S2-HU-07.3 la pidió explícitamente como criterio de
-  liberación).
+  revirtió esa decisión (un requisito posterior la pidió explícitamente
+  como criterio de liberación).
 - `POST /api/cubicacion/costear` (cubicar + estimar flete) — no se migró en
   NEXO tampoco: depende de un método de Biblioteca (`EstimarFleteAsync`) que
   nunca se migró a su puerto. Gap pre-existente, ajeno al Cubicador.
 - Frontend del Cubicador 3D — sigue pendiente aparte, en ningún repo todavía.
-- "Comunicación solo por colas" (decisión técnica de S2-HU-072) — hoy el
+- "Comunicación solo por colas" (decisión técnica del port) — hoy el
   servicio sigue siendo REST para todo lo que no es `optimizar`/
   `crear-desde-línea`. Ver nota al inicio de este README.

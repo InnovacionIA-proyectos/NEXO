@@ -81,16 +81,14 @@ public static class clsMensajeriaDependencyInjection
             // misma fuente y no pueden decir cosas distintas.
             x.AddConsumer<clsAvisarTrabajoConsumer>();
 
-            // Issue #13: alerta al equipo cuando un mensaje agota reintentos y cae a la
-            // cola de error (ver clsAlertaDeFalloConsumer<T>). MassTransit 8.5 no tiene forma
-            // de registrar un Fault<T> genérico abierto contra IRegistrationConfigurator
-            // (AddConsumer(Type) solo acepta tipos CERRADOS, se verificó por reflexión y
-            // se confirmó en runtime: revienta con "Type.ContainsGenericParameters is
-            // true"), así que toca una línea por tipo de mensaje - igual que los
-            // validadores de abajo. Si se agrega un mensaje nuevo y se olvida esta lista,
-            // ese mensaje simplemente no genera alerta (sin excepción, sin romper nada) -
-            // por eso el criterio de cierre de la #13 debe verificar esto explícitamente,
-            // no asumir que es automático.
+            // Alerta al equipo cuando un mensaje agota reintentos y cae a la cola de
+            // error (ver clsAlertaDeFalloConsumer<T>). MassTransit 8.5 no permite registrar
+            // un Fault<T> genérico abierto contra IRegistrationConfigurator
+            // (AddConsumer(Type) solo acepta tipos CERRADOS: revienta en runtime con
+            // "Type.ContainsGenericParameters is true"), así que toca una línea por tipo
+            // de mensaje - igual que los validadores de abajo. Si se agrega un mensaje
+            // nuevo y se olvida esta lista, ese mensaje simplemente no genera alerta
+            // (sin excepción, sin romper nada).
             x.AddConsumer<clsAlertaDeFalloConsumer<clsAutoCosteoSolicitado>>();
             x.AddConsumer<clsAlertaDeFalloConsumer<clsRepartirLineasDeCosteo>>();
             x.AddConsumer<clsAlertaDeFalloConsumer<clsPliegoRepartido>>();
@@ -103,20 +101,20 @@ public static class clsMensajeriaDependencyInjection
             x.AddConsumer<clsAlertaDeFalloConsumer<clsTrabajoActualizado>>();
             x.AddConsumer<clsAlertaDeFalloConsumer<clsExpiracionAutoCosteo>>();
 
-            // Issue #28, S2-HU-075: puente hacia Cubicador (microservicio Python,
-            // cubicador/, mismo repo). MassTransit real (decisión del equipo: no la
-            // aproximación previa con RabbitMQ.Client directo) - ver
-            // docs/mensajeria/CUBICACION.md para el porqué de la topología manual de
-            // abajo (Cubicador usa un exchange/routing-keys propios, no el
-            // exchange-por-tipo que MassTransit crearía por defecto).
+            // Puente hacia Cubicador (microservicio Python, cubicador/, mismo repo).
+            // MassTransit real (decisión del equipo: no la aproximación previa con
+            // RabbitMQ.Client directo) - ver docs/mensajeria/CUBICACION.md para el
+            // porqué de la topología manual de abajo (Cubicador usa un exchange/
+            // routing-keys propios, no el exchange-por-tipo que MassTransit crearía
+            // por defecto).
             x.AddConsumer<clsPlanDeCargueGeneradoConsumer>();
             x.AddConsumer<clsCubicacionRechazadaConsumer>();
             x.AddConsumer<clsAlertaDeFalloConsumer<clsPlanDeCargueGenerado>>();
             x.AddConsumer<clsAlertaDeFalloConsumer<clsCubicacionRechazada>>();
 
-            // S3-HU-03 (issue #110/#111): catálogo de vehículos - mismo puente, misma
-            // tubería. Un solo consumer atiende los 2 tipos (ver clsVehiculoCatalogoConsumer),
-            // pero MassTransit igual necesita un AddConsumer<T> y un Fault<T> por MENSAJE.
+            // Catálogo de vehículos - mismo puente, misma tubería. Un solo consumer
+            // atiende los 2 tipos (ver clsVehiculoCatalogoConsumer), pero MassTransit
+            // igual necesita un AddConsumer<T> y un Fault<T> por MENSAJE.
             x.AddConsumer<clsVehiculoCatalogoConsumer>();
             x.AddConsumer<clsAlertaDeFalloConsumer<clsVehiculoCreado>>();
             x.AddConsumer<clsAlertaDeFalloConsumer<clsVehiculoActualizado>>();
@@ -134,9 +132,9 @@ public static class clsMensajeriaDependencyInjection
             // notificación perdida no se recupera consultando nada y nadie se enteraría.
             x.AddConsumer<clsNotificarEntregaConsumer>();
 
-            // Las 3 alertas de negocio de la sección 9 del documento de entendimiento
-            // (issue #131): tarifa vencida, línea sin costear por falla técnica, y
-            // cotización ganada. Mismo criterio que arriba: la excepción sube.
+            // Las 3 alertas de negocio del documento de entendimiento: tarifa vencida,
+            // línea sin costear por falla técnica, y cotización ganada. Mismo criterio
+            // que arriba: la excepción sube.
             x.AddConsumer<clsNotificarTarifaVencidaConsumer>();
             x.AddConsumer<clsNotificarLineaFalloTecnicoConsumer>();
             x.AddConsumer<clsNotificarCotizacionGanadaConsumer>();
@@ -188,11 +186,11 @@ public static class clsMensajeriaDependencyInjection
             // de la de producción afirma menos de lo que parece.
             //
             // `excluirDeAutoConfigurar`: consumers cuyo receive endpoint YA se configuró
-            // a mano (issue #28 - clsPlanDeCargueGeneradoConsumer/clsCubicacionRechazadaConsumer,
+            // a mano (clsPlanDeCargueGeneradoConsumer/clsCubicacionRechazadaConsumer,
             // enganchados al exchange propio de Cubicador, no al de MassTransit por tipo).
             // Sin excluirlos, ConfigureEndpoints intenta crearles OTRO endpoint con el
             // mismo nombre por defecto y revienta con "A receive endpoint with the same
-            // key was already added" - se confirmó en runtime, no es una suposición.
+            // key was already added".
             void Tuberia<T>(IBusRegistrationContext contexto, IBusFactoryConfigurator<T> cfg, params Type[] excluirDeAutoConfigurar)
                 where T : IReceiveEndpointConfigurator
             {
@@ -205,7 +203,7 @@ public static class clsMensajeriaDependencyInjection
                 // Reintentos escalonados: un fallo transitorio del broker o de una
                 // fuente externa no debe tumbar el mensaje al primer intento. Agotados
                 // los intentos, MassTransit lo lleva a la cola de error (DLQ), que es
-                // donde la #13 conectará la alerta al equipo.
+                // donde clsAlertaDeFalloConsumer conecta la alerta al equipo.
                 cfg.UseMessageRetry(r =>
                 {
                     // NO SE REINTENTA LO QUE NO TIENE ARREGLO. Un adjunto que pesa más de
@@ -233,13 +231,12 @@ public static class clsMensajeriaDependencyInjection
             // No es una comodidad: sin esto el bus intenta conectarse a RabbitMQ, no
             // lo consigue y se queda en "not started". El chequeo de salud del bus
             // pasa a Unhealthy y /health responde 503 aunque el API atienda bien —
-            // que es exactamente lo que llevaba pasando en las pruebas desde la #14
-            // sin que nadie lo notara, porque la suite de Api.Tests no se corría
+            // pasó desapercibido en pruebas porque la suite de Api.Tests no se corría
             // completa.
             //
             // Arrancar sin broker en Producción sería perder mensajes en silencio, y
             // eso lo impide la guarda de clsProgram.cs, con el mismo criterio fail-closed
-            // que la de la identidad del portal (S2-HU-03.3).
+            // que la de la identidad del portal.
             if (string.IsNullOrWhiteSpace(host))
                 x.UsingInMemory((contexto, cfg) => Tuberia(contexto, cfg));
             else
@@ -286,11 +283,11 @@ public static class clsMensajeriaDependencyInjection
                         e.ConfigureConsumer<clsCubicacionRechazadaConsumer>(contexto);
                     });
 
-                    // S3-HU-03 (issue #110/#111): mismo patrón, 2 endpoints más porque cada
-                    // routing key necesita el suyo propio - MassTransit no permite bindear
-                    // 2 routing keys distintas a un mismo ReceiveEndpoint con nombres de cola
-                    // separados (y sí queremos colas separadas: un fallo en vehiculo.creado
-                    // no debe bloquear vehiculo.actualizado ni viceversa).
+                    // Mismo patrón, 2 endpoints más porque cada routing key necesita el suyo
+                    // propio - MassTransit no permite bindear 2 routing keys distintas a un
+                    // mismo ReceiveEndpoint con nombres de cola separados (y sí queremos
+                    // colas separadas: un fallo en vehiculo.creado no debe bloquear
+                    // vehiculo.actualizado ni viceversa).
                     cfg.ReceiveEndpoint("Cubicacion.clsVehiculoCreado", (IRabbitMqReceiveEndpointConfigurator e) =>
                     {
                         e.ConfigureConsumeTopology = false;

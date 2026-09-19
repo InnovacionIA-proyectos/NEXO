@@ -7,7 +7,7 @@ using Nexo.Application.Common.Exceptions;
 namespace Nexo.Application.CasosDeUso.PlanDeCargue;
 
 /// <summary>
-/// S3-HU-03 (issue #112): GET /api/planes-cargue/{id}/resultado — detalle completo
+/// GET /api/planes-cargue/{id}/resultado — detalle completo
 /// (ítems, colocaciones con geometría, métricas, incidencias) contra la proyección
 /// local. También sirve GET .../exportar: mismo shape, mismo criterio que usa
 /// Cubicador en su propia API síncrona (su endpoint /exportar es, hoy, idéntico a

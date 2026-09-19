@@ -3,15 +3,15 @@ using Nexo.Application.CasosDeUso.Solicitudes.DTOs;
 namespace Nexo.Application.CasosDeUso.PlanDeCargue.DTOs;
 
 /// <summary>Respuesta del 202: el patrón de trabajos pesados del contrato de
-/// integración, aplicado a la cubicación (S2-HU-08.1).</summary>
+/// integración, aplicado a la cubicación.</summary>
 public record clsSolicitudDeCubicacionAceptadaDto(Guid PlanCargueId, string Estado, string ConsultarEn);
 
 /// <summary>
-/// Respuesta 202 genérica de los comandos de escritura de S3-HU-02 que NO generan (ni
-/// tienen, ver issue #108) un recurso propio de NEXO para consultar — guardar_vehiculo,
-/// crear_plan_demo, guardar_item, importar_items, eliminar_item, eliminar_plan,
-/// ajustar_colocacion. <c>CorrelationId</c> es el mismo id que viaja en el sobre de la
-/// cola, útil para cruzar con logs/DLQ si el worker rechaza el comando.
+/// Respuesta 202 genérica de los comandos de escritura que NO generan (ni tienen) un
+/// recurso propio de NEXO para consultar — guardar_vehiculo, crear_plan_demo,
+/// guardar_item, importar_items, eliminar_item, eliminar_plan, ajustar_colocacion.
+/// <c>CorrelationId</c> es el mismo id que viaja en el sobre de la cola, útil para
+/// cruzar con logs/DLQ si el worker rechaza el comando.
 /// </summary>
 public record clsComandoAceptadoDto(Guid CorrelationId, string Estado);
 
@@ -53,11 +53,11 @@ public record clsAvisoPlanCargueDto(Guid PlanCargueId, string Estado, decimal Pu
 }
 
 // ---------------------------------------------------------------------------------
-// S3-HU-03 (issue #112): lectura completa del visor 3D — TODAS contra la proyección
-// local que llena clsPlanDeCargueGeneradoConsumer/clsVehiculoCatalogoConsumer (issue #111).
-// Ninguna de estas consultas llama a Cubicador (criterio no-negociable de la HU). Los
-// shapes espejan cubicador/CONTRATO.md §3.2 (clsResultadoPlanDto/clsVehiculoCubicacionDto/etc.)
-// para que el frontend (S3-HU-04) reciba lo mismo que ya conoce del contrato de Cubicador.
+// Lectura completa del visor 3D — TODAS contra la proyección local que llena
+// clsPlanDeCargueGeneradoConsumer/clsVehiculoCatalogoConsumer. Ninguna de estas consultas
+// llama a Cubicador (criterio no-negociable). Los shapes espejan cubicador/CONTRATO.md
+// §3.2 (clsResultadoPlanDto/clsVehiculoCubicacionDto/etc.) para que el frontend reciba lo
+// mismo que ya conoce del contrato de Cubicador.
 // ---------------------------------------------------------------------------------
 
 public record clsEjeVehiculoDto(decimal PosicionMm, decimal CapacidadKg);
@@ -84,7 +84,7 @@ public record clsColocacionCargueDto(
     string? CodigoRechazo, string? RazonRechazo);
 
 /// <summary>Detalle completo del plan (a diferencia de <see cref="clsPlanCargueDto"/>, que es
-/// el resumen de la consulta de respaldo de S2-HU-08.1) — con sus ítems completos.</summary>
+/// el resumen de la consulta de respaldo) — con sus ítems completos.</summary>
 public record clsPlanCargueDetalleDto(
     Guid Id, string Nombre, Guid VehiculoId, Guid? LineaSolicitudId, int NumeroVehiculo,
     string Estado, string Estrategia, string Algoritmo, int? Semilla,
@@ -92,8 +92,8 @@ public record clsPlanCargueDetalleDto(
     decimal Puntaje, IReadOnlyList<clsItemPlanCargueDetalleDto> Items,
     DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt);
 
-/// <summary>GET /api/planes-cargue/{id}/resultado y /exportar (issue #112) — mismo shape
-/// que <c>clsResultadoPlanDto</c> de Cubicador, leído de la proyección local. <c>Metricas</c>
+/// <summary>GET /api/planes-cargue/{id}/resultado y /exportar — mismo shape que
+/// <c>clsResultadoPlanDto</c> de Cubicador, leído de la proyección local. <c>Metricas</c>
 /// es <c>null</c> si el plan nunca se optimizó (nadie ha publicado un
 /// plan-de-cargue.generado con métricas todavía).</summary>
 public record clsResultadoPlanDto(
@@ -103,7 +103,7 @@ public record clsResultadoPlanDto(
     Mensajes.Cubicacion.clsMetricasCubicacionEvento? Metricas,
     IReadOnlyList<Mensajes.Cubicacion.clsIncidenciaValidacionEvento> Incidencias);
 
-/// <summary>GET /api/planes-cargue/{id}/flota (issue #112) — los vehículos (planes)
-/// hermanos de una misma línea de solicitud (S2-HU-08: una carga que no cabe en un
-/// vehículo se reparte en varios planes con la misma LineaSolicitudId).</summary>
+/// <summary>GET /api/planes-cargue/{id}/flota — los vehículos (planes) hermanos de una
+/// misma línea de solicitud (una carga que no cabe en un vehículo se reparte en varios
+/// planes con la misma LineaSolicitudId).</summary>
 public record clsPlanFlotaItemDto(Guid Id, int NumeroVehiculo, int TotalVehiculos, int UnidadesCargadas, int UnidadesTotales);

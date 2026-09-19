@@ -10,9 +10,8 @@ namespace Nexo.Infrastructure.Persistence.Migrations
     {
         /// <inheritdoc />
         // EF generó BORRAR Y RECREAR en vez de renombrar, y avisó de posible pérdida de
-        // datos. Aquí es inocuo: lineas_esperando_tarifa se creó en la issue #15, en esta
-        // misma pila de ramas sin mergear, y nunca se desplegó — no hay una sola fila que
-        // perder.
+        // datos. Aquí es inocuo: lineas_esperando_tarifa se creó en esta misma pila de
+        // ramas sin mergear y nunca se desplegó — no hay una sola fila que perder.
         //
         // Si esta migración se estuviera aplicando sobre un ambiente con datos, habría que
         // reescribirla como RenameTable + AddColumn con un valor por defecto. Se deja

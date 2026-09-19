@@ -1,11 +1,10 @@
 namespace Nexo.Domain.PlanDeCargue.Reglas;
 
 /// <summary>
-/// S2-HU-08.2 (#30): la función de plan de cargue solo se habilita cuando los golden
-/// tests de paridad del motor están 26/26 (S2-HU-07.3). Función pura: no lee
-/// configuración ni hace I/O — solo decide, dados los tres campos, si la evidencia
-/// alcanza. El adaptador que sí lee `IConfiguration` vive en Infrastructure
-/// (clsParidadCubicadorAdapter).
+/// La función de plan de cargue solo se habilita cuando los golden tests de paridad del
+/// motor están 26/26. Función pura: no lee configuración ni hace I/O — solo decide, dados
+/// los tres campos, si la evidencia alcanza. El adaptador que sí lee `IConfiguration`
+/// vive en Infrastructure (clsParidadCubicadorAdapter).
 ///
 /// NO es un booleano suelto: <paramref name="verificada"/> por sí solo no habilita nada.
 /// Tiene que venir acompañado de a QUÉ evidencia concreta se refiere

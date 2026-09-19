@@ -8,7 +8,7 @@ using Nexo.Mensajes.Cubicacion;
 namespace Nexo.Application.CasosDeUso.PlanDeCargue;
 
 /// <summary>
-/// [S3-HU-04.3, issue #78] Crea la flota de un plan de cargue a partir de una línea de
+/// Crea la flota de un plan de cargue a partir de una línea de
 /// solicitud ya cotizada — POST /api/planes-cargue/desde-linea/{lineaId} — reemplaza el
 /// POST que <c>crearPlanDesdeLinea()</c> (cubicador-api.service.ts) hacía directo contra
 /// Cubicador con la clave compartida.
@@ -32,7 +32,7 @@ namespace Nexo.Application.CasosDeUso.PlanDeCargue;
 ///
 /// A propósito NO pasa por <see cref="IParidadCubicadorPort"/>: arma un plan a partir de
 /// datos ya existentes (dato, no cálculo) — mismo criterio que <see cref="clsCrearPlanCommand"/>
-/// y el resto de los comandos de escritura de S3-HU-02.
+/// y el resto de los comandos de escritura.
 ///
 /// LIMITACIÓN CONOCIDA (no de este comando, del worker de Cubicador): hoy
 /// <c>worker/main.py::_ejecutar_solicitud</c> solo devuelve el <b>primer</b> plan de la
@@ -40,10 +40,10 @@ namespace Nexo.Application.CasosDeUso.PlanDeCargue;
 /// por "plan-de-cargue.generado". Cuando una línea reparte en 2+ vehículos, los vehículos
 /// 2..N quedan optimizados en la base de Cubicador pero NUNCA llegan a proyectarse en NEXO
 /// — <see cref="clsObtenerPlanesPorLineaQuery"/> (que lee solo la proyección local, sin
-/// llamar a Cubicador, por el criterio no-negociable de S3-HU-03) no puede mostrarlos.
+/// llamar a Cubicador, por el criterio no-negociable) no puede mostrarlos.
 /// Detectado al implementar este comando, no estaba documentado antes; requiere que el
-/// worker publique un evento por cada plan de la flota, no solo por el primero — issue
-/// nueva pendiente de abrir contra `cubicador/worker/main.py` y
+/// worker publique un evento por cada plan de la flota, no solo por el primero —
+/// pendiente en `cubicador/worker/main.py` y
 /// `cubicador/application/plan_cargue/desde_linea.py`. No bloquea el caso de un solo
 /// vehículo (el más común), que ya funciona de punta a punta.
 /// </summary>

@@ -5,15 +5,15 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace Nexo.Infrastructure.Persistence.Migrations
 {
     /// <summary>
-    /// S2-HU-10.1 (#31 -> en realidad #35): set de datos limpio para el equipo de
-    /// datos. Vistas de SOLO LECTURA sobre la BD transaccional propia, en un esquema
-    /// aparte (`analitica`) para poder otorgar permisos de SELECT acotados sin exponer
-    /// el esquema `dbo` completo. Documentación de cada vista (columnas, tipos,
-    /// semántica, origen) en docs/analitica/DICCIONARIO_DATOS.md.
+    /// Set de datos limpio para el equipo de datos. Vistas de SOLO LECTURA sobre la BD
+    /// transaccional propia, en un esquema aparte (`analitica`) para poder otorgar
+    /// permisos de SELECT acotados sin exponer el esquema `dbo` completo.
+    /// Documentación de cada vista (columnas, tipos, semántica, origen) en
+    /// docs/analitica/DICCIONARIO_DATOS.md.
     ///
     /// NO ES UN DW NI UN CUBO (alcance acordado "foto única"): son vistas simples que
     /// envuelven un SELECT — no precalculan nada, no imponen grano ni variable
-    /// objetivo. Eso lo decide el análisis exploratorio de S2-HU-11.
+    /// objetivo. Eso lo decide el análisis exploratorio posterior.
     ///
     /// WITH (NOLOCK) en toda lectura: acepta lecturas sucias (una fila a medio
     /// escribir, rarísimo en esta carga) a cambio de no bloquear ni ser bloqueada por

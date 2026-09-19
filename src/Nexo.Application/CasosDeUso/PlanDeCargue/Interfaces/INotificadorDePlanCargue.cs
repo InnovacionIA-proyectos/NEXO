@@ -3,7 +3,7 @@ using Nexo.Application.CasosDeUso.PlanDeCargue.DTOs;
 namespace Nexo.Application.CasosDeUso.PlanDeCargue.Interfaces;
 
 /// <summary>
-/// Empuja el desenlace de un plan de cargue a quien lo esté mirando (S2-HU-08.1).
+/// Empuja el desenlace de un plan de cargue a quien lo esté mirando.
 ///
 /// Va aparte de INotificadorDeTrabajos a propósito: ese contrato lleva Avance con
 /// pendientes/reintentos técnicos, conceptos del auto-costeo que no tienen sentido para

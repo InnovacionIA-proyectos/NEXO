@@ -9,16 +9,16 @@ namespace Nexo.Application.CasosDeUso.Notificaciones;
 /// <summary>
 /// Manda el correo de una cotización entregada.
 ///
-/// FUERA DE LA PETICIÓN, y ese es el punto de la HU-06.1. Antes esto vivía dentro del caso
+/// FUERA DE LA PETICIÓN. Antes esto vivía dentro del caso
 /// de uso de entrega: quien entregaba esperaba a que el correo saliera, y con el relay lento
 /// esperaba de más. Ahora la entrega publica el evento y responde; esto corre después,
 /// llamado desde un consumidor.
 ///
-/// LA NOTIFICACIÓN ES INTERNA Y VA A QUIEN LA PIDIÓ (S2-HU-06.2). El destinatario es
+/// LA NOTIFICACIÓN ES INTERNA Y VA A QUIEN LA PIDIÓ. El destinatario es
 /// <c>clsSolicitud.Creador</c> — el usuario de Nexo que dio de alta la solicitud de flete,
-/// resuelto contra la sesión real del portal (S2-HU-03) — nunca el cliente ni un
-/// "responsable comercial" sacado de un Data Warehouse por NIT (así resolvía esto antes
-/// de la #22; se retiró IComercialResponsablePort/DwCubosSap por completo, ya sin uso).
+/// resuelto contra la sesión real del portal — nunca el cliente ni un
+/// "responsable comercial" sacado de un Data Warehouse por NIT (así resolvía esto antes;
+/// se retiró IComercialResponsablePort/DwCubosSap por completo, ya sin uso).
 /// Es, además, una salvaguarda estructural: <c>clsCliente</c> no tiene columna de correo, así
 /// que no hay de dónde sacar una dirección de cliente aunque alguien lo intentara.
 ///

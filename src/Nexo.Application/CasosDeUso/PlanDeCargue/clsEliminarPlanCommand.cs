@@ -8,11 +8,10 @@ using Nexo.Mensajes.Cubicacion;
 namespace Nexo.Application.CasosDeUso.PlanDeCargue;
 
 /// <summary>
-/// S3-HU-02 (issue #104): borra un plan de cargue — DELETE /api/planes-cargue/{id}. El
+/// Borra un plan de cargue — DELETE /api/planes-cargue/{id}. El
 /// borrado en NEXO es OPTIMISTA (se aplica antes de publicar, no se deshace si Cubicador
 /// rechaza el comando): es la misma asimetría del PATCH síncrono que reemplaza — deshacer
-/// un borrado es un caso raro y de bajo valor frente a la simplicidad de no reconciliarlo
-/// (ver issue #108 para el detalle de esta decisión).
+/// un borrado es un caso raro y de bajo valor frente a la simplicidad de no reconciliarlo.
 /// </summary>
 public sealed record clsEliminarPlanCommand(Guid PlanCargueId) : ICommand<clsComandoAceptadoDto>;
 

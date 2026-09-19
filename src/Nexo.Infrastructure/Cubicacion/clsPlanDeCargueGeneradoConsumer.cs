@@ -11,8 +11,8 @@ using Microsoft.Extensions.Logging;
 namespace Nexo.Infrastructure.Cubicacion;
 
 /// <summary>
-/// Consume el resultado de una escritura/optimización exitosa (issue #28, S2-HU-075;
-/// enriquecido en S3-HU-03, issue #111) y proyecta la base propia de NEXO —
+/// Consume el resultado de una escritura/optimización exitosa y proyecta la base
+/// propia de NEXO —
 /// reactivando tablas que ya existían en el <c>DbContext</c> sin ningún código que las
 /// usara (<c>VehiculosCubicacion</c>, <c>ItemsPlanCargue</c>, <c>ColocacionesCargue</c>).
 ///
@@ -22,10 +22,10 @@ namespace Nexo.Infrastructure.Cubicacion;
 /// reintento propio aquí. La topología (bind al exchange `cubicador.eventos` de
 /// Cubicador) se configura en el registro del bus, no aquí.
 ///
-/// NO hace ninguna llamada saliente a Cubicador (criterio de cierre de S3-HU-03,
-/// issue #111): todo lo que escribe viene del propio evento — nunca reconsulta.
+/// NO hace ninguna llamada saliente a Cubicador: todo lo que escribe viene del
+/// propio evento — nunca reconsulta.
 ///
-/// UPSERT, no solo UPDATE: a diferencia de la versión anterior a S3-HU-03, este
+/// UPSERT, no solo UPDATE: a diferencia de la versión anterior, este
 /// consumer inserta el plan si no existe (crear_plan_demo no deja fila espejo al
 /// publicar — ver docs/mensajeria/CUBICACION.md §6.5 y ADR-planid-generado-por-nexo.md)
 /// y siempre upsertea el vehículo con datos REALES (ya no el stub de solo Id+Nombre que
@@ -81,7 +81,7 @@ public sealed class clsPlanDeCargueGeneradoConsumer(
 
         await db.SaveChangesAsync(ct);
 
-        // Un fallo al avisar NO es un fallo del trabajo (S2-HU-08.1): la verdad sigue en
+        // Un fallo al avisar NO es un fallo del trabajo: la verdad sigue en
         // GET /api/planes-cargue/{id}. Dejar que la excepción suba mandaría este mensaje
         // — que ya cumplió su parte, el plan quedó guardado — a reintentos y DLQ por algo
         // tan ajeno como un navegador desconectado. Mismo criterio que clsAvisarTrabajoConsumer.
@@ -198,7 +198,7 @@ public sealed class clsPlanDeCargueGeneradoConsumer(
 /// Upsert de <see cref="clsVehiculoCubicacion"/> desde el evento de Cubicador — compartido
 /// entre <see cref="clsPlanDeCargueGeneradoConsumer"/> (que trae el vehículo del plan
 /// embebido) y <see cref="clsVehiculoCatalogoConsumer"/> (vehiculo.creado/actualizado
-/// dedicados, S3-HU-03 issue #110/#111), para no duplicar el mapeo evento-a-entidad.
+/// dedicados), para no duplicar el mapeo evento-a-entidad.
 /// </summary>
 internal static class clsVehiculoProyeccion
 {

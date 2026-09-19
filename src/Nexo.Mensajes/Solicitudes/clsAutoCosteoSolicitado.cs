@@ -3,7 +3,7 @@ namespace Nexo.Mensajes.Solicitudes;
 /// <summary>
 /// Se cargaron las líneas de un pliego y hay que costearlas.
 ///
-/// Lo publica la carga masiva; lo consume la saga del auto-costeo (issue #15), que
+/// Lo publica la carga masiva; lo consume la saga del auto-costeo, que
 /// hace el reparto por línea. El <see cref="TrabajoId"/> es el mismo identificador
 /// que el endpoint devolvió al cliente con el 202: es la forma de que quien preguntó
 /// y quien procesa hablen del mismo trabajo.

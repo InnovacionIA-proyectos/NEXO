@@ -1,8 +1,8 @@
 namespace Nexo.Application.Common.Ports;
 
 /// <summary>
-/// Solicita una cubicación (plan de cargue) al microservicio Cubicador — issue #28,
-/// S2-HU-075 (decisión del equipo: MassTransit nativo). NO usa
+/// Solicita una cubicación (plan de cargue) al microservicio Cubicador (decisión del
+/// equipo: MassTransit nativo). NO usa
 /// <see cref="IPublicadorDeMensajes"/> — ese puerto no expone forma de fijar el
 /// routing key del mensaje, y Cubicador espera uno específico
 /// (`cubicacion.solicitada`) en su propio exchange (`cubicador.eventos`), no el
@@ -32,14 +32,14 @@ public interface ICubicacionPort
         CancellationToken ct);
 
     /// <summary>
-    /// S3-HU-02 (issue #103/#104): publica cualquiera de los 8 comandos de escritura del
+    /// Publica cualquiera de los 8 comandos de escritura del
     /// plan de cargue (crear_plan, crear_plan_demo, guardar_vehiculo, guardar_item,
     /// importar_items, eliminar_item, eliminar_plan, ajustar_colocacion) por el MISMO
     /// camino auditable que "optimizar" — mismo exchange, mismos reintentos (1s/5s/15s/
     /// 60s), mismo DLQ y misma alerta por correo, todo configurado una sola vez a nivel
     /// de bus (ver clsMensajeriaDependencyInjection.cs). A propósito NO consulta
     /// <c>IParidadCubicadorPort</c>: son operaciones de datos, no de cálculo — la
-    /// compuerta de paridad solo bloquea "optimizar" (ver HU S3-HU-02, criterio 5).
+    /// compuerta de paridad solo bloquea "optimizar".
     /// </summary>
     /// <param name="tipo">Discriminador que el worker de Cubicador usa para elegir el caso
     /// de uso — uno de los 8 valores listados arriba.</param>

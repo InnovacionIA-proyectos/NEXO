@@ -11,7 +11,7 @@ namespace Nexo.Application.CasosDeUso.Solicitudes;
 /// solicitud") para que otro caso de uso —como clsResolverCatalogosDeLineasCommand, que
 /// alimenta a lineas:bulk desde un formulario de texto libre sin crear la solicitud
 /// completa— use exactamente la misma normalización. Dos normalizadores divergentes
-/// crearían rutas/vehículos duplicados según por dónde entró el texto (issue #131).
+/// crearían rutas/vehículos duplicados según por dónde entró el texto.
 /// </summary>
 public static class clsResolucionDeCatalogos
 {

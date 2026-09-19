@@ -70,7 +70,7 @@ async def obtener_resultado(
         # pedirle las metricas al motor, porque Metricas() copia r.Puntaje/
         # r.PuntajesParciales tal cual a la salida.
         resultado.puntaje = plan.puntaje
-        # Issue #150: igual de necesario para las incidencias - sin esta linea
+        # Igual de necesario para las incidencias - sin esta linea
         # `resultado.incidencias` queda en su default_factory=list (vacio) y
         # `_motor.metricas()` cuenta advertencias/violaciones criticas SIEMPRE en
         # 0, sin importar las incidencias reales ya persistidas en el plan. Mismo

@@ -7,12 +7,12 @@ using Nexo.Application.Common.Ports;
 namespace Nexo.Application.CasosDeUso.PlanDeCargue;
 
 /// <summary>
-/// Pide la optimización de un plan de cargue ya existente (S2-HU-08.1). NO bloquea: dejar
+/// Pide la optimización de un plan de cargue ya existente. NO bloquea: dejar
 /// el plan en "procesando" y publicar a la cola es rápido — el motor corre aparte y el
 /// resultado llega por cola (consumers de Infrastructure: clsPlanDeCargueGeneradoConsumer /
 /// clsCubicacionRechazadaConsumer).
 ///
-/// Cerrada la compuerta de paridad (S2-HU-08.2, #30), esto ni siquiera llega a tocar el
+/// Cerrada la compuerta de paridad, esto ni siquiera llega a tocar el
 /// plan ni a publicar nada: 503 "en verificación" antes de cualquier efecto.
 /// </summary>
 public sealed record clsSolicitarOptimizacionCommand(

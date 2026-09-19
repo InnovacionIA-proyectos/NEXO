@@ -7,7 +7,7 @@ namespace Nexo.Infrastructure.Identidad.Adaptadores;
 /// <summary>
 /// Solo para Desarrollo/QA sin acceso todavía a la base de identidad real del portal.
 /// Se registra ÚNICAMENTE cuando ConnectionStrings:clsIdentidadPortal no está configurada
-/// (clsProgram.cs impide arrancar así en Producción — fail-closed, S2-HU-03.3). No es un
+/// (clsProgram.cs impide arrancar así en Producción — fail-closed). No es un
 /// esquema de rol simulado: no confía en nada que declare el cliente, resuelve el rol
 /// contra un registro REAL ya sembrado en la base local (mismo invariante de seguridad
 /// que el adapter real, solo que la fuente de verdad es la tabla Usuarios local en vez

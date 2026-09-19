@@ -1,6 +1,6 @@
 # Decisión — el score de prioridad usa los 4 pesos documentados, no solo urgencia
 
-**Estado:** aceptada · **Fecha:** 2026-09-18 · **Decide:** Ismael Vasco (decisión técnica, no de negocio — ver issue) · **Issue:** #172 (S4-HU-06.1)
+**Estado:** aceptada · **Fecha:** 2026-09-18 · **Decide:** Ismael Vasco (decisión técnica, no de negocio)
 
 ## La contradicción encontrada
 
@@ -52,13 +52,13 @@ Y el propio repo se contradice a sí mismo sobre cuál es la versión correcta:
 3. El propio `README.md:243-245` (la sección que describe el flujo real de
    negocio, no la sección que describe qué prueba el test) documenta
    explícitamente los 4 factores con pesos configurables.
-4. Medido contra las 387 solicitudes de prueba (issue #174, antes del fix):
+4. Medido contra las 387 solicitudes de prueba (antes del fix):
    337 de 387 solicitudes empatadas en score exactamente 50, y otras 45 en
    exactamente 100 — la firma inequívoca de que el "score" es en realidad solo
    un bucket discreto de urgencia (deadline lejano=0, medio=50, vencido=100),
    no un score real diferenciado. Oportunidades de $9M y $3.9M con **el mismo
    puntaje** porque ambas caían en el mismo bucket de urgencia — exactamente
-   el problema que la HU pide resolver.
+   el problema que se busca resolver.
 
 ## Decisión
 
@@ -66,7 +66,7 @@ Y el propio repo se contradice a sí mismo sobre cuál es la versión correcta:
 tipo, ponderados por `ParametrosScore`). La prueba unitaria actual
 (`Total_es_exclusivamente_la_urgencia_por_deadline` y
 `El_total_no_depende_de_valor_probabilidad_ni_tipo`) documenta un defecto, no
-una regla de negocio real — se reemplaza (issue #173) por pruebas que
+una regla de negocio real — se reemplaza por pruebas que
 verifiquen la suma ponderada real.
 
 Fórmula a implementar:
@@ -78,13 +78,13 @@ total = PesoUrgencia × urgencia + PesoValor × valor + PesoProbabilidad × prob
 Con los defaults actuales de `ParametrosScore` (0.40 / 0.30 / 0.20 / 0.10, que
 ya suman 1.0), el total queda en la misma escala 0-100 que tenía antes.
 
-## Verificación #174 — contra las 409 solicitudes reales de `dbInformesAutomatizados_Pruebas`
+## Verificación — contra las 409 solicitudes reales de `dbInformesAutomatizados_Pruebas`
 
 Corrido `tests/QA/s4-hu-06.3-score-4-pesos-387-solicitudes/verify-score-4-pesos.sql`
 (2026-09-18, solo lectura) contra el dataset real (409 solicitudes al momento de correr,
-más que las 387 del issue porque el dataset crece con el tiempo).
+más que las 387 de la medición original porque el dataset crece con el tiempo).
 
-**La prueba puntual del issue queda confirmada:** las oportunidades de $9.000.000 y
+**La prueba puntual queda confirmada:** las oportunidades de $9.000.000 y
 $3.900.000, que antes compartían score 100.00, ahora quedan en **86.08** y **80.72**
 respectivamente — distintas, como pide el criterio de aceptación.
 
@@ -105,14 +105,14 @@ exactamente `ComponenteUrgencia` sin deadline, `ValorPorDefectoSinValor` y
 **Deadline, ValorEstimado y ProbabilidadCierre en NULL**. Se diferencian solo por Tipo
 porque es el único de los 4 componentes que sí tienen capturado.
 
-**Conclusión:** el fix de #173 funciona como se documentó — los 4 pesos ya ponderan el
-total, y por eso el ejemplo puntual del issue ($9M vs $3.9M) y el empate exacto en
+**Conclusión:** el fix funciona como se documentó — los 4 pesos ya ponderan el
+total, y por eso el ejemplo puntual ($9M vs $3.9M) y el empate exacto en
 50/100 quedan resueltos. Pero la mayoría de las solicitudes en este dataset nunca
 tuvieron deadline/valor/probabilidad capturados, así que ninguna fórmula (ni esta ni
 ninguna otra) puede diferenciarlas mientras esos 3 campos falten en el origen. Ese es un
 problema de captura de datos aguas arriba (en `CrearSolicitudCommand` o en el flujo que
-alimenta esos campos), no un defecto de `ScorePrioridadCalculator` — recomendado abrir un
-issue aparte para decidir si esos campos deben ser obligatorios o tener otro fallback.
+alimenta esos campos), no un defecto de `ScorePrioridadCalculator` — recomendado decidir aparte si esos campos deben ser obligatorios o tener otro
+fallback.
 
 ## Por qué no la otra versión
 

@@ -11,7 +11,7 @@ public record clsSesionActualDto(long Id, string Nombre, RolUsuario Rol, IReadOn
 /// crea sesión: cada petición posterior vuelve a validarse por su cuenta." La identidad
 /// y el rol ya quedaron resueltos por clsIdentidadPortalAuthenticationHandler antes de
 /// llegar acá — este controller solo empaqueta la respuesta; un 401/403 nunca llega
-/// hasta aquí, los produce el esquema de autenticación (S2-HU-03.1).
+/// hasta aquí, los produce el esquema de autenticación.
 /// </summary>
 [ApiController]
 [Route("api/sesion")]

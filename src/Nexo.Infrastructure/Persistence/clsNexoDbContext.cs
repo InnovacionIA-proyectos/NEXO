@@ -406,8 +406,8 @@ public class clsNexoDbContext : DbContext
         // al usuario.
         //
         // Se rompía POST /api/cotizaciones/{id}/lineas —agregar el flete a una cotización,
-        // el camino principal del módulo piloto— y llevaba así desde antes del sprint 2.
-        // No se veía porque la suite de Api.Tests no se corría completa.
+        // el camino principal del módulo piloto— y llevaba así tiempo sin detectarse
+        // porque la suite de Api.Tests no se corría completa.
         //
         // Esto le dice al modelo lo que de verdad pasa: la clave llega puesta y hay que
         // insertarla tal cual.

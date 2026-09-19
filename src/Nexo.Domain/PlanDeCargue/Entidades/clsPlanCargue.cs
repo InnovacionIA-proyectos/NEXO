@@ -95,10 +95,10 @@ public class clsPlanCargue : IAuditable
     public string IncidenciasJson { get; set; } = "[]";
 
     /// <summary>
-    /// S3-HU-03 (issue #111): JSON de MetricasCubicacionDto (cubicador/CONTRATO.md §3.2)
-    /// tal cual llega en el evento enriquecido de plan-de-cargue.generado — igual que
-    /// <see cref="IncidenciasJson"/>, se guarda verbatim (NEXO no recalcula métricas, solo
-    /// proyecta lo que Cubicador ya calculó). Nulo hasta la primera optimización.
+    /// JSON de MetricasCubicacionDto (cubicador/CONTRATO.md §3.2), tal cual llega en el
+    /// evento enriquecido de plan-de-cargue.generado — igual que <see cref="IncidenciasJson"/>,
+    /// se guarda verbatim (NEXO no recalcula métricas, solo proyecta lo que Cubicador ya
+    /// calculó). Nulo hasta la primera optimización.
     /// </summary>
     public string? MetricasJson { get; set; }
 

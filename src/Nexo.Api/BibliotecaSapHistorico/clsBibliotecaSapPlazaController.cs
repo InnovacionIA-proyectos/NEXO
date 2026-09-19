@@ -31,12 +31,11 @@ public class clsBibliotecaSapPlazaController(
     /// por texto (código DIVIPOLA de origen/destino o detalles), línea de negocio,
     /// vehículo, carrocería y clase de viaje.
     ///
-    /// Issue #156: medido en vivo, ~22,8 K filas — "top" nunca dejaba ver más allá
-    /// de las primeras 50-200, sin aviso de que el resto existía, aunque `total`
-    /// ya viajaba en la respuesta. "page" (1-based, opcional, default 1) agrega
-    /// el `Skip` que faltaba; "top" sigue siendo el tamaño de página. Mismo shape
-    /// de respuesta que siempre (`{ total, items }`) — cambio aditivo, no rompe a
-    /// quien ya consume esto sin "page".
+    /// Medido en vivo, ~22,8 K filas: "top" nunca dejaba ver más allá de las
+    /// primeras 50-200, sin aviso de que el resto existía aunque `total` ya
+    /// viajaba en la respuesta. "page" (1-based, opcional, default 1) agrega
+    /// el `Skip` que faltaba; "top" sigue siendo el tamaño de página. Cambio
+    /// aditivo: mismo shape de respuesta de siempre (`{ total, items }`).
     /// </summary>
     [HttpGet]
     [EnableRateLimiting(clsRateLimitingExtensions.PoliticaListadosPesados)]

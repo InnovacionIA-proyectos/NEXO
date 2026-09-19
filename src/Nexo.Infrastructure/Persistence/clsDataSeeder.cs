@@ -41,9 +41,9 @@ public static class clsDataSeeder
         var sl2 = new clsUsuario { Nombre = "Jorge Organista", Email = "jorganista@boterosoto.com.co", Rol = RolUsuario.ServiciosLogisticos }; // edge: sin identidad del portal
         var admin1 = new clsUsuario { Nombre = "Paola Restrepo", Email = "prestrepo@boterosoto.com.co", Rol = RolUsuario.Admin, IdentidadPortalId = 1005 };
         var admin2 = new clsUsuario { Nombre = "Albert Blanco", Email = "ablanco@boterosoto.com.co", Rol = RolUsuario.Admin, IdentidadPortalId = 1006 };
-        // Issue #187: faltaba un Comercial sembrado - la mayoría de los comandos de
-        // escritura de S3-HU-02 (plan de cargue) exigen ese rol, y sin este usuario no
-        // había forma de probarlos localmente con X-Portal-clsUsuario-Id sin sembrar uno a mano.
+        // Faltaba un Comercial sembrado - la mayoría de los comandos de escritura de
+        // plan de cargue exigen ese rol, y sin este usuario no había forma de probarlos
+        // localmente con X-Portal-clsUsuario-Id sin sembrar uno a mano.
         var com1 = new clsUsuario { Nombre = "Mariana Ospina", Email = "mospina@boterosoto.com.co", Rol = RolUsuario.Comercial, IdentidadPortalId = 1007 };
         db.Usuarios.AddRange(coord1, coord2, coord3, coord4, lider1, lider2, sl1, sl2, admin1, admin2, com1);
 

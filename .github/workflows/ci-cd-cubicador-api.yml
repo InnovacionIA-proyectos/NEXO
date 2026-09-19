@@ -1,7 +1,5 @@
 name: CI/CD Cubicador-API
 
-# S3-HU-11.2/11.5 (issues #135/#138).
-#
 # Los `paths` de este workflow y los de ci-cd-cubicador-worker.yml son
 # IDENTICOS a proposito. No es copia-pega olvidada: es la consecuencia de dos
 # hechos verificados del repo.
@@ -26,7 +24,8 @@ name: CI/CD Cubicador-API
 # Separar por carpeta de nivel superior (cubicador/api/** aca,
 # cubicador/worker/** alla) ya estaba mal en la practica, no solo en teoria:
 # worker/main.py importa `api.dependencias` y `api.dtos.plan_cargue`, que es
-# justo donde vivia el bug 10.2 (#132) — un cambio bajo cubicador/api/ que
+# justo donde vivia el bug 2 (ver docs/CI_CD_RUTAS_COMPARTIDAS.md) — un cambio
+# bajo cubicador/api/ que
 # rompia al WORKER.
 on:
   push:
@@ -82,7 +81,7 @@ jobs:
             -H "X-GitHub-Event: push" ^
             -d "{\"ref\":\"${{ github.ref }}\",\"repository\":{\"full_name\":\"${{ github.repository }}\"}}"
 
-      # Issue #163: mismo razonamiento que ci-cd-api.yml - el webhook de arriba
+      # Mismo razonamiento que ci-cd-api.yml - el webhook de arriba
       # solo confirma que Dokploy RECIBIO la orden, nunca que termino el
       # build/deploy real. Este paso detecta al menos "el contenedor nuevo
       # nunca volvio a responder" (crash/timeout de arranque), con reintentos

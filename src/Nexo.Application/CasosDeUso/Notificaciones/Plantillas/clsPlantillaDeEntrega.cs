@@ -10,7 +10,7 @@ namespace Nexo.Application.CasosDeUso.Notificaciones.Plantillas;
 /// a quién se notifica y cuándo, la otra es cómo se ve el correo. Mezcladas, cualquier
 /// ajuste de redacción obliga a tocar el archivo donde vive la lógica de la notificación.
 ///
-/// S2-HU-06.2 (#22): el destinatario ahora es quien SOLICITÓ la consulta (no un
+/// El destinatario ahora es quien SOLICITÓ la consulta (no un
 /// "comercial responsable" externo), así que el saludo y el cuerpo se ajustan a eso —
 /// confirma que Nexo entregó SU solicitud, no una notificación genérica de cliente.
 /// Redacción sujeta a revisión final de negocio antes de producción; el contenido en sí

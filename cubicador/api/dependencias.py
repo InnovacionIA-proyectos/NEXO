@@ -74,9 +74,9 @@ def obtener_vehiculo_repo(
     sesion: AsyncSession = Depends(obtener_db),
     publisher: RabbitMqEventosPublisher = Depends(obtener_eventos_publisher),
 ) -> SqlVehiculoCubicacionRepository:
-    # Issue #162: el publisher es necesario para que listar_con_siembra()
-    # pueda publicar vehiculo.creado por cada preset nuevo que siembre - ver
-    # ese metodo en infrastructure/persistence/repositorios/vehiculo_repo.py.
+    # El publisher es necesario para que listar_con_siembra() pueda publicar
+    # vehiculo.creado por cada preset nuevo que siembre - ver ese metodo en
+    # infrastructure/persistence/repositorios/vehiculo_repo.py.
     return SqlVehiculoCubicacionRepository(sesion, publisher)
 
 

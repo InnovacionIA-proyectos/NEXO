@@ -8,7 +8,7 @@ using Nexo.Mensajes.Cubicacion;
 namespace Nexo.Application.CasosDeUso.PlanDeCargue;
 
 /// <summary>
-/// S3-HU-02 (issue #104): alta/edición de un ítem del plan — POST
+/// Alta/edición de un ítem del plan — POST
 /// /api/planes-cargue/{id}/items. <c>Id</c> nulo = alta; con <c>Id</c> = edición (upsert),
 /// misma semántica que el POST síncrono de Cubicador que este comando reemplaza.
 /// </summary>

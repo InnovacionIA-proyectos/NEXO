@@ -4,9 +4,8 @@ namespace Nexo.Mensajes.Cubicacion;
 /// Contrato de mensajes con el microservicio Cubicador (carpeta cubicador/ de este
 /// mismo repo, Python + aio_pika — ver cubicador/CONTRATO.md sección 6).
 ///
-/// Estos SÍ son mensajes reales de MassTransit (issue #28, S2-HU-075 — decisión del
-/// equipo: MassTransit nativo, no un cliente RabbitMQ crudo del lado de NEXO):
-/// `clsCubicacionSolicitada` se publica con `IPublishEndpoint`
+/// Son mensajes reales de MassTransit (MassTransit nativo, no un cliente RabbitMQ crudo
+/// del lado de NEXO): `clsCubicacionSolicitada` se publica con `IPublishEndpoint`
 /// (`Infrastructure/Cubicacion/clsCubicacionPublicadorAdapter.cs`) y
 /// `clsPlanDeCargueGenerado`/`clsCubicacionRechazada` se consumen con `IConsumer&lt;T&gt;`
 /// reales (`clsPlanDeCargueGeneradoConsumer`/`clsCubicacionRechazadaConsumer`) — heredan la
@@ -19,45 +18,39 @@ namespace Nexo.Mensajes.Cubicacion;
 /// `cfg.Publish&lt;T&gt;()`/`ReceiveEndpoint` con `Bind()` manual). Cubicador, del otro
 /// lado, no adopta MassTransit — solo aprendió a hablar su "sobre" JSON mínimo en estos
 /// 2 puntos de cruce (ver cubicador/infrastructure/mensajeria/rabbitmq.py y
-/// cubicador/docs/DECISIONES_TECNICAS.md #12). Ver docs/mensajeria/CUBICACION.md para
-/// el detalle completo.
+/// cubicador/docs/DECISIONES_TECNICAS.md). Ver docs/mensajeria/CUBICACION.md para el
+/// detalle completo.
 /// </summary>
 
 /// <summary>
 /// Comando saliente: NEXO -> Cubicador, routing key `cubicacion.solicitada`.
 /// Mismo shape que espera `worker/main.py::_ejecutar_solicitud`.
 ///
-/// `clsSolicitud` es <c>object</c> a propósito (S3-HU-02, issue #103): los 9 tipos que hoy
-/// viajan en este único sobre ("optimizar" + los 8 comandos de escritura del plan de
+/// `clsSolicitud` es <c>object</c> a propósito: los 10 tipos que viajan en este único
+/// sobre ("optimizar", "crear_desde_linea" y los demás comandos de escritura del plan de
 /// cargue) tienen cada uno su propio payload. Reutilizar EL MISMO tipo de mensaje en vez
-/// de crear 9 records de MassTransit distintos es lo que permite que los 8 nuevos hereden
-/// gratis la topología ya verificada en producción para "optimizar" (mismo exchange
-/// `cubicador.eventos`, mismos reintentos 1s/5s/15s/60s, mismo DLQ, misma alerta —
-/// configurados una sola vez, a nivel de bus, en clsMensajeriaDependencyInjection.cs) sin
-/// tocar esa configuración. La validación de CUÁL payload le corresponde a cada "Tipo" la
-/// hace <see cref="clsCubicacionSolicitadaValidador"/> con un patrón de tipo en tiempo de
-/// ejecución — funciona porque la validación corre ANTES de serializar, sobre la misma
-/// instancia en memoria con la que se construyó el mensaje.
-///
-/// [S3-HU-04.3, issue #78] "crear_desde_linea" (<see cref="clsCrearPlanDesdeLineaInput"/>) se
-/// suma como un décimo Tipo — el worker de Cubicador ya lo implementa desde antes (ver
-/// cubicador/worker/main.py), solo faltaba que NEXO lo publicara en vez de que lo disparara
-/// el navegador directo.
+/// de crear un record de MassTransit por tipo es lo que permite que todos hereden la
+/// misma topología (mismo exchange `cubicador.eventos`, mismos reintentos 1s/5s/15s/60s,
+/// mismo DLQ, misma alerta — configurados una sola vez, a nivel de bus, en
+/// clsMensajeriaDependencyInjection.cs) sin tocar esa configuración. La validación de CUÁL
+/// payload le corresponde a cada "Tipo" la hace <see cref="clsCubicacionSolicitadaValidador"/>
+/// con un patrón de tipo en tiempo de ejecución — funciona porque la validación corre
+/// ANTES de serializar, sobre la misma instancia en memoria con la que se construyó el
+/// mensaje.
 /// </summary>
 public sealed record clsCubicacionSolicitada(
     string Tipo, string PlanId, string CorrelationId, object clsSolicitud);
 
-/// <summary>Payload de "optimizar" (S2-HU-08.1) y de "reoptimizar".</summary>
+/// <summary>Payload de "optimizar" y de "reoptimizar".</summary>
 public sealed record clsSolicitudDeCubicacion(
     string Estrategia, string Algoritmo, int? Semilla, object? Ponderaciones, bool RespetarBloqueadas);
 
 // ---------------------------------------------------------------------------------
-// Payloads de los 8 comandos nuevos (S3-HU-02, issue #103). Cada uno espeja 1:1 el DTO
+// Payloads de los comandos de escritura del plan de cargue. Cada uno espeja 1:1 el DTO
 // de Cubicador citado en cubicador/CONTRATO.md §3.2 (mismos campos, PascalCase acá,
 // camelCase en el JSON por JsonSerializerDefaults.Web — Cubicador los recibe con el
 // mismo alias camelCase por `to_camel` en api/dtos/comun.py::ApiModel). Ver
-// docs/mensajeria/CUBICACION.md y el contrato publicado en la issue #108 para el
-// detalle completo de cada endpoint.
+// docs/mensajeria/CUBICACION.md para el detalle completo de cada endpoint.
 // ---------------------------------------------------------------------------------
 
 /// <summary>"crear_plan" — espeja clsCrearPlanRequest. El plan lo crea Cubicador con el
@@ -69,14 +62,12 @@ public sealed record clsCrearPlanInput(string Nombre, string VehiculoId);
 public sealed record clsCrearPlanDemoInput;
 
 /// <summary>
-/// [S3-HU-04.3, issue #78] "crear_desde_linea" — dispara la generación de la flota
-/// (uno o más vehículos, ver <c>cubicador/application/plan_cargue/desde_linea.py</c>) a
-/// partir de las posiciones de una línea de solicitud ya cotizada (botón "Cubicar" de la
-/// Mesa de Costeo). El worker de Cubicador YA implementa este Tipo desde antes de esta HU
-/// (verificado contra <c>cubicador/worker/main.py</c>) — este payload es lo único que
-/// faltaba del lado de NEXO para poder publicarlo. <c>LineaSolicitudId</c> espeja el mismo
-/// campo (camelCase) que <c>worker/main.py</c> lee como <c>solicitud["lineaSolicitudId"]</c>.
-/// Ver <see cref="Application.CasosDeUso.PlanDeCargue.clsCrearPlanDesdeLineaCommand"/>.
+/// "crear_desde_linea" — dispara la generación de la flota (uno o más vehículos, ver
+/// <c>cubicador/application/plan_cargue/desde_linea.py</c>) a partir de las posiciones de
+/// una línea de solicitud ya cotizada (botón "Cubicar" de la Mesa de Costeo).
+/// <c>LineaSolicitudId</c> espeja el mismo campo (camelCase) que <c>worker/main.py</c> lee
+/// como <c>solicitud["lineaSolicitudId"]</c>. Ver
+/// <see cref="Application.CasosDeUso.PlanDeCargue.clsCrearPlanDesdeLineaCommand"/>.
 /// </summary>
 public sealed record clsCrearPlanDesdeLineaInput(string LineaSolicitudId);
 
@@ -147,8 +138,8 @@ public sealed record clsEliminarPlanInput;
 ///
 /// Cierra el par de "guardar_vehiculo": el frontend llama <c>eliminarVehiculo()</c>
 /// (cubicador-api.service.ts) y sin este comando esa única escritura seguiría saliendo
-/// del navegador directo a Cubicador con la API key en el bundle — lo que impide cerrar
-/// S3-HU-05 (retirar el CORS y rotar la clave), que exige CERO llamadas de navegador.
+/// del navegador directo a Cubicador con la API key en el bundle, impidiendo retirar el
+/// CORS y rotar la clave (cero llamadas de navegador a Cubicador).
 ///
 /// Puede ser rechazado con VEHICULO_EN_USO: Cubicador se niega a borrar un vehículo con
 /// planes de cargue asociados (application/plan_cargue/vehiculos.py::eliminar_vehiculo).
@@ -173,17 +164,17 @@ public sealed record clsAjustarColocacionInput(
 /// Evento entrante: Cubicador -> NEXO, routing key `plan-de-cargue.generado`.
 /// Mismo shape que publica `RabbitMqEventosPublisher.publicar_plan_generado`.
 ///
-/// S3-HU-03 (issue #110/#111): enriquecido — antes <c>Resultado</c> solo traía
-/// {estado, puntaje, colocaciones: int} (el CONTEO); ahora trae el <c>clsResultadoPlanDto</c>
-/// completo de Cubicador (items, colocaciones con geometría, métricas, incidencias) para
-/// que <see cref="Infrastructure.Cubicacion.clsPlanDeCargueGeneradoConsumer"/> proyecte la
-/// base de NEXO sin volver a consultar a Cubicador. Tamaño medido ANTES de este cambio
-/// en docs/decisiones/medicion-evento-enriquecido-plan-cargue.md (issue #109).
+/// <c>Resultado</c> trae el <c>clsResultadoPlanDto</c> completo de Cubicador (items,
+/// colocaciones con geometría, métricas, incidencias), no solo {estado, puntaje,
+/// colocaciones: int}, para que
+/// <see cref="Infrastructure.Cubicacion.clsPlanDeCargueGeneradoConsumer"/> proyecte la
+/// base de NEXO sin volver a consultar a Cubicador. Tamaño medido en
+/// docs/decisiones/medicion-evento-enriquecido-plan-cargue.md.
 ///
-/// [S3-HU-04.3, issue #78] LIMITACIÓN CONOCIDA: cuando "crear_desde_linea" reparte la carga
-/// en varios vehículos, hoy solo se publica UN evento de estos, para el primer plan de la
-/// flota (ver worker/main.py::_ejecutar_solicitud) — los vehículos 2..N no llegan acá. Ver
-/// la nota completa en <see cref="Application.CasosDeUso.PlanDeCargue.clsCrearPlanDesdeLineaCommand"/>.
+/// LIMITACIÓN CONOCIDA: cuando "crear_desde_linea" reparte la carga en varios vehículos,
+/// hoy solo se publica UN evento de estos, para el primer plan de la flota (ver
+/// worker/main.py::_ejecutar_solicitud) — los vehículos 2..N no llegan acá. Ver la nota
+/// completa en <see cref="Application.CasosDeUso.PlanDeCargue.clsCrearPlanDesdeLineaCommand"/>.
 /// </summary>
 public sealed record clsPlanDeCargueGenerado(string CorrelationId, string PlanId, clsResultadoDeCubicacion Resultado);
 
@@ -235,14 +226,14 @@ public sealed record clsIncidenciaValidacionEvento(
 public sealed record clsCubicacionRechazada(string CorrelationId, string PlanId, string Codigo, string Mensaje);
 
 // ---------------------------------------------------------------------------------
-// S3-HU-03 (issue #110/#111): catálogo de vehículos. Cubicador es la fuente de verdad
-// (ver ADR-planid-generado-por-nexo.md sobre por qué NEXO no la posee) — estos 2 eventos
+// Catálogo de vehículos. Cubicador es la fuente de verdad (ver
+// ADR-planid-generado-por-nexo.md sobre por qué NEXO no la posee) — estos 2 eventos
 // mantienen la proyección de NEXO (`VehiculosCubicacion`) al día para que
-// GET /api/vehiculos (issue #112) nunca tenga que preguntarle a Cubicador en caliente.
+// GET /api/vehiculos nunca tenga que preguntarle a Cubicador en caliente.
 // ---------------------------------------------------------------------------------
 
 /// <summary>Evento entrante: Cubicador -> NEXO, routing key `vehiculo.creado` — publicado
-/// cuando `guardar_vehiculo` (S3-HU-02) crea una fila nueva (Id no existía antes).</summary>
+/// cuando `guardar_vehiculo` crea una fila nueva (Id no existía antes).</summary>
 public sealed record clsVehiculoCreado(string CorrelationId, clsVehiculoCubicacionEvento Vehiculo);
 
 /// <summary>Evento entrante: Cubicador -> NEXO, routing key `vehiculo.actualizado` —

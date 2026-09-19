@@ -7,7 +7,7 @@ es la referencia que usa quien SÍ va a encenderlo.
 
 ---
 
-## 1. Compuerta de paridad del plan de cargue (S2-HU-08.2, issue #30)
+## 1. Compuerta de paridad del plan de cargue
 
 > ✅ **ENCENDIDA en Dokploy (ambiente Pre-Despliegue-BACKEND) el
 > 2026-09-14.** Autorizado por Kevin Cano (@kcano-ux). Ver "Encendido
@@ -40,13 +40,13 @@ esta configuración a medias).
 
 ### A qué evidencia está enlazado
 
-**S2-HU-07.3** (hotspot H5, "paridad automatizada") — el criterio de cierre
+**Hotspot H5** ("paridad automatizada") — el criterio de cierre
 es **26/26** casos dorados coincidiendo exacto entre el motor C# original y
 el motor Python de Cubicador (`cubicador/tests/paridad/
 test_paridad_casos_dorados.py`).
 
 > ⚠️ **Corrección**: esta sección decía que la suite corre en
-> `cubicador-ci.yml`. Ese workflow **ya no existe** — se retiró en S3-HU-11.
+> `cubicador-ci.yml`. Ese workflow **ya no existe** — fue retirado.
 > Hoy la misma suite corre dentro de `_cubicador-pruebas.yml` (workflow
 > reusable, job "Pruebas unitarias y de integracion (pytest)"), invocado por
 > `ci-cd-cubicador-api.yml` y `ci-cd-cubicador-worker.yml` en cada push/PR
@@ -57,11 +57,11 @@ DECISIONES_TECNICAS.md` sección 3 y `cubicador/README.md`).
 
 ### De quién es la decisión
 
-**Kevin Cano (@kcano-ux).** Ninguna otra HU de este repo enciende esta
-compuerta por defecto — S3-HU-05 (issue #118) explícitamente la dejó
-enlazada, sin ejecutar. Ver `PENDIENTES.md`, sección "Encendido de la
+**Kevin Cano (@kcano-ux).** Ninguna otra iniciativa de este repo enciende esta
+compuerta por defecto — el cierre de CORS y rotación de claves de Cubicador
+(sección 2) explícitamente la dejó enlazada, sin ejecutar. Ver `PENDIENTES.md`, sección "Encendido de la
 función de plan de cargue", para el detalle completo de la decisión
-original (S2-HU-08.2).
+original.
 
 ### Encendido confirmado (2026-09-14)
 
@@ -97,16 +97,16 @@ Cubicacion__ParidadFecha=2026-09-14
 
 ---
 
-## 2. Cierre de CORS y rotación de claves de Cubicador (S3-HU-05)
+## 2. Cierre de CORS y rotación de claves de Cubicador
 
 Ya ejecutado — se deja acá como registro, no como pendiente:
 
 - `CUBICADOR_CORS_ORIGENES` retirada por completo (código + `.env`/
-  `.env.example`/`docker-compose.yml`) — issue #116. Confirmado antes de
-  retirarla: S3-HU-04 (visor 3D en `administracion_embarqa_nexo`) cerrada y
-  verificada en QA, ningún navegador llama a Cubicador directo.
+  `.env.example`/`docker-compose.yml`). Confirmado antes de
+  retirarla: el visor 3D en `administracion_embarqa_nexo` cerrado y
+  verificado en QA, ningún navegador llama a Cubicador directo.
 - `CUBICADOR_API_KEY` y el par `NEXO_CALLBACK_API_KEY`/
-  `Cubicador3D__InboundApiKey` rotados — issue #117. El valor que estuvo
+  `Cubicador3D__InboundApiKey` rotados. El valor que estuvo
   expuesto en el bundle público del portal queda inválido.
 
 **Pendiente de quien tenga acceso al ambiente real (fuera de este repo)**:

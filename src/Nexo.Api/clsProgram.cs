@@ -49,7 +49,7 @@ using Microsoft.EntityFrameworkCore;
 // (Tablero del Líder). Cubicación 3D y Plan de Cargue son un microservicio
 // Python aparte (carpeta cubicador/ de este mismo repo) — NEXO no reimplementa
 // el motor, solo le pide trabajos y recibe resultados por cola vía MassTransit
-// (issue #28, S2-HU-075, ver AddMensajeria() y docs/mensajeria/CUBICACION.md).
+// (ver AddMensajeria() y docs/mensajeria/CUBICACION.md).
 // -----------------------------------------------------------------------------
 
 var builder = WebApplication.CreateBuilder(args);
@@ -102,8 +102,8 @@ builder.Services.AddScoped<ICurrentUser, clsCurrentUser>();
 builder.Services.AddScoped<Nexo.Application.Common.ICurrentUserPort>(sp => sp.GetRequiredService<ICurrentUser>());
 
 // --------------------------------------------------------------- Autenticación / Autorización
-// S2-HU-03.3: fail-closed. Nexo no tiene login propio (docs/contrato-integracion, D1) — la
-// única fuente de identidad es la tabla de usuarios/permisos del portal. Sin ella configurada,
+// Fail-closed: Nexo no tiene login propio (docs/contrato-integracion, D1) — la única
+// fuente de identidad es la tabla de usuarios/permisos del portal. Sin ella configurada,
 // el arranque en Producción falla aquí mismo, antes de exponer un solo endpoint.
 var identidadPortalConfigurada = !string.IsNullOrWhiteSpace(builder.Configuration.GetConnectionString("clsIdentidadPortal"));
 if (builder.Environment.IsProduction() && !identidadPortalConfigurada)
@@ -149,8 +149,8 @@ builder.Services.Configure<ForwardedHeadersOptions>(o =>
     o.KnownProxies.Clear();
 });
 
-// Issue #168: rate limiting básico (por rol/IP) en los endpoints de listado más
-// pesados - ver clsRateLimitingExtensions para el detalle de las dos políticas.
+// Rate limiting básico (por rol/IP) en los endpoints de listado más pesados —
+// ver clsRateLimitingExtensions para el detalle de las dos políticas.
 builder.Services.AddRateLimitingNexo();
 
 // --------------------------------------------------------------- Controllers + JSON
@@ -172,11 +172,11 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 // El backend lo consumen dos clientes con orígenes distintos: el frontend standalone
-// (desarrollo) y el módulo cabina-fletes dentro del portal de la Administración
-// (S2-HU-02.2) — el portal tiene su propio dominio por ambiente (QA, Producción) y
-// Nexo mantiene su propia URL base (docs/contrato-integracion/README.md, sección 7),
-// así que la llamada del portal es cross-origin. Por eso la configuración admite una
-// lista, no un único origen.
+// (desarrollo) y el módulo cabina-fletes dentro del portal de la Administración —
+// el portal tiene su propio dominio por ambiente (QA, Producción) y Nexo mantiene
+// su propia URL base (docs/contrato-integracion/README.md, sección 7), así que la
+// llamada del portal es cross-origin. Por eso la configuración admite una lista,
+// no un único origen.
 const string ClientesCors = "clientes";
 var origenesPermitidos = (builder.Configuration["Cors:OrigenesPermitidos"] ?? "http://localhost:5173")
     .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
@@ -253,8 +253,8 @@ app.MapHub<clsTrabajosHub>("/hubs/trabajos");
 // trabajo. Meterle la bandeja dejaría el nombre mintiendo.
 app.MapHub<clsBandejaHub>("/hubs/bandeja");
 
-// Plan de cargue (S2-HU-08): aparte de /hubs/trabajos por la misma razón que la bandeja
-// — un plan de cargue no tiene líneas pendientes ni reintentos técnicos, forzar esa
+// Plan de cargue: aparte de /hubs/trabajos por la misma razón que la bandeja — un
+// plan de cargue no tiene líneas pendientes ni reintentos técnicos, forzar esa
 // forma dejaría el nombre mintiendo.
 app.MapHub<clsPlanCargueHub>("/hubs/plan-cargue");
 // /health responde JSON con el detalle por chequeo, no solo "Healthy"/"Unhealthy".

@@ -7,13 +7,13 @@ using Nexo.Mensajes.Cubicacion;
 namespace Nexo.Application.CasosDeUso.PlanDeCargue;
 
 /// <summary>
-/// S3-HU-02 (issue #104): da de alta un vehículo/contenedor — POST /api/vehiculos. El
-/// vehiculoId lo genera NEXO (criterio 1 de la HU: "genera el vehiculoId"); la fila REAL
-/// (dimensiones, ejes, presets) vive únicamente en la base de Cubicador — NEXO no
-/// mantiene espejo de vehículos (ver issue #108, limitación documentada: hoy nada en NEXO
-/// lee <c>VehiculosCubicacion</c> salvo el stub que <see cref="clsCrearPlanCommand"/> asegura
-/// para no romper su FK). Por eso este comando no toca ninguna fila propia ni resuelve
-/// fallos de Cubicador con un aviso — solo publica y responde 202.
+/// Da de alta un vehículo/contenedor — POST /api/vehiculos. El
+/// vehiculoId lo genera NEXO; la fila REAL (dimensiones, ejes, presets) vive únicamente
+/// en la base de Cubicador — NEXO no mantiene espejo de vehículos (limitación conocida:
+/// hoy nada en NEXO lee <c>VehiculosCubicacion</c> salvo el stub que
+/// <see cref="clsCrearPlanCommand"/> asegura para no romper su FK). Por eso este comando
+/// no toca ninguna fila propia ni resuelve fallos de Cubicador con un aviso — solo
+/// publica y responde 202.
 /// </summary>
 public sealed record clsGuardarVehiculoCommand(
     string Nombre,

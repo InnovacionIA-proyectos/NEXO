@@ -1,4 +1,4 @@
-"""Smoke test POST-DEPLOY de RabbitMQ (S3-HU-11.4, issue #137).
+"""Smoke test POST-DEPLOY de RabbitMQ.
 
 RabbitMQ no tiene código fuente propio en este repo (su imagen es
 `build/Dockerfile.rabbit`, RabbitMQ oficial + el plugin de retardo que
@@ -41,8 +41,9 @@ EXCHANGE = "cubicador.eventos"
 # (nombre de cola, routing key esperada) — ver MensajeriaDependencyInjection.cs
 # (lado NEXO) y worker/main.py (lado Cubicador) para el origen de cada una.
 # "cubicador.optimizar" es la ÚNICA cola que atienden los 9 comandos que
-# valida CubicacionSolicitadaValidador (optimizar + los 8 de S3-HU-02) más
-# crear_desde_linea — los 10 se despachan por el campo "tipo" dentro del
+# valida CubicacionSolicitadaValidador (optimizar + los 8 comandos de
+# escritura del plan de cargue) más crear_desde_linea — los 10 se
+# despachan por el campo "tipo" dentro del
 # mismo mensaje, así que un solo binding basta.
 COLAS_Y_ROUTING_KEYS_ESPERADAS: list[tuple[str, str]] = [
     ("cubicador.optimizar", "cubicacion.solicitada"),

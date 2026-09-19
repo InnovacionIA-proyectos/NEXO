@@ -14,7 +14,7 @@ namespace Nexo.Application.CasosDeUso.Solicitudes;
 /// orden de llegada. Por defecto (atención 'pendientes') es la COLA DE TRABAJO:
 /// solo solicitudes con líneas SIN flete.
 ///
-/// Issue #166: pagina (page 1-based, pageSize) - a diferencia de los listados
+/// Pagina (page 1-based, pageSize) - a diferencia de los listados
 /// paginados en SQL (Skip/Take antes de traer las filas), acá el score se
 /// recalcula en memoria por fila con "ahora" (el score persistido se congela al
 /// capturar), así que la paginación se aplica DESPUÉS de traer y ordenar todo lo

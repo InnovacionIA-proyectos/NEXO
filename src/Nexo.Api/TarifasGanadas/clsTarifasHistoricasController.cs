@@ -23,8 +23,8 @@ public class clsTarifasHistoricasController(
     /// Con ruta/vehículo → sugerencias para el costeo (siempre las 10 más recientes, sin
     /// paginar — es una sugerencia puntual, no un listado a recorrer). Con
     /// q/mercancia/vigencia/origen → búsqueda filtrada de la Biblioteca, PAGINADA
-    /// (issue #166: page/pageSize, respuesta `{ items, total }`). Sin nada → las más
-    /// recientes sin paginar (mismo comportamiento que "sugerir").
+    /// (page/pageSize, respuesta `{ items, total }`). Sin nada → las más recientes
+    /// sin paginar (mismo comportamiento que "sugerir").
     ///
     /// El shape de la respuesta depende de la rama (array plano vs. `{items,total}`) -
     /// a propósito, son dos casos de uso distintos que comparten ruta desde el original;

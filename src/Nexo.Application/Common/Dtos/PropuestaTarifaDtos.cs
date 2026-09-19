@@ -10,7 +10,7 @@ namespace Nexo.Application.Common.Dtos;
 // ---------------------------------------------------------------------------
 
 /// <summary>
-/// Issue #169: <paramref name="Advertencia"/> es no-nulo cuando el candidato NO es un
+/// <paramref name="Advertencia"/> es no-nulo cuando el candidato NO es un
 /// match exacto de las reglas de negocio (A/B/C de clsTarifarioSapAdapter) sino el
 /// fallback conservador ("mayor valor vigente") — ej. el peso de la línea excede el
 /// límite de todas las tarifas vigentes para ese vehículo, o el vehículo no resolvió en

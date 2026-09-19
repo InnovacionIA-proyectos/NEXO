@@ -9,8 +9,7 @@ namespace Nexo.Infrastructure.Cubicacion;
 /// <summary>
 /// Implementa <see cref="ICubicacionPort"/> con <see cref="IPublishEndpoint"/> de
 /// MassTransit directo — MassTransit real, con el Outbox transaccional de NEXO
-/// (issue #28, S2-HU-075, decisión del equipo: MassTransit nativo, todo sigue
-/// viajando por RabbitMQ).
+/// (decisión del equipo: MassTransit nativo, todo sigue viajando por RabbitMQ).
 ///
 /// NO usa <see cref="IPublicadorDeMensajes"/> (el puerto genérico del resto de
 /// NEXO) porque ese puerto no expone forma de fijar el ROUTING KEY en el

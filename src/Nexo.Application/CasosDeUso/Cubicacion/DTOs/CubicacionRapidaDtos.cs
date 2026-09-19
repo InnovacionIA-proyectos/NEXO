@@ -1,7 +1,7 @@
 namespace Nexo.Application.CasosDeUso.Cubicacion.DTOs;
 
 /// <summary>
-/// [S3-HU-04.3, issue #78, sección 8.2] Espejo 1:1 del contrato HTTP de
+/// Espejo 1:1 del contrato HTTP de
 /// <c>POST /api/cubicacion</c> de Cubicador (<c>cubicador/api/dtos/cubicacion_rapida.py</c>).
 /// A propósito NO hay mapeo de dominio: es cálculo puro sin persistencia, NEXO solo
 /// reenvía la solicitud y devuelve la respuesta tal cual — ver

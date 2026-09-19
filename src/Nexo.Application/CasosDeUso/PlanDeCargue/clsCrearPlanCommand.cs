@@ -9,8 +9,8 @@ using Nexo.Mensajes.Cubicacion;
 namespace Nexo.Application.CasosDeUso.PlanDeCargue;
 
 /// <summary>
-/// S3-HU-02 (issue #104): crea un plan de cargue nuevo — POST /api/planes-cargue. El
-/// PlanId lo genera NEXO acá (no Cubicador, ver criterio 1 de la HU): la fila espejo
+/// Crea un plan de cargue nuevo — POST /api/planes-cargue. El
+/// PlanId lo genera NEXO acá (no Cubicador): la fila espejo
 /// queda de inmediato en NEXO, y el comando "crear_plan" le pide a Cubicador crear la
 /// fila REAL con ese mismo id en su propia base. Si Cubicador la rechaza (p.ej.
 /// vehiculoId inexistente en su catálogo), <c>clsCubicacionRechazadaConsumer</c> marca esta
@@ -30,10 +30,10 @@ namespace Nexo.Application.CasosDeUso.PlanDeCargue;
 /// "procesando", la fila aparece cuando llega el aviso).
 ///
 /// A propósito NO pasa por <c>IParidadCubicadorPort</c>: es una operación de datos, no de
-/// cálculo (HU S3-HU-02, criterio 5) — a diferencia de <see cref="clsSolicitarOptimizacionCommand"/>.
+/// cálculo — a diferencia de <see cref="clsSolicitarOptimizacionCommand"/>.
 ///
 /// Decisión de que el planId lo genera NEXO (no Cubicador): ver
-/// docs/decisiones/ADR-planid-generado-por-nexo.md (issue #102, S3-HU-01.2).
+/// docs/decisiones/ADR-planid-generado-por-nexo.md.
 /// </summary>
 public sealed record clsCrearPlanCommand(string Nombre, Guid VehiculoId) : ICommand<clsSolicitudDeCubicacionAceptadaDto>;
 

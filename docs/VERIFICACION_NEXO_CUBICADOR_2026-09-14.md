@@ -2,8 +2,8 @@
 
 > **Actualización 2026-09-14, tarde — retest post-fix de disco.** Tras
 > liberar espacio en el host de Dokploy y redesplegar, se repitió toda la
-> batería de pruebas contra la misma URL. Resultado: **los 16 endpoints de
-> S3-HU-02/S3-HU-03 ya están y funcionan de punta a punta contra el
+> batería de pruebas contra la misma URL. Resultado: **los 16 endpoints del
+> plan de cargue ya están y funcionan de punta a punta contra el
 > Cubicador real** (`crear_plan_demo` verificado en vivo: el plan de prueba
 > apareció proyectado en NEXO en segundos). El ÚNICO bloqueo que queda es la
 > compuerta de paridad, que sigue cerrada (`503
@@ -27,7 +27,7 @@ una variable de entorno faltante y se documentan los hallazgos.
      — comportamiento esperado y documentado, pendiente de que Kevin Cano
      confirme la evidencia de paridad (ver `docs/CHECKLIST_DESPLIEGUE.md`).
   2. **El build desplegado en Dokploy es más viejo que la rama actual**: le
-     faltan TODOS los endpoints de S3-HU-02/S3-HU-03 (crear plan, ítems,
+     faltan TODOS los endpoints del plan de cargue (crear plan, ítems,
      catálogo de vehículos, proyección de lectura del visor 3D). Confirmado
      contra `swagger.json` real del despliegue — ver sección 4.2. Esto es
      independiente de la compuerta de paridad: aunque se abriera la
@@ -164,12 +164,12 @@ Se descargó el `swagger.json` real del despliegue
 /api/planes-cargue/{id}/optimizar
 ```
 
-Eso es exactamente la superficie de **S2-HU-08** (la HU original). **Ninguno**
-de los endpoints agregados por S3-HU-02 (crear plan, ítems, ajustar
-colocación, catálogo de vehículos — 9 endpoints) ni por S3-HU-03 (7
-endpoints de lectura del visor 3D: `GET /api/vehiculos`, `GET
+Eso es exactamente la superficie original de Plan de Cargue. **Ninguno**
+de los endpoints agregados después — los comandos de escritura (crear plan,
+ítems, ajustar colocación, catálogo de vehículos — 9 endpoints) ni la
+proyección de lectura del visor 3D (7 endpoints: `GET /api/vehiculos`, `GET
 /api/planes-cargue` listado, `/resultado`, `/flota`, `/metricas`,
-`/no-cargadas`, `/exportar`) está en ese `swagger.json`. Confirmado también
+`/no-cargadas`, `/exportar`) — está en ese `swagger.json`. Confirmado también
 por comportamiento real:
 
 - `POST /api/planes-cargue/demo` → `405 Method Not Allowed` (la ruta no
@@ -178,8 +178,8 @@ por comportamiento real:
 - `GET /api/vehiculos` → `404`.
 
 **Esto significa que el build corriendo en Dokploy es más viejo que el
-código que está en esta rama** (`Pre-Despliegue-BACKEND`, donde S3-HU-02/03
-ya existen y se probaron funcionando en el punto 3.2). Dokploy está
+código que está en esta rama** (`Pre-Despliegue-BACKEND`, donde esos
+endpoints ya existen y se probaron funcionando en el punto 3.2). Dokploy está
 construyendo desde un commit/rama anterior a esos cambios, o el redeploy
 automático no se disparó tras el último merge.
 
@@ -193,8 +193,8 @@ código: el build es idéntico al que corrió bien en local en este mismo día
 (sección 3). Dokploy no reemplaza el contenedor si el build no termina, así
 que sigue sirviendo la última imagen que sí compiló — de ahí que el
 `swagger.json` real (sección 4.2) sea más viejo que esta rama: **todos los
-redeploys posteriores a S3-HU-02/03 han estado fallando en silencio por
-disco lleno**, no por un rechazo de despliegue.
+redeploys posteriores a agregar esos endpoints han estado fallando en
+silencio por disco lleno**, no por un rechazo de despliegue.
 
 **Qué revisar en el host de Dokploy (por SSH/terminal del propio Dokploy),
 no en este repo:**
@@ -208,7 +208,7 @@ docker system df           # confirmar que bajó
 ```
 
 Con el disco liberado, reintentar el deploy de `Pre-Despliegue-BACKEND` —
-debería traer ya los endpoints de S3-HU-02/03 (punto 4.2 resuelto). Vale la
+debería traer ya esos endpoints (punto 4.2 resuelto). Vale la
 pena revisar también si el segundo despliegue duplicado que mencionaste
 (mismo puerto, misma red) dejó imágenes/volúmenes huérfanos ocupando disco
 antes de apagarlo.
@@ -219,7 +219,7 @@ antes de apagarlo.
 |---|---|---|---|
 | 1 | `Cubicador3D__InboundApiKey` puede llegar vacía si se copia el `.env` tal cual a un `docker-compose` | Cualquier despliegue por compose | Puente inverso (`crear_desde_linea`) 401 siempre — **corregido en este `.env`, ver sección 2** |
 | 2 | Compuerta de paridad cerrada (`Cubicacion:ParidadVerificada`) | Dokploy (API de NEXO) | `POST /optimizar` responde 503 siempre — decisión de negocio pendiente (Kevin Cano), no un bug |
-| 3 | **Build desplegado en Dokploy no tiene S3-HU-02/S3-HU-03** — causa raíz confirmada: el host de Dokploy se queda sin disco durante `dotnet restore` (`No space left on device`), así que todo redeploy desde S3-HU-02/03 viene fallando en silencio y sigue sirviendo la imagen vieja | Host de Dokploy (disco) | Faltan 16 endpoints de Plan de Cargue completos — liberar disco (`docker builder prune -af`, `docker image prune -af`) y reintentar el deploy |
+| 3 | **Build desplegado en Dokploy no tiene los 16 endpoints de Plan de Cargue** — causa raíz confirmada: el host de Dokploy se queda sin disco durante `dotnet restore` (`No space left on device`), así que todo redeploy desde que se agregaron esos endpoints viene fallando en silencio y sigue sirviendo la imagen vieja | Host de Dokploy (disco) | Faltan 16 endpoints de Plan de Cargue completos — liberar disco (`docker builder prune -af`, `docker image prune -af`) y reintentar el deploy |
 | 4 | No se pudo verificar si el `worker` de Cubicador está desplegado como app separada en Dokploy, ni la conectividad Dokploy↔RabbitMQ↔Cubicador | Dokploy (solo se dio la URL de NEXO, no la de Cubicador) | Sin poder confirmarlo desde afuera — pendiente que confirmes cuántas apps de Dokploy existen para `cubicador/` |
 
 ## 6. Próximos pasos recomendados
@@ -261,7 +261,7 @@ Mismo `swagger.json` real descargado de nuevo:
 /api/vehiculos/{id}
 ```
 
-**Los 16 endpoints de S3-HU-02/S3-HU-03 ya están** (punto 3 de la tabla de
+**Los 16 endpoints del plan de cargue ya están** (punto 3 de la tabla de
 la sección 5, resuelto).
 
 Probado en vivo contra esa URL:
@@ -364,7 +364,7 @@ redeploy parcial, conviene revisar los logs de la app específica
 involucrada (en este caso, el worker, no la API) antes de asumir que el
 problema está en la que sí se redesplegó.
 
-## 11. Verificación local tras cerrar S3-HU-04.3 al 20/20 (2026-09-14, noche)
+## 11. Verificación local tras cerrar los 20/20 endpoints (2026-09-14, noche)
 
 Nuevos commits desde la sección 10: `774de8c` (fix real de producción: el
 worker de Cubicador podía atascarse por completo) y `dce27f8` (agrega
@@ -426,10 +426,10 @@ Salud, los 6 roles, `demo → optimizar → optimizado` con métricas reales, y
 al final: **0 mensajes en todas las colas, incluida `cubicacion.dlq`**, sin
 colas `_error`.
 
-## 10. Verificación local tras S3-HU-04.3 (2026-09-14, tarde-noche) — nuevos endpoints + bug real encontrado y corregido
+## 10. Verificación local tras los nuevos endpoints de línea (2026-09-14, tarde-noche) — nuevos endpoints + bug real encontrado y corregido
 
 Se pidió repetir la verificación local completa después de varios commits
-nuevos, el más relevante `ccaa795` ([S3-HU-04.3], issue #78): agrega
+nuevos, el más relevante `ccaa795`: agrega
 `POST /api/planes-cargue/desde-linea/{lineaId}`,
 `GET /api/planes-cargue/por-linea/{lineaId}` y
 `GET /api/planes-cargue/{id}/colocaciones`. El propio commit avisa que NO se
@@ -507,7 +507,7 @@ después de resolver la causa raíz de la sección 8.0 (caché de build):
 |---|---|---|
 | 1 | `GET /health` | `200 Healthy` — `masstransit-bus` y `database` OK |
 | 2 | `GET /api/sesion/actual`, los 6 roles (ivasco/kcano/bquintero/jpvelez/scalderon/dguerra) | `200`, los 6 resuelven con su rol correcto |
-| 3 | `GET /api/planes-cargue`, `GET /api/vehiculos` (S3-HU-02/03) | `200` ambos |
+| 3 | `GET /api/planes-cargue`, `GET /api/vehiculos` | `200` ambos |
 | 4 | `GET /api/lineas-solicitud/{id}/cubicacion` sin Bearer / con Bearer incorrecto / con `Cubicador3D__InboundApiKey` real de Dokploy | `401` / `401` / **`404`** (autentica correctamente; 404 es "línea no existe", no un fallo de auth) |
 | 5 | Flujo completo `POST /demo` → `POST /{id}/optimizar` → `GET /{id}` | `202` → `202` → **`estado: "optimizado"`, `puntaje 59.00`, `59 colocaciones`** — motor real de Cubicador, no mock |
 
@@ -524,8 +524,8 @@ Kevin Cano (@kcano-ux) autorizó encender la compuerta de paridad
 (`Domain.PlanDeCargue.Reglas.CompuertaDeParidad`) para el ambiente Dokploy
 "Pre-Despliegue-BACKEND". No había una corrida de GitHub Actions ya
 enlazada como evidencia formal (ver `docs/CHECKLIST_DESPLIEGUE.md`, que
-además tenía una referencia desactualizada a `cubicador-ci.yml`, retirado en
-S3-HU-11) ni acceso a `gh`/Actions desde esta sesión para traer una — en su
+además tenía una referencia desactualizada a `cubicador-ci.yml`, ya
+retirado) ni acceso a `gh`/Actions desde esta sesión para traer una — en su
 lugar se corrió la MISMA suite de paridad de forma directa y verificable,
 contra el código exacto del commit desplegado.
 

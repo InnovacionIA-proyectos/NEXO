@@ -1,16 +1,17 @@
-# S2-HU-09.2 (issue #32) — Dataset de tarifas de plaza provisionales, validado por negocio
+# Dataset de tarifas de plaza provisionales, validado por negocio
 
 Rama: `32-s2-hu-092-set-de-datos-provisionales-realistas-validado-por-el-negocio`.
 
-Issue #34 ("QA de reglas con fuente provisional") está bloqueada por #32 (esta HU) y
-#33. Esta HU cubre **#32: construir y validar el dataset**. Conectar ese dataset al
-motor de costeo real (un valor `FuenteFlete.Provisional` o equivalente) es trabajo de
-**#33**, fuera de alcance aquí — hoy `ReglaDeCosteo` no consume este dataset.
+Este documento cubre construir y validar el dataset. Conectar ese dataset al
+motor de costeo real (un valor `FuenteFlete.Provisional` o equivalente) queda
+fuera de alcance aquí, como trabajo aparte — hoy `ReglaDeCosteo` no consume
+este dataset. La validación de las reglas contra esta fuente provisional
+también queda pendiente, como trabajo aparte.
 
 ## Archivos
 
 - **[`dataset-tarifas-plaza-provisionales.json`](./dataset-tarifas-plaza-provisionales.json)**
-  — estructurado, para cuando #33 lo consuma.
+  — estructurado, para cuando el motor de costeo lo consuma.
 - **[`dataset-tarifas-plaza-provisionales.xlsx`](./dataset-tarifas-plaza-provisionales.xlsx)**
   — documento de revisión para negocio (hojas: Leame, Núcleo, Vigencia vencida,
   Valores extremos, Sin plaza, Hallazgo vehículo vacío, **Aprobación**).
@@ -77,7 +78,7 @@ de negocio**, valores entre **$700.000 y $9.949.761** (promedio $4.637.389).
 | Sin plaza | 15 | Las 15 rutas más frecuentes en el histórico (`tblSAPTarifasLog`) que **hoy no tienen ninguna fila** en `tblSAPTarifas` — ausencia real, no un valor nulo. La más frecuente: Cúcuta↔Buenaventura, 59 apariciones históricas |
 
 No se encontró ninguna fila con `Valor` no numérico (texto en vez de número) en toda
-la tabla — a diferencia del dataset de pliego de la HU anterior, aquí ese subcaso
+la tabla — a diferencia del dataset de pliego anterior, aquí ese subcaso
 específico de "malformado" no existe en los datos reales, así que no se incluyó
 inventado.
 
@@ -226,7 +227,8 @@ no resuelve contra ningún catálogo** (se probó primero contra `tblSAPTiposVeh
 tabla equivocada, es de otro dominio — y luego contra la correcta,
 `tblSAPTiposVehiculoTarifario`). Documentado en la hoja "Hallazgo - vehículo vacío"
 del Excel, con conteo completo por código y una muestra de 5 filas reales. No forma
-parte del núcleo ni de los casos borde "oficiales" de la HU, pero es información que
+parte del núcleo ni de los casos borde "oficiales" de este trabajo, pero es
+información que
 el Administrador de Fletes debería conocer al revisar.
 
 ## Consultas SQL exactas (reproducibles)
@@ -305,13 +307,13 @@ Nuevo escenario en
 `Propuesta calculada con datos de plaza provisionales realistas`. No existía en el
 repo (se confirmó por búsqueda exhaustiva antes de escribirlo). Usa este dataset
 como `Dado`, y queda etiquetado dejando explícito que el mecanismo real de consumo
-(que `ReglaDeCosteo`/`PropuestaTarifaAdapter` lean de esta fuente) depende de la
-issue #33, todavía no construida.
+(que `ReglaDeCosteo`/`PropuestaTarifaAdapter` lean de esta fuente) depende de
+trabajo aparte, todavía no construido.
 
 ## Fuera de alcance (declarado)
 
 - No se agrega `FuenteFlete.Provisional` ni ningún cambio al motor de costeo real
-  — es #33.
+  — queda como trabajo aparte.
 - No se valida este dataset contra `ReglaDeCosteo` — esa regla no tiene hoy ninguna
   noción de "fuente provisional" a la que aplicarse.
 - La aprobación es autoaprobación del equipo, según lo acordado explícitamente —

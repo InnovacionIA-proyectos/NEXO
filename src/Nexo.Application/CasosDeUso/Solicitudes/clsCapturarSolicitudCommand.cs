@@ -219,7 +219,7 @@ public sealed class clsCapturarSolicitudCommandHandler(
             // devolver nada (p. ej. la propia clsSolicitud no se pudo leer), no por una fuente
             // caída en una línea puntual — eso ya lo aísla ProponerAsync internamente
             // (ver clsPropuestaTarifaAdapter.ProponerAsync, por-grupo). Aun así se deja un
-            // motivo explícito en vez de un PorCostear mudo (issue #131).
+            // motivo explícito en vez de un PorCostear mudo.
             foreach (var linea in solicitud.Lineas)
                 linea.MotivoPendiente = $"No se pudo consultar la Biblioteca: {ex.Message}";
             return (0, solicitud.Lineas.Count);

@@ -1,6 +1,6 @@
-# Topología de mensajería (issue #13, S2-HU-041)
+# Topología de mensajería
 
-Documento de cierre del criterio "topología documentada" de la HU. No es
+Documento de referencia del criterio "topología documentada". No es
 teoría: cada tabla de este documento se verificó contra un broker RabbitMQ
 real (`docker compose up`, API de administración en `:15672`) — ver
 `tests/QA/13-s2-hu-041-aprovisionar-rabbitmq-y-topologia-de-mensajeria/README.md`
@@ -72,8 +72,8 @@ estado (`EstadoAutoCosteo`).
 | `AvisarTrabajo` | `AvisarTrabajoConsumer` | `TrabajoActualizado` | Sí |
 | `PliegoRepartido`, `LineaCosteada`, `LineaFalloTecnico`, `LineaRequiereTarifaManual`, `RepartirLineasDeCosteo`, `RecostearLineaSolicitada`, `TarifasActualizadas`, `TrabajoActualizado`, `ExpiracionAutoCosteo` | `AlertaDeFalloConsumer<T>` (uno por tipo) | `Fault<T>` | — (solo escucha fallos) |
 
-**Por qué la lista de `AlertaDeFalloConsumer<T>` es explícita y no automática**
-(issue #13): MassTransit 8.5 no soporta registrar un `IConsumer<Fault<T>>`
+**Por qué la lista de `AlertaDeFalloConsumer<T>` es explícita y no automática:**
+MassTransit 8.5 no soporta registrar un `IConsumer<Fault<T>>`
 genérico ABIERTO contra `IRegistrationConfigurator` — se intentó
 `x.AddConsumer(typeof(AlertaDeFalloConsumer<>))` y falló en runtime con
 `Type.ContainsGenericParameters is true` (verificado, no es una suposición).
@@ -108,7 +108,7 @@ propiedad del tipo del mensaje, no del consumer. Por esto
 `AlertaDeFalloConsumer<T>` recibe el fallo sin importar si su propia cola
 "normal" quedó con nombre corto o completo.
 
-## 5. Alerta al equipo (issue #13, lo nuevo de esta HU)
+## 5. Alerta al equipo
 
 `AlertaDeFalloConsumer<T>` (`src/Nexo.Infrastructure/Common/
 Mensajeria/AlertaDeFalloConsumer.cs`):

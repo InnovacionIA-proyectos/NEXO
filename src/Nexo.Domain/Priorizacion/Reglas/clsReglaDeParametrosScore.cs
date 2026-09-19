@@ -5,9 +5,9 @@ namespace Nexo.Domain.Priorizacion.Reglas;
 /// <summary>
 /// Qué tiene que cumplir una recalibración del score para poder guardarse.
 ///
-/// Desde el fix de issue #173 (ver
-/// docs/decisiones/score-prioridad-4-pesos-vs-solo-urgencia.md), los 4 pesos SÍ entran
-/// en el total: <see cref="clsScorePrioridadCalculator"/> devuelve
+/// Los 4 pesos entran en el total (ver
+/// docs/decisiones/score-prioridad-4-pesos-vs-solo-urgencia.md):
+/// <see cref="clsScorePrioridadCalculator"/> devuelve
 /// <c>PesoUrgencia·urgencia + PesoValor·valor + PesoProbabilidad·probabilidad + PesoTipo·tipo</c>.
 /// Por eso deben sumar 1.0: con otra suma el score dejaría de estar en escala 0–100 y los
 /// puntajes de antes y después de recalibrar no se podrían comparar.

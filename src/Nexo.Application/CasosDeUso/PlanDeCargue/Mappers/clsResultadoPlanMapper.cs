@@ -7,10 +7,10 @@ using Nexo.Mensajes.Cubicacion;
 namespace Nexo.Application.CasosDeUso.PlanDeCargue.Mappers;
 
 /// <summary>
-/// S3-HU-03 (issue #112): arma <see cref="clsResultadoPlanDto"/> (GET .../resultado,
-/// /exportar, y la base de /metricas y /no-cargadas) desde la proyección local — nunca
-/// consulta a Cubicador. Un solo mapeo compartido para no repetirlo en cada endpoint
-/// (mismo criterio que <c>ResultadoPlanReader</c> del lado de Cubicador).
+/// Arma <see cref="clsResultadoPlanDto"/> (GET .../resultado, /exportar, y la base de
+/// /metricas y /no-cargadas) desde la proyección local — nunca consulta a Cubicador. Un
+/// solo mapeo compartido para no repetirlo en cada endpoint (mismo criterio que
+/// <c>ResultadoPlanReader</c> del lado de Cubicador).
 /// </summary>
 public static class clsResultadoPlanMapper
 {

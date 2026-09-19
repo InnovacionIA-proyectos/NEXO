@@ -19,7 +19,7 @@ public record clsCubicarRequest(IReadOnlyList<clsItemCubicacionRequest> Items, I
 }
 
 /// <summary>
-/// [S3-HU-04.3, issue #78] Reemplaza el POST que <c>cubicar()</c>
+/// Reemplaza el POST que <c>cubicar()</c>
 /// (<c>captura-api.service.ts</c>, usado por <c>captura-page</c> y <c>mesa-costeo-page</c>)
 /// hacía directo contra Cubicador con la clave compartida. Mismos roles que el resto de
 /// Cubicación porque las dos pantallas que lo usan pertenecen a Comercial (captura) y a

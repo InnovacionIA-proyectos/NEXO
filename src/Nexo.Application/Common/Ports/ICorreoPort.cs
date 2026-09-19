@@ -7,8 +7,8 @@ public sealed record clsAdjuntoDeCorreo(string Nombre, byte[] Contenido);
 /// Un correo listo para salir.
 ///
 /// Los destinatarios van en lista y no en un solo campo porque el relay corporativo
-/// admite varios, y porque la #22 va a derivar el destinatario de la sesión — mejor que
-/// la forma del puerto no tenga que cambiar otra vez para eso.
+/// admite varios, y porque una futura notificación podría derivar el destinatario de la
+/// sesión — mejor que la forma del puerto no tenga que cambiar otra vez para eso.
 /// </summary>
 /// <param name="Metadatos">
 /// Pares clave/valor que la salida guarda junto al correo. Sirven para responder "¿se

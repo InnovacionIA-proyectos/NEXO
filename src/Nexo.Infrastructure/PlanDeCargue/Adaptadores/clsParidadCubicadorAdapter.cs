@@ -6,7 +6,7 @@ using Microsoft.Extensions.Logging;
 namespace Nexo.Infrastructure.PlanDeCargue.Adaptadores;
 
 /// <summary>
-/// S2-HU-08.2 (#30): lee la evidencia de paridad de configuración y aplica la regla de
+/// Lee la evidencia de paridad de configuración y aplica la regla de
 /// negocio (Domain.PlanDeCargue.Reglas.clsCompuertaDeParidad). Tres claves, no una:
 ///
 /// - <c>Cubicacion:ParidadVerificada</c> (bool) — el interruptor.
@@ -25,7 +25,7 @@ public sealed class clsParidadCubicadorAdapter(IConfiguration config, ILogger<cl
     {
         get
         {
-            // Issue #183: config.GetValue<bool>(...) usa Convert.ChangeType, que lanza
+            // config.GetValue<bool>(...) usa Convert.ChangeType, que lanza
             // FormatException sin controlar con el valor por defecto real de esta clave
             // (cadena vacía, no ausente): un despliegue nuevo sin encender la compuerta
             // crasheaba con 500 en vez de responder el 503 documentado.

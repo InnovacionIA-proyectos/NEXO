@@ -53,8 +53,8 @@ public static class DependencyInjection
     /// vivo), Solicitudes/Captura, Servicios Conexos, Tarifas Ganadas, Tarifas
     /// SICE-TAC admin, Métricas y Plan de Cargue (orquestación por colas contra el
     /// motor Cubicador, microservicio Python aparte — ver PENDIENTES.md). Única
-    /// excepción HTTP declarada a ese "por colas": <see cref="ICubicacionRapidaPort"/>
-    /// (S3-HU-04.3, issue #78), ver el comentario de esa interfaz.
+    /// excepción HTTP declarada a ese "por colas": <see cref="ICubicacionRapidaPort"/>,
+    /// ver el comentario de esa interfaz.
     /// </summary>
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration config)
     {
@@ -86,15 +86,14 @@ public static class DependencyInjection
                 options.UseSqlServer(dwSice, sql =>
                 {
                     sql.EnableRetryOnFailure(maxRetryCount: 3, maxRetryDelay: TimeSpan.FromSeconds(5), errorNumbersToAdd: null);
-                    // Issue #167: tblRutasSicetac (~2.14M filas) no tiene NINGÚN índice sobre
+                    // tblRutasSicetac (~2.14M filas) no tiene NINGÚN índice sobre
                     // Periodo/NombreRuta/Configuracion/NombreUnidadTransporte - NEXO no
-                    // gestiona el esquema de esa base (clsDwSiceDbContext es solo lectura, sin
-                    // migraciones propias: la tabla la mantiene el ETL del DW corporativo),
-                    // así que el índice real es una petición al equipo de datos, no un fix
-                    // de código acá. Mientras tanto, el default de 30s de SqlClient coincide
-                    // exactamente con el síntoma reportado ("Execution Timeout Expired" al
-                    // filtrar) - subirlo evita el 500 duro en consultas legítimamente lentas
-                    // sin pretender resolver la causa raíz.
+                    // gestiona el esquema de esa base (clsDwSiceDbContext es solo lectura,
+                    // sin migraciones propias: la mantiene el ETL del DW corporativo), así
+                    // que el índice real es una petición al equipo de datos, no un fix de
+                    // código acá. El default de 30s de SqlClient coincide con el síntoma
+                    // reportado ("Execution Timeout Expired" al filtrar) - subirlo evita el
+                    // 500 duro en consultas legítimamente lentas sin resolver la causa raíz.
                     sql.CommandTimeout(90);
                 }));
         }
@@ -110,11 +109,11 @@ public static class DependencyInjection
                     sql.EnableRetryOnFailure(maxRetryCount: 3, maxRetryDelay: TimeSpan.FromSeconds(5), errorNumbersToAdd: null)));
         }
 
-        // Identidad del portal de la Administración (S2-HU-03, docs/contrato-integracion,
-        // sección 7): SOLO LECTURA, misma familia que los demás DW. A diferencia de esos,
-        // sin esta cadena NO se degrada a un adapter "no configurado" — clsProgram.cs impide
-        // arrancar así en Producción (fail-closed, S2-HU-03.3); en Desarrollo/QA sin la
-        // fuente real todavía, se registra un adapter local contra la tabla Usuarios
+        // Identidad del portal de la Administración (docs/contrato-integracion, sección
+        // 7): SOLO LECTURA, misma familia que los demás DW. A diferencia de esos, sin
+        // esta cadena NO se degrada a un adapter "no configurado" — clsProgram.cs impide
+        // arrancar así en Producción (fail-closed); en Desarrollo/QA sin la fuente real
+        // todavía, se registra un adapter local contra la tabla Usuarios
         // (clsResolverIdentidadPortalLocalAdapter) para no bloquear el trabajo del equipo.
         var identidadPortal = config.GetConnectionString("clsIdentidadPortal");
         var identidadPortalConfigurada = !string.IsNullOrWhiteSpace(identidadPortal);
@@ -197,8 +196,8 @@ public static class DependencyInjection
         services.AddScoped<ITarifarioSapPort, clsTarifarioSapAdapter>();
         services.AddScoped<IPropuestaTarifaPort, clsPropuestaTarifaAdapter>();
 
-        // S2-HU-09 (#31/#33): conexión SAP nueva (plaza en vivo), todavía inexistente.
-        // "Deshabilitado" (default) y "Real" (sin adaptador real todavía) resuelven al
+        // Conexión SAP nueva (plaza en vivo), todavía inexistente. "Deshabilitado"
+        // (default) y "Real" (sin adaptador real todavía) resuelven al
         // MISMO adaptador que nunca produce candidato — las fuentes de lectura reales
         // que hoy operan (DwSice, DwCubos, DbSolucionesTi) no se tocan. Sin conmutar
         // código, solo config: SapTarifaFleteEnVivo:Modo.
@@ -241,17 +240,17 @@ public static class DependencyInjection
         // Métricas (Tablero del Líder)
         services.AddScoped<IMetricasPort, clsMetricasAdapter>();
 
-        // Plan de cargue (S2-HU-08): orquestación por colas contra el motor Cubicador
+        // Plan de cargue: orquestación por colas contra el motor Cubicador
         // (ICubicacionPort lo registra AddMensajeria(), no este método) + compuerta de
-        // paridad (S2-HU-08.2, #30).
+        // paridad.
         services.AddScoped<IPlanCargueRepository, clsEfPlanCargueRepository>();
-        // S3-HU-03 (issue #112): catálogo de vehículos, proyectado por clsVehiculoCatalogoConsumer.
+        // Catálogo de vehículos, proyectado por clsVehiculoCatalogoConsumer.
         services.AddScoped<IVehiculoCubicacionRepository, clsEfVehiculoCubicacionRepository>();
         services.AddScoped<IParidadCubicadorPort, clsParidadCubicadorAdapter>();
         // Puente de solo lectura hacia Solicitudes para el Cubicador (crear-desde-línea).
         services.AddScoped<ILineaSolicitudCubicacionPort, clsLineaSolicitudCubicacionAdapter>();
 
-        // [S3-HU-04.3, issue #78] cubicar() (captura-api.service.ts): único método de
+        // cubicar() (captura-api.service.ts): único método de
         // Cubicación sin cola ni proyección posibles (cálculo puro, sin persistencia) — ver
         // ICubicacionRapidaPort para por qué esto SÍ es una llamada HTTP saliente, a
         // diferencia de todo lo demás de este módulo. Sin las dos claves configuradas, se

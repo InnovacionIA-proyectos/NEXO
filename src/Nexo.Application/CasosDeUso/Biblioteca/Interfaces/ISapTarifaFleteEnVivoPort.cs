@@ -4,13 +4,13 @@ using Nexo.Application.Common.Dtos;
 namespace Nexo.Application.CasosDeUso.Biblioteca.Interfaces;
 
 /// <summary>
-/// S2-HU-09.1 (#31): contrato de la conexión SAP NUEVA — la tarifa de plaza en vivo
+/// Contrato de la conexión SAP NUEVA: la tarifa de plaza en vivo
 /// (equivalente en tiempo real a <c>getConsultarTarifaFlete</c>), que hoy NO existe
 /// (ni real ni como réplica): "el equipo de conexiones" todavía no la construye. NO
 /// confundir con <see cref="ITarifarioSapPort"/>, que sigue siendo la fuente REAL de
-/// plaza (réplica de <c>DbSolucionesTi</c>) y no se toca — esta HU solo mockea lo NUEVO.
+/// plaza (réplica de <c>DbSolucionesTi</c>) y no se toca — este puerto solo mockea lo NUEVO.
 ///
-/// CONTRATO DE DATOS (obligatorio documentar por el criterio de cierre de #31):
+/// CONTRATO DE DATOS (documentación obligatoria):
 ///
 /// Entrada — reutiliza <see cref="clsConsultaTarifarioSap"/> (ya documentado, ya es la
 /// forma que consume el resto del motor de propuesta): Origen/Destino (nombres de
@@ -21,7 +21,7 @@ namespace Nexo.Application.CasosDeUso.Biblioteca.Interfaces;
 /// Salida — <see cref="clsCandidatoTarifaDto"/>:
 ///   - <c>Fuente</c>: SIEMPRE un valor que empiece por <c>"sap_en_vivo"</c> (nunca
 ///     <c>"plaza"</c> a secas, que es el tag de la fuente real vía DbSolucionesTi) —
-///     así la trazabilidad de origen (#33) nunca confunde una propuesta con datos
+///     así la trazabilidad de origen nunca confunde una propuesta con datos
 ///     provisionales con una de la fuente real.
 ///   - <c>Valor</c>: tarifa de plaza en COP, ya neta (sin impuestos), positiva.
 ///   - <c>Detalle</c>: descripción legible para mostrar al usuario (ruta, vehículo,
@@ -39,7 +39,7 @@ namespace Nexo.Application.CasosDeUso.Biblioteca.Interfaces;
 /// Null: sin candidato para esa ruta/vehículo (no es un error, es "no hay dato"),
 /// exactamente igual semántica que <see cref="ITarifarioSapPort"/>.
 ///
-/// SUSTITUCIÓN FUTURA (criterio central de la HU): el día que "el equipo de
+/// SUSTITUCIÓN FUTURA: el día que "el equipo de
 /// conexiones" construya la integración real, se agrega un adaptador nuevo que
 /// implemente esta MISMA interfaz y se cambia UNA línea en DependencyInjection.cs
 /// (configuración `SapTarifaFleteEnVivo:Modo`). Ni <c>clsReglaDeCosteo</c> ni

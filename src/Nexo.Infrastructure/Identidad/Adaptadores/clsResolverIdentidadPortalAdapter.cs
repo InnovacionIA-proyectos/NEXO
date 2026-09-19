@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Nexo.Infrastructure.Identidad.Adaptadores;
 
 /// <summary>
-/// Implementación real (Producción/QA) de S2-HU-03.1/03.2: consulta la tabla de la
+/// Implementación real (Producción/QA): consulta la tabla de la
 /// administración en cada llamada (sin caché de sesión), traduce sus roles a uno de los
 /// 6 de Nexo vía <see cref="clsMapeoRolPortal"/>, y mantiene sincronizada la cuenta local
 /// que sirve de autoría real para clsAuditLog (docs/contrato-integracion, sección 1 y

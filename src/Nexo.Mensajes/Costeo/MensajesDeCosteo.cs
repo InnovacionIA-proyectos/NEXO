@@ -31,7 +31,7 @@ public sealed record clsRepartirLineasDeCosteo(Guid TrabajoId, Guid SolicitudId)
 /// </summary>
 public sealed record clsPliegoRepartido(Guid TrabajoId, Guid SolicitudId, int TotalLineas);
 
-/// <summary>Costear una línea. Lo atiende el consumidor de costeo (issue #16).</summary>
+/// <summary>Costear una línea. Lo atiende el consumidor de costeo.</summary>
 public sealed record clsCostearLineaSolicitada(Guid TrabajoId, Guid SolicitudId, Guid LineaId);
 
 /// <summary>Línea resuelta por el servicio, con la fuente que gobernó la propuesta.</summary>

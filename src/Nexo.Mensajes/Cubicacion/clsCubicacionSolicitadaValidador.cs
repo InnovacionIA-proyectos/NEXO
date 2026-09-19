@@ -3,25 +3,23 @@ namespace Nexo.Mensajes.Cubicacion;
 /// <summary>Invariantes de <see cref="clsCubicacionSolicitada"/> — ver clsPublicadorValidado
 /// (falla cerrado sin este validador registrado).
 ///
-/// S3-HU-02 (issue #103): extendido de 1 a 9 "Tipo" posibles ("optimizar" + los 8
-/// comandos de escritura del plan de cargue). Cada Tipo exige un <c>clsSolicitud</c> del
-/// shape concreto correspondiente (ver MensajesDeCubicacion.cs) — el patrón de tipo en
-/// tiempo de ejecución funciona porque este validador corre ANTES de publicar, sobre la
-/// misma instancia en memoria con la que <see cref="Infrastructure.Cubicacion.clsCubicacionPublicadorAdapter"/>
-/// construyó el mensaje (no hay que deserializar nada).
-///
-/// [S3-HU-04.3, issue #78] Ahora son 10: se suma "crear_desde_linea".</summary>
+/// Soporta 10 "Tipo" posibles ("optimizar", "crear_desde_linea" y los demás comandos de
+/// escritura del plan de cargue). Cada Tipo exige un <c>clsSolicitud</c> del shape concreto
+/// correspondiente (ver MensajesDeCubicacion.cs) — el patrón de tipo en tiempo de ejecución
+/// funciona porque este validador corre ANTES de publicar, sobre la misma instancia en
+/// memoria con la que <see cref="Infrastructure.Cubicacion.clsCubicacionPublicadorAdapter"/>
+/// construyó el mensaje (no hay que deserializar nada).</summary>
 public sealed class clsCubicacionSolicitadaValidador : IValidadorDeMensaje<clsCubicacionSolicitada>
 {
     private static readonly HashSet<string> TiposConocidos = new(StringComparer.Ordinal)
     {
         "optimizar", "crear_plan", "crear_plan_demo", "guardar_vehiculo", "guardar_item",
         "importar_items", "eliminar_item", "eliminar_plan", "ajustar_colocacion",
-        // Cierra el par de "guardar_vehiculo": sin el, esa escritura seguiria saliendo
-        // del navegador y S3-HU-05 no puede cerrar. Ver clsEliminarVehiculoInput.
+        // Cierra el par de "guardar_vehiculo": sin él, esa escritura seguiría saliendo
+        // directo del navegador. Ver clsEliminarVehiculoInput.
         "eliminar_vehiculo",
-        // [S3-HU-04.3, issue #78] El worker de Cubicador ya implementa este tipo desde
-        // antes de esta HU (cubicador/worker/main.py) — ver clsCrearPlanDesdeLineaCommand.
+        // El worker de Cubicador ya implementa este tipo (cubicador/worker/main.py) —
+        // ver clsCrearPlanDesdeLineaCommand.
         "crear_desde_linea",
     };
 
@@ -134,7 +132,7 @@ public sealed class clsCubicacionSolicitadaValidador : IValidadorDeMensaje<clsCu
             motivos.Add("clsSolicitud.VehiculoId debe ser un GUID válido.");
     }
 
-    /// <summary>[S3-HU-04.3, issue #78] "crear_desde_linea".</summary>
+    /// <summary>Valida el payload de "crear_desde_linea".</summary>
     private static void ValidarCrearDesdeLinea(object solicitud, List<string> motivos)
     {
         if (solicitud is not clsCrearPlanDesdeLineaInput s)

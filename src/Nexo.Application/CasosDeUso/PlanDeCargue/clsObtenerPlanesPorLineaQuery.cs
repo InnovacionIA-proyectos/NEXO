@@ -5,9 +5,9 @@ using Nexo.Application.Common.Abstractions;
 namespace Nexo.Application.CasosDeUso.PlanDeCargue;
 
 /// <summary>
-/// [S3-HU-04.3, issue #78] GET /api/planes-cargue/por-linea/{lineaId} — sondeo de la flota
+/// GET /api/planes-cargue/por-linea/{lineaId} — sondeo de la flota
 /// que crea <see cref="clsCrearPlanDesdeLineaCommand"/>, contra la proyección local (mismo
-/// criterio "sin llamada a Cubicador" que el resto de S3-HU-03). Responde lista VACÍA, no
+/// criterio "sin llamada a Cubicador" que el resto de las consultas). Responde lista VACÍA, no
 /// 404, mientras el comando "crear_desde_linea" sigue en proceso: no hay forma de
 /// distinguir acá "la línea no existe" de "todavía no llegó el primer plan" sin volver a
 /// consultar a Cubicador, y el contrato del frontend (<c>porLinea()</c> en

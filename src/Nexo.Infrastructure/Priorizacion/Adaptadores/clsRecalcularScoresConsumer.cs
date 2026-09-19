@@ -13,12 +13,12 @@ namespace Nexo.Infrastructure.Priorizacion.Adaptadores;
 /// <summary>
 /// Hace el recálculo que la saga pidió.
 ///
-/// LA EXCEPCIÓN SUBE A PROPÓSITO. Es lo contrario del consumidor de avisos de la #17: allá
+/// LA EXCEPCIÓN SUBE A PROPÓSITO. Es lo contrario del consumidor de avisos: allá
 /// un fallo se registra y se sigue, porque un navegador desconectado no es una avería.
 /// Aquí sí lo es — si el score persistido deja de refrescarse, los reportes empiezan a
 /// mentir sin que nadie lo note. Dejando subir la excepción, la política escalonada del
-/// bus reintenta y, si los agota, el mensaje va a la cola de error, que es de donde la
-/// #13 saca la alerta al equipo.
+/// bus reintenta y, si los agota, el mensaje va a la cola de error, de donde sale la
+/// alerta al equipo.
 ///
 /// Y ESE FALLO NO AFECTA AL API, que es lo que pide el criterio de cierre: esto corre en
 /// el consumidor, no en el hilo de una petición. Antes vivía en un BackgroundService del

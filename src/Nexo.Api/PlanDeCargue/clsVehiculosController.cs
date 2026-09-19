@@ -29,14 +29,14 @@ public record clsGuardarVehiculoRequest(
     decimal ToleranciaEntreUnidadesMm = 0);
 
 /// <summary>
-/// S3-HU-02 (issue #104): alta de vehículos/contenedores por cola — reemplaza el POST
-/// síncrono que el navegador hacía directo contra Cubicador. La fuente de verdad del
-/// vehículo (dimensiones, presets, catálogo) sigue viviendo en Cubicador; NEXO solo
-/// genera el id y publica (ver issue #108 para el detalle de esta asimetría intencional).
+/// Alta de vehículos/contenedores por cola — reemplaza el POST síncrono que el
+/// navegador hacía directo contra Cubicador. La fuente de verdad del vehículo
+/// (dimensiones, presets, catálogo) sigue viviendo en Cubicador; NEXO solo genera
+/// el id y publica, una asimetría intencional.
 ///
-/// S3-HU-03 (issue #112) agrega la lectura: GET, a diferencia del POST, SÍ está resuelto
-/// enteramente en NEXO — contra la proyección local que vehiculo.creado/vehiculo.actualizado
-/// mantienen sincronizada (issue #110/#111), nunca contra Cubicador en caliente.
+/// La lectura (GET), a diferencia del POST, SÍ está resuelta enteramente en NEXO —
+/// contra la proyección local que vehiculo.creado/vehiculo.actualizado mantienen
+/// sincronizada, nunca contra Cubicador en caliente.
 /// </summary>
 [ApiController]
 [Route("api/vehiculos")]
@@ -66,8 +66,8 @@ public class clsVehiculosController(
     /// todos los planes, a diferencia del alta, que un comercial puede necesitar en medio
     /// de una cotización.
     ///
-    /// Issue #155: responde 409 VEHICULO_EN_USO si algún plan de cargue todavía referencia
-    /// el vehículo (validado síncrono contra la fila espejo de clsPlanCargue, ver
+    /// Responde 409 VEHICULO_EN_USO si algún plan de cargue todavía referencia el
+    /// vehículo (validado síncrono contra la fila espejo de clsPlanCargue, ver
     /// clsEliminarVehiculoCommandHandler). Solo si no hay ningún plan asociado se publica el
     /// comando y responde 202.
     /// </summary>
@@ -77,10 +77,10 @@ public class clsVehiculosController(
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<ActionResult<clsComandoAceptadoDto>> Eliminar(Guid id, CancellationToken ct = default)
         => Accepted(await eliminar.Handle(new clsEliminarVehiculoCommand(id), ct));
-    /// <summary>S3-HU-03 (issue #112): catálogo contra la proyección local.
-    /// [Authorize] sin rol específico — mismo criterio que el resto de las consultas
-    /// del sistema (docs/ROLES_Y_PERMISOS.md). Issue #166: pagina (page/pageSize,
-    /// mismo patrón que /api/servicios-conexos) aunque el catálogo hoy sea chico.</summary>
+    /// <summary>Catálogo contra la proyección local. [Authorize] sin rol específico —
+    /// mismo criterio que el resto de las consultas del sistema
+    /// (docs/ROLES_Y_PERMISOS.md). Pagina (page/pageSize, mismo patrón que
+    /// /api/servicios-conexos) aunque el catálogo hoy sea chico.</summary>
     [Authorize]
     [HttpGet]
     [ProducesResponseType(StatusCodes.Status200OK)]

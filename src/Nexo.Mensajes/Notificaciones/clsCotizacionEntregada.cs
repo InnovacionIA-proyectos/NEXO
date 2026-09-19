@@ -25,7 +25,7 @@ namespace Nexo.Mensajes.Notificaciones;
 /// </summary>
 /// <param name="CotizacionId">La cotización entregada. El consumidor lee sus datos de la base.</param>
 /// <param name="SolicitudId">Su solicitud, para llegar al cliente.</param>
-/// <param name="EntregadaPor">Quién la entregó. Viaja para la auditoría y para la #22.</param>
+/// <param name="EntregadaPor">Quién la entregó. Viaja para la auditoría.</param>
 /// <param name="EntregadaEn">Momento de la entrega, en UTC.</param>
 /// <param name="FormatoPdf">El formato que se adjunta. Nulo si la entrega no trajo archivo.</param>
 /// <param name="NombrePdf">Nombre con el que se adjunta.</param>

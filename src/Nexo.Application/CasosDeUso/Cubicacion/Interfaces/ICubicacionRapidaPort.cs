@@ -3,14 +3,14 @@ using Nexo.Application.CasosDeUso.Cubicacion.DTOs;
 namespace Nexo.Application.CasosDeUso.Cubicacion.Interfaces;
 
 /// <summary>
-/// [S3-HU-04.3, issue #78, sección 8.2] Cierra el único de los 20 métodos de
+/// Cierra el único de los 20 métodos de
 /// <c>CubicadorApiService</c>/<c>CapturaApiService</c> sin equivalente en NEXO:
 /// <c>cubicar()</c> (<c>captura-api.service.ts</c>), usado por <c>captura-page</c> y
 /// <c>mesa-costeo-page</c> para una cubicación rápida SIN persistencia — no hay plan, no
 /// hay Id, no hay nada que guardar ni proyectar.
 ///
-/// POR QUÉ ES UNA EXCEPCIÓN DECLARADA, NO EL PATRÓN NUEVO. El resto de Cubicación (S3-HU-02/
-/// 03/04.3) sigue al pie de la letra "NEXO habla con Cubicador solo por colas, nunca HTTP"
+/// POR QUÉ ES UNA EXCEPCIÓN DECLARADA, NO EL PATRÓN NUEVO. El resto de Cubicación sigue al
+/// pie de la letra "NEXO habla con Cubicador solo por colas, nunca HTTP"
 /// (<c>cubicador/CONTRATO.md</c> sección 5) porque cada operación tiene un dueño async claro
 /// (una cola que la procesa, una proyección que la lee). Este cálculo no tiene ninguno de
 /// los dos: es síncrono por naturaleza (la pantalla necesita el resultado para renderizar
@@ -25,7 +25,7 @@ namespace Nexo.Application.CasosDeUso.Cubicacion.Interfaces;
 ///
 /// El secreto (mismo Bearer que Cubicador ya valida en <c>verificar_api_key</c>) vive SOLO
 /// en la configuración del backend (<c>clsCubicador3D:OutboundApiKey</c>) — nunca en el bundle
-/// del portal. Eso es, en una frase, todo lo que esta HU necesitaba lograr.
+/// del portal. Eso es, en una frase, todo lo que este puerto necesitaba lograr.
 /// </summary>
 public interface ICubicacionRapidaPort
 {

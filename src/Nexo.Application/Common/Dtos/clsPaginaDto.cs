@@ -1,8 +1,8 @@
 namespace Nexo.Application.Common.Dtos;
 
 /// <summary>
-/// Envoltorio de paginación compartido por los endpoints de listado nuevos
-/// (S4-HU-02, issue #166) — mismo shape que ya usa `/api/servicios-conexos`
+/// Envoltorio de paginación compartido por los endpoints de listado nuevos —
+/// mismo shape que ya usa `/api/servicios-conexos`
 /// (`clsPaginaServiciosDto`): `{ items, total }`, sin `page`/`pageSize` en la
 /// respuesta (el cliente ya los conoce, los mandó él). Genérico para no
 /// duplicar el mismo record por cada endpoint que se pagine; `servicios-conexos`

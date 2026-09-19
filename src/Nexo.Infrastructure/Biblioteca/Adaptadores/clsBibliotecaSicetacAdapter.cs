@@ -17,14 +17,13 @@ namespace Nexo.Infrastructure.Biblioteca.Adaptadores;
 public sealed class clsBibliotecaSicetacAdapter(clsDwSiceDbContext dw, IMemoryCache cache) : IBibliotecaSicetacPort
 {
     private const int MaxTop = 200;
-    // Issue #167: en frío, PeriodosAsync dispara un DISTINCT sobre Periodo en las
-    // ~2.14M filas de tblRutasSicetac (sin índice - ver DependencyInjection.cs)
-    // - probablemente la causa principal de los ~33s reportados "sin filtros"
-    // (BuscarAsync resuelve el periodo más reciente por acá antes de filtrar la
-    // matriz). Los periodos SICE-TAC cambian con baja frecuencia (mensual), así
-    // que subir el TTL de 15 min a 6 horas reduce drásticamente cuántas veces al
-    // día se paga ese costo, sin arriesgar servir un periodo desactualizado por
-    // más que unas horas.
+    // PeriodosAsync dispara un DISTINCT sobre Periodo en las ~2.14M filas de
+    // tblRutasSicetac (sin índice - ver DependencyInjection.cs), probable causa
+    // principal de los ~33s reportados en frío "sin filtros" (BuscarAsync resuelve
+    // el periodo más reciente por acá antes de filtrar la matriz). Los periodos
+    // SICE-TAC cambian con baja frecuencia (mensual), así que subir el TTL de
+    // 15 min a 6 horas reduce el costo sin arriesgar servir un periodo
+    // desactualizado por más que unas horas.
     private static readonly TimeSpan CacheTtl = TimeSpan.FromHours(6);
 
     public async Task<clsMatrizSicetacResultDto> BuscarAsync(

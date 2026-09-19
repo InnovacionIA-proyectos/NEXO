@@ -1,6 +1,6 @@
 # ADR-001 — La identidad del portal viaja sin firma
 
-**Estado:** aceptada · **Fecha:** 2026-08-24 · **Issue:** #7 · **Contrato:** v1.0.0
+**Estado:** aceptada · **Fecha:** 2026-08-24 · **Contrato:** v1.0.0
 
 ## Contexto
 
@@ -12,8 +12,8 @@ Lo que no hay es un token de sesión, una firma, ni una fecha de vencimiento. Na
 que Nexo pueda verificar contra el servidor del portal para confirmar que quien
 dice ser alguien realmente lo es.
 
-Pedir esa pieza significa abrir una solicitud al equipo del portal y esperar. El
-sprint dura dos semanas.
+Pedir esa pieza significa abrir una solicitud al equipo del portal y esperar
+semanas a que se resuelva.
 
 ## Decisión
 
@@ -45,7 +45,7 @@ otra persona.
 El riesgo residual se consideró bajo frente al costo de bloquear la integración
 completa esperando una pieza que depende de otro equipo.
 
-La decisión es del líder técnico y quedó registrada en la issue #7.
+La decisión es del líder técnico y quedó documentada en este ADR.
 
 ## Cuándo hay que volver a mirar esto
 
@@ -76,5 +76,6 @@ gobierna el portal.
 peor en todo lo demás: reabre la falsificación de roles, que es el agujero grande
 y el que sí podíamos cerrar gratis.
 
-**Esperar el token antes de seguir.** Bloquea la HU-02 y la HU-03 completas contra
-un tercero sin fecha comprometida. Es el hotspot H2, y el sprint no lo aguanta.
+**Esperar el token antes de seguir.** Bloquea el resto de la integración contra
+un tercero sin fecha comprometida. Es el hotspot H2, y el calendario del
+proyecto no lo aguanta.

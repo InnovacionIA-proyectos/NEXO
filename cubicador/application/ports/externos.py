@@ -34,9 +34,8 @@ class ILineaSolicitudPort(Protocol):
 
 class IEventosPort(Protocol):
     """Publica los eventos de dominio a RabbitMQ (CubicaciónSolicitada,
-    PlanDeCargueGenerado, CubicaciónRechazada, y desde S3-HU-03 tambien
-    VehiculoCreado/VehiculoActualizado). Ver CONTRATO.md seccion 6 para las
-    rutas/colas."""
+    PlanDeCargueGenerado, CubicaciónRechazada, VehiculoCreado/
+    VehiculoActualizado). Ver CONTRATO.md seccion 6 para las rutas/colas."""
 
     async def publicar_cubicacion_solicitada(
         self, plan_id: str, tipo: str, solicitud: dict[str, Any],

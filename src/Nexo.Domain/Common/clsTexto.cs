@@ -37,10 +37,10 @@ public static class clsTexto
 
     /// <summary>
     /// Clave de ruta + tipo de vehículo (origen|destino|tipoVehiculo) normalizada.
-    /// Issue #17: la regla "Solo SICE-TAC" se DEFINE con estas 3 llaves (ver
-    /// clsReglaSoloSicetac), pero se venía APLICANDO solo con las 2 primeras
-    /// (<see cref="ClaveRuta"/>) - marcar un único tipo de vehículo apagaba la
-    /// comparación contra plaza para TODOS los tipos de vehículo de la ruta.
+    /// La regla "Solo SICE-TAC" se DEFINE con estas 3 llaves (ver clsReglaSoloSicetac),
+    /// pero se venía APLICANDO solo con las 2 primeras (<see cref="ClaveRuta"/>): marcar
+    /// un único tipo de vehículo apagaba la comparación contra plaza para TODOS los tipos
+    /// de vehículo de la ruta.
     /// </summary>
     public static string ClaveRutaVehiculo(string? origen, string? destino, string? tipoVehiculo) =>
         $"{ClaveRuta(origen, destino)}|{Normalizar(tipoVehiculo)}";

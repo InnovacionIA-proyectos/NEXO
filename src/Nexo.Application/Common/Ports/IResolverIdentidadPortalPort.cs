@@ -3,7 +3,7 @@ using Nexo.Domain.Enums;
 namespace Nexo.Application.Common.Ports;
 
 /// <summary>
-/// Orquesta la resolución de sesión que exige S2-HU-03.1/03.2 en un solo puerto, para
+/// Orquesta la resolución de sesión de identidad del portal en un solo puerto, para
 /// que el esquema de autenticación (Api) no conozca ni la tabla externa ni la de mapeo
 /// de roles. Se llama en CADA petición, sin caché de sesión (docs/contrato-integracion,
 /// D5/ADR-001): la persona pudo perder el permiso desde la última vez.

@@ -1,6 +1,6 @@
 # ADR — NEXO genera el planId al crear un plan de cargue
 
-**Estado:** aceptada e implementada · **Fecha:** 2026-09-09 · **Issue:** #102 (S3-HU-01.2) · **Implementado en:** #104/#105 (S3-HU-02), referenciado desde S3-HU-02.2
+**Estado:** aceptada e implementada · **Fecha:** 2026-09-09
 
 ## Contexto
 
@@ -13,7 +13,7 @@ contrato de trabajos pesados (`docs/contrato-integracion/README.md` §4) — ese
 patrón exige devolver el id **en el mismo request** que acepta el trabajo, no
 después.
 
-Cubo 2 (S3-HU-02) necesitaba resolver esto ANTES de escribir
+Cubo 2 necesitaba resolver esto ANTES de escribir
 `POST /api/planes-cargue`: sin un id conocido de antemano, NEXO no puede
 responder `202` con un `consultarEn` que apunte a algo real, ni dejar una fila
 propia en `borrador` para ese plan.

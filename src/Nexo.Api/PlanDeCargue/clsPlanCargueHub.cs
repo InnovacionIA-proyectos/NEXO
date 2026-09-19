@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.SignalR;
 namespace Nexo.Api.PlanDeCargue;
 
 /// <summary>
-/// Canal de avisos del desenlace de un plan de cargue (S2-HU-08.1).
+/// Canal de avisos del desenlace de un plan de cargue.
 ///
 /// Va aparte de /hubs/trabajos a propósito: ese canal ya está publicado en el contrato
 /// como el avance de un pliego con líneas pendientes/reintentos técnicos — conceptos que
