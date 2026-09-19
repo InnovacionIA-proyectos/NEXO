@@ -61,7 +61,7 @@ public class clsMailSenderRealTests(ITestOutputHelper salida)
         return (new clsMailSenderCorreoAdapter(http, config, NullLogger<clsMailSenderCorreoAdapter>.Instance), http);
     }
 
-    [HechoConCorreoReal]
+    [clsHechoConCorreoReal]
     public async Task El_MailSender_acepta_nuestro_multipart_con_adjunto()
     {
         var (adaptador, http) = Armar();
@@ -104,7 +104,7 @@ public class clsMailSenderRealTests(ITestOutputHelper salida)
         salida.WriteLine($"Intentos: {intentos}");
     }
 
-    [HechoConCorreoReal]
+    [clsHechoConCorreoReal]
     public async Task Un_correo_sin_destinatarios_lo_rechaza_el_relay_y_no_se_reintenta()
     {
         // Comprueba contra el servicio real que un rechazo suyo se traduce en la clase
