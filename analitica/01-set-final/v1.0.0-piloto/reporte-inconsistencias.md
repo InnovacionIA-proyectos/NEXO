@@ -12,7 +12,7 @@ hallazgo.
 | 2 | `Deadline` anterior a `CreatedAt` (1 caso real) | Registro puntual | Baja | No |
 | 3 | Ruta malformada, origen "b" destino "j" | Registro puntual | Baja | No — 1 sola línea afectada |
 | 4 | Verificación cruzada contra fuentes externas | Validación (positiva) | — | No — 14/15 confirmadas, 1 no verificable por el punto 3 |
-| 5 | `consultascubos` con permisos de escritura | Seguridad, heredado de la extracción de fuentes corporativas | Media | No — pero requiere acción de IT |
+| 5 | `consultascubos` con permisos de escritura | Seguridad, heredado de S2-HU-10.2 | Media | No — pero requiere acción de IT |
 
 ## 1. Bajo volumen de datos reales (hallazgo estructural, no un registro puntual)
 
@@ -26,7 +26,7 @@ todavía.
 
 **Por qué se documenta en vez de descartarse:** es real (pasó por el motor de
 costeo de verdad, contra los DW reales), a diferencia del `DataSeeder` — pero
-quien use este set para el EDA debe saber que **no tiene escala de
+quien use este set para el EDA (S2-HU-11) debe saber que **no tiene escala de
 producción** y que las conclusiones que saque están limitadas a esta muestra
 pequeña.
 
@@ -62,7 +62,7 @@ están en la vista `analitica.inconsistencias` completa, no en este set.
 | Fecha | 2026-08-24 |
 
 **Causa:** `rutas` se crea dinámicamente a partir del texto libre capturado en
-la solicitud (confirmado en `docs/diccionario-datos-nexo.md`, sección
+la solicitud (confirmado en `docs/diccionario-datos-cabinafletes.md`, sección
 de la tabla `rutas`) — no hay validación de longitud mínima ni de que el texto
 sea un nombre de ciudad real. Esta fila probablemente vino de una prueba
 manual rápida con datos de relleno.
@@ -96,7 +96,7 @@ Las 8 líneas con `Fuente=Tarifario` coincidieron 8/8 contra `VALOR` de
 cotizado) funciona correctamente en el 100% de los casos verificables. La
 única falla es de captura de datos (ruta "b"/"j"), no del motor de costeo.
 
-## 5. Permisos de escritura en `consultascubos` (heredado de la extracción de fuentes corporativas)
+## 5. Permisos de escritura en `consultascubos` (heredado de S2-HU-10.2)
 
 Ya documentado en `./datos/fuentes-corporativas/README.md`: la cuenta
 `consultascubos` tiene `INSERT`/`UPDATE`/`DELETE` en `DWCubosOperacionesEBS`
@@ -104,7 +104,7 @@ Ya documentado en `./datos/fuentes-corporativas/README.md`: la cuenta
 también depende de esa fuente — no es un hallazgo nuevo, es el mismo riesgo
 heredado.
 
-## Resumen para quien use este set en el EDA
+## Resumen para quien use este set en el EDA (S2-HU-11)
 
 - Trátalo como una muestra pequeña y real, no como producción a escala.
 - `Fuente=Sicetac`/`Tarifario` en `cotizacion_lineas` es confiable — se probó

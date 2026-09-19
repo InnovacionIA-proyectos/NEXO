@@ -1,10 +1,10 @@
-# BD propia — extracción puntual
+# BD propia — extracción puntual (S2-HU-10.1 / S2-HU-10.3)
 
 Las vistas de solo lectura (`analitica.*`) y su definición están documentadas
-en [`DICCIONARIO_DATOS.md`](DICCIONARIO_DATOS.md). Ese
+en [`DICCIONARIO_DATOS.md`](DICCIONARIO_DATOS.md) (S2-HU-10.1, issue #35). Ese
 documento describe el **esquema** (qué columnas trae cada vista). Este README
-documenta la **extracción real** hecha a partir de esas vistas, que el
-trabajo original de definición de vistas nunca llegó a ejecutar.
+documenta la **extracción real** hecha a partir de esas vistas (S2-HU-10.3),
+que la HU-10.1 original nunca llegó a ejecutar.
 
 ## Por qué esta extracción, y no la de producción
 
@@ -58,4 +58,4 @@ SELECT * FROM analitica.solicitudes WHERE CreatedAt >= '<fecha de corte deseada>
 
 Requiere que la migración `20260831194721_VistasAnaliticaSoloLectura` esté
 aplicada (`dotnet ef database update --context NexoDbContext`) —
-en este entorno no lo estaba hasta que se corrió como parte de esta extracción.
+en este entorno no lo estaba hasta que se corrió como parte de S2-HU-10.3.

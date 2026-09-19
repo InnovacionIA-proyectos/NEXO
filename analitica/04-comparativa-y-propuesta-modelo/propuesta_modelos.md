@@ -1,6 +1,6 @@
-# Propuesta de modelo(s)
+# Propuesta de modelo(s) — S2-HU-11 parte 3
 
-Dos propuestas de modelo, cada una con objetivo, grano, features y supuestos — **ningún modelo se construye en esta etapa**. Cada ficha declara explícitamente sus limitaciones conocidas y qué falta resolver antes de poder entrenar en serio. Ver [`informe_comparativo.md`](informe_comparativo.md) para la comparativa que sustenta estas propuestas, y `hallazgos.md`/`limitaciones.md` de ambos EDA para la evidencia citada (H-0xx/L-0x).
+Dos propuestas de modelo, cada una con objetivo, grano, features y supuestos — **ningún modelo se construye este sprint**. Cada ficha declara explícitamente sus limitaciones conocidas y qué falta resolver antes de poder entrenar en serio. Ver [`informe_comparativo.md`](informe_comparativo.md) para la comparativa que sustenta estas propuestas, y `hallazgos.md`/`limitaciones.md` de ambos EDA para la evidencia citada (H-0xx/L-0x).
 
 **Nota:** originalmente se había planteado aquí un modelo para `Flete Producción FO` vía Tarifario SAP, entendido como comparación contra la regla de precio. Al analizarlo más a fondo, esa comparación específica no es un modelo predictivo — es una **verificación** de si la regla que Nexo ya automatiza (`ReglaDeCosteo`, MAX(SICE-TAC, SAP)) también explica el histórico real de la empresa. Esa verificación se movió a [`recomendacion_captura_datos.md`](recomendacion_captura_datos.md) §7, como recomendación de una HU de validación futura, no como propuesta de modelo. Es un objetivo **distinto** del Modelo 2 de abajo: el Modelo 2 no compara contra la regla de precio, predice `Flete Producción FO` directamente a partir de variables operativas del viaje — el objetivo 1 de `informe_comparativo.md` §4, ya declarado viable con el dato de hoy.
 
@@ -70,7 +70,7 @@ Una fila = una combinación **ruta (`NOMBRERUTA`/`ORIGEN`-`DESTINO`) × `CONFIGU
 - La variable de paros camioneros es trabajo de captura nuevo, no dato ya disponible.
 - El volumen de datos (27 archivos, ~50+ millones de filas en total) requiere procesamiento por lotes, no un análisis casual en memoria.
 
-### Reentrenamiento (diseñado, no ejecutado todavía)
+### Reentrenamiento (diseñado, no ejecutado este sprint)
 
 - **Disparador:** cuando se publique un nuevo `PERIODO` oficial de SICE-TAC.
 - **Proceso:** agregar el período nuevo al histórico, reentrenar, comparar el error de pronóstico del modelo nuevo contra el vigente sobre una ventana de validación reciente.
@@ -147,7 +147,7 @@ Aplican con la misma salvedad que en el Modelo 1: se agregan como features candi
 - `Distancia Total` es valor de tabla/zona, no medición real del viaje — se usa como variable de tarifa, no de logística real (H-011 EDA-1).
 - Las variables exógenas (salario mínimo, combustible, paros) son, igual que en el Modelo 1, trabajo de captura nuevo — hoy no existen en ningún extracto disponible, así que la primera versión del modelo se entrena solo con variables operativas y suma las exógenas cuando estén curadas.
 
-### Reentrenamiento (diseñado, no ejecutado todavía)
+### Reentrenamiento (diseñado, no ejecutado este sprint)
 
 - **Disparador:** cadencia fija de **3 días**, a diferencia del Modelo 1 (que depende de la publicación oficial de un nuevo `PERIODO` de SICE-TAC, con cadencia mensual). Tiene sentido una cadencia corta y fija acá porque `FactFWOFUFO` se alimenta de viajes que se van completando de forma continua, no de una publicación periódica externa — cada ciclo de 3 días simplemente sí o sí incorpora los viajes `Concluido`/`Ejecutado` nuevos desde el ciclo anterior.
 - **Proceso:** agregar los viajes nuevos del ciclo, reentrenar, comparar el error contra el modelo vigente sobre una ventana de validación reciente (igual que Modelo 1).

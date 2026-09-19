@@ -1,13 +1,13 @@
-# EDA-2 — extracción que cruza las 4 fuentes
+# EDA-2 — extracción que cruza las 4 fuentes (S2-HU-11 parte 2)
 
 Plan listo en [`PLAN_EDA_Extraccion_4_Fuentes.md`](PLAN_EDA_Extraccion_4_Fuentes.md);
-notebooks sin empezar todavía. Segundo de los dos análisis exploratorios de
-este proyecto (ver [`../02-eda-viajes-btura/`](../02-eda-viajes-btura/) para
-el primero, ya completo). Este va sobre el **set consolidado**
+notebooks sin empezar todavía. Segundo de los dos análisis que pide la HU-11
+(ver [`../02-eda-viajes-btura/`](../02-eda-viajes-btura/) para el primero, ya
+completo). Este va sobre el **set consolidado de S2-HU-10**
 (`../01-set-final/v1.0.0-piloto/`) — BD propia + piso SICE-TAC histórico +
 plaza/histórico SAP + clientes — no sobre el histórico crudo de Viajes-Btura.
 
-**Dependencia:** requiere la entrega del set final (ya completada, ver
+**Dependencia:** requiere la entrega de S2-HU-10.3 (ya completada, ver
 `01-set-final/v1.0.0-piloto/`).
 
 ## Objetivo
@@ -43,5 +43,4 @@ de históricos no tenía (ej. relación cotización vs. piso/plaza del período)
 ## Nota de alcance
 
 Este EDA-2, junto con el EDA-1, alimentan la **comparativa con propuesta de
-modelo(s)** que cierra esta etapa de análisis — ningún modelo se construye
-en esta etapa.
+modelo(s)** que cierra la HU-11 — ningún modelo se construye en este sprint.

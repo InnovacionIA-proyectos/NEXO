@@ -1,6 +1,6 @@
 # Diccionario reconciliado — Lado propio (`bd-propia`)
 
-Diccionario de las 13 tablas del lado propio (Nexo) del set `v1.0.0-piloto`, cruzando la definición oficial (`diccionario-y-linaje.md` y `DICCIONARIO_DATOS.md`, ambos del set final) con lo que confirmó el análisis a lo largo de los 8 notebooks de este EDA. Ver [`diccionario_reconciliado_fuentes_corporativas.md`](diccionario_reconciliado_fuentes_corporativas.md) para el lado externo (SICE-TAC, SAP, clientes SAP), `hallazgos.md` para el detalle completo de cada hallazgo referenciado (H-0xx) y `limitaciones.md` para las preguntas que este set no puede responder (L-0x).
+Diccionario de las 13 tablas del lado propio (Nexo) del set `v1.0.0-piloto`, cruzando la definición oficial (`diccionario-y-linaje.md` y `DICCIONARIO_DATOS.md`, ambos de HU-10.3) con lo que confirmó el análisis a lo largo de los 8 notebooks de este EDA. Ver [`diccionario_reconciliado_fuentes_corporativas.md`](diccionario_reconciliado_fuentes_corporativas.md) para el lado externo (SICE-TAC, SAP, clientes SAP), `hallazgos.md` para el detalle completo de cada hallazgo referenciado (H-0xx) y `limitaciones.md` para las preguntas que este set no puede responder (L-0x).
 
 **Nombres de columna en código:** mismo criterio que el EDA-1 — camelCase, sin tildes ni espacios (notebook `00`, Paso 4).
 
@@ -94,7 +94,7 @@ Diccionario de las 13 tablas del lado propio (Nexo) del set `v1.0.0-piloto`, cru
 | Columna (original) | Nombre en código | Definición oficial | Unidad/moneda | Ejemplo | Confiabilidad y notas de reconciliación |
 |---|---|---|---|---|---|
 | `Id` | `id` | Identificador del evento | GUID | `50A6E1BF-E7F8-42D8-9D40-002FA749B109` | Confiable |
-| `UsuarioId` | `usuarioId` | FK a `catalogo_usuarios`, autor de la acción | GUID | `00000000-0000-0000-0000-000000000001` | Nulo en registros históricos anteriores a que la autoría quedara garantizada — esperado, no defecto |
+| `UsuarioId` | `usuarioId` | FK a `catalogo_usuarios`, autor de la acción | GUID | `00000000-0000-0000-0000-000000000001` | Nulo en registros previos a S2-HU-03 — esperado, no defecto |
 | `Entidad`/`EntidadId` | `entidad`/`entidadId` | Sobre qué entidad de negocio actuó | texto/GUID | `cotizaciones` / `D782291B-35C9-4532-B845-4A765C1CFF3C` | Sin hallazgos relevantes |
 | `Accion` | `accion` | Qué se hizo (`entregar`, `cargar_lineas_bulk`, ...) | texto | `entregar`, `captura`, `crear` | Sin hallazgos relevantes |
 | `CreatedAt` | `createdAt` | Cuándo | fecha/hora | `2026-08-27 13:24:07` | Sin hallazgos relevantes |

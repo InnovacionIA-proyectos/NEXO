@@ -1,4 +1,4 @@
-# Diccionario de datos — set analítico de Nexo
+# Diccionario de datos — set analítico de Nexo (S2-HU-10.1, issue #35)
 
 Este documento describe las vistas de solo lectura del esquema `analitica`,
 creadas por la migración
@@ -10,7 +10,7 @@ sobre la base transaccional `Nexo`.
 Es una **extracción puntual** ("foto única", alcance acordado con el equipo
 de datos): vistas simples que envuelven un `SELECT`, sin agregaciones ni
 transformaciones. **No es un Data Warehouse ni un cubo** — esa decisión se
-toma después del análisis exploratorio, con evidencia de qué
+toma después del análisis exploratorio (S2-HU-11), con evidencia de qué
 grano y qué variable objetivo tiene sentido.
 
 Por eso estas vistas están **deliberadamente sin unir entre sí**: cada una
@@ -163,7 +163,7 @@ Registro de auditoría append-only. **Grano: un evento de auditoría.**
 | Columna | Tipo | Semántica | Origen |
 |---|---|---|---|
 | `Id` | uniqueidentifier | Identificador del evento | Sistema |
-| `UsuarioId` | uniqueidentifier, nullable | FK a `analitica.usuarios` — autor de la acción | Sesión del usuario (nulo en registros históricos anteriores a que la autoría real quedara garantizada — ver `analitica.inconsistencias`) |
+| `UsuarioId` | uniqueidentifier, nullable | FK a `analitica.usuarios` — autor de la acción | Sesión del usuario (nulo en registros anteriores a S2-HU-03, cuando la autoría real todavía no estaba garantizada — ver `analitica.inconsistencias`) |
 | `Entidad`, `EntidadId` | nvarchar / uniqueidentifier | Sobre qué entidad de negocio actuó | Sistema |
 | `Accion` | nvarchar(50) | Qué se hizo (`entregar`, `cargar_lineas_bulk`, …) | Sistema |
 | `CreatedAt` | datetimeoffset | Cuándo | Sistema |
@@ -194,10 +194,10 @@ normal, y ADEMÁS aparece acá con su motivo.
 | Línea sin ruta asignada | No debería poder costearse sin ruta |
 | Peso nulo o en cero | Dato físico faltante para una línea de carga |
 | `Deadline` anterior a `CreatedAt` | Solicitud creada con un plazo ya vencido — puede ser captura tardía o error de fecha |
-| Auditoría sin usuario identificado | Acción sin autor real (esperable solo en registros históricos anteriores a que la autoría quedara garantizada) |
+| Auditoría sin usuario identificado | Acción sin autor real (esperable solo en registros previos a S2-HU-03) |
 
 Esta lista es el punto de partida, no exhaustiva: si el análisis
-exploratorio encuentra otros patrones, se agregan como una
+exploratorio (S2-HU-11) encuentra otros patrones, se agregan como una
 cláusula `UNION ALL` más — la vista está diseñada para crecer así.
 
 ## 6. Cómo producir el export real

@@ -1,7 +1,7 @@
 # Informe comparativo — EDA-1 (Viajes-Btura) vs. EDA-2 (extracción 4 fuentes)
 
 **Alcance de este documento:** solo el **informe comparativo** (primer punto
-del criterio de cierre de esta etapa). La propuesta de modelo(s) con
+del criterio de cierre de S2-HU-11 parte 3). La propuesta de modelo(s) con
 sus supuestos, la recomendación de captura de datos futura y la declaración
 formal de no-viabilidad se abordan en un paso siguiente — ver
 [`README.md`](README.md) de esta carpeta para el estado de cada uno.
@@ -18,7 +18,7 @@ contrasta la ya verificada en ambos EDA.
 
 | | EDA-1 — Viajes-Btura (histórico) | EDA-2 — extracción 4 fuentes (`v1.0.0-piloto`) |
 |---|---|---|
-| **Qué es** | Extracto plano de viajes ya ejecutados, entregado directo por el negocio | Set consolidado: BD propia (Nexo) + piso SICE-TAC + plaza SAP + clientes |
+| **Qué es** | Extracto plano de viajes ya ejecutados, entregado directo por el negocio | Set consolidado de S2-HU-10: BD propia (Nexo) + piso SICE-TAC + plaza SAP + clientes |
 | **Volumen** | 41.237 filas, 13 meses (abril 2025 → abril 2026, último mes parcial) | 13 solicitudes reales de Nexo (prueba manual del usuario, sin intención de representatividad) + ~2 millones de filas de contexto de mercado (SICE-TAC/SAP), pero solo como catálogo, no ligadas a volumen operativo real |
 | **Variable objetivo** | `Flete Producción FO` (precio pagado al transportista) — completa, confiable, foco confirmado del futuro modelo | `ValorFlete` de cotización — solo 13 casos, y no necesariamente el mismo concepto que `Flete Producción FO` (cotización vs. histórico ejecutado) |
 | **Contexto de mercado** | Ninguno — no hay SICE-TAC ni SAP en este extracto | Es su aporte central: piso SICE-TAC y plaza SAP, con la lógica de cruce por ruta ya validada exacta en ambos lados (ver §3) |

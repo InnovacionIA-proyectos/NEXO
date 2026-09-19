@@ -3,8 +3,8 @@
 Referencia única para todas las columnas del set final: qué significa cada una,
 de qué sistema/tabla real viene (linaje), y en qué unidad está. Cubre las 13
 tablas del lado propio (`./datos/bd-propia/`, exportadas de las
-vistas `analitica.*`) y las 4 del lado externo
-(`./datos/fuentes-corporativas/`) — el diccionario es
+vistas `analitica.*` de S2-HU-10.1) y las 4 del lado externo
+(`./datos/fuentes-corporativas/`, S2-HU-10.2) — el diccionario es
 autocontenido, no hace falta saltar de documento para entender una columna.
 
 **Los datos NO están aplanados en una sola tabla.** Cada archivo conserva el
@@ -109,7 +109,7 @@ sistemas distintos, sin relación directa entre sí.
 | Columna | Significado | Origen | Unidad |
 |---|---|---|---|
 | `Id` | Identificador del evento | `audit_log.Id` | GUID |
-| `UsuarioId` | Autor de la acción (nulo en registros históricos anteriores a que la autoría quedara garantizada) | → `catalogo_usuarios.Id` | GUID |
+| `UsuarioId` | Autor de la acción (nulo en registros previos a S2-HU-03) | → `catalogo_usuarios.Id` | GUID |
 | `Entidad`/`EntidadId` | Sobre qué entidad de negocio actuó | `audit_log.*` | texto/GUID |
 | `Accion` | Qué se hizo (`entregar`, `cargar_lineas_bulk`, ...) | `audit_log.Accion` | texto |
 | `CreatedAt` | Cuándo | `audit_log.CreatedAt` | fecha/hora |
@@ -127,7 +127,7 @@ transacciones — filtrarlas por fecha no aplica. Columnas descriptivas
 
 | Columna | Significado | Origen |
 |---|---|---|
-| `Entidad` | Tabla donde se detectó | `analitica.inconsistencias` (9 reglas ya construidas y probadas) |
+| `Entidad` | Tabla donde se detectó | `analitica.inconsistencias` (9 reglas ya construidas y probadas en S2-HU-10.1) |
 | `EntidadId` | Fila específica | ídem |
 | `Motivo` | Cuál de las 9 reglas se incumplió | ídem |
 
@@ -136,7 +136,7 @@ transacciones — filtrarlas por fecha no aplica. Columnas descriptivas
 fila real**, tuya, no del seeder. Ver el Reporte de Inconsistencias para el
 detalle.
 
-## Lado externo (`./datos/fuentes-corporativas/`)
+## Lado externo (`./datos/fuentes-corporativas/`, S2-HU-10.2)
 
 > Detalle completo de fecha de corte, volumen y metodología de muestreo en
 > `./datos/fuentes-corporativas/README.md`. Las columnas se repiten

@@ -1,13 +1,13 @@
-# Plan de EDA — Extracción que cruza las 4 fuentes
+# Plan de EDA — Extracción que cruza las 4 fuentes (S2-HU-11 parte 2)
 
-**Objetivo:** análisis exploratorio del dataset consolidado (BD propia + piso SICE-TAC histórico + plaza/histórico SAP + clientes), con el mismo rigor del EDA-1, evaluando qué **señal** aparece al cruzar el contexto de mercado que el set de históricos no tenía (p. ej. relación cotización vs. piso/plaza del período).
+**Historia:** `EDA sobre la extracción que cruza las fuentes` **Objetivo:** análisis exploratorio del dataset consolidado de S2-HU-10 (BD propia + piso SICE-TAC histórico + plaza/histórico SAP + clientes), con el mismo rigor del EDA-1, evaluando qué **señal** aparece al cruzar el contexto de mercado que el set de históricos no tenía (p. ej. relación cotización vs. piso/plaza del período).
 
 | Campo | Valor |
 | :---- | :---- |
 | Insumo | `analitica/01-set-final/v1.0.0-piloto/` — snapshot congelado, 13 CSV lado propio + 4 CSV lado externo, **sin aplanar** (grano propio por tabla, cruce por llaves documentadas) |
 | Diccionario | `01-set-final/v1.0.0-piloto/diccionario-y-linaje.md` — ya existe, autocontenido, con llaves de cruce documentadas. No hay que reconstruirlo desde cero como en el EDA-1 |
-| Calidad ya reportada | `01-set-final/v1.0.0-piloto/reporte-inconsistencias.md` — 5 hallazgos ya documentados en ese reporte, se heredan como baseline, no se re-descubren |
-| Dependencia | `01-set-final/v1.0.0-piloto` (ya entregado) |
+| Calidad ya reportada | `01-set-final/v1.0.0-piloto/reporte-inconsistencias.md` — 5 hallazgos ya documentados por HU-10.3, se heredan como baseline, no se re-descubren |
+| Dependencia | S2-HU-10.3 (ya entregada, `v1.0.0-piloto`) |
 | Volumen (lado propio) | 13 solicitudes, 18 cotizaciones, 48 líneas de cotización — **muestra chica y real, no producción** |
 | Volumen (lado externo) | 151 filas SICE-TAC (muestra estratificada, no la tabla completa), 23.020 tarifa-plaza, 25.318 histórico SAP, 38.995 clientes SAP |
 | Fecha del plan | 2026-09-10 |
@@ -18,7 +18,7 @@
 
 ## 0. Criterio de cierre (Definition of Done)
 
-Igual que el EDA-1, más un criterio nuevo propio de este EDA:
+Igual que el EDA-1, más un criterio nuevo propio de esta HU:
 
 - [ ] **Notebook reproducible y versionado en el repo** — corre de principio a fin en limpio (`Restart & Run All`), sin rutas locales ni celdas manuales.
 - [ ] **Hallazgos con contexto de mercado documentados** — no basta con calidad/distribuciones genéricas: cada hallazgo relevante debe decir qué aporta (o no) para entender cotización vs. piso/plaza.
@@ -34,28 +34,28 @@ Criterios de aceptación transversales (idénticos al EDA-1):
 
 ## 1. Fase 0 — Encuadre antes de tocar el dato
 
-**Objetivo:** a diferencia del EDA-1 (donde el diccionario había que reconstruirlo), aquí el diccionario y el linaje **ya existen** (ver `01-set-final/v1.0.0-piloto/diccionario-y-linaje.md`). El encuadre se enfoca en traducir eso a un plan de análisis, no en descubrirlo.
+**Objetivo:** a diferencia del EDA-1 (donde el diccionario había que reconstruirlo), aquí el diccionario y el linaje **ya existen** (HU-10.3). El encuadre se enfoca en traducir eso a un plan de análisis, no en descubrirlo.
 
 ### 1.1 Qué pregunta de negocio responde este EDA
 
 | # | Pregunta | Columnas que la responderían | ¿Set suficiente? |
 | :---- | :---- | :---- | :---- |
 | P1 | ¿Qué tan cerca cotiza Nexo respecto al piso SICE-TAC / la plaza SAP vigente en el mismo período? | `cotizacion_lineas.ValorFlete`+`Fuente` vs. `VALORSICECONHORA` (SICE-TAC) o `VALOR` (SAP), cruzados por ruta+período | Parcial — ver §1.3, la cobertura real de cruce es chica |
-| P2 | ¿El motor de costeo realmente usa la fuente que dice usar (`Fuente=Sicetac`/`Tarifario`)? | Ya verificado en el set final (14/15 casos coinciden exacto) — este EDA solo debe reconfirmarlo con código propio, no es hallazgo nuevo | Sí, ya resuelto — reconfirmar, no reinvestigar |
+| P2 | ¿El motor de costeo realmente usa la fuente que dice usar (`Fuente=Sicetac`/`Tarifario`)? | Ya verificado por HU-10.3 (14/15 casos coinciden exacto) — este EDA solo debe reconfirmarlo con código propio, no es hallazgo nuevo | Sí, ya resuelto — reconfirmar, no reinvestigar |
 | P3 | ¿Qué variación de precio hay en el mercado (SICE-TAC/SAP) para las mismas rutas/líneas de negocio que cotiza Nexo? | `tblRutasSicetac`/`tblSAPTarifas` segmentado por las mismas dimensiones que usa `lineas_solicitud` | Sí para el lado externo solo; el cruce contra lo propio depende de qué tan bien se puedan enlazar (ver §1.3) |
-| P4 | ¿El bajo volumen real (13 solicitudes) permite alguna conclusión generalizable? | Todas | No — ya declarado como limitación estructural en el reporte de inconsistencias del set final, se hereda tal cual |
+| P4 | ¿El bajo volumen real (13 solicitudes) permite alguna conclusión generalizable? | Todas | No — ya declarado como limitación estructural desde HU-10.3, se hereda tal cual |
 
-### 1.2 Definiciones — heredadas del set final, no se re-derivan
+### 1.2 Definiciones — heredadas de HU-10.3, no se re-derivan
 
 El diccionario (`diccionario-y-linaje.md`) y el reporte de inconsistencias ya resuelven la mayoría de lo que en el EDA-1 costó varios pasos descubrir. Estado heredado:
 
 | # | Pregunta | Estado | Fuente |
 | :---- | :---- | :---- | :---- |
 | 1 | ¿Qué es cada columna? | ✅ Resuelto | `diccionario-y-linaje.md`, autocontenido |
-| 2 | ¿Cuál es el piso SICE-TAC efectivo? | ✅ Resuelto | `VALORSICECONHORA`, no `VALOR` (verificado 6/6 en el set final) |
+| 2 | ¿Cuál es el piso SICE-TAC efectivo? | ✅ Resuelto | `VALORSICECONHORA`, no `VALOR` (verificado 6/6 en HU-10.3) |
 | 3 | ¿La tarifa de plaza SAP es un solo valor por ruta? | ⚠️ Parcial | Puede haber múltiples tarifas "vigentes" simultáneas (caso extremo: 567 candidatos Villavicencio↔Buenaventura en SICE-TAC) — no asumir una tarifa única por ruta |
 | 4 | ¿`tblSAPTarifasLog` es "tarifa ganada" o "log de auditoría"? | ❌ Abierto, ya escalado | Pendiente de confirmar con negocio (documentado en `00-fuentes/fuentes-corporativas/README.md`) — este EDA no debe asumir ninguna de las dos sin más evidencia |
-| 5 | ¿`VIGENCIA` de SAP está corregida? | ✅ Resuelto (es cruda) | Se entrega sin `AjusteVigenciaPlaza` a propósito — el 95,8% de `tblSAPTarifas` completa está vencida a la fecha de hoy (hallazgo ya documentado previamente, ver `../00-fuentes/fuentes-corporativas/README.md`) |
+| 5 | ¿`VIGENCIA` de SAP está corregida? | ✅ Resuelto (es cruda) | Se entrega sin `AjusteVigenciaPlaza` a propósito — el 95,8% de `tblSAPTarifas` completa está vencida a la fecha de hoy (hallazgo previo, HU-09.2) |
 | 6 | ¿Cómo se cruza `Ruta` entre lado propio y externo? | ❌ Abierto, es trabajo de este EDA | Lado propio y SICE-TAC usan texto libre sin código DANE; SAP usa código DANE o zona (`ZC_`/`ZTC_`). Ninguna normalización está hecha — es la pieza central que este EDA debe resolver o declarar como limitación |
 | 7 | ¿Qué tan bien se cruza `LineaNegocio`/`ClaseViaje`/`ClaseContenedor`? | ⚠️ Por cuantificar | El diccionario dice que son "la misma llave" en ambos lados, pero **no dice qué tan seguido está poblada** — ver hallazgo preliminar en §1.4 |
 
@@ -114,15 +114,15 @@ No se copian los datos crudos aquí — se leen directamente desde
 
 - Versiones fijas de librerías (`requirements.txt`, ya creado con las mismas versiones del EDA-1).
 - Rutas relativas al repo, nunca `C:\Users\...`.
-- Semilla fija donde haya muestreo (`random_state=42`) — aunque aquí no se espera muestrear de nuevo, `piso-sicetac` ya viene muestreado desde la extracción de fuentes corporativas.
+- Semilla fija donde haya muestreo (`random_state=42`) — aunque aquí no se espera muestrear de nuevo, `piso-sicetac` ya viene muestreado por HU-10.2.
 - Hash MD5 de cada uno de los 17 archivos crudos registrado en la primera celda (más archivos que en el EDA-1 — un solo hash no alcanza).
 - Fecha y hora de ejecución impresas en la primera celda.
 
 ### 2.3 Versionado
 
-- Rama de este EDA, PR a `QA` (CI verde + 1 revisor); Kevin (@kcano-ux) valida y hace el PR `QA` → `main`.
+- Rama de esta HU (`40-s2-hu-112-eda-2-...`), PR a `QA` (CI verde + 1 revisor); Kevin (@kcano-ux) valida y hace el PR `QA` → `main`.
 - Commits atómicos con mensaje descriptivo.
-- PR con el informe de hallazgos en la descripción.
+- PR con el informe de hallazgos en la descripción, referenciando el issue de esta HU.
 
 ### 2.4 Carga defensiva — con la lección del EDA-1 ya aplicada
 
@@ -187,7 +187,7 @@ Esta es la tabla que reemplaza al "Anexo A" del EDA-1 como entregable central de
 
 ## 5. Fase 4 — Calidad del dato
 
-**Objetivo:** igual que el EDA-1 — cuantificar 7 dimensiones, un número por cada una, no un adjetivo. Aquí gran parte del trabajo de calidad **ya está hecho** por `reporte-inconsistencias.md`; esta fase reconfirma esos 5 hallazgos con código propio y busca lo que ese reporte no cubrió (llaves de cruce, sesgo de muestreo, fila fantasma).
+**Objetivo:** igual que el EDA-1 — cuantificar 7 dimensiones, un número por cada una, no un adjetivo. Aquí gran parte del trabajo de calidad **ya está hecho** por `reporte-inconsistencias.md` (HU-10.3); esta fase reconfirma esos 5 hallazgos con código propio y busca lo que ese reporte no cubrió (llaves de cruce, sesgo de muestreo, fila fantasma).
 
 ### 5.1 Completitud
 
@@ -206,20 +206,20 @@ Cubierto en §4.
 
 ### 5.4 Consistencia (dominios y reglas cruzadas)
 
-- **Reconfirmar el hallazgo más importante del set:** de 15 líneas verificables (`Fuente` en `Sicetac`/`Tarifario`), 14 coinciden exacto contra la fuente externa correspondiente, usando `VALORSICECONHORA` para `Sicetac` (no `VALOR`) y `VALOR` para `Tarifario`. Reproducir esta verificación con código propio, no solo citar el hallazgo previo.
+- **Reconfirmar el hallazgo más importante del set (HU-10.3):** de 15 líneas verificables (`Fuente` en `Sicetac`/`Tarifario`), 14 coinciden exacto contra la fuente externa correspondiente, usando `VALORSICECONHORA` para `Sicetac` (no `VALOR`) y `VALOR` para `Tarifario`. Reproducir esta verificación con código propio, no solo citar el hallazgo previo.
 - Verificar que `TYPE` en `catalogo-clientes-BUT000` sea consistentemente `'2'` (ya filtrado en el extracto, según el diccionario).
-- Verificar consistencia de las banderas booleanas (`Exclusivo`/`Consolidado`/`RetornaContenedor`, etc.) — recordar que en `tarifa-plaza`/`historico-sap` estas vienen como texto `True`/`False` (efecto secundario documentado de la corrección de comillas RFC4180, ver `../00-fuentes/fuentes-corporativas/README.md`), no como `1`/`0`.
+- Verificar consistencia de las banderas booleanas (`Exclusivo`/`Consolidado`/`RetornaContenedor`, etc.) — recordar que en `tarifa-plaza`/`historico-sap` estas vienen como texto `True`/`False` (efecto secundario documentado de la corrección de comillas RFC4180 de HU-10.2), no como `1`/`0`.
 
 ### 5.5 Exactitud (plausibilidad)
 
 - Confirmar que `ValorFlete` de `cotizacion_lineas` con `Fuente=Manual` no tiene por qué coincidir con ninguna fuente externa (es la categoría "sin verificación cruzada posible", ya documentada).
-- Para las líneas con match real contra SICE-TAC/SAP (los "candidatos" de §3.2): calcular la diferencia (`ValorFlete` − piso/plaza) y su signo — este número es el corazón de la "señal de mercado" que pide este EDA, se profundiza en la Fase 6.
+- Para las líneas con match real contra SICE-TAC/SAP (los "candidatos" de §3.2): calcular la diferencia (`ValorFlete` − piso/plaza) y su signo — este número es el corazón de la "señal de mercado" que pide la HU, se profundiza en la Fase 6.
 
 ### 5.6 Integridad referencial
 
 Cubierto en §4.2 (huérfanos), más:
 
-- Confirmar el hallazgo ya conocido de **permisos de escritura de `consultascubos` en `DWCubosOperacionesEBS`** — no es nuevo para investigar, solo repetirlo como recordatorio (ya reportado a IT, no bloquea este EDA).
+- Confirmar el hallazgo ya conocido de **permisos de escritura de `consultascubos` en `DWCubosOperacionesEBS`** — no es nuevo para investigar, solo repetirlo como recordatorio (ya reportado a IT desde HU-10.2/10.3, no bloquea este EDA).
 
 ### 5.7 Oportunidad y cobertura temporal
 
@@ -230,7 +230,7 @@ Cubierto en §4.2 (huérfanos), más:
 
 ### 5.8 Salida de la fase
 
-Misma tabla resumen de calidad que el EDA-1 (dimensión, regla, registros afectados, %, severidad, decisión, responsable) — con una columna adicional: **"¿Ya estaba en `reporte-inconsistencias.md`?"** para distinguir lo heredado del set final de lo nuevo que aporte este EDA.
+Misma tabla resumen de calidad que el EDA-1 (dimensión, regla, registros afectados, %, severidad, decisión, responsable) — con una columna adicional: **"¿Ya estaba en `reporte-inconsistencias.md`?"** para distinguir lo heredado de HU-10.3 de lo nuevo que aporte este EDA.
 
 ---
 
@@ -260,16 +260,16 @@ Misma tabla resumen de calidad que el EDA-1 (dimensión, regla, registros afecta
 
 ---
 
-## 7. Fase 6 — Análisis bivariado y multivariado (el corazón de este EDA)
+## 7. Fase 6 — Análisis bivariado y multivariado (el corazón de esta HU)
 
-**Objetivo:** esta es la fase que responde la pregunta central de este EDA — "qué señal aparece al cruzar el contexto de mercado". Todo lo anterior existe para llegar aquí con confianza en los números.
+**Objetivo:** esta es la fase que responde la pregunta central de la HU — "qué señal aparece al cruzar el contexto de mercado". Todo lo anterior existe para llegar aquí con confianza en los números.
 
 ### 7.1 Cruce cotización propia ↔ piso SICE-TAC
 
 Solo sobre las líneas con `Fuente = "Sicetac"` (§3.2 ya debería haber cuantificado cuántas son) y que además logren un match real contra `piso-sicetac` (`Muestra == "nucleo"`, por ruta/tipo de carga/condición/unidad de transporte):
 
 - `ValorFlete` (propio) vs. `VALORSICECONHORA` (mercado) — diferencia absoluta y %.
-- Reconfirmar el hallazgo del set final: ¿siguen coincidiendo exacto, o hay diferencia cuando se amplía más allá de las 6 líneas ya verificadas?
+- Reconfirmar HU-10.3: ¿siguen coincidiendo exacto, o hay diferencia cuando se amplía más allá de las 6 líneas ya verificadas?
 - Documentar explícitamente cuántas líneas con `Fuente=Sicetac` **no** lograron match (por ejemplo, si su ruta cae en alguna de las 567 candidatas de Villavicencio↔Buenaventura, ¿contra cuál de las 567 se comparó, y con qué criterio de desempate?).
 
 ### 7.2 Cruce cotización propia ↔ plaza SAP
@@ -327,12 +327,12 @@ Aunque el cruce directo sea chico, el lado externo por sí solo permite caracter
 
 Preguntas a responder con evidencia (adaptadas del EDA-1 a esta fuente):
 
-1. **Sesgo de volumen — ya declarado en el reporte de inconsistencias del set final, se hereda.** 13 solicitudes reales no son producción; cualquier conclusión de este EDA sobre "qué tan seguido cotiza bien Nexo" está limitada a esa muestra.
+1. **Sesgo de volumen — ya declarado por HU-10.3, se hereda.** 13 solicitudes reales no son producción; cualquier conclusión de este EDA sobre "qué tan seguido cotiza bien Nexo" está limitada a esa muestra.
 2. **Sesgo de muestreo deliberado en SICE-TAC (§1.5).** La muestra sobre-representa casos extremos a propósito — cualquier "% que tal cosa pasa" calculado sobre el archivo completo (sin separar `nucleo`/`rara_*`) está sesgado y sería un error real, no solo una imprecisión.
 3. **Sesgo de cobertura de llaves de cruce.** Si solo ~11% de `lineas_solicitud` tiene `LineaNegocio`/`ClaseViaje`/`ClaseContenedor` poblado (§3.2), cualquier conclusión de "señal de mercado" solo describe ese subconjunto, no el total de líneas cotizadas.
 4. **Sesgo temporal de la ventana de SICE-TAC.** Un solo período (agosto 2026) — no se puede saber si ese mes fue típico o atípico del mercado.
-5. **Sesgo de `VIGENCIA` sin corregir en SAP.** 95,8% de `tblSAPTarifas` completa está vencida a la fecha de hoy (hallazgo ya documentado previamente, ver `../00-fuentes/fuentes-corporativas/README.md`) — cualquier análisis que use `VIGENCIA` para filtrar "tarifas activas hoy" debe tener esto en cuenta.
-6. **Sesgo de selección en clientes SAP.** Se excluyeron personas naturales (`TYPE='1'`, 91.701 de 130.933) — el catálogo de clientes de esta extracción es solo organizaciones, coherente con el propósito (contexto de mercado B2B), pero hay que declararlo.
+5. **Sesgo de `VIGENCIA` sin corregir en SAP.** 95,8% de `tblSAPTarifas` completa está vencida a la fecha de hoy (hallazgo previo HU-09.2) — cualquier análisis que use `VIGENCIA` para filtrar "tarifas activas hoy" debe tener esto en cuenta.
+6. **Sesgo de selección en clientes SAP.** Se excluyeron personas naturales (`TYPE='1'`, 91.701 de 130.933) — el catálogo de clientes de esta HU es solo organizaciones, coherente con el propósito (contexto de mercado B2B), pero hay que declararlo.
 
 ---
 
@@ -340,7 +340,7 @@ Preguntas a responder con evidencia (adaptadas del EDA-1 a esta fuente):
 
 **Objetivo:** igual que el EDA-1 — dejar por escrito qué preguntas este cruce **no** puede responder.
 
-### 12.1 Vacíos ya conocidos, heredados de la extracción de fuentes corporativas y del set final (no se re-descubren, se documentan)
+### 12.1 Vacíos ya conocidos, heredados de HU-10.2/10.3 (no se re-descubren, se documentan)
 
 | Vacío | Qué impide analizar |
 | :---- | :---- |
@@ -353,7 +353,7 @@ Preguntas a responder con evidencia (adaptadas del EDA-1 a esta fuente):
 
 ### 12.2 Formato del entregable
 
-Misma tabla que el EDA-1 en `reportes/limitaciones.md` (ID, pregunta, causa, tipo, qué se necesitaría) — con una columna adicional marcando si la limitación ya estaba declarada en el set final o es nueva de este EDA.
+Misma tabla que el EDA-1 en `reportes/limitaciones.md` (ID, pregunta, causa, tipo, qué se necesitaría) — con una columna adicional marcando si la limitación ya estaba declarada por HU-10.3 o es nueva de este EDA.
 
 ---
 
@@ -365,7 +365,7 @@ Misma ficha estándar que el EDA-1 (ID, Título, Dimensión, Evidencia, Ejemplo,
 
 - H-001: fila fantasma tipo "------" en al menos 3 (verificar en 17) archivos.
 - H-002: cobertura real de las llaves `LineaNegocio`/`ClaseViaje`/`ClaseContenedor` (cuantificar el ~11% preliminar).
-- H-003: reconfirmación (o matiz nuevo) del hallazgo del set final de que `Fuente=Sicetac`/`Tarifario` coincide con la fuente externa.
+- H-003: reconfirmación (o matiz nuevo) del hallazgo HU-10.3 de que `Fuente=Sicetac`/`Tarifario` coincide con la fuente externa.
 - H-004: caracterización del mercado SICE-TAC/SAP por segmento, independiente del cruce con lo propio.
 - H-005: el sesgo de muestreo deliberado de SICE-TAC, y su efecto si se ignora.
 
@@ -373,9 +373,9 @@ Misma ficha estándar que el EDA-1 (ID, Título, Dimensión, Evidencia, Ejemplo,
 
 Igual formato que el EDA-1 — toda decisión ante ambigüedad (ej. qué criterio de desempate se usó ante múltiples tarifas vigentes) con su justificación y reversibilidad.
 
-### 13.3 Comparativa con propuesta de modelo(s) — entregable aparte, no de este notebook
+### 13.3 Comparativa con propuesta de modelo(s) — entregable de la HU, no de este notebook
 
-El alcance de este trabajo pide, además de los dos EDA, una **comparativa con propuesta de modelo(s)** (sin construir ningún modelo en esta etapa). Ese documento vive aparte (no dentro de este plan ni de `03-eda-extraccion-4-fuentes/`) y toma como insumo los hallazgos de **ambos** EDA — se aborda una vez este EDA-2 esté cerrado.
+El alcance de la HU pide, además de los dos EDA, una **comparativa con propuesta de modelo(s)** (sin construir ningún modelo este sprint). Ese documento vive aparte (no dentro de este plan ni de `03-eda-extraccion-4-fuentes/`) y toma como insumo los hallazgos de **ambos** EDA — se aborda una vez este EDA-2 esté cerrado.
 
 ### 13.4 Verificación final antes del PR
 
@@ -389,10 +389,10 @@ Idéntica al EDA-1 (`Restart & Run All` en limpio, números spot-check, sin ruta
 | :---- | :---- | :---- |
 | R-01 | La cobertura real de cruce (llaves de negocio, ruta→DANE) resulta tan baja que "la señal de mercado" se reduce a un puñado de casos | Cuantificar temprano (Fase 2, §3.2) y ajustar expectativas del entregable en consecuencia — no forzar un análisis estadístico sobre 3-5 filas |
 | R-02 | Tratar la muestra de SICE-TAC como representativa sin filtrar `Muestra=="nucleo"` primero | Regla explícita desde §1.5, aplicada en la carga (Fase 1), no al final |
-| R-03 | Confundir `tblSAPTarifasLog` con "tarifa realmente aplicada" sin la confirmación de negocio pendiente | Tratar como fuente de frecuencia de uso (proxy ya usado previamente, ver `../00-fuentes/fuentes-corporativas/README.md`), no como hecho consumado |
+| R-03 | Confundir `tblSAPTarifasLog` con "tarifa realmente aplicada" sin la confirmación de negocio pendiente | Tratar como fuente de frecuencia de uso (proxy ya usado en HU-09.2), no como hecho consumado |
 | R-04 | Que la fila fantasma "------" no se detecte en algún archivo por no revisar los 17 completos | Checklist explícito de los 17 archivos en la Fase 1, no solo los 3 ya detectados |
 | R-05 | El negocio no confirma a tiempo las preguntas abiertas de §1.2 | Entregar con las limitaciones marcadas como "no resuelto por falta de definición", igual criterio que el EDA-1 (R-05 de ese plan) |
 
 ---
 
-**Supuestos de este plan:** mismo stack que el EDA-1 (Python: pandas, matplotlib/seaborn, Jupyter) y repo Git — se reutiliza `requirements.txt` con las mismas versiones para que ambos EDA sean directamente comparables, tal como pide el criterio de cierre de este plan.
+**Supuestos de este plan:** mismo stack que el EDA-1 (Python: pandas, matplotlib/seaborn, Jupyter) y repo Git — se reutiliza `requirements.txt` con las mismas versiones para que ambos EDA sean directamente comparables, tal como pide el criterio de cierre de esta HU.
