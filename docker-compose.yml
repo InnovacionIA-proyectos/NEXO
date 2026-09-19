@@ -210,5 +210,4 @@ networks:
   internal:
 
 volumes:
-  mssql-data:
   rabbit-data:
