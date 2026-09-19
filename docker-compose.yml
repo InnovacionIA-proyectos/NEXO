@@ -6,7 +6,7 @@
 #     original. La API queda publicada en el puerto del host (API_PORT,
 #     por defecto 8080) para que cualquier frontend (el original NEXO/frontend
 #     u otro) la consuma directamente — no hay proxy Nginx aquí.
-#   - Plan de cargue (S2-HU-08): el motor Cubicador es un microservicio
+#   - Plan de cargue: el motor Cubicador es un microservicio
 #     Python aparte (carpeta cubicador/ de este mismo repo, su propio
 #     docker-compose.yml). NEXO le habla SOLO por colas del mismo RabbitMQ
 #     de abajo (ConnectionStrings:RabbitMq) — no hay URL HTTP ni servicio
@@ -89,7 +89,7 @@ services:
       # Cuántas solicitudes por lote. Existe para no dejar una transacción larga
       # bloqueando filas que la bandeja está leyendo.
       Score__TamanoDeLoteRecalculo: ${SCORE_TAMANO_LOTE:-200}
-      # Identidad del portal de la Administración (S2-HU-03). Vacía en local: cae al
+      # Identidad del portal de la Administración. Vacía en local: cae al
       # adapter que resuelve contra la tabla Usuarios propia (ver .env.example).
       # ASPNETCORE_ENVIRONMENT=Production EXIGE esta cadena (fail-closed).
       ConnectionStrings__IdentidadPortal: ${ConnectionStrings__IdentidadPortal}
@@ -98,7 +98,7 @@ services:
       # se degradan solos (503 accionable o Configurado=false), no rompen.
       ConnectionStrings__DwSice: ${ConnectionStrings__DwSice}
       ConnectionStrings__DwCubos: ${ConnectionStrings__DwCubos}
-      # Conexión SAP nueva: plaza en vivo (S2-HU-09). Deshabilitado por defecto —
+      # Conexión SAP nueva: plaza en vivo. Deshabilitado por defecto —
       # la plaza real sigue saliendo de DbSolucionesTi, sin tocar.
       SapTarifaFleteEnVivo__Modo: ${SAP_TARIFA_FLETE_EN_VIVO_MODO}
       ConnectionStrings__DbSolucionesTi: ${ConnectionStrings__DbSolucionesTi}
@@ -111,7 +111,7 @@ services:
       Smtp__Remitente: ${Smtp__Remitente:-}
       Smtp__Usuario: ${Smtp__Usuario:-}
       Smtp__Clave: ${Smtp__Clave:-}
-      # Compuerta de liberación del plan de cargue por paridad (S2-HU-08.2, #30).
+      # Compuerta de liberación del plan de cargue por paridad.
       # Vacías por defecto: la función responde 503 "en verificación", sin fallback.
       Cubicacion__ParidadVerificada: ${CUBICACION_PARIDAD_VERIFICADA}
       Cubicacion__ParidadEvidencia: ${CUBICACION_PARIDAD_EVIDENCIA}
@@ -120,7 +120,7 @@ services:
       # /cubicacion) — debe ser igual a NEXO_CALLBACK_API_KEY en cubicador/.env. Vacía =
       # el endpoint responde 401 a cualquier Bearer (fail-closed).
       Cubicador3D__InboundApiKey: ${CUBICADOR3D_INBOUND_API_KEY}
-      # [S3-HU-04.3] Única llamada HTTP SALIENTE de NEXO hacia Cubicador (POST
+      # Única llamada HTTP SALIENTE de NEXO hacia Cubicador (POST
       # /api/cubicacion, cubicación rápida sin persistencia). Faltaba este par en este
       # archivo (agregado en la verificación local del 2026-09-14, sección 10 de
       # docs/VERIFICACION_NEXO_CUBICADOR_2026-09-14.md) — sin él, .env.example documenta

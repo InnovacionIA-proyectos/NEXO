@@ -80,23 +80,23 @@ cada sección). `page`/`pageSize` son opcionales (default `page=1`,
 comportamiento de un cliente existente.
 
 Historial:
-- Issue #156: Servicios Conexos (`page`+`pageSize`, patrón original), Biblioteca
+- Servicios Conexos (`page`+`pageSize`, patrón original), Biblioteca
   SICE-TAC y Biblioteca plaza SAP (`page`+`top`) — medido en vivo, ~2,15 M y
   ~22,8 K filas respectivamente, truncaban en la primera página sin forma de
   pedir la siguiente aunque `total` ya viajaba en la respuesta.
-- Issue #166 (S4-HU-02): se agrega `page`/`pageSize` al resto de los listados
+- Se agrega `page`/`pageSize` al resto de los listados
   — `solicitudes` (Bandeja Priorizada), `tarifas-historicas` (rama "buscar"),
   `vehiculos`, `planes-cargue` — reemplazando los topes fijos que tenían antes
   (`Take(50)`, `Take(100)`, sin tope en `solicitudes`). Todos responden
   `{ items, total }`. `biblioteca-sap-historico` y `reglas-solo-sicetac`
   siguen SIN paginar (bajo volumen medido, ver
   `docs/decisiones/paginacion-endpoints-listado.md`).
-- Issue #167: el timeout real de `biblioteca-sicetac` (causa: falta de índice
+- El timeout real de `biblioteca-sicetac` (causa: falta de índice
   en la tabla del Data Warehouse externo, fuera del alcance de este repo) se
   mitigó con un `CommandTimeout` más generoso y un caché más largo — ver
   `docs/decisiones/timeout-biblioteca-sicetac.md`.
 
-### Rate limiting (issue #168)
+### Rate limiting
 
 Los endpoints de listado tienen rate limiting básico (`Microsoft.AspNetCore.
 RateLimiting`, nativo del framework), particionado por rol del usuario
@@ -225,7 +225,7 @@ interface AnalisisExcelDto { archivo: string; hojas: HojaExcelDto[] }
 interface ClienteBusquedaDto { clienteId: UUID | null; bp: string | null; nit: string; nombre: string }
 interface CandidatoTarifaDto {
   fuente: string; valor: Decimal; detalle: string; criterio: string; coincidencias: number
-  advertencia: string | null // issue #169: no-nulo cuando NO es un match exacto (fallback "mayor valor vigente" por peso fuera de rango o vehículo no resuelto en el catálogo SAP) — mostrar al usuario antes de confirmar
+  advertencia: string | null // no-nulo cuando NO es un match exacto (fallback "mayor valor vigente" por peso fuera de rango o vehículo no resuelto en el catálogo SAP) — mostrar al usuario antes de confirmar
 }
 interface AprovisionamientoDto { candidato: CandidatoTarifaDto | null }
 
@@ -320,7 +320,7 @@ interface PlanCargueDto {
 }
 interface AvisoPlanCargueDto { planCargueId: UUID; estado: string; puntaje: Decimal; motivo: string | null }
 
-// [S3-HU-04.3, issue #78] respuesta común de los comandos async del puente Mesa de Costeo → 3D
+// Respuesta común de los comandos async del puente Mesa de Costeo → 3D
 interface ComandoAceptadoDto { correlationId: UUID; estado: string }
 interface PlanFlotaItemDto { id: UUID; numeroVehiculo: number; totalVehiculos: number; unidadesCargadas: number; unidadesTotales: number }
 // ColocacionCargueDto: mismo shape que ya devuelve el `resultado` de `.../optimizar` dentro de `colocaciones[]`
@@ -349,7 +349,7 @@ Detalle completo del flujo en
 
 - `GET /api/solicitudes` — Bandeja Priorizada.
   `Query: estado?, atencion? ("pendientes"|"automatico"|"administrador"|"atendidas"|"todas"), desde?, hasta?, vigencia? ("vigente"|"vencida"), page? (>=1, def. 1), pageSize? (1-200, def. 50)`
-  → `200 { items: BandejaItemDto[], total }` (issue #166 — antes devolvía el array completo sin tope; el orden por score se recalcula en memoria y la paginación se aplica después, no reduce el trabajo del backend pero sí el tamaño de la respuesta)
+  → `200 { items: BandejaItemDto[], total }` (antes devolvía el array completo sin tope; el orden por score se recalcula en memoria y la paginación se aplica después, no reduce el trabajo del backend pero sí el tamaño de la respuesta)
 - `GET /api/solicitudes/{id}` — costeo pre-armado (SICE-TAC + históricos) por línea → `200 SolicitudCosteoDto`
 - `POST /api/solicitudes` — `CoordinadorFletes, Admin`. Alta spot (o cabecera de licitación).
   `Body: { clienteId, tipo: "spot"|"licitacion", modalidad?, deadline?, valorEstimado?, probabilidadCierre?, linea?: { rutaId?, configVehiculoId?, tipologia?, peso?, valorMercancia? } }`
@@ -391,7 +391,7 @@ Detalle completo del flujo en
   `multipart/form-data: formato?` (PDF, opcional, máx. 10 MB) → `200 EntregarCotizacionResultDto`
 - `POST /api/cotizaciones/{id}/resultado` — `Comercial, AdminTarifas, CoordinadorFletes, Admin`. Realimenta Tarifas Ganadas si `resultado="ganada"`.
   `Body: { resultado: "ganada"|"perdida", motivo?, comentario? }` → `200 CotizacionDto` / `409 COTIZACION_NO_ENTREGADA`
-  si la cotización no está en estado `Entregada` — issue #171: antes se permitía marcar resultado directo desde
+  si la cotización no está en estado `Entregada` — antes se permitía marcar resultado directo desde
   `Borrador` ("entrega implícita", sin correo ni evento), lo que ponía `entregadaAt` sin haber pasado por
   `/entregar` y contaminaba el tablero de KPIs del piloto. Ahora **siempre** hay que entregar primero.
 - `GET /api/cotizaciones/{id}/exportar-excel` → `200`, `Content-Disposition: attachment` (binario .xlsx)
@@ -409,7 +409,7 @@ Detalle completo del flujo en
 
 ### Biblioteca plaza SAP (solo lectura) — `/api/biblioteca-sap-plaza` (`[Authorize]`)
 
-- `GET` — mismos parámetros que el histórico + `page? (>=1, def. 1)` (issue #156: ~22,8 K filas medidas en vivo, este SÍ pagina; el histórico NO — ver nota de la sección de Paginación) → `200 SapHistoricoResultDto`
+- `GET` — mismos parámetros que el histórico + `page? (>=1, def. 1)` (~22,8 K filas medidas en vivo, este SÍ pagina; el histórico NO — ver nota de la sección de Paginación) → `200 SapHistoricoResultDto`
 - `GET /filtros` → `200 SapHistoricoFiltrosDto`
 - Ajuste **local** de vigencia sobre esta misma ruta (`AdminTarifas, CoordinadorFletes, Admin`):
   - `PATCH /{tarifaId}/vigencia` — `Body: { nuevaVigencia, motivo? }` → `204`
@@ -437,7 +437,7 @@ Detalle completo del flujo en
 
 - `GET` — con `ruta` o `vehiculo` → sugerencias para el costeo (siempre las 10 más recientes, sin paginar); con `q`/`mercancia`/`vigencia`/`origen` → búsqueda filtrada, PAGINADA; sin nada → las más recientes sin paginar.
   `Query: q?, ruta? (uuid), vehiculo? (uuid), mercancia?, vigencia?, origen? ("ganada"|"legado"), page? (>=1, def. 1, solo aplica a la búsqueda filtrada), pageSize? (1-200, def. 50, ídem)`
-  → `200 BibliotecaItemDto[]` (sugerencias/recientes) **o** `200 { items: BibliotecaItemDto[], total }` (búsqueda filtrada, issue #166 — antes `Take(50)` fijo sin `total` ni forma de pedir más)
+  → `200 BibliotecaItemDto[]` (sugerencias/recientes) **o** `200 { items: BibliotecaItemDto[], total }` (búsqueda filtrada — antes `Take(50)` fijo sin `total` ni forma de pedir más)
 
 ### Tarifas SICE-TAC (caché local admin) — `/api/tarifas-sicetac` (`[Authorize]`)
 
@@ -463,34 +463,34 @@ Cambiar esto reordena la bandeja de todo el mundo — ver
 
 - `GET` — `[Authorize]`. Listado contra la proyección local.
   `Query: page? (>=1, def. 1), pageSize? (1-200, def. 50)` → `200 { items: PlanCargueDto[], total }`
-  (issue #166 — antes tope fijo de 100 sin `total` ni forma de pedir más)
+  (antes tope fijo de 100 sin `total` ni forma de pedir más)
 - `POST /{id}/optimizar` — `Comercial, CoordinadorFletes, Admin`. No bloquea; `503 CUBICACION_EN_VERIFICACION` si la compuerta de paridad está cerrada, `409` si ya está procesando.
   `Body?: { estrategia?, algoritmo?, semilla?, respetarBloqueadas? }` → `202 SolicitudDeCubicacionAceptadaDto`
 - `GET /{id}` — `[Authorize]`. Consulta de respaldo → `200 PlanCargueDto` / `404`
-- `POST /desde-linea/{lineaId}` — `Comercial, CoordinadorFletes, Admin` (S3-HU-04.3, issue #78). Puente Mesa
+- `POST /desde-linea/{lineaId}` — `Comercial, CoordinadorFletes, Admin`. Puente Mesa
   de Costeo → 3D: publica `crear_desde_linea` para que Cubicador arme la flota a partir de las posiciones de
   la línea. No pasa por la compuerta de paridad (es una operación de datos, no de cálculo, mismo criterio que
   los 8 comandos de la sección 6 de `docs/mensajeria/CUBICACION.md`). `404 LINEA_SOLICITUD_NO_ENCONTRADA` si
   la línea no existe.
   → `202 ComandoAceptadoDto`
-- `GET /por-linea/{lineaId}` — `[Authorize]` (S3-HU-04.3, issue #78). Sondeo del `POST` de arriba contra la
+- `GET /por-linea/{lineaId}` — `[Authorize]`. Sondeo del `POST` de arriba contra la
   proyección local: lista vacía mientras Cubicador sigue `procesando`, se llena cuando llega
   `plan-de-cargue.generado`. ⚠️ Limitación conocida: hoy el worker de Cubicador solo reporta el primer
   vehículo de una flota multi-vehículo, así que esta lista puede no reflejar el resto de la flota — pendiente
   de resolver del lado del motor, fuera de alcance de este endpoint.
   → `200 PlanFlotaItemDto[]`
-- `GET /{id}/colocaciones` — `[Authorize]` (S3-HU-04.3, issue #78). Todas las colocaciones del plan, cargadas
+- `GET /{id}/colocaciones` — `[Authorize]`. Todas las colocaciones del plan, cargadas
   y rechazadas — a diferencia de `.../no-cargadas` (sección 7.2 de `docs/mensajeria/CUBICACION.md`), que
   filtra por `Cargada = false`. `404` si el plan no existe.
   → `200 ColocacionCargueDto[]`
 
 ### Catálogo de vehículos (Cubicador) — `/api/vehiculos`
 
-- `GET` — `[Authorize]`. Catálogo contra la proyección local (issue #112) — nunca llama a Cubicador.
+- `GET` — `[Authorize]`. Catálogo contra la proyección local — nunca llama a Cubicador.
   `Query: page? (>=1, def. 1), pageSize? (1-200, def. 50)` → `200 { items: VehiculoCubicacionDto[], total }`
-  (issue #166 — antes devolvía el array completo sin tope; catálogo hoy chico, pagina igual por consistencia)
+  (antes devolvía el array completo sin tope; catálogo hoy chico, pagina igual por consistencia)
 - `POST` — `Comercial, CoordinadorFletes, Admin`. Alta/edición, publica por cola. → `202 ComandoAceptadoDto`
-- `DELETE /{id}` — `Admin`. `409 VEHICULO_EN_USO` si algún plan de cargue todavía lo referencia (issue #155).
+- `DELETE /{id}` — `Admin`. `409 VEHICULO_EN_USO` si algún plan de cargue todavía lo referencia.
   → `202 ComandoAceptadoDto`
 
 ### Trabajos — `/api/trabajos` (`[Authorize]`)

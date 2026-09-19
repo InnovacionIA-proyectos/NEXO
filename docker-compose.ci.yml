@@ -13,7 +13,7 @@
 # que un rojo. Encadenar los dos comandos lo hace imposible.
 #
 # El código de salida del contenedor es el del compilador: 0 compila, distinto
-# de 0 no. Eso es lo que va a leer el workflow de GitHub Actions (issue #4).
+# de 0 no. Eso es lo que va a leer el workflow de GitHub Actions.
 # ============================================================================
 name: nexo-ci
 
@@ -61,7 +61,7 @@ services:
         condition: service_healthy
     environment:
       TEST_DB_CONNECTION: "Server=db-pruebas,1433;Database=Nexo_Test;User Id=sa;Password=${TEST_DB_PASSWORD:-Pruebas_Nexo_2026!};TrustServerCertificate=True;Encrypt=True;"
-      # Issue #184: db-pruebas nace vacía en cada corrida (sin volumen, ver arriba) -
+      # db-pruebas nace vacía en cada corrida (sin volumen, ver arriba) -
       # a diferencia de TEST_DB_CONNECTION contra la base corporativa real (donde este
       # flag debe quedar OFF a propósito, ver ApiFixture.cs), acá SÍ hay que crear el
       # esquema o los 171 tests de Api.Tests fallan contra una base sin tablas.
@@ -87,7 +87,7 @@ services:
         condition: service_healthy
     environment:
       TEST_DB_CONNECTION: "Server=db-pruebas,1433;Database=Nexo_Test;User Id=sa;Password=${TEST_DB_PASSWORD:-Pruebas_Nexo_2026!};TrustServerCertificate=True;Encrypt=True;"
-      # Issue #184: mismo motivo que en 'pruebas' arriba - db-pruebas nace vacía.
+      # Mismo motivo que en 'pruebas' arriba - db-pruebas nace vacía.
       TEST_DB_MIGRATE_ON_STARTUP: "true"
     networks:
       - ci
