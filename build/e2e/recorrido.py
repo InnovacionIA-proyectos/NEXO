@@ -40,16 +40,17 @@ from datetime import datetime, timedelta, timezone
 
 API = os.environ.get("API_BASE", "http://api:8080")
 SEP = "\x1e"
-ADMIN = ("X-Rol", "Admin")
 
 # S2-HU-03.3 retiró X-Rol (ver IdentidadPortalAuthenticationHandler) en favor de
 # X-Portal-Usuario-Id + ResolverIdentidadPortalLocalAdapter, que resuelve contra un
 # usuario REAL ya sembrado en la tabla Usuarios (no hay rol declarable por header).
-# El resto de este script sigue en X-Rol (hallazgo aparte, fuera del alcance de
-# S3-HU-02.4/issue #106: recorrido.py entero quedó desactualizado con ese cambio y
-# nadie lo volvió a correr) — solo `probar_comandos_escritura_plan_cargue()` usa el
-# esquema nuevo. 1005 = Paola Restrepo, rol Admin (seed de Database__SeedOnStartup).
-ADMIN_PORTAL = ("X-Portal-Usuario-Id", "1005")
+# Issue #186: todo el script quedó en X-Rol tras ese cambio (401 desde entonces) salvo
+# `probar_comandos_escritura_plan_cargue()` (S3-HU-02.4/issue #106, la única función que
+# se corrigió en su momento) — ahora todo usa el esquema nuevo.
+# 1005 = Paola Restrepo, rol Admin (seed de Database__SeedOnStartup).
+ADMIN = ("X-Portal-Usuario-Id", "1005")
+# 1007 = Mariana Ospina, rol Comercial (issue #187, seed de Database__SeedOnStartup).
+COMERCIAL = ("X-Portal-Usuario-Id", "1007")
 
 fallos = []
 paso_actual = ["(inicio)"]
@@ -268,11 +269,16 @@ def probar_comandos_escritura_plan_cargue():
     worker). Repetirlo para los 7 tipos restantes solo repetiría la misma prueba de
     infraestructura ya confirmada, sin verificar nada nuevo de cada comando.
     """
-    def pedir(ruta, cuerpo=None, metodo=None, esperado=None):
-        return _pedir_base(ruta, cuerpo, metodo, rol=ADMIN_PORTAL, esperado=esperado)
+    def pedir(ruta, cuerpo=None, metodo=None, esperado=None, rol=ADMIN):
+        return _pedir_base(ruta, cuerpo, metodo, rol=rol, esperado=esperado)
 
-    paso("S3-HU-02.4 (issue #106): guardar_vehiculo (1/9)")
-    codigo, r = pedir("/api/vehiculos", _vehiculo_de_prueba(), "POST", esperado=202)
+    # Issue #187: guardar_vehiculo se prueba como Comercial (no Admin) a propósito -
+    # es el rol real que usa este comando, y hasta que se sembró este usuario no había
+    # forma de probarlo localmente sin pasos manuales. El resto de la función sigue en
+    # ADMIN porque eliminar_vehiculo (9/9) es Admin-only ([Authorize(Roles = "Admin")]
+    # en VehiculosController) y Comercial no puede completarlo.
+    paso("S3-HU-02.4 (issue #106): guardar_vehiculo (1/9, como Comercial)")
+    codigo, r = pedir("/api/vehiculos", _vehiculo_de_prueba(), "POST", esperado=202, rol=COMERCIAL)
     vehiculo_id = r["correlationId"]
     dato(f"vehiculoId = {vehiculo_id}")
     ok(esperar(lambda: any(v["id"] == vehiculo_id for v in _items(pedir("/api/vehiculos")[1])),
@@ -364,7 +370,7 @@ def main():
 
     paso("Autorización: la recalibración del score es solo de Admin")
     pedir("/api/priorizacion/parametros", rol=("Accept", "*/*"), esperado=401)
-    pedir("/api/priorizacion/parametros", rol=("X-Rol", "Comercial"), esperado=403)
+    pedir("/api/priorizacion/parametros", rol=COMERCIAL, esperado=403)
     pedir("/api/priorizacion/parametros", esperado=200)
     codigo, _ = pedir("/hubs/trabajos/negotiate?negotiateVersion=1",
                       None, "POST", rol=("Accept", "*/*"))

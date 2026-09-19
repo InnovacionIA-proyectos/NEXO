@@ -24,7 +24,7 @@ public static class DataSeeder
         var parametros = await db.ParametrosScore.AsNoTracking().FirstAsync();
         var now = DateTimeOffset.UtcNow;
 
-        // ----------------------------------------------------------------- Usuarios (10)
+        // ----------------------------------------------------------------- Usuarios (11)
         //
         // IdentidadPortalId: id que un desarrollador manda en X-Portal-Usuario-Id para
         // entrar localmente como esta persona cuando ConnectionStrings:IdentidadPortal NO
@@ -41,7 +41,11 @@ public static class DataSeeder
         var sl2 = new Usuario { Nombre = "Jorge Organista", Email = "jorganista@boterosoto.com.co", Rol = RolUsuario.ServiciosLogisticos }; // edge: sin identidad del portal
         var admin1 = new Usuario { Nombre = "Paola Restrepo", Email = "prestrepo@boterosoto.com.co", Rol = RolUsuario.Admin, IdentidadPortalId = 1005 };
         var admin2 = new Usuario { Nombre = "Albert Blanco", Email = "ablanco@boterosoto.com.co", Rol = RolUsuario.Admin, IdentidadPortalId = 1006 };
-        db.Usuarios.AddRange(coord1, coord2, coord3, coord4, lider1, lider2, sl1, sl2, admin1, admin2);
+        // Issue #187: faltaba un Comercial sembrado - la mayoría de los comandos de
+        // escritura de S3-HU-02 (plan de cargue) exigen ese rol, y sin este usuario no
+        // había forma de probarlos localmente con X-Portal-Usuario-Id sin sembrar uno a mano.
+        var com1 = new Usuario { Nombre = "Mariana Ospina", Email = "mospina@boterosoto.com.co", Rol = RolUsuario.Comercial, IdentidadPortalId = 1007 };
+        db.Usuarios.AddRange(coord1, coord2, coord3, coord4, lider1, lider2, sl1, sl2, admin1, admin2, com1);
 
         // ----------------------------------------------------------------- Clientes (10)
         var cPostobon = new Cliente { Nombre = "Postobón S.A.", Nit = "890903939-1", RazonSocial = "Postobón S.A.", Telefonos = "[\"6044448888\",\"3104448888\"]" };
