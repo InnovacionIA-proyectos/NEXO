@@ -16,10 +16,10 @@ public static class DependencyInjection
     /// </summary>
     public static IServiceCollection AddBibliotecaUseCases(this IServiceCollection services)
     {
-        services.AddScoped<IQueryHandler<ProponerPropuestaTarifaQuery, PropuestaSolicitudDto>, ProponerPropuestaTarifaQueryHandler>();
-        services.AddScoped<IQueryHandler<BuscarMatrizSicetacQuery, MatrizSicetacResultDto>, BuscarMatrizSicetacQueryHandler>();
-        services.AddScoped<IQueryHandler<PeriodosSicetacQuery, IReadOnlyList<int>>, PeriodosSicetacQueryHandler>();
-        services.AddScoped<IQueryHandler<FiltrosSicetacQuery, SicetacFiltrosDto>, FiltrosSicetacQueryHandler>();
+        services.AddScoped<IQueryHandler<clsProponerPropuestaTarifaQuery, clsPropuestaSolicitudDto>, clsProponerPropuestaTarifaQueryHandler>();
+        services.AddScoped<IQueryHandler<clsBuscarMatrizSicetacQuery, clsMatrizSicetacResultDto>, clsBuscarMatrizSicetacQueryHandler>();
+        services.AddScoped<IQueryHandler<clsPeriodosSicetacQuery, IReadOnlyList<int>>, clsPeriodosSicetacQueryHandler>();
+        services.AddScoped<IQueryHandler<clsFiltrosSicetacQuery, clsSicetacFiltrosDto>, clsFiltrosSicetacQueryHandler>();
         return services;
     }
 }

@@ -4,7 +4,7 @@ namespace Nexo.Application.CasosDeUso.Solicitudes.Interfaces;
 
 public interface IConfiguracionesVehiculoPort
 {
-    Task<IReadOnlyList<ConfiguracionVehiculo>> ListarAsync(CancellationToken ct);
+    Task<IReadOnlyList<clsConfiguracionVehiculo>> ListarAsync(CancellationToken ct);
 
-    void Agregar(ConfiguracionVehiculo vehiculo);
+    void Agregar(clsConfiguracionVehiculo vehiculo);
 }

@@ -14,5 +14,5 @@ namespace Nexo.Application.CasosDeUso.Bandeja.Interfaces;
 /// </summary>
 public interface INotificadorDeBandeja
 {
-    Task AvisarAsync(AvisoDeBandeja aviso, CancellationToken ct = default);
+    Task AvisarAsync(clsAvisoDeBandeja aviso, CancellationToken ct = default);
 }

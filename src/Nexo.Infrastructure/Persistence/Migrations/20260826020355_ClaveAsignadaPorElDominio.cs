@@ -12,7 +12,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
     /// Existe para que la instantánea del modelo quede al día. Sin ella, la próxima
     /// migración que alguien genere arrastraría este cambio mezclado con el suyo.
     /// </summary>
-    public partial class ClaveAsignadaPorElDominio : Migration
+    public partial class clsClaveAsignadaPorElDominio : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)

@@ -8,7 +8,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
     /// Reemplaza a `20260901201038_QuitarNolockVistasAnalitica` (commit
     /// cd17068), retirada de esta rama por quedar desactualizada: fue escrita
     /// antes del rename de esquema `dbo` → `dbo_NEXO_prueba` (issue #93,
-    /// `RecrearVistasAnaliticaEnDboNexoPrueba`, ya en QA) y por eso reventaba
+    /// `clsRecrearVistasAnaliticaEnDboNexoPrueba`, ya en QA) y por eso reventaba
     /// contra QA con "Invalid object name 'dbo.clientes'" — hallazgo de
     /// revisión de esta PR.
     ///
@@ -22,9 +22,9 @@ namespace Nexo.Infrastructure.Persistence.Migrations
     /// RCSI, sin diferencia de bloqueo entre ambas.
     ///
     /// Esta migración solo quita `WITH (NOLOCK)`; el esquema (`dbo_NEXO_prueba`,
-    /// ya corregido por `RecrearVistasAnaliticaEnDboNexoPrueba`) no cambia.
+    /// ya corregido por `clsRecrearVistasAnaliticaEnDboNexoPrueba`) no cambia.
     /// </summary>
-    public partial class QuitarNolockVistasAnaliticaDboNexoPrueba : Migration
+    public partial class clsQuitarNolockVistasAnaliticaDboNexoPrueba : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)

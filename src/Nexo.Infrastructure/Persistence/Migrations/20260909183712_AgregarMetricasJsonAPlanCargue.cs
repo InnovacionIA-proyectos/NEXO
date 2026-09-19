@@ -5,7 +5,7 @@
 namespace Nexo.Infrastructure.Persistence.Migrations
 {
     /// <inheritdoc />
-    public partial class AgregarMetricasJsonAPlanCargue : Migration
+    public partial class clsAgregarMetricasJsonAPlanCargue : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)

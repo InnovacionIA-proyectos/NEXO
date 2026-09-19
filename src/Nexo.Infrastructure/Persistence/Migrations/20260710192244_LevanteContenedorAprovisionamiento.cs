@@ -5,7 +5,7 @@
 namespace Nexo.Infrastructure.Migrations
 {
     /// <inheritdoc />
-    public partial class LevanteContenedorAprovisionamiento : Migration
+    public partial class clsLevanteContenedorAprovisionamiento : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)

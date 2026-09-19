@@ -8,6 +8,6 @@ namespace Nexo.Application.CasosDeUso.TarifasGanadas;
 public static class DependencyInjection
 {
     public static IServiceCollection AddTarifasGanadasUseCases(this IServiceCollection services) => services
-        .AddScoped<IQueryHandler<SugerirTarifaHistoricaQuery, IReadOnlyList<BibliotecaItemDto>>, SugerirTarifaHistoricaQueryHandler>()
-        .AddScoped<IQueryHandler<BuscarBibliotecaTarifasQuery, PaginaDto<BibliotecaItemDto>>, BuscarBibliotecaTarifasQueryHandler>();
+        .AddScoped<IQueryHandler<clsSugerirTarifaHistoricaQuery, IReadOnlyList<clsBibliotecaItemDto>>, clsSugerirTarifaHistoricaQueryHandler>()
+        .AddScoped<IQueryHandler<clsBuscarBibliotecaTarifasQuery, clsPaginaDto<clsBibliotecaItemDto>>, clsBuscarBibliotecaTarifasQueryHandler>();
 }

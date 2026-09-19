@@ -1,7 +1,7 @@
 namespace Nexo.Application.Common.Ports;
 
 /// <summary>Un archivo que va adjunto al correo.</summary>
-public sealed record AdjuntoDeCorreo(string Nombre, byte[] Contenido);
+public sealed record clsAdjuntoDeCorreo(string Nombre, byte[] Contenido);
 
 /// <summary>
 /// Un correo listo para salir.
@@ -22,11 +22,11 @@ public sealed record AdjuntoDeCorreo(string Nombre, byte[] Contenido);
 /// Se descubrió mandando un correo de verdad: las pruebas contra un servidor simulado no
 /// podían verlo porque el simulado acepta cualquier cosa.
 /// </param>
-public sealed record CorreoParaEnviar(
+public sealed record clsCorreoParaEnviar(
     IReadOnlyList<string> Destinatarios,
     string Asunto,
     string CuerpoHtml,
-    IReadOnlyList<AdjuntoDeCorreo> Adjuntos,
+    IReadOnlyList<clsAdjuntoDeCorreo> Adjuntos,
     IReadOnlyDictionary<string, string>? Metadatos = null);
 
 /// <summary>
@@ -50,11 +50,11 @@ public interface ICorreoPort
     /// Entrega el correo a la salida corporativa.
     /// </summary>
     /// <returns>Identificador del correo en el relay, o null si no lo provee.</returns>
-    /// <exception cref="CorreoRechazadoException">
+    /// <exception cref="clsCorreoRechazadoException">
     /// El correo no se puede enviar y reintentarlo no va a cambiar nada.
     /// </exception>
-    /// <exception cref="CorreoTransitorioException">
+    /// <exception cref="clsCorreoTransitorioException">
     /// La salida no respondió o falló por algo pasajero. Reintentar tiene sentido.
     /// </exception>
-    Task<string?> EnviarAsync(CorreoParaEnviar correo, CancellationToken ct = default);
+    Task<string?> EnviarAsync(clsCorreoParaEnviar correo, CancellationToken ct = default);
 }

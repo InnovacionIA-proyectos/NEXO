@@ -8,5 +8,5 @@ namespace Nexo.Application.CasosDeUso.Solicitudes.Interfaces;
 /// </summary>
 public interface IExcelSolicitudesPort
 {
-    Task<AnalisisExcelDto> AnalizarAsync(Stream archivo, string nombreArchivo, CancellationToken ct);
+    Task<clsAnalisisExcelDto> AnalizarAsync(Stream archivo, string nombreArchivo, CancellationToken ct);
 }

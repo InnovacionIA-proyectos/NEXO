@@ -9,5 +9,5 @@ namespace Nexo.Application.CasosDeUso.ReglasSoloSicetac.Interfaces;
 /// </summary>
 public interface IExcelReglasSoloSicetacPort
 {
-    IReadOnlyList<FilaReglaSoloSicetacDto> Leer(Stream archivo);
+    IReadOnlyList<clsFilaReglaSoloSicetacDto> Leer(Stream archivo);
 }

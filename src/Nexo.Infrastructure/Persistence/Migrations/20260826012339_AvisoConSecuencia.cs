@@ -9,7 +9,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
     /// los avisos rezagados. Arranca en cero para las sagas que ya existan: la primera
     /// vez que cambien empezarán a contar y los clientes se sincronizan solos.
     /// </summary>
-    public partial class AvisoConSecuencia : Migration
+    public partial class clsAvisoConSecuencia : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)

@@ -8,7 +8,7 @@ namespace Nexo.Application.Common.Ports;
 /// (`cubicacion.solicitada`) en su propio exchange (`cubicador.eventos`), no el
 /// exchange-por-tipo que MassTransit crea por defecto (confirmado en runtime: sin el
 /// routing key correcto, el mensaje "se publica" pero se pierde en silencio). El
-/// adaptador (`CubicacionPublicadorAdapter`) inyecta `IPublishEndpoint` directo con el
+/// adaptador (`clsCubicacionPublicadorAdapter`) inyecta `IPublishEndpoint` directo con el
 /// routing key fijado por mensaje — sigue recibiendo el Outbox transaccional de NEXO
 /// (el Outbox intercepta a nivel de `IPublishEndpoint`, no de este puerto genérico) y
 /// valida las invariantes a mano con el mismo <see cref="IValidadorDeMensaje{T}"/> que
@@ -37,7 +37,7 @@ public interface ICubicacionPort
     /// importar_items, eliminar_item, eliminar_plan, ajustar_colocacion) por el MISMO
     /// camino auditable que "optimizar" — mismo exchange, mismos reintentos (1s/5s/15s/
     /// 60s), mismo DLQ y misma alerta por correo, todo configurado una sola vez a nivel
-    /// de bus (ver MensajeriaDependencyInjection.cs). A propósito NO consulta
+    /// de bus (ver clsMensajeriaDependencyInjection.cs). A propósito NO consulta
     /// <c>IParidadCubicadorPort</c>: son operaciones de datos, no de cálculo — la
     /// compuerta de paridad solo bloquea "optimizar" (ver HU S3-HU-02, criterio 5).
     /// </summary>

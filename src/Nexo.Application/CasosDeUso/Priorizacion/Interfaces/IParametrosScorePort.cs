@@ -16,5 +16,5 @@ namespace Nexo.Application.CasosDeUso.Priorizacion.Interfaces;
 public interface IParametrosScorePort
 {
     /// <summary>La fila única, con seguimiento: el llamador la va a modificar.</summary>
-    Task<ParametrosScore> ParaEditarAsync(CancellationToken ct = default);
+    Task<clsParametrosScore> ParaEditarAsync(CancellationToken ct = default);
 }

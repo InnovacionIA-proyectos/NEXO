@@ -9,7 +9,7 @@ namespace Nexo.Application.CasosDeUso.Solicitudes.Interfaces;
 public interface IRutasCatalogoPort
 {
     /// <summary>Carga el catálogo completo a memoria (es pequeño) para resolver muchas líneas sin ida y vuelta a la BD.</summary>
-    Task<IReadOnlyList<Ruta>> ListarAsync(CancellationToken ct);
+    Task<IReadOnlyList<clsRuta>> ListarAsync(CancellationToken ct);
 
-    void Agregar(Ruta ruta);
+    void Agregar(clsRuta ruta);
 }

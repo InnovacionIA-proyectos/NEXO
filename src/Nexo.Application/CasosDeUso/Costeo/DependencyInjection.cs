@@ -7,8 +7,8 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddCosteoUseCases(this IServiceCollection services)
     {
-        services.AddScoped<ICommandHandler<CostearLineaCommand, Unit>, CostearLineaCommandHandler>();
-        services.AddScoped<ICommandHandler<RecostearLineaCommand, Unit>, RecostearLineaCommandHandler>();
+        services.AddScoped<ICommandHandler<clsCostearLineaCommand, Unit>, clsCostearLineaCommandHandler>();
+        services.AddScoped<ICommandHandler<clsRecostearLineaCommand, Unit>, clsRecostearLineaCommandHandler>();
         return services;
     }
 }

@@ -1,25 +1,25 @@
 namespace Nexo.Mensajes.Bandeja;
 
 /// <summary>
-/// Invariantes de <see cref="BandejaCambio"/>.
+/// Invariantes de <see cref="clsBandejaCambio"/>.
 ///
 /// El motivo tiene que ser uno de los conocidos, no cualquier texto. Un motivo libre
 /// convertiría el contrato en una convención de pasillo: el cliente empezaría a comparar
 /// contra cadenas que alguien escribió de memoria, y un error de tipeo pasaría al
 /// navegador sin que nada lo frene.
 /// </summary>
-public sealed class BandejaCambioValidador : IValidadorDeMensaje<BandejaCambio>
+public sealed class clsBandejaCambioValidador : IValidadorDeMensaje<clsBandejaCambio>
 {
     private static readonly string[] Conocidos =
     [
-        MotivoDeCambio.SolicitudNueva,
-        MotivoDeCambio.SolicitudRechazada,
-        MotivoDeCambio.TrabajoTerminado,
-        MotivoDeCambio.ParametrosRecalibrados,
-        MotivoDeCambio.RefrescoPeriodico,
+        clsMotivoDeCambio.SolicitudNueva,
+        clsMotivoDeCambio.SolicitudRechazada,
+        clsMotivoDeCambio.TrabajoTerminado,
+        clsMotivoDeCambio.ParametrosRecalibrados,
+        clsMotivoDeCambio.RefrescoPeriodico,
     ];
 
-    public IReadOnlyList<string> Validar(BandejaCambio m)
+    public IReadOnlyList<string> Validar(clsBandejaCambio m)
     {
         var motivos = new List<string>();
 

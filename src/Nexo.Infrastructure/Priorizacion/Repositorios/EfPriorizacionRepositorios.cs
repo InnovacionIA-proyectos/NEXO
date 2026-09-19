@@ -15,15 +15,15 @@ namespace Nexo.Infrastructure.Priorizacion.Repositorios;
 /// un 500 al abrir la pantalla de recalibración — cuando lo que corresponde es mostrarle
 /// la configuración por defecto, que es exactamente con la que el sistema está corriendo.
 /// </summary>
-public sealed class EfParametrosScoreRepository(NexoDbContext db) : IParametrosScorePort
+public sealed class clsEfParametrosScoreRepository(clsNexoDbContext db) : IParametrosScorePort
 {
-    public async Task<ParametrosScore> ParaEditarAsync(CancellationToken ct = default)
+    public async Task<clsParametrosScore> ParaEditarAsync(CancellationToken ct = default)
     {
-        var fila = await db.ParametrosScore.FirstOrDefaultAsync(ct);
+        var fila = await db.clsParametrosScore.FirstOrDefaultAsync(ct);
         if (fila is not null) return fila;
 
-        fila = new ParametrosScore();
-        db.ParametrosScore.Add(fila);
+        fila = new clsParametrosScore();
+        db.clsParametrosScore.Add(fila);
         return fila;
     }
 }
@@ -38,10 +38,10 @@ public sealed class EfParametrosScoreRepository(NexoDbContext db) : IParametrosS
 ///
 /// Con seguimiento porque el caso de uso modifica el score y lo guarda por lote.
 /// </summary>
-public sealed class EfSolicitudesParaRecalcularRepository(NexoDbContext db)
+public sealed class clsEfSolicitudesParaRecalcularRepository(clsNexoDbContext db)
     : ISolicitudesParaRecalcularPort
 {
-    public async Task<IReadOnlyList<Solicitud>> ActivasAsync(
+    public async Task<IReadOnlyList<clsSolicitud>> ActivasAsync(
         Guid? despuesDe, int tamano, CancellationToken ct = default) =>
         await db.Solicitudes
             .Where(s => s.Estado == EstadoSolicitud.Pendiente || s.Estado == EstadoSolicitud.EnCosteo)

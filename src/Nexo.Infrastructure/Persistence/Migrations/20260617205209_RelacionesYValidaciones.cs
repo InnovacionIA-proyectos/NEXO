@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace Nexo.Infrastructure.Migrations
 {
     /// <inheritdoc />
-    public partial class RelacionesYValidaciones : Migration
+    public partial class clsRelacionesYValidaciones : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)

@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace Nexo.Infrastructure.Persistence.Migrations
 {
     /// <inheritdoc />
-    public partial class PendientesDeCosteoConTipo : Migration
+    public partial class clsPendientesDeCosteoConTipo : Migration
     {
         /// <inheritdoc />
         // EF generó BORRAR Y RECREAR en vez de renombrar, y avisó de posible pérdida de

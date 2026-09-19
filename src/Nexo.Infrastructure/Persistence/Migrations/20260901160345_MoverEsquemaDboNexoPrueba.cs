@@ -5,7 +5,7 @@
 namespace Nexo.Infrastructure.Persistence.Migrations
 {
     /// <inheritdoc />
-    public partial class MoverEsquemaDboNexoPrueba : Migration
+    public partial class clsMoverEsquemaDboNexoPrueba : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)

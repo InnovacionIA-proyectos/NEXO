@@ -3,37 +3,37 @@ namespace Nexo.Mensajes.Priorizacion;
 // Un validador por mensaje. Fallo cerrado: un tipo sin validador no se publica, así
 // que esta lista y la de mensajes crecen juntas por construcción.
 
-public sealed class ArrancarPriorizacionValidador : IValidadorDeMensaje<ArrancarPriorizacion>
+public sealed class clsArrancarPriorizacionValidador : IValidadorDeMensaje<clsArrancarPriorizacion>
 {
-    public IReadOnlyList<string> Validar(ArrancarPriorizacion m) =>
-        Motivos.De(("CadenaId", m.CadenaId));
+    public IReadOnlyList<string> Validar(clsArrancarPriorizacion m) =>
+        clsMotivos.De(("CadenaId", m.CadenaId));
 }
 
-public sealed class TicDePriorizacionValidador : IValidadorDeMensaje<TicDePriorizacion>
+public sealed class clsTicDePriorizacionValidador : IValidadorDeMensaje<clsTicDePriorizacion>
 {
-    public IReadOnlyList<string> Validar(TicDePriorizacion m) =>
-        Motivos.De(("CadenaId", m.CadenaId));
+    public IReadOnlyList<string> Validar(clsTicDePriorizacion m) =>
+        clsMotivos.De(("CadenaId", m.CadenaId));
 }
 
-public sealed class ParametrosDePriorizacionCambiaronValidador
-    : IValidadorDeMensaje<ParametrosDePriorizacionCambiaron>
+public sealed class clsParametrosDePriorizacionCambiaronValidador
+    : IValidadorDeMensaje<clsParametrosDePriorizacionCambiaron>
 {
-    public IReadOnlyList<string> Validar(ParametrosDePriorizacionCambiaron m)
+    public IReadOnlyList<string> Validar(clsParametrosDePriorizacionCambiaron m)
     {
         // CambiadoPor es obligatorio: recalibrar el score reordena la bandeja de todo
         // el mundo, y tiene que quedar de quién fue.
-        var motivos = Motivos.De(("CadenaId", m.CadenaId), ("CambiadoPor", m.CambiadoPor));
+        var motivos = clsMotivos.De(("CadenaId", m.CadenaId), ("CambiadoPor", m.CambiadoPor));
         if (m.CambiadoEn == default)
             motivos.Add("CambiadoEn es obligatorio: sin fecha no hay rastro del recalibrado.");
         return motivos;
     }
 }
 
-public sealed class RecalcularScoresSolicitadoValidador : IValidadorDeMensaje<RecalcularScoresSolicitado>
+public sealed class clsRecalcularScoresSolicitadoValidador : IValidadorDeMensaje<clsRecalcularScoresSolicitado>
 {
-    public IReadOnlyList<string> Validar(RecalcularScoresSolicitado m)
+    public IReadOnlyList<string> Validar(clsRecalcularScoresSolicitado m)
     {
-        var motivos = Motivos.De(("CadenaId", m.CadenaId));
+        var motivos = clsMotivos.De(("CadenaId", m.CadenaId));
 
         // El motivo es lo único que distingue un recálculo del reloj de uno disparado
         // por el Admin. Sin él, un recálculo repetido en el log no se puede explicar.

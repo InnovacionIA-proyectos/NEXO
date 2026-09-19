@@ -6,15 +6,15 @@ namespace Nexo.Mensajes.Cubicacion;
 ///
 /// Estos SÍ son mensajes reales de MassTransit (issue #28, S2-HU-075 — decisión del
 /// equipo: MassTransit nativo, no un cliente RabbitMQ crudo del lado de NEXO):
-/// `CubicacionSolicitada` se publica con `IPublishEndpoint`
-/// (`Infrastructure/Cubicacion/CubicacionPublicadorAdapter.cs`) y
-/// `PlanDeCargueGenerado`/`CubicacionRechazada` se consumen con `IConsumer&lt;T&gt;`
-/// reales (`PlanDeCargueGeneradoConsumer`/`CubicacionRechazadaConsumer`) — heredan la
+/// `clsCubicacionSolicitada` se publica con `IPublishEndpoint`
+/// (`Infrastructure/Cubicacion/clsCubicacionPublicadorAdapter.cs`) y
+/// `clsPlanDeCargueGenerado`/`clsCubicacionRechazada` se consumen con `IConsumer&lt;T&gt;`
+/// reales (`clsPlanDeCargueGeneradoConsumer`/`clsCubicacionRechazadaConsumer`) — heredan la
 /// misma tubería de reintentos/Fault/alerta que el resto de NEXO.
 ///
 /// Lo ÚNICO no estándar es la TOPOLOGÍA: Cubicador declara su propio exchange topic
 /// (`cubicador.eventos`) con routing keys semánticas, no el exchange-por-tipo que
-/// MassTransit crea por defecto — por eso `MensajeriaDependencyInjection.cs` anula esa
+/// MassTransit crea por defecto — por eso `clsMensajeriaDependencyInjection.cs` anula esa
 /// convención a mano solo para estos 3 tipos (`cfg.Message&lt;T&gt;()`/
 /// `cfg.Publish&lt;T&gt;()`/`ReceiveEndpoint` con `Bind()` manual). Cubicador, del otro
 /// lado, no adopta MassTransit — solo aprendió a hablar su "sobre" JSON mínimo en estos
@@ -27,28 +27,28 @@ namespace Nexo.Mensajes.Cubicacion;
 /// Comando saliente: NEXO -> Cubicador, routing key `cubicacion.solicitada`.
 /// Mismo shape que espera `worker/main.py::_ejecutar_solicitud`.
 ///
-/// `Solicitud` es <c>object</c> a propósito (S3-HU-02, issue #103): los 9 tipos que hoy
+/// `clsSolicitud` es <c>object</c> a propósito (S3-HU-02, issue #103): los 9 tipos que hoy
 /// viajan en este único sobre ("optimizar" + los 8 comandos de escritura del plan de
 /// cargue) tienen cada uno su propio payload. Reutilizar EL MISMO tipo de mensaje en vez
 /// de crear 9 records de MassTransit distintos es lo que permite que los 8 nuevos hereden
 /// gratis la topología ya verificada en producción para "optimizar" (mismo exchange
 /// `cubicador.eventos`, mismos reintentos 1s/5s/15s/60s, mismo DLQ, misma alerta —
-/// configurados una sola vez, a nivel de bus, en MensajeriaDependencyInjection.cs) sin
+/// configurados una sola vez, a nivel de bus, en clsMensajeriaDependencyInjection.cs) sin
 /// tocar esa configuración. La validación de CUÁL payload le corresponde a cada "Tipo" la
-/// hace <see cref="CubicacionSolicitadaValidador"/> con un patrón de tipo en tiempo de
+/// hace <see cref="clsCubicacionSolicitadaValidador"/> con un patrón de tipo en tiempo de
 /// ejecución — funciona porque la validación corre ANTES de serializar, sobre la misma
 /// instancia en memoria con la que se construyó el mensaje.
 ///
-/// [S3-HU-04.3, issue #78] "crear_desde_linea" (<see cref="CrearPlanDesdeLineaInput"/>) se
+/// [S3-HU-04.3, issue #78] "crear_desde_linea" (<see cref="clsCrearPlanDesdeLineaInput"/>) se
 /// suma como un décimo Tipo — el worker de Cubicador ya lo implementa desde antes (ver
 /// cubicador/worker/main.py), solo faltaba que NEXO lo publicara en vez de que lo disparara
 /// el navegador directo.
 /// </summary>
-public sealed record CubicacionSolicitada(
-    string Tipo, string PlanId, string CorrelationId, object Solicitud);
+public sealed record clsCubicacionSolicitada(
+    string Tipo, string PlanId, string CorrelationId, object clsSolicitud);
 
 /// <summary>Payload de "optimizar" (S2-HU-08.1) y de "reoptimizar".</summary>
-public sealed record SolicitudDeCubicacion(
+public sealed record clsSolicitudDeCubicacion(
     string Estrategia, string Algoritmo, int? Semilla, object? Ponderaciones, bool RespetarBloqueadas);
 
 // ---------------------------------------------------------------------------------
@@ -60,13 +60,13 @@ public sealed record SolicitudDeCubicacion(
 // detalle completo de cada endpoint.
 // ---------------------------------------------------------------------------------
 
-/// <summary>"crear_plan" — espeja CrearPlanRequest. El plan lo crea Cubicador con el
-/// PlanId que ya viene en el sobre (nunca uno propio) — ver CrearPlanCommand.</summary>
-public sealed record CrearPlanInput(string Nombre, string VehiculoId);
+/// <summary>"crear_plan" — espeja clsCrearPlanRequest. El plan lo crea Cubicador con el
+/// PlanId que ya viene en el sobre (nunca uno propio) — ver clsCrearPlanCommand.</summary>
+public sealed record clsCrearPlanInput(string Nombre, string VehiculoId);
 
 /// <summary>"crear_plan_demo" — sin payload: Cubicador elige internamente el vehículo y
 /// los ítems del escenario de demostración (equivalente a application/plan_cargue/demo.py).</summary>
-public sealed record CrearPlanDemoInput;
+public sealed record clsCrearPlanDemoInput;
 
 /// <summary>
 /// [S3-HU-04.3, issue #78] "crear_desde_linea" — dispara la generación de la flota
@@ -76,15 +76,15 @@ public sealed record CrearPlanDemoInput;
 /// (verificado contra <c>cubicador/worker/main.py</c>) — este payload es lo único que
 /// faltaba del lado de NEXO para poder publicarlo. <c>LineaSolicitudId</c> espeja el mismo
 /// campo (camelCase) que <c>worker/main.py</c> lee como <c>solicitud["lineaSolicitudId"]</c>.
-/// Ver <see cref="Application.CasosDeUso.PlanDeCargue.CrearPlanDesdeLineaCommand"/>.
+/// Ver <see cref="Application.CasosDeUso.PlanDeCargue.clsCrearPlanDesdeLineaCommand"/>.
 /// </summary>
-public sealed record CrearPlanDesdeLineaInput(string LineaSolicitudId);
+public sealed record clsCrearPlanDesdeLineaInput(string LineaSolicitudId);
 
-public sealed record EjeVehiculoInput(decimal PosicionMm, decimal CapacidadKg);
+public sealed record clsEjeVehiculoInput(decimal PosicionMm, decimal CapacidadKg);
 
-/// <summary>"guardar_vehiculo" — espeja GuardarVehiculoInput. Id nulo = alta; con Id =
+/// <summary>"guardar_vehiculo" — espeja clsGuardarVehiculoInput. Id nulo = alta; con Id =
 /// actualización (upsert), igual semántica que el endpoint síncrono que reemplaza.</summary>
-public sealed record GuardarVehiculoInput(
+public sealed record clsGuardarVehiculoInput(
     string? Id,
     string Nombre,
     string? Descripcion,
@@ -96,18 +96,18 @@ public sealed record GuardarVehiculoInput(
     decimal PuertaAnchoMm,
     decimal PuertaAltoMm,
     string PuertaPosicion,
-    IReadOnlyList<EjeVehiculoInput> Ejes,
+    IReadOnlyList<clsEjeVehiculoInput> Ejes,
     decimal ToleranciaParedesMm = 0,
     decimal ToleranciaEntreUnidadesMm = 0);
 
 /// <summary>"guardar_item" — espeja GuardarItemPlanCargueInput. Id nulo = alta; con Id =
 /// actualización.</summary>
-public sealed record GuardarItemInput(
+public sealed record clsGuardarItemInput(
     string? Id,
     string? Sku,
     string Descripcion,
     string? Pedido,
-    string? Cliente,
+    string? clsCliente,
     string? Destino,
     int SecuenciaEntrega,
     decimal LargoMm,
@@ -131,18 +131,18 @@ public sealed record GuardarItemInput(
 
 /// <summary>"importar_items" — entre 1 y 2.000 (misma regla que Cubicador valida otra vez
 /// del lado del worker; NEXO valida temprano para dar 400 rápido sin encolar nada).</summary>
-public sealed record ImportarItemsInput(IReadOnlyList<GuardarItemInput> Items);
+public sealed record clsImportarItemsInput(IReadOnlyList<clsGuardarItemInput> Items);
 
 /// <summary>"eliminar_item" — el PlanId del sobre identifica el plan; este payload solo
 /// agrega el item dentro de ese plan.</summary>
-public sealed record EliminarItemInput(string ItemId);
+public sealed record clsEliminarItemInput(string ItemId);
 
 /// <summary>"eliminar_plan" — sin payload adicional: el PlanId del sobre basta.</summary>
-public sealed record EliminarPlanInput;
+public sealed record clsEliminarPlanInput;
 
 /// <summary>"eliminar_vehiculo" — sin payload adicional: el id del vehículo viaja en el
 /// PlanId del sobre, igual que hace "guardar_vehiculo" (ver la nota de esa asimetría en
-/// <see cref="GuardarVehiculoInput"/>: los comandos de catálogo no tienen plan, así que
+/// <see cref="clsGuardarVehiculoInput"/>: los comandos de catálogo no tienen plan, así que
 /// reutilizan ese campo como identidad del recurso afectado).
 ///
 /// Cierra el par de "guardar_vehiculo": el frontend llama <c>eliminarVehiculo()</c>
@@ -154,12 +154,12 @@ public sealed record EliminarPlanInput;
 /// planes de cargue asociados (application/plan_cargue/vehiculos.py::eliminar_vehiculo).
 /// Es un rechazo de negocio normal, viaja como "cubicacion.rechazada" y no se
 /// reintenta.</summary>
-public sealed record EliminarVehiculoInput;
+public sealed record clsEliminarVehiculoInput;
 
 /// <summary>"ajustar_colocacion" — espeja AjusteColocacionInput + el ColocacionId que el
 /// PATCH síncrono llevaba en la ruta. Reemplaza el PATCH directo contra Cubicador
-/// (CompuertaDeParidad.cs no aplica acá: es dato, no cálculo).</summary>
-public sealed record AjustarColocacionInput(
+/// (clsCompuertaDeParidad.cs no aplica acá: es dato, no cálculo).</summary>
+public sealed record clsAjustarColocacionInput(
     string ColocacionId,
     decimal? X,
     decimal? Y,
@@ -174,47 +174,47 @@ public sealed record AjustarColocacionInput(
 /// Mismo shape que publica `RabbitMqEventosPublisher.publicar_plan_generado`.
 ///
 /// S3-HU-03 (issue #110/#111): enriquecido — antes <c>Resultado</c> solo traía
-/// {estado, puntaje, colocaciones: int} (el CONTEO); ahora trae el <c>ResultadoPlanDto</c>
+/// {estado, puntaje, colocaciones: int} (el CONTEO); ahora trae el <c>clsResultadoPlanDto</c>
 /// completo de Cubicador (items, colocaciones con geometría, métricas, incidencias) para
-/// que <see cref="Infrastructure.Cubicacion.PlanDeCargueGeneradoConsumer"/> proyecte la
+/// que <see cref="Infrastructure.Cubicacion.clsPlanDeCargueGeneradoConsumer"/> proyecte la
 /// base de NEXO sin volver a consultar a Cubicador. Tamaño medido ANTES de este cambio
 /// en docs/decisiones/medicion-evento-enriquecido-plan-cargue.md (issue #109).
 ///
 /// [S3-HU-04.3, issue #78] LIMITACIÓN CONOCIDA: cuando "crear_desde_linea" reparte la carga
 /// en varios vehículos, hoy solo se publica UN evento de estos, para el primer plan de la
 /// flota (ver worker/main.py::_ejecutar_solicitud) — los vehículos 2..N no llegan acá. Ver
-/// la nota completa en <see cref="Application.CasosDeUso.PlanDeCargue.CrearPlanDesdeLineaCommand"/>.
+/// la nota completa en <see cref="Application.CasosDeUso.PlanDeCargue.clsCrearPlanDesdeLineaCommand"/>.
 /// </summary>
-public sealed record PlanDeCargueGenerado(string CorrelationId, string PlanId, ResultadoDeCubicacion Resultado);
+public sealed record clsPlanDeCargueGenerado(string CorrelationId, string PlanId, clsResultadoDeCubicacion Resultado);
 
-public sealed record ResultadoDeCubicacion(
-    PlanCargueEvento Plan,
-    VehiculoCubicacionEvento Vehiculo,
-    IReadOnlyList<ColocacionCargueEvento> Colocaciones,
-    MetricasCubicacionEvento? Metricas,
-    IReadOnlyList<IncidenciaValidacionEvento> Incidencias);
+public sealed record clsResultadoDeCubicacion(
+    clsPlanCargueEvento Plan,
+    clsVehiculoCubicacionEvento Vehiculo,
+    IReadOnlyList<clsColocacionCargueEvento> Colocaciones,
+    clsMetricasCubicacionEvento? Metricas,
+    IReadOnlyList<clsIncidenciaValidacionEvento> Incidencias);
 
-public sealed record PlanCargueEvento(
+public sealed record clsPlanCargueEvento(
     string Id, string Nombre, string VehiculoId, string? LineaSolicitudId, int NumeroVehiculo,
     string Estado, string Estrategia, string Algoritmo, int? Semilla,
     decimal PesoTotalKg, decimal VolumenUtilizadoM3, decimal UtilizacionVolumen, decimal UtilizacionPiso,
-    decimal Puntaje, IReadOnlyList<ItemPlanCargueEvento> Items);
+    decimal Puntaje, IReadOnlyList<clsItemPlanCargueEvento> Items);
 
-public sealed record ItemPlanCargueEvento(
-    string Id, string PlanCargueId, string Sku, string Descripcion, string? Pedido, string? Cliente,
+public sealed record clsItemPlanCargueEvento(
+    string Id, string PlanCargueId, string Sku, string Descripcion, string? Pedido, string? clsCliente,
     string? Destino, int SecuenciaEntrega, decimal LargoMm, decimal AnchoMm, decimal AltoMm, decimal PesoKg,
     int Cantidad, string? Color, int Prioridad, string? TipoEmbalaje, bool Apilable, int MaxNiveles,
     decimal MaxPesoEncimaKg, bool Rotable, bool MantenerVertical, bool Fragil, bool Peligroso, bool Refrigerado,
     string? GrupoCompatibilidad, string? Observaciones);
 
-public sealed record ColocacionCargueEvento(
+public sealed record clsColocacionCargueEvento(
     string Id, string PlanCargueId, string ItemPlanCargueId, int IndiceUnidad, bool Cargada,
     decimal X, decimal Y, decimal Z, decimal LargoColocadoMm, decimal AnchoColocadoMm, decimal AltoColocadoMm,
     int OrientacionIndice, int SecuenciaCargue, string? SoporteColocacionId, decimal PorcentajeSoporte,
     decimal PesoEncimaKg, string EstadoEstabilidad, string Accesibilidad, bool Bloqueada, bool AjusteManual,
     string? CodigoRechazo, string? RazonRechazo);
 
-public sealed record MetricasCubicacionEvento(
+public sealed record clsMetricasCubicacionEvento(
     decimal VolumenInternoM3, decimal VolumenUtilizadoM3, decimal PorcentajeVolumen,
     decimal AreaPisoM2, decimal AreaPisoUtilizadaM2, decimal PorcentajePiso,
     decimal PesoMaximoKg, decimal PesoCargadoKg, decimal PorcentajePeso,
@@ -224,7 +224,7 @@ public sealed record MetricasCubicacionEvento(
     int Advertencias, int ViolacionesCriticas, decimal Puntaje,
     IReadOnlyDictionary<string, decimal> PuntajesParciales, decimal EspacioVacioUtilM3, decimal EspacioFragmentadoM3);
 
-public sealed record IncidenciaValidacionEvento(
+public sealed record clsIncidenciaValidacionEvento(
     string Severidad, string CodigoRegla, string Titulo, string Descripcion,
     string? AccionSugerida, string? ColocacionItemId);
 
@@ -232,7 +232,7 @@ public sealed record IncidenciaValidacionEvento(
 /// Evento entrante: Cubicador -> NEXO, routing key `cubicacion.rechazada`.
 /// Mismo shape que publica `RabbitMqEventosPublisher.publicar_cubicacion_rechazada`.
 /// </summary>
-public sealed record CubicacionRechazada(string CorrelationId, string PlanId, string Codigo, string Mensaje);
+public sealed record clsCubicacionRechazada(string CorrelationId, string PlanId, string Codigo, string Mensaje);
 
 // ---------------------------------------------------------------------------------
 // S3-HU-03 (issue #110/#111): catálogo de vehículos. Cubicador es la fuente de verdad
@@ -243,11 +243,11 @@ public sealed record CubicacionRechazada(string CorrelationId, string PlanId, st
 
 /// <summary>Evento entrante: Cubicador -> NEXO, routing key `vehiculo.creado` — publicado
 /// cuando `guardar_vehiculo` (S3-HU-02) crea una fila nueva (Id no existía antes).</summary>
-public sealed record VehiculoCreado(string CorrelationId, VehiculoCubicacionEvento Vehiculo);
+public sealed record clsVehiculoCreado(string CorrelationId, clsVehiculoCubicacionEvento Vehiculo);
 
 /// <summary>Evento entrante: Cubicador -> NEXO, routing key `vehiculo.actualizado` —
 /// publicado cuando `guardar_vehiculo` actualiza una fila existente.</summary>
-public sealed record VehiculoActualizado(string CorrelationId, VehiculoCubicacionEvento Vehiculo);
+public sealed record clsVehiculoActualizado(string CorrelationId, clsVehiculoCubicacionEvento Vehiculo);
 
 /// <summary>Evento entrante: Cubicador -> NEXO, routing key `vehiculo.eliminado` —
 /// publicado cuando `eliminar_vehiculo` borra la fila de verdad (si Cubicador rechaza
@@ -258,13 +258,13 @@ public sealed record VehiculoActualizado(string CorrelationId, VehiculoCubicacio
 /// vehículo inexistente y el <c>crear_plan</c> que lo eligiera fallaría con
 /// VEHICULO_INVALIDO.
 ///
-/// Solo lleva el id, no el <see cref="VehiculoCubicacionEvento"/> completo: no hay nada
+/// Solo lleva el id, no el <see cref="clsVehiculoCubicacionEvento"/> completo: no hay nada
 /// que proyectar, solo una fila que borrar.</summary>
-public sealed record VehiculoEliminado(string CorrelationId, string VehiculoId);
+public sealed record clsVehiculoEliminado(string CorrelationId, string VehiculoId);
 
-public sealed record VehiculoCubicacionEvento(
+public sealed record clsVehiculoCubicacionEvento(
     string Id, string Nombre, string? Descripcion,
     decimal LargoInternoMm, decimal AnchoInternoMm, decimal AltoInternoMm,
     decimal CapacidadKg, decimal TaraKg, decimal PuertaAnchoMm, decimal PuertaAltoMm, string PuertaPosicion,
-    IReadOnlyList<EjeVehiculoInput> Ejes, decimal ToleranciaParedesMm, decimal ToleranciaEntreUnidadesMm,
+    IReadOnlyList<clsEjeVehiculoInput> Ejes, decimal ToleranciaParedesMm, decimal ToleranciaEntreUnidadesMm,
     bool EsPreset);

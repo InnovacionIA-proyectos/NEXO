@@ -10,7 +10,7 @@ namespace Nexo.Application.Common.Ports;
 /// </summary>
 public interface IResolverIdentidadPortalPort
 {
-    Task<IdentidadResueltaDto?> ResolverAsync(long idPortal, CancellationToken ct = default);
+    Task<clsIdentidadResueltaDto?> ResolverAsync(long idPortal, CancellationToken ct = default);
 }
 
 /// <summary>
@@ -20,4 +20,4 @@ public interface IResolverIdentidadPortalPort
 /// pudo resolver identidad alguna" (401, cuando el método devuelve null en vez de esta
 /// clase).
 /// </summary>
-public sealed record IdentidadResueltaDto(Guid? UsuarioId, string Nombre, RolUsuario? Rol);
+public sealed record clsIdentidadResueltaDto(Guid? UsuarioId, string Nombre, RolUsuario? Rol);

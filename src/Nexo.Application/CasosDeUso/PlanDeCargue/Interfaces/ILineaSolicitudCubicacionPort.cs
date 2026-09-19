@@ -12,5 +12,5 @@ namespace Nexo.Application.CasosDeUso.PlanDeCargue.Interfaces;
 public interface ILineaSolicitudCubicacionPort
 {
     /// <summary>Null si la línea no existe.</summary>
-    Task<LineaParaCubicacionDto?> ObtenerAsync(Guid lineaSolicitudId, CancellationToken ct = default);
+    Task<clsLineaParaCubicacionDto?> ObtenerAsync(Guid lineaSolicitudId, CancellationToken ct = default);
 }

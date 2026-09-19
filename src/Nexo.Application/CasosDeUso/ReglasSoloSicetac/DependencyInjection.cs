@@ -7,8 +7,8 @@ namespace Nexo.Application.CasosDeUso.ReglasSoloSicetac;
 public static class DependencyInjection
 {
     public static IServiceCollection AddReglasSoloSicetacUseCases(this IServiceCollection services) => services
-        .AddScoped<ICommandHandler<CrearReglaSoloSicetacCommand, ReglaSoloSicetacDto>, CrearReglaSoloSicetacCommandHandler>()
-        .AddScoped<ICommandHandler<EliminarReglaSoloSicetacCommand, bool>, EliminarReglaSoloSicetacCommandHandler>()
-        .AddScoped<ICommandHandler<ImportarReglasSoloSicetacExcelCommand, ImportarReglasResultDto>, ImportarReglasSoloSicetacExcelCommandHandler>()
-        .AddScoped<IQueryHandler<ListarReglasSoloSicetacQuery, IReadOnlyList<ReglaSoloSicetacDto>>, ListarReglasSoloSicetacQueryHandler>();
+        .AddScoped<ICommandHandler<clsCrearReglaSoloSicetacCommand, clsReglaSoloSicetacDto>, clsCrearReglaSoloSicetacCommandHandler>()
+        .AddScoped<ICommandHandler<clsEliminarReglaSoloSicetacCommand, bool>, clsEliminarReglaSoloSicetacCommandHandler>()
+        .AddScoped<ICommandHandler<clsImportarReglasSoloSicetacExcelCommand, clsImportarReglasResultDto>, clsImportarReglasSoloSicetacExcelCommandHandler>()
+        .AddScoped<IQueryHandler<clsListarReglasSoloSicetacQuery, IReadOnlyList<clsReglaSoloSicetacDto>>, clsListarReglasSoloSicetacQueryHandler>();
 }

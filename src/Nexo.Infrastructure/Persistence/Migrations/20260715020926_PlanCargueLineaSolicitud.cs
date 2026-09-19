@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace Nexo.Infrastructure.Migrations
 {
     /// <inheritdoc />
-    public partial class PlanCargueLineaSolicitud : Migration
+    public partial class clsPlanCargueLineaSolicitud : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)

@@ -10,5 +10,5 @@ public interface ITarifasHistoricasPort
 
     Task<bool> ExistenParaCotizacionAsync(Guid cotizacionId, CancellationToken ct);
 
-    void Agregar(TarifaHistorica tarifa);
+    void Agregar(clsTarifaHistorica tarifa);
 }

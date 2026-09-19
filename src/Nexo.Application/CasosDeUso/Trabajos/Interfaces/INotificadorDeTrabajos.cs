@@ -16,5 +16,5 @@ namespace Nexo.Application.CasosDeUso.Trabajos.Interfaces;
 /// </summary>
 public interface INotificadorDeTrabajos
 {
-    Task AvisarAsync(AvisoDeTrabajo aviso, CancellationToken ct = default);
+    Task AvisarAsync(clsAvisoDeTrabajo aviso, CancellationToken ct = default);
 }

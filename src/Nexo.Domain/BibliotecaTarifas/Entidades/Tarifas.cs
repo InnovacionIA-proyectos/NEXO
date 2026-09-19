@@ -8,7 +8,7 @@ using Nexo.Domain.Enums;
 namespace Nexo.Domain.BibliotecaTarifas.Entidades;
 
 /// <summary>Caché del piso regulatorio SICE-TAC, importada desde el Excel exportado de la fuente.</summary>
-public class TarifaSicetac : IAuditable
+public class clsTarifaSicetac : IAuditable
 {
     public Guid Id { get; set; } = Guid.NewGuid();
 
@@ -22,7 +22,7 @@ public class TarifaSicetac : IAuditable
     public Guid? RutaId { get; set; }
 
     [JsonIgnore]
-    public Ruta? Ruta { get; set; }
+    public clsRuta? clsRuta { get; set; }
 
     [Required, MaxLength(12)]
     public string OrigenDane { get; set; } = null!;
@@ -70,19 +70,19 @@ public class TarifaSicetac : IAuditable
 }
 
 /// <summary>Tarifa ganada en el pasado, reutilizable (Biblioteca de Tarifas Ganadas).</summary>
-public class TarifaHistorica : IAuditable
+public class clsTarifaHistorica : IAuditable
 {
     public Guid Id { get; set; } = Guid.NewGuid();
 
     public Guid? RutaId { get; set; }
 
     [JsonIgnore]
-    public Ruta? Ruta { get; set; }
+    public clsRuta? clsRuta { get; set; }
 
     public Guid? ConfigVehiculoId { get; set; }
 
     [JsonIgnore]
-    public ConfiguracionVehiculo? ConfiguracionVehiculo { get; set; }
+    public clsConfiguracionVehiculo? clsConfiguracionVehiculo { get; set; }
 
     public TipologiaCarga? Tipologia { get; set; }
 
@@ -95,7 +95,7 @@ public class TarifaHistorica : IAuditable
     public Guid? CotizacionId { get; set; }
 
     [JsonIgnore]
-    public Cotizacion? Cotizacion { get; set; }
+    public clsCotizacion? clsCotizacion { get; set; }
 
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;

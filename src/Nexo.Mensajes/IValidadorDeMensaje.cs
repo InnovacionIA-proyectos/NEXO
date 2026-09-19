@@ -14,6 +14,6 @@ namespace Nexo.Mensajes;
 /// <typeparam name="T">Tipo de mensaje que valida.</typeparam>
 public interface IValidadorDeMensaje<in T> where T : class
 {
-    /// <summary>Motivos por los que el mensaje no puede publicarse. Vacío = válido.</summary>
+    /// <summary>clsMotivos por los que el mensaje no puede publicarse. Vacío = válido.</summary>
     IReadOnlyList<string> Validar(T mensaje);
 }

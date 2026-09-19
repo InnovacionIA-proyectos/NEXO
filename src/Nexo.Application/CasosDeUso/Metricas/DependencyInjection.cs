@@ -7,6 +7,6 @@ namespace Nexo.Application.CasosDeUso.Metricas;
 public static class DependencyInjection
 {
     public static IServiceCollection AddMetricasUseCases(this IServiceCollection services) => services
-        .AddScoped<IQueryHandler<ObtenerCumplimientoQuery, CumplimientoDto>, ObtenerCumplimientoQueryHandler>()
-        .AddScoped<IQueryHandler<ObtenerKpisPilotoQuery, KpisPilotoDto>, ObtenerKpisPilotoQueryHandler>();
+        .AddScoped<IQueryHandler<clsObtenerCumplimientoQuery, clsCumplimientoDto>, clsObtenerCumplimientoQueryHandler>()
+        .AddScoped<IQueryHandler<clsObtenerKpisPilotoQuery, clsKpisPilotoDto>, clsObtenerKpisPilotoQueryHandler>();
 }

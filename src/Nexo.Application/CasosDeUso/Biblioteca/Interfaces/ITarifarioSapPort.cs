@@ -5,9 +5,9 @@ namespace Nexo.Application.CasosDeUso.Biblioteca.Interfaces;
 /// <summary>
 /// Motor tarifario SAP TM (replica getConsultarTarifaFlete). Null cuando la
 /// conexión al datacenter (DbSolucionesTi) no está configurada — se degrada,
-/// nunca falla. Implementado por Infrastructure/Adapters/TarifarioSapAdapter.cs.
+/// nunca falla. Implementado por Infrastructure/Adapters/clsTarifarioSapAdapter.cs.
 /// </summary>
 public interface ITarifarioSapPort
 {
-    Task<ResultadoTarifarioSap?> ConsultarAsync(ConsultaTarifarioSap consulta, CancellationToken ct = default);
+    Task<clsResultadoTarifarioSap?> ConsultarAsync(clsConsultaTarifarioSap consulta, CancellationToken ct = default);
 }

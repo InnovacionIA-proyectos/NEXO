@@ -1,6 +1,6 @@
 namespace Nexo.Application.CasosDeUso.Solicitudes.Interfaces;
 
-public sealed record ClienteDwDto(string Bp, string Nit, string Nombre);
+public sealed record clsClienteDwDto(string Bp, string Nit, string Nombre);
 
 /// <summary>
 /// Clientes reales del Data Warehouse (DWCubosOperacionesEBS.DimBPSolicitante).
@@ -12,5 +12,5 @@ public interface IClientesDwPort
     bool Configurado { get; }
 
     /// <summary>Catálogo completo (~4,5 K filas), cacheado 1 h.</summary>
-    Task<IReadOnlyList<ClienteDwDto>> ListarAsync(CancellationToken ct);
+    Task<IReadOnlyList<clsClienteDwDto>> ListarAsync(CancellationToken ct);
 }

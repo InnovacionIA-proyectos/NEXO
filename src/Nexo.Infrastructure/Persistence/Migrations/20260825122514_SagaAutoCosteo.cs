@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace Nexo.Infrastructure.Persistence.Migrations
 {
     /// <inheritdoc />
-    public partial class SagaAutoCosteo : Migration
+    public partial class clsSagaAutoCosteo : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)

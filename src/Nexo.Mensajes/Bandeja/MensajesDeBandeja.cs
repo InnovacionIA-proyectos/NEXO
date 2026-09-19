@@ -4,7 +4,7 @@ namespace Nexo.Mensajes.Bandeja;
 /// Por qué cambió la bandeja. Viaja en el aviso para que el cliente pueda decidir —y
 /// para que en el log se entienda qué provocó cada refresco.
 /// </summary>
-public static class MotivoDeCambio
+public static class clsMotivoDeCambio
 {
     /// <summary>Entró una solicitud. La bandeja tiene una fila más, ya priorizada.</summary>
     public const string SolicitudNueva = "solicitud-nueva";
@@ -55,6 +55,6 @@ public static class MotivoDeCambio
 /// consultas y el mismo resultado. Agregar un contador sería complejidad sin problema
 /// que resolver.
 /// </summary>
-/// <param name="Motivo">Uno de <see cref="MotivoDeCambio"/>.</param>
+/// <param name="Motivo">Uno de <see cref="clsMotivoDeCambio"/>.</param>
 /// <param name="En">Cuándo se produjo el cambio, en UTC.</param>
-public sealed record BandejaCambio(string Motivo, DateTimeOffset En);
+public sealed record clsBandejaCambio(string Motivo, DateTimeOffset En);

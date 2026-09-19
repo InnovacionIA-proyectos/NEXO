@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace Nexo.Infrastructure.Migrations
 {
     /// <inheritdoc />
-    public partial class Cubicador3D : Migration
+    public partial class clsCubicador3D : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -80,7 +80,7 @@ namespace Nexo.Infrastructure.Migrations
                     Sku = table.Column<string>(type: "nvarchar(60)", maxLength: 60, nullable: false),
                     Descripcion = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: false),
                     Pedido = table.Column<string>(type: "nvarchar(60)", maxLength: 60, nullable: true),
-                    Cliente = table.Column<string>(type: "nvarchar(120)", maxLength: 120, nullable: true),
+                    clsCliente = table.Column<string>(type: "nvarchar(120)", maxLength: 120, nullable: true),
                     Destino = table.Column<string>(type: "nvarchar(120)", maxLength: 120, nullable: true),
                     SecuenciaEntrega = table.Column<int>(type: "int", nullable: false),
                     LargoMm = table.Column<decimal>(type: "decimal(12,2)", nullable: false),

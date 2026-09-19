@@ -17,7 +17,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
     /// contenedor. EF la valida igual: si la instantánea del modelo no coincidiera con el
     /// modelo real, MigrateAsync fallaría con PendingModelChangesWarning.
     /// </summary>
-    public partial class CadenaDePriorizacion : Migration
+    public partial class clsCadenaDePriorizacion : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)

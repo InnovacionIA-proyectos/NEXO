@@ -8,25 +8,25 @@ namespace Nexo.Application.CasosDeUso.Cotizaciones.DTOs;
 // controller de Api los serializa directamente como respuesta HTTP (no hay un
 // segundo mapeo redundante en Api para esto).
 
-public record CotizacionLineaDto(
+public record clsCotizacionLineaDto(
     Guid Id, Guid? LineaSolicitudId, decimal ValorFlete, FuenteFlete Fuente,
     decimal? ValorAprovisionamiento = null, decimal? ValorRetornoContenedor = null);
 
-public record CotizacionConexoDto(
+public record clsCotizacionConexoDto(
     Guid Id, Guid? ServicioConexoId, string? Nombre, string Categoria, decimal Cantidad, decimal ValorAplicado);
 
-public record CotizacionDto(
+public record clsCotizacionDto(
     Guid Id,
     Guid SolicitudId,
     EstadoCotizacion Estado,
     ResultadoCotizacion Resultado,
     decimal Total,
     DateTimeOffset? EntregadaAt,
-    IReadOnlyList<CotizacionLineaDto> Lineas,
-    IReadOnlyList<CotizacionConexoDto> Conexos);
+    IReadOnlyList<clsCotizacionLineaDto> Lineas,
+    IReadOnlyList<clsCotizacionConexoDto> Conexos);
 
 /// <summary>Resultado de aplicar las propuestas de la Biblioteca como fletes por defecto.</summary>
-public record AplicarPropuestasResultDto(CotizacionDto Cotizacion, int Agregadas);
+public record clsAplicarPropuestasResultDto(clsCotizacionDto clsCotizacion, int Agregadas);
 
 /// <summary>
 /// Resultado de entregar la cotización.
@@ -43,11 +43,11 @@ public record AplicarPropuestasResultDto(CotizacionDto Cotizacion, int Agregadas
 /// Data Warehouse dentro de la petición, que es una de las esperas que esta HU quita.
 /// </summary>
 /// <param name="EstadoNotificacion">Hoy siempre "encolada". Es lo único cierto al responder.</param>
-/// <param name="Mensaje">Texto para mostrar a quien entregó.</param>
-public record EntregarCotizacionResultDto(
-    CotizacionDto Cotizacion,
+/// <param name="Mensaje">clsTexto para mostrar a quien entregó.</param>
+public record clsEntregarCotizacionResultDto(
+    clsCotizacionDto clsCotizacion,
     string EstadoNotificacion,
     string Mensaje);
 
 /// <summary>Archivo binario de salida (usado por la exportación a Excel).</summary>
-public record ArchivoDto(byte[] Contenido, string NombreArchivo, string ContentType);
+public record clsArchivoDto(byte[] Contenido, string NombreArchivo, string ContentType);

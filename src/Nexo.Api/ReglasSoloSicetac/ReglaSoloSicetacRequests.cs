@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Nexo.Api.ReglasSoloSicetac;
 
-public class CrearReglaSoloSicetacRequest
+public class clsCrearReglaSoloSicetacRequest
 {
     [Required, MaxLength(150)]
     public string Origen { get; set; } = null!;

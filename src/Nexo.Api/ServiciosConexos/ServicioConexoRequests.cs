@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Nexo.Api.ServiciosConexos;
 
-public class CrearServicioConexoRequest
+public class clsCrearServicioConexoRequest
 {
     [Required, MaxLength(120)]
     public string Nombre { get; set; } = null!;
@@ -23,7 +23,7 @@ public class CrearServicioConexoRequest
 }
 
 /// <summary>PATCH: solo se actualizan los campos presentes (no nulos).</summary>
-public class EditarServicioConexoRequest
+public class clsEditarServicioConexoRequest
 {
     [MaxLength(120)]
     public string? Nombre { get; set; }

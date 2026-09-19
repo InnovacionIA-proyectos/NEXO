@@ -5,13 +5,13 @@ namespace Nexo.Api.Cotizaciones;
 // DTOs de ENTRADA del API: la validación HTTP (DataAnnotations, [ApiController])
 // vive aquí. El controller los mapea 1:1 a un Command de Application.
 
-public class CrearCotizacionRequest
+public class clsCrearCotizacionRequest
 {
     [Required]
     public Guid SolicitudId { get; set; }
 }
 
-public class AgregarLineaCotizacionRequest
+public class clsAgregarLineaCotizacionRequest
 {
     public Guid? LineaSolicitudId { get; set; }
 
@@ -28,13 +28,13 @@ public class AgregarLineaCotizacionRequest
     public string Fuente { get; set; } = null!;
 }
 
-public class AgregarConexosRequest
+public class clsAgregarConexosRequest
 {
     [Required, MinLength(1, ErrorMessage = "Debe incluir al menos un servicio conexo.")]
-    public List<ConexoItemRequest> Items { get; set; } = new();
+    public List<clsConexoItemRequest> Items { get; set; } = new();
 }
 
-public class ConexoItemRequest
+public class clsConexoItemRequest
 {
     [Required]
     public Guid ServicioConexoId { get; set; }
@@ -47,7 +47,7 @@ public class ConexoItemRequest
     public decimal? ValorAplicado { get; set; }
 }
 
-public class MarcarResultadoRequest
+public class clsMarcarResultadoRequest
 {
     [Required]
     [RegularExpression("(?i)^(ganada|perdida)$", ErrorMessage = "Resultado debe ser 'ganada' o 'perdida'.")]

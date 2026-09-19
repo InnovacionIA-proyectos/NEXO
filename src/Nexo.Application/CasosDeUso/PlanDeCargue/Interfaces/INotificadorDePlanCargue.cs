@@ -15,5 +15,5 @@ namespace Nexo.Application.CasosDeUso.PlanDeCargue.Interfaces;
 /// </summary>
 public interface INotificadorDePlanCargue
 {
-    Task AvisarAsync(AvisoPlanCargueDto aviso, CancellationToken ct = default);
+    Task AvisarAsync(clsAvisoPlanCargueDto aviso, CancellationToken ct = default);
 }

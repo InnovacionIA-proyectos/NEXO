@@ -8,51 +8,51 @@ namespace Nexo.Application.CasosDeUso.Cubicacion.DTOs;
 /// <see cref="Interfaces.ICubicacionRapidaPort"/> para por qué esto es una excepción
 /// declarada al patrón "solo colas" del resto de Cubicación.
 /// </summary>
-public sealed record ItemCubicacionRapidaDto(
+public sealed record clsItemCubicacionRapidaDto(
     string? Descripcion, int Cantidad, decimal LargoCm, decimal AnchoCm, decimal AltoCm,
     decimal? PesoKg, string? TipoMercancia);
 
-public sealed record CubicacionRapidaSolicitud(
-    IReadOnlyList<ItemCubicacionRapidaDto> Items, IReadOnlyList<string>? UnidadIds, string? ClaseViaje);
+public sealed record clsCubicacionRapidaSolicitud(
+    IReadOnlyList<clsItemCubicacionRapidaDto> Items, IReadOnlyList<string>? UnidadIds, string? ClaseViaje);
 
-public sealed record UnidadCubicacionDto(
+public sealed record clsUnidadCubicacionDto(
     string Id, string Nombre, string Geometria, string ControlAmbiental,
     decimal LargoUtilM, decimal AnchoUtilM, decimal AltoUtilM,
     decimal PesoBrutoPermitidoKg, decimal PesoVacioKg, IReadOnlyList<decimal> CapacidadPorEjeKg,
     string? ConfigVehiculo, string? Carroceria, string? ClaseViaje, string? ClaseContenedor);
 
-public sealed record CriterioCubicacionDto(string Criterio, string Resultado, string Detalle, string Criticidad);
+public sealed record clsCriterioCubicacionDto(string Criterio, string Resultado, string Detalle, string Criticidad);
 
-public sealed record ColocacionDisposicionDto(
+public sealed record clsColocacionDisposicionDto(
     string Descripcion, decimal X, decimal Y, decimal Z,
     decimal LargoM, decimal AnchoM, decimal AltoM, decimal PesoKg);
 
-public sealed record DisposicionDto(
+public sealed record clsDisposicionDto(
     decimal PesoTotalKg, IReadOnlyList<decimal> CentroGravedadM, bool MargenEstabilidadOk,
     decimal FactorUtilizacionVolumen, IReadOnlyList<string> ItemsSinUbicar,
-    IReadOnlyList<ColocacionDisposicionDto> Colocaciones);
+    IReadOnlyList<clsColocacionDisposicionDto> Colocaciones);
 
-public sealed record MatrizCubicacionDto(
-    UnidadCubicacionDto Unidad, IReadOnlyList<CriterioCubicacionDto> Criterios, string Banda,
-    IReadOnlyList<string> Advertencias, DisposicionDto? Disposicion);
+public sealed record clsMatrizCubicacionDto(
+    clsUnidadCubicacionDto Unidad, IReadOnlyList<clsCriterioCubicacionDto> Criterios, string Banda,
+    IReadOnlyList<string> Advertencias, clsDisposicionDto? Disposicion);
 
-public sealed record SugerenciaVehiculoDto(
+public sealed record clsSugerenciaVehiculoDto(
     string UnidadId, string UnidadNombre, string Banda, decimal FactorUtilizacion,
     string? ConfigVehiculo, string? Carroceria, string? ClaseViaje, string? ClaseContenedor);
 
-public sealed record SugerenciaFlotaDto(
+public sealed record clsSugerenciaFlotaDto(
     string UnidadId, string UnidadNombre, int CantidadVehiculos, decimal UtilizacionPromedio,
     string? ConfigVehiculo, string? Carroceria, string? ClaseViaje, string? ClaseContenedor,
-    IReadOnlyList<DisposicionDto> Disposiciones);
+    IReadOnlyList<clsDisposicionDto> Disposiciones);
 
-public sealed record MedidasEstandarDto(decimal LargoMaxCm, decimal AnchoMaxCm, decimal AltoMaxCm, decimal PesoMaxKg);
+public sealed record clsMedidasEstandarDto(decimal LargoMaxCm, decimal AnchoMaxCm, decimal AltoMaxCm, decimal PesoMaxKg);
 
-public sealed record PiezaExcedidaDto(
+public sealed record clsPiezaExcedidaDto(
     string Descripcion, IReadOnlyList<string> Excesos, decimal LargoCm, decimal AnchoCm, decimal AltoCm, decimal? PesoKg);
 
-public sealed record DeteccionExtradimensionDto(
-    bool HayExtradimension, MedidasEstandarDto MedidasEstandar, IReadOnlyList<PiezaExcedidaDto> Piezas, string? Sugerencia);
+public sealed record clsDeteccionExtradimensionDto(
+    bool HayExtradimension, clsMedidasEstandarDto MedidasEstandar, IReadOnlyList<clsPiezaExcedidaDto> Piezas, string? Sugerencia);
 
-public sealed record CubicacionRapidaResultado(
-    IReadOnlyList<MatrizCubicacionDto> Matrices, SugerenciaVehiculoDto? Sugerencia, IReadOnlyList<string> Advertencias,
-    SugerenciaFlotaDto? SugerenciaFlota, DeteccionExtradimensionDto? Extradimension);
+public sealed record clsCubicacionRapidaResultado(
+    IReadOnlyList<clsMatrizCubicacionDto> Matrices, clsSugerenciaVehiculoDto? Sugerencia, IReadOnlyList<string> Advertencias,
+    clsSugerenciaFlotaDto? SugerenciaFlota, clsDeteccionExtradimensionDto? Extradimension);

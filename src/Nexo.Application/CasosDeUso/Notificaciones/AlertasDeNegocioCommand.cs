@@ -18,25 +18,25 @@ namespace Nexo.Application.CasosDeUso.Notificaciones;
 // distintas para cada una, y ya son solo 3 — no hay abstracción que valga la pena.
 // ---------------------------------------------------------------------------
 
-public sealed record NotificarTarifaVencidaCommand(Guid LineaId, string Justificacion, DateTimeOffset DetectadaEn)
-    : ICommand<ResultadoDeNotificacionDto>;
+public sealed record clsNotificarTarifaVencidaCommand(Guid LineaId, string Justificacion, DateTimeOffset DetectadaEn)
+    : ICommand<clsResultadoDeNotificacionDto>;
 
 /// <summary>Urgencia Alta: Administrador de Fletes y Administrador de Reglas (partido hoy entre AdminTarifas y ServiciosLogisticos — ver docs/ROLES_Y_PERMISOS.md).</summary>
-public sealed class NotificarTarifaVencidaCommandHandler(
+public sealed class clsNotificarTarifaVencidaCommandHandler(
     IDestinatariosDeAlertaPort destinatarios, ICorreoPort correo)
-    : ICommandHandler<NotificarTarifaVencidaCommand, ResultadoDeNotificacionDto>
+    : ICommandHandler<clsNotificarTarifaVencidaCommand, clsResultadoDeNotificacionDto>
 {
-    public async Task<ResultadoDeNotificacionDto> Handle(NotificarTarifaVencidaCommand command, CancellationToken ct = default)
+    public async Task<clsResultadoDeNotificacionDto> Handle(clsNotificarTarifaVencidaCommand command, CancellationToken ct = default)
     {
         if (!correo.Configurado)
-            return ResultadoDeNotificacionDto.NoHabiaQueEnviar("La salida de correo corporativo no está configurada.");
+            return clsResultadoDeNotificacionDto.NoHabiaQueEnviar("La salida de correo corporativo no está configurada.");
 
         var email = new HashSet<string>(
             [.. await destinatarios.EmailsPorRolAsync(RolUsuario.CoordinadorFletes, ct),
              .. await destinatarios.EmailsPorRolAsync(RolUsuario.AdminTarifas, ct),
              .. await destinatarios.EmailsPorRolAsync(RolUsuario.ServiciosLogisticos, ct)]);
         if (email.Count == 0)
-            return ResultadoDeNotificacionDto.NoHabiaQueEnviar("No hay usuarios activos en los roles a notificar.");
+            return clsResultadoDeNotificacionDto.NoHabiaQueEnviar("No hay usuarios activos en los roles a notificar.");
 
         var cuerpo = $"""
             <p>Se detectó una tarifa de plaza SAP <strong>vencida</strong> al costear la línea
@@ -47,28 +47,28 @@ public sealed class NotificarTarifaVencidaCommandHandler(
             <p style="color:#777;font-size:12px">Correo automático de Nexo — Alerta de urgencia Alta.</p>
             """;
 
-        var id = await correo.EnviarAsync(new CorreoParaEnviar(
+        var id = await correo.EnviarAsync(new clsCorreoParaEnviar(
             [.. email], "[Nexo] Tarifa de plaza vencida detectada", cuerpo, []), ct);
-        return ResultadoDeNotificacionDto.Enviada(string.Join(", ", email), id, 0);
+        return clsResultadoDeNotificacionDto.Enviada(string.Join(", ", email), id, 0);
     }
 }
 
-public sealed record NotificarLineaFalloTecnicoCommand(Guid TrabajoId, Guid LineaId, string Motivo)
-    : ICommand<ResultadoDeNotificacionDto>;
+public sealed record clsNotificarLineaFalloTecnicoCommand(Guid TrabajoId, Guid LineaId, string Motivo)
+    : ICommand<clsResultadoDeNotificacionDto>;
 
 /// <summary>Urgencia Media: Administrador de Fletes (CoordinadorFletes).</summary>
-public sealed class NotificarLineaFalloTecnicoCommandHandler(
+public sealed class clsNotificarLineaFalloTecnicoCommandHandler(
     IDestinatariosDeAlertaPort destinatarios, ICorreoPort correo)
-    : ICommandHandler<NotificarLineaFalloTecnicoCommand, ResultadoDeNotificacionDto>
+    : ICommandHandler<clsNotificarLineaFalloTecnicoCommand, clsResultadoDeNotificacionDto>
 {
-    public async Task<ResultadoDeNotificacionDto> Handle(NotificarLineaFalloTecnicoCommand command, CancellationToken ct = default)
+    public async Task<clsResultadoDeNotificacionDto> Handle(clsNotificarLineaFalloTecnicoCommand command, CancellationToken ct = default)
     {
         if (!correo.Configurado)
-            return ResultadoDeNotificacionDto.NoHabiaQueEnviar("La salida de correo corporativo no está configurada.");
+            return clsResultadoDeNotificacionDto.NoHabiaQueEnviar("La salida de correo corporativo no está configurada.");
 
         var email = await destinatarios.EmailsPorRolAsync(RolUsuario.CoordinadorFletes, ct);
         if (email.Count == 0)
-            return ResultadoDeNotificacionDto.NoHabiaQueEnviar("No hay usuarios activos con rol CoordinadorFletes.");
+            return clsResultadoDeNotificacionDto.NoHabiaQueEnviar("No hay usuarios activos con rol CoordinadorFletes.");
 
         var cuerpo = $"""
             <p>Una línea del trabajo <strong>{command.TrabajoId}</strong> no se pudo costear:
@@ -78,28 +78,28 @@ public sealed class NotificarLineaFalloTecnicoCommandHandler(
             <p style="color:#777;font-size:12px">Correo automático de Nexo — Alerta de urgencia Media.</p>
             """;
 
-        var id = await correo.EnviarAsync(new CorreoParaEnviar(
+        var id = await correo.EnviarAsync(new clsCorreoParaEnviar(
             email, "[Nexo] Línea sin costear por falla técnica", cuerpo, []), ct);
-        return ResultadoDeNotificacionDto.Enviada(string.Join(", ", email), id, 0);
+        return clsResultadoDeNotificacionDto.Enviada(string.Join(", ", email), id, 0);
     }
 }
 
-public sealed record NotificarCotizacionGanadaCommand(Guid CotizacionId, Guid SolicitudId, DateTimeOffset MarcadaEn)
-    : ICommand<ResultadoDeNotificacionDto>;
+public sealed record clsNotificarCotizacionGanadaCommand(Guid CotizacionId, Guid SolicitudId, DateTimeOffset MarcadaEn)
+    : ICommand<clsResultadoDeNotificacionDto>;
 
 /// <summary>Urgencia Baja: Administrador de Reglas (AdminTarifas).</summary>
-public sealed class NotificarCotizacionGanadaCommandHandler(
+public sealed class clsNotificarCotizacionGanadaCommandHandler(
     IDestinatariosDeAlertaPort destinatarios, ICorreoPort correo)
-    : ICommandHandler<NotificarCotizacionGanadaCommand, ResultadoDeNotificacionDto>
+    : ICommandHandler<clsNotificarCotizacionGanadaCommand, clsResultadoDeNotificacionDto>
 {
-    public async Task<ResultadoDeNotificacionDto> Handle(NotificarCotizacionGanadaCommand command, CancellationToken ct = default)
+    public async Task<clsResultadoDeNotificacionDto> Handle(clsNotificarCotizacionGanadaCommand command, CancellationToken ct = default)
     {
         if (!correo.Configurado)
-            return ResultadoDeNotificacionDto.NoHabiaQueEnviar("La salida de correo corporativo no está configurada.");
+            return clsResultadoDeNotificacionDto.NoHabiaQueEnviar("La salida de correo corporativo no está configurada.");
 
         var email = await destinatarios.EmailsPorRolAsync(RolUsuario.AdminTarifas, ct);
         if (email.Count == 0)
-            return ResultadoDeNotificacionDto.NoHabiaQueEnviar("No hay usuarios activos con rol AdminTarifas.");
+            return clsResultadoDeNotificacionDto.NoHabiaQueEnviar("No hay usuarios activos con rol AdminTarifas.");
 
         var cuerpo = $"""
             <p>La cotización <strong>{command.CotizacionId}</strong> quedó marcada como
@@ -109,8 +109,8 @@ public sealed class NotificarCotizacionGanadaCommandHandler(
             <p style="color:#777;font-size:12px">Correo automático de Nexo — Alerta de urgencia Baja.</p>
             """;
 
-        var id = await correo.EnviarAsync(new CorreoParaEnviar(
+        var id = await correo.EnviarAsync(new clsCorreoParaEnviar(
             email, "[Nexo] Cotización marcada como ganada", cuerpo, []), ct);
-        return ResultadoDeNotificacionDto.Enviada(string.Join(", ", email), id, 0);
+        return clsResultadoDeNotificacionDto.Enviada(string.Join(", ", email), id, 0);
     }
 }

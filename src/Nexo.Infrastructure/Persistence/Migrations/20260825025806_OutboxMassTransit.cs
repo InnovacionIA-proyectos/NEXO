@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace Nexo.Infrastructure.Persistence.Migrations
 {
     /// <inheritdoc />
-    public partial class OutboxMassTransit : Migration
+    public partial class clsOutboxMassTransit : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)

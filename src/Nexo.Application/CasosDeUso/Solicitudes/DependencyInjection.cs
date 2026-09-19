@@ -12,24 +12,24 @@ namespace Nexo.Application.CasosDeUso.Solicitudes;
 /// Antes solo existía un puerto mínimo hacia este módulo desde Cotizaciones
 /// (ISolicitudesPort/ILineasSolicitudPort en Cotizaciones.Ports); ESTE módulo es
 /// la migración completa del servicio original. Los dos puertos de Cotizaciones
-/// siguen viviendo donde están: son un contrato hacia el AGREGADO Solicitud, no
+/// siguen viviendo donde están: son un contrato hacia el AGREGADO clsSolicitud, no
 /// hacia este módulo, y ya tienen su propia implementación EF — no se tocan.
 /// </summary>
 public static class DependencyInjection
 {
     public static IServiceCollection AddSolicitudesUseCases(this IServiceCollection services)
     {
-        services.AddScoped<ICommandHandler<CrearSolicitudCommand, Guid>, CrearSolicitudCommandHandler>();
-        services.AddScoped<ICommandHandler<CargarLineasBulkCommand, Guid>, CargarLineasBulkCommandHandler>();
-        services.AddScoped<ICommandHandler<RechazarSolicitudCommand, Unit>, RechazarSolicitudCommandHandler>();
-        services.AddScoped<ICommandHandler<RecalcularScoreCommand, DesgloseScoreDto>, RecalcularScoreCommandHandler>();
-        services.AddScoped<ICommandHandler<CapturarSolicitudCommand, CapturaResultDto>, CapturarSolicitudCommandHandler>();
-        services.AddScoped<ICommandHandler<ResolverCatalogosDeLineasCommand, IReadOnlyList<CatalogoLineaResueltoDto>>, ResolverCatalogosDeLineasCommandHandler>();
+        services.AddScoped<ICommandHandler<clsCrearSolicitudCommand, Guid>, clsCrearSolicitudCommandHandler>();
+        services.AddScoped<ICommandHandler<clsCargarLineasBulkCommand, Guid>, clsCargarLineasBulkCommandHandler>();
+        services.AddScoped<ICommandHandler<clsRechazarSolicitudCommand, Unit>, clsRechazarSolicitudCommandHandler>();
+        services.AddScoped<ICommandHandler<clsRecalcularScoreCommand, clsDesgloseScoreDto>, clsRecalcularScoreCommandHandler>();
+        services.AddScoped<ICommandHandler<clsCapturarSolicitudCommand, clsCapturaResultDto>, clsCapturarSolicitudCommandHandler>();
+        services.AddScoped<ICommandHandler<clsResolverCatalogosDeLineasCommand, IReadOnlyList<clsCatalogoLineaResueltoDto>>, clsResolverCatalogosDeLineasCommandHandler>();
 
-        services.AddScoped<IQueryHandler<ObtenerBandejaQuery, PaginaDto<BandejaItemDto>>, ObtenerBandejaQueryHandler>();
-        services.AddScoped<IQueryHandler<ObtenerCosteoQuery, SolicitudCosteoDto>, ObtenerCosteoQueryHandler>();
-        services.AddScoped<IQueryHandler<AnalizarExcelQuery, AnalisisExcelDto>, AnalizarExcelQueryHandler>();
-        services.AddScoped<IQueryHandler<BuscarClientesQuery, IReadOnlyList<DTOs.ClienteBusquedaDto>>, BuscarClientesQueryHandler>();
+        services.AddScoped<IQueryHandler<clsObtenerBandejaQuery, clsPaginaDto<clsBandejaItemDto>>, clsObtenerBandejaQueryHandler>();
+        services.AddScoped<IQueryHandler<clsObtenerCosteoQuery, clsSolicitudCosteoDto>, clsObtenerCosteoQueryHandler>();
+        services.AddScoped<IQueryHandler<clsAnalizarExcelQuery, clsAnalisisExcelDto>, clsAnalizarExcelQueryHandler>();
+        services.AddScoped<IQueryHandler<clsBuscarClientesQuery, IReadOnlyList<DTOs.clsClienteBusquedaDto>>, clsBuscarClientesQueryHandler>();
         return services;
     }
 }

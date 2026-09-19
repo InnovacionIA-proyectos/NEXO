@@ -14,10 +14,10 @@ public static class DependencyInjection
     /// </summary>
     public static IServiceCollection AddBibliotecaSapHistoricoUseCases(this IServiceCollection services)
     {
-        services.AddScoped<IQueryHandler<BuscarSapHistoricoQuery, SapHistoricoResultDto>, BuscarSapHistoricoQueryHandler>();
-        services.AddScoped<IQueryHandler<FiltrosSapHistoricoQuery, SapHistoricoFiltrosDto>, FiltrosSapHistoricoQueryHandler>();
-        services.AddScoped<IQueryHandler<BuscarSapPlazaQuery, SapHistoricoResultDto>, BuscarSapPlazaQueryHandler>();
-        services.AddScoped<IQueryHandler<FiltrosSapPlazaQuery, SapHistoricoFiltrosDto>, FiltrosSapPlazaQueryHandler>();
+        services.AddScoped<IQueryHandler<clsBuscarSapHistoricoQuery, clsSapHistoricoResultDto>, clsBuscarSapHistoricoQueryHandler>();
+        services.AddScoped<IQueryHandler<clsFiltrosSapHistoricoQuery, clsSapHistoricoFiltrosDto>, clsFiltrosSapHistoricoQueryHandler>();
+        services.AddScoped<IQueryHandler<clsBuscarSapPlazaQuery, clsSapHistoricoResultDto>, clsBuscarSapPlazaQueryHandler>();
+        services.AddScoped<IQueryHandler<clsFiltrosSapPlazaQuery, clsSapHistoricoFiltrosDto>, clsFiltrosSapPlazaQueryHandler>();
         return services;
     }
 }

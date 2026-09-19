@@ -4,7 +4,7 @@ using Nexo.Domain.Enums;
 namespace Nexo.Application.CasosDeUso.Biblioteca.DTOs;
 
 /// <summary>Entrada del motor tarifario SAP TM: los datos de una línea de solicitud.</summary>
-public record ConsultaTarifarioSap(
+public record clsConsultaTarifarioSap(
     string Origen,
     string Destino,
     LineaNegocio? LineaNegocio,
@@ -24,14 +24,14 @@ public record ConsultaTarifarioSap(
 /// cuando la condición de comparación aplica, y la tarifa del retorno del
 /// contenedor vacío cuando el viaje lo incluye.
 /// </summary>
-public record ResultadoTarifarioSap(
-    CandidatoTarifaDto? Tarifa,
+public record clsResultadoTarifarioSap(
+    clsCandidatoTarifaDto? Tarifa,
     bool Vencida,
-    CandidatoTarifaDto? SicetacOficial,
-    CandidatoTarifaDto? Retorno = null);
+    clsCandidatoTarifaDto? SicetacOficial,
+    clsCandidatoTarifaDto? Retorno = null);
 
 /// <summary>Ítem de la matriz oficial SICE-TAC (DWSice), espejo 1:1 de la fila del Data Warehouse.</summary>
-public record RutaSicetacItemDto(
+public record clsRutaSicetacItemDto(
     int Id,
     int Periodo,
     string NombreRuta,
@@ -50,9 +50,9 @@ public record RutaSicetacItemDto(
     DateTime FechaCreacion,
     DateTime FechaModificacion);
 
-public record MatrizSicetacResultDto(int Periodo, int Total, IReadOnlyList<RutaSicetacItemDto> Items);
+public record clsMatrizSicetacResultDto(int Periodo, int Total, IReadOnlyList<clsRutaSicetacItemDto> Items);
 
-public record SicetacFiltrosDto(
+public record clsSicetacFiltrosDto(
     IReadOnlyList<int> Periodos,
     IReadOnlyList<string> Configuraciones,
     IReadOnlyList<string> TiposCarga,

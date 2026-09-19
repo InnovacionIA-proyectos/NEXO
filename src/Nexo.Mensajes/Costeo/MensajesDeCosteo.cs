@@ -20,28 +20,28 @@ namespace Nexo.Mensajes.Costeo;
 
 /// <summary>
 /// La saga pide repartir el pliego en líneas. Quien lo atiende lee las líneas de la
-/// base y publica un <see cref="CostearLineaSolicitada"/> por cada una.
+/// base y publica un <see cref="clsCostearLineaSolicitada"/> por cada una.
 /// </summary>
-public sealed record RepartirLineasDeCosteo(Guid TrabajoId, Guid SolicitudId);
+public sealed record clsRepartirLineasDeCosteo(Guid TrabajoId, Guid SolicitudId);
 
 /// <summary>
 /// Reparto terminado. El total que trae es la cuenta AUTORITATIVA con la que la saga
 /// sabe cuándo está completa: el que venía en el mensaje inicial es informativo y
 /// puede haber quedado desfasado.
 /// </summary>
-public sealed record PliegoRepartido(Guid TrabajoId, Guid SolicitudId, int TotalLineas);
+public sealed record clsPliegoRepartido(Guid TrabajoId, Guid SolicitudId, int TotalLineas);
 
 /// <summary>Costear una línea. Lo atiende el consumidor de costeo (issue #16).</summary>
-public sealed record CostearLineaSolicitada(Guid TrabajoId, Guid SolicitudId, Guid LineaId);
+public sealed record clsCostearLineaSolicitada(Guid TrabajoId, Guid SolicitudId, Guid LineaId);
 
 /// <summary>Línea resuelta por el servicio, con la fuente que gobernó la propuesta.</summary>
-public sealed record LineaCosteada(Guid TrabajoId, Guid LineaId, decimal ValorPropuesto, string Fuente);
+public sealed record clsLineaCosteada(Guid TrabajoId, Guid LineaId, decimal ValorPropuesto, string Fuente);
 
 /// <summary>
 /// Una fuente falló. Es transitorio: se reintenta y se espera que se resuelva solo.
 /// El motivo viaja para poder mostrarlo mientras tanto.
 /// </summary>
-public sealed record LineaFalloTecnico(Guid TrabajoId, Guid LineaId, string Motivo);
+public sealed record clsLineaFalloTecnico(Guid TrabajoId, Guid LineaId, string Motivo);
 
 /// <summary>
 /// La línea necesita que una persona agregue o actualice la tarifa.
@@ -51,7 +51,7 @@ public sealed record LineaFalloTecnico(Guid TrabajoId, Guid LineaId, string Moti
 /// Tarifas, donde no hay reloj: esa persona puede tener otros pliegos delante y eso
 /// no es algo que un timeout deba resolver.
 /// </summary>
-public sealed record LineaRequiereTarifaManual(Guid TrabajoId, Guid SolicitudId, Guid LineaId, string Motivo);
+public sealed record clsLineaRequiereTarifaManual(Guid TrabajoId, Guid SolicitudId, Guid LineaId, string Motivo);
 
 // ============================================================================
 // Recosteo: cuando aparece una tarifa que antes no existía.
@@ -70,17 +70,17 @@ public sealed record LineaRequiereTarifaManual(Guid TrabajoId, Guid SolicitudId,
 /// En vez de adivinar, se le vuelve a preguntar a la regla. Cuesta algún recosteo de
 /// más; a cambio no hay línea que se quede olvidada.
 /// </summary>
-public sealed record TarifasActualizadas(string Motivo, DateTimeOffset OcurridoEn);
+public sealed record clsTarifasActualizadas(string Motivo, DateTimeOffset OcurridoEn);
 
 /// <summary>
 /// Reintentar el costeo de una línea que había quedado esperando una tarifa.
 ///
-/// Va por su propio mensaje y NO por CostearLineaSolicitada porque no debe llegar a la
+/// Va por su propio mensaje y NO por clsCostearLineaSolicitada porque no debe llegar a la
 /// saga: ese trabajo ya cerró, y cerró en Parcial con razón — en ese momento lo estaba.
 /// Reabrirlo falsearía el histórico. Lo que el recosteo resuelve es la línea y su
 /// pendiente, no el trabajo de entonces.
 /// </summary>
-public sealed record RecostearLineaSolicitada(Guid TrabajoId, Guid SolicitudId, Guid LineaId);
+public sealed record clsRecostearLineaSolicitada(Guid TrabajoId, Guid SolicitudId, Guid LineaId);
 
 /// <summary>
 /// El estado de un trabajo cambió. Sirve para avisarle a quien lo esté mirando.
@@ -96,4 +96,4 @@ public sealed record RecostearLineaSolicitada(Guid TrabajoId, Guid SolicitudId, 
 /// barra de progreso. Leyendo el estado al recibir, lo peor que pasa es avisar dos
 /// veces lo mismo.
 /// </summary>
-public sealed record TrabajoActualizado(Guid TrabajoId);
+public sealed record clsTrabajoActualizado(Guid TrabajoId);

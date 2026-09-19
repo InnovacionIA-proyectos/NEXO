@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations;
 namespace Nexo.Api.AjustesVigenciaPlaza;
 
 /// <summary>Ajuste 1 a 1 de la vigencia de una tarifa de plaza.</summary>
-public class AjustarVigenciaPlazaRequest
+public class clsAjustarVigenciaPlazaRequest
 {
     [Required]
     public DateTime NuevaVigencia { get; set; }
@@ -17,7 +17,7 @@ public class AjustarVigenciaPlazaRequest
 /// Modo "fecha": fija la misma NuevaVigencia a todas. Modo "extender": suma Cantidad
 /// de Unidad ("dias"|"meses") a la vigencia efectiva de cada una.
 /// </summary>
-public class AjusteVigenciaMasivoRequest
+public class clsAjusteVigenciaMasivoRequest
 {
     [Required, MinLength(1, ErrorMessage = "Indica al menos una tarifa.")]
     public List<int> TarifaIds { get; set; } = new();

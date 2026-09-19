@@ -6,9 +6,9 @@ public interface IClientesPort
 {
     Task<bool> ExisteAsync(Guid id, CancellationToken ct);
 
-    Task<Cliente?> ObtenerPorNitAsync(string nit, CancellationToken ct);
+    Task<clsCliente?> ObtenerPorNitAsync(string nit, CancellationToken ct);
 
-    void Agregar(Cliente cliente);
+    void Agregar(clsCliente cliente);
 
-    Task<IReadOnlyList<Cliente>> BuscarAsync(string? terminoNormalizado, int top, CancellationToken ct);
+    Task<IReadOnlyList<clsCliente>> BuscarAsync(string? terminoNormalizado, int top, CancellationToken ct);
 }

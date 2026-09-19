@@ -9,7 +9,7 @@ namespace Nexo.Api.Solicitudes;
 /// vehículo del catálogo. Sirve tanto al formulario manual como a la importación
 /// de Excel (el frontend mapea columnas → líneas antes de enviar).
 /// </summary>
-public class CapturaSolicitudRequest
+public class clsCapturaSolicitudRequest
 {
     public Guid? ClienteId { get; set; }
 
@@ -36,10 +36,10 @@ public class CapturaSolicitudRequest
     public decimal? HorasDescargue { get; set; }
 
     [Required, MinLength(1, ErrorMessage = "La solicitud debe traer al menos una línea.")]
-    public List<CapturaLineaRequest> Lineas { get; set; } = [];
+    public List<clsCapturaLineaRequest> Lineas { get; set; } = [];
 }
 
-public class CapturaLineaRequest
+public class clsCapturaLineaRequest
 {
     [Required, MaxLength(150)]
     public string Origen { get; set; } = null!;
@@ -86,14 +86,14 @@ public class CapturaLineaRequest
     public decimal? ValorMercancia { get; set; }
 
     [MaxLength(200, ErrorMessage = "Una línea admite máximo 200 posiciones.")]
-    public List<CapturaPosicionRequest>? Posiciones { get; set; }
+    public List<clsCapturaPosicionRequest>? Posiciones { get; set; }
 }
 
 /// <summary>
 /// Una línea de texto libre a resolver contra el catálogo (sin crear ninguna solicitud):
 /// entrada de POST /api/solicitudes/resolver-catalogos.
 /// </summary>
-public class ResolverCatalogoLineaRequest
+public class clsResolverCatalogoLineaRequest
 {
     [Required, MaxLength(150)]
     public string Origen { get; set; } = null!;
@@ -109,7 +109,7 @@ public class ResolverCatalogoLineaRequest
 }
 
 /// <summary>Una pieza/bulto a transportar, con dimensiones en centímetros.</summary>
-public class CapturaPosicionRequest
+public class clsCapturaPosicionRequest
 {
     [MaxLength(200)]
     public string? Descripcion { get; set; }

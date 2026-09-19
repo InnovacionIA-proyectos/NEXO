@@ -5,7 +5,7 @@ using Nexo.Domain.Usuarios.Entidades;
 
 namespace Nexo.Domain.Catalogos.Entidades;
 
-public class Ruta : IAuditable
+public class clsRuta : IAuditable
 {
     public Guid Id { get; set; } = Guid.NewGuid();
 
@@ -19,7 +19,7 @@ public class Ruta : IAuditable
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 }
 
-public class ConfiguracionVehiculo : IAuditable
+public class clsConfiguracionVehiculo : IAuditable
 {
     public Guid Id { get; set; } = Guid.NewGuid();
 
@@ -37,7 +37,7 @@ public class ConfiguracionVehiculo : IAuditable
 }
 
 /// <summary>Catálogo de servicios conexos mantenido por Servicios Logísticos.</summary>
-public class ServicioConexo : IAuditable
+public class clsServicioConexo : IAuditable
 {
     public Guid Id { get; set; } = Guid.NewGuid();
 
@@ -61,7 +61,7 @@ public class ServicioConexo : IAuditable
     public Guid? ActualizadoPor { get; set; }
 
     [JsonIgnore]
-    public Usuario? ActualizadoPorUsuario { get; set; }
+    public clsUsuario? ActualizadoPorUsuario { get; set; }
 
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;

@@ -6,7 +6,7 @@ namespace Nexo.Infrastructure.External;
 /// (dbo.tblSAPTarifasLog) comparten estas columnas. Modelos de SOLO LECTURA:
 /// las tablas las mantiene la integración SAP.
 /// </summary>
-public abstract class SapTarifaBase
+public abstract class clsSapTarifaBase
 {
     public int Id { get; set; }
     public int LineaNegocio { get; set; }               // código de línea (1, 2, 4, 6, …)
@@ -31,7 +31,7 @@ public abstract class SapTarifaBase
 /// Tarifa de plaza (vigente) de SAP TM (dbo.tblSAPTarifas). Trae columnas
 /// adicionales que el log no tiene (detalles, flags, fecha de modificación).
 /// </summary>
-public class SapTarifaPlaza : SapTarifaBase
+public class clsSapTarifaPlaza : clsSapTarifaBase
 {
     public DateTime FechaModificacion { get; set; }
     public string UsuarioModificacion { get; set; } = null!;
@@ -45,7 +45,7 @@ public class SapTarifaPlaza : SapTarifaBase
 /// tblSAPTarifasHistorico como fuente del histórico. LINEANEGOCIO y CLASEVIAJE
 /// llegan como varchar con el código numérico (conversión en el mapeo EF).
 /// </summary>
-public class SapTarifaLog : SapTarifaBase
+public class clsSapTarifaLog : clsSapTarifaBase
 {
     public int IdTarifa { get; set; }                   // fila de tblSAPTarifas que originó el registro
 }

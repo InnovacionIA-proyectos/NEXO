@@ -24,10 +24,10 @@ namespace Nexo.Application.CasosDeUso.Cubicacion.Interfaces;
 /// responde en el orden de cientos de milisegundos por HTTP.
 ///
 /// El secreto (mismo Bearer que Cubicador ya valida en <c>verificar_api_key</c>) vive SOLO
-/// en la configuración del backend (<c>Cubicador3D:OutboundApiKey</c>) — nunca en el bundle
+/// en la configuración del backend (<c>clsCubicador3D:OutboundApiKey</c>) — nunca en el bundle
 /// del portal. Eso es, en una frase, todo lo que esta HU necesitaba lograr.
 /// </summary>
 public interface ICubicacionRapidaPort
 {
-    Task<CubicacionRapidaResultado> EvaluarAsync(CubicacionRapidaSolicitud solicitud, CancellationToken ct = default);
+    Task<clsCubicacionRapidaResultado> EvaluarAsync(clsCubicacionRapidaSolicitud solicitud, CancellationToken ct = default);
 }

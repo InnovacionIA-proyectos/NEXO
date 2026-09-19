@@ -5,7 +5,7 @@
 namespace Nexo.Infrastructure.Migrations
 {
     /// <inheritdoc />
-    public partial class RetornoContenedorConsolidado : Migration
+    public partial class clsRetornoContenedorConsolidado : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)

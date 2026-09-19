@@ -4,7 +4,7 @@ namespace Nexo.Application.CasosDeUso.BibliotecaSapHistorico.DTOs;
 /// Tarifa SAP TM (log de cambios tblSAPTarifasLog o tarifas de plaza tblSAPTarifas) expuesta
 /// en la Biblioteca. Espejo de la estructura de la tabla del datacenter.
 /// </summary>
-public record SapTarifaHistoricoItemDto(
+public record clsSapTarifaHistoricoItemDto(
     int Id,
     int LineaNegocio,
     string? LineaNegocioNombre,    // tblSAPLineaNegocio; null si el ID no está en el catálogo
@@ -37,16 +37,16 @@ public record SapTarifaHistoricoItemDto(
     DateTime? VigenciaAjustada = null);
 
 /// <summary>Resultado paginado (por corte superior) del histórico/plaza SAP.</summary>
-public record SapHistoricoResultDto(
+public record clsSapHistoricoResultDto(
     int Total,                 // filas que cumplen el filtro
-    IReadOnlyList<SapTarifaHistoricoItemDto> Items);
+    IReadOnlyList<clsSapTarifaHistoricoItemDto> Items);
 
 /// <summary>Opción de filtro genérica: valor que viaja en el query string + etiqueta legible.</summary>
-public record OpcionFiltroDto(string Valor, string Etiqueta);
+public record clsOpcionFiltroDto(string Valor, string Etiqueta);
 
 /// <summary>Valores disponibles para los filtros del histórico/plaza SAP (solo los usados en la tabla).</summary>
-public record SapHistoricoFiltrosDto(
-    IReadOnlyList<OpcionFiltroDto> LineasNegocio,
-    IReadOnlyList<OpcionFiltroDto> TiposVehiculo,
-    IReadOnlyList<OpcionFiltroDto> TiposCarroseria,
-    IReadOnlyList<OpcionFiltroDto> ClasesViaje);
+public record clsSapHistoricoFiltrosDto(
+    IReadOnlyList<clsOpcionFiltroDto> LineasNegocio,
+    IReadOnlyList<clsOpcionFiltroDto> TiposVehiculo,
+    IReadOnlyList<clsOpcionFiltroDto> TiposCarroseria,
+    IReadOnlyList<clsOpcionFiltroDto> ClasesViaje);

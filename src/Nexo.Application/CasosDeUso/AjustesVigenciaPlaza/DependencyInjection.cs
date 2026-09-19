@@ -7,7 +7,7 @@ namespace Nexo.Application.CasosDeUso.AjustesVigenciaPlaza;
 public static class DependencyInjection
 {
     public static IServiceCollection AddAjustesVigenciaPlazaUseCases(this IServiceCollection services) => services
-        .AddScoped<ICommandHandler<AjustarVigenciaPlazaCommand, Unit>, AjustarVigenciaPlazaCommandHandler>()
-        .AddScoped<ICommandHandler<AjustarVigenciaPlazaMasivoCommand, AjusteVigenciaResultDto>, AjustarVigenciaPlazaMasivoCommandHandler>()
-        .AddScoped<ICommandHandler<QuitarVigenciaPlazaCommand, bool>, QuitarVigenciaPlazaCommandHandler>();
+        .AddScoped<ICommandHandler<clsAjustarVigenciaPlazaCommand, Unit>, clsAjustarVigenciaPlazaCommandHandler>()
+        .AddScoped<ICommandHandler<clsAjustarVigenciaPlazaMasivoCommand, clsAjusteVigenciaResultDto>, clsAjustarVigenciaPlazaMasivoCommandHandler>()
+        .AddScoped<ICommandHandler<clsQuitarVigenciaPlazaCommand, bool>, clsQuitarVigenciaPlazaCommandHandler>();
 }

@@ -6,20 +6,20 @@ namespace Nexo.Infrastructure.Persistence.Migrations
 {
     /// <summary>
     /// Issue #93 (hallazgo de QA sobre el PR #90): las 13 vistas `analitica.*`
-    /// (S2-HU-10.1, `VistasAnaliticaSoloLectura`) se crearon con SQL crudo
+    /// (S2-HU-10.1, `clsVistasAnaliticaSoloLectura`) se crearon con SQL crudo
     /// `FROM dbo.&lt;tabla&gt;` — un `string`, no una referencia que EF Core rastree.
-    /// `MoverEsquemaDboNexoPrueba` solo hace `RenameTable` sobre las 27 tablas base;
+    /// `clsMoverEsquemaDboNexoPrueba` solo hace `RenameTable` sobre las 27 tablas base;
     /// no reescribe el texto de vistas que las referencian desde fuera del modelo, así
     /// que las 13 quedaron apuntando a un esquema `dbo` donde esas tablas ya no viven
     /// ("Invalid object name 'dbo.solicitudes'").
     ///
-    /// Se recrean aquí (no se edita `VistasAnaliticaSoloLectura`: esa migración ya se
+    /// Se recrean aquí (no se edita `clsVistasAnaliticaSoloLectura`: esa migración ya se
     /// aplicó contra la BD real, y `dotnet ef` no vuelve a correr una migración por
     /// haberle cambiado el código) apuntando a `dbo_NEXO_prueba`, mismo criterio que
     /// falta MENOS a propósito: mismas 13 vistas, mismas columnas, mismo
     /// `WITH (NOLOCK)` — el único cambio es el esquema del `FROM`/`JOIN`.
     /// </summary>
-    public partial class RecrearVistasAnaliticaEnDboNexoPrueba : Migration
+    public partial class clsRecrearVistasAnaliticaEnDboNexoPrueba : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)

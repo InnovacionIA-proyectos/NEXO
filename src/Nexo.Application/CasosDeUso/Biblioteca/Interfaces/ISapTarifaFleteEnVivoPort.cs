@@ -12,13 +12,13 @@ namespace Nexo.Application.CasosDeUso.Biblioteca.Interfaces;
 ///
 /// CONTRATO DE DATOS (obligatorio documentar por el criterio de cierre de #31):
 ///
-/// Entrada — reutiliza <see cref="ConsultaTarifarioSap"/> (ya documentado, ya es la
+/// Entrada — reutiliza <see cref="clsConsultaTarifarioSap"/> (ya documentado, ya es la
 /// forma que consume el resto del motor de propuesta): Origen/Destino (nombres de
 /// ciudad, texto libre normalizado por quien implementa), LineaNegocio/ClaseViaje/
 /// ClaseContenedor (catálogo SAP TM local), ConfigVehiculo/Carroceria (texto local),
 /// Peso (kg, puede ser null), Exclusivo/Consolidado/RetornaContenedor/CiudadDevolucion.
 ///
-/// Salida — <see cref="CandidatoTarifaDto"/>:
+/// Salida — <see cref="clsCandidatoTarifaDto"/>:
 ///   - <c>Fuente</c>: SIEMPRE un valor que empiece por <c>"sap_en_vivo"</c> (nunca
 ///     <c>"plaza"</c> a secas, que es el tag de la fuente real vía DbSolucionesTi) —
 ///     así la trazabilidad de origen (#33) nunca confunde una propuesta con datos
@@ -42,8 +42,8 @@ namespace Nexo.Application.CasosDeUso.Biblioteca.Interfaces;
 /// SUSTITUCIÓN FUTURA (criterio central de la HU): el día que "el equipo de
 /// conexiones" construya la integración real, se agrega un adaptador nuevo que
 /// implemente esta MISMA interfaz y se cambia UNA línea en DependencyInjection.cs
-/// (configuración `SapTarifaFleteEnVivo:Modo`). Ni <c>ReglaDeCosteo</c> ni
-/// <c>PropuestaTarifaAdapter</c> ni ninguna pantalla se enteran.
+/// (configuración `SapTarifaFleteEnVivo:Modo`). Ni <c>clsReglaDeCosteo</c> ni
+/// <c>clsPropuestaTarifaAdapter</c> ni ninguna pantalla se enteran.
 /// </summary>
 public interface ISapTarifaFleteEnVivoPort
 {
@@ -51,5 +51,5 @@ public interface ISapTarifaFleteEnVivoPort
     /// adaptador real todavía disponible — degrada, nunca falla.</summary>
     bool Configurado { get; }
 
-    Task<CandidatoTarifaDto?> ConsultarPlazaAsync(ConsultaTarifarioSap consulta, CancellationToken ct = default);
+    Task<clsCandidatoTarifaDto?> ConsultarPlazaAsync(clsConsultaTarifarioSap consulta, CancellationToken ct = default);
 }

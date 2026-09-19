@@ -6,7 +6,7 @@ namespace Nexo.Application.CasosDeUso.Priorizacion.DTOs;
 /// Es un DTO y no la entidad porque la entidad lleva <c>RowVersion</c>, timestamps de
 /// auditoría y el Id de la fila única — nada de eso es asunto de quien recalibra.
 /// </summary>
-public record ParametrosScoreDto(
+public record clsParametrosScoreDto(
     double PesoUrgencia,
     double PesoValor,
     double PesoProbabilidad,
@@ -25,4 +25,4 @@ public record ParametrosScoreDto(
 /// si se revisan 400 y se actualizan 0, el recálculo está corriendo de más y el
 /// intervalo se puede espaciar. Con un solo número eso no se ve.
 /// </summary>
-public record ResultadoDeRecalculoDto(int Revisadas, int Actualizadas, int Lotes);
+public record clsResultadoDeRecalculoDto(int Revisadas, int Actualizadas, int Lotes);

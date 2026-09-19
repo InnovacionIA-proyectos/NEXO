@@ -11,9 +11,9 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace Nexo.Infrastructure.Persistence.Migrations
 {
-    [DbContext(typeof(NexoDbContext))]
+    [DbContext(typeof(clsNexoDbContext))]
     [Migration("20260825150203_PendientesDeCosteoConTipo")]
-    partial class PendientesDeCosteoConTipo
+    partial class clsPendientesDeCosteoConTipo
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -25,7 +25,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
-            modelBuilder.Entity("Nexo.Domain.Auditoria.Entidades.AuditLog", b =>
+            modelBuilder.Entity("Nexo.Domain.Auditoria.Entidades.clsAuditLog", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -60,7 +60,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
                     b.ToTable("audit_log", (string)null);
                 });
 
-            modelBuilder.Entity("Nexo.Domain.BibliotecaTarifas.Entidades.TarifaHistorica", b =>
+            modelBuilder.Entity("Nexo.Domain.BibliotecaTarifas.Entidades.clsTarifaHistorica", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -106,7 +106,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
                     b.ToTable("tarifas_historicas", (string)null);
                 });
 
-            modelBuilder.Entity("Nexo.Domain.BibliotecaTarifas.Entidades.TarifaSicetac", b =>
+            modelBuilder.Entity("Nexo.Domain.BibliotecaTarifas.Entidades.clsTarifaSicetac", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -205,7 +205,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
                     b.ToTable("tarifas_sicetac", (string)null);
                 });
 
-            modelBuilder.Entity("Nexo.Domain.Catalogos.Entidades.Cliente", b =>
+            modelBuilder.Entity("Nexo.Domain.Catalogos.Entidades.clsCliente", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -246,7 +246,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
                     b.ToTable("clientes", (string)null);
                 });
 
-            modelBuilder.Entity("Nexo.Domain.Catalogos.Entidades.ConfiguracionVehiculo", b =>
+            modelBuilder.Entity("Nexo.Domain.Catalogos.Entidades.clsConfiguracionVehiculo", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -280,7 +280,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
                     b.ToTable("configuraciones_vehiculo", (string)null);
                 });
 
-            modelBuilder.Entity("Nexo.Domain.Catalogos.Entidades.Ruta", b =>
+            modelBuilder.Entity("Nexo.Domain.Catalogos.Entidades.clsRuta", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -314,7 +314,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
                     b.ToTable("rutas", (string)null);
                 });
 
-            modelBuilder.Entity("Nexo.Domain.Catalogos.Entidades.ServicioConexo", b =>
+            modelBuilder.Entity("Nexo.Domain.Catalogos.Entidades.clsServicioConexo", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -369,7 +369,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
                     b.ToTable("servicios_conexos", (string)null);
                 });
 
-            modelBuilder.Entity("Nexo.Domain.Costeo.Entidades.AjusteVigenciaPlaza", b =>
+            modelBuilder.Entity("Nexo.Domain.Costeo.Entidades.clsAjusteVigenciaPlaza", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -409,7 +409,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
                     b.ToTable("ajustes_vigencia_plaza", (string)null);
                 });
 
-            modelBuilder.Entity("Nexo.Domain.Costeo.Entidades.ReglaSoloSicetac", b =>
+            modelBuilder.Entity("Nexo.Domain.Costeo.Entidades.clsReglaSoloSicetac", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -451,7 +451,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
                     b.ToTable("reglas_solo_sicetac", (string)null);
                 });
 
-            modelBuilder.Entity("Nexo.Domain.Cotizaciones.Entidades.Cotizacion", b =>
+            modelBuilder.Entity("Nexo.Domain.Cotizaciones.Entidades.clsCotizacion", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -509,7 +509,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
                     b.ToTable("cotizaciones", (string)null);
                 });
 
-            modelBuilder.Entity("Nexo.Domain.Cotizaciones.Entidades.CotizacionConexo", b =>
+            modelBuilder.Entity("Nexo.Domain.Cotizaciones.Entidades.clsCotizacionConexo", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -546,7 +546,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
                     b.ToTable("cotizacion_conexos", (string)null);
                 });
 
-            modelBuilder.Entity("Nexo.Domain.Cotizaciones.Entidades.CotizacionLinea", b =>
+            modelBuilder.Entity("Nexo.Domain.Cotizaciones.Entidades.clsCotizacionLinea", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -591,7 +591,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
                     b.ToTable("cotizacion_lineas", (string)null);
                 });
 
-            modelBuilder.Entity("Nexo.Domain.PlanDeCargue.Entidades.ColocacionCargue", b =>
+            modelBuilder.Entity("Nexo.Domain.PlanDeCargue.Entidades.clsColocacionCargue", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -685,7 +685,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
                     b.ToTable("colocaciones_cargue", (string)null);
                 });
 
-            modelBuilder.Entity("Nexo.Domain.PlanDeCargue.Entidades.ItemPlanCargue", b =>
+            modelBuilder.Entity("Nexo.Domain.PlanDeCargue.Entidades.clsItemPlanCargue", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -703,7 +703,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
                     b.Property<int>("Cantidad")
                         .HasColumnType("int");
 
-                    b.Property<string>("Cliente")
+                    b.Property<string>("clsCliente")
                         .HasMaxLength(120)
                         .HasColumnType("nvarchar(120)");
 
@@ -794,7 +794,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
                     b.ToTable("items_plan_cargue", (string)null);
                 });
 
-            modelBuilder.Entity("Nexo.Domain.PlanDeCargue.Entidades.PlanCargue", b =>
+            modelBuilder.Entity("Nexo.Domain.PlanDeCargue.Entidades.clsPlanCargue", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -873,7 +873,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
                     b.ToTable("planes_cargue", (string)null);
                 });
 
-            modelBuilder.Entity("Nexo.Domain.PlanDeCargue.Entidades.VehiculoCubicacion", b =>
+            modelBuilder.Entity("Nexo.Domain.PlanDeCargue.Entidades.clsVehiculoCubicacion", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -942,7 +942,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
                     b.ToTable("vehiculos_cubicacion", (string)null);
                 });
 
-            modelBuilder.Entity("Nexo.Domain.Priorizacion.Entidades.ParametrosScore", b =>
+            modelBuilder.Entity("Nexo.Domain.Priorizacion.Entidades.clsParametrosScore", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -1018,7 +1018,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("Nexo.Domain.Solicitudes.Entidades.LineaPendienteDeCosteo", b =>
+            modelBuilder.Entity("Nexo.Domain.Solicitudes.Entidades.clsLineaPendienteDeCosteo", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -1066,7 +1066,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
                     b.ToTable("lineas_pendientes_de_costeo", (string)null);
                 });
 
-            modelBuilder.Entity("Nexo.Domain.Solicitudes.Entidades.LineaSolicitud", b =>
+            modelBuilder.Entity("Nexo.Domain.Solicitudes.Entidades.clsLineaSolicitud", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -1161,7 +1161,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
                     b.ToTable("lineas_solicitud", (string)null);
                 });
 
-            modelBuilder.Entity("Nexo.Domain.Solicitudes.Entidades.Solicitud", b =>
+            modelBuilder.Entity("Nexo.Domain.Solicitudes.Entidades.clsSolicitud", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -1234,7 +1234,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
                     b.ToTable("solicitudes", (string)null);
                 });
 
-            modelBuilder.Entity("Nexo.Domain.Usuarios.Entidades.Usuario", b =>
+            modelBuilder.Entity("Nexo.Domain.Usuarios.Entidades.clsUsuario", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -1298,7 +1298,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("Nexo.Infrastructure.Common.Mensajeria.Saga.EstadoAutoCosteo", b =>
+            modelBuilder.Entity("Nexo.Infrastructure.Common.Mensajeria.Saga.clsEstadoAutoCosteo", b =>
                 {
                     b.Property<Guid>("CorrelationId")
                         .ValueGeneratedOnAdd()
@@ -1514,53 +1514,53 @@ namespace Nexo.Infrastructure.Persistence.Migrations
                     b.ToTable("OutboxState");
                 });
 
-            modelBuilder.Entity("Nexo.Domain.Auditoria.Entidades.AuditLog", b =>
+            modelBuilder.Entity("Nexo.Domain.Auditoria.Entidades.clsAuditLog", b =>
                 {
-                    b.HasOne("Nexo.Domain.Usuarios.Entidades.Usuario", "Usuario")
+                    b.HasOne("Nexo.Domain.Usuarios.Entidades.clsUsuario", "clsUsuario")
                         .WithMany()
                         .HasForeignKey("UsuarioId")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.Navigation("Usuario");
+                    b.Navigation("clsUsuario");
                 });
 
-            modelBuilder.Entity("Nexo.Domain.BibliotecaTarifas.Entidades.TarifaHistorica", b =>
+            modelBuilder.Entity("Nexo.Domain.BibliotecaTarifas.Entidades.clsTarifaHistorica", b =>
                 {
-                    b.HasOne("Nexo.Domain.Catalogos.Entidades.ConfiguracionVehiculo", "ConfiguracionVehiculo")
+                    b.HasOne("Nexo.Domain.Catalogos.Entidades.clsConfiguracionVehiculo", "clsConfiguracionVehiculo")
                         .WithMany()
                         .HasForeignKey("ConfigVehiculoId")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.HasOne("Nexo.Domain.Cotizaciones.Entidades.Cotizacion", "Cotizacion")
+                    b.HasOne("Nexo.Domain.Cotizaciones.Entidades.clsCotizacion", "clsCotizacion")
                         .WithMany()
                         .HasForeignKey("CotizacionId")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.HasOne("Nexo.Domain.Catalogos.Entidades.Ruta", "Ruta")
+                    b.HasOne("Nexo.Domain.Catalogos.Entidades.clsRuta", "clsRuta")
                         .WithMany()
                         .HasForeignKey("RutaId")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.Navigation("ConfiguracionVehiculo");
+                    b.Navigation("clsConfiguracionVehiculo");
 
-                    b.Navigation("Cotizacion");
+                    b.Navigation("clsCotizacion");
 
-                    b.Navigation("Ruta");
+                    b.Navigation("clsRuta");
                 });
 
-            modelBuilder.Entity("Nexo.Domain.BibliotecaTarifas.Entidades.TarifaSicetac", b =>
+            modelBuilder.Entity("Nexo.Domain.BibliotecaTarifas.Entidades.clsTarifaSicetac", b =>
                 {
-                    b.HasOne("Nexo.Domain.Catalogos.Entidades.Ruta", "Ruta")
+                    b.HasOne("Nexo.Domain.Catalogos.Entidades.clsRuta", "clsRuta")
                         .WithMany()
                         .HasForeignKey("RutaId")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.Navigation("Ruta");
+                    b.Navigation("clsRuta");
                 });
 
-            modelBuilder.Entity("Nexo.Domain.Catalogos.Entidades.ServicioConexo", b =>
+            modelBuilder.Entity("Nexo.Domain.Catalogos.Entidades.clsServicioConexo", b =>
                 {
-                    b.HasOne("Nexo.Domain.Usuarios.Entidades.Usuario", "ActualizadoPorUsuario")
+                    b.HasOne("Nexo.Domain.Usuarios.Entidades.clsUsuario", "ActualizadoPorUsuario")
                         .WithMany()
                         .HasForeignKey("ActualizadoPor")
                         .OnDelete(DeleteBehavior.Restrict);
@@ -1568,14 +1568,14 @@ namespace Nexo.Infrastructure.Persistence.Migrations
                     b.Navigation("ActualizadoPorUsuario");
                 });
 
-            modelBuilder.Entity("Nexo.Domain.Cotizaciones.Entidades.Cotizacion", b =>
+            modelBuilder.Entity("Nexo.Domain.Cotizaciones.Entidades.clsCotizacion", b =>
                 {
-                    b.HasOne("Nexo.Domain.Usuarios.Entidades.Usuario", "EntregadaPorUsuario")
+                    b.HasOne("Nexo.Domain.Usuarios.Entidades.clsUsuario", "EntregadaPorUsuario")
                         .WithMany()
                         .HasForeignKey("EntregadaPor")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.HasOne("Nexo.Domain.Solicitudes.Entidades.Solicitud", "Solicitud")
+                    b.HasOne("Nexo.Domain.Solicitudes.Entidades.clsSolicitud", "clsSolicitud")
                         .WithMany("Cotizaciones")
                         .HasForeignKey("SolicitudId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -1583,50 +1583,50 @@ namespace Nexo.Infrastructure.Persistence.Migrations
 
                     b.Navigation("EntregadaPorUsuario");
 
-                    b.Navigation("Solicitud");
+                    b.Navigation("clsSolicitud");
                 });
 
-            modelBuilder.Entity("Nexo.Domain.Cotizaciones.Entidades.CotizacionConexo", b =>
+            modelBuilder.Entity("Nexo.Domain.Cotizaciones.Entidades.clsCotizacionConexo", b =>
                 {
-                    b.HasOne("Nexo.Domain.Cotizaciones.Entidades.Cotizacion", null)
+                    b.HasOne("Nexo.Domain.Cotizaciones.Entidades.clsCotizacion", null)
                         .WithMany("Conexos")
                         .HasForeignKey("CotizacionId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Nexo.Domain.Catalogos.Entidades.ServicioConexo", "ServicioConexo")
+                    b.HasOne("Nexo.Domain.Catalogos.Entidades.clsServicioConexo", "clsServicioConexo")
                         .WithMany()
                         .HasForeignKey("ServicioConexoId")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.Navigation("ServicioConexo");
+                    b.Navigation("clsServicioConexo");
                 });
 
-            modelBuilder.Entity("Nexo.Domain.Cotizaciones.Entidades.CotizacionLinea", b =>
+            modelBuilder.Entity("Nexo.Domain.Cotizaciones.Entidades.clsCotizacionLinea", b =>
                 {
-                    b.HasOne("Nexo.Domain.Cotizaciones.Entidades.Cotizacion", null)
+                    b.HasOne("Nexo.Domain.Cotizaciones.Entidades.clsCotizacion", null)
                         .WithMany("Lineas")
                         .HasForeignKey("CotizacionId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Nexo.Domain.Solicitudes.Entidades.LineaSolicitud", "LineaSolicitud")
+                    b.HasOne("Nexo.Domain.Solicitudes.Entidades.clsLineaSolicitud", "clsLineaSolicitud")
                         .WithMany()
                         .HasForeignKey("LineaSolicitudId")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.Navigation("LineaSolicitud");
+                    b.Navigation("clsLineaSolicitud");
                 });
 
-            modelBuilder.Entity("Nexo.Domain.PlanDeCargue.Entidades.ColocacionCargue", b =>
+            modelBuilder.Entity("Nexo.Domain.PlanDeCargue.Entidades.clsColocacionCargue", b =>
                 {
-                    b.HasOne("Nexo.Domain.PlanDeCargue.Entidades.ItemPlanCargue", "Item")
+                    b.HasOne("Nexo.Domain.PlanDeCargue.Entidades.clsItemPlanCargue", "Item")
                         .WithMany()
                         .HasForeignKey("ItemPlanCargueId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("Nexo.Domain.PlanDeCargue.Entidades.PlanCargue", null)
+                    b.HasOne("Nexo.Domain.PlanDeCargue.Entidades.clsPlanCargue", null)
                         .WithMany("Colocaciones")
                         .HasForeignKey("PlanCargueId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1635,18 +1635,18 @@ namespace Nexo.Infrastructure.Persistence.Migrations
                     b.Navigation("Item");
                 });
 
-            modelBuilder.Entity("Nexo.Domain.PlanDeCargue.Entidades.ItemPlanCargue", b =>
+            modelBuilder.Entity("Nexo.Domain.PlanDeCargue.Entidades.clsItemPlanCargue", b =>
                 {
-                    b.HasOne("Nexo.Domain.PlanDeCargue.Entidades.PlanCargue", null)
+                    b.HasOne("Nexo.Domain.PlanDeCargue.Entidades.clsPlanCargue", null)
                         .WithMany("Items")
                         .HasForeignKey("PlanCargueId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("Nexo.Domain.PlanDeCargue.Entidades.PlanCargue", b =>
+            modelBuilder.Entity("Nexo.Domain.PlanDeCargue.Entidades.clsPlanCargue", b =>
                 {
-                    b.HasOne("Nexo.Domain.PlanDeCargue.Entidades.VehiculoCubicacion", "Vehiculo")
+                    b.HasOne("Nexo.Domain.PlanDeCargue.Entidades.clsVehiculoCubicacion", "Vehiculo")
                         .WithMany()
                         .HasForeignKey("VehiculoId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -1655,46 +1655,46 @@ namespace Nexo.Infrastructure.Persistence.Migrations
                     b.Navigation("Vehiculo");
                 });
 
-            modelBuilder.Entity("Nexo.Domain.Solicitudes.Entidades.LineaSolicitud", b =>
+            modelBuilder.Entity("Nexo.Domain.Solicitudes.Entidades.clsLineaSolicitud", b =>
                 {
-                    b.HasOne("Nexo.Domain.Catalogos.Entidades.ConfiguracionVehiculo", "ConfiguracionVehiculo")
+                    b.HasOne("Nexo.Domain.Catalogos.Entidades.clsConfiguracionVehiculo", "clsConfiguracionVehiculo")
                         .WithMany()
                         .HasForeignKey("ConfigVehiculoId")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.HasOne("Nexo.Domain.Catalogos.Entidades.Ruta", "Ruta")
+                    b.HasOne("Nexo.Domain.Catalogos.Entidades.clsRuta", "clsRuta")
                         .WithMany()
                         .HasForeignKey("RutaId")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.HasOne("Nexo.Domain.Solicitudes.Entidades.Solicitud", "Solicitud")
+                    b.HasOne("Nexo.Domain.Solicitudes.Entidades.clsSolicitud", "clsSolicitud")
                         .WithMany("Lineas")
                         .HasForeignKey("SolicitudId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("ConfiguracionVehiculo");
+                    b.Navigation("clsConfiguracionVehiculo");
 
-                    b.Navigation("Ruta");
+                    b.Navigation("clsRuta");
 
-                    b.Navigation("Solicitud");
+                    b.Navigation("clsSolicitud");
                 });
 
-            modelBuilder.Entity("Nexo.Domain.Solicitudes.Entidades.Solicitud", b =>
+            modelBuilder.Entity("Nexo.Domain.Solicitudes.Entidades.clsSolicitud", b =>
                 {
-                    b.HasOne("Nexo.Domain.Catalogos.Entidades.Cliente", "Cliente")
+                    b.HasOne("Nexo.Domain.Catalogos.Entidades.clsCliente", "clsCliente")
                         .WithMany("Solicitudes")
                         .HasForeignKey("ClienteId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("Nexo.Domain.Usuarios.Entidades.Usuario", "Creador")
+                    b.HasOne("Nexo.Domain.Usuarios.Entidades.clsUsuario", "Creador")
                         .WithMany()
                         .HasForeignKey("CreadoPor")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.Navigation("Cliente");
+                    b.Navigation("clsCliente");
 
                     b.Navigation("Creador");
                 });
@@ -1711,26 +1711,26 @@ namespace Nexo.Infrastructure.Persistence.Migrations
                         .HasPrincipalKey("MessageId", "ConsumerId");
                 });
 
-            modelBuilder.Entity("Nexo.Domain.Catalogos.Entidades.Cliente", b =>
+            modelBuilder.Entity("Nexo.Domain.Catalogos.Entidades.clsCliente", b =>
                 {
                     b.Navigation("Solicitudes");
                 });
 
-            modelBuilder.Entity("Nexo.Domain.Cotizaciones.Entidades.Cotizacion", b =>
+            modelBuilder.Entity("Nexo.Domain.Cotizaciones.Entidades.clsCotizacion", b =>
                 {
                     b.Navigation("Conexos");
 
                     b.Navigation("Lineas");
                 });
 
-            modelBuilder.Entity("Nexo.Domain.PlanDeCargue.Entidades.PlanCargue", b =>
+            modelBuilder.Entity("Nexo.Domain.PlanDeCargue.Entidades.clsPlanCargue", b =>
                 {
                     b.Navigation("Colocaciones");
 
                     b.Navigation("Items");
                 });
 
-            modelBuilder.Entity("Nexo.Domain.Solicitudes.Entidades.Solicitud", b =>
+            modelBuilder.Entity("Nexo.Domain.Solicitudes.Entidades.clsSolicitud", b =>
                 {
                     b.Navigation("Cotizaciones");
 

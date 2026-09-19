@@ -10,7 +10,7 @@ namespace Nexo.Application.CasosDeUso.TarifasSicetacAdmin.Interfaces;
 /// </summary>
 public interface ITarifasSicetacRepository
 {
-    Task<IReadOnlyList<TarifaSicetacDto>> ConsultarAsync(SicetacFiltro filtro, CancellationToken ct);
+    Task<IReadOnlyList<clsTarifaSicetacDto>> ConsultarAsync(clsSicetacFiltro filtro, CancellationToken ct);
 
     /// <summary>
     /// Import todo-en-uno: parseo del Excel (columnas por encabezado), enlace a rutas
@@ -19,7 +19,7 @@ public interface ITarifasSicetacRepository
     /// ServiciosConexos: lectura de celdas ClosedXML entrelazada con reglas de enlace,
     /// sin separación que aporte testabilidad real.
     /// </summary>
-    Task<ImportResumenDto> ImportarExcelAsync(Stream excel, Guid usuarioId, CancellationToken ct);
+    Task<clsImportResumenDto> ImportarExcelAsync(Stream excel, Guid usuarioId, CancellationToken ct);
 
-    Task<IReadOnlyList<ImportacionDto>> ListarImportacionesAsync(CancellationToken ct);
+    Task<IReadOnlyList<clsImportacionDto>> ListarImportacionesAsync(CancellationToken ct);
 }

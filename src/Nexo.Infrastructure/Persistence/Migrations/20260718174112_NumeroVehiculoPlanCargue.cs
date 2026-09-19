@@ -5,7 +5,7 @@
 namespace Nexo.Infrastructure.Migrations
 {
     /// <inheritdoc />
-    public partial class NumeroVehiculoPlanCargue : Migration
+    public partial class clsNumeroVehiculoPlanCargue : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)

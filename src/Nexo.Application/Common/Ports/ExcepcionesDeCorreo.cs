@@ -11,7 +11,7 @@ namespace Nexo.Application.Common.Ports;
 /// La política del bus está configurada para NO reintentar esta: va derecho a la cola de
 /// error, y la alerta llega al primer intento en vez de al cuarto.
 /// </summary>
-public sealed class CorreoRechazadoException(string mensaje, Exception? interna = null)
+public sealed class clsCorreoRechazadoException(string mensaje, Exception? interna = null)
     : Exception(mensaje, interna);
 
 /// <summary>
@@ -21,5 +21,5 @@ public sealed class CorreoRechazadoException(string mensaje, Exception? interna 
 /// caso para el que existe la política escalonada. Si se agotan los intentos, el mensaje
 /// queda en la cola de error y de ahí sale la alerta.
 /// </summary>
-public sealed class CorreoTransitorioException(string mensaje, Exception? interna = null)
+public sealed class clsCorreoTransitorioException(string mensaje, Exception? interna = null)
     : Exception(mensaje, interna);

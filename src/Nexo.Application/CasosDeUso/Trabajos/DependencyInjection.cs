@@ -8,7 +8,7 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddTrabajosUseCases(this IServiceCollection services)
     {
-        services.AddScoped<IQueryHandler<ConsultarTrabajoQuery, EstadoTrabajoDto>, ConsultarTrabajoQueryHandler>();
+        services.AddScoped<IQueryHandler<clsConsultarTrabajoQuery, clsEstadoTrabajoDto>, clsConsultarTrabajoQueryHandler>();
         return services;
     }
 }

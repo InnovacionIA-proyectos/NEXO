@@ -3,17 +3,17 @@ namespace Nexo.Mensajes.Costeo;
 // Un validador por mensaje. La regla es fallo cerrado: un tipo sin validador no se
 // publica, así que esta lista y la de mensajes crecen juntas por construcción.
 
-public sealed class RepartirLineasDeCosteoValidador : IValidadorDeMensaje<RepartirLineasDeCosteo>
+public sealed class clsRepartirLineasDeCosteoValidador : IValidadorDeMensaje<clsRepartirLineasDeCosteo>
 {
-    public IReadOnlyList<string> Validar(RepartirLineasDeCosteo m) =>
-        Motivos.De(("TrabajoId", m.TrabajoId), ("SolicitudId", m.SolicitudId));
+    public IReadOnlyList<string> Validar(clsRepartirLineasDeCosteo m) =>
+        clsMotivos.De(("TrabajoId", m.TrabajoId), ("SolicitudId", m.SolicitudId));
 }
 
-public sealed class PliegoRepartidoValidador : IValidadorDeMensaje<PliegoRepartido>
+public sealed class clsPliegoRepartidoValidador : IValidadorDeMensaje<clsPliegoRepartido>
 {
-    public IReadOnlyList<string> Validar(PliegoRepartido m)
+    public IReadOnlyList<string> Validar(clsPliegoRepartido m)
     {
-        var motivos = Motivos.De(("TrabajoId", m.TrabajoId), ("SolicitudId", m.SolicitudId));
+        var motivos = clsMotivos.De(("TrabajoId", m.TrabajoId), ("SolicitudId", m.SolicitudId));
         // Cero líneas sí es válido: un pliego vacío se cierra completo sin repartir nada.
         // Negativo no: sería un error de conteo, y la saga nunca alcanzaría su total.
         if (m.TotalLineas < 0)
@@ -22,17 +22,17 @@ public sealed class PliegoRepartidoValidador : IValidadorDeMensaje<PliegoReparti
     }
 }
 
-public sealed class CostearLineaSolicitadaValidador : IValidadorDeMensaje<CostearLineaSolicitada>
+public sealed class clsCostearLineaSolicitadaValidador : IValidadorDeMensaje<clsCostearLineaSolicitada>
 {
-    public IReadOnlyList<string> Validar(CostearLineaSolicitada m) =>
-        Motivos.De(("TrabajoId", m.TrabajoId), ("SolicitudId", m.SolicitudId), ("LineaId", m.LineaId));
+    public IReadOnlyList<string> Validar(clsCostearLineaSolicitada m) =>
+        clsMotivos.De(("TrabajoId", m.TrabajoId), ("SolicitudId", m.SolicitudId), ("LineaId", m.LineaId));
 }
 
-public sealed class LineaCosteadaValidador : IValidadorDeMensaje<LineaCosteada>
+public sealed class clsLineaCosteadaValidador : IValidadorDeMensaje<clsLineaCosteada>
 {
-    public IReadOnlyList<string> Validar(LineaCosteada m)
+    public IReadOnlyList<string> Validar(clsLineaCosteada m)
     {
-        var motivos = Motivos.De(("TrabajoId", m.TrabajoId), ("LineaId", m.LineaId));
+        var motivos = clsMotivos.De(("TrabajoId", m.TrabajoId), ("LineaId", m.LineaId));
 
         // Regla inviolable: nunca se propone un flete por debajo del piso. Cero o
         // negativo no es "barato", es un cálculo roto, y dejarlo pasar contamina la
@@ -47,31 +47,31 @@ public sealed class LineaCosteadaValidador : IValidadorDeMensaje<LineaCosteada>
     }
 }
 
-public sealed class LineaFalloTecnicoValidador : IValidadorDeMensaje<LineaFalloTecnico>
+public sealed class clsLineaFalloTecnicoValidador : IValidadorDeMensaje<clsLineaFalloTecnico>
 {
-    public IReadOnlyList<string> Validar(LineaFalloTecnico m)
+    public IReadOnlyList<string> Validar(clsLineaFalloTecnico m)
     {
-        var motivos = Motivos.De(("TrabajoId", m.TrabajoId), ("LineaId", m.LineaId));
+        var motivos = clsMotivos.De(("TrabajoId", m.TrabajoId), ("LineaId", m.LineaId));
         if (string.IsNullOrWhiteSpace(m.Motivo))
             motivos.Add("Motivo es obligatorio: una línea pendiente sin motivo no se puede explicar ni diagnosticar.");
         return motivos;
     }
 }
 
-public sealed class LineaRequiereTarifaManualValidador : IValidadorDeMensaje<LineaRequiereTarifaManual>
+public sealed class clsLineaRequiereTarifaManualValidador : IValidadorDeMensaje<clsLineaRequiereTarifaManual>
 {
-    public IReadOnlyList<string> Validar(LineaRequiereTarifaManual m)
+    public IReadOnlyList<string> Validar(clsLineaRequiereTarifaManual m)
     {
-        var motivos = Motivos.De(("TrabajoId", m.TrabajoId), ("SolicitudId", m.SolicitudId), ("LineaId", m.LineaId));
+        var motivos = clsMotivos.De(("TrabajoId", m.TrabajoId), ("SolicitudId", m.SolicitudId), ("LineaId", m.LineaId));
         if (string.IsNullOrWhiteSpace(m.Motivo))
             motivos.Add("Motivo es obligatorio: el Administrador de Tarifas necesita saber QUÉ falta para poder resolverlo.");
         return motivos;
     }
 }
 
-public sealed class TarifasActualizadasValidador : IValidadorDeMensaje<TarifasActualizadas>
+public sealed class clsTarifasActualizadasValidador : IValidadorDeMensaje<clsTarifasActualizadas>
 {
-    public IReadOnlyList<string> Validar(TarifasActualizadas m)
+    public IReadOnlyList<string> Validar(clsTarifasActualizadas m)
     {
         var motivos = new List<string>();
         if (string.IsNullOrWhiteSpace(m.Motivo))
@@ -82,15 +82,15 @@ public sealed class TarifasActualizadasValidador : IValidadorDeMensaje<TarifasAc
     }
 }
 
-public sealed class RecostearLineaSolicitadaValidador : IValidadorDeMensaje<RecostearLineaSolicitada>
+public sealed class clsRecostearLineaSolicitadaValidador : IValidadorDeMensaje<clsRecostearLineaSolicitada>
 {
-    public IReadOnlyList<string> Validar(RecostearLineaSolicitada m) =>
-        Motivos.De(("TrabajoId", m.TrabajoId), ("SolicitudId", m.SolicitudId), ("LineaId", m.LineaId));
+    public IReadOnlyList<string> Validar(clsRecostearLineaSolicitada m) =>
+        clsMotivos.De(("TrabajoId", m.TrabajoId), ("SolicitudId", m.SolicitudId), ("LineaId", m.LineaId));
 }
 
-public sealed class TrabajoActualizadoValidador : IValidadorDeMensaje<TrabajoActualizado>
+public sealed class clsTrabajoActualizadoValidador : IValidadorDeMensaje<clsTrabajoActualizado>
 {
-    public IReadOnlyList<string> Validar(TrabajoActualizado m) => Motivos.De(("TrabajoId", m.TrabajoId));
+    public IReadOnlyList<string> Validar(clsTrabajoActualizado m) => clsMotivos.De(("TrabajoId", m.TrabajoId));
 }
 
 /// <summary>Los identificadores vacíos son el motivo que se repite en todos los mensajes.</summary>

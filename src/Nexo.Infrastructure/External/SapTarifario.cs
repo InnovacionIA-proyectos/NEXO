@@ -12,7 +12,7 @@ namespace Nexo.Infrastructure.External;
 /// pertenece a la zona cuyo IDZONATRANSPORTE contiene su nombre
 /// (ZTC_CALI = ZC_CALI + ZC_YUMBO + ZC_PALMIRA).
 /// </summary>
-public class SapZonaTarificacionRelacion
+public class clsSapZonaTarificacionRelacion
 {
     public int Id { get; set; }
     public string IdZonaTarificacion { get; set; } = null!; // ZTC_CALI
@@ -24,7 +24,7 @@ public class SapZonaTarificacionRelacion
 /// tblContenedorRangoPeso deriva la config para la comparación SICETAC de
 /// viajes en contenedor.
 /// </summary>
-public class SapRangoPeso
+public class clsSapRangoPeso
 {
     public int Id { get; set; }
     public int PesoMinimo { get; set; }   // kg
@@ -33,7 +33,7 @@ public class SapRangoPeso
 }
 
 /// <summary>Rangos de peso aplicables a cada clase de contenedor (tblContenedorRangoPeso).</summary>
-public class SapContenedorRangoPeso
+public class clsSapContenedorRangoPeso
 {
     public int Id { get; set; }
     public int IdClaseContenedor { get; set; }
@@ -45,7 +45,7 @@ public class SapContenedorRangoPeso
 /// comparación SICETAC: 457 = nombre tipo carga cupo ("General"),
 /// 458 = nombre unidad transporte cupo ("ESTACAS").
 /// </summary>
-public class SapParametro
+public class clsSapParametro
 {
     public string DataAreaId { get; set; } = null!;
     public int IdParametro { get; set; }
@@ -57,7 +57,7 @@ public class SapParametro
 /// Clase de contenedor (tblSAPClaseContenedor): resuelve el texto local
 /// ('CNT20.IT') al ID que referencian las tarifas SAP, con la TARA del equipo.
 /// </summary>
-public class SapClaseContenedorCatalogo
+public class clsSapClaseContenedorCatalogo
 {
     public int Id { get; set; }
     public string Descripcion { get; set; } = null!;  // CNT40.HC, CNT20.IT, …

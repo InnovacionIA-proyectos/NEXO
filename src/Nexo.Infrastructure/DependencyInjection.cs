@@ -58,19 +58,19 @@ public static class DependencyInjection
     /// </summary>
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration config)
     {
-        services.AddDbContext<NexoDbContext>(options =>
+        services.AddDbContext<clsNexoDbContext>(options =>
             options.UseSqlServer(
                 config.GetConnectionString("Nexo"),
                 sql => sql.EnableRetryOnFailure(maxRetryCount: 5, maxRetryDelay: TimeSpan.FromSeconds(10), errorNumbersToAdd: null)));
 
 // Datacenter corporativo (dbsolucionesTI, SOLO LECTURA): tarifario SAP TM
-        // (TarifarioSapAdapter/PropuestaTarifaAdapter) y vigencia de tarifas de plaza.
+        // (clsTarifarioSapAdapter/clsPropuestaTarifaAdapter) y vigencia de tarifas de plaza.
         // Opcional: si la cadena no está configurada, esos adapters se degradan (null).
         var dbSolucionesTi = config.GetConnectionString("DbSolucionesTi");
         var dbSolucionesTiConfigurado = !string.IsNullOrWhiteSpace(dbSolucionesTi);
         if (dbSolucionesTiConfigurado)
         {
-            services.AddDbContext<DbSolucionesTiDbContext>(options =>
+            services.AddDbContext<clsDbSolucionesTiDbContext>(options =>
                 options.UseSqlServer(dbSolucionesTi, sql =>
                     sql.EnableRetryOnFailure(maxRetryCount: 3, maxRetryDelay: TimeSpan.FromSeconds(5), errorNumbersToAdd: null)));
         }
@@ -82,13 +82,13 @@ public static class DependencyInjection
         var dwSiceConfigurado = !string.IsNullOrWhiteSpace(dwSice);
         if (dwSiceConfigurado)
         {
-            services.AddDbContext<DwSiceDbContext>(options =>
+            services.AddDbContext<clsDwSiceDbContext>(options =>
                 options.UseSqlServer(dwSice, sql =>
                 {
                     sql.EnableRetryOnFailure(maxRetryCount: 3, maxRetryDelay: TimeSpan.FromSeconds(5), errorNumbersToAdd: null);
                     // Issue #167: tblRutasSicetac (~2.14M filas) no tiene NINGÚN índice sobre
                     // Periodo/NombreRuta/Configuracion/NombreUnidadTransporte - NEXO no
-                    // gestiona el esquema de esa base (DwSiceDbContext es solo lectura, sin
+                    // gestiona el esquema de esa base (clsDwSiceDbContext es solo lectura, sin
                     // migraciones propias: la tabla la mantiene el ETL del DW corporativo),
                     // así que el índice real es una petición al equipo de datos, no un fix
                     // de código acá. Mientras tanto, el default de 30s de SqlClient coincide
@@ -101,53 +101,53 @@ public static class DependencyInjection
 
         // DW de cubos de operaciones (DWCubosOperacionesEBS.DimBPSolicitante, SOLO
         // LECTURA): catálogo de clientes reales para la Captura. Opcional: sin esta
-        // cadena, ClientesDwAdapter.Configurado = false y la captura usa la tabla local.
+        // cadena, clsClientesDwAdapter.Configurado = false y la captura usa la tabla local.
         var dwCubos = config.GetConnectionString("DwCubos");
         if (!string.IsNullOrWhiteSpace(dwCubos))
         {
-            services.AddDbContext<DwCubosDbContext>(options =>
+            services.AddDbContext<clsDwCubosDbContext>(options =>
                 options.UseSqlServer(dwCubos, sql =>
                     sql.EnableRetryOnFailure(maxRetryCount: 3, maxRetryDelay: TimeSpan.FromSeconds(5), errorNumbersToAdd: null)));
         }
 
         // Identidad del portal de la Administración (S2-HU-03, docs/contrato-integracion,
         // sección 7): SOLO LECTURA, misma familia que los demás DW. A diferencia de esos,
-        // sin esta cadena NO se degrada a un adapter "no configurado" — Program.cs impide
+        // sin esta cadena NO se degrada a un adapter "no configurado" — clsProgram.cs impide
         // arrancar así en Producción (fail-closed, S2-HU-03.3); en Desarrollo/QA sin la
         // fuente real todavía, se registra un adapter local contra la tabla Usuarios
-        // (ResolverIdentidadPortalLocalAdapter) para no bloquear el trabajo del equipo.
-        var identidadPortal = config.GetConnectionString("IdentidadPortal");
+        // (clsResolverIdentidadPortalLocalAdapter) para no bloquear el trabajo del equipo.
+        var identidadPortal = config.GetConnectionString("clsIdentidadPortal");
         var identidadPortalConfigurada = !string.IsNullOrWhiteSpace(identidadPortal);
         if (identidadPortalConfigurada)
         {
-            services.AddDbContext<IdentidadPortalDbContext>(options =>
+            services.AddDbContext<clsIdentidadPortalDbContext>(options =>
                 options.UseSqlServer(identidadPortal, sql =>
                     sql.EnableRetryOnFailure(maxRetryCount: 3, maxRetryDelay: TimeSpan.FromSeconds(5), errorNumbersToAdd: null)));
         }
 
         services.AddMemoryCache();
 
-        services.AddScoped<IUnitOfWork, EfUnitOfWork>();
+        services.AddScoped<IUnitOfWork, clsEfUnitOfWork>();
 
         // Priorización: los parámetros del score y las activas por lotes para refrescarlo.
-        services.AddScoped<IParametrosScorePort, EfParametrosScoreRepository>();
-        services.AddScoped<ISolicitudesParaRecalcularPort, EfSolicitudesParaRecalcularRepository>();
-        services.AddScoped<ICotizacionRepository, EfCotizacionRepository>();
-        services.AddScoped<ISolicitudesPort, EfSolicitudesRepository>();
-        services.AddScoped<ILineasSolicitudPort, EfLineasSolicitudRepository>();
-        services.AddScoped<EfTarifasHistoricasRepository>();
-        services.AddScoped<ITarifasHistoricasPort>(sp => sp.GetRequiredService<EfTarifasHistoricasRepository>());
-        services.AddScoped<IHistoricoTarifasPort>(sp => sp.GetRequiredService<EfTarifasHistoricasRepository>());
-        services.AddScoped<IAuditoriaPort, EfAuditoriaRepository>();
+        services.AddScoped<IParametrosScorePort, clsEfParametrosScoreRepository>();
+        services.AddScoped<ISolicitudesParaRecalcularPort, clsEfSolicitudesParaRecalcularRepository>();
+        services.AddScoped<ICotizacionRepository, clsEfCotizacionRepository>();
+        services.AddScoped<ISolicitudesPort, clsEfSolicitudesRepository>();
+        services.AddScoped<ILineasSolicitudPort, clsEfLineasSolicitudRepository>();
+        services.AddScoped<clsEfTarifasHistoricasRepository>();
+        services.AddScoped<ITarifasHistoricasPort>(sp => sp.GetRequiredService<clsEfTarifasHistoricasRepository>());
+        services.AddScoped<IHistoricoTarifasPort>(sp => sp.GetRequiredService<clsEfTarifasHistoricasRepository>());
+        services.AddScoped<IAuditoriaPort, clsEfAuditoriaRepository>();
 
         if (identidadPortalConfigurada)
         {
-            services.AddScoped<IIdentidadPortalPort, IdentidadPortalAdapter>();
-            services.AddScoped<IResolverIdentidadPortalPort, ResolverIdentidadPortalAdapter>();
+            services.AddScoped<IIdentidadPortalPort, clsIdentidadPortalAdapter>();
+            services.AddScoped<IResolverIdentidadPortalPort, clsResolverIdentidadPortalAdapter>();
         }
         else
         {
-            services.AddScoped<IResolverIdentidadPortalPort, ResolverIdentidadPortalLocalAdapter>();
+            services.AddScoped<IResolverIdentidadPortalPort, clsResolverIdentidadPortalLocalAdapter>();
         }
 
         // SALIDA DE CORREO: se elige por configuración.
@@ -160,12 +160,12 @@ public static class DependencyInjection
         //
         // Mismo criterio que con el transporte del bus: el adaptador lo decide la
         // configuración, no una constante en el código.
-        var mailSender = config[MailSenderCorreoAdapter.ClaveBaseUrl];
+        var mailSender = config[clsMailSenderCorreoAdapter.ClaveBaseUrl];
         if (!string.IsNullOrWhiteSpace(mailSender))
         {
-            // Cliente tipado por IHttpClientFactory: reutiliza conexiones y respeta el
+            // clsCliente tipado por IHttpClientFactory: reutiliza conexiones y respeta el
             // reciclado de DNS. Un HttpClient creado a mano por llamada agota puertos.
-            services.AddHttpClient<ICorreoPort, MailSenderCorreoAdapter>(cliente =>
+            services.AddHttpClient<ICorreoPort, clsMailSenderCorreoAdapter>(cliente =>
             {
                 cliente.BaseAddress = new Uri(mailSender.TrimEnd('/') + "/");
                 // Corto a propósito: el MailSender solo encola y responde 202. Si tarda
@@ -176,26 +176,26 @@ public static class DependencyInjection
         }
         else
         {
-            services.AddScoped<ICorreoPort, SmtpCorreoAdapter>();
+            services.AddScoped<ICorreoPort, clsSmtpCorreoAdapter>();
         }
-        services.AddSingleton<IExportadorCotizacionExcelPort, ExportadorCotizacionExcelClosedXml>(); // sin estado
-        services.AddScoped<IDestinatariosDeAlertaPort, DestinatariosDeAlertaAdapter>();
+        services.AddSingleton<IExportadorCotizacionExcelPort, clsExportadorCotizacionExcelClosedXml>(); // sin estado
+        services.AddScoped<IDestinatariosDeAlertaPort, clsDestinatariosDeAlertaAdapter>();
 
         // Reglas "solo SICE-TAC" (el mismo repositorio implementa el puerto de lectura
         // cacheada que consume Biblioteca).
-        services.AddScoped<EfReglasSoloSicetacRepository>();
-        services.AddScoped<IReglasSoloSicetacRepository>(sp => sp.GetRequiredService<EfReglasSoloSicetacRepository>());
-        services.AddScoped<IClavesSoloSicetacPort>(sp => sp.GetRequiredService<EfReglasSoloSicetacRepository>());
-        services.AddScoped<IExcelReglasSoloSicetacPort, ExcelReglasSoloSicetacAdapter>();
+        services.AddScoped<clsEfReglasSoloSicetacRepository>();
+        services.AddScoped<IReglasSoloSicetacRepository>(sp => sp.GetRequiredService<clsEfReglasSoloSicetacRepository>());
+        services.AddScoped<IClavesSoloSicetacPort>(sp => sp.GetRequiredService<clsEfReglasSoloSicetacRepository>());
+        services.AddScoped<IExcelReglasSoloSicetacPort, clsExcelReglasSoloSicetacAdapter>();
 
         // Ajustes de vigencia de tarifas de plaza
-        services.AddScoped<IAjustesVigenciaPlazaRepository, EfAjustesVigenciaPlazaRepository>();
-        services.AddScoped<IVigenciaSapPlazaPort, VigenciaSapPlazaAdapter>();
+        services.AddScoped<IAjustesVigenciaPlazaRepository, clsEfAjustesVigenciaPlazaRepository>();
+        services.AddScoped<IVigenciaSapPlazaPort, clsVigenciaSapPlazaAdapter>();
 
         // Biblioteca: tarifario SAP TM + propuesta de tarifa (cierra el bloqueo de
         // "Aplicar propuestas" en Cotizaciones) + matriz SICE-TAC de solo lectura.
-        services.AddScoped<ITarifarioSapPort, TarifarioSapAdapter>();
-        services.AddScoped<IPropuestaTarifaPort, PropuestaTarifaAdapter>();
+        services.AddScoped<ITarifarioSapPort, clsTarifarioSapAdapter>();
+        services.AddScoped<IPropuestaTarifaPort, clsPropuestaTarifaAdapter>();
 
         // S2-HU-09 (#31/#33): conexión SAP nueva (plaza en vivo), todavía inexistente.
         // "Deshabilitado" (default) y "Real" (sin adaptador real todavía) resuelven al
@@ -204,52 +204,52 @@ public static class DependencyInjection
         // código, solo config: SapTarifaFleteEnVivo:Modo.
         var modoSapEnVivo = config["SapTarifaFleteEnVivo:Modo"];
         if (string.Equals(modoSapEnVivo, "Mock", StringComparison.OrdinalIgnoreCase))
-            services.AddScoped<ISapTarifaFleteEnVivoPort, SapTarifaFleteEnVivoMockAdapter>();
+            services.AddScoped<ISapTarifaFleteEnVivoPort, clsSapTarifaFleteEnVivoMockAdapter>();
         else
-            services.AddScoped<ISapTarifaFleteEnVivoPort, SapTarifaFleteEnVivoDeshabilitadoAdapter>();
+            services.AddScoped<ISapTarifaFleteEnVivoPort, clsSapTarifaFleteEnVivoDeshabilitadoAdapter>();
         if (dwSiceConfigurado)
-            services.AddScoped<IBibliotecaSicetacPort, BibliotecaSicetacAdapter>();
+            services.AddScoped<IBibliotecaSicetacPort, clsBibliotecaSicetacAdapter>();
         else
-            services.AddScoped<IBibliotecaSicetacPort, BibliotecaSicetacNoConfiguradoAdapter>();
+            services.AddScoped<IBibliotecaSicetacPort, clsBibliotecaSicetacNoConfiguradoAdapter>();
 
         // Biblioteca: histórico y tarifas de plaza SAP TM leídos en vivo (SOLO LECTURA,
         // mismo datacenter que AjustesVigenciaPlaza). Sin ConnectionStrings:DbSolucionesTi,
         // responde 503 accionable en vez de fallar la inyección de dependencias.
         if (dbSolucionesTiConfigurado)
-            services.AddScoped<ISapHistoricoPort, SapHistoricoAdapter>();
+            services.AddScoped<ISapHistoricoPort, clsSapHistoricoAdapter>();
         else
-            services.AddScoped<ISapHistoricoPort, SapHistoricoNoConfiguradoAdapter>();
+            services.AddScoped<ISapHistoricoPort, clsSapHistoricoNoConfiguradoAdapter>();
 
         // Solicitudes/Captura
-        services.AddScoped<ISolicitudesRepository, EfSolicitudesCatalogoRepository>();
-        services.AddScoped<IRutasCatalogoPort, EfRutasCatalogoRepository>();
-        services.AddScoped<IConfiguracionesVehiculoPort, EfConfiguracionesVehiculoRepository>();
-        services.AddScoped<IClientesPort, EfClientesRepository>();
-        services.AddScoped<IClientesDwPort, ClientesDwAdapter>();
-        services.AddScoped<IExcelSolicitudesPort, ExcelSolicitudesAdapter>();
-        services.AddScoped<ITarifasCosteoPort, EfTarifasCosteoRepository>();
+        services.AddScoped<ISolicitudesRepository, clsEfSolicitudesCatalogoRepository>();
+        services.AddScoped<IRutasCatalogoPort, clsEfRutasCatalogoRepository>();
+        services.AddScoped<IConfiguracionesVehiculoPort, clsEfConfiguracionesVehiculoRepository>();
+        services.AddScoped<IClientesPort, clsEfClientesRepository>();
+        services.AddScoped<IClientesDwPort, clsClientesDwAdapter>();
+        services.AddScoped<IExcelSolicitudesPort, clsExcelSolicitudesAdapter>();
+        services.AddScoped<ITarifasCosteoPort, clsEfTarifasCosteoRepository>();
 
         // Servicios conexos (catálogo administrado por Servicios Logísticos; el mismo
         // repositorio también implementa IServiciosConexosPort para Cotizaciones).
-        services.AddScoped<EfServiciosConexosRepository>();
-        services.AddScoped<IServiciosConexosRepository>(sp => sp.GetRequiredService<EfServiciosConexosRepository>());
-        services.AddScoped<IServiciosConexosPort>(sp => sp.GetRequiredService<EfServiciosConexosRepository>());
+        services.AddScoped<clsEfServiciosConexosRepository>();
+        services.AddScoped<IServiciosConexosRepository>(sp => sp.GetRequiredService<clsEfServiciosConexosRepository>());
+        services.AddScoped<IServiciosConexosPort>(sp => sp.GetRequiredService<clsEfServiciosConexosRepository>());
 
         // Caché local del piso SICE-TAC (import periódico admin)
-        services.AddScoped<ITarifasSicetacRepository, EfTarifasSicetacRepository>();
+        services.AddScoped<ITarifasSicetacRepository, clsEfTarifasSicetacRepository>();
 
         // Métricas (Tablero del Líder)
-        services.AddScoped<IMetricasPort, MetricasAdapter>();
+        services.AddScoped<IMetricasPort, clsMetricasAdapter>();
 
         // Plan de cargue (S2-HU-08): orquestación por colas contra el motor Cubicador
         // (ICubicacionPort lo registra AddMensajeria(), no este método) + compuerta de
         // paridad (S2-HU-08.2, #30).
-        services.AddScoped<IPlanCargueRepository, EfPlanCargueRepository>();
-        // S3-HU-03 (issue #112): catálogo de vehículos, proyectado por VehiculoCatalogoConsumer.
-        services.AddScoped<IVehiculoCubicacionRepository, EfVehiculoCubicacionRepository>();
-        services.AddScoped<IParidadCubicadorPort, ParidadCubicadorAdapter>();
+        services.AddScoped<IPlanCargueRepository, clsEfPlanCargueRepository>();
+        // S3-HU-03 (issue #112): catálogo de vehículos, proyectado por clsVehiculoCatalogoConsumer.
+        services.AddScoped<IVehiculoCubicacionRepository, clsEfVehiculoCubicacionRepository>();
+        services.AddScoped<IParidadCubicadorPort, clsParidadCubicadorAdapter>();
         // Puente de solo lectura hacia Solicitudes para el Cubicador (crear-desde-línea).
-        services.AddScoped<ILineaSolicitudCubicacionPort, LineaSolicitudCubicacionAdapter>();
+        services.AddScoped<ILineaSolicitudCubicacionPort, clsLineaSolicitudCubicacionAdapter>();
 
         // [S3-HU-04.3, issue #78] cubicar() (captura-api.service.ts): único método de
         // Cubicación sin cola ni proyección posibles (cálculo puro, sin persistencia) — ver
@@ -257,11 +257,11 @@ public static class DependencyInjection
         // diferencia de todo lo demás de este módulo. Sin las dos claves configuradas, se
         // registra el adapter "no configurado" (503 accionable) en vez de fallar la DI —
         // mismo criterio que BibliotecaSicetac/SapHistorico más arriba.
-        var cubicadorOutboundBaseUrl = config["Cubicador3D:OutboundBaseUrl"];
-        var cubicadorOutboundApiKey = config["Cubicador3D:OutboundApiKey"];
+        var cubicadorOutboundBaseUrl = config["clsCubicador3D:OutboundBaseUrl"];
+        var cubicadorOutboundApiKey = config["clsCubicador3D:OutboundApiKey"];
         if (!string.IsNullOrWhiteSpace(cubicadorOutboundBaseUrl) && !string.IsNullOrWhiteSpace(cubicadorOutboundApiKey))
         {
-            services.AddHttpClient<ICubicacionRapidaPort, CubicacionRapidaAdapter>(cliente =>
+            services.AddHttpClient<ICubicacionRapidaPort, clsCubicacionRapidaAdapter>(cliente =>
             {
                 cliente.BaseAddress = new Uri(cubicadorOutboundBaseUrl.TrimEnd('/') + "/");
                 cliente.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", cubicadorOutboundApiKey);
@@ -269,12 +269,12 @@ public static class DependencyInjection
                 // tarda más que esto, conviene que la pantalla se entere pronto en vez de
                 // dejar al usuario mirando un spinner.
                 cliente.Timeout = TimeSpan.FromSeconds(
-                    int.TryParse(config["Cubicador3D:OutboundTimeoutSegundos"], out var s) ? Math.Clamp(s, 5, 60) : 15);
+                    int.TryParse(config["clsCubicador3D:OutboundTimeoutSegundos"], out var s) ? Math.Clamp(s, 5, 60) : 15);
             });
         }
         else
         {
-            services.AddScoped<ICubicacionRapidaPort, CubicacionRapidaNoConfiguradoAdapter>();
+            services.AddScoped<ICubicacionRapidaPort, clsCubicacionRapidaNoConfiguradoAdapter>();
         }
 
         return services;

@@ -8,12 +8,12 @@ public static class DependencyInjection
 {
     /// <summary>Registra los casos de uso (Handlers) del módulo Cotizaciones.</summary>
     public static IServiceCollection AddCotizacionesUseCases(this IServiceCollection services) => services
-        .AddScoped<ICommandHandler<CrearCotizacionCommand, CotizacionDto>, CrearCotizacionCommandHandler>()
-        .AddScoped<ICommandHandler<AgregarLineaCotizacionCommand, CotizacionDto>, AgregarLineaCotizacionCommandHandler>()
-        .AddScoped<ICommandHandler<AgregarConexosCotizacionCommand, CotizacionDto>, AgregarConexosCotizacionCommandHandler>()
-        .AddScoped<ICommandHandler<AplicarPropuestasCommand, AplicarPropuestasResultDto>, AplicarPropuestasCommandHandler>()
-        .AddScoped<ICommandHandler<EntregarCotizacionCommand, EntregarCotizacionResultDto>, EntregarCotizacionCommandHandler>()
-        .AddScoped<ICommandHandler<MarcarResultadoCommand, CotizacionDto>, MarcarResultadoCommandHandler>()
-        .AddScoped<IQueryHandler<ObtenerCotizacionQuery, CotizacionDto>, ObtenerCotizacionQueryHandler>()
-        .AddScoped<IQueryHandler<ExportarCotizacionExcelQuery, ArchivoDto>, ExportarCotizacionExcelQueryHandler>();
+        .AddScoped<ICommandHandler<clsCrearCotizacionCommand, clsCotizacionDto>, clsCrearCotizacionCommandHandler>()
+        .AddScoped<ICommandHandler<clsAgregarLineaCotizacionCommand, clsCotizacionDto>, clsAgregarLineaCotizacionCommandHandler>()
+        .AddScoped<ICommandHandler<clsAgregarConexosCotizacionCommand, clsCotizacionDto>, clsAgregarConexosCotizacionCommandHandler>()
+        .AddScoped<ICommandHandler<clsAplicarPropuestasCommand, clsAplicarPropuestasResultDto>, clsAplicarPropuestasCommandHandler>()
+        .AddScoped<ICommandHandler<clsEntregarCotizacionCommand, clsEntregarCotizacionResultDto>, clsEntregarCotizacionCommandHandler>()
+        .AddScoped<ICommandHandler<clsMarcarResultadoCommand, clsCotizacionDto>, clsMarcarResultadoCommandHandler>()
+        .AddScoped<IQueryHandler<clsObtenerCotizacionQuery, clsCotizacionDto>, clsObtenerCotizacionQueryHandler>()
+        .AddScoped<IQueryHandler<clsExportarCotizacionExcelQuery, clsArchivoDto>, clsExportarCotizacionExcelQueryHandler>();
 }

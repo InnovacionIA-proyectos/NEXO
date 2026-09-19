@@ -5,7 +5,7 @@
 namespace Nexo.Infrastructure.Persistence.Migrations
 {
     /// <inheritdoc />
-    public partial class AgregarMotivoPendienteALinea : Migration
+    public partial class clsAgregarMotivoPendienteALinea : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)

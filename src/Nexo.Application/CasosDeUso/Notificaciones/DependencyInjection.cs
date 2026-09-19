@@ -13,8 +13,8 @@ namespace Nexo.Application.CasosDeUso.Notificaciones;
 public static class DependencyInjection
 {
     public static IServiceCollection AddNotificacionesUseCases(this IServiceCollection services) => services
-        .AddScoped<ICommandHandler<NotificarEntregaCommand, ResultadoDeNotificacionDto>, NotificarEntregaCommandHandler>()
-        .AddScoped<ICommandHandler<NotificarTarifaVencidaCommand, ResultadoDeNotificacionDto>, NotificarTarifaVencidaCommandHandler>()
-        .AddScoped<ICommandHandler<NotificarLineaFalloTecnicoCommand, ResultadoDeNotificacionDto>, NotificarLineaFalloTecnicoCommandHandler>()
-        .AddScoped<ICommandHandler<NotificarCotizacionGanadaCommand, ResultadoDeNotificacionDto>, NotificarCotizacionGanadaCommandHandler>();
+        .AddScoped<ICommandHandler<clsNotificarEntregaCommand, clsResultadoDeNotificacionDto>, clsNotificarEntregaCommandHandler>()
+        .AddScoped<ICommandHandler<clsNotificarTarifaVencidaCommand, clsResultadoDeNotificacionDto>, clsNotificarTarifaVencidaCommandHandler>()
+        .AddScoped<ICommandHandler<clsNotificarLineaFalloTecnicoCommand, clsResultadoDeNotificacionDto>, clsNotificarLineaFalloTecnicoCommandHandler>()
+        .AddScoped<ICommandHandler<clsNotificarCotizacionGanadaCommand, clsResultadoDeNotificacionDto>, clsNotificarCotizacionGanadaCommandHandler>();
 }

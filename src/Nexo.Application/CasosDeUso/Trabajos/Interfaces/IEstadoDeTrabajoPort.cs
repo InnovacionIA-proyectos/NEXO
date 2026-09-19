@@ -11,5 +11,5 @@ namespace Nexo.Application.CasosDeUso.Trabajos.Interfaces;
 /// </summary>
 public interface IEstadoDeTrabajoPort
 {
-    Task<EstadoTrabajoDto?> ObtenerAsync(Guid trabajoId, CancellationToken ct = default);
+    Task<clsEstadoTrabajoDto?> ObtenerAsync(Guid trabajoId, CancellationToken ct = default);
 }

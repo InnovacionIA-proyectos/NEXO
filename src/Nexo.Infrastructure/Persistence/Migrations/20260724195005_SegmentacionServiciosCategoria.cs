@@ -5,7 +5,7 @@
 namespace Nexo.Infrastructure.Migrations
 {
     /// <inheritdoc />
-    public partial class SegmentacionServiciosCategoria : Migration
+    public partial class clsSegmentacionServiciosCategoria : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)

@@ -6,14 +6,14 @@ namespace Nexo.Infrastructure.External;
 /// </summary>
 
 /// <summary>Línea de negocio (tblSAPLineaNegocio). El histórico referencia el ID.</summary>
-public class SapLineaNegocio
+public class clsSapLineaNegocio
 {
     public int Id { get; set; }
     public string Descripcion { get; set; } = null!;
 }
 
 /// <summary>Tipo de vehículo tarifario (tblSAPTiposVehiculoTarifario). El histórico referencia el ID.</summary>
-public class SapTipoVehiculo
+public class clsSapTipoVehiculo
 {
     public int Id { get; set; }
     public string Codigo { get; set; } = null!;      // 3S3, 2S2, C2, …
@@ -22,7 +22,7 @@ public class SapTipoVehiculo
 }
 
 /// <summary>Tipo de carrocería (tblSAPTiposCarroseria). El histórico referencia el CODIGO.</summary>
-public class SapTipoCarroseria
+public class clsSapTipoCarroseria
 {
     public decimal Id { get; set; }
     public string Codigo { get; set; } = null!;      // 1, 2, 4, 11, …
@@ -30,7 +30,7 @@ public class SapTipoCarroseria
 }
 
 /// <summary>Clase de viaje (tblSAPClaseViaje). El histórico referencia el ID.</summary>
-public class SapClaseViaje
+public class clsSapClaseViaje
 {
     public int Id { get; set; }
     public string Descripcion { get; set; } = null!; // Contenedor, Cupo, Carga Suelta, …

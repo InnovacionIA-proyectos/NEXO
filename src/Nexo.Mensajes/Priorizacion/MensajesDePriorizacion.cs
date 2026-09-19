@@ -11,7 +11,7 @@ namespace Nexo.Mensajes.Priorizacion;
 /// duplicaba con cada réplica —dos procesos, dos relojes, el mismo UPDATE sobre las
 /// mismas filas— y ese sí es un problema que no se ve hasta que hay dos instancias.
 /// </summary>
-public static class CadenaDePriorizacion
+public static class clsCadenaDePriorizacion
 {
     public static readonly Guid Unica = new("b7c1a5d2-0000-4000-8000-5c07e0000001");
 
@@ -31,7 +31,7 @@ public static class CadenaDePriorizacion
 /// perdió —por ejemplo si alguien borró el volumen del broker—, en vez de dejarla
 /// muerta en silencio sin que nadie se entere hasta revisar los reportes.
 /// </summary>
-public sealed record ArrancarPriorizacion(Guid CadenaId);
+public sealed record clsArrancarPriorizacion(Guid CadenaId);
 
 /// <summary>
 /// Vence el plazo y toca recalcular. Es el reloj, y vive en el broker.
@@ -40,7 +40,7 @@ public sealed record ArrancarPriorizacion(Guid CadenaId);
 /// un temporizador en memoria, reiniciar el API dejaba el siguiente recálculo
 /// perdido hasta que a alguien se le ocurriera mirar.
 /// </summary>
-public sealed record TicDePriorizacion(Guid CadenaId);
+public sealed record clsTicDePriorizacion(Guid CadenaId);
 
 /// <summary>
 /// El Admin recalibró los parámetros del score. Es el segundo disparador que pide la HU.
@@ -49,7 +49,7 @@ public sealed record TicDePriorizacion(Guid CadenaId);
 /// parámetros recibe su 200 de inmediato y el recálculo de todas las activas ocurre
 /// aparte, con sus reintentos. Recalibrar no debe quedarse esperando a que termine.
 /// </summary>
-public sealed record ParametrosDePriorizacionCambiaron(
+public sealed record clsParametrosDePriorizacionCambiaron(
     Guid CadenaId, Guid CambiadoPor, DateTimeOffset CambiadoEn);
 
 /// <summary>
@@ -62,4 +62,4 @@ public sealed record ParametrosDePriorizacionCambiaron(
 /// </summary>
 /// <param name="CadenaId">La cadena que lo pidió. Para trazar, no para correlacionar.</param>
 /// <param name="Motivo">Reloj o cambio de parámetros. Va al log.</param>
-public sealed record RecalcularScoresSolicitado(Guid CadenaId, string Motivo);
+public sealed record clsRecalcularScoresSolicitado(Guid CadenaId, string Motivo);

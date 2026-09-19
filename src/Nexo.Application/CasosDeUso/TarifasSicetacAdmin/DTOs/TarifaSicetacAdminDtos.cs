@@ -5,7 +5,7 @@ using Nexo.Domain.Usuarios.Entidades;
 namespace Nexo.Application.CasosDeUso.TarifasSicetacAdmin.DTOs;
 
 /// <summary>Filtros de consulta del piso SICE-TAC (caché local, cargada por Excel).</summary>
-public record SicetacFiltro(
+public record clsSicetacFiltro(
     string? Origen,
     string? Destino,
     string? Config,
@@ -14,7 +14,7 @@ public record SicetacFiltro(
     string? Condicion,
     int? Periodo);
 
-public record TarifaSicetacDto(
+public record clsTarifaSicetacDto(
     Guid Id,
     int Periodo,
     string OrigenDane,
@@ -29,7 +29,7 @@ public record TarifaSicetacDto(
     decimal? HorasPactadas);
 
 /// <summary>Resumen del resultado de importar un Excel SICE-TAC.</summary>
-public record ImportResumenDto(
+public record clsImportResumenDto(
     int Procesadas,
     int Insertadas,
     int Actualizadas,
@@ -41,8 +41,8 @@ public record ImportResumenDto(
     int SinRutaLocal = 0);
 
 /// <summary>Entrada del historial de cargas (derivada de audit_log).</summary>
-public record ImportacionDto(
+public record clsImportacionDto(
     Guid Id,
-    string? Usuario,
+    string? clsUsuario,
     string? Detalle,
     DateTimeOffset Fecha);

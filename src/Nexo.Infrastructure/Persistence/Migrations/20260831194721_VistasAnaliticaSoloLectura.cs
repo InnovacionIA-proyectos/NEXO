@@ -20,7 +20,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
     /// la operación — es una extracción analítica puntual, no una transacción de
     /// negocio. Ejecutar la exportación real en ventana de bajo uso de todas formas.
     /// </summary>
-    public partial class VistasAnaliticaSoloLectura : Migration
+    public partial class clsVistasAnaliticaSoloLectura : Migration
     {
         protected override void Up(MigrationBuilder migrationBuilder)
         {

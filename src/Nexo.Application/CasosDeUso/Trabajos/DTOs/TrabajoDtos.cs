@@ -11,7 +11,7 @@ namespace Nexo.Application.CasosDeUso.Trabajos.DTOs;
 /// Tarifas" no se le explican igual a un comercial, y en el segundo caso hay alguien
 /// concreto a quien ir a buscar.
 /// </summary>
-public record AvanceTrabajoDto(
+public record clsAvanceTrabajoDto(
     int? Total,
     int Resueltas,
     int Pendientes,
@@ -25,7 +25,7 @@ public record AvanceTrabajoDto(
 /// hacer; esto dice qué línea, qué pasó y si se va a resolver sola o si hace falta que
 /// alguien actúe.
 /// </summary>
-public record PendienteDeCosteoDto(
+public record clsPendienteDeCosteoDto(
     Guid LineaId, TipoPendienteDeCosteo Tipo, string Motivo, DateTimeOffset PendienteDesde);
 
 /// <summary>
@@ -37,19 +37,19 @@ public record PendienteDeCosteoDto(
 /// aviso con un número menor o igual. Sin él, un aviso rezagado que llegue justo
 /// después de la consulta pisaría datos más nuevos con datos más viejos.
 /// </summary>
-public record EstadoTrabajoDto(
+public record clsEstadoTrabajoDto(
     Guid TrabajoId,
     string Estado,
-    AvanceTrabajoDto Avance,
+    clsAvanceTrabajoDto Avance,
     DateTimeOffset SolicitadoEn,
     DateTimeOffset? TerminadoEn,
-    IReadOnlyList<PendienteDeCosteoDto> Pendientes,
+    IReadOnlyList<clsPendienteDeCosteoDto> Pendientes,
     int Secuencia);
 
 /// <summary>
 /// Lo que viaja por el canal de avisos cuando un trabajo cambia.
 ///
-/// Es el estado SIN la lista de pendientes, y se construye desde <see cref="EstadoTrabajoDto"/>
+/// Es el estado SIN la lista de pendientes, y se construye desde <see cref="clsEstadoTrabajoDto"/>
 /// para que los campos compartidos no puedan divergir. La equivalencia que pide el
 /// contrato no se consigue escribiendo dos cosas parecidas: se consigue derivando una
 /// de la otra.
@@ -68,13 +68,13 @@ public record EstadoTrabajoDto(
 /// barra de progreso retrocedida hasta el siguiente aviso. <c>Secuencia</c> solo crece;
 /// el cliente descarta lo que llegue con un número menor o igual al último que pintó.
 /// </summary>
-public record AvisoDeTrabajo(
+public record clsAvisoDeTrabajo(
     Guid TrabajoId,
     string Estado,
-    AvanceTrabajoDto Avance,
+    clsAvanceTrabajoDto Avance,
     DateTimeOffset? TerminadoEn,
     int Secuencia)
 {
-    public static AvisoDeTrabajo Desde(EstadoTrabajoDto estado) =>
+    public static clsAvisoDeTrabajo Desde(clsEstadoTrabajoDto estado) =>
         new(estado.TrabajoId, estado.Estado, estado.Avance, estado.TerminadoEn, estado.Secuencia);
 }

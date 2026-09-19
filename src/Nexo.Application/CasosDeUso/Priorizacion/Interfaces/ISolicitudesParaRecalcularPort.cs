@@ -18,5 +18,5 @@ public interface ISolicitudesParaRecalcularPort
 {
     /// <param name="despuesDe">Último identificador procesado. Nulo para el primer lote.</param>
     /// <param name="tamano">Cuántas traer como máximo.</param>
-    Task<IReadOnlyList<Solicitud>> ActivasAsync(Guid? despuesDe, int tamano, CancellationToken ct = default);
+    Task<IReadOnlyList<clsSolicitud>> ActivasAsync(Guid? despuesDe, int tamano, CancellationToken ct = default);
 }

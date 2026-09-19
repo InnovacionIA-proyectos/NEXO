@@ -15,13 +15,13 @@ public interface IPendientesDeCosteoPort
                         TipoPendienteDeCosteo tipo, string motivo, CancellationToken ct = default);
 
     /// <summary>Las que siguen pendientes en un trabajo, con su tipo y motivo.</summary>
-    Task<IReadOnlyList<PendienteDeCosteoDto>> DeTrabajoAsync(Guid trabajoId, CancellationToken ct = default);
+    Task<IReadOnlyList<clsPendienteDeCosteoDto>> DeTrabajoAsync(Guid trabajoId, CancellationToken ct = default);
 
     /// <summary>
     /// Todas las que esperan intervención humana, de cualquier trabajo. Es lo que se
     /// revisa cuando aparecen tarifas nuevas.
     /// </summary>
-    Task<IReadOnlyList<LineaPendienteRef>> ManualesAbiertasAsync(CancellationToken ct = default);
+    Task<IReadOnlyList<clsLineaPendienteRef>> ManualesAbiertasAsync(CancellationToken ct = default);
 
     /// <summary>
     /// Cierra el pendiente porque la línea se resolvió. Deja el rastro de cuánto tardó,
@@ -31,4 +31,4 @@ public interface IPendientesDeCosteoPort
 }
 
 /// <summary>Referencia mínima a una línea pendiente: lo justo para volver a costearla.</summary>
-public sealed record LineaPendienteRef(Guid TrabajoId, Guid SolicitudId, Guid LineaId);
+public sealed record clsLineaPendienteRef(Guid TrabajoId, Guid SolicitudId, Guid LineaId);

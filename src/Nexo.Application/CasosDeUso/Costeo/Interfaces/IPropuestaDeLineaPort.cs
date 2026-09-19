@@ -20,5 +20,5 @@ public interface IPropuestaDeLineaPort
     /// el puerto por solicitud, y las dos firmas serían idénticas salvo el tipo de
     /// retorno — algo que C# no permite sobrecargar.
     /// </remarks>
-    Task<ResultadoDeCosteo> ProponerParaLineaAsync(Guid lineaId, CancellationToken ct = default);
+    Task<clsResultadoDeCosteo> ProponerParaLineaAsync(Guid lineaId, CancellationToken ct = default);
 }
