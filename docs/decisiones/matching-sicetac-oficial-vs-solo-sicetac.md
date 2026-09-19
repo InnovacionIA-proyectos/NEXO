@@ -13,7 +13,7 @@ instante — es decir, la ruta siempre fue encontrable.
 ## Causa raíz
 
 `PropuestaTarifaAdapter.ProponerLineaAsync`
-(`src/CabinaFletes.Infrastructure/Biblioteca/Adaptadores/PropuestaTarifaAdapter.cs`)
+(`src/Nexo.Infrastructure/Biblioteca/Adaptadores/PropuestaTarifaAdapter.cs`)
 tiene dos caminos completamente distintos para resolver el piso SICE-TAC de una línea,
 y el que corre automáticamente (cuando hay `ClaseViaje` capturado y hay conexión SAP —
 o sea, casi siempre) es mucho más estricto que el que corre cuando alguien fuerza
@@ -75,7 +75,7 @@ implementada, solo nunca recibía un `sicetac` no-nulo para los casos afectados.
 
 ## Limitación de la verificación
 
-No existe proyecto de tests para `CabinaFletes.Infrastructure` (los adaptadores hablan
+No existe proyecto de tests para `Nexo.Infrastructure` (los adaptadores hablan
 con SQL Server real vía EF, sin mocks — limitación preexistente, no de este fix). No se
 pudo verificar contra datos reales desde el entorno de desarrollo (sin conectividad a
 las bases corporativas desde el sandbox). Verificación pendiente, con las queries en

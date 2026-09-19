@@ -1,6 +1,6 @@
 # language: es
 #
-# Escenarios de las reglas de negocio del motor de costeo de CabinaFletes
+# Escenarios de las reglas de negocio del motor de costeo de Nexo
 # (`ReglaDeCosteo` + `PropuestaTarifaAdapter`). Documentación viva de
 # criterios de aceptación, igual que `docs/contrato-integracion/escenarios.feature`:
 # no hay runner de Gherkin instalado en este proyecto, así que estos escenarios

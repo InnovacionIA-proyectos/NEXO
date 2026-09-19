@@ -1,19 +1,19 @@
 // Prueba de carga QA para la HU-04.2 (issue #14, PR #61) — NO forma parte del PR
 // original. Para reproducirla: copiar este archivo dentro de
-// tests/CabinaFletes.Api.Tests/Mensajeria/ (mismas dependencias del proyecto) y
+// tests/Nexo.Api.Tests/Mensajeria/ (mismas dependencias del proyecto) y
 // correr `dotnet test --filter FullyQualifiedName~OutboxCarga` con
 // TEST_DB_CONNECTION apuntando a un SQL Server real. Ver README.md de esta
 // carpeta para el resultado ya obtenido y el detalle completo.
-using CabinaFletes.Api.Tests.Infra;
-using CabinaFletes.Infrastructure.Persistence;
-using CabinaFletes.Mensajes.Solicitudes;
+using Nexo.Api.Tests.Infra;
+using Nexo.Infrastructure.Persistence;
+using Nexo.Mensajes.Solicitudes;
 using MassTransit;
 using MassTransit.EntityFrameworkCoreIntegration;
 using MassTransit.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace CabinaFletes.Api.Tests.Mensajeria;
+namespace Nexo.Api.Tests.Mensajeria;
 
 /// <summary>
 /// Confirma que el Outbox transaccional aguanta publicaciones concurrentes sin
@@ -30,10 +30,10 @@ public class OutboxCargaTests : IAsyncLifetime
     public async Task InitializeAsync()
     {
         var servicios = new ServiceCollection();
-        servicios.AddDbContext<CabinaFletesDbContext>(o => o.UseSqlServer(ApiFactory.TestConnection));
+        servicios.AddDbContext<NexoDbContext>(o => o.UseSqlServer(ApiFactory.TestConnection));
         servicios.AddMassTransitTestHarness(x =>
         {
-            x.AddEntityFrameworkOutbox<CabinaFletesDbContext>(o =>
+            x.AddEntityFrameworkOutbox<NexoDbContext>(o =>
             {
                 o.UseSqlServer();
                 o.UseBusOutbox();
@@ -42,11 +42,11 @@ public class OutboxCargaTests : IAsyncLifetime
         _servicios = servicios.BuildServiceProvider(validateScopes: true);
 
         using var alcance = _servicios.CreateScope();
-        var db = alcance.ServiceProvider.GetRequiredService<CabinaFletesDbContext>();
+        var db = alcance.ServiceProvider.GetRequiredService<NexoDbContext>();
         await db.Database.MigrateAsync();
         // ExecuteDeleteAsync en vez de SQL crudo: un "DELETE FROM OutboxMessage" sin
         // calificar asume esquema 'dbo', y dejó de ser cierto desde que
-        // CabinaFletesDbContext fijó HasDefaultSchema("dbo_NEXO_prueba") (issue #92).
+        // NexoDbContext fijó HasDefaultSchema("dbo_NEXO_prueba") (issue #92).
         await db.Set<OutboxMessage>().ExecuteDeleteAsync();
 
         _bus = _servicios.GetRequiredService<ITestHarness>();
@@ -68,7 +68,7 @@ public class OutboxCargaTests : IAsyncLifetime
         var tareas = Enumerable.Range(0, concurrencia).Select(async _ =>
         {
             using var alcance = _servicios.CreateScope();
-            var db = alcance.ServiceProvider.GetRequiredService<CabinaFletesDbContext>();
+            var db = alcance.ServiceProvider.GetRequiredService<NexoDbContext>();
             var publicador = alcance.ServiceProvider.GetRequiredService<IPublishEndpoint>();
 
             await using var tx = await db.Database.BeginTransactionAsync();
@@ -82,7 +82,7 @@ public class OutboxCargaTests : IAsyncLifetime
         cronometro.Stop();
 
         using var verificacion = _servicios.CreateScope();
-        var dbVerificacion = verificacion.ServiceProvider.GetRequiredService<CabinaFletesDbContext>();
+        var dbVerificacion = verificacion.ServiceProvider.GetRequiredService<NexoDbContext>();
         var enTablaDeSalida = await dbVerificacion.Set<OutboxMessage>().CountAsync();
 
         Assert.Equal(concurrencia, enTablaDeSalida);

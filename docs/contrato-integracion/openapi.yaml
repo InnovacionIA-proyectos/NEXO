@@ -8,7 +8,7 @@ openapi: 3.0.3
 # meterlos convertiría este archivo en una copia desactualizada del código.
 
 info:
-  title: Nexo (Cabina de Fletes) — contrato de integración con el portal
+  title: Nexo (Nexo) — contrato de integración con el portal
   version: 1.3.0
   description: |
     Nexo no tiene inicio de sesión propio. La identidad la aporta la sesión del
@@ -20,7 +20,7 @@ info:
 
 servers:
   - url: /api
-    description: Raíz del API de Cabina de Fletes
+    description: Raíz del API de Nexo
 
 tags:
   - name: sesion
@@ -45,7 +45,7 @@ paths:
         vuelve a validarse por su cuenta.
       responses:
         '200':
-          description: Identidad válida con permiso sobre Cabina de Fletes
+          description: Identidad válida con permiso sobre Nexo
           content:
             application/json:
               schema:
@@ -59,7 +59,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ApiError' }
         '403':
-          description: La persona existe pero no tiene permiso sobre Cabina de Fletes
+          description: La persona existe pero no tiene permiso sobre Nexo
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ApiError' }

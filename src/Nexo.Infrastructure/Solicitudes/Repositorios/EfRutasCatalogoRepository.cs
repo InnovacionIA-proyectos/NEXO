@@ -1,0 +1,13 @@
+using Nexo.Application.CasosDeUso.Solicitudes.Interfaces;
+using Nexo.Domain.Catalogos.Entidades;
+using Nexo.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
+
+namespace Nexo.Infrastructure.Solicitudes.Repositorios;
+
+public sealed class EfRutasCatalogoRepository(NexoDbContext db) : IRutasCatalogoPort
+{
+    public async Task<IReadOnlyList<Ruta>> ListarAsync(CancellationToken ct) => await db.Rutas.ToListAsync(ct);
+
+    public void Agregar(Ruta ruta) => db.Rutas.Add(ruta);
+}

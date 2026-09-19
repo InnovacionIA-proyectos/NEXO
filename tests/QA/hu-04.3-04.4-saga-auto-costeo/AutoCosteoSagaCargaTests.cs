@@ -1,18 +1,18 @@
 // Prueba de carga QA para la HU-04.3/04.4 (issues #15/#16, PR #62) — NO forma parte
 // del PR original. Para reproducirla: copiar este archivo dentro de
-// tests/CabinaFletes.Api.Tests/Mensajeria/ (mismas dependencias del proyecto) y
+// tests/Nexo.Api.Tests/Mensajeria/ (mismas dependencias del proyecto) y
 // correr `dotnet test --filter FullyQualifiedName~AutoCosteoSagaCarga`. No necesita
 // SQL Server ni RabbitMQ real: usa el transporte en memoria del arnés de pruebas de
 // MassTransit, igual que AutoCosteoSagaTests.cs. Ver README.md de esta carpeta para
 // el resultado ya obtenido.
-using CabinaFletes.Infrastructure.Common.Mensajeria.Saga;
-using CabinaFletes.Mensajes.Costeo;
-using CabinaFletes.Mensajes.Solicitudes;
+using Nexo.Infrastructure.Common.Mensajeria.Saga;
+using Nexo.Mensajes.Costeo;
+using Nexo.Mensajes.Solicitudes;
 using MassTransit;
 using MassTransit.Testing;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace CabinaFletes.Api.Tests.Mensajeria;
+namespace Nexo.Api.Tests.Mensajeria;
 
 /// <summary>
 /// Prueba de carga QA (no forma parte del PR original): muchos trabajos de

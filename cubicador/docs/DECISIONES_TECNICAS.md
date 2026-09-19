@@ -455,7 +455,7 @@ más profundo del que hace falta. El único costo real que se acepta es el
 `messageType`, que debe coincidir exacto con el namespace/nombre de la clase
 C# del otro lado — un acoplamiento cruzado real, sin verificación en tiempo
 de compilación en ninguno de los dos lados, protegido hoy solo por las
-pruebas de contrato de cada lado (`tests/CabinaFletes.Api.Tests/Cubicacion/
+pruebas de contrato de cada lado (`tests/Nexo.Api.Tests/Cubicacion/
 ContratoCubicacionTests.cs` en NEXO, y la verificación E2E documentada en
 `tests/QA/28-.../README.md` de NEXO).
 

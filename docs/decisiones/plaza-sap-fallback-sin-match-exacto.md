@@ -64,10 +64,10 @@ en 3 y 4 (peso exacto / catálogo de vehículo, según corresponda).
 
 ## Limitación conocida (no resuelta aquí)
 
-No hay un proyecto de tests para la capa `CabinaFletes.Infrastructure` en este
+No hay un proyecto de tests para la capa `Nexo.Infrastructure` en este
 repo — `TarifarioSapAdapter`/`PropuestaTarifaAdapter` no tienen cobertura
 automatizada de regresión (ni la tenían antes de este fix). La verificación de
 esta issue se hizo de forma real pero manual (SQL Server efímero + datos
 sintéticos, sin tocar ninguna base real), no queda como test que corra en CI.
 Vale la pena un issue de seguimiento si se decide invertir en
-`CabinaFletes.Infrastructure.Tests`.
+`Nexo.Infrastructure.Tests`.

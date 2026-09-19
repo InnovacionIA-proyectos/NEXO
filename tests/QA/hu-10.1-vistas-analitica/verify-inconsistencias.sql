@@ -12,7 +12,7 @@
 --
 -- Requiere: app levantada con migraciones aplicadas (docker compose up -d --build --wait).
 -- Correr contra la BD: docker exec -i nexo-db-1 /opt/mssql-tools18/bin/sqlcmd -C -S localhost
---   -U sa -P '<password>' -d CabinaFletes -i verify-inconsistencias.sql
+--   -U sa -P '<password>' -d Nexo -i verify-inconsistencias.sql
 --
 -- AL TERMINAR: correr la sección "LIMPIEZA" al final de este archivo (comentada a
 -- propósito, para no borrar nada por accidente si se corre este script sin querer).

@@ -60,7 +60,7 @@ Cubicador confirme.
 ### Efecto colateral encontrado y resuelto: la FK de `VehiculoId` en NEXO
 
 `PlanCargue.VehiculoId` tiene una foreign key real contra la tabla
-`VehiculosCubicacion` DE LA BASE DE NEXO (`CabinaFletesDbContext.cs`). Pero el
+`VehiculosCubicacion` DE LA BASE DE NEXO (`NexoDbContext.cs`). Pero el
 `vehiculoId` que llega en `POST /api/planes-cargue` es del catálogo de
 **Cubicador** (fuente de verdad de vehículos desde el split a microservicio) —
 nunca existió en la tabla de NEXO, que hoy no la usa ningún otro código

@@ -2,7 +2,7 @@
 
 Microservicio propio y contenerizado que vive dentro de este mismo repo
 (`NEXO/cubicador/`), como carpeta separada — no es parte de la solución
-.NET (`CabinaFletes.Clean.sln`), ni comparte proceso ni base de datos con el
+.NET (`Nexo.Clean.sln`), ni comparte proceso ni base de datos con el
 backend C#. Construido para S2-HU-072 ("portar el motor de cubicación a
 Python, servicio contenerizado") y S2-HU-07.3 ("paridad automatizada con
 los 26 casos dorados en CI"): trae **completo** el cubicador que

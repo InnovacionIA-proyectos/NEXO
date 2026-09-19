@@ -13,7 +13,7 @@
 -- Cómo correrlo: levantar la app de esta rama con migraciones aplicadas
 -- (Database__MigrateOnStartup=true) contra cualquier SQL Server, luego:
 --   docker exec -i <contenedor-db> /opt/mssql-tools18/bin/sqlcmd -C -S localhost \
---     -U sa -P '<password>' -d CabinaFletes -i verify-analitica-tras-mover-esquema.sql
+--     -U sa -P '<password>' -d Nexo -i verify-analitica-tras-mover-esquema.sql
 
 PRINT '--- dónde quedó la tabla solicitudes tras la migración ---';
 SELECT s.name AS esquema, t.name AS tabla

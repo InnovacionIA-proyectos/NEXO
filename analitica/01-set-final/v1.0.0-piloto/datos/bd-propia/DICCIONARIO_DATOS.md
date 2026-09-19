@@ -1,9 +1,9 @@
-# Diccionario de datos — set analítico de CabinaFletes (S2-HU-10.1, issue #35)
+# Diccionario de datos — set analítico de Nexo (S2-HU-10.1, issue #35)
 
 Este documento describe las vistas de solo lectura del esquema `analitica`,
 creadas por la migración
-[`20260831194721_VistasAnaliticaSoloLectura`](../../../src/CabinaFletes.Infrastructure/Persistence/Migrations/20260831194721_VistasAnaliticaSoloLectura.cs)
-sobre la base transaccional `CabinaFletes`.
+[`20260831194721_VistasAnaliticaSoloLectura`](../../../src/Nexo.Infrastructure/Persistence/Migrations/20260831194721_VistasAnaliticaSoloLectura.cs)
+sobre la base transaccional `Nexo`.
 
 ## 1. Qué es esto y qué NO es
 
@@ -208,7 +208,7 @@ para exportarlas a archivo. Ejemplo con `sqlcmd` (ejecutar en ventana de
 bajo uso, contra un usuario de solo lectura):
 
 ```powershell
-sqlcmd -S <servidor> -d CabinaFletes -U <usuario_solo_lectura> -P <clave> `
+sqlcmd -S <servidor> -d Nexo -U <usuario_solo_lectura> -P <clave> `
   -Q "SET NOCOUNT ON; SELECT * FROM analitica.cotizaciones" `
   -s "," -W -o cotizaciones.csv
 ```

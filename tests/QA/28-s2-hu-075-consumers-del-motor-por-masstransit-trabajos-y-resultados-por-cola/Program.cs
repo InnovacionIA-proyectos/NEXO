@@ -2,7 +2,7 @@
 // HU-075 (issue #28, PR #73) SIN pasar por ICubicacionPort (que hoy nadie dispara desde
 // un flujo de usuario real) ni por un harness de xUnit contra ApiFixture. Habla
 // exactamente la misma topología manual que registra
-// src/CabinaFletes.Infrastructure/Common/Mensajeria/MensajeriaDependencyInjection.cs
+// src/Nexo.Infrastructure/Common/Mensajeria/MensajeriaDependencyInjection.cs
 // para los 3 tipos de Cubicacion (exchange topic `cubicador.eventos`, routing keys
 // semánticas) — sin esto el mensaje "se publica" pero no llega a nadie (topic exchange
 // sin bind que matchee, sin error).
@@ -27,7 +27,7 @@
 // INEXISTENTE no pasa nada -- el propio consumer hace `if (plan is null) return`, a
 // propósito (ver su comentario: "el trabajo puede haberse creado y purgado en otro
 // proceso").
-using CabinaFletes.Mensajes.Cubicacion;
+using Nexo.Mensajes.Cubicacion;
 using MassTransit;
 using Microsoft.Extensions.DependencyInjection;
 

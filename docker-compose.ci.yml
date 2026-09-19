@@ -24,7 +24,7 @@ services:
       context: .
       dockerfile: build/Dockerfile.ci
     image: nexo-ci:local
-    command: ["dotnet", "build", "CabinaFletes.Clean.sln", "-c", "Release", "--no-restore"]
+    command: ["dotnet", "build", "Nexo.Clean.sln", "-c", "Release", "--no-restore"]
 
   # SQL Server efímero para las pruebas de integración. NO es la base corporativa
   # ni pretende serlo: nace y muere con la corrida, sin volumen, para que ninguna
@@ -60,7 +60,7 @@ services:
       db-pruebas:
         condition: service_healthy
     environment:
-      TEST_DB_CONNECTION: "Server=db-pruebas,1433;Database=CabinaFletes_Test;User Id=sa;Password=${TEST_DB_PASSWORD:-Pruebas_Nexo_2026!};TrustServerCertificate=True;Encrypt=True;"
+      TEST_DB_CONNECTION: "Server=db-pruebas,1433;Database=Nexo_Test;User Id=sa;Password=${TEST_DB_PASSWORD:-Pruebas_Nexo_2026!};TrustServerCertificate=True;Encrypt=True;"
       # Issue #184: db-pruebas nace vacía en cada corrida (sin volumen, ver arriba) -
       # a diferencia de TEST_DB_CONNECTION contra la base corporativa real (donde este
       # flag debe quedar OFF a propósito, ver ApiFixture.cs), acá SÍ hay que crear el
@@ -71,7 +71,7 @@ services:
     command:
       - dotnet
       - test
-      - CabinaFletes.Clean.sln
+      - Nexo.Clean.sln
       - -c
       - Release
       - --no-restore
@@ -86,7 +86,7 @@ services:
       db-pruebas:
         condition: service_healthy
     environment:
-      TEST_DB_CONNECTION: "Server=db-pruebas,1433;Database=CabinaFletes_Test;User Id=sa;Password=${TEST_DB_PASSWORD:-Pruebas_Nexo_2026!};TrustServerCertificate=True;Encrypt=True;"
+      TEST_DB_CONNECTION: "Server=db-pruebas,1433;Database=Nexo_Test;User Id=sa;Password=${TEST_DB_PASSWORD:-Pruebas_Nexo_2026!};TrustServerCertificate=True;Encrypt=True;"
       # Issue #184: mismo motivo que en 'pruebas' arriba - db-pruebas nace vacía.
       TEST_DB_MIGRATE_ON_STARTUP: "true"
     networks:
@@ -94,7 +94,7 @@ services:
     command:
       - dotnet
       - test
-      - tests/CabinaFletes.Api.Tests
+      - tests/Nexo.Api.Tests
       - -c
       - Release
       - --no-restore

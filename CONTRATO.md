@@ -1,4 +1,4 @@
-# Contrato de la API — NEXO (Cabina de Fletes)
+# Contrato de la API — NEXO (Nexo)
 
 Referencia completa, endpoint por endpoint, para que el frontend sepa qué llamar,
 qué mandar y qué esperar. Es un **complemento** de
@@ -24,7 +24,7 @@ X-Portal-Usuario-Id: 10123
 ```
 
 Sin este header, o si el id no resuelve a una identidad válida → **401**. Con
-identidad válida pero sin uno de los 6 roles de Nexo sobre Cabina de Fletes →
+identidad válida pero sin uno de los 6 roles de Nexo sobre Nexo →
 **403**. Ningún endpoint es público salvo `GET /health`. Detalle completo:
 [`docs/contrato-integracion/README.md`, sección 1](docs/contrato-integracion/README.md#1-identidad).
 
@@ -324,7 +324,7 @@ interface AvisoPlanCargueDto { planCargueId: UUID; estado: string; puntaje: Deci
 interface ComandoAceptadoDto { correlationId: UUID; estado: string }
 interface PlanFlotaItemDto { id: UUID; numeroVehiculo: number; totalVehiculos: number; unidadesCargadas: number; unidadesTotales: number }
 // ColocacionCargueDto: mismo shape que ya devuelve el `resultado` de `.../optimizar` dentro de `colocaciones[]`
-// (geometría + estado de cada bulto) — ver `CabinaFletes.Application.CasosDeUso.PlanDeCargue.DTOs.PlanCargueDtos.cs`
+// (geometría + estado de cada bulto) — ver `Nexo.Application.CasosDeUso.PlanDeCargue.DTOs.PlanCargueDtos.cs`
 // para el shape completo; espeja 1:1 el `ColocacionCargueDto` documentado en `cubicador/CONTRATO.md` §3.2.
 
 interface SesionActualDto { id: number; nombre: string; rol: RolUsuario; capacidades: string[] }
@@ -551,5 +551,5 @@ LineaNegocio           PuertoAInterior · InteriorAPuerto · Nacional · Devoluc
 ClaseViaje             Contenedor · Cupo · CargaSuelta · Extradimensionado
 ```
 
-`src/CabinaFletes.Domain/Enums/Enums.cs` es la fuente de la verdad; si este
+`src/Nexo.Domain/Enums/Enums.cs` es la fuente de la verdad; si este
 apéndice y el código difieren, gana el código.

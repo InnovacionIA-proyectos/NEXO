@@ -1,5 +1,5 @@
 # ============================================================================
-# CabinaFletes (Clean Architecture) — despliegue con Docker Compose
+# Nexo (Clean Architecture) — despliegue con Docker Compose
 #
 #   - Este repositorio es SOLO BACKEND (no incluye frontend): la migración
 #     a Clean Architecture se acotó explícitamente a src/ del proyecto
@@ -14,12 +14,12 @@
 #     (Cubicacion__Paridad*, ver .env.example), la función responde 503 "en
 #     verificación", nunca cae a un fallback.
 #   - El servicio 'db' (SQL Server local en contenedor) está DESHABILITADO:
-#     se usa una BD de pruebas/producción real vía ConnectionStrings__CabinaFletes
+#     se usa una BD de pruebas/producción real vía ConnectionStrings__Nexo
 #     (.env). No se elimina el bloque por si hace falta volver a levantarlo
 #     para desarrollo aislado.
 #
 # Uso:
-#   1) cp .env.example .env   y completar los valores (mínimo ConnectionStrings__CabinaFletes).
+#   1) cp .env.example .env   y completar los valores (mínimo ConnectionStrings__Nexo).
 #   2) docker compose up -d --build
 #   3) La API queda en http://localhost:${API_PORT:-8080} (health en /health).
 #   4) Sembrar datos demo (opcional, alternativa a MIGRATE_ON_STARTUP=true):
@@ -65,7 +65,7 @@ services:
   api:
     build:
       context: .
-      dockerfile: src/CabinaFletes.Api/Dockerfile
+      dockerfile: src/Nexo.Api/Dockerfile
     depends_on:
       rabbit:
         condition: service_healthy
@@ -74,8 +74,8 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
       # 'db' local deshabilitado: se conecta directo a la BD de pruebas real
-      # definida en ConnectionStrings__CabinaFletes (.env), no al contenedor.
-      ConnectionStrings__CabinaFletes: ${ConnectionStrings__CabinaFletes}
+      # definida en ConnectionStrings__Nexo (.env), no al contenedor.
+      ConnectionStrings__Nexo: ${ConnectionStrings__Nexo}
       ConnectionStrings__RabbitMq: "amqp://${RABBITMQ_USER:-nexo}:${RABBITMQ_PASSWORD}@rabbit:5672/"
       Database__MigrateOnStartup: ${MIGRATE_ON_STARTUP}
       # Siembra datos de demostración al arrancar si la BD está vacía (idempotente).
@@ -184,12 +184,12 @@ services:
     profiles: ["seed"]
     build:
       context: .
-      dockerfile: src/CabinaFletes.Api/Dockerfile
+      dockerfile: src/Nexo.Api/Dockerfile
     # depends_on: db: deshabilitado junto con el servicio 'db' de arriba (BD de pruebas real).
     environment:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
-      ConnectionStrings__CabinaFletes: ${ConnectionStrings__CabinaFletes}
-    entrypoint: ["dotnet", "CabinaFletes.Api.dll", "seed"]
+      ConnectionStrings__Nexo: ${ConnectionStrings__Nexo}
+    entrypoint: ["dotnet", "Nexo.Api.dll", "seed"]
     networks:
       - internal
     restart: "no"

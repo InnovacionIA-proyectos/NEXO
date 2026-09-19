@@ -97,8 +97,8 @@ CONVENCION = [
      "documentacion: no cambia comportamiento"),
     ("cubicador/README.md", False, False, "documentacion"),
     ("cubicador/CONTRATO.md", False, False, "documentacion"),
-    ("src/CabinaFletes.Api/Program.cs", False, False, "API .NET: ajeno a Cubicador"),
-    ("tests/CabinaFletes.Api.Tests/Infra/ApiFixture.cs", False, False, "idem"),
+    ("src/Nexo.Api/Program.cs", False, False, "API .NET: ajeno a Cubicador"),
+    ("tests/Nexo.Api.Tests/Infra/ApiFixture.cs", False, False, "idem"),
 ]
 
 # Huecos ya identificados en los pipelines de las issues #134 y #137. Se

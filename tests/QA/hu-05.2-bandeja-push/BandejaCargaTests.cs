@@ -1,19 +1,19 @@
 // Prueba de carga QA para la HU-05.2 (issue #20, PR #67) — NO forma parte del PR
 // original. Para reproducirla: copiar este archivo dentro de
-// tests/CabinaFletes.Api.Tests/Mensajeria/ (mismas dependencias del proyecto) y correr
+// tests/Nexo.Api.Tests/Mensajeria/ (mismas dependencias del proyecto) y correr
 // `dotnet test --filter FullyQualifiedName~BandejaCarga`. No necesita SQL Server ni
 // RabbitMQ real: usa el transporte en memoria del arnés de pruebas de MassTransit,
 // igual que BandejaPushTests.cs. Ver README.md de esta carpeta para el resultado ya
 // obtenido.
-using CabinaFletes.Infrastructure.Common.Mensajeria.Saga;
-using CabinaFletes.Mensajes.Bandeja;
-using CabinaFletes.Mensajes.Costeo;
-using CabinaFletes.Mensajes.Solicitudes;
+using Nexo.Infrastructure.Common.Mensajeria.Saga;
+using Nexo.Mensajes.Bandeja;
+using Nexo.Mensajes.Costeo;
+using Nexo.Mensajes.Solicitudes;
 using MassTransit;
 using MassTransit.Testing;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace CabinaFletes.Api.Tests.Mensajeria;
+namespace Nexo.Api.Tests.Mensajeria;
 
 /// <summary>
 /// BandejaPushTests.cs (del propio PR) prueba el agrupamiento con UN pliego a la vez.

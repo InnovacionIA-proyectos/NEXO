@@ -33,7 +33,7 @@ Y el propio repo se contradice a sí mismo sobre cuál es la versión correcta:
 
 ## Evidencia a favor de los 4 pesos (la que se adopta)
 
-1. **`ParametrosScore.cs`** (`src/CabinaFletes.Domain/Priorizacion/Entidades/`)
+1. **`ParametrosScore.cs`** (`src/Nexo.Domain/Priorizacion/Entidades/`)
    ya tiene los 4 campos de peso, editables por el Admin, con defaults que
    suman 1.0:
    ```csharp

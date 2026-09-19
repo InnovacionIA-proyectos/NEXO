@@ -33,11 +33,11 @@ EXCHANGE = "cubicador.eventos"
 logger = logging.getLogger("cubicador.rabbitmq")
 
 # Namespace C# real de los mensajes que SI consume NEXO con un IConsumer<T>
-# de MassTransit - ver NEXO/src/CabinaFletes.Mensajes/Cubicacion/
+# de MassTransit - ver NEXO/src/Nexo.Mensajes/Cubicacion/
 # MensajesDeCubicacion.cs. Acoplamiento cruzado real: si NEXO renombra esas
 # clases o el namespace, este valor queda desincronizado sin ningun error de
 # compilacion que lo avise - solo se nota si un mensaje deja de entregarse.
-_NAMESPACE_MENSAJES_NEXO = "CabinaFletes.Mensajes.Cubicacion"
+_NAMESPACE_MENSAJES_NEXO = "Nexo.Mensajes.Cubicacion"
 
 
 def _sobre_masstransit(tipo_csharp: str, payload: dict[str, Any]) -> dict[str, Any]:

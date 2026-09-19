@@ -118,7 +118,7 @@ código que la usara).
 **`cubicacion.rechazada`**: `{ "correlationId", "planId", "codigo",
 "mensaje" }` → marca `PlanCargue.Estado = "error"`.
 
-Ambos shapes protegidos por `tests/CabinaFletes.Api.Tests/Cubicacion/
+Ambos shapes protegidos por `tests/Nexo.Api.Tests/Cubicacion/
 ContratoCubicacionTests.cs` (sin broker, solo (de)serialización) — copiados
 literal de lo que publica `RabbitMqEventosPublisher` del lado de Cubicador.
 
@@ -143,14 +143,14 @@ al final). Log real:
 ```
 21:32:00 warn: R-RETRY rabbitmq://rabbit/Cubicacion.PlanDeCargueGenerado ...
   System.NullReferenceException: Object reference not set to an instance of an object.
-  at CabinaFletes.Infrastructure.Cubicacion.PlanDeCargueGeneradoConsumer.Consume(...)
-21:33:21 dbug: SEND rabbitmq://rabbit/MassTransit:Fault--CabinaFletes.Mensajes.Cubicacion:PlanDeCargueGenerado-- ...
-  MassTransit.Fault<CabinaFletes.Mensajes.Cubicacion.PlanDeCargueGenerado>
+  at Nexo.Infrastructure.Cubicacion.PlanDeCargueGeneradoConsumer.Consume(...)
+21:33:21 dbug: SEND rabbitmq://rabbit/MassTransit:Fault--Nexo.Mensajes.Cubicacion:PlanDeCargueGenerado-- ...
+  MassTransit.Fault<Nexo.Mensajes.Cubicacion.PlanDeCargueGenerado>
 21:33:21 fail: R-FAULT rabbitmq://rabbit/Cubicacion.PlanDeCargueGenerado ... (agotados los reintentos)
 21:33:21 info: SmtpCorreoAdapter Correo enviado a scalderon@boterosoto.com.co: [NEXO] Mensaje PlanDeCargueGenerado cayó a la cola de error
   (... 5 correos más, uno por destinatario)
 21:33:21 dbug: RECEIVE rabbitmq://rabbit/PlanDeCargueGenerado ... Fault<PlanDeCargueGenerado>
-  AlertaDeFalloConsumer<CabinaFletes.Mensajes.Cubicacion.PlanDeCargueGenerado>
+  AlertaDeFalloConsumer<Nexo.Mensajes.Cubicacion.PlanDeCargueGenerado>
 ```
 
 81 segundos entre el primer `R-RETRY` (21:32:00) y el `Fault` (21:33:21) — 
@@ -348,7 +348,7 @@ comando perdido. Cubrirlos exige un registro explícito de comandos en vuelo.
 ### 6.3 Payload de cada comando en la cola
 
 Mismo sobre de siempre (routing key `cubicacion.solicitada`), con
-`solicitud` variando por tipo — ver `CabinaFletes.Mensajes.Cubicacion.
+`solicitud` variando por tipo — ver `Nexo.Mensajes.Cubicacion.
 MensajesDeCubicacion.cs` para el shape exacto (records `CrearPlanInput`,
 `GuardarVehiculoInput`, `GuardarItemInput`, `ImportarItemsInput`,
 `EliminarItemInput`, `EliminarPlanInput`, `AjustarColocacionInput`) y
@@ -509,7 +509,7 @@ siempre; `resultado` pasó de `{estado, puntaje, colocaciones: int}` al
 }
 ```
 
-Shape exacto de cada objeto: `CabinaFletes.Mensajes.Cubicacion.
+Shape exacto de cada objeto: `Nexo.Mensajes.Cubicacion.
 MensajesDeCubicacion.cs` (`PlanCargueEvento`/`ItemPlanCargueEvento`/
 `ColocacionCargueEvento`/`MetricasCubicacionEvento`/
 `IncidenciaValidacionEvento`) del lado C#, `ResultadoPlanDto` (cubicador/
@@ -570,7 +570,7 @@ restringirlas por rol — mismo criterio que ya usaba
 
 Los DTOs completos (`VehiculoCubicacionDto`, `PlanCargueDetalleDto`,
 `ItemPlanCargueDetalleDto`, `ColocacionCargueDto`, `ResultadoPlanDto`,
-`PlanFlotaItemDto`) están en `CabinaFletes.Application.CasosDeUso.
+`PlanFlotaItemDto`) están en `Nexo.Application.CasosDeUso.
 PlanDeCargue.DTOs.PlanCargueDtos.cs` — espejan 1:1 los DTOs de Cubicador
 citados en cubicador/CONTRATO.md §3.2, con `Guid`/`decimal` en vez de
 `string`/`float` (convención del resto de la API HTTP de NEXO).

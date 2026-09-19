@@ -5,7 +5,7 @@ Rama: `18-s2-hu-047-pliego-de-prueba-realista-y-validación-muestral-del-costeo`
 Objetivo de la HU: construir un dataset de pliego de 300+ líneas con casos borde y
 validar por muestreo que las propuestas calculadas cumplen las reglas de negocio del
 costeo (regla del mayor, piso inviolable, fuente correcta), documentadas en
-[`ReglaDeCosteo.cs`](../../../src/CabinaFletes.Domain/Costeo/Reglas/ReglaDeCosteo.cs).
+[`ReglaDeCosteo.cs`](../../../src/Nexo.Domain/Costeo/Reglas/ReglaDeCosteo.cs).
 
 ## Dónde está el dataset
 
@@ -13,20 +13,20 @@ El dataset vive junto a las pruebas que lo consumen, no en esta carpeta, para qu
 compile y ejecute como parte normal de la suite (no como un README que hay que creer
 por las buenas):
 
-- **Dataset (JSON, estructurado)**: [`tests/CabinaFletes.Domain.Tests/TestData/pliego-300-lineas.json`](../../CabinaFletes.Domain.Tests/TestData/pliego-300-lineas.json)
+- **Dataset (JSON, estructurado)**: [`tests/Nexo.Domain.Tests/TestData/pliego-300-lineas.json`](../../Nexo.Domain.Tests/TestData/pliego-300-lineas.json)
   — 320 líneas, versionado en el repo.
-- **Dataset (Excel, mismo contenido)**: [`tests/CabinaFletes.Domain.Tests/TestData/pliego-300-lineas.xlsx`](../../CabinaFletes.Domain.Tests/TestData/pliego-300-lineas.xlsx)
+- **Dataset (Excel, mismo contenido)**: [`tests/Nexo.Domain.Tests/TestData/pliego-300-lineas.xlsx`](../../Nexo.Domain.Tests/TestData/pliego-300-lineas.xlsx)
   — insumo del flujo real de carga (ver "¿Por qué JSON y también Excel?" abajo).
-- **Prueba**: [`tests/CabinaFletes.Domain.Tests/PliegoDatasetValidacionTests.cs`](../../CabinaFletes.Domain.Tests/PliegoDatasetValidacionTests.cs)
+- **Prueba**: [`tests/Nexo.Domain.Tests/PliegoDatasetValidacionTests.cs`](../../Nexo.Domain.Tests/PliegoDatasetValidacionTests.cs)
   — corre `ReglaDeCosteo` real sobre el dataset JSON y compara contra la regla esperada.
 
 Reproducir:
 ```
-dotnet test tests/CabinaFletes.Domain.Tests --filter FullyQualifiedName~PliegoDatasetValidacionTests
+dotnet test tests/Nexo.Domain.Tests --filter FullyQualifiedName~PliegoDatasetValidacionTests
 ```
 
 **Resultado real de esta sesión (no simulado):** `95/95` en verde — las 61 pruebas
-que ya existían en `CabinaFletes.Domain.Tests` más las 34 nuevas de esta HU. Cero
+que ya existían en `Nexo.Domain.Tests` más las 34 nuevas de esta HU. Cero
 regresiones.
 
 ## Cómo se generó
@@ -76,9 +76,9 @@ Hoja 'Pliego': fila encabezado=1, columnas=14, filas de datos totales=320, filas
 ```
 
 Detecta el encabezado y las 320 filas correctamente. Esta verificación no quedó como
-prueba automática dentro de `CabinaFletes.Domain.Tests` porque ese proyecto, por
-arquitectura, no depende de `CabinaFletes.Infrastructure` (Domain es la capa más
-interna); tampoco se agregó a `CabinaFletes.Api.Tests` porque esa suite necesita la
+prueba automática dentro de `Nexo.Domain.Tests` porque ese proyecto, por
+arquitectura, no depende de `Nexo.Infrastructure` (Domain es la capa más
+interna); tampoco se agregó a `Nexo.Api.Tests` porque esa suite necesita la
 base de datos SQL Server corporativa para arrancar su fixture, no disponible en este
 entorno (ver "Fuera de alcance"). Quedó como verificación manual documentada aquí,
 reproducible con un arnés de una sola clase si hace falta repetirla.

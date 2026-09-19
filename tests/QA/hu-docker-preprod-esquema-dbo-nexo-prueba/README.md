@@ -23,7 +23,7 @@ Historial completo de esta HU (sin issue/HU numerada propia, es infraestructura)
 ## Qué trae el PR #95 (contenido real, más allá de las carpetas recuperadas)
 
 - `docker-compose.yml`: deshabilita el servicio `db` local, conecta la API a una
-  BD de pruebas/preproducción real vía `ConnectionStrings__CabinaFletes`.
+  BD de pruebas/preproducción real vía `ConnectionStrings__Nexo`.
 - Migración `MoverEsquemaDboNexoPrueba`: mueve las 27 tablas de NEXO de `dbo` a
   `dbo_NEXO_prueba` (BD compartida con otra app que ya usa `dbo`).
 - Migración `AgregarRolesPortalNexo` + fix en `IdentidadPortalDbContext.cs`:

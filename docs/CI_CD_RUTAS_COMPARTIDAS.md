@@ -26,7 +26,7 @@ completa en el encabezado de ese archivo).
 
 | Ruta que cambió | `ci-cd-api` | `ci-cd-cubicador-api` | `ci-cd-cubicador-worker` | `ci-cd-rabbitmq` |
 |---|:---:|:---:|:---:|:---:|
-| `src/**`, `tests/**`, `CabinaFletes.Clean.sln` | ✅ | | | |
+| `src/**`, `tests/**`, `Nexo.Clean.sln` | ✅ | | | |
 | `cubicador/**` (código, Dockerfiles, `requirements.txt`, `pyproject.toml`, `tests/`, `scripts/`, `docker-compose.yml`) | | ✅ | ✅ | |
 | `cubicador/docs/**`, `cubicador/**.md` | | | | |
 | `docker-compose.yml` (raíz) | | ✅ | ✅ | ✅ |
@@ -138,7 +138,7 @@ pruebas.
 
 No comparten código con Cubicador, así que sus `paths:` son autocontenidos
 (salvo `docker-compose.yml` y `build/Dockerfile.rabbit`, ya explicados). La
-única razón por la que `ci-cd-api.yml` incluye `CabinaFletes.Clean.sln` en su
+única razón por la que `ci-cd-api.yml` incluye `Nexo.Clean.sln` en su
 lista (y no solo `src/**`) es que agregar un proyecto nuevo a la solución
 cambia ese archivo; sin incluirlo, un `.csproj` nuevo podría no disparar el
 pipeline la primera vez que se referencia.

@@ -1,8 +1,8 @@
-# CabinaFletes — Backend (Clean Architecture)
+# Nexo — Backend (Clean Architecture)
 
 ## 1. Descripción del proyecto
 
-CabinaFletes es el sistema interno de pricing de fletes de Botero Soto ·
+Nexo es el sistema interno de pricing de fletes de Botero Soto ·
 Soluciones Logísticas (3PL): gestiona la Bandeja Priorizada de solicitudes
 de cotización (spot y licitación), la Mesa de Costeo, la Biblioteca de
 tarifas (SICE-TAC en vivo, histórico propio y caché local administrada) y
@@ -43,7 +43,7 @@ depende de nada; Api es la única capa que conoce ASP.NET Core):
                     └─────────▲─────────┘
                               │ implementa los Ports de
                     ┌─────────┴─────────┐
-                    │  Infrastructure   │  EF Core (CabinaFletesDbContext,
+                    │  Infrastructure   │  EF Core (NexoDbContext,
                     │                   │  Migrations), Repositories, Adapters
                     │                   │  (SMTP, Excel, DW externos)
                     └───────────────────┘
@@ -96,13 +96,13 @@ valor aquí con un handler por caso de uso.
 
 ### Base de datos
 
-SQL Server. `CabinaFletesDbContext` (EF Core 10) es la única fuente de
+SQL Server. `NexoDbContext` (EF Core 10) es la única fuente de
 escritura; las migraciones ya versionadas viven en
-`src/CabinaFletes.Infrastructure/Persistence/Migrations`.
+`src/Nexo.Infrastructure/Persistence/Migrations`.
 
 Cuando la BD de destino es compartida con otra aplicación (p. ej. la de
 pruebas antes de producción, `dbInformesAutomatizados_Pruebas`), las tablas
-de NEXO NO van al esquema `dbo` por defecto: `CabinaFletesDbContext` fija
+de NEXO NO van al esquema `dbo` por defecto: `NexoDbContext` fija
 `HasDefaultSchema("dbo_NEXO_prueba")`, así no se mezclan con las de la otra
 app. El DDL completo, comentado tabla por tabla, está en
 [`docs/Database/ESQUEMA_NEXO.sql`](docs/Database/ESQUEMA_NEXO.sql) (generado
@@ -174,7 +174,7 @@ contenedor pueda completar ese handshake sin afectar al resto del sistema.
 Ver [`.env.example`](.env.example) para el listado completo y comentado.
 Resumen de las obligatorias para levantar la Api:
 
-- `ConnectionStrings__CabinaFletes` (en Docker Compose, con el servicio `db`
+- `ConnectionStrings__Nexo` (en Docker Compose, con el servicio `db`
   local descomentado, en cambio la obligatoria es `MSSQL_SA_PASSWORD` — ver
   sección 3, subsección Docker).
 - Todo lo demás (DWs, SMTP) es opcional: el sistema se degrada, nunca se
@@ -188,13 +188,13 @@ Resumen de las obligatorias para levantar la Api:
 
 ### Docker
 
-- `src/CabinaFletes.Api/Dockerfile`: build multi-stage (.NET 10 SDK → ASP.NET
+- `src/Nexo.Api/Dockerfile`: build multi-stage (.NET 10 SDK → ASP.NET
   Core runtime), usuario sin privilegios, healthcheck vía `/health`.
 - `docker-compose.yml` (raíz): servicios `rabbit` y `api`, más un perfil
   `seed` para sembrar datos de demostración en un solo comando. El servicio
   `db` (SQL Server 2022 local) está **comentado, no eliminado** — se usa
   cuando se apunta a una BD de pruebas/producción real vía
-  `ConnectionStrings__CabinaFletes` en `.env`; descomentarlo (y el
+  `ConnectionStrings__Nexo` en `.env`; descomentarlo (y el
   `depends_on`/la variable de `api` que lo referencian) para volver a un SQL
   Server local en contenedor. No incluye frontend (fuera de alcance de este
   repositorio). Cubicador (`cubicador/`) tiene su propio `docker-compose.yml`,
@@ -220,7 +220,7 @@ documento manda sobre cualquier otra descripción, incluida esta.
   ambiente del portal que vaya a consumir la API — QA y Producción tienen
   dominios distintos — además del frontend standalone de desarrollo. Sin el
   origen exacto en la lista, el navegador bloquea la respuesta aunque la API
-  responda `200`; `tests/CabinaFletes.Api.Tests/CorsTests.cs` verifica el
+  responda `200`; `tests/Nexo.Api.Tests/CorsTests.cs` verifica el
   mecanismo (un origen de la lista recibe `Access-Control-Allow-Origin`, uno
   fuera de ella no).
 - **Healthcheck**: `/health` (sección 2, ya documentado) es público
@@ -296,19 +296,19 @@ módulos en la sección 2 y el detalle de roles en cada controller.
 
 ```bash
 # 1) Restaurar y compilar
-dotnet restore CabinaFletes.Clean.sln
-dotnet build CabinaFletes.Clean.sln
+dotnet restore Nexo.Clean.sln
+dotnet build Nexo.Clean.sln
 
 # 2) Configurar la cadena de conexión (elige una opción):
 #    a) variables de entorno (ver .env.example), o
-#    b) src/CabinaFletes.Api/appsettings.Development.local.json (no versionado):
-#       { "ConnectionStrings": { "CabinaFletes": "Server=localhost;Database=CabinaFletes;Trusted_Connection=True;TrustServerCertificate=True;" } }
+#    b) src/Nexo.Api/appsettings.Development.local.json (no versionado):
+#       { "ConnectionStrings": { "Nexo": "Server=localhost;Database=Nexo;Trusted_Connection=True;TrustServerCertificate=True;" } }
 
 # 3) Aplicar migraciones y sembrar datos de demostración
-dotnet run --project src/CabinaFletes.Api seed
+dotnet run --project src/Nexo.Api seed
 
 # 4) Levantar la Api (por defecto en http://localhost:5080, ver ASPNETCORE_URLS)
-dotnet run --project src/CabinaFletes.Api
+dotnet run --project src/Nexo.Api
 ```
 
 Swagger UI queda disponible en `/swagger` cuando
@@ -318,7 +318,7 @@ Swagger UI queda disponible en `/swagger` cuando
 
 ```bash
 cp .env.example .env
-# Editar .env: como mínimo, ConnectionStrings__CabinaFletes (apunta a la BD
+# Editar .env: como mínimo, ConnectionStrings__Nexo (apunta a la BD
 # real de pruebas/producción — el servicio 'db' local está deshabilitado por
 # defecto, ver sección 3). Para volver a un SQL Server local en contenedor,
 # descomentar 'db' en docker-compose.yml y completar MSSQL_SA_PASSWORD.
@@ -367,14 +367,14 @@ API, con su propio versionado— sigue en
 La migración incluye tres proyectos de test bajo `tests/`, alineados con las
 capas que tiene sentido probar de forma distinta:
 
-- **`CabinaFletes.Domain.Tests`** — unitarios puros, sin dependencias.
+- **`Nexo.Domain.Tests`** — unitarios puros, sin dependencias.
   Cubren `ScorePrioridadCalculator` (confirma que el score total es la suma
   ponderada de los 4 componentes documentados — urgencia, valor, probabilidad
   y tipo, con los pesos de `ParametrosScore` — ver
   `docs/decisiones/score-prioridad-4-pesos-vs-solo-urgencia.md`), `Texto`
   (normalización de tildes/mayúsculas, partición de rutas) e `ImporteParser`
   (formato colombiano vs. invariante).
-- **`CabinaFletes.Application.Tests`** — unitarios con Moq, Ports mockeados
+- **`Nexo.Application.Tests`** — unitarios con Moq, Ports mockeados
   (`ICotizacionRepository`, `ISolicitudesPort`, `IAuditoriaPort`,
   `ICurrentUserPort`, `IUnitOfWork`, etc.). Cubren los Command Handlers con
   más reglas de negocio: `CrearCotizacionCommand` (reutiliza borrador
@@ -383,10 +383,10 @@ capas que tiene sentido probar de forma distinta:
   Biblioteca de Tarifas Ganadas una sola vez por línea), `CrearServicioConexoCommand`
   (normalización de categoría), `CrearReglaSoloSicetacCommand` (normalización
   de texto, duplicados) y `CrearSolicitudCommand` (score calculado al crear).
-- **`CabinaFletes.Api.Tests`** — integración end-to-end con
+- **`Nexo.Api.Tests`** — integración end-to-end con
   `WebApplicationFactory<Program>` contra una base SQL Server real de
   pruebas (`TEST_DB_CONNECTION`, por defecto
-  `Server=localhost;Database=CabinaFletesClean_Test;Trusted_Connection=True;TrustServerCertificate=True;`),
+  `Server=localhost;Database=NexoClean_Test;Trusted_Connection=True;TrustServerCertificate=True;`),
   con autenticación de prueba por header (`X-Test-Role`, ver
   `Infra/TestAuthHandler.cs`). Incluyen el flujo de negocio completo
   (`CotizacionesTests.Flujo_completo_cotizacion`: crear solicitud con línea
@@ -444,10 +444,10 @@ alguien agrega un proyecto de pruebas, entra solo.
 Fuera de contenedor:
 
 ```
-dotnet test CabinaFletes.Clean.sln
+dotnet test Nexo.Clean.sln
 ```
 
-`CabinaFletes.Api.Tests` requiere una instancia de SQL Server accesible
+`Nexo.Api.Tests` requiere una instancia de SQL Server accesible
 (local o contenedor); los otros dos proyectos no necesitan base de datos.
 `ApiFixture` crea la base de pruebas, corre las migraciones y siembra los
 datos (`DataSeeder`) una sola vez por corrida de test.
@@ -468,7 +468,7 @@ Antes de desplegar a producción, de todas formas:
 
 1. Abrir la solución en Visual Studio / Rider / VS Code y revisar el panel
    de errores del compilador.
-2. Ejecutar `dotnet build CabinaFletes.Clean.sln` y corregir lo que salga.
+2. Ejecutar `dotnet build Nexo.Clean.sln` y corregir lo que salga.
 3. Ejecutar `dotnet test` con una base de datos de pruebas real disponible.
 
 ## 9. Estructura del proyecto
@@ -479,7 +479,7 @@ está construido.
 
 ```
 NEXO/
-  CabinaFletes.Clean.sln
+  Nexo.Clean.sln
   .env.example                 # Variables de entorno (backend + Docker Compose)
   .dockerignore                # Qué NO entra al contexto de build
   docker-compose.yml           # rabbit + api (+ perfil seed); 'db' comentado, ver sección 3
@@ -492,7 +492,7 @@ NEXO/
   MIGRACION.md · PENDIENTES.md · README.md
 
   src/
-    CabinaFletes.Domain/              # Por AGREGADO del event storming
+    Nexo.Domain/              # Por AGREGADO del event storming
       Solicitudes/Entidades/          #   Solicitud, LineaSolicitud
       Cotizaciones/Entidades/         #   Cotizacion, CotizacionLinea, CotizacionConexo
       PlanDeCargue/Entidades/         #   PlanCargue, ItemPlanCargue, ColocacionCargue
@@ -504,7 +504,7 @@ NEXO/
       Reglas/                         #   MaquinaEstados (cruza agregados)
       Enums/ · Common/                #   Enums compartidos · IAuditable, Texto, ImporteParser
 
-    CabinaFletes.Application/
+    Nexo.Application/
       CasosDeUso/<Contexto>/          # Los casos de uso, directos bajo su contexto
         DTOs/                         #   Entrada y salida de esos casos de uso
         Interfaces/                   #   Los puertos que el contexto define
@@ -513,23 +513,23 @@ NEXO/
         Excepciones/                  #   Solo cuando el contexto necesita una propia
       Common/                         # Abstractions, Ports y Dtos genuinamente transversales
 
-    CabinaFletes.Infrastructure/
+    Nexo.Infrastructure/
       <Contexto>/Adaptadores/         # SMTP, Excel, SAP, DW: lo que no es solo EF Core
       <Contexto>/Repositorios/        # Implementaciones EF Core de los puertos
       Common/                         # EfAuditoriaRepository, EfUnitOfWork
       Persistence/ · External/        # DbContext y migraciones · DbContexts de los DW
       DependencyInjection.cs
 
-    CabinaFletes.Api/
+    Nexo.Api/
       <Contexto>/                     # Controlador y DTOs de entrada de ese contexto
       Common/{Auth,Errors,Middleware} # Transversal
       Program.cs                      # Composition root
       Dockerfile
 
   tests/
-    CabinaFletes.Domain.Tests/        # Unitarios puros
-    CabinaFletes.Application.Tests/   # Unitarios con Moq
-    CabinaFletes.Api.Tests/           # Integración contra SQL Server
+    Nexo.Domain.Tests/        # Unitarios puros
+    Nexo.Application.Tests/   # Unitarios con Moq
+    Nexo.Api.Tests/           # Integración contra SQL Server
 ```
 
 ### Reglas de frontera

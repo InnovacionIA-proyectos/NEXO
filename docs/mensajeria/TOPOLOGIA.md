@@ -12,8 +12,8 @@ para el registro completo de esa verificación.
   `build/Dockerfile.rabbit`, con el plugin `rabbitmq_delayed_message_exchange`
   — lo necesita el planificador de timeouts del Saga, no viene en la imagen
   oficial).
-- Un solo proceso (`CabinaFletes.Api`) es hoy API y worker a la vez — todos
-  los consumers viven en el mismo `AddMensajeria()` (`src/CabinaFletes.
+- Un solo proceso (`Nexo.Api`) es hoy API y worker a la vez — todos
+  los consumers viven en el mismo `AddMensajeria()` (`src/Nexo.
   Infrastructure/Common/Mensajeria/MensajeriaDependencyInjection.cs`). Si en
   el futuro se separa un proceso de workers, ambos deben llamar al mismo
   método — está pensado para eso desde su comentario de cabecera.
@@ -94,7 +94,7 @@ convenciones conviven:
   nombre corto del mensaje (`CostearLineaSolicitada`).
 - **Evento de Saga** (`Event(() => X, ...)` dentro de un
   `MassTransitStateMachine`): exchange con el nombre **completo** (namespace
-  incluido) del mensaje (`CabinaFletes.Mensajes.Solicitudes:
+  incluido) del mensaje (`Nexo.Mensajes.Solicitudes:
   AutoCosteoSolicitado`), que alimenta el exchange/cola del Saga
   (`EstadoAutoCosteo`).
 
@@ -110,7 +110,7 @@ propiedad del tipo del mensaje, no del consumer. Por esto
 
 ## 5. Alerta al equipo (issue #13, lo nuevo de esta HU)
 
-`AlertaDeFalloConsumer<T>` (`src/CabinaFletes.Infrastructure/Common/
+`AlertaDeFalloConsumer<T>` (`src/Nexo.Infrastructure/Common/
 Mensajeria/AlertaDeFalloConsumer.cs`):
 
 1. Recibe `Fault<T>` (cualquier tipo, ver tabla de arriba).

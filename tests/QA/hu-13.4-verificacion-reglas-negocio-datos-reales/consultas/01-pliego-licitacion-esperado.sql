@@ -6,7 +6,7 @@
 -- Objetivo: calcular, para cada línea, el valor esperado según la regla de
 -- negocio documentada (MAX entre el piso SICE-TAC vigente y la tarifa de
 -- plaza SAP vigente), antes de subir el Excel a la app real, para comparar
--- a ciegas contra la propuesta que realmente genera CabinaFletes.
+-- a ciegas contra la propuesta que realmente genera Nexo.
 --
 -- Resultado y análisis completo: ver README.md de esta carpeta y
 -- ../esperado-final-pliego.md (fuente autoritativa de los valores finales).

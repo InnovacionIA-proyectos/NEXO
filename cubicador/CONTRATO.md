@@ -41,7 +41,7 @@ Al no haber plan ni Id que guardar ni proyectar, no hay cola que lo procese
 ni proyección que lo sirva después — NEXO lo llama directo con el mismo
 Bearer de esta sección (`CUBICADOR_API_KEY`), guardado en su configuración
 como `Cubicador3D:OutboundApiKey` (nunca en el navegador). Ver
-`NEXO/src/CabinaFletes.Application/CasosDeUso/Cubicacion/Interfaces/ICubicacionRapidaPort.cs`
+`NEXO/src/Nexo.Application/CasosDeUso/Cubicacion/Interfaces/ICubicacionRapidaPort.cs`
 para el razonamiento completo de por qué esto no reabre la puerta a más
 llamadas HTTP.
 
@@ -620,7 +620,7 @@ espera ese formato para deserializar:
 ```json
 {
   "messageId": "uuid",
-  "messageType": ["urn:message:CabinaFletes.Mensajes.Cubicacion:PlanDeCargueGenerado"],
+  "messageType": ["urn:message:Nexo.Mensajes.Cubicacion:PlanDeCargueGenerado"],
   "message": { "correlationId": "uuid", "planId": "uuid", "resultado": {...} },
   "sentTime": "2026-08-27T21:00:00.000Z"
 }

@@ -528,7 +528,7 @@ separado de la sesión del portal, Bearer contra `Cubicador3D:InboundApiKey`).
 (`CapturarSolicitudCommand`/`PosicionCargaDto` en NEXO) — no hizo falta
 ningún cambio de captura, solo el endpoint de lectura.
 
-**Verificado con tests de integración HTTP reales** (`tests/CabinaFletes
+**Verificado con tests de integración HTTP reales** (`tests/Nexo
 .Api.Tests/Cubicacion/LineasSolicitudCubicacionControllerTests.cs`, contra
 SQL Server real, no simulado): `200` con posiciones/ruta correctas, lista
 vacía sin posiciones, `404` con línea inexistente, `401` sin Bearer, `401`
@@ -573,7 +573,7 @@ docker compose up -d --build --wait
 
 # Sembrar Dimensiones de prueba en una línea existente (ejemplo)
 docker exec nexo-db-1 /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P '<MSSQL_SA_PASSWORD>' \
-  -d CabinaFletes -Q "UPDATE lineas_solicitud SET Dimensiones = '[{\"descripcion\":\"Pallet\",\"cantidad\":3,\"largoCm\":120,\"anchoCm\":100,\"altoCm\":100,\"pesoKg\":500}]' WHERE Id = '<lineaSolicitudId>'"
+  -d Nexo -Q "UPDATE lineas_solicitud SET Dimensiones = '[{\"descripcion\":\"Pallet\",\"cantidad\":3,\"largoCm\":120,\"anchoCm\":100,\"altoCm\":100,\"pesoKg\":500}]' WHERE Id = '<lineaSolicitudId>'"
 
 # cubicador/.env: NEXO_CALLBACK_API_KEY debe ser IDÉNTICA a
 # Cubicador3D__InboundApiKey del .env de NEXO, y NEXO_BASE_URL debe usar el

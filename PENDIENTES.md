@@ -239,11 +239,11 @@ sin haber acceso a esa base.
 ## Testing (agregado en esta pasada)
 
 Se agregaron tres proyectos de test bajo `tests/` y se registraron en
-`CabinaFletes.Clean.sln`: `CabinaFletes.Domain.Tests` (unitarios puros,
-portados de `NEXO/tests/CabinaFletes.Domain.Tests` y
-`NEXO/src/CabinaFletes.Tests`), `CabinaFletes.Application.Tests` (nuevos,
+`Nexo.Clean.sln`: `Nexo.Domain.Tests` (unitarios puros,
+portados de `NEXO/tests/Nexo.Domain.Tests` y
+`NEXO/src/Nexo.Tests`), `Nexo.Application.Tests` (nuevos,
 con Moq, cubriendo Cotizaciones/ServiciosConexos/ReglasSoloSicetac/Solicitudes)
-y `CabinaFletes.Api.Tests` (portados de `NEXO/tests/CabinaFletes.Api.Tests`,
+y `Nexo.Api.Tests` (portados de `NEXO/tests/Nexo.Api.Tests`,
 integración con `WebApplicationFactory<Program>` contra SQL Server real,
 incluyendo el flujo completo de una cotización de punta a punta). Ver la
 sección 8 de `README.md` para el detalle de qué cubre cada proyecto y cómo
@@ -256,7 +256,7 @@ ese proceso encontró dos regresiones reales en `ServiciosConexosController`
 (rol `ServiciosLogisticos` faltante en Crear/Editar/ImportarExcel, default
 de `soloActivos` invertido), ya corregidas.
 
-**Actualización**: se agregó `CabinaFletes.Application.Tests/AjustesVigenciaPlaza/AjustesVigenciaPlazaCommandTests.cs`,
+**Actualización**: se agregó `Nexo.Application.Tests/AjustesVigenciaPlaza/AjustesVigenciaPlazaCommandTests.cs`,
 cubriendo los tres Command Handlers del módulo (`AjustarVigenciaPlazaCommand`,
 `AjustarVigenciaPlazaMasivoCommand`, `QuitarVigenciaPlazaCommand`): validaciones
 de modo "fecha"/"extender", deduplicación de IDs, resolución de la fecha base al
@@ -283,7 +283,7 @@ menciona `dotnet`.**
 Es lo que impide cerrar el criterio de S3-HU-06.2: *"el test debe fallar el
 build si algún nombre deja de coincidir — no debe depender de que alguien lo
 note"*. La guarda ya existe y está verificada por mutación
-(`tests/CabinaFletes.Api.Tests/Cubicacion/ContratoMessageTypeTests.cs`), pero
+(`tests/Nexo.Api.Tests/Cubicacion/ContratoMessageTypeTests.cs`), pero
 **sin build que falle, sigue dependiendo de que alguien la ejecute** — justo lo
 que esa HU quería eliminar. El test queda listo para engancharse el día que el
 workflow exista; no hace falta tocarlo.
@@ -308,10 +308,10 @@ PR que rompa la compilación de .NET entra sin que nadie se entere hasta que
 alguien clona y construye.
 
 Consolidar los proyectos de test duplicados (`tests/` y
-`src/CabinaFletes.Tests` en el original) sigue pendiente como limpieza
+`src/Nexo.Tests` en el original) sigue pendiente como limpieza
 cosmética: el original tenía tests solo en `NEXO/tests` (Domain, Api) y
-`NEXO/src/CabinaFletes.Tests` (Texto, ImporteParser); ambos se consolidaron
-ya en `NEXO-Clean/tests/CabinaFletes.Domain.Tests`, así que en `NEXO-Clean`
+`NEXO/src/Nexo.Tests` (Texto, ImporteParser); ambos se consolidaron
+ya en `NEXO-Clean/tests/Nexo.Domain.Tests`, así que en `NEXO-Clean`
 no queda duplicación — el original (`NEXO/`) queda igual, sin tocar.
 
 ## Limpieza post-migración — CERRADA (issue #2)
@@ -333,7 +333,7 @@ mencionaban siguen vivos en su ubicación definitiva.
 ## Antes de correr el proyecto
 
 Falta `appsettings.{Environment}.local.json` (no versionado, uno por
-desarrollador) con al menos `ConnectionStrings:CabinaFletes`. Las cadenas
+desarrollador) con al menos `ConnectionStrings:Nexo`. Las cadenas
 `DwSice`, `DbSolucionesTi` y `DwCubos` son OPCIONALES: sin ellas, los
 adapters correspondientes se degradan solos (503 accionable o
 `Configurado = false`), igual que en el original — no es necesario tenerlas

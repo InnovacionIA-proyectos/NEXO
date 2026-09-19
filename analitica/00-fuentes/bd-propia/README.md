@@ -57,5 +57,5 @@ SELECT * FROM analitica.solicitudes WHERE CreatedAt >= '<fecha de corte deseada>
 ```
 
 Requiere que la migración `20260831194721_VistasAnaliticaSoloLectura` esté
-aplicada (`dotnet ef database update --context CabinaFletesDbContext`) —
+aplicada (`dotnet ef database update --context NexoDbContext`) —
 en este entorno no lo estaba hasta que se corrió como parte de S2-HU-10.3.

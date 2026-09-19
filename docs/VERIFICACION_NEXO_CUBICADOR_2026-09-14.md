@@ -438,10 +438,10 @@ línea").
 
 ### 10.1 Build y tests unitarios (antes de tocar Docker)
 
-- `dotnet build CabinaFletes.Clean.sln -c Release` → **compila sin errores**
+- `dotnet build Nexo.Clean.sln -c Release` → **compila sin errores**
   (1 warning preexistente y no relacionado, `ASPDEPR005`).
-- `dotnet test tests/CabinaFletes.Domain.Tests` → **127/127 passed**.
-- `dotnet test tests/CabinaFletes.Application.Tests` → **139/139 passed**
+- `dotnet test tests/Nexo.Domain.Tests` → **127/127 passed**.
+- `dotnet test tests/Nexo.Application.Tests` → **139/139 passed**
   (incluye los tests nuevos de `CrearPlanDesdeLineaCommandTests`,
   `ObtenerColocacionesPlanQueryTests`, `ObtenerPlanesPorLineaQueryTests`,
   `CubicacionSolicitadaValidadorTests`).

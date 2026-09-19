@@ -8,7 +8,7 @@ broker levantó bien Y de que la topología esperada (exchange, colas,
 bindings) está declarada.
 
 Importante — orden de las piezas: las colas y bindings de este exchange las
-declaran NEXO (MassTransit, al arrancar `CabinaFletes.Api`) y Cubicador
+declaran NEXO (MassTransit, al arrancar `Nexo.Api`) y Cubicador
 (`worker/main.py`, al arrancar el worker) — NO RabbitMQ por sí solo. Un
 RabbitMQ recién desplegado CON el volumen de datos anterior (`rabbit-data`,
 ver docker-compose.yml raíz) conserva las colas durables de antes; un

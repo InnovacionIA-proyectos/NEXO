@@ -20,7 +20,7 @@ Característica: Identidad e integración con el portal de la Administración
   @issue-9 @identidad
   Escenario: Una persona con sesión válida entra al módulo
     Dado un usuario con identificador 10123 en la tabla de la administración
-    Y que tiene permiso sobre Cabina de Fletes
+    Y que tiene permiso sobre Nexo
     Cuando consulta la sesión actual enviando su identificador
     Entonces recibe 200
     Y el rol viene resuelto desde la tabla
@@ -35,9 +35,9 @@ Característica: Identidad e integración con el portal de la Administración
     Y no se le asigna ningún rol por defecto
 
   @issue-9 @identidad
-  Escenario: Una persona real sin permiso sobre Cabina de Fletes no entra
+  Escenario: Una persona real sin permiso sobre Nexo no entra
     Dado un usuario que sí existe en la tabla
-    Pero que no tiene permiso sobre Cabina de Fletes
+    Pero que no tiene permiso sobre Nexo
     Cuando consulta la sesión actual
     Entonces recibe 403
     Y el mensaje explica que le falta el permiso, no que no exista
@@ -145,7 +145,7 @@ Característica: Identidad e integración con el portal de la Administración
 
   # ---------------------------------------------------- trabajos pesados
 
-  # Insumo real (S2-HU-04.7): tests/CabinaFletes.Domain.Tests/TestData/pliego-300-lineas.json
+  # Insumo real (S2-HU-04.7): tests/Nexo.Domain.Tests/TestData/pliego-300-lineas.json
   # (320 líneas) — ver tests/QA/hu-04.7-pliego-dataset-validacion-muestral/README.md
   @hu-04 @asincrono
   Escenario: Cargar un pliego responde de inmediato
@@ -235,7 +235,7 @@ Característica: Identidad e integración con el portal de la Administración
   # S2-HU-11.
   @hu-10 @habilitador-b8
   Escenario: El set final queda consolidado, versionado y con diccionario y linaje
-    Dado el lado propio (BD CabinaFletes) y el lado externo (4 fuentes corporativas)
+    Dado el lado propio (BD Nexo) y el lado externo (4 fuentes corporativas)
       ya extraídos y documentados por separado
     Cuando se publican juntos como un set final con número de versión
     Entonces existe un diccionario único que explica cada columna, su significado,

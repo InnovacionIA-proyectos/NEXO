@@ -1,0 +1,48 @@
+using Nexo.Domain.BibliotecaTarifas.Entidades;
+using Nexo.Domain.Enums;
+using Nexo.Domain.Usuarios.Entidades;
+
+namespace Nexo.Application.CasosDeUso.TarifasSicetacAdmin.DTOs;
+
+/// <summary>Filtros de consulta del piso SICE-TAC (caché local, cargada por Excel).</summary>
+public record SicetacFiltro(
+    string? Origen,
+    string? Destino,
+    string? Config,
+    string? TipoCarga,
+    string? Unidad,
+    string? Condicion,
+    int? Periodo);
+
+public record TarifaSicetacDto(
+    Guid Id,
+    int Periodo,
+    string OrigenDane,
+    string DestinoDane,
+    string? NombreRuta,
+    string Configuracion,
+    string TipoCarga,
+    string UnidadTransporte,
+    CondicionCarga CondicionCarga,
+    decimal ValorPiso,
+    decimal? ValorHora,
+    decimal? HorasPactadas);
+
+/// <summary>Resumen del resultado de importar un Excel SICE-TAC.</summary>
+public record ImportResumenDto(
+    int Procesadas,
+    int Insertadas,
+    int Actualizadas,
+    int Rechazadas,
+    IReadOnlyList<string> Errores,
+    // Pisos importados que no se pudieron enlazar a una ruta local (NOMBRERUTA no
+    // coincide con ninguna ruta capturada): no aparecerán en la Mesa hasta que la
+    // ruta exista. Cero cuando todo se enlazó.
+    int SinRutaLocal = 0);
+
+/// <summary>Entrada del historial de cargas (derivada de audit_log).</summary>
+public record ImportacionDto(
+    Guid Id,
+    string? Usuario,
+    string? Detalle,
+    DateTimeOffset Fecha);

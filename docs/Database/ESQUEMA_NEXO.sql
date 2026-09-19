@@ -1,16 +1,16 @@
 -- =============================================================================
--- Esquema de NEXO (Cabina de Fletes) — dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba
+-- Esquema de NEXO (Nexo) — dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba
 -- =============================================================================
 -- dbInformesAutomatizados_Pruebas es una base COMPARTIDA con otra app ajena a
 -- NEXO (esa otra app ya vivía en 'dbo' y tiene su propio esquema 'dbo_prueba').
--- Por eso CabinaFletesDbContext fija HasDefaultSchema("dbo_NEXO_prueba"): así
+-- Por eso NexoDbContext fija HasDefaultSchema("dbo_NEXO_prueba"): así
 -- las tablas de NEXO no se mezclan con las de esa otra app.
 --
 -- Este archivo es DOCUMENTACIÓN, no la fuente de la verdad: se generó
 -- consultando el catálogo (sys.tables/sys.columns/sys.foreign_keys/sys.indexes)
 -- de la base real ya migrada, el 2026-09-01. La fuente de la verdad real son
 -- las migraciones EF Core en
--- src/CabinaFletes.Infrastructure/Persistence/Migrations/ — cualquier cambio
+-- src/Nexo.Infrastructure/Persistence/Migrations/ — cualquier cambio
 -- de esquema se hace ahí (dotnet ef migrations add), nunca editando la BD a
 -- mano ni este archivo.
 --
@@ -29,7 +29,7 @@
 -- (X-Portal-Usuario-Id en cada petición, ver docs/contrato-integracion). Estas
 -- dos tablas son la copia local de esa identidad y la traducción de sus roles.
 
--- Cuenta local de cada persona que ha entrado a Cabina de Fletes: nombre, email,
+-- Cuenta local de cada persona que ha entrado a Nexo: nombre, email,
 -- uno de los 6 roles de Nexo y (si vino del portal real) su IdentidadPortalId.
 CREATE TABLE [dbo_NEXO_prueba].[usuarios] (
     [Id] uniqueidentifier NOT NULL,

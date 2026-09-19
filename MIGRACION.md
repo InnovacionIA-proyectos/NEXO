@@ -51,7 +51,7 @@ dos piezas necesitan para resolver códigos/zonas.
 - **Domain**: copia verbatim del original (Entities, Common, Scoring, Workflow,
   Enums). Esta capa no cambia de responsabilidad en la migración a Clean
   Architecture: entidades, value objects y reglas puras siguen igual.
-- **Infrastructure/Persistence**: `CabinaFletesDbContext`, `DataSeeder` y las
+- **Infrastructure/Persistence**: `NexoDbContext`, `DataSeeder` y las
   `Migrations` se copiaron verbatim (el esquema no cambió). `External/` solo
   trae `DwCubosSapDbContext` (el único DW que usa Cotizaciones); los demás DW
   (DwSice, DwCubos, DbSolucionesTi) se migran junto con los módulos que los usan.
@@ -117,17 +117,17 @@ paquetes), así que este código NO se compiló aquí. Ábrelo en tu IDE (Visual
 Studio / Rider / VS Code) o corre:
 
 ```
-dotnet restore NEXO-Clean/CabinaFletes.Clean.sln
-dotnet build NEXO-Clean/CabinaFletes.Clean.sln
+dotnet restore NEXO-Clean/Nexo.Clean.sln
+dotnet build NEXO-Clean/Nexo.Clean.sln
 ```
 
 y revisa el panel de errores. Dado que ya tenías carpetas `obj/` generándose
-automáticamente en `CabinaFletes.Application` y `CabinaFletes.Api` mientras yo
+automáticamente en `Nexo.Application` y `Nexo.Api` mientras yo
 escribía los archivos, tu editor probablemente ya está restaurando/compilando
 en vivo — mira ahí primero.
 
 Falta además `appsettings.*.local.json` (no versionado) con
-`ConnectionStrings:CabinaFletes` como mínimo para poder correr `dotnet run`.
+`ConnectionStrings:Nexo` como mínimo para poder correr `dotnet run`.
 
 ## Cuarta pasada: Solicitudes/Captura (Bandeja Priorizada)
 
@@ -226,14 +226,14 @@ ya esperaba pero que no existía en `NEXO-Clean` (sí en el original).
 ## Séptima pasada: tests y flujos de negocio
 
 Se agregaron tres proyectos de test bajo `tests/`, registrados en
-`CabinaFletes.Clean.sln`:
+`Nexo.Clean.sln`:
 
-- `CabinaFletes.Domain.Tests` — portados de `NEXO/tests/CabinaFletes.Domain.Tests`
-  y de `NEXO/src/CabinaFletes.Tests` (`TextoTests`, `ImporteParserTests`).
-- `CabinaFletes.Application.Tests` — nuevos, con Moq: `CrearCotizacionCommand`,
+- `Nexo.Domain.Tests` — portados de `NEXO/tests/Nexo.Domain.Tests`
+  y de `NEXO/src/Nexo.Tests` (`TextoTests`, `ImporteParserTests`).
+- `Nexo.Application.Tests` — nuevos, con Moq: `CrearCotizacionCommand`,
   `MarcarResultadoCommand`, `CrearServicioConexoCommand`,
   `CrearReglaSoloSicetacCommand`, `CrearSolicitudCommand`.
-- `CabinaFletes.Api.Tests` — portados de `NEXO/tests/CabinaFletes.Api.Tests`,
+- `Nexo.Api.Tests` — portados de `NEXO/tests/Nexo.Api.Tests`,
   con `WebApplicationFactory<Program>` contra SQL Server real de pruebas.
   Requirió agregar `public partial class Program { }` al final de
   `Api/Program.cs` (con top-level statements, `WebApplicationFactory<Program>`
@@ -274,7 +274,7 @@ ya lo cubren `Api.Tests` (`TarifasHistoricasTests`, `TarifasSicetacTests`,
 `MetricasTests`).
 
 **AjustesVigenciaPlaza sí tenía reglas de negocio propias en Application**, y
-se agregó `tests/CabinaFletes.Application.Tests/AjustesVigenciaPlaza/AjustesVigenciaPlazaCommandTests.cs`
+se agregó `tests/Nexo.Application.Tests/AjustesVigenciaPlaza/AjustesVigenciaPlazaCommandTests.cs`
 cubriendo los tres handlers:
 
 - `AjustarVigenciaPlazaCommand`: un ajuste NUEVO consulta la vigencia SAP

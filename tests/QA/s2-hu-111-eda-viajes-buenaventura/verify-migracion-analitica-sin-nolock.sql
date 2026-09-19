@@ -4,8 +4,8 @@
 --
 -- Uso: aplicar TODAS las migraciones de la rama (incluida esta) contra una base
 -- limpia con:
---   dotnet ef database update --project src/CabinaFletes.Infrastructure \
---     --startup-project src/CabinaFletes.Api --context CabinaFletesDbContext \
+--   dotnet ef database update --project src/Nexo.Infrastructure \
+--     --startup-project src/Nexo.Api --context NexoDbContext \
 --     --connection "<connection-string>"
 -- y despues correr este script contra esa misma base.
 --

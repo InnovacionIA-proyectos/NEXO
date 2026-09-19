@@ -7,7 +7,7 @@
 --
 -- Compara contra una lectura normal (SIN NOLOCK) de la misma tabla base, que gracias a
 -- READ_COMMITTED_SNAPSHOT (ya activo en esta base, confirmado con
--- `SELECT is_read_committed_snapshot_on FROM sys.databases WHERE name='CabinaFletes'`)
+-- `SELECT is_read_committed_snapshot_on FROM sys.databases WHERE name='Nexo'`)
 -- NO ve la fila sucia y tampoco se bloquea esperando el COMMIT/ROLLBACK.
 --
 -- Cómo correrlo (dos sesiones en paralelo):
@@ -15,11 +15,11 @@
 -- 1) Sesión A (escritor, deja la fila sin confirmar 10s y luego la revierte):
 --    docker cp verify-dirty-read-nolock.sql nexo-db-1:/tmp/
 --    docker exec -d nexo-db-1 /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa \
---      -P '<password>' -d CabinaFletes -i /tmp/verify-dirty-read-nolock.sql
+--      -P '<password>' -d Nexo -i /tmp/verify-dirty-read-nolock.sql
 --
 -- 2) Sesión B (lector, mientras la sesión A sigue abierta, correr varias veces seguidas):
 --    docker exec nexo-db-1 /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa \
---      -P '<password>' -d CabinaFletes -Q "
+--      -P '<password>' -d Nexo -Q "
 --        SELECT 'analitica(NOLOCK)=' + CAST(COUNT(*) AS VARCHAR) FROM analitica.solicitudes
 --          WHERE Id='DEAD0001-0000-0000-0000-000000000001';
 --        SELECT 'dbo(sin NOLOCK)=' + CAST(COUNT(*) AS VARCHAR) FROM dbo.solicitudes
