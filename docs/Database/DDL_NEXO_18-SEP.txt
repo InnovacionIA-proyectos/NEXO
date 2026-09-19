@@ -43,13 +43,13 @@ CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.OutboxState (
 CREATE NONCLUSTERED INDEX IX_OutboxState_Created ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.OutboxState (Created);
 
 
--- dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.ajustes_vigencia_plaza definition
+-- dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_ajustes_vigencia_plaza definition
 
 -- Drop table
 
--- DROP TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.ajustes_vigencia_plaza;
+-- DROP TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_ajustes_vigencia_plaza;
 
-CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.ajustes_vigencia_plaza (
+CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_ajustes_vigencia_plaza (
 	Id uniqueidentifier NOT NULL,
 	TarifaPlazaId int NOT NULL,
 	VigenciaAjustada datetime2 NOT NULL,
@@ -60,16 +60,16 @@ CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.ajustes_vigencia_pl
 	UpdatedAt datetimeoffset DEFAULT sysdatetimeoffset() NOT NULL,
 	CONSTRAINT PK_ajustes_vigencia_plaza PRIMARY KEY (Id)
 );
-CREATE UNIQUE NONCLUSTERED INDEX IX_ajustes_vigencia_plaza_TarifaPlazaId ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.ajustes_vigencia_plaza (TarifaPlazaId);
+CREATE UNIQUE NONCLUSTERED INDEX IX_ajustes_vigencia_plaza_TarifaPlazaId ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_ajustes_vigencia_plaza (TarifaPlazaId);
 
 
--- dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.cadena_priorizacion definition
+-- dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_cadena_priorizacion definition
 
 -- Drop table
 
--- DROP TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.cadena_priorizacion;
+-- DROP TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_cadena_priorizacion;
 
-CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.cadena_priorizacion (
+CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_cadena_priorizacion (
 	CorrelationId uniqueidentifier NOT NULL,
 	Version int NOT NULL,
 	CurrentState nvarchar(64) COLLATE Modern_Spanish_CI_AS NOT NULL,
@@ -83,13 +83,13 @@ CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.cadena_priorizacion
 );
 
 
--- dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.clientes definition
+-- dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_clientes definition
 
 -- Drop table
 
--- DROP TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.clientes;
+-- DROP TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_clientes;
 
-CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.clientes (
+CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_clientes (
 	Id uniqueidentifier NOT NULL,
 	Nombre nvarchar(200) COLLATE Modern_Spanish_CI_AS NOT NULL,
 	Nit nvarchar(20) COLLATE Modern_Spanish_CI_AS NOT NULL,
@@ -99,16 +99,16 @@ CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.clientes (
 	UpdatedAt datetimeoffset DEFAULT sysdatetimeoffset() NOT NULL,
 	CONSTRAINT PK_clientes PRIMARY KEY (Id)
 );
-CREATE UNIQUE NONCLUSTERED INDEX IX_clientes_Nit ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.clientes (Nit);
+CREATE UNIQUE NONCLUSTERED INDEX IX_clientes_Nit ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_clientes (Nit);
 
 
--- dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.configuraciones_vehiculo definition
+-- dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_configuraciones_vehiculo definition
 
 -- Drop table
 
--- DROP TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.configuraciones_vehiculo;
+-- DROP TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_configuraciones_vehiculo;
 
-CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.configuraciones_vehiculo (
+CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_configuraciones_vehiculo (
 	Id uniqueidentifier NOT NULL,
 	TipoVehiculo nvarchar(100) COLLATE Modern_Spanish_CI_AS NOT NULL,
 	Carroceria nvarchar(100) COLLATE Modern_Spanish_CI_AS NULL,
@@ -119,13 +119,13 @@ CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.configuraciones_veh
 );
 
 
--- dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.lineas_pendientes_de_costeo definition
+-- dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_lineas_pendientes_de_costeo definition
 
 -- Drop table
 
--- DROP TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.lineas_pendientes_de_costeo;
+-- DROP TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_lineas_pendientes_de_costeo;
 
-CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.lineas_pendientes_de_costeo (
+CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_lineas_pendientes_de_costeo (
 	Id uniqueidentifier NOT NULL,
 	TrabajoId uniqueidentifier NOT NULL,
 	SolicitudId uniqueidentifier NOT NULL,
@@ -137,17 +137,17 @@ CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.lineas_pendientes_d
 	UpdatedAt datetimeoffset DEFAULT sysdatetimeoffset() NOT NULL,
 	CONSTRAINT PK_lineas_pendientes_de_costeo PRIMARY KEY (Id)
 );
-CREATE NONCLUSTERED INDEX IX_lineas_pendientes_de_costeo_SolicitudId ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.lineas_pendientes_de_costeo (SolicitudId);
-CREATE NONCLUSTERED INDEX IX_lineas_pendientes_de_costeo_TrabajoId_LineaSolicitudId_Tipo ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.lineas_pendientes_de_costeo (TrabajoId, LineaSolicitudId, Tipo);
+CREATE NONCLUSTERED INDEX IX_lineas_pendientes_de_costeo_SolicitudId ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_lineas_pendientes_de_costeo (SolicitudId);
+CREATE NONCLUSTERED INDEX IX_lineas_pendientes_de_costeo_TrabajoId_LineaSolicitudId_Tipo ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_lineas_pendientes_de_costeo (TrabajoId, LineaSolicitudId, Tipo);
 
 
--- dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.mapeo_rol_portal definition
+-- dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_mapeo_rol_portal definition
 
 -- Drop table
 
--- DROP TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.mapeo_rol_portal;
+-- DROP TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_mapeo_rol_portal;
 
-CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.mapeo_rol_portal (
+CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_mapeo_rol_portal (
 	Id uniqueidentifier NOT NULL,
 	IdRolPortal bigint NULL,
 	DescripcionRolPortal nvarchar(200) COLLATE Modern_Spanish_CI_AS NULL,
@@ -155,16 +155,16 @@ CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.mapeo_rol_portal (
 	CreatedAt datetimeoffset NOT NULL,
 	CONSTRAINT PK_mapeo_rol_portal PRIMARY KEY (Id)
 );
-CREATE UNIQUE NONCLUSTERED INDEX IX_mapeo_rol_portal_IdRolPortal ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.mapeo_rol_portal (IdRolPortal);
+CREATE UNIQUE NONCLUSTERED INDEX IX_mapeo_rol_portal_IdRolPortal ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_mapeo_rol_portal (IdRolPortal);
 
 
--- dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.parametros_score definition
+-- dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_parametros_score definition
 
 -- Drop table
 
--- DROP TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.parametros_score;
+-- DROP TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_parametros_score;
 
-CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.parametros_score (
+CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_parametros_score (
 	Id int IDENTITY(1,1) NOT NULL,
 	PesoUrgencia float NOT NULL,
 	PesoValor float NOT NULL,
@@ -183,13 +183,13 @@ CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.parametros_score (
 );
 
 
--- dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.reglas_solo_sicetac definition
+-- dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_reglas_solo_sicetac definition
 
 -- Drop table
 
--- DROP TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.reglas_solo_sicetac;
+-- DROP TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_reglas_solo_sicetac;
 
-CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.reglas_solo_sicetac (
+CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_reglas_solo_sicetac (
 	Id uniqueidentifier NOT NULL,
 	Origen nvarchar(150) COLLATE Modern_Spanish_CI_AS NOT NULL,
 	Destino nvarchar(150) COLLATE Modern_Spanish_CI_AS NOT NULL,
@@ -199,16 +199,16 @@ CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.reglas_solo_sicetac
 	UpdatedAt datetimeoffset DEFAULT sysdatetimeoffset() NOT NULL,
 	CONSTRAINT PK_reglas_solo_sicetac PRIMARY KEY (Id)
 );
-CREATE UNIQUE NONCLUSTERED INDEX IX_reglas_solo_sicetac_Origen_Destino_TipoVehiculo ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.reglas_solo_sicetac (Origen, Destino, TipoVehiculo);
+CREATE UNIQUE NONCLUSTERED INDEX IX_reglas_solo_sicetac_Origen_Destino_TipoVehiculo ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_reglas_solo_sicetac (Origen, Destino, TipoVehiculo);
 
 
--- dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.rutas definition
+-- dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_rutas definition
 
 -- Drop table
 
--- DROP TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.rutas;
+-- DROP TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_rutas;
 
-CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.rutas (
+CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_rutas (
 	Id uniqueidentifier NOT NULL,
 	Origen nvarchar(150) COLLATE Modern_Spanish_CI_AS NOT NULL,
 	Destino nvarchar(150) COLLATE Modern_Spanish_CI_AS NOT NULL,
@@ -216,16 +216,16 @@ CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.rutas (
 	UpdatedAt datetimeoffset DEFAULT sysdatetimeoffset() NOT NULL,
 	CONSTRAINT PK_rutas PRIMARY KEY (Id)
 );
-CREATE UNIQUE NONCLUSTERED INDEX IX_rutas_Origen_Destino ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.rutas (Origen, Destino);
+CREATE UNIQUE NONCLUSTERED INDEX IX_rutas_Origen_Destino ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_rutas (Origen, Destino);
 
 
--- dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.trabajos_auto_costeo definition
+-- dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_trabajos_auto_costeo definition
 
 -- Drop table
 
--- DROP TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.trabajos_auto_costeo;
+-- DROP TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_trabajos_auto_costeo;
 
-CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.trabajos_auto_costeo (
+CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_trabajos_auto_costeo (
 	CorrelationId uniqueidentifier NOT NULL,
 	Version int NOT NULL,
 	CurrentState nvarchar(64) COLLATE Modern_Spanish_CI_AS NOT NULL,
@@ -243,13 +243,13 @@ CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.trabajos_auto_coste
 );
 
 
--- dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.usuarios definition
+-- dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_usuarios definition
 
 -- Drop table
 
--- DROP TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.usuarios;
+-- DROP TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_usuarios;
 
-CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.usuarios (
+CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_usuarios (
 	Id uniqueidentifier NOT NULL,
 	Nombre nvarchar(200) COLLATE Modern_Spanish_CI_AS NOT NULL,
 	Email nvarchar(256) COLLATE Modern_Spanish_CI_AS NOT NULL,
@@ -260,17 +260,17 @@ CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.usuarios (
 	IdentidadPortalId bigint NULL,
 	CONSTRAINT PK_usuarios PRIMARY KEY (Id)
 );
-CREATE UNIQUE NONCLUSTERED INDEX IX_usuarios_Email ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.usuarios (Email);
-CREATE UNIQUE NONCLUSTERED INDEX IX_usuarios_IdentidadPortalId ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.usuarios (IdentidadPortalId);
+CREATE UNIQUE NONCLUSTERED INDEX IX_usuarios_Email ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_usuarios (Email);
+CREATE UNIQUE NONCLUSTERED INDEX IX_usuarios_IdentidadPortalId ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_usuarios (IdentidadPortalId);
 
 
--- dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.vehiculos_cubicacion definition
+-- dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_vehiculos_cubicacion definition
 
 -- Drop table
 
--- DROP TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.vehiculos_cubicacion;
+-- DROP TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_vehiculos_cubicacion;
 
-CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.vehiculos_cubicacion (
+CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_vehiculos_cubicacion (
 	Id uniqueidentifier NOT NULL,
 	Nombre nvarchar(100) COLLATE Modern_Spanish_CI_AS NOT NULL,
 	Descripcion nvarchar(300) COLLATE Modern_Spanish_CI_AS NULL,
@@ -330,13 +330,13 @@ CREATE UNIQUE NONCLUSTERED INDEX IX_OutboxMessage_InboxMessageId_InboxConsumerId
 CREATE UNIQUE NONCLUSTERED INDEX IX_OutboxMessage_OutboxId_SequenceNumber ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.OutboxMessage (OutboxId, SequenceNumber);
 
 
--- dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.audit_log definition
+-- dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_audit_log definition
 
 -- Drop table
 
--- DROP TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.audit_log;
+-- DROP TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_audit_log;
 
-CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.audit_log (
+CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_audit_log (
 	Id uniqueidentifier NOT NULL,
 	UsuarioId uniqueidentifier NULL,
 	Entidad nvarchar(100) COLLATE Modern_Spanish_CI_AS NULL,
@@ -345,19 +345,19 @@ CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.audit_log (
 	Diff nvarchar(MAX) COLLATE Modern_Spanish_CI_AS NULL,
 	CreatedAt datetimeoffset NOT NULL,
 	CONSTRAINT PK_audit_log PRIMARY KEY (Id),
-	CONSTRAINT FK_audit_log_usuarios_UsuarioId FOREIGN KEY (UsuarioId) REFERENCES dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.usuarios(Id)
+	CONSTRAINT FK_audit_log_usuarios_UsuarioId FOREIGN KEY (UsuarioId) REFERENCES dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_usuarios(Id)
 );
-CREATE NONCLUSTERED INDEX IX_audit_log_Entidad_EntidadId ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.audit_log (Entidad, EntidadId);
-CREATE NONCLUSTERED INDEX IX_audit_log_UsuarioId ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.audit_log (UsuarioId);
+CREATE NONCLUSTERED INDEX IX_audit_log_Entidad_EntidadId ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_audit_log (Entidad, EntidadId);
+CREATE NONCLUSTERED INDEX IX_audit_log_UsuarioId ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_audit_log (UsuarioId);
 
 
--- dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.planes_cargue definition
+-- dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_planes_cargue definition
 
 -- Drop table
 
--- DROP TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.planes_cargue;
+-- DROP TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_planes_cargue;
 
-CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.planes_cargue (
+CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_planes_cargue (
 	Id uniqueidentifier NOT NULL,
 	Nombre nvarchar(150) COLLATE Modern_Spanish_CI_AS NOT NULL,
 	VehiculoId uniqueidentifier NOT NULL,
@@ -378,19 +378,19 @@ CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.planes_cargue (
 	NumeroVehiculo int DEFAULT 0 NOT NULL,
 	MetricasJson nvarchar(MAX) COLLATE Modern_Spanish_CI_AS NULL,
 	CONSTRAINT PK_planes_cargue PRIMARY KEY (Id),
-	CONSTRAINT FK_planes_cargue_vehiculos_cubicacion_VehiculoId FOREIGN KEY (VehiculoId) REFERENCES dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.vehiculos_cubicacion(Id)
+	CONSTRAINT FK_planes_cargue_vehiculos_cubicacion_VehiculoId FOREIGN KEY (VehiculoId) REFERENCES dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_vehiculos_cubicacion(Id)
 );
-CREATE NONCLUSTERED INDEX IX_planes_cargue_LineaSolicitudId ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.planes_cargue (LineaSolicitudId);
-CREATE NONCLUSTERED INDEX IX_planes_cargue_VehiculoId ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.planes_cargue (VehiculoId);
+CREATE NONCLUSTERED INDEX IX_planes_cargue_LineaSolicitudId ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_planes_cargue (LineaSolicitudId);
+CREATE NONCLUSTERED INDEX IX_planes_cargue_VehiculoId ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_planes_cargue (VehiculoId);
 
 
--- dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.servicios_conexos definition
+-- dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_servicios_conexos definition
 
 -- Drop table
 
--- DROP TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.servicios_conexos;
+-- DROP TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_servicios_conexos;
 
-CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.servicios_conexos (
+CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_servicios_conexos (
 	Id uniqueidentifier NOT NULL,
 	Nombre nvarchar(120) COLLATE Modern_Spanish_CI_AS NOT NULL,
 	ReglaCobro nvarchar(MAX) COLLATE Modern_Spanish_CI_AS NULL,
@@ -403,18 +403,18 @@ CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.servicios_conexos (
 	RowVersion timestamp NULL,
 	Categoria nvarchar(20) COLLATE Modern_Spanish_CI_AS DEFAULT N'logistico' NOT NULL,
 	CONSTRAINT PK_servicios_conexos PRIMARY KEY (Id),
-	CONSTRAINT FK_servicios_conexos_usuarios_ActualizadoPor FOREIGN KEY (ActualizadoPor) REFERENCES dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.usuarios(Id)
+	CONSTRAINT FK_servicios_conexos_usuarios_ActualizadoPor FOREIGN KEY (ActualizadoPor) REFERENCES dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_usuarios(Id)
 );
-CREATE NONCLUSTERED INDEX IX_servicios_conexos_ActualizadoPor ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.servicios_conexos (ActualizadoPor);
+CREATE NONCLUSTERED INDEX IX_servicios_conexos_ActualizadoPor ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_servicios_conexos (ActualizadoPor);
 
 
--- dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.solicitudes definition
+-- dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_solicitudes definition
 
 -- Drop table
 
--- DROP TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.solicitudes;
+-- DROP TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_solicitudes;
 
-CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.solicitudes (
+CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_solicitudes (
 	Id uniqueidentifier NOT NULL,
 	ClienteId uniqueidentifier NOT NULL,
 	Tipo nvarchar(20) COLLATE Modern_Spanish_CI_AS NOT NULL,
@@ -430,22 +430,22 @@ CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.solicitudes (
 	UpdatedAt datetimeoffset DEFAULT sysdatetimeoffset() NOT NULL,
 	RowVersion timestamp NULL,
 	CONSTRAINT PK_solicitudes PRIMARY KEY (Id),
-	CONSTRAINT FK_solicitudes_clientes_ClienteId FOREIGN KEY (ClienteId) REFERENCES dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.clientes(Id),
-	CONSTRAINT FK_solicitudes_usuarios_CreadoPor FOREIGN KEY (CreadoPor) REFERENCES dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.usuarios(Id)
+	CONSTRAINT FK_solicitudes_clientes_ClienteId FOREIGN KEY (ClienteId) REFERENCES dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_clientes(Id),
+	CONSTRAINT FK_solicitudes_usuarios_CreadoPor FOREIGN KEY (CreadoPor) REFERENCES dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_usuarios(Id)
 );
-CREATE NONCLUSTERED INDEX IX_solicitudes_ClienteId ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.solicitudes (ClienteId);
-CREATE NONCLUSTERED INDEX IX_solicitudes_CreadoPor ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.solicitudes (CreadoPor);
-CREATE NONCLUSTERED INDEX IX_solicitudes_Deadline ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.solicitudes (Deadline);
-CREATE NONCLUSTERED INDEX IX_solicitudes_Estado_ScorePrioridad ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.solicitudes (Estado, ScorePrioridad);
+CREATE NONCLUSTERED INDEX IX_solicitudes_ClienteId ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_solicitudes (ClienteId);
+CREATE NONCLUSTERED INDEX IX_solicitudes_CreadoPor ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_solicitudes (CreadoPor);
+CREATE NONCLUSTERED INDEX IX_solicitudes_Deadline ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_solicitudes (Deadline);
+CREATE NONCLUSTERED INDEX IX_solicitudes_Estado_ScorePrioridad ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_solicitudes (Estado, ScorePrioridad);
 
 
--- dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tarifas_sicetac definition
+-- dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_tarifas_sicetac definition
 
 -- Drop table
 
--- DROP TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tarifas_sicetac;
+-- DROP TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_tarifas_sicetac;
 
-CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tarifas_sicetac (
+CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_tarifas_sicetac (
 	Id uniqueidentifier NOT NULL,
 	SiceId bigint NULL,
 	Periodo int NOT NULL,
@@ -470,19 +470,19 @@ CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tarifas_sicetac (
 	CreatedAt datetimeoffset DEFAULT sysdatetimeoffset() NOT NULL,
 	UpdatedAt datetimeoffset DEFAULT sysdatetimeoffset() NOT NULL,
 	CONSTRAINT PK_tarifas_sicetac PRIMARY KEY (Id),
-	CONSTRAINT FK_tarifas_sicetac_rutas_RutaId FOREIGN KEY (RutaId) REFERENCES dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.rutas(Id)
+	CONSTRAINT FK_tarifas_sicetac_rutas_RutaId FOREIGN KEY (RutaId) REFERENCES dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_rutas(Id)
 );
-CREATE UNIQUE NONCLUSTERED INDEX IX_tarifas_sicetac_Periodo_OrigenDane_DestinoDane_Configuracion_TipoCarga_UnidadTransporte_CondicionCarga ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tarifas_sicetac (Periodo, OrigenDane, DestinoDane, Configuracion, TipoCarga, UnidadTransporte, CondicionCarga);
-CREATE NONCLUSTERED INDEX IX_tarifas_sicetac_RutaId ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tarifas_sicetac (RutaId);
+CREATE UNIQUE NONCLUSTERED INDEX IX_tarifas_sicetac_Periodo_OrigenDane_DestinoDane_Configuracion_TipoCarga_UnidadTransporte_CondicionCarga ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_tarifas_sicetac (Periodo, OrigenDane, DestinoDane, Configuracion, TipoCarga, UnidadTransporte, CondicionCarga);
+CREATE NONCLUSTERED INDEX IX_tarifas_sicetac_RutaId ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_tarifas_sicetac (RutaId);
 
 
--- dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.cotizaciones definition
+-- dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_cotizaciones definition
 
 -- Drop table
 
--- DROP TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.cotizaciones;
+-- DROP TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_cotizaciones;
 
-CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.cotizaciones (
+CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_cotizaciones (
 	Id uniqueidentifier NOT NULL,
 	SolicitudId uniqueidentifier NOT NULL,
 	Estado nvarchar(20) COLLATE Modern_Spanish_CI_AS DEFAULT N'Borrador' NOT NULL,
@@ -494,20 +494,20 @@ CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.cotizaciones (
 	UpdatedAt datetimeoffset DEFAULT sysdatetimeoffset() NOT NULL,
 	RowVersion timestamp NULL,
 	CONSTRAINT PK_cotizaciones PRIMARY KEY (Id),
-	CONSTRAINT FK_cotizaciones_solicitudes_SolicitudId FOREIGN KEY (SolicitudId) REFERENCES dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.solicitudes(Id),
-	CONSTRAINT FK_cotizaciones_usuarios_EntregadaPor FOREIGN KEY (EntregadaPor) REFERENCES dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.usuarios(Id)
+	CONSTRAINT FK_cotizaciones_solicitudes_SolicitudId FOREIGN KEY (SolicitudId) REFERENCES dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_solicitudes(Id),
+	CONSTRAINT FK_cotizaciones_usuarios_EntregadaPor FOREIGN KEY (EntregadaPor) REFERENCES dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_usuarios(Id)
 );
-CREATE NONCLUSTERED INDEX IX_cotizaciones_EntregadaPor ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.cotizaciones (EntregadaPor);
-CREATE NONCLUSTERED INDEX IX_cotizaciones_SolicitudId ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.cotizaciones (SolicitudId);
+CREATE NONCLUSTERED INDEX IX_cotizaciones_EntregadaPor ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_cotizaciones (EntregadaPor);
+CREATE NONCLUSTERED INDEX IX_cotizaciones_SolicitudId ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_cotizaciones (SolicitudId);
 
 
--- dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.items_plan_cargue definition
+-- dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_items_plan_cargue definition
 
 -- Drop table
 
--- DROP TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.items_plan_cargue;
+-- DROP TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_items_plan_cargue;
 
-CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.items_plan_cargue (
+CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_items_plan_cargue (
 	Id uniqueidentifier NOT NULL,
 	PlanCargueId uniqueidentifier NOT NULL,
 	Sku nvarchar(60) COLLATE Modern_Spanish_CI_AS NOT NULL,
@@ -537,18 +537,18 @@ CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.items_plan_cargue (
 	CreatedAt datetimeoffset DEFAULT sysdatetimeoffset() NOT NULL,
 	UpdatedAt datetimeoffset DEFAULT sysdatetimeoffset() NOT NULL,
 	CONSTRAINT PK_items_plan_cargue PRIMARY KEY (Id),
-	CONSTRAINT FK_items_plan_cargue_planes_cargue_PlanCargueId FOREIGN KEY (PlanCargueId) REFERENCES dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.planes_cargue(Id) ON DELETE CASCADE
+	CONSTRAINT FK_items_plan_cargue_planes_cargue_PlanCargueId FOREIGN KEY (PlanCargueId) REFERENCES dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_planes_cargue(Id) ON DELETE CASCADE
 );
-CREATE NONCLUSTERED INDEX IX_items_plan_cargue_PlanCargueId ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.items_plan_cargue (PlanCargueId);
+CREATE NONCLUSTERED INDEX IX_items_plan_cargue_PlanCargueId ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_items_plan_cargue (PlanCargueId);
 
 
--- dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.lineas_solicitud definition
+-- dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_lineas_solicitud definition
 
 -- Drop table
 
--- DROP TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.lineas_solicitud;
+-- DROP TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_lineas_solicitud;
 
-CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.lineas_solicitud (
+CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_lineas_solicitud (
 	Id uniqueidentifier NOT NULL,
 	SolicitudId uniqueidentifier NOT NULL,
 	RutaId uniqueidentifier NULL,
@@ -572,22 +572,22 @@ CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.lineas_solicitud (
 	RetornaContenedor bit DEFAULT CONVERT([bit],(0)) NOT NULL,
 	MotivoPendiente nvarchar(500) COLLATE Modern_Spanish_CI_AS NULL,
 	CONSTRAINT PK_lineas_solicitud PRIMARY KEY (Id),
-	CONSTRAINT FK_lineas_solicitud_configuraciones_vehiculo_ConfigVehiculoId FOREIGN KEY (ConfigVehiculoId) REFERENCES dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.configuraciones_vehiculo(Id),
-	CONSTRAINT FK_lineas_solicitud_rutas_RutaId FOREIGN KEY (RutaId) REFERENCES dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.rutas(Id),
-	CONSTRAINT FK_lineas_solicitud_solicitudes_SolicitudId FOREIGN KEY (SolicitudId) REFERENCES dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.solicitudes(Id) ON DELETE CASCADE
+	CONSTRAINT FK_lineas_solicitud_configuraciones_vehiculo_ConfigVehiculoId FOREIGN KEY (ConfigVehiculoId) REFERENCES dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_configuraciones_vehiculo(Id),
+	CONSTRAINT FK_lineas_solicitud_rutas_RutaId FOREIGN KEY (RutaId) REFERENCES dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_rutas(Id),
+	CONSTRAINT FK_lineas_solicitud_solicitudes_SolicitudId FOREIGN KEY (SolicitudId) REFERENCES dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_solicitudes(Id) ON DELETE CASCADE
 );
-CREATE NONCLUSTERED INDEX IX_lineas_solicitud_ConfigVehiculoId ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.lineas_solicitud (ConfigVehiculoId);
-CREATE NONCLUSTERED INDEX IX_lineas_solicitud_RutaId ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.lineas_solicitud (RutaId);
-CREATE NONCLUSTERED INDEX IX_lineas_solicitud_SolicitudId ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.lineas_solicitud (SolicitudId);
+CREATE NONCLUSTERED INDEX IX_lineas_solicitud_ConfigVehiculoId ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_lineas_solicitud (ConfigVehiculoId);
+CREATE NONCLUSTERED INDEX IX_lineas_solicitud_RutaId ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_lineas_solicitud (RutaId);
+CREATE NONCLUSTERED INDEX IX_lineas_solicitud_SolicitudId ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_lineas_solicitud (SolicitudId);
 
 
--- dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tarifas_historicas definition
+-- dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_tarifas_historicas definition
 
 -- Drop table
 
--- DROP TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tarifas_historicas;
+-- DROP TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_tarifas_historicas;
 
-CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tarifas_historicas (
+CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_tarifas_historicas (
 	Id uniqueidentifier NOT NULL,
 	RutaId uniqueidentifier NULL,
 	ConfigVehiculoId uniqueidentifier NULL,
@@ -598,22 +598,22 @@ CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tarifas_historicas 
 	CreatedAt datetimeoffset DEFAULT sysdatetimeoffset() NOT NULL,
 	UpdatedAt datetimeoffset DEFAULT sysdatetimeoffset() NOT NULL,
 	CONSTRAINT PK_tarifas_historicas PRIMARY KEY (Id),
-	CONSTRAINT FK_tarifas_historicas_configuraciones_vehiculo_ConfigVehiculoId FOREIGN KEY (ConfigVehiculoId) REFERENCES dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.configuraciones_vehiculo(Id),
-	CONSTRAINT FK_tarifas_historicas_cotizaciones_CotizacionId FOREIGN KEY (CotizacionId) REFERENCES dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.cotizaciones(Id),
-	CONSTRAINT FK_tarifas_historicas_rutas_RutaId FOREIGN KEY (RutaId) REFERENCES dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.rutas(Id)
+	CONSTRAINT FK_tarifas_historicas_configuraciones_vehiculo_ConfigVehiculoId FOREIGN KEY (ConfigVehiculoId) REFERENCES dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_configuraciones_vehiculo(Id),
+	CONSTRAINT FK_tarifas_historicas_cotizaciones_CotizacionId FOREIGN KEY (CotizacionId) REFERENCES dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_cotizaciones(Id),
+	CONSTRAINT FK_tarifas_historicas_rutas_RutaId FOREIGN KEY (RutaId) REFERENCES dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_rutas(Id)
 );
-CREATE NONCLUSTERED INDEX IX_tarifas_historicas_ConfigVehiculoId ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tarifas_historicas (ConfigVehiculoId);
-CREATE NONCLUSTERED INDEX IX_tarifas_historicas_CotizacionId ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tarifas_historicas (CotizacionId);
-CREATE NONCLUSTERED INDEX IX_tarifas_historicas_RutaId_ConfigVehiculoId_Tipologia ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tarifas_historicas (RutaId, ConfigVehiculoId, Tipologia);
+CREATE NONCLUSTERED INDEX IX_tarifas_historicas_ConfigVehiculoId ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_tarifas_historicas (ConfigVehiculoId);
+CREATE NONCLUSTERED INDEX IX_tarifas_historicas_CotizacionId ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_tarifas_historicas (CotizacionId);
+CREATE NONCLUSTERED INDEX IX_tarifas_historicas_RutaId_ConfigVehiculoId_Tipologia ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_tarifas_historicas (RutaId, ConfigVehiculoId, Tipologia);
 
 
--- dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.colocaciones_cargue definition
+-- dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_colocaciones_cargue definition
 
 -- Drop table
 
--- DROP TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.colocaciones_cargue;
+-- DROP TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_colocaciones_cargue;
 
-CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.colocaciones_cargue (
+CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_colocaciones_cargue (
 	Id uniqueidentifier NOT NULL,
 	PlanCargueId uniqueidentifier NOT NULL,
 	ItemPlanCargueId uniqueidentifier NOT NULL,
@@ -639,20 +639,20 @@ CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.colocaciones_cargue
 	CreatedAt datetimeoffset DEFAULT sysdatetimeoffset() NOT NULL,
 	UpdatedAt datetimeoffset DEFAULT sysdatetimeoffset() NOT NULL,
 	CONSTRAINT PK_colocaciones_cargue PRIMARY KEY (Id),
-	CONSTRAINT FK_colocaciones_cargue_items_plan_cargue_ItemPlanCargueId FOREIGN KEY (ItemPlanCargueId) REFERENCES dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.items_plan_cargue(Id),
-	CONSTRAINT FK_colocaciones_cargue_planes_cargue_PlanCargueId FOREIGN KEY (PlanCargueId) REFERENCES dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.planes_cargue(Id) ON DELETE CASCADE
+	CONSTRAINT FK_colocaciones_cargue_items_plan_cargue_ItemPlanCargueId FOREIGN KEY (ItemPlanCargueId) REFERENCES dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_items_plan_cargue(Id),
+	CONSTRAINT FK_colocaciones_cargue_planes_cargue_PlanCargueId FOREIGN KEY (PlanCargueId) REFERENCES dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_planes_cargue(Id) ON DELETE CASCADE
 );
-CREATE NONCLUSTERED INDEX IX_colocaciones_cargue_ItemPlanCargueId ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.colocaciones_cargue (ItemPlanCargueId);
-CREATE NONCLUSTERED INDEX IX_colocaciones_cargue_PlanCargueId_Cargada ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.colocaciones_cargue (PlanCargueId, Cargada);
+CREATE NONCLUSTERED INDEX IX_colocaciones_cargue_ItemPlanCargueId ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_colocaciones_cargue (ItemPlanCargueId);
+CREATE NONCLUSTERED INDEX IX_colocaciones_cargue_PlanCargueId_Cargada ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_colocaciones_cargue (PlanCargueId, Cargada);
 
 
--- dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.cotizacion_conexos definition
+-- dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_cotizacion_conexos definition
 
 -- Drop table
 
--- DROP TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.cotizacion_conexos;
+-- DROP TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_cotizacion_conexos;
 
-CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.cotizacion_conexos (
+CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_cotizacion_conexos (
 	Id uniqueidentifier NOT NULL,
 	CotizacionId uniqueidentifier NOT NULL,
 	ServicioConexoId uniqueidentifier NULL,
@@ -661,20 +661,20 @@ CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.cotizacion_conexos 
 	CreatedAt datetimeoffset DEFAULT sysdatetimeoffset() NOT NULL,
 	UpdatedAt datetimeoffset DEFAULT sysdatetimeoffset() NOT NULL,
 	CONSTRAINT PK_cotizacion_conexos PRIMARY KEY (Id),
-	CONSTRAINT FK_cotizacion_conexos_cotizaciones_CotizacionId FOREIGN KEY (CotizacionId) REFERENCES dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.cotizaciones(Id) ON DELETE CASCADE,
-	CONSTRAINT FK_cotizacion_conexos_servicios_conexos_ServicioConexoId FOREIGN KEY (ServicioConexoId) REFERENCES dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.servicios_conexos(Id)
+	CONSTRAINT FK_cotizacion_conexos_cotizaciones_CotizacionId FOREIGN KEY (CotizacionId) REFERENCES dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_cotizaciones(Id) ON DELETE CASCADE,
+	CONSTRAINT FK_cotizacion_conexos_servicios_conexos_ServicioConexoId FOREIGN KEY (ServicioConexoId) REFERENCES dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_servicios_conexos(Id)
 );
-CREATE NONCLUSTERED INDEX IX_cotizacion_conexos_CotizacionId ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.cotizacion_conexos (CotizacionId);
-CREATE NONCLUSTERED INDEX IX_cotizacion_conexos_ServicioConexoId ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.cotizacion_conexos (ServicioConexoId);
+CREATE NONCLUSTERED INDEX IX_cotizacion_conexos_CotizacionId ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_cotizacion_conexos (CotizacionId);
+CREATE NONCLUSTERED INDEX IX_cotizacion_conexos_ServicioConexoId ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_cotizacion_conexos (ServicioConexoId);
 
 
--- dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.cotizacion_lineas definition
+-- dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_cotizacion_lineas definition
 
 -- Drop table
 
--- DROP TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.cotizacion_lineas;
+-- DROP TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_cotizacion_lineas;
 
-CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.cotizacion_lineas (
+CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_cotizacion_lineas (
 	Id uniqueidentifier NOT NULL,
 	CotizacionId uniqueidentifier NOT NULL,
 	LineaSolicitudId uniqueidentifier NULL,
@@ -685,8 +685,8 @@ CREATE TABLE dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.cotizacion_lineas (
 	ValorAprovisionamiento decimal(18,2) NULL,
 	ValorRetornoContenedor decimal(18,2) NULL,
 	CONSTRAINT PK_cotizacion_lineas PRIMARY KEY (Id),
-	CONSTRAINT FK_cotizacion_lineas_cotizaciones_CotizacionId FOREIGN KEY (CotizacionId) REFERENCES dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.cotizaciones(Id) ON DELETE CASCADE,
-	CONSTRAINT FK_cotizacion_lineas_lineas_solicitud_LineaSolicitudId FOREIGN KEY (LineaSolicitudId) REFERENCES dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.lineas_solicitud(Id)
+	CONSTRAINT FK_cotizacion_lineas_cotizaciones_CotizacionId FOREIGN KEY (CotizacionId) REFERENCES dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_cotizaciones(Id) ON DELETE CASCADE,
+	CONSTRAINT FK_cotizacion_lineas_lineas_solicitud_LineaSolicitudId FOREIGN KEY (LineaSolicitudId) REFERENCES dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_lineas_solicitud(Id)
 );
-CREATE NONCLUSTERED INDEX IX_cotizacion_lineas_CotizacionId ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.cotizacion_lineas (CotizacionId);
-CREATE NONCLUSTERED INDEX IX_cotizacion_lineas_LineaSolicitudId ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.cotizacion_lineas (LineaSolicitudId);
+CREATE NONCLUSTERED INDEX IX_cotizacion_lineas_CotizacionId ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_cotizacion_lineas (CotizacionId);
+CREATE NONCLUSTERED INDEX IX_cotizacion_lineas_LineaSolicitudId ON dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.tbl_cotizacion_lineas (LineaSolicitudId);

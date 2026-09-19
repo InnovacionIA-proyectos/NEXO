@@ -67,7 +67,7 @@ public class clsNexoDbContext : DbContext
         // hace la pantalla; indexar las ya resueltas no aporta y la tabla crece.
         b.Entity<clsLineaPendienteDeCosteo>(e =>
         {
-            e.ToTable("lineas_pendientes_de_costeo");
+            e.ToTable("tbl_lineas_pendientes_de_costeo");
             e.Property(x => x.Motivo).HasMaxLength(500).IsRequired();
             e.Property(x => x.Tipo).HasConversion<string>().HasMaxLength(20);
             e.HasIndex(x => new { x.TrabajoId, x.LineaSolicitudId, x.Tipo });
@@ -79,7 +79,7 @@ public class clsNexoDbContext : DbContext
         // borrara, quedaría preguntando por algo que ya nadie recuerda.
         b.Entity<clsEstadoAutoCosteo>(e =>
         {
-            e.ToTable("trabajos_auto_costeo");
+            e.ToTable("tbl_trabajos_auto_costeo");
             e.HasKey(x => x.CorrelationId);
             e.Property(x => x.CurrentState).HasMaxLength(64).IsRequired();
             // Derivadas del estado, no columnas.
@@ -90,14 +90,14 @@ public class clsNexoDbContext : DbContext
 
         b.Entity<clsEstadoPriorizacion>(e =>
         {
-            e.ToTable("cadena_priorizacion");
+            e.ToTable("tbl_cadena_priorizacion");
             e.HasKey(x => x.CorrelationId);
             e.Property(x => x.CurrentState).HasMaxLength(64).IsRequired();
         });
 
         b.Entity<clsUsuario>(e =>
         {
-            e.ToTable("usuarios");
+            e.ToTable("tbl_usuarios");
             e.HasIndex(x => x.Email).IsUnique();
             e.Property(x => x.Rol).HasConversion<string>().HasMaxLength(40);
             e.Property(x => x.Activo).HasDefaultValue(true);
@@ -118,7 +118,7 @@ public class clsNexoDbContext : DbContext
 
         b.Entity<clsMapeoRolPortal>(e =>
         {
-            e.ToTable("mapeo_rol_portal");
+            e.ToTable("tbl_mapeo_rol_portal");
             // Filtrado (no único plano): IdRolPortal queda NULL hasta que TI confirme el
             // id real (ver comentario del seed más abajo), y puede haber varias filas así
             // a la vez.
@@ -153,13 +153,13 @@ public class clsNexoDbContext : DbContext
 
         b.Entity<clsCliente>(e =>
         {
-            e.ToTable("clientes");
+            e.ToTable("tbl_clientes");
             e.HasIndex(x => x.Nit).IsUnique();
         });
 
         b.Entity<clsSolicitud>(e =>
         {
-            e.ToTable("solicitudes");
+            e.ToTable("tbl_solicitudes");
             e.Property(x => x.Tipo).HasConversion<string>().HasMaxLength(20);
             e.Property(x => x.Modalidad).HasConversion<string>().HasMaxLength(30);
             e.Property(x => x.Estado).HasConversion<string>().HasMaxLength(20)
@@ -188,7 +188,7 @@ public class clsNexoDbContext : DbContext
 
         b.Entity<clsLineaSolicitud>(e =>
         {
-            e.ToTable("lineas_solicitud");
+            e.ToTable("tbl_lineas_solicitud");
             e.Property(x => x.Tipologia).HasConversion<string>().HasMaxLength(30);
             e.Property(x => x.LineaNegocio).HasConversion<string>().HasMaxLength(30);
             e.Property(x => x.ClaseViaje).HasConversion<string>().HasMaxLength(20);
@@ -216,15 +216,15 @@ public class clsNexoDbContext : DbContext
 
         b.Entity<clsRuta>(e =>
         {
-            e.ToTable("rutas");
+            e.ToTable("tbl_rutas");
             e.HasIndex(x => new { x.Origen, x.Destino }).IsUnique();
         });
 
-        b.Entity<clsConfiguracionVehiculo>(e => e.ToTable("configuraciones_vehiculo"));
+        b.Entity<clsConfiguracionVehiculo>(e => e.ToTable("tbl_configuraciones_vehiculo"));
 
         b.Entity<clsTarifaSicetac>(e =>
         {
-            e.ToTable("tarifas_sicetac");
+            e.ToTable("tbl_tarifas_sicetac");
             e.Property(x => x.CondicionCarga).HasConversion<string>().HasMaxLength(20);
             e.Property(x => x.ValorPiso).HasColumnType("decimal(18,2)");
             e.Property(x => x.ValorHora).HasColumnType("decimal(18,2)");
@@ -245,7 +245,7 @@ public class clsNexoDbContext : DbContext
 
         b.Entity<clsTarifaHistorica>(e =>
         {
-            e.ToTable("tarifas_historicas");
+            e.ToTable("tbl_tarifas_historicas");
             e.Property(x => x.Tipologia).HasConversion<string>().HasMaxLength(30);
             e.Property(x => x.Valor).HasColumnType("decimal(18,2)");
             e.HasIndex(x => new { x.RutaId, x.ConfigVehiculoId, x.Tipologia });
@@ -265,7 +265,7 @@ public class clsNexoDbContext : DbContext
 
         b.Entity<clsServicioConexo>(e =>
         {
-            e.ToTable("servicios_conexos");
+            e.ToTable("tbl_servicios_conexos");
             e.Property(x => x.ValorBase).HasColumnType("decimal(18,2)");
             e.Property(x => x.Activo).HasDefaultValue(true);
             e.Property(x => x.RowVersion).IsRowVersion();
@@ -277,7 +277,7 @@ public class clsNexoDbContext : DbContext
 
         b.Entity<clsCotizacion>(e =>
         {
-            e.ToTable("cotizaciones");
+            e.ToTable("tbl_cotizaciones");
             e.Property(x => x.Estado).HasConversion<string>().HasMaxLength(20)
              .HasDefaultValue(EstadoCotizacion.Borrador);
             e.Property(x => x.Resultado).HasConversion<string>().HasMaxLength(20)
@@ -294,7 +294,7 @@ public class clsNexoDbContext : DbContext
 
         b.Entity<clsCotizacionLinea>(e =>
         {
-            e.ToTable("cotizacion_lineas");
+            e.ToTable("tbl_cotizacion_lineas");
             e.Property(x => x.Fuente).HasConversion<string>().HasMaxLength(20);
             e.Property(x => x.ValorFlete).HasColumnType("decimal(18,2)");
             e.Property(x => x.ValorAprovisionamiento).HasColumnType("decimal(18,2)");
@@ -307,7 +307,7 @@ public class clsNexoDbContext : DbContext
 
         b.Entity<clsCotizacionConexo>(e =>
         {
-            e.ToTable("cotizacion_conexos");
+            e.ToTable("tbl_cotizacion_conexos");
             e.Property(x => x.Cantidad).HasColumnType("decimal(12,2)");
             e.Property(x => x.ValorAplicado).HasColumnType("decimal(18,2)");
             e.HasOne(x => x.clsServicioConexo)
@@ -318,7 +318,7 @@ public class clsNexoDbContext : DbContext
 
         b.Entity<clsAuditLog>(e =>
         {
-            e.ToTable("audit_log");
+            e.ToTable("tbl_audit_log");
             e.HasIndex(x => new { x.Entidad, x.EntidadId });
             e.HasOne(x => x.clsUsuario)
              .WithMany()
@@ -329,7 +329,7 @@ public class clsNexoDbContext : DbContext
         // ------------------------------------------------------------- Cubicador 3D
         b.Entity<clsVehiculoCubicacion>(e =>
         {
-            e.ToTable("vehiculos_cubicacion");
+            e.ToTable("tbl_vehiculos_cubicacion");
             foreach (var p in new[] { "LargoInternoMm", "AnchoInternoMm", "AltoInternoMm", "CapacidadKg", "TaraKg",
                                        "PuertaAnchoMm", "PuertaAltoMm", "ToleranciaParedesMm", "ToleranciaEntreUnidadesMm" })
                 e.Property(p).HasColumnType("decimal(12,2)");
@@ -337,7 +337,7 @@ public class clsNexoDbContext : DbContext
 
         b.Entity<clsPlanCargue>(e =>
         {
-            e.ToTable("planes_cargue");
+            e.ToTable("tbl_planes_cargue");
             e.Property(x => x.PesoTotalKg).HasColumnType("decimal(12,2)");
             e.Property(x => x.VolumenUtilizadoM3).HasColumnType("decimal(12,3)");
             e.Property(x => x.UtilizacionVolumen).HasColumnType("decimal(6,2)");
@@ -351,14 +351,14 @@ public class clsNexoDbContext : DbContext
 
         b.Entity<clsItemPlanCargue>(e =>
         {
-            e.ToTable("items_plan_cargue");
+            e.ToTable("tbl_items_plan_cargue");
             foreach (var p in new[] { "LargoMm", "AnchoMm", "AltoMm", "PesoKg", "MaxPesoEncimaKg" })
                 e.Property(p).HasColumnType("decimal(12,2)");
         });
 
         b.Entity<clsColocacionCargue>(e =>
         {
-            e.ToTable("colocaciones_cargue");
+            e.ToTable("tbl_colocaciones_cargue");
             foreach (var p in new[] { "X", "Y", "Z", "LargoColocadoMm", "AnchoColocadoMm", "AltoColocadoMm",
                                        "PorcentajeSoporte", "PesoEncimaKg" })
                 e.Property(p).HasColumnType("decimal(12,2)");
@@ -368,7 +368,7 @@ public class clsNexoDbContext : DbContext
 
         b.Entity<clsAjusteVigenciaPlaza>(e =>
         {
-            e.ToTable("ajustes_vigencia_plaza");
+            e.ToTable("tbl_ajustes_vigencia_plaza");
             // Un ajuste por tarifa de plaza (override): clave natural única.
             e.HasIndex(x => x.TarifaPlazaId).IsUnique();
             e.Property(x => x.Motivo).HasMaxLength(300);
@@ -376,14 +376,14 @@ public class clsNexoDbContext : DbContext
 
         b.Entity<clsReglaSoloSicetac>(e =>
         {
-            e.ToTable("reglas_solo_sicetac");
+            e.ToTable("tbl_reglas_solo_sicetac");
             // Clave natural única: no repetir la misma ruta + tipo de vehículo.
             e.HasIndex(x => new { x.Origen, x.Destino, x.TipoVehiculo }).IsUnique();
         });
 
         b.Entity<clsParametrosScore>(e =>
         {
-            e.ToTable("parametros_score");
+            e.ToTable("tbl_parametros_score");
             e.Property(x => x.ValorReferencia).HasColumnType("decimal(18,2)");
             e.Property(x => x.RowVersion).IsRowVersion();
             // Fila única (singleton) con los valores por defecto del algoritmo.
