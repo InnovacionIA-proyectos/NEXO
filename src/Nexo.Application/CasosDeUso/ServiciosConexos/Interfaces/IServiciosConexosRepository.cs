@@ -16,7 +16,7 @@ public interface IServiciosConexosRepository
     /// <summary>
     /// Carga masiva desde Excel (.xlsx): Nombre, Valor base, Vigente hasta, Categoría, Activo.
     /// Todo el análisis del archivo (detección de encabezado tolerante, parseo de celdas) y la
-    /// persistencia viven aquí — como en Biblioteca (ver MIGRACION.md), separar el parseo de
+    /// persistencia viven aquí: separar el parseo de
     /// ClosedXML de la decisión "insertar/duplicado/inválida" no gana testabilidad real.
     /// </summary>
     Task<clsImportarServiciosResultDto> ImportarExcelAsync(Stream archivo, Guid usuarioId, CancellationToken ct);

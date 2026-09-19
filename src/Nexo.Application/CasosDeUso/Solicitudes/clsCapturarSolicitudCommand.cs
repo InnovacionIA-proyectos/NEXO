@@ -41,8 +41,8 @@ public sealed record clsCapturarSolicitudCommand(
 /// difiere a un Task.Run con su propio scope de DI (la petición HTTP ya respondió).
 /// Esto obliga a este Handler a depender de IServiceScopeFactory — una abstracción
 /// de Microsoft.Extensions.DependencyInjection, no de ASP.NET Core ni de EF Core —
-/// igual que hacía el service original. Se documenta aquí y en MIGRACION.md porque
-/// es una excepción deliberada a "Application no depende de infraestructura".
+/// igual que hacía el service original: es una excepción deliberada a
+/// "Application no depende de infraestructura".
 /// </summary>
 public sealed class clsCapturarSolicitudCommandHandler(
     ISolicitudesRepository solicitudes, IRutasCatalogoPort rutasCatalogo,

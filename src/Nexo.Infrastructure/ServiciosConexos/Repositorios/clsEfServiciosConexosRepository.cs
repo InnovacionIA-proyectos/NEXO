@@ -19,7 +19,7 @@ namespace Nexo.Infrastructure.ServiciosConexos.Repositorios;
 /// masiva (ClosedXML). El mapeo de columnas tolerante y las conversiones de celda son
 /// detalle de acceso a datos entrelazado con el formato de archivo: no hay una regla de
 /// negocio separable con provecho real de testabilidad, así que vive aquí completo
-/// (mismo criterio pragmático documentado en MIGRACION.md para Biblioteca/ReglasSoloSicetac).
+/// (mismo criterio pragmático usado en Biblioteca/ReglasSoloSicetac).
 /// </summary>
 public sealed class clsEfServiciosConexosRepository(clsNexoDbContext db) : IServiciosConexosRepository, IServiciosConexosPort
 {

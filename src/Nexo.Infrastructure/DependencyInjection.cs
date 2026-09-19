@@ -52,7 +52,7 @@ public static class DependencyInjection
     /// (TarifarioSap + PropuestaTarifa + matriz SICE-TAC + histórico/plaza SAP en
     /// vivo), Solicitudes/Captura, Servicios Conexos, Tarifas Ganadas, Tarifas
     /// SICE-TAC admin, Métricas y Plan de Cargue (orquestación por colas contra el
-    /// motor Cubicador, microservicio Python aparte — ver PENDIENTES.md). Única
+    /// motor Cubicador, microservicio Python aparte). Única
     /// excepción HTTP declarada a ese "por colas": <see cref="ICubicacionRapidaPort"/>,
     /// ver el comentario de esa interfaz.
     /// </summary>

@@ -10,7 +10,7 @@ namespace Nexo.Api.AjustesVigenciaPlaza;
 /// Ajuste LOCAL de la vigencia de tarifas de plaza de SAP TM (la fuente SAP es de solo
 /// lectura). Mismas rutas que el proyecto original bajo /api/biblioteca-sap-plaza; el
 /// listado/filtros de tarifas de plaza en sí (GET, GET /filtros) pertenecen a
-/// BibliotecaSapHistoricoService, que todavía no se migró — ver PENDIENTES.md.
+/// BibliotecaSapHistoricoService, que todavía no se migró.
 /// </summary>
 [ApiController]
 [Authorize(Roles = "AdminTarifas,CoordinadorFletes,Admin")]

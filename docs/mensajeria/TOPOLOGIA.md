@@ -124,7 +124,7 @@ Mensajeria/AlertaDeFalloConsumer.cs`):
 4. Envía un correo por destinatario vía `ICorreoPort`/`SmtpCorreoAdapter` —
    el mismo adaptador que ya usa Cotizaciones, movido a `Application/Common/
    Ports` porque ahora lo consume más de un módulo (mismo criterio ya usado
-   con `IPropuestaTarifaPort`/`IAuditoriaPort`, ver `MIGRACION.md`).
+   con `IPropuestaTarifaPort`/`IAuditoriaPort`).
 
 No reemplaza a `FalloDeCosteoConsumer` (que sigue existiendo, específico de
 `CostearLineaSolicitada`, y convierte el fallo en un desenlace de NEGOCIO

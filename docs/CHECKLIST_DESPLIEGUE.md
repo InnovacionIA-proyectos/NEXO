@@ -59,9 +59,7 @@ DECISIONES_TECNICAS.md` sección 3 y `cubicador/README.md`).
 
 **Kevin Cano (@kcano-ux).** Ninguna otra iniciativa de este repo enciende esta
 compuerta por defecto — el cierre de CORS y rotación de claves de Cubicador
-(sección 2) explícitamente la dejó enlazada, sin ejecutar. Ver `PENDIENTES.md`, sección "Encendido de la
-función de plan de cargue", para el detalle completo de la decisión
-original.
+(sección 2) explícitamente la dejó enlazada, sin ejecutar.
 
 ### Encendido confirmado (2026-09-14)
 

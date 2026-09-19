@@ -15,7 +15,7 @@ public interface IPropuestaTarifaPort
     /// Piso SICE-TAC del viaje VACÍO desde la ciudad de levante del contenedor hasta
     /// el origen del cargue (aprovisionamiento, Res. 16075). Null si el DW no está
     /// configurado o no hay tarifa para la ruta. Lo usa Captura de Solicitudes
-    /// (módulo aún no migrado — ver PENDIENTES.md); el puerto ya queda listo.
+    /// (módulo aún no migrado —); el puerto ya queda listo.
     /// </summary>
     Task<clsCandidatoTarifaDto?> EstimarAprovisionamientoAsync(
         string ciudadLevante, string origen, string? configuracion, CancellationToken ct = default);

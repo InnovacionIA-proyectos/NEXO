@@ -1,7 +1,7 @@
 # Migración pendiente: prefijo `tbl_` en las tablas
 
 El código ya quedó listo (`clsNexoDbContext.cs` usa `.ToTable("tbl_...")` en las 24
-tablas propias) y el DDL de referencia (`ESQUEMA_NEXO.sql`, `DDL_NEXO_18-SEP.txt`) ya
+tablas propias) y el DDL de referencia (`ESQUEMA_NEXO.sql`) ya
 refleja los nombres nuevos. Falta generar la migración de EF Core, porque este entorno
 no tiene el SDK de .NET para correr `dotnet ef`.
 

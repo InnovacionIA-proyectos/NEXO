@@ -21,7 +21,7 @@ crear plan desde línea).
 **Nota sobre el puente hacia NEXO** (actualizado 2026-09-02): el endpoint que
 NEXO expone para "crear plan desde línea" (`GET /api/lineas-solicitud/{id}
 /cubicacion`) ya está implementado y verificado en el NEXO real
-(`LineasSolicitudCubicacionController`, ver `PENDIENTES.md` y
+(`LineasSolicitudCubicacionController`, ver
 `docs/testDocumentation/PRUEBAS_DE_INTEGRACION.md` sección 2.9). Hubo un
 primer intento en una rama vieja del repo de NEXO (`cubicador`) que nunca se
 mezcló y quedó descolgada — ese diseño es el que se portó a la
@@ -205,7 +205,7 @@ endpoint. Verificado con 6 tests de integración HTTP contra SQL Server real
 cruzando los dos stacks en Docker: `POST /desde-linea/{id}` → RabbitMQ →
 worker → `GET .../cubicacion` (200) → plan armado con el vehículo sugerido
 por el cubicador rápido → optimizado, 3/3 unidades cargadas. Detalle
-completo en `cubicador/CONTRATO.md` sección 7 y en `NEXO/PENDIENTES.md`.
+completo en `cubicador/CONTRATO.md` sección 7.
 
 ## CI
 

@@ -28,8 +28,8 @@ namespace Nexo.Infrastructure.Biblioteca.Adaptadores;
 /// fuentes de la Biblioteca —piso SICE-TAC (DWSice), tarifas de plaza SAP e
 /// histórico SAP— y propone el valor MÁS ALTO. Portado 1:1 desde
 /// Nexo.Api/Services/PropuestaTarifaService.cs del proyecto original.
-/// Reemplaza a PropuestaTarifaNoMigradaAdapter (ver PENDIENTES.md/MIGRACION.md):
-/// cierra el bloqueo de "Aplicar propuestas" en Cotizaciones.
+/// Reemplaza a PropuestaTarifaNoMigradaAdapter: cierra el bloqueo de
+/// "Aplicar propuestas" en Cotizaciones.
 ///
 /// Los cargues masivos se procesan en PARALELO con scope propio de DbContext por
 /// trabajador (los contextos no son thread-safe), concurrencia limitada.

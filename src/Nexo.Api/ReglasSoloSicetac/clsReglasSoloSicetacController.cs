@@ -13,7 +13,7 @@ namespace Nexo.Api.ReglasSoloSicetac;
 /// Rutas "solo SICE-TAC" que demarca el Administrador de Fletes: origen + destino +
 /// tipo de vehículo. Las solicitudes que hagan match se cotizan exclusivamente con el
 /// piso SICE-TAC y se auto-costean hacia el comercial (esa parte vive en Biblioteca,
-/// todavía no migrada — ver PENDIENTES.md).
+/// todavía no migrada).
 /// </summary>
 [ApiController]
 [Authorize(Roles = "AdminTarifas,Admin")]

@@ -31,7 +31,7 @@ namespace Nexo.Infrastructure.Biblioteca.Adaptadores;
 /// consultas EF: la lógica está indisolublemente ligada a la forma de las
 /// tablas SAP/DW (IQueryable dinámico según catálogos resueltos en runtime).
 /// Separarla en Application obligaría a exponer un "mini-ORM" de puertos sin
-/// beneficio real — ver MIGRACION.md, sección Biblioteca.
+/// beneficio real.
 /// </summary>
 public sealed class clsTarifarioSapAdapter : ITarifarioSapPort
 {
