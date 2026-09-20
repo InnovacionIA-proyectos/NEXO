@@ -69,7 +69,7 @@ public record clsLineaCosteoDto(
     string? TipoVehiculo, string? Carroceria, IReadOnlyList<clsPosicionCargaDto> Posiciones,
     clsPisoSicetacDto? PisoSicetac, IReadOnlyList<clsHistoricaSugeridaDto> Historicas);
 
-public record clsSolicitudCosteoDto(clsSolicitudDto clsSolicitud, clsTiemposLogisticosDto Tiempos, IReadOnlyList<clsLineaCosteoDto> Lineas);
+public record clsSolicitudCosteoDto(clsSolicitudDto Solicitud, clsTiemposLogisticosDto Tiempos, IReadOnlyList<clsLineaCosteoDto> Lineas);
 
 /// <summary>Resultado de la captura, incluido el auto-costeo con la Biblioteca.</summary>
 public record clsCapturaResultDto(

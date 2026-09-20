@@ -109,15 +109,15 @@ public static class clsMensajeriaDependencyInjection
             // por defecto).
             x.AddConsumer<clsPlanDeCargueGeneradoConsumer>();
             x.AddConsumer<clsCubicacionRechazadaConsumer>();
-            x.AddConsumer<clsAlertaDeFalloConsumer<clsPlanDeCargueGenerado>>();
-            x.AddConsumer<clsAlertaDeFalloConsumer<clsCubicacionRechazada>>();
+            x.AddConsumer<clsAlertaDeFalloConsumer<PlanDeCargueGenerado>>();
+            x.AddConsumer<clsAlertaDeFalloConsumer<CubicacionRechazada>>();
 
             // Catálogo de vehículos - mismo puente, misma tubería. Un solo consumer
             // atiende los 2 tipos (ver clsVehiculoCatalogoConsumer), pero MassTransit
             // igual necesita un AddConsumer<T> y un Fault<T> por MENSAJE.
             x.AddConsumer<clsVehiculoCatalogoConsumer>();
-            x.AddConsumer<clsAlertaDeFalloConsumer<clsVehiculoCreado>>();
-            x.AddConsumer<clsAlertaDeFalloConsumer<clsVehiculoActualizado>>();
+            x.AddConsumer<clsAlertaDeFalloConsumer<VehiculoCreado>>();
+            x.AddConsumer<clsAlertaDeFalloConsumer<VehiculoActualizado>>();
 
             // Refresca el score persistido de las activas cuando la cadena de
             // priorización lo pide. La excepción sube: si esto deja de correr, los

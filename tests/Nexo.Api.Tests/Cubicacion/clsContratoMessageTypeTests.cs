@@ -95,7 +95,7 @@ public class clsContratoMessageTypeTests
     [Fact]
     public void El_namespace_del_urn_es_el_mismo_en_los_dos_lados()
     {
-        var enCSharp = typeof(Nexo.Mensajes.Cubicacion.clsPlanDeCargueGenerado).Namespace;
+        var enCSharp = typeof(Nexo.Mensajes.Cubicacion.PlanDeCargueGenerado).Namespace;
 
         Assert.Equal(enCSharp, NamespaceQueUsaCubicador());
     }

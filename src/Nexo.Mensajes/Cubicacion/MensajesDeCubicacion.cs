@@ -39,7 +39,7 @@ namespace Nexo.Mensajes.Cubicacion;
 /// mensaje.
 /// </summary>
 public sealed record clsCubicacionSolicitada(
-    string Tipo, string PlanId, string CorrelationId, object clsSolicitud);
+    string Tipo, string PlanId, string CorrelationId, object Solicitud);
 
 /// <summary>Payload de "optimizar" y de "reoptimizar".</summary>
 public sealed record clsSolicitudDeCubicacion(
@@ -176,7 +176,7 @@ public sealed record clsAjustarColocacionInput(
 /// worker/main.py::_ejecutar_solicitud) — los vehículos 2..N no llegan acá. Ver la nota
 /// completa en <see cref="Application.CasosDeUso.PlanDeCargue.clsCrearPlanDesdeLineaCommand"/>.
 /// </summary>
-public sealed record clsPlanDeCargueGenerado(string CorrelationId, string PlanId, clsResultadoDeCubicacion Resultado);
+public sealed record PlanDeCargueGenerado(string CorrelationId, string PlanId, clsResultadoDeCubicacion Resultado);
 
 public sealed record clsResultadoDeCubicacion(
     clsPlanCargueEvento Plan,
@@ -223,7 +223,7 @@ public sealed record clsIncidenciaValidacionEvento(
 /// Evento entrante: Cubicador -> NEXO, routing key `cubicacion.rechazada`.
 /// Mismo shape que publica `RabbitMqEventosPublisher.publicar_cubicacion_rechazada`.
 /// </summary>
-public sealed record clsCubicacionRechazada(string CorrelationId, string PlanId, string Codigo, string Mensaje);
+public sealed record CubicacionRechazada(string CorrelationId, string PlanId, string Codigo, string Mensaje);
 
 // ---------------------------------------------------------------------------------
 // Catálogo de vehículos. Cubicador es la fuente de verdad (ver
@@ -234,11 +234,11 @@ public sealed record clsCubicacionRechazada(string CorrelationId, string PlanId,
 
 /// <summary>Evento entrante: Cubicador -> NEXO, routing key `vehiculo.creado` — publicado
 /// cuando `guardar_vehiculo` crea una fila nueva (Id no existía antes).</summary>
-public sealed record clsVehiculoCreado(string CorrelationId, clsVehiculoCubicacionEvento Vehiculo);
+public sealed record VehiculoCreado(string CorrelationId, clsVehiculoCubicacionEvento Vehiculo);
 
 /// <summary>Evento entrante: Cubicador -> NEXO, routing key `vehiculo.actualizado` —
 /// publicado cuando `guardar_vehiculo` actualiza una fila existente.</summary>
-public sealed record clsVehiculoActualizado(string CorrelationId, clsVehiculoCubicacionEvento Vehiculo);
+public sealed record VehiculoActualizado(string CorrelationId, clsVehiculoCubicacionEvento Vehiculo);
 
 /// <summary>Evento entrante: Cubicador -> NEXO, routing key `vehiculo.eliminado` —
 /// publicado cuando `eliminar_vehiculo` borra la fila de verdad (si Cubicador rechaza
@@ -251,7 +251,7 @@ public sealed record clsVehiculoActualizado(string CorrelationId, clsVehiculoCub
 ///
 /// Solo lleva el id, no el <see cref="clsVehiculoCubicacionEvento"/> completo: no hay nada
 /// que proyectar, solo una fila que borrar.</summary>
-public sealed record clsVehiculoEliminado(string CorrelationId, string VehiculoId);
+public sealed record VehiculoEliminado(string CorrelationId, string VehiculoId);
 
 public sealed record clsVehiculoCubicacionEvento(
     string Id, string Nombre, string? Descripcion,

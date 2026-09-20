@@ -50,7 +50,7 @@ public sealed class clsCubicacionSolicitadaValidador : IValidadorDeMensaje<clsCu
             return motivos;
         }
 
-        if (mensaje.clsSolicitud is null)
+        if (mensaje.Solicitud is null)
         {
             motivos.Add($"clsSolicitud no puede ser nula para Tipo '{mensaje.Tipo}'.");
             return motivos;
@@ -59,37 +59,37 @@ public sealed class clsCubicacionSolicitadaValidador : IValidadorDeMensaje<clsCu
         switch (mensaje.Tipo)
         {
             case "optimizar":
-                ValidarOptimizar(mensaje.clsSolicitud, motivos);
+                ValidarOptimizar(mensaje.Solicitud, motivos);
                 break;
             case "crear_plan":
-                ValidarCrearPlan(mensaje.clsSolicitud, motivos);
+                ValidarCrearPlan(mensaje.Solicitud, motivos);
                 break;
             case "crear_plan_demo":
-                ExigirTipo<clsCrearPlanDemoInput>(mensaje.clsSolicitud, "crear_plan_demo", motivos);
+                ExigirTipo<clsCrearPlanDemoInput>(mensaje.Solicitud, "crear_plan_demo", motivos);
                 break;
             case "crear_desde_linea":
-                ValidarCrearDesdeLinea(mensaje.clsSolicitud, motivos);
+                ValidarCrearDesdeLinea(mensaje.Solicitud, motivos);
                 break;
             case "guardar_vehiculo":
-                ValidarGuardarVehiculo(mensaje.clsSolicitud, motivos);
+                ValidarGuardarVehiculo(mensaje.Solicitud, motivos);
                 break;
             case "guardar_item":
-                ValidarGuardarItem(mensaje.clsSolicitud, "clsSolicitud", motivos);
+                ValidarGuardarItem(mensaje.Solicitud, "clsSolicitud", motivos);
                 break;
             case "importar_items":
-                ValidarImportarItems(mensaje.clsSolicitud, motivos);
+                ValidarImportarItems(mensaje.Solicitud, motivos);
                 break;
             case "eliminar_item":
-                ValidarEliminarItem(mensaje.clsSolicitud, motivos);
+                ValidarEliminarItem(mensaje.Solicitud, motivos);
                 break;
             case "eliminar_plan":
-                ExigirTipo<clsEliminarPlanInput>(mensaje.clsSolicitud, "eliminar_plan", motivos);
+                ExigirTipo<clsEliminarPlanInput>(mensaje.Solicitud, "eliminar_plan", motivos);
                 break;
             case "eliminar_vehiculo":
-                ExigirTipo<clsEliminarVehiculoInput>(mensaje.clsSolicitud, "eliminar_vehiculo", motivos);
+                ExigirTipo<clsEliminarVehiculoInput>(mensaje.Solicitud, "eliminar_vehiculo", motivos);
                 break;
             case "ajustar_colocacion":
-                ValidarAjustarColocacion(mensaje.clsSolicitud, motivos);
+                ValidarAjustarColocacion(mensaje.Solicitud, motivos);
                 break;
         }
 

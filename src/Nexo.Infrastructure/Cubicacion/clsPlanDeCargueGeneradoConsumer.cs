@@ -33,11 +33,11 @@ namespace Nexo.Infrastructure.Cubicacion;
 /// </summary>
 public sealed class clsPlanDeCargueGeneradoConsumer(
     clsNexoDbContext db, INotificadorDePlanCargue avisos, ILogger<clsPlanDeCargueGeneradoConsumer> log)
-    : IConsumer<clsPlanDeCargueGenerado>
+    : IConsumer<PlanDeCargueGenerado>
 {
     private static readonly JsonSerializerOptions JsonCamelCase = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 
-    public async Task Consume(ConsumeContext<clsPlanDeCargueGenerado> context)
+    public async Task Consume(ConsumeContext<PlanDeCargueGenerado> context)
     {
         var mensaje = context.Message;
         if (!Guid.TryParse(mensaje.PlanId, out var planId)) return;

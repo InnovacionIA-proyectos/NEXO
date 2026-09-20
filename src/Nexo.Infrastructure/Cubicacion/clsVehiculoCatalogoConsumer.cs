@@ -22,15 +22,15 @@ namespace Nexo.Infrastructure.Cubicacion;
 /// propio evento.
 /// </summary>
 public sealed class clsVehiculoCatalogoConsumer(clsNexoDbContext db)
-    : IConsumer<clsVehiculoCreado>, IConsumer<clsVehiculoActualizado>, IConsumer<clsVehiculoEliminado>
+    : IConsumer<VehiculoCreado>, IConsumer<VehiculoActualizado>, IConsumer<VehiculoEliminado>
 {
-    public async Task Consume(ConsumeContext<clsVehiculoCreado> context)
+    public async Task Consume(ConsumeContext<VehiculoCreado> context)
     {
         await clsVehiculoProyeccion.UpsertAsync(db, context.Message.Vehiculo, context.CancellationToken);
         await db.SaveChangesAsync(context.CancellationToken);
     }
 
-    public async Task Consume(ConsumeContext<clsVehiculoActualizado> context)
+    public async Task Consume(ConsumeContext<VehiculoActualizado> context)
     {
         await clsVehiculoProyeccion.UpsertAsync(db, context.Message.Vehiculo, context.CancellationToken);
         await db.SaveChangesAsync(context.CancellationToken);
@@ -46,7 +46,7 @@ public sealed class clsVehiculoCatalogoConsumer(clsNexoDbContext db)
     /// reintentos y DLQ un mensaje que no tiene nada que arreglar — mismo criterio que
     /// el upsert de arriba, que también es idempotente por construcción.
     /// </summary>
-    public async Task Consume(ConsumeContext<clsVehiculoEliminado> context)
+    public async Task Consume(ConsumeContext<VehiculoEliminado> context)
     {
         var id = Guid.Parse(context.Message.VehiculoId);
         var vehiculo = await db.VehiculosCubicacion.FirstOrDefaultAsync(v => v.Id == id, context.CancellationToken);

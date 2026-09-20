@@ -16,9 +16,9 @@ namespace Nexo.Infrastructure.Cubicacion;
 /// </summary>
 public sealed class clsCubicacionRechazadaConsumer(
     clsNexoDbContext db, INotificadorDePlanCargue avisos, ILogger<clsCubicacionRechazadaConsumer> log)
-    : IConsumer<clsCubicacionRechazada>
+    : IConsumer<CubicacionRechazada>
 {
-    public async Task Consume(ConsumeContext<clsCubicacionRechazada> context)
+    public async Task Consume(ConsumeContext<CubicacionRechazada> context)
     {
         var mensaje = context.Message;
         if (!Guid.TryParse(mensaje.PlanId, out var planId)) return;

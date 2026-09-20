@@ -26,7 +26,7 @@ public record clsCotizacionDto(
     IReadOnlyList<clsCotizacionConexoDto> Conexos);
 
 /// <summary>Resultado de aplicar las propuestas de la Biblioteca como fletes por defecto.</summary>
-public record clsAplicarPropuestasResultDto(clsCotizacionDto clsCotizacion, int Agregadas);
+public record clsAplicarPropuestasResultDto(clsCotizacionDto Cotizacion, int Agregadas);
 
 /// <summary>
 /// Resultado de entregar la cotización.

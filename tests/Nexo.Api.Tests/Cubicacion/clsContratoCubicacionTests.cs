@@ -97,7 +97,7 @@ public class clsContratoCubicacionTests
             }}
             """;
 
-        var evento = JsonSerializer.Deserialize<clsPlanDeCargueGenerado>(json, Opciones);
+        var evento = JsonSerializer.Deserialize<PlanDeCargueGenerado>(json, Opciones);
 
         Assert.NotNull(evento);
         Assert.Equal("abc-123", evento.PlanId);
@@ -122,7 +122,7 @@ public class clsContratoCubicacionTests
             {"correlationId": "abc-123", "planId": "abc-123", "codigo": "PLAN_NO_ENCONTRADO", "mensaje": "Plan de cargue no encontrado."}
             """;
 
-        var evento = JsonSerializer.Deserialize<clsCubicacionRechazada>(json, Opciones);
+        var evento = JsonSerializer.Deserialize<CubicacionRechazada>(json, Opciones);
 
         Assert.NotNull(evento);
         Assert.Equal("abc-123", evento.PlanId);
@@ -144,7 +144,7 @@ public class clsContratoCubicacionTests
         // Copiado literal de RabbitMqEventosPublisher.publicar_vehiculo_creado (issue #110).
         var json = $$"""{"correlationId": "veh-1", "vehiculo": {{VehiculoJson}}}""";
 
-        var evento = JsonSerializer.Deserialize<clsVehiculoCreado>(json, Opciones);
+        var evento = JsonSerializer.Deserialize<VehiculoCreado>(json, Opciones);
 
         Assert.NotNull(evento);
         Assert.Equal("veh-1", evento.CorrelationId);
@@ -159,7 +159,7 @@ public class clsContratoCubicacionTests
         // Copiado literal de RabbitMqEventosPublisher.publicar_vehiculo_actualizado (issue #110).
         var json = $$"""{"correlationId": "veh-1", "vehiculo": {{VehiculoJson}}}""";
 
-        var evento = JsonSerializer.Deserialize<clsVehiculoActualizado>(json, Opciones);
+        var evento = JsonSerializer.Deserialize<VehiculoActualizado>(json, Opciones);
 
         Assert.NotNull(evento);
         Assert.Equal("veh-1", evento.CorrelationId);
@@ -174,7 +174,7 @@ public class clsContratoCubicacionTests
         // nada que proyectar, solo una fila que borrar.
         const string json = """{"correlationId": "veh-1", "vehiculoId": "veh-1"}""";
 
-        var evento = JsonSerializer.Deserialize<clsVehiculoEliminado>(json, Opciones);
+        var evento = JsonSerializer.Deserialize<VehiculoEliminado>(json, Opciones);
 
         Assert.NotNull(evento);
         Assert.Equal("veh-1", evento.CorrelationId);
