@@ -45,7 +45,7 @@ public record clsAplicarPropuestasResultDto(clsCotizacionDto clsCotizacion, int 
 /// <param name="EstadoNotificacion">Hoy siempre "encolada". Es lo único cierto al responder.</param>
 /// <param name="Mensaje">clsTexto para mostrar a quien entregó.</param>
 public record clsEntregarCotizacionResultDto(
-    clsCotizacionDto clsCotizacion,
+    clsCotizacionDto Cotizacion,
     string EstadoNotificacion,
     string Mensaje);
 

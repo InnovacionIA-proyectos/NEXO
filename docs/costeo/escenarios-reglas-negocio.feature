@@ -69,7 +69,7 @@ Característica: Reglas de negocio del costeo verificadas contra datos reales en
 
   # --------------------------------------------------------- ganada archiva tarifa
   # Evidencia real: confirmado en las 54 cotizaciones reales marcadas
-  # "Ganada" en `dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.cotizaciones`
+  # "Ganada" en `dbInformesAutomatizados_Pruebas.db_NEXO.cotizaciones`
   # — las 54 con exactamente 1 tarifa histórica por línea, 0 desincronizadas.
 
   @ganada-archiva-tarifa

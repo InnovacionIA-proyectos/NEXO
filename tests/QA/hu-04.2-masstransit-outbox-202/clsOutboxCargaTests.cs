@@ -46,7 +46,7 @@ public class clsOutboxCargaTests : IAsyncLifetime
         await db.Database.MigrateAsync();
         // ExecuteDeleteAsync en vez de SQL crudo: un "DELETE FROM OutboxMessage" sin
         // calificar asume esquema 'dbo', y dejó de ser cierto desde que
-        // clsNexoDbContext fijó HasDefaultSchema("dbo_NEXO_prueba") (issue #92).
+        // clsNexoDbContext fijó HasDefaultSchema("db_NEXO") (issue #92).
         await db.Set<OutboxMessage>().ExecuteDeleteAsync();
 
         _bus = _servicios.GetRequiredService<ITestHarness>();

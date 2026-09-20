@@ -1,0 +1,6 @@
+﻿PID de este proceso PowerShell: 22816
+Directorio actual: C:\Users\ivasco\Desktop\PROYECTOS-INNOVACION\NEXO
+Existe .env: True
+Claves leidas de .env: 46
+TEST_DB_CONNECTION (en esta sesion) = 
+TEST_DB_CONNECTION visto desde un proceso hijo = En línea: 1 Carácter: 46 + $env:TEST_DB_CONNECTION -replace (Password=)[^;]*, `$1*** +                                              ~ Falta una expresión de índice de matriz o no es válida. En línea: 1 Carácter: 46 + $env:TEST_DB_CONNECTION -replace (Password=)[^;]*, `$1*** +                                              ~ Token '^' inesperado en la expresión o la instrucción.     + CategoryInfo          : ParserError: (:) [], ParentContainsErrorRecordException     + FullyQualifiedErrorId : MissingArrayIndexExpression  

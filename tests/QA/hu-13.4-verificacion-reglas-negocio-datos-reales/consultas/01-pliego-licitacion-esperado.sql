@@ -333,7 +333,7 @@ WHERE NOMBRERUTA = 'NEIVA HUILA - BOGOTA BOGOTA D. C.'
 
 -- ============================================================
 -- PARTE C — Regla 3 (solo SICE-TAC): ¿alguna de las 15 rutas del pliego
--- tiene la regla activa? (base: dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba)
+-- tiene la regla activa? (base: dbInformesAutomatizados_Pruebas.db_NEXO)
 --
 -- Resultado: ninguna de las 15 rutas coincide. El sistema tiene 3 reglas
 -- "solo SICE-TAC" configuradas (Medellín->Bogotá 3S3, Cali->Medellín 3S3,

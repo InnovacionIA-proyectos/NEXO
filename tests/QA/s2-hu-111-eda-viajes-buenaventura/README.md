@@ -8,18 +8,18 @@
 La primera revisión de esta rama encontró que traía una migración de EF
 (`QuitarNolockVistasAnalitica`, de un commit temprano y no relacionado con el
 EDA) que todavía apuntaba al esquema `dbo` de antes del rename a
-`dbo_NEXO_prueba` (PR #90/#93/#95) — la rama tenía 59 commits de atraso. Verificado
+`db_NEXO` (PR #90/#93/#95) — la rama tenía 59 commits de atraso. Verificado
 empíricamente que **reventaba** contra el `QA` actual con
 `Invalid object name 'dbo.clientes'`. Reportado al responsable (comentario en el
 PR), quien renombró y corrigió la migración
 (`20260910231344_QuitarNolockVistasAnaliticaDboNexoPrueba`, apunta correctamente a
-`dbo_NEXO_prueba.*`).
+`db_NEXO.*`).
 
 **Verificación de la corrección:** se hizo un merge real de `QA` sobre la rama (sin
 conflictos, sin archivos perdidos — confirmado con `git diff --diff-filter=D`), y se
 aplicaron TODAS las migraciones (las de `QA` + esta nueva) contra una base de
 pruebas limpia con `dotnet ef database update`. Aplicaron las 29 sin error. La
-vista `analitica.clientes` quedó correcta (`FROM dbo_NEXO_prueba.clientes`, sin
+vista `analitica.clientes` quedó correcta (`FROM db_NEXO.clientes`, sin
 `WITH (NOLOCK)`) y es consultable sin error. Script de verificación, ya probado
 contra una base real:
 [`verify-migracion-analitica-sin-nolock.sql`](verify-migracion-analitica-sin-nolock.sql)

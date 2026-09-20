@@ -21,7 +21,8 @@ public static class clsDataSeeder
     {
         if (await db.Clientes.AnyAsync()) return false; // ya sembrado
 
-        var parametros = await db.clsParametrosScore.AsNoTracking().FirstAsync();
+        var parametros = await db.clsParametrosScore.AsNoTracking().FirstOrDefaultAsync()
+            ?? new clsParametrosScore(); // fila singleton aun no creada en esta base (ver clsApiFixture)
         var now = DateTimeOffset.UtcNow;
 
         // ----------------------------------------------------------------- Usuarios (11)

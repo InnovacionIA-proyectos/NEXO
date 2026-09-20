@@ -38,7 +38,7 @@ Acceso a datos reales: `sqlcmd` (Windows Auth, `-C` para el certificado
 interno) permite conexión directa desde este entorno a **3 bases**, todas en
 el servidor `tbsdatacenter`: **`dbSolucionesTI`** (tarifa SAP — usada para
 casi todas las consultas de plaza de esta sesión), y **`dbInformesAutomatizados_Pruebas`**,
-schema `dbo_NEXO_prueba` (la base propia de la app Nexo — usada para
+schema `db_NEXO` (la base propia de la app Nexo — usada para
 verificar Reglas 3, 5, 6 y 7 directamente). **`DWSice`** (piso SICE-TAC) vive
 en otro servidor al que no se encontró acceso directo; esas consultas las
 corrió el usuario por su conexión `consultascubos` en DBeaver. Las consultas
@@ -72,7 +72,7 @@ que la reconstrucción manual porque ejercita el código real de punta a punta
    — documento único y final (consolida lo que antes eran varios archivos de
    diagnóstico 07b-07h, ya eliminados): Parte A (tarifa de plaza SAP, 15
    líneas), Parte B (piso SICE-TAC, 15 líneas), Parte C (regla "solo
-   SICE-TAC" — ya corrida contra `dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba.reglas_solo_sicetac`:
+   SICE-TAC" — ya corrida contra `dbInformesAutomatizados_Pruebas.db_NEXO.reglas_solo_sicetac`:
    existen 3 reglas configuradas, ninguna coincide con las 15 líneas del
    pliego). Cada consulta trae su resultado real ya documentado como
    comentario.

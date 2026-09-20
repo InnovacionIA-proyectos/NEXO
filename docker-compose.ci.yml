@@ -101,5 +101,65 @@ services:
       - --filter
       - Categoria=Integracion
 
+  # Corre la suite de tests LOCALMENTE contra la base REAL corporativa
+  # (dbInformesAutomatizados_Pruebas, esquema db_NEXO — la misma que usa la app
+  # en dev/producción) en vez de una SQL Server efímera, porque acá se necesita
+  # validar comportamiento real, no solo contra una base recién creada y vacía.
+  #
+  # Diferencias contra 'pruebas'/'pruebas-integracion' de arriba:
+  #   - NO depende de db-pruebas: no hay SQL Server efímero en este servicio.
+  #   - NO se une a la red aislada 'ci': necesita salir a la red corporativa/VPN
+  #     para alcanzar 10.10.40.85 (el default network de Compose ya permite
+  #     salida NAT, igual que el host).
+  #   - TEST_DB_MIGRATE_ON_STARTUP se deja SIN DEFINIR a propósito (ver
+  #     clsApiFixture.cs): el login de pruebas (userInformesOw) no tiene
+  #     permisos DDL y no debe tenerlos — si el esquema no está desplegado,
+  #     los tests deben fallar con un error de SQL claro, no migrar solos.
+  #   - TEST_DB_CONNECTION toma el mismo valor que ConnectionStrings__Nexo de
+  #     .env: Compose lee ese .env directamente (sin pasar por ninguna shell/
+  #     PowerShell), así que no hay riesgo de que la variable no propague.
+  #
+  #   docker compose -f docker-compose.ci.yml build && \
+  #   docker compose -f docker-compose.ci.yml run --rm pruebas-reales
+  pruebas-reales:
+    image: nexo-ci:local
+    environment:
+      TEST_DB_CONNECTION: ${ConnectionStrings__Nexo}
+      ConnectionStrings__DwSice: ${ConnectionStrings__DwSice}
+      ConnectionStrings__DbSolucionesTi: ${ConnectionStrings__DbSolucionesTi}
+      ConnectionStrings__DwCubos: ${ConnectionStrings__DwCubos}
+      ConnectionStrings__IdentidadPortal: ${ConnectionStrings__IdentidadPortal}
+    command:
+      - dotnet
+      - test
+      - tests/Nexo.Api.Tests
+      - -c
+      - Release
+      - --no-restore
+
+  # Igual que 'pruebas-reales' de arriba (misma base corporativa, mismo motivo
+  # para no migrar el esquema), pero sobre TODA la solucion en vez de solo
+  # Nexo.Api.Tests - para cuando se necesita correr localmente la suite
+  # completa contra datos reales, no solo la de integracion de la API.
+  #
+  #   docker compose -f docker-compose.ci.yml build && \
+  #   docker compose -f docker-compose.ci.yml run --rm pruebas-reales-completas
+  pruebas-reales-completas:
+    image: nexo-ci:local
+    environment:
+      TEST_DB_CONNECTION: ${ConnectionStrings__Nexo}
+      ConnectionStrings__DwSice: ${ConnectionStrings__DwSice}
+      ConnectionStrings__DbSolucionesTi: ${ConnectionStrings__DbSolucionesTi}
+      ConnectionStrings__DwCubos: ${ConnectionStrings__DwCubos}
+      ConnectionStrings__IdentidadPortal: ${ConnectionStrings__IdentidadPortal}
+    command:
+      - dotnet
+      - test
+      - Nexo.Clean.sln
+      - -c
+      - Release
+      - --no-restore
+
+
 networks:
   ci:

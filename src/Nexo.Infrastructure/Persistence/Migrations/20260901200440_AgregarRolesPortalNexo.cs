@@ -14,7 +14,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.InsertData(
-                schema: "dbo_NEXO_prueba",
+                schema: "db_NEXO",
                 table: "mapeo_rol_portal",
                 columns: new[] { "Id", "CreatedAt", "DescripcionRolPortal", "IdRolPortal", "Rol" },
                 values: new object[,]
@@ -32,37 +32,37 @@ namespace Nexo.Infrastructure.Persistence.Migrations
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DeleteData(
-                schema: "dbo_NEXO_prueba",
+                schema: "db_NEXO",
                 table: "mapeo_rol_portal",
                 keyColumn: "Id",
                 keyValue: new Guid("00000000-0000-0000-0001-000000000004"));
 
             migrationBuilder.DeleteData(
-                schema: "dbo_NEXO_prueba",
+                schema: "db_NEXO",
                 table: "mapeo_rol_portal",
                 keyColumn: "Id",
                 keyValue: new Guid("00000000-0000-0000-0001-000000000005"));
 
             migrationBuilder.DeleteData(
-                schema: "dbo_NEXO_prueba",
+                schema: "db_NEXO",
                 table: "mapeo_rol_portal",
                 keyColumn: "Id",
                 keyValue: new Guid("00000000-0000-0000-0001-000000000006"));
 
             migrationBuilder.DeleteData(
-                schema: "dbo_NEXO_prueba",
+                schema: "db_NEXO",
                 table: "mapeo_rol_portal",
                 keyColumn: "Id",
                 keyValue: new Guid("00000000-0000-0000-0001-000000000007"));
 
             migrationBuilder.DeleteData(
-                schema: "dbo_NEXO_prueba",
+                schema: "db_NEXO",
                 table: "mapeo_rol_portal",
                 keyColumn: "Id",
                 keyValue: new Guid("00000000-0000-0000-0001-000000000008"));
 
             migrationBuilder.DeleteData(
-                schema: "dbo_NEXO_prueba",
+                schema: "db_NEXO",
                 table: "mapeo_rol_portal",
                 keyColumn: "Id",
                 keyValue: new Guid("00000000-0000-0000-0001-000000000009"));

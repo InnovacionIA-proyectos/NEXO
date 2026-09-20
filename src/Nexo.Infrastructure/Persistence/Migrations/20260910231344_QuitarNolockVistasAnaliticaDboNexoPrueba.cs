@@ -7,7 +7,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
     /// <summary>
     /// Reemplaza a `20260901201038_QuitarNolockVistasAnalitica` (commit
     /// cd17068), retirada de esta rama por quedar desactualizada: fue escrita
-    /// antes del rename de esquema `dbo` → `dbo_NEXO_prueba`
+    /// antes del rename de esquema `dbo` → `db_NEXO`
     /// (`clsRecrearVistasAnaliticaEnDboNexoPrueba`, ya en QA) y por eso reventaba
     /// contra QA con "Invalid object name 'dbo.clientes'" — hallazgo de
     /// revisión de código.
@@ -21,7 +21,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
     /// vista con NOLOCK, pero nunca a través de una lectura protegida por
     /// RCSI, sin diferencia de bloqueo entre ambas.
     ///
-    /// Esta migración solo quita `WITH (NOLOCK)`; el esquema (`dbo_NEXO_prueba`,
+    /// Esta migración solo quita `WITH (NOLOCK)`; el esquema (`db_NEXO`,
     /// ya corregido por `clsRecrearVistasAnaliticaEnDboNexoPrueba`) no cambia.
     /// </summary>
     public partial class clsQuitarNolockVistasAnaliticaDboNexoPrueba : Migration
@@ -33,32 +33,32 @@ namespace Nexo.Infrastructure.Persistence.Migrations
                 ALTER VIEW analitica.clientes AS
                 SELECT
                     Id, Nombre, Nit, RazonSocial, CreatedAt, UpdatedAt
-                FROM dbo_NEXO_prueba.clientes;
+                FROM db_NEXO.clientes;
                 """);
 
             migrationBuilder.Sql("""
                 ALTER VIEW analitica.rutas AS
                 SELECT Id, Origen, Destino, CreatedAt, UpdatedAt
-                FROM dbo_NEXO_prueba.rutas;
+                FROM db_NEXO.rutas;
                 """);
 
             migrationBuilder.Sql("""
                 ALTER VIEW analitica.configuraciones_vehiculo AS
                 SELECT Id, TipoVehiculo, Carroceria, RangoPeso, CreatedAt, UpdatedAt
-                FROM dbo_NEXO_prueba.configuraciones_vehiculo;
+                FROM db_NEXO.configuraciones_vehiculo;
                 """);
 
             migrationBuilder.Sql("""
                 ALTER VIEW analitica.servicios_conexos AS
                 SELECT
                     Id, Nombre, Categoria, ValorBase, VigenteHasta, Activo, CreatedAt, UpdatedAt
-                FROM dbo_NEXO_prueba.servicios_conexos;
+                FROM db_NEXO.servicios_conexos;
                 """);
 
             migrationBuilder.Sql("""
                 ALTER VIEW analitica.usuarios AS
                 SELECT Id, Rol, Activo, CreatedAt
-                FROM dbo_NEXO_prueba.usuarios;
+                FROM db_NEXO.usuarios;
                 """);
 
             migrationBuilder.Sql("""
@@ -66,7 +66,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
                 SELECT
                     Id, ClienteId, Tipo, Modalidad, Deadline, ProbabilidadCierre,
                     ValorEstimado, ScorePrioridad, Estado, CreadoPor, CreatedAt, UpdatedAt
-                FROM dbo_NEXO_prueba.solicitudes;
+                FROM db_NEXO.solicitudes;
                 """);
 
             migrationBuilder.Sql("""
@@ -76,7 +76,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
                     ClaseViaje, ClaseContenedor, Exclusivo, Consolidado, RetornaContenedor,
                     LevanteContenedorDiferente, ValorAprovisionamiento, Peso, ValorMercancia,
                     EstadoLinea, CreatedAt, UpdatedAt
-                FROM dbo_NEXO_prueba.lineas_solicitud;
+                FROM db_NEXO.lineas_solicitud;
                 """);
 
             migrationBuilder.Sql("""
@@ -84,7 +84,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
                 SELECT
                     Id, SolicitudId, Estado, Resultado, Total, EntregadaPor, EntregadaAt,
                     CreatedAt, UpdatedAt
-                FROM dbo_NEXO_prueba.cotizaciones;
+                FROM db_NEXO.cotizaciones;
                 """);
 
             migrationBuilder.Sql("""
@@ -92,13 +92,13 @@ namespace Nexo.Infrastructure.Persistence.Migrations
                 SELECT
                     Id, CotizacionId, LineaSolicitudId, ValorFlete, ValorAprovisionamiento,
                     ValorRetornoContenedor, Fuente, CreatedAt, UpdatedAt
-                FROM dbo_NEXO_prueba.cotizacion_lineas;
+                FROM db_NEXO.cotizacion_lineas;
                 """);
 
             migrationBuilder.Sql("""
                 ALTER VIEW analitica.cotizacion_conexos AS
                 SELECT Id, CotizacionId, ServicioConexoId, Cantidad, ValorAplicado, CreatedAt, UpdatedAt
-                FROM dbo_NEXO_prueba.cotizacion_conexos;
+                FROM db_NEXO.cotizacion_conexos;
                 """);
 
             migrationBuilder.Sql("""
@@ -106,69 +106,69 @@ namespace Nexo.Infrastructure.Persistence.Migrations
                 SELECT
                     Id, RutaId, ConfigVehiculoId, Tipologia, Valor, Fecha, CotizacionId,
                     CreatedAt, UpdatedAt
-                FROM dbo_NEXO_prueba.tarifas_historicas;
+                FROM db_NEXO.tarifas_historicas;
                 """);
 
             migrationBuilder.Sql("""
                 ALTER VIEW analitica.audit_log AS
                 SELECT Id, UsuarioId, Entidad, EntidadId, Accion, CreatedAt
-                FROM dbo_NEXO_prueba.audit_log;
+                FROM db_NEXO.audit_log;
                 """);
 
             migrationBuilder.Sql("""
                 ALTER VIEW analitica.inconsistencias AS
                 SELECT 'cotizaciones' AS Entidad, c.Id AS EntidadId,
                     'Entregada sin EntregadaAt o EntregadaPor' AS Motivo
-                FROM dbo_NEXO_prueba.cotizaciones c
+                FROM db_NEXO.cotizaciones c
                 WHERE c.Estado = 'Entregada' AND (c.EntregadaAt IS NULL OR c.EntregadaPor IS NULL)
 
                 UNION ALL
                 SELECT 'cotizaciones', c.Id,
                     'Resultado definido (Ganada/Perdida) sin haber sido entregada'
-                FROM dbo_NEXO_prueba.cotizaciones c
+                FROM db_NEXO.cotizaciones c
                 WHERE c.Resultado <> 'SinDefinir' AND c.Estado <> 'Entregada'
 
                 UNION ALL
                 SELECT 'cotizaciones', c.Id, 'Entregada sin ninguna línea de flete'
-                FROM dbo_NEXO_prueba.cotizaciones c
+                FROM db_NEXO.cotizaciones c
                 WHERE c.Estado = 'Entregada'
-                  AND NOT EXISTS (SELECT 1 FROM dbo_NEXO_prueba.cotizacion_lineas cl WHERE cl.CotizacionId = c.Id)
+                  AND NOT EXISTS (SELECT 1 FROM db_NEXO.cotizacion_lineas cl WHERE cl.CotizacionId = c.Id)
 
                 UNION ALL
                 SELECT 'cotizacion_lineas', cl.Id, 'ValorFlete en cero o negativo'
-                FROM dbo_NEXO_prueba.cotizacion_lineas cl
+                FROM db_NEXO.cotizacion_lineas cl
                 WHERE cl.ValorFlete <= 0
 
                 UNION ALL
                 SELECT 'tarifas_historicas', th.Id,
                     'Referencia una cotizacion que no quedo Ganada (contradice el proposito de la tarifa)'
-                FROM dbo_NEXO_prueba.tarifas_historicas th
-                JOIN dbo_NEXO_prueba.cotizaciones c ON c.Id = th.CotizacionId
+                FROM db_NEXO.tarifas_historicas th
+                JOIN db_NEXO.cotizaciones c ON c.Id = th.CotizacionId
                 WHERE c.Resultado <> 'Ganada'
 
                 UNION ALL
                 SELECT 'tarifas_historicas', th.Id, 'Valor en cero o negativo'
-                FROM dbo_NEXO_prueba.tarifas_historicas th
+                FROM db_NEXO.tarifas_historicas th
                 WHERE th.Valor <= 0
 
                 UNION ALL
                 SELECT 'lineas_solicitud', l.Id, 'Sin ruta asignada (RutaId nulo)'
-                FROM dbo_NEXO_prueba.lineas_solicitud l
+                FROM db_NEXO.lineas_solicitud l
                 WHERE l.RutaId IS NULL
 
                 UNION ALL
                 SELECT 'lineas_solicitud', l.Id, 'Peso nulo o en cero'
-                FROM dbo_NEXO_prueba.lineas_solicitud l
+                FROM db_NEXO.lineas_solicitud l
                 WHERE l.Peso IS NULL OR l.Peso <= 0
 
                 UNION ALL
                 SELECT 'solicitudes', s.Id, 'Deadline anterior a la fecha de creacion'
-                FROM dbo_NEXO_prueba.solicitudes s
+                FROM db_NEXO.solicitudes s
                 WHERE s.Deadline IS NOT NULL AND s.Deadline < s.CreatedAt
 
                 UNION ALL
                 SELECT 'audit_log', a.Id, 'Sin usuario identificado (UsuarioId nulo)'
-                FROM dbo_NEXO_prueba.audit_log a
+                FROM db_NEXO.audit_log a
                 WHERE a.UsuarioId IS NULL;
                 """);
         }
@@ -180,32 +180,32 @@ namespace Nexo.Infrastructure.Persistence.Migrations
                 ALTER VIEW analitica.clientes AS
                 SELECT
                     Id, Nombre, Nit, RazonSocial, CreatedAt, UpdatedAt
-                FROM dbo_NEXO_prueba.clientes WITH (NOLOCK);
+                FROM db_NEXO.clientes WITH (NOLOCK);
                 """);
 
             migrationBuilder.Sql("""
                 ALTER VIEW analitica.rutas AS
                 SELECT Id, Origen, Destino, CreatedAt, UpdatedAt
-                FROM dbo_NEXO_prueba.rutas WITH (NOLOCK);
+                FROM db_NEXO.rutas WITH (NOLOCK);
                 """);
 
             migrationBuilder.Sql("""
                 ALTER VIEW analitica.configuraciones_vehiculo AS
                 SELECT Id, TipoVehiculo, Carroceria, RangoPeso, CreatedAt, UpdatedAt
-                FROM dbo_NEXO_prueba.configuraciones_vehiculo WITH (NOLOCK);
+                FROM db_NEXO.configuraciones_vehiculo WITH (NOLOCK);
                 """);
 
             migrationBuilder.Sql("""
                 ALTER VIEW analitica.servicios_conexos AS
                 SELECT
                     Id, Nombre, Categoria, ValorBase, VigenteHasta, Activo, CreatedAt, UpdatedAt
-                FROM dbo_NEXO_prueba.servicios_conexos WITH (NOLOCK);
+                FROM db_NEXO.servicios_conexos WITH (NOLOCK);
                 """);
 
             migrationBuilder.Sql("""
                 ALTER VIEW analitica.usuarios AS
                 SELECT Id, Rol, Activo, CreatedAt
-                FROM dbo_NEXO_prueba.usuarios WITH (NOLOCK);
+                FROM db_NEXO.usuarios WITH (NOLOCK);
                 """);
 
             migrationBuilder.Sql("""
@@ -213,7 +213,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
                 SELECT
                     Id, ClienteId, Tipo, Modalidad, Deadline, ProbabilidadCierre,
                     ValorEstimado, ScorePrioridad, Estado, CreadoPor, CreatedAt, UpdatedAt
-                FROM dbo_NEXO_prueba.solicitudes WITH (NOLOCK);
+                FROM db_NEXO.solicitudes WITH (NOLOCK);
                 """);
 
             migrationBuilder.Sql("""
@@ -223,7 +223,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
                     ClaseViaje, ClaseContenedor, Exclusivo, Consolidado, RetornaContenedor,
                     LevanteContenedorDiferente, ValorAprovisionamiento, Peso, ValorMercancia,
                     EstadoLinea, CreatedAt, UpdatedAt
-                FROM dbo_NEXO_prueba.lineas_solicitud WITH (NOLOCK);
+                FROM db_NEXO.lineas_solicitud WITH (NOLOCK);
                 """);
 
             migrationBuilder.Sql("""
@@ -231,7 +231,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
                 SELECT
                     Id, SolicitudId, Estado, Resultado, Total, EntregadaPor, EntregadaAt,
                     CreatedAt, UpdatedAt
-                FROM dbo_NEXO_prueba.cotizaciones WITH (NOLOCK);
+                FROM db_NEXO.cotizaciones WITH (NOLOCK);
                 """);
 
             migrationBuilder.Sql("""
@@ -239,13 +239,13 @@ namespace Nexo.Infrastructure.Persistence.Migrations
                 SELECT
                     Id, CotizacionId, LineaSolicitudId, ValorFlete, ValorAprovisionamiento,
                     ValorRetornoContenedor, Fuente, CreatedAt, UpdatedAt
-                FROM dbo_NEXO_prueba.cotizacion_lineas WITH (NOLOCK);
+                FROM db_NEXO.cotizacion_lineas WITH (NOLOCK);
                 """);
 
             migrationBuilder.Sql("""
                 ALTER VIEW analitica.cotizacion_conexos AS
                 SELECT Id, CotizacionId, ServicioConexoId, Cantidad, ValorAplicado, CreatedAt, UpdatedAt
-                FROM dbo_NEXO_prueba.cotizacion_conexos WITH (NOLOCK);
+                FROM db_NEXO.cotizacion_conexos WITH (NOLOCK);
                 """);
 
             migrationBuilder.Sql("""
@@ -253,69 +253,69 @@ namespace Nexo.Infrastructure.Persistence.Migrations
                 SELECT
                     Id, RutaId, ConfigVehiculoId, Tipologia, Valor, Fecha, CotizacionId,
                     CreatedAt, UpdatedAt
-                FROM dbo_NEXO_prueba.tarifas_historicas WITH (NOLOCK);
+                FROM db_NEXO.tarifas_historicas WITH (NOLOCK);
                 """);
 
             migrationBuilder.Sql("""
                 ALTER VIEW analitica.audit_log AS
                 SELECT Id, UsuarioId, Entidad, EntidadId, Accion, CreatedAt
-                FROM dbo_NEXO_prueba.audit_log WITH (NOLOCK);
+                FROM db_NEXO.audit_log WITH (NOLOCK);
                 """);
 
             migrationBuilder.Sql("""
                 ALTER VIEW analitica.inconsistencias AS
                 SELECT 'cotizaciones' AS Entidad, c.Id AS EntidadId,
                     'Entregada sin EntregadaAt o EntregadaPor' AS Motivo
-                FROM dbo_NEXO_prueba.cotizaciones c WITH (NOLOCK)
+                FROM db_NEXO.cotizaciones c WITH (NOLOCK)
                 WHERE c.Estado = 'Entregada' AND (c.EntregadaAt IS NULL OR c.EntregadaPor IS NULL)
 
                 UNION ALL
                 SELECT 'cotizaciones', c.Id,
                     'Resultado definido (Ganada/Perdida) sin haber sido entregada'
-                FROM dbo_NEXO_prueba.cotizaciones c WITH (NOLOCK)
+                FROM db_NEXO.cotizaciones c WITH (NOLOCK)
                 WHERE c.Resultado <> 'SinDefinir' AND c.Estado <> 'Entregada'
 
                 UNION ALL
                 SELECT 'cotizaciones', c.Id, 'Entregada sin ninguna línea de flete'
-                FROM dbo_NEXO_prueba.cotizaciones c WITH (NOLOCK)
+                FROM db_NEXO.cotizaciones c WITH (NOLOCK)
                 WHERE c.Estado = 'Entregada'
-                  AND NOT EXISTS (SELECT 1 FROM dbo_NEXO_prueba.cotizacion_lineas cl WITH (NOLOCK) WHERE cl.CotizacionId = c.Id)
+                  AND NOT EXISTS (SELECT 1 FROM db_NEXO.cotizacion_lineas cl WITH (NOLOCK) WHERE cl.CotizacionId = c.Id)
 
                 UNION ALL
                 SELECT 'cotizacion_lineas', cl.Id, 'ValorFlete en cero o negativo'
-                FROM dbo_NEXO_prueba.cotizacion_lineas cl WITH (NOLOCK)
+                FROM db_NEXO.cotizacion_lineas cl WITH (NOLOCK)
                 WHERE cl.ValorFlete <= 0
 
                 UNION ALL
                 SELECT 'tarifas_historicas', th.Id,
                     'Referencia una cotizacion que no quedo Ganada (contradice el proposito de la tarifa)'
-                FROM dbo_NEXO_prueba.tarifas_historicas th WITH (NOLOCK)
-                JOIN dbo_NEXO_prueba.cotizaciones c WITH (NOLOCK) ON c.Id = th.CotizacionId
+                FROM db_NEXO.tarifas_historicas th WITH (NOLOCK)
+                JOIN db_NEXO.cotizaciones c WITH (NOLOCK) ON c.Id = th.CotizacionId
                 WHERE c.Resultado <> 'Ganada'
 
                 UNION ALL
                 SELECT 'tarifas_historicas', th.Id, 'Valor en cero o negativo'
-                FROM dbo_NEXO_prueba.tarifas_historicas th WITH (NOLOCK)
+                FROM db_NEXO.tarifas_historicas th WITH (NOLOCK)
                 WHERE th.Valor <= 0
 
                 UNION ALL
                 SELECT 'lineas_solicitud', l.Id, 'Sin ruta asignada (RutaId nulo)'
-                FROM dbo_NEXO_prueba.lineas_solicitud l WITH (NOLOCK)
+                FROM db_NEXO.lineas_solicitud l WITH (NOLOCK)
                 WHERE l.RutaId IS NULL
 
                 UNION ALL
                 SELECT 'lineas_solicitud', l.Id, 'Peso nulo o en cero'
-                FROM dbo_NEXO_prueba.lineas_solicitud l WITH (NOLOCK)
+                FROM db_NEXO.lineas_solicitud l WITH (NOLOCK)
                 WHERE l.Peso IS NULL OR l.Peso <= 0
 
                 UNION ALL
                 SELECT 'solicitudes', s.Id, 'Deadline anterior a la fecha de creacion'
-                FROM dbo_NEXO_prueba.solicitudes s WITH (NOLOCK)
+                FROM db_NEXO.solicitudes s WITH (NOLOCK)
                 WHERE s.Deadline IS NOT NULL AND s.Deadline < s.CreatedAt
 
                 UNION ALL
                 SELECT 'audit_log', a.Id, 'Sin usuario identificado (UsuarioId nulo)'
-                FROM dbo_NEXO_prueba.audit_log a WITH (NOLOCK)
+                FROM db_NEXO.audit_log a WITH (NOLOCK)
                 WHERE a.UsuarioId IS NULL;
                 """);
         }

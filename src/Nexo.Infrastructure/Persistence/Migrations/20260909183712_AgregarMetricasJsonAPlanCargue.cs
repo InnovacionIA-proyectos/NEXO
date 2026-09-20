@@ -12,7 +12,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
         {
             migrationBuilder.AddColumn<string>(
                 name: "MetricasJson",
-                schema: "dbo_NEXO_prueba",
+                schema: "db_NEXO",
                 table: "planes_cargue",
                 type: "nvarchar(max)",
                 nullable: true);
@@ -23,7 +23,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
         {
             migrationBuilder.DropColumn(
                 name: "MetricasJson",
-                schema: "dbo_NEXO_prueba",
+                schema: "db_NEXO",
                 table: "planes_cargue");
         }
     }

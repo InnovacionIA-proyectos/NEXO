@@ -12,7 +12,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
         {
             migrationBuilder.AddColumn<string>(
                 name: "MotivoPendiente",
-                schema: "dbo_NEXO_prueba",
+                schema: "db_NEXO",
                 table: "lineas_solicitud",
                 type: "nvarchar(500)",
                 maxLength: 500,
@@ -24,7 +24,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
         {
             migrationBuilder.DropColumn(
                 name: "MotivoPendiente",
-                schema: "dbo_NEXO_prueba",
+                schema: "db_NEXO",
                 table: "lineas_solicitud");
         }
     }

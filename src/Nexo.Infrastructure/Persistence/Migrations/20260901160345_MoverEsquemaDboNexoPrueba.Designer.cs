@@ -20,7 +20,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasDefaultSchema("dbo_NEXO_prueba")
+                .HasDefaultSchema("db_NEXO")
                 .HasAnnotation("ProductVersion", "10.0.0")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
@@ -57,7 +57,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("Entidad", "EntidadId");
 
-                    b.ToTable("audit_log", "dbo_NEXO_prueba");
+                    b.ToTable("audit_log", "db_NEXO");
                 });
 
             modelBuilder.Entity("Nexo.Domain.BibliotecaTarifas.Entidades.clsTarifaHistorica", b =>
@@ -102,7 +102,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("RutaId", "ConfigVehiculoId", "Tipologia");
 
-                    b.ToTable("tarifas_historicas", "dbo_NEXO_prueba");
+                    b.ToTable("tarifas_historicas", "db_NEXO");
                 });
 
             modelBuilder.Entity("Nexo.Domain.BibliotecaTarifas.Entidades.clsTarifaSicetac", b =>
@@ -200,7 +200,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
                     b.HasIndex("Periodo", "OrigenDane", "DestinoDane", "Configuracion", "TipoCarga", "UnidadTransporte", "CondicionCarga")
                         .IsUnique();
 
-                    b.ToTable("tarifas_sicetac", "dbo_NEXO_prueba");
+                    b.ToTable("tarifas_sicetac", "db_NEXO");
                 });
 
             modelBuilder.Entity("Nexo.Domain.Catalogos.Entidades.clsCliente", b =>
@@ -240,7 +240,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
                     b.HasIndex("Nit")
                         .IsUnique();
 
-                    b.ToTable("clientes", "dbo_NEXO_prueba");
+                    b.ToTable("clientes", "db_NEXO");
                 });
 
             modelBuilder.Entity("Nexo.Domain.Catalogos.Entidades.clsConfiguracionVehiculo", b =>
@@ -273,7 +273,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("configuraciones_vehiculo", "dbo_NEXO_prueba");
+                    b.ToTable("configuraciones_vehiculo", "db_NEXO");
                 });
 
             modelBuilder.Entity("Nexo.Domain.Catalogos.Entidades.clsRuta", b =>
@@ -306,7 +306,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
                     b.HasIndex("Origen", "Destino")
                         .IsUnique();
 
-                    b.ToTable("rutas", "dbo_NEXO_prueba");
+                    b.ToTable("rutas", "db_NEXO");
                 });
 
             modelBuilder.Entity("Nexo.Domain.Catalogos.Entidades.clsServicioConexo", b =>
@@ -360,7 +360,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("ActualizadoPor");
 
-                    b.ToTable("servicios_conexos", "dbo_NEXO_prueba");
+                    b.ToTable("servicios_conexos", "db_NEXO");
                 });
 
             modelBuilder.Entity("Nexo.Domain.Costeo.Entidades.clsAjusteVigenciaPlaza", b =>
@@ -399,7 +399,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
                     b.HasIndex("TarifaPlazaId")
                         .IsUnique();
 
-                    b.ToTable("ajustes_vigencia_plaza", "dbo_NEXO_prueba");
+                    b.ToTable("ajustes_vigencia_plaza", "db_NEXO");
                 });
 
             modelBuilder.Entity("Nexo.Domain.Costeo.Entidades.clsReglaSoloSicetac", b =>
@@ -440,7 +440,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
                     b.HasIndex("Origen", "Destino", "TipoVehiculo")
                         .IsUnique();
 
-                    b.ToTable("reglas_solo_sicetac", "dbo_NEXO_prueba");
+                    b.ToTable("reglas_solo_sicetac", "db_NEXO");
                 });
 
             modelBuilder.Entity("Nexo.Domain.Cotizaciones.Entidades.clsCotizacion", b =>
@@ -497,7 +497,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("SolicitudId");
 
-                    b.ToTable("cotizaciones", "dbo_NEXO_prueba");
+                    b.ToTable("cotizaciones", "db_NEXO");
                 });
 
             modelBuilder.Entity("Nexo.Domain.Cotizaciones.Entidades.clsCotizacionConexo", b =>
@@ -533,7 +533,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("ServicioConexoId");
 
-                    b.ToTable("cotizacion_conexos", "dbo_NEXO_prueba");
+                    b.ToTable("cotizacion_conexos", "db_NEXO");
                 });
 
             modelBuilder.Entity("Nexo.Domain.Cotizaciones.Entidades.clsCotizacionLinea", b =>
@@ -577,7 +577,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("LineaSolicitudId");
 
-                    b.ToTable("cotizacion_lineas", "dbo_NEXO_prueba");
+                    b.ToTable("cotizacion_lineas", "db_NEXO");
                 });
 
             modelBuilder.Entity("Nexo.Domain.PlanDeCargue.Entidades.clsColocacionCargue", b =>
@@ -670,7 +670,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("PlanCargueId", "Cargada");
 
-                    b.ToTable("colocaciones_cargue", "dbo_NEXO_prueba");
+                    b.ToTable("colocaciones_cargue", "db_NEXO");
                 });
 
             modelBuilder.Entity("Nexo.Domain.PlanDeCargue.Entidades.clsItemPlanCargue", b =>
@@ -778,7 +778,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("PlanCargueId");
 
-                    b.ToTable("items_plan_cargue", "dbo_NEXO_prueba");
+                    b.ToTable("items_plan_cargue", "db_NEXO");
                 });
 
             modelBuilder.Entity("Nexo.Domain.PlanDeCargue.Entidades.clsPlanCargue", b =>
@@ -856,7 +856,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("VehiculoId");
 
-                    b.ToTable("planes_cargue", "dbo_NEXO_prueba");
+                    b.ToTable("planes_cargue", "db_NEXO");
                 });
 
             modelBuilder.Entity("Nexo.Domain.PlanDeCargue.Entidades.clsVehiculoCubicacion", b =>
@@ -924,7 +924,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("vehiculos_cubicacion", "dbo_NEXO_prueba");
+                    b.ToTable("vehiculos_cubicacion", "db_NEXO");
                 });
 
             modelBuilder.Entity("Nexo.Domain.Priorizacion.Entidades.clsParametrosScore", b =>
@@ -982,7 +982,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("parametros_score", "dbo_NEXO_prueba");
+                    b.ToTable("parametros_score", "db_NEXO");
 
                     b.HasData(
                         new
@@ -1047,7 +1047,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("TrabajoId", "LineaSolicitudId", "Tipo");
 
-                    b.ToTable("lineas_pendientes_de_costeo", "dbo_NEXO_prueba");
+                    b.ToTable("lineas_pendientes_de_costeo", "db_NEXO");
                 });
 
             modelBuilder.Entity("Nexo.Domain.Solicitudes.Entidades.clsLineaSolicitud", b =>
@@ -1141,7 +1141,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("SolicitudId");
 
-                    b.ToTable("lineas_solicitud", "dbo_NEXO_prueba");
+                    b.ToTable("lineas_solicitud", "db_NEXO");
                 });
 
             modelBuilder.Entity("Nexo.Domain.Solicitudes.Entidades.clsSolicitud", b =>
@@ -1213,7 +1213,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("Estado", "ScorePrioridad");
 
-                    b.ToTable("solicitudes", "dbo_NEXO_prueba");
+                    b.ToTable("solicitudes", "db_NEXO");
                 });
 
             modelBuilder.Entity("Nexo.Domain.Usuarios.Entidades.clsMapeoRolPortal", b =>
@@ -1242,7 +1242,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasFilter("[IdRolPortal] IS NOT NULL");
 
-                    b.ToTable("mapeo_rol_portal", "dbo_NEXO_prueba");
+                    b.ToTable("mapeo_rol_portal", "db_NEXO");
 
                     b.HasData(
                         new
@@ -1315,7 +1315,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasFilter("[IdentidadPortalId] IS NOT NULL");
 
-                    b.ToTable("usuarios", "dbo_NEXO_prueba");
+                    b.ToTable("usuarios", "db_NEXO");
 
                     b.HasData(
                         new
@@ -1375,7 +1375,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
 
                     b.HasKey("CorrelationId");
 
-                    b.ToTable("trabajos_auto_costeo", "dbo_NEXO_prueba");
+                    b.ToTable("trabajos_auto_costeo", "db_NEXO");
                 });
 
             modelBuilder.Entity("Nexo.Infrastructure.Common.Mensajeria.Saga.clsEstadoPriorizacion", b =>
@@ -1411,7 +1411,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
 
                     b.HasKey("CorrelationId");
 
-                    b.ToTable("cadena_priorizacion", "dbo_NEXO_prueba");
+                    b.ToTable("cadena_priorizacion", "db_NEXO");
                 });
 
             modelBuilder.Entity("MassTransit.EntityFrameworkCoreIntegration.InboxState", b =>
@@ -1458,7 +1458,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("Delivered");
 
-                    b.ToTable("InboxState", "dbo_NEXO_prueba");
+                    b.ToTable("InboxState", "db_NEXO");
                 });
 
             modelBuilder.Entity("MassTransit.EntityFrameworkCoreIntegration.OutboxMessage", b =>
@@ -1551,7 +1551,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasFilter("[InboxMessageId] IS NOT NULL AND [InboxConsumerId] IS NOT NULL");
 
-                    b.ToTable("OutboxMessage", "dbo_NEXO_prueba");
+                    b.ToTable("OutboxMessage", "db_NEXO");
                 });
 
             modelBuilder.Entity("MassTransit.EntityFrameworkCoreIntegration.OutboxState", b =>
@@ -1580,7 +1580,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("Created");
 
-                    b.ToTable("OutboxState", "dbo_NEXO_prueba");
+                    b.ToTable("OutboxState", "db_NEXO");
                 });
 
             modelBuilder.Entity("Nexo.Domain.Auditoria.Entidades.clsAuditLog", b =>

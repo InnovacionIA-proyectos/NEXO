@@ -190,7 +190,7 @@ las descarta sin ninguna traza visible para el usuario.
   ninguna propuesta quedó por debajo del piso SICE-TAC (de hecho, todas
   fueron exactamente el piso).
 - **Regla 3 (solo SICE-TAC):** consultada la Parte C contra `reglas_solo_sicetac`
-  (base de la app, `dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba`) —
+  (base de la app, `dbInformesAutomatizados_Pruebas.db_NEXO`) —
   existen 3 reglas configuradas (Medellín→Bogotá 3S3; Cali→Medellín 3S3;
   Barranquilla→Pereira 2S3, estas 2 últimas creadas el mismo día). Ninguna
   coincide con las 15 líneas del pliego ya subido, así que **no se pudo

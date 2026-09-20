@@ -90,7 +90,7 @@ public class clsOutboxConsistenciaTests : IAsyncLifetime
             //
             // ExecuteDeleteAsync en vez de SQL crudo a propósito: un "DELETE FROM
             // OutboxMessage" sin calificar asume que la tabla vive en 'dbo', y dejó de
-            // ser cierto cuando clsNexoDbContext fijó HasDefaultSchema("dbo_NEXO_prueba")
+            // ser cierto cuando clsNexoDbContext fijó HasDefaultSchema("db_NEXO")
             // (issue #92). Pasando por el DbSet, EF Core resuelve el esquema real del
             // modelo — no hay nada que hardcodear ni que se pueda desactualizar si el
             // esquema vuelve a cambiar.

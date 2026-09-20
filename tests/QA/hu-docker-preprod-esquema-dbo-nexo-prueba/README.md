@@ -1,4 +1,4 @@
-# Verificación QA — docker-compose test preproducción (schema `dbo_NEXO_prueba`)
+# Verificación QA — docker-compose test preproducción (schema `db_NEXO`)
 
 Historial completo de esta HU (sin issue/HU numerada propia, es infraestructura):
 
@@ -25,11 +25,11 @@ Historial completo de esta HU (sin issue/HU numerada propia, es infraestructura)
 - `docker-compose.yml`: deshabilita el servicio `db` local, conecta la API a una
   BD de pruebas/preproducción real vía `ConnectionStrings__Nexo`.
 - Migración `MoverEsquemaDboNexoPrueba`: mueve las 27 tablas de NEXO de `dbo` a
-  `dbo_NEXO_prueba` (BD compartida con otra app que ya usa `dbo`).
+  `db_NEXO` (BD compartida con otra app que ya usa `dbo`).
 - Migración `AgregarRolesPortalNexo` + fix en `IdentidadPortalDbContext.cs`:
   identidad real del portal y mapeo de los 6 roles.
 - **Migración nueva `RecrearVistasAnaliticaEnDboNexoPrueba`** (fix de #93): recrea
-  las 13 vistas `analitica.*` apuntando a `dbo_NEXO_prueba.<tabla>` en vez de
+  las 13 vistas `analitica.*` apuntando a `db_NEXO.<tabla>` en vez de
   `dbo.<tabla>` — mismas columnas, mismo `WITH (NOLOCK)`, solo cambia el esquema
   del `FROM`/`JOIN`. `Down()` es simétrico (vuelve a dejarlas apuntando a `dbo`,
   el estado roto de antes, a propósito — no hay forma de "arreglar" un rollback
@@ -59,10 +59,10 @@ están incluidas y en verde (105+13=118 total, 103+13=116 pasadas).
 
 Con la app real levantada (SQL Server real, migraciones aplicadas desde cero
 incluida la del movimiento de esquema), confirmado que la tabla base vive en
-`dbo_NEXO_prueba` y las 13 vistas `analitica.*` resuelven sin error:
+`db_NEXO` y las 13 vistas `analitica.*` resuelven sin error:
 
 ```
-dbo_NEXO_prueba.solicitudes
+db_NEXO.solicitudes
 
 clientes -> OK (10 filas)
 rutas -> OK (12 filas)

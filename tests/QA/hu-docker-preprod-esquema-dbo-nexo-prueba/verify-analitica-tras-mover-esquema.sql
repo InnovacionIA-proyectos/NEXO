@@ -1,7 +1,7 @@
 -- Verificación QA — PR #90 ("Actualizacion de docker compose test preproduccion").
 --
 -- El PR agrega la migración MoverEsquemaDboNexoPrueba, que mueve las 27 tablas de
--- NEXO de `dbo` a un esquema nuevo `dbo_NEXO_prueba` (para compartir la BD de
+-- NEXO de `dbo` a un esquema nuevo `db_NEXO` (para compartir la BD de
 -- pruebas real con otra app que ya usa `dbo`). Las 13 vistas `analitica.*`
 -- (HU-10.1, PR #82, YA MERGEADO A QA) fueron creadas con SQL crudo que referencia
 -- `dbo.<tabla>` literalmente (ver migración VistasAnaliticaSoloLectura.cs) — no usan
