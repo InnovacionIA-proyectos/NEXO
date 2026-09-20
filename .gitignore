@@ -28,6 +28,10 @@ docker-compose.override.yml
 # Logs y temporales
 *.log
 *.tmp
+diagnostico.txt
+
+# Resultados de `dotnet test` (artefactos de build, uno por corrida local)
+TestResults/
 
 # OS
 Thumbs.db
