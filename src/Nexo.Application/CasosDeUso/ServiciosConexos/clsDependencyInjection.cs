@@ -4,7 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Nexo.Application.CasosDeUso.ServiciosConexos;
 
-public static class DependencyInjection
+public static class clsDependencyInjection
 {
     public static IServiceCollection AddServiciosConexosUseCases(this IServiceCollection services) => services
         .AddScoped<ICommandHandler<clsCrearServicioConexoCommand, clsServicioConexoDto>, clsCrearServicioConexoCommandHandler>()

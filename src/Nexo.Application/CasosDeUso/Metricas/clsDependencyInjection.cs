@@ -4,7 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Nexo.Application.CasosDeUso.Metricas;
 
-public static class DependencyInjection
+public static class clsDependencyInjection
 {
     public static IServiceCollection AddMetricasUseCases(this IServiceCollection services) => services
         .AddScoped<IQueryHandler<clsObtenerCumplimientoQuery, clsCumplimientoDto>, clsObtenerCumplimientoQueryHandler>()

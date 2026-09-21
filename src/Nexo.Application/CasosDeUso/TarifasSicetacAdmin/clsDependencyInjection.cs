@@ -4,7 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Nexo.Application.CasosDeUso.TarifasSicetacAdmin;
 
-public static class DependencyInjection
+public static class clsDependencyInjection
 {
     public static IServiceCollection AddTarifasSicetacAdminUseCases(this IServiceCollection services) => services
         .AddScoped<IQueryHandler<clsConsultarTarifasSicetacQuery, IReadOnlyList<clsTarifaSicetacDto>>, clsConsultarTarifasSicetacQueryHandler>()

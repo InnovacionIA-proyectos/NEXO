@@ -15,7 +15,7 @@ namespace Nexo.Application.CasosDeUso.Solicitudes;
 /// siguen viviendo donde están: son un contrato hacia el AGREGADO clsSolicitud, no
 /// hacia este módulo, y ya tienen su propia implementación EF — no se tocan.
 /// </summary>
-public static class DependencyInjection
+public static class clsDependencyInjection
 {
     public static IServiceCollection AddSolicitudesUseCases(this IServiceCollection services)
     {

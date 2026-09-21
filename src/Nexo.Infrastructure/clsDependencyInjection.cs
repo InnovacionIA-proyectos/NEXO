@@ -44,7 +44,7 @@ using System.Net.Http.Headers;
 
 namespace Nexo.Infrastructure;
 
-public static class DependencyInjection
+public static class clsDependencyInjection
 {
     /// <summary>
     /// Registra los adapters de todos los módulos de negocio migrados: Cotizaciones

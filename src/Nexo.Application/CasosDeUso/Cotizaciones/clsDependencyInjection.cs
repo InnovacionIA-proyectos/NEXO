@@ -4,7 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Nexo.Application.CasosDeUso.Cotizaciones;
 
-public static class DependencyInjection
+public static class clsDependencyInjection
 {
     /// <summary>Registra los casos de uso (Handlers) del módulo Cotizaciones.</summary>
     public static IServiceCollection AddCotizacionesUseCases(this IServiceCollection services) => services

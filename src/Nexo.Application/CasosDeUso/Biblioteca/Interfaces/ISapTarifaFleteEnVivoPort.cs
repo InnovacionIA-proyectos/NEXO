@@ -41,7 +41,7 @@ namespace Nexo.Application.CasosDeUso.Biblioteca.Interfaces;
 ///
 /// SUSTITUCIÓN FUTURA: el día que "el equipo de
 /// conexiones" construya la integración real, se agrega un adaptador nuevo que
-/// implemente esta MISMA interfaz y se cambia UNA línea en DependencyInjection.cs
+/// implemente esta MISMA interfaz y se cambia UNA línea en clsDependencyInjection.cs
 /// (configuración `SapTarifaFleteEnVivo:Modo`). Ni <c>clsReglaDeCosteo</c> ni
 /// <c>clsPropuestaTarifaAdapter</c> ni ninguna pantalla se enteran.
 /// </summary>

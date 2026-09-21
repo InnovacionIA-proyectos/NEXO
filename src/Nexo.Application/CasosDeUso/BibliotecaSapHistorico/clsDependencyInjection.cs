@@ -4,7 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Nexo.Application.CasosDeUso.BibliotecaSapHistorico;
 
-public static class DependencyInjection
+public static class clsDependencyInjection
 {
     /// <summary>
     /// Biblioteca — histórico y tarifas de plaza de SAP TM leídos en vivo (SOLO

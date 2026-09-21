@@ -10,7 +10,7 @@ namespace Nexo.Application.CasosDeUso.Notificaciones;
 /// Vive aparte porque ninguna de estas notificaciones es dueña de un solo módulo —
 /// las dispara Cotizaciones, Biblioteca y Costeo por igual.
 /// </summary>
-public static class DependencyInjection
+public static class clsDependencyInjection
 {
     public static IServiceCollection AddNotificacionesUseCases(this IServiceCollection services) => services
         .AddScoped<ICommandHandler<clsNotificarEntregaCommand, clsResultadoDeNotificacionDto>, clsNotificarEntregaCommandHandler>()

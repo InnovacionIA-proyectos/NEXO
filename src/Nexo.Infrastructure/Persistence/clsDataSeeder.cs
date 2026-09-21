@@ -29,7 +29,7 @@ public static class clsDataSeeder
         //
         // IdentidadPortalId: id que un desarrollador manda en X-Portal-clsUsuario-Id para
         // entrar localmente como esta persona cuando ConnectionStrings:IdentidadPortal NO
-        // está configurada (clsResolverIdentidadPortalLocalAdapter, ver DependencyInjection.cs).
+        // está configurada (clsResolverIdentidadPortalLocalAdapter, ver clsDependencyInjection.cs).
         // No todas tienen: coord3/lider2/sl2 simulan a alguien que todavía no inició sesión
         // por el portal ("edge: sin identidad del portal").
         var coord1 = new clsUsuario { Nombre = "Carlos Herrera", Email = "cherrera@boterosoto.com.co", Rol = RolUsuario.CoordinadorFletes, IdentidadPortalId = 1001 };

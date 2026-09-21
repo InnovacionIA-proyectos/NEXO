@@ -4,7 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Nexo.Application.CasosDeUso.Trabajos;
 
-public static class DependencyInjection
+public static class clsDependencyInjection
 {
     public static IServiceCollection AddTrabajosUseCases(this IServiceCollection services)
     {

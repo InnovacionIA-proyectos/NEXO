@@ -13,7 +13,7 @@ namespace Nexo.Infrastructure.Biblioteca.Adaptadores;
 /// para las mismas rutas.
 ///
 /// Se activa SOLO por configuración (`SapTarifaFleteEnVivo:Modo=Mock`,
-/// DependencyInjection.cs) — nunca reemplaza a <see cref="ITarifarioSapPort"/> (la
+/// clsDependencyInjection.cs) — nunca reemplaza a <see cref="ITarifarioSapPort"/> (la
 /// fuente REAL de plaza, vía DbSolucionesTi, que sigue intacta) salvo que un operador
 /// lo encienda a propósito.
 /// </summary>

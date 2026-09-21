@@ -11,7 +11,7 @@ namespace Nexo.Application.CasosDeUso.Priorizacion;
 /// vive aquí es la administración de sus parámetros y el trabajo de refresco que antes
 /// estaba en un BackgroundService del API.
 /// </summary>
-public static class DependencyInjection
+public static class clsDependencyInjection
 {
     public static IServiceCollection AddPriorizacionUseCases(this IServiceCollection services)
     {

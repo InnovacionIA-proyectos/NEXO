@@ -18,7 +18,7 @@ public sealed class clsBibliotecaSicetacAdapter(clsDwSiceDbContext dw, IMemoryCa
 {
     private const int MaxTop = 200;
     // PeriodosAsync dispara un DISTINCT sobre Periodo en las ~2.14M filas de
-    // tblRutasSicetac (sin índice - ver DependencyInjection.cs), probable causa
+    // tblRutasSicetac (sin índice - ver clsDependencyInjection.cs), probable causa
     // principal de los ~33s reportados en frío "sin filtros" (BuscarAsync resuelve
     // el periodo más reciente por acá antes de filtrar la matriz). Los periodos
     // SICE-TAC cambian con baja frecuencia (mensual), así que subir el TTL de

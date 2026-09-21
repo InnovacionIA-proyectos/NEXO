@@ -4,7 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Nexo.Application.CasosDeUso.ReglasSoloSicetac;
 
-public static class DependencyInjection
+public static class clsDependencyInjection
 {
     public static IServiceCollection AddReglasSoloSicetacUseCases(this IServiceCollection services) => services
         .AddScoped<ICommandHandler<clsCrearReglaSoloSicetacCommand, clsReglaSoloSicetacDto>, clsCrearReglaSoloSicetacCommandHandler>()

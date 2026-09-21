@@ -5,7 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Nexo.Application.CasosDeUso.Biblioteca;
 
-public static class DependencyInjection
+public static class clsDependencyInjection
 {
     /// <summary>
     /// Módulo Biblioteca: motor de propuesta de tarifa (plaza SAP + SICE-TAC vivo +

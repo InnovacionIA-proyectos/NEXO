@@ -5,7 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Nexo.Application.CasosDeUso.TarifasGanadas;
 
-public static class DependencyInjection
+public static class clsDependencyInjection
 {
     public static IServiceCollection AddTarifasGanadasUseCases(this IServiceCollection services) => services
         .AddScoped<IQueryHandler<clsSugerirTarifaHistoricaQuery, IReadOnlyList<clsBibliotecaItemDto>>, clsSugerirTarifaHistoricaQueryHandler>()

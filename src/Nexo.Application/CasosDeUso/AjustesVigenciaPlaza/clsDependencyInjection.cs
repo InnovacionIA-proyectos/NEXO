@@ -4,7 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Nexo.Application.CasosDeUso.AjustesVigenciaPlaza;
 
-public static class DependencyInjection
+public static class clsDependencyInjection
 {
     public static IServiceCollection AddAjustesVigenciaPlazaUseCases(this IServiceCollection services) => services
         .AddScoped<ICommandHandler<clsAjustarVigenciaPlazaCommand, Unit>, clsAjustarVigenciaPlazaCommandHandler>()

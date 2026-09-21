@@ -6,7 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Nexo.Application.CasosDeUso.PlanDeCargue;
 
-public static class DependencyInjection
+public static class clsDependencyInjection
 {
     public static IServiceCollection AddPlanDeCargueUseCases(this IServiceCollection services) => services
         .AddScoped<ICommandHandler<clsSolicitarOptimizacionCommand, clsSolicitudDeCubicacionAceptadaDto>, clsSolicitarOptimizacionCommandHandler>()
