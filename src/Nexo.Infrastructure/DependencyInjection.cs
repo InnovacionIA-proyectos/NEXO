@@ -115,7 +115,7 @@ public static class DependencyInjection
         // arrancar así en Producción (fail-closed); en Desarrollo/QA sin la fuente real
         // todavía, se registra un adapter local contra la tabla Usuarios
         // (clsResolverIdentidadPortalLocalAdapter) para no bloquear el trabajo del equipo.
-        var identidadPortal = config.GetConnectionString("clsIdentidadPortal");
+        var identidadPortal = config.GetConnectionString("IdentidadPortal");
         var identidadPortalConfigurada = !string.IsNullOrWhiteSpace(identidadPortal);
         if (identidadPortalConfigurada)
         {

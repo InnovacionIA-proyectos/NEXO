@@ -32,7 +32,7 @@ public class clsRolPortalDw
 /// esquema de referencia de la integración; confirmar contra sys.columns de la base real
 /// antes de desplegar (mismo criterio que los demás Data Warehouses de solo lectura: no
 /// asumir, verificar). El nombre de la base física (distinta entre QA y Producción) va
-/// en la cadena de conexión (ConnectionStrings:clsIdentidadPortal), nunca hardcodeado aquí.
+/// en la cadena de conexión (ConnectionStrings:IdentidadPortal), nunca hardcodeado aquí.
 /// </summary>
 public class clsIdentidadPortalDbContext : DbContext
 {

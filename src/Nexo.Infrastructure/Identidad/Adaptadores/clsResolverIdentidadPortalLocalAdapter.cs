@@ -6,7 +6,7 @@ namespace Nexo.Infrastructure.Identidad.Adaptadores;
 
 /// <summary>
 /// Solo para Desarrollo/QA sin acceso todavía a la base de identidad real del portal.
-/// Se registra ÚNICAMENTE cuando ConnectionStrings:clsIdentidadPortal no está configurada
+/// Se registra ÚNICAMENTE cuando ConnectionStrings:IdentidadPortal no está configurada
 /// (clsProgram.cs impide arrancar así en Producción — fail-closed). No es un
 /// esquema de rol simulado: no confía en nada que declare el cliente, resuelve el rol
 /// contra un registro REAL ya sembrado en la base local (mismo invariante de seguridad

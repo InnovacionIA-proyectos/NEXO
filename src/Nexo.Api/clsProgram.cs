@@ -105,10 +105,10 @@ builder.Services.AddScoped<Nexo.Application.Common.ICurrentUserPort>(sp => sp.Ge
 // Fail-closed: Nexo no tiene login propio (docs/contrato-integracion, D1) — la única
 // fuente de identidad es la tabla de usuarios/permisos del portal. Sin ella configurada,
 // el arranque en Producción falla aquí mismo, antes de exponer un solo endpoint.
-var identidadPortalConfigurada = !string.IsNullOrWhiteSpace(builder.Configuration.GetConnectionString("clsIdentidadPortal"));
+var identidadPortalConfigurada = !string.IsNullOrWhiteSpace(builder.Configuration.GetConnectionString("IdentidadPortal"));
 if (builder.Environment.IsProduction() && !identidadPortalConfigurada)
     throw new InvalidOperationException(
-        "ConnectionStrings:clsIdentidadPortal no está configurado en Producción. Sin la fuente de " +
+        "ConnectionStrings:IdentidadPortal no está configurado en Producción. Sin la fuente de " +
         "identidad del portal, Nexo no puede resolver sesiones reales. Configure la cadena antes de desplegar.");
 
 // Mismo criterio para el broker: sin cadena configurada la mensajería va en memoria,
