@@ -1,4 +1,4 @@
-# Generador de casos dorados (S2-HU-07.3)
+# Generador de casos dorados
 
 Herramienta de un solo propósito: corre el motor de cubicación **C# real**
 de `cabinaFletes` (no una reescritura, no una descripción — las clases
