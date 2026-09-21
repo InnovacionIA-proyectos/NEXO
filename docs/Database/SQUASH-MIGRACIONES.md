@@ -121,6 +121,45 @@ la fila singleton de `clsParametrosScore` — de una sola pasada, ejecutando
 `MIGRATE_ON_STARTUP` de vuelta a `false` (mismo criterio que ya documenta
 `DOKPLOY.md`).
 
+## Hallazgo importante: 10 FKs que faltan en la base de pruebas real
+
+Al comparar `ESQUEMA_NEXO.sql` contra un DDL exportado directamente de
+`dbInformesAutomatizados_Pruebas.db_NEXO` (2026-09-21) se encontró que 10
+foreign keys que el modelo C# actual declara (y que migraciones ya aplicadas
+crearon en su momento: `RelacionesYValidaciones`, `OutboxMassTransit`) NO
+existen hoy en esa base — alguien las quitó a mano, fuera de EF. Dos de esas
+10 (`FK_solicitudes_clientes_ClienteId`, `FK_planes_cargue_vehiculos_cubicacion_VehiculoId`)
+nunca las creó NINGUNA de las 29 migraciones, pese a que el modelo ya las
+declara — un cambio de modelo que nunca se migró, previo a este squash.
+
+Las 10 FKs afectadas: `FK_solicitudes_clientes_ClienteId`,
+`FK_solicitudes_usuarios_CreadoPor`,
+`FK_planes_cargue_vehiculos_cubicacion_VehiculoId`,
+`FK_tarifas_historicas_cotizaciones_CotizacionId`,
+`FK_servicios_conexos_usuarios_ActualizadoPor`,
+`FK_tarifas_historicas_configuraciones_vehiculo_ConfigVehiculoId`,
+`FK_tarifas_historicas_rutas_RutaId`, `FK_tarifas_sicetac_rutas_RutaId`,
+`FK_OutboxMessage_InboxState_InboxMessageId_InboxConsumerId`,
+`FK_OutboxMessage_OutboxState_OutboxId`.
+
+Decisión tomada: no tocar `dbInformesAutomatizados_Pruebas` por ahora — el
+DDL/InitialCreate (que sí trae las 10 FKs correctamente, verificado línea por
+línea) es la fuente que de verdad importa para producción. Consecuencia
+directa para el Paso 4: esto SOLO queda resuelto si producción arranca "en
+cero" y `InitialCreate` corre de verdad (crea las 10 FKs junto con todo lo
+demás). Si en cambio producción se siembra restaurando/clonando una copia de
+`dbInformesAutomatizados_Pruebas` (en vez de dejar correr la migración), esa
+copia arrastra el mismo hueco — hay que agregar esas 10 FKs a mano ahí antes
+o durante el fake-apply, revisando primero que no haya filas huérfanas que
+lo impidan (ClienteId/RutaId/etc. apuntando a un Id que ya no existe).
+
+Los 5 índices únicos filtrados (WHERE ... IS NOT NULL, ej.
+`IX_usuarios_IdentidadPortalId`) que el DDL exportado tampoco mostraba se
+descartaron como hallazgo real: se extrajeron con DBeaver, que no siempre
+scriptea el predicado WHERE de un índice filtrado. El modelo C#
+(`clsNexoDbContext.cs`, `HasFilter(...)`) y `ESQUEMA_NEXO.sql` sí lo traen
+bien — no requiere cambios.
+
 ## Otros entornos con la base ya creada (dev local de cada quien)
 
 Si alguien más tiene una base de desarrollo LOCAL (no la compartida de
