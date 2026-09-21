@@ -81,6 +81,8 @@ services:
       # Siembra datos de demostración al arrancar si la BD está vacía (idempotente).
       # Poner en "false" en producción real una vez cargados los datos definitivos.
       Database__SeedOnStartup: ${SEED_ON_STARTUP:-true}
+      # Esquema propio de NEXO dentro de ConnectionStrings__Nexo (ver clsEsquemaNexo.cs).
+      Database__Esquema: ${DB_ESQUEMA:-db_NEXO}
       Cors__OrigenesPermitidos: ${ORIGENES_PERMITIDOS_CORS}
       # Recálculo del score persistido (#19). El reloj vive en el broker, no en este
       # proceso, así que cambiar el intervalo solo afecta cada cuánto suena: no hay

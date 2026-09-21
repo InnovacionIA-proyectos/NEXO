@@ -129,6 +129,7 @@ services:
       ConnectionStrings__DbSolucionesTi: ${ConnectionStrings__DbSolucionesTi}
       ConnectionStrings__DwCubos: ${ConnectionStrings__DwCubos}
       ConnectionStrings__IdentidadPortal: ${ConnectionStrings__IdentidadPortal}
+      Database__Esquema: ${Database__Esquema}
     command:
       - dotnet
       - test
@@ -152,6 +153,7 @@ services:
       ConnectionStrings__DbSolucionesTi: ${ConnectionStrings__DbSolucionesTi}
       ConnectionStrings__DwCubos: ${ConnectionStrings__DwCubos}
       ConnectionStrings__IdentidadPortal: ${ConnectionStrings__IdentidadPortal}
+      Database__Esquema: ${Database__Esquema}
     command:
       - dotnet
       - test

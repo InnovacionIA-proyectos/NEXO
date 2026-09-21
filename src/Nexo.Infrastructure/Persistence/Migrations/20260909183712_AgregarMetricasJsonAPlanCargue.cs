@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore.Migrations;
+using Nexo.Infrastructure.Persistence;
 
 #nullable disable
 
@@ -12,7 +13,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
         {
             migrationBuilder.AddColumn<string>(
                 name: "MetricasJson",
-                schema: "db_NEXO",
+                schema: clsEsquemaNexo.Nombre,
                 table: "planes_cargue",
                 type: "nvarchar(max)",
                 nullable: true);
@@ -23,7 +24,7 @@ namespace Nexo.Infrastructure.Persistence.Migrations
         {
             migrationBuilder.DropColumn(
                 name: "MetricasJson",
-                schema: "db_NEXO",
+                schema: clsEsquemaNexo.Nombre,
                 table: "planes_cargue");
         }
     }

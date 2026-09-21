@@ -178,6 +178,13 @@ builder.Services.AddSwaggerGen();
 // llamada del portal es cross-origin. Por eso la configuración admite una lista,
 // no un único origen.
 const string ClientesCors = "clientes";
+// Mismo criterio fail-closed que IdentidadPortal/RabbitMq más arriba: sin esta
+// variable en Producción, el fallback de desarrollo (localhost:5173) dejaría el CORS
+// mal configurado en silencio en vez de fallar visiblemente al arrancar.
+if (builder.Environment.IsProduction() && builder.Configuration["Cors:OrigenesPermitidos"] is null)
+    throw new InvalidOperationException(
+        "Cors:OrigenesPermitidos no está configurado en Producción. Configure los orígenes permitidos antes de desplegar.");
+
 var origenesPermitidos = (builder.Configuration["Cors:OrigenesPermitidos"] ?? "http://localhost:5173")
     .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 // "*" es un atajo SOLO para desarrollo/pruebas: WithOrigins("*") no es un comodín (lo

@@ -54,7 +54,7 @@ public class clsNexoDbContext : DbContext
         // Se llamó "dbo_NEXO_prueba" originalmente; se renombró a "db_NEXO" — sigue
         // siendo un schema dentro de la MISMA base compartida, no una base aparte.
         // Es la única línea que hay que tocar para mover NEXO a otro schema/base.
-        b.HasDefaultSchema("db_NEXO");
+        b.HasDefaultSchema(clsEsquemaNexo.Nombre);
 
         // Tablas del Transactional Outbox de MassTransit. Viven en ESTA base a
         // propósito: la garantía de atomicidad depende de que el mensaje y los datos
