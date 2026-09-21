@@ -186,7 +186,8 @@ CREATE TABLE [db_NEXO].[tbl_lineas_solicitud] (
     [ValorAprovisionamiento] decimal(18,2) NULL,
     [CiudadDevolucionContenedor] nvarchar(150) NULL,
     [Consolidado] bit NOT NULL DEFAULT (CONVERT([bit],(0))),
-    [RetornaContenedor] bit NOT NULL DEFAULT (CONVERT([bit],(0)))
+    [RetornaContenedor] bit NOT NULL DEFAULT (CONVERT([bit],(0))),
+    [MotivoPendiente] nvarchar(500) NULL
     , CONSTRAINT [PK_lineas_solicitud] PRIMARY KEY ([Id])
 );
 
