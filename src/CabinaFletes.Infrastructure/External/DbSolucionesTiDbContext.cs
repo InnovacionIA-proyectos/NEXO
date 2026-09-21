@@ -27,6 +27,7 @@ public class DbSolucionesTiDbContext : DbContext
     public DbSet<SapContenedorRangoPeso> ContenedorRangosPeso => Set<SapContenedorRangoPeso>();
     public DbSet<SapParametro> Parametros => Set<SapParametro>();
     public DbSet<SapClaseContenedorCatalogo> ClasesContenedor => Set<SapClaseContenedorCatalogo>();
+    public DbSet<Prospecto> Prospectos => Set<Prospecto>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -105,6 +106,12 @@ public class DbSolucionesTiDbContext : DbContext
         cc.Property(x => x.TamanoContenedor).HasColumnName("TAMANOCONTENEDOR");
         cc.Property(x => x.PesoInfCnt).HasColumnName("PESOINFCNT");
         cc.Property(x => x.PesoSupCnt).HasColumnName("PESOSUPCNT");
+
+        var pr = modelBuilder.Entity<Prospecto>();
+        pr.ToTable("tblProspectos", "dbo");
+        pr.HasKey(x => x.Nit);
+        pr.Property(x => x.Nit).HasColumnName("NIT").HasMaxLength(15);
+        pr.Property(x => x.Cliente).HasColumnName("CLIENTE").HasMaxLength(100);
 
         // Vigente ("de plaza") y log de cambios comparten el núcleo de columnas.
         var plaza = MapTarifaSap<SapTarifaPlaza>(modelBuilder, "tblSAPTarifas");

@@ -226,6 +226,10 @@ public static class DependencyInjection
         services.AddScoped<IConfiguracionesVehiculoPort, EfConfiguracionesVehiculoRepository>();
         services.AddScoped<IClientesPort, EfClientesRepository>();
         services.AddScoped<IClientesDwPort, ClientesDwAdapter>();
+        // Prospectos (dbSolucionesTI.tblProspectos, HU-005 parte 2): mismo criterio que
+        // ClientesDwAdapter — se registra siempre, y se degrada sola (Configurado=false)
+        // si DbSolucionesTiDbContext no está registrado (ver dbSolucionesTiConfigurado arriba).
+        services.AddScoped<IProspectosDwPort, ProspectosDwAdapter>();
         services.AddScoped<IExcelSolicitudesPort, ExcelSolicitudesAdapter>();
         services.AddScoped<ITarifasCosteoPort, EfTarifasCosteoRepository>();
 

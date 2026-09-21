@@ -169,7 +169,33 @@ builder.Services.AddControllers()
     });
 
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(o =>
+{
+    // Conveniencia SOLO para pruebas manuales en Swagger (Development, ver más abajo):
+    // el esquema real (IdentidadPortalAuthenticationHandler) valida el encabezado
+    // X-Portal-Usuario-Id en cada request, no un bearer token. Declararlo como
+    // "apiKey" acá le pone a Swagger un botón "Authorize" normal donde se pega el id
+    // una sola vez y queda aplicado a todas las llamadas de prueba.
+    var esquema = new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+    {
+        Name = IdentidadPortalAuthenticationHandler.HeaderIdUsuario,
+        In = Microsoft.OpenApi.Models.ParameterLocation.Header,
+        Type = Microsoft.OpenApi.Models.SecuritySchemeType.ApiKey,
+        Description = "Id de portal de un usuario ya sembrado (tabla Usuarios), ej. 1007 (Comercial).",
+    };
+    o.AddSecurityDefinition(IdentidadPortalAuthenticationHandler.SchemeName, esquema);
+    o.AddSecurityRequirement(new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
+    {
+        [new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+        {
+            Reference = new Microsoft.OpenApi.Models.OpenApiReference
+            {
+                Type = Microsoft.OpenApi.Models.ReferenceType.SecurityScheme,
+                Id = IdentidadPortalAuthenticationHandler.SchemeName,
+            },
+        }] = []
+    });
+});
 
 // El backend lo consumen dos clientes con orígenes distintos: el frontend standalone
 // (desarrollo) y el módulo cabina-fletes dentro del portal de la Administración
