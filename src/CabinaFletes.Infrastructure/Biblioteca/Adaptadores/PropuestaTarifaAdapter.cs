@@ -223,19 +223,33 @@ public sealed class PropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuestaDeL
                 linea.RetornaContenedor, linea.CiudadDevolucionContenedor), ct);
         }
 
-        CandidatoTarifaDto? sicetac;
         CandidatoTarifaDto? plaza;
         var vencida = oficial?.Vencida == true;
         if (oficial is not null)
         {
             plaza = oficial.Tarifa;
-            sicetac = oficial.SicetacOficial;
         }
         else
         {
-            sicetac = dw is null ? null : await CandidatoSicetacAsync(dw, origen, destino, vehiculo, linea.Tipologia, linea.ConfiguracionVehiculo?.Carroceria, ct);
             plaza = dc is null ? null : await CandidatoSapAsync(dc, dc.TarifasPlazaSap, "plaza", origen, destino, vehiculo, linea.Peso, soloVigentes: true, ajustesVigencia, ct);
         }
+
+        // Issue #175/#176: TarifarioSapAdapter.SicetacOficialAsync (réplica 1:1 de la
+        // lógica SAP legada) exige match exacto de Configuracion/TipoCarga/
+        // UnidadTransporte/ViaEstandar sin fallback, y solo aplica a Contenedor/Cupo
+        // (nunca a CargaSuelta/Extradimensionado) - eso deja sin piso automático rutas
+        // que sí existen y son encontrables (reproducido con Medellín-Guarne),
+        // obligando a marcar "Solo SICE-TAC" a mano para que aparezcan (la ruta
+        // siempre fue encontrable: esa marca usa CandidatoSicetacAsync, el selector
+        // tolerante de abajo). Si el camino oficial no encuentra nada, se reintenta con
+        // ESE MISMO selector antes de rendirse, así el camino normal encuentra como
+        // mínimo lo mismo que "Solo SICE-TAC". El camino oficial se prueba primero y no
+        // se toca: sigue gobernando sin cambios cuando sí encuentra algo (verificado
+        // contra datos reales en tests/QA/hu-13.4-verificacion-reglas-negocio-datos-reales).
+        var sicetac = oficial?.SicetacOficial;
+        if (sicetac is null && dw is not null)
+            sicetac = await CandidatoSicetacAsync(dw, origen, destino, vehiculo, linea.Tipologia, linea.ConfiguracionVehiculo?.Carroceria, ct);
+
         var historico = dc is null ? null : await CandidatoSapAsync(dc, dc.TarifasLogSap, "historico_sap", origen, destino, vehiculo, linea.Peso, soloVigentes: false, ajustesVigencia, ct);
 
         // S2-HU-09.1/09.3 (#31/#33): conexión SAP NUEVA (plaza en vivo), todavía no
