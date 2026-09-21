@@ -7,14 +7,14 @@ name: CI/CD API
 # convención completa de qué ruta dispara qué pipeline.
 on:
   push:
-    branches: [main, Pre-Despliegue-BACKEND]
+    branches: [main, DEPLOY]
     paths:
       - "src/**"
       - "tests/**"
       - "Nexo.Clean.sln"
       - ".github/workflows/ci-cd-api.yml"
   pull_request:
-    branches: [main, Pre-Despliegue-BACKEND]
+    branches: [main, DEPLOY]
     paths:
       - "src/**"
       - "tests/**"
@@ -122,7 +122,7 @@ jobs:
   # en PRs). Dokploy construye con el Dockerfile del servicio API al recibir esto.
   deploy:
     needs: build-and-test
-    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/Pre-Despliegue-BACKEND') && github.event_name == 'push'
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/DEPLOY') && github.event_name == 'push'
 
     # Self-hosted: corre en la red donde vive Dokploy — es la única forma de alcanzar
     # su webhook, inalcanzable desde runners ubuntu-latest.

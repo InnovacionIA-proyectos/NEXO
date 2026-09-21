@@ -9,7 +9,7 @@ es la referencia que usa quien SÍ va a encenderlo.
 
 ## 1. Compuerta de paridad del plan de cargue
 
-> ✅ **ENCENDIDA en Dokploy (ambiente Pre-Despliegue-BACKEND) el
+> ✅ **ENCENDIDA en Dokploy (ambiente DEPLOY) el
 > 2026-09-14.** Autorizado por Kevin Cano (@kcano-ux). Ver "Encendido
 > confirmado" al final de esta sección para la evidencia y los valores
 > exactos que se configuraron.
@@ -64,7 +64,7 @@ compuerta por defecto — el cierre de CORS y rotación de claves de Cubicador
 ### Encendido confirmado (2026-09-14)
 
 **Autorizado por Kevin Cano (@kcano-ux)** para el ambiente Dokploy
-"Pre-Despliegue-BACKEND"
+"DEPLOY"
 (`http://nexo-predesplieguebackend-ijaiqn-cdc194-10-10-40-17.sslip.io`).
 
 **Evidencia**: no se usó una corrida de GitHub Actions (no había una
@@ -74,7 +74,7 @@ corrió la MISMA suite (`pytest tests/paridad -v`) en un contenedor efímero
 exacto del commit desplegado:
 
 - **Commit**: `82fb52ba73083b7d94ea07d42a4774a2b9b8e1e3` (rama
-  `Pre-Despliegue-BACKEND`)
+  `DEPLOY`)
 - **Fecha de la corrida**: 2026-09-14
 - **Resultado**: `27 passed in 3.60s` — los 26 casos dorados
   (`test_paridad_colisiones[01..05]`, `test_paridad_orientaciones[06..09]`,

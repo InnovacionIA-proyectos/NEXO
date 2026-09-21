@@ -1,4 +1,4 @@
-# QA — traer a `QA` el arreglo del worker que quedó aislado en `Pre-Despliegue-BACKEND`
+# QA — traer a `QA` el arreglo del worker que quedó aislado en `DEPLOY`
 
 **Commit original:** `774de8c` (`fix(cubicador): el reporte de un fallo ya no puede atascar el worker`).
 **Autor:** Bran / bquintero.
@@ -6,10 +6,10 @@
 
 ## Contexto
 
-Al revisar `Pre-Despliegue-BACKEND` (por un desacuerdo sobre por qué las pruebas
+Al revisar `DEPLOY` (por un desacuerdo sobre por qué las pruebas
 de integración locales daban 69 fallas), encontré que esa rama tenía un commit
 real que **nunca llegó a `QA` ni a `main`** — comiteado directo a
-`Pre-Despliegue-BACKEND`, sin pasar por PR hacia `QA`.
+`DEPLOY`, sin pasar por PR hacia `QA`.
 
 Es un arreglo genuino, distinto del bug #131 que cerramos en S3-HU-10.1 (PR #141):
 - **#131 (ya en QA):** `cuerpo["planId"]` con indexación directa — `KeyError` si
@@ -25,7 +25,7 @@ Confirmado real en el propio ambiente de pre-despliegue el 14-sep (no es
 hipotético): 2 mensajes así dejaron el broker con `messages_unacknowledged=2` y
 8 mensajes más encolados detrás sin procesar.
 
-No se trabajó parado en `Pre-Despliegue-BACKEND` (esa rama está 35 commits
+No se trabajó parado en `DEPLOY` (esa rama está 35 commits
 atrás de `QA` — hubiera sido el mismo problema de rama vieja que ya conocemos,
 al revés). Se trajo el commit puntual con `git cherry-pick` sobre una rama
 nueva basada en `QA` actual.

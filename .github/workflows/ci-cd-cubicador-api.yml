@@ -29,7 +29,7 @@ name: CI/CD Cubicador-API
 # rompia al WORKER.
 on:
   push:
-    branches: [main, Pre-Despliegue-BACKEND]
+    branches: [main, DEPLOY]
     paths:
       - "cubicador/**"
       # Documentacion no cambia comportamiento: excluirla evita redesplegar
@@ -47,7 +47,7 @@ on:
       - ".github/workflows/ci-cd-cubicador-api.yml"
       - ".github/workflows/_cubicador-pruebas.yml"
   pull_request:
-    branches: [main, Pre-Despliegue-BACKEND]
+    branches: [main, DEPLOY]
     paths:
       - "cubicador/**"
       - "!cubicador/docs/**"
@@ -63,7 +63,7 @@ jobs:
 
   deploy:
     needs: build-and-test
-    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/Pre-Despliegue-BACKEND') && github.event_name == 'push'
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/DEPLOY') && github.event_name == 'push'
     runs-on: [self-hosted, dokploy_]
     steps:
       - name: Mostrar información del deploy

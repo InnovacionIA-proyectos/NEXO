@@ -178,7 +178,7 @@ por comportamiento real:
 - `GET /api/vehiculos` → `404`.
 
 **Esto significa que el build corriendo en Dokploy es más viejo que el
-código que está en esta rama** (`Pre-Despliegue-BACKEND`, donde esos
+código que está en esta rama** (`DEPLOY`, donde esos
 endpoints ya existen y se probaron funcionando en el punto 3.2). Dokploy está
 construyendo desde un commit/rama anterior a esos cambios, o el redeploy
 automático no se disparó tras el último merge.
@@ -207,7 +207,7 @@ docker image prune -af     # imágenes sin usar (incluida la del segundo desplie
 docker system df           # confirmar que bajó
 ```
 
-Con el disco liberado, reintentar el deploy de `Pre-Despliegue-BACKEND` —
+Con el disco liberado, reintentar el deploy de `DEPLOY` —
 debería traer ya esos endpoints (punto 4.2 resuelto). Vale la
 pena revisar también si el segundo despliegue duplicado que mencionaste
 (mismo puerto, misma red) dejó imágenes/volúmenes huérfanos ocupando disco
@@ -225,7 +225,7 @@ antes de apagarlo.
 ## 6. Próximos pasos recomendados
 
 1. **Redesplegar la app de NEXO en Dokploy** desde el commit actual de
-   `Pre-Despliegue-BACKEND` (o el que corresponda a producción) — eso por sí
+   `DEPLOY` (o el que corresponda a producción) — eso por sí
    solo debería resolver el punto 3 de la tabla.
 2. Confirmar en Dokploy, en la app de la API de NEXO, que existe
    `Cubicador3D__InboundApiKey` (con doble guion bajo) con el mismo valor
@@ -522,7 +522,7 @@ conocidos para el flujo NEXO ↔ Cubicador en este ambiente.
 
 Kevin Cano (@kcano-ux) autorizó encender la compuerta de paridad
 (`Domain.PlanDeCargue.Reglas.CompuertaDeParidad`) para el ambiente Dokploy
-"Pre-Despliegue-BACKEND". No había una corrida de GitHub Actions ya
+"DEPLOY". No había una corrida de GitHub Actions ya
 enlazada como evidencia formal (ver `docs/CHECKLIST_DESPLIEGUE.md`, que
 además tenía una referencia desactualizada a `cubicador-ci.yml`, ya
 retirado) ni acceso a `gh`/Actions desde esta sesión para traer una — en su
@@ -538,7 +538,7 @@ docker run --rm -v "<ruta a cubicador/>:/app" -w /app python:3.14-slim \
 ```
 
 **Commit verificado**: `82fb52ba73083b7d94ea07d42a4774a2b9b8e1e3` (rama
-`Pre-Despliegue-BACKEND`, 2026-09-14 08:10:33 -0500).
+`DEPLOY`, 2026-09-14 08:10:33 -0500).
 
 **Resultado — 27 passed in 3.60s** (los 26 casos dorados + el meta-test que
 confirma que son exactamente 26 fixtures, ni más ni menos):

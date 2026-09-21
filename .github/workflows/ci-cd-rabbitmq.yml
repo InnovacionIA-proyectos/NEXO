@@ -10,13 +10,13 @@ name: CI/CD RabbitMQ
 # 2 archivos, no con cualquier cambio del repo.
 on:
   push:
-    branches: [main, Pre-Despliegue-BACKEND]
+    branches: [main, DEPLOY]
     paths:
       - "docker-compose.yml"
       - "build/Dockerfile.rabbit"
       - ".github/workflows/ci-cd-rabbitmq.yml"
   pull_request:
-    branches: [main, Pre-Despliegue-BACKEND]
+    branches: [main, DEPLOY]
     paths:
       - "docker-compose.yml"
       - "build/Dockerfile.rabbit"
@@ -39,7 +39,7 @@ jobs:
 
   deploy:
     needs: build
-    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/Pre-Despliegue-BACKEND') && github.event_name == 'push'
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/DEPLOY') && github.event_name == 'push'
     runs-on: [self-hosted, dokploy_]
     steps:
       - name: Mostrar información del deploy
