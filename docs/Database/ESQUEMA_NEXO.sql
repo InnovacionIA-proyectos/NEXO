@@ -3,16 +3,22 @@
 -- =============================================================================
 -- dbInformesAutomatizados_Pruebas es una base COMPARTIDA con otra app ajena a
 -- NEXO (esa otra app ya vivía en 'dbo' y tiene su propio esquema 'dbo_prueba').
--- Por eso NexoDbContext fija HasDefaultSchema("db_NEXO"): así
+-- Por eso NexoDbContext fija HasDefaultSchema(clsEsquemaNexo.Nombre): así
 -- las tablas de NEXO no se mezclan con las de esa otra app.
 --
--- Este archivo es DOCUMENTACIÓN, no la fuente de la verdad: se generó
--- consultando el catálogo (sys.tables/sys.columns/sys.foreign_keys/sys.indexes)
--- de la base real ya migrada, el 2026-09-01. La fuente de la verdad real son
--- las migraciones EF Core en
--- src/Nexo.Infrastructure/Persistence/Migrations/ — cualquier cambio
--- de esquema se hace ahí (dotnet ef migrations add), nunca editando la BD a
--- mano ni este archivo.
+-- "db_NEXO" (usado en todo este archivo) es el NOMBRE POR DEFECTO documentado
+-- en .env.example, no un valor fijo en código: el esquema real se lee de la
+-- variable de entorno Database__Esquema (ver clsEsquemaNexo.cs), obligatoria y
+-- sin default en el código (fail-closed). Para desplegar contra otro nombre de
+-- esquema, cambie esa variable — no hace falta tocar este archivo ni el código,
+-- solo reemplazar mentalmente "db_NEXO" por el valor configurado al leer este DDL.
+--
+-- Este archivo es DOCUMENTACIÓN, no la fuente de la verdad: refleja el esquema
+-- final consolidado en la migración InitialCreate (ver
+-- src/Nexo.Infrastructure/Persistence/Migrations/) — una sola migración
+-- estructural, sin datos, pensada para que producción arranque desde cero.
+-- Cualquier cambio de esquema se hace en las migraciones EF Core (dotnet ef
+-- migrations add), nunca editando la BD a mano ni este archivo.
 --
 -- Orden: 1) tablas agrupadas por módulo de negocio, cada una con un comentario
 -- corto de su objetivo; 2) llaves foráneas; 3) índices. Las FK van aparte

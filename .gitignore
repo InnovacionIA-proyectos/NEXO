@@ -18,6 +18,7 @@ appsettings.*.local.json
 .env.*
 !.env.example
 !.env.dokploy
+!.env.githubSECRETS
 
 # Configuración local de Claude Code (permisos, hosts internos) — no versionar
 .claude/settings.json
