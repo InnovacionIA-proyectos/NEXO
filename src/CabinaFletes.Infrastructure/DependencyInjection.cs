@@ -230,6 +230,8 @@ public static class DependencyInjection
         // ClientesDwAdapter — se registra siempre, y se degrada sola (Configurado=false)
         // si DbSolucionesTiDbContext no está registrado (ver dbSolucionesTiConfigurado arriba).
         services.AddScoped<IProspectosDwPort, ProspectosDwAdapter>();
+        // Ciudades para Origen/Destino (HU-005 parte 3): mismo criterio de degradación.
+        services.AddScoped<ICiudadesDwPort, CiudadesDwAdapter>();
         services.AddScoped<IExcelSolicitudesPort, ExcelSolicitudesAdapter>();
         services.AddScoped<ITarifasCosteoPort, EfTarifasCosteoRepository>();
 

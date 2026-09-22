@@ -92,5 +92,8 @@ public record AnalisisExcelDto(string Archivo, IReadOnlyList<HojaExcelDto> Hojas
 /// </summary>
 public record ClienteBusquedaDto(Guid? ClienteId, string? Bp, string Nit, string Nombre, string Origen);
 
+/// <summary>Ciudad para Origen/Destino del formulario de captura (HU-005 parte 3).</summary>
+public record CiudadBusquedaDto(string Municipio, string Departamento);
+
 /// <summary>Estimación del aprovisionamiento del contenedor (viaje vacío levante → origen).</summary>
 public record AprovisionamientoDto(CandidatoTarifaDto? Candidato);

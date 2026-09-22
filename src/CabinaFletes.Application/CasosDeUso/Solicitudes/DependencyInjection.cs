@@ -30,6 +30,8 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<ObtenerCosteoQuery, SolicitudCosteoDto>, ObtenerCosteoQueryHandler>();
         services.AddScoped<IQueryHandler<AnalizarExcelQuery, AnalisisExcelDto>, AnalizarExcelQueryHandler>();
         services.AddScoped<IQueryHandler<BuscarClientesQuery, IReadOnlyList<DTOs.ClienteBusquedaDto>>, BuscarClientesQueryHandler>();
+        services.AddScoped<IQueryHandler<ListarDepartamentosQuery, IReadOnlyList<string>>, ListarDepartamentosQueryHandler>();
+        services.AddScoped<IQueryHandler<BuscarCiudadesQuery, IReadOnlyList<DTOs.CiudadBusquedaDto>>, BuscarCiudadesQueryHandler>();
         return services;
     }
 }
