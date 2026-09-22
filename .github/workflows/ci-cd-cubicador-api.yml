@@ -85,9 +85,14 @@ jobs:
       # pull/build/recrear el contenedor tras recibir el webhook, asi que sin
       # esta espera el primer intento de abajo caia casi siempre en el hueco
       # (contenedor viejo ya detenido, el nuevo aun no responde).
+      # ping en vez de timeout: el runner self-hosted corre como servicio de
+      # Windows, sin consola adjunta, y "timeout" intenta leer stdin para
+      # detectar Ctrl+C — sin consola falla al instante con "No es compatible
+      # la redirección de entradas" (ver ci-cd-api.yml). ping sí funciona sin
+      # consola: -n 91 son 90 intervalos de 1s (91 ecos, el primero inmediato).
       - name: Esperar a que el contenedor termine de levantar (90s)
         shell: cmd
-        run: timeout /t 90 /nobreak >NUL
+        run: ping -n 91 127.0.0.1 >NUL
 
       # Mismo razonamiento que ci-cd-api.yml - el webhook de arriba
       # solo confirma que Dokploy RECIBIO la orden, nunca que termino el
@@ -106,7 +111,7 @@ jobs:
           if not errorlevel 1 goto exito
           set /a INTENTOS+=1
           if %INTENTOS% GEQ 12 goto fallo
-          timeout /t 10 /nobreak >NUL
+          ping -n 11 127.0.0.1 >NUL
           goto verificar
           :exito
           echo Servicio respondio saludable tras el despliegue.

@@ -68,6 +68,20 @@ public class clsAjustarVigenciaPlazaCommandTests
 
         Assert.Equal("original", existente.Motivo);
     }
+
+    [Fact]
+    public async Task Sin_nueva_vigencia_lanza_ValidationFailedException_y_no_guarda_nada()
+    {
+        // Regresión del bug confirmado en QA de producción (2026-09-22): un body {} sin
+        // NuevaVigencia respondía 204 y dejaba la tarifa con vigencia 0001-01-01, porque
+        // [Required] sobre un DateTime no-nullable nunca dispara en el DTO de Api. La
+        // fuente de verdad de esta regla ahora vive acá, no solo en el DTO.
+        await Assert.ThrowsAsync<clsValidationFailedException>(() =>
+            Handler().Handle(new clsAjustarVigenciaPlazaCommand(7, null, "porque si")));
+
+        _ajustes.Verify(a => a.Agregar(It.IsAny<clsAjusteVigenciaPlaza>()), Times.Never);
+        _uow.Verify(u => u.SaveChangesAsync(default), Times.Never);
+    }
 }
 
 public class clsAjustarVigenciaPlazaMasivoCommandTests
