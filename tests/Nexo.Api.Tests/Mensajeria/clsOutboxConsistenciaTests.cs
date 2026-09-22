@@ -4,6 +4,7 @@ using Nexo.Mensajes.Solicitudes;
 using MassTransit;
 using MassTransit.EntityFrameworkCoreIntegration;
 using MassTransit.Testing;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -94,7 +95,29 @@ public class clsOutboxConsistenciaTests : IAsyncLifetime
             // (issue #92). Pasando por el DbSet, EF Core resuelve el esquema real del
             // modelo — no hay nada que hardcodear ni que se pueda desactualizar si el
             // esquema vuelve a cambiar.
-            await db.Set<OutboxMessage>().ExecuteDeleteAsync();
+            //
+            // Reintento manual (no EnableRetryOnFailure): este DELETE sin WHERE puede
+            // quedar elegido como "víctima" de un deadlock si compite por locks con el
+            // servicio de entrega del outbox de MassTransit de la corrida anterior, que
+            // puede seguir drenando OutboxMessage/OutboxState un instante después de que
+            // DisposeAsync() llamó _bus.Stop() (intermitente, visto en CI). No se usa
+            // EnableRetryOnFailure porque esa execution strategy prohíbe las
+            // transacciones explícitas (BeginTransactionAsync) que usan las otras
+            // pruebas de esta misma clase con el mismo DbContext.
+            const int reintentosMax = 3;
+            for (var intento = 1; ; intento++)
+            {
+                try
+                {
+                    await db.Set<OutboxMessage>().ExecuteDeleteAsync();
+                    break;
+                }
+                catch (InvalidOperationException ex) when (intento < reintentosMax
+                    && ex.InnerException is SqlException { Number: 1205 })
+                {
+                    await Task.Delay(TimeSpan.FromMilliseconds(300 * intento));
+                }
+            }
         }
 
         _bus = _servicios.GetRequiredService<ITestHarness>();
