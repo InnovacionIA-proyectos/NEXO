@@ -13,7 +13,7 @@ Correr **todo en un solo bloque, en la misma consola** que ejecuta `dotnet test`
 `dotnet test` vuelve a caer al fallback de `localhost`):
 
 ```powershell
-Get-Content .env | Where-Object { $_ -match '^(ConnectionStrings__Nexo|ConnectionStrings__DwSice|ConnectionStrings__DbSolucionesTi|ConnectionStrings__DwCubos|ConnectionStrings__IdentidadPortal)=' } | ForEach-Object {
+Get-Content .env | Where-Object { $_ -match '^(ConnectionStrings__Nexo|Database__Esquema|ConnectionStrings__DwSice|ConnectionStrings__DbSolucionesTi|ConnectionStrings__DwCubos|ConnectionStrings__IdentidadPortal)=' } | ForEach-Object {
     $k, $v = $_ -split '=', 2
     Set-Item -Path "env:$k" -Value $v
 }
