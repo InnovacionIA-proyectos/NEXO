@@ -115,6 +115,7 @@ jobs:
           ConnectionStrings__DbSolucionesTi: ${{ secrets.CONNECTIONSTRINGS_DBSOLUCIONESTI }}
           ConnectionStrings__DwCubos: ${{ secrets.CONNECTIONSTRINGS_DWCUBOS }}
           ConnectionStrings__IdentidadPortal: ${{ secrets.CONNECTIONSTRINGS_IDENTIDADPORTAL }}
+          Database__Esquema: ${{ secrets.DATABASE_ESQUEMA }}
         run: dotnet test Nexo.Clean.sln -c Release --no-build --logger "console;verbosity=normal"
 
   # El despliegue queda atado estructuralmente a que la suite haya pasado en ESTE
