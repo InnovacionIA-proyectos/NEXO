@@ -81,13 +81,22 @@ jobs:
             -H "X-GitHub-Event: push" ^
             -d "{\"ref\":\"${{ github.ref }}\",\"repository\":{\"full_name\":\"${{ github.repository }}\"}}"
 
+      # Mismo razonamiento que ci-cd-api.yml: Dokploy todavia tiene que hacer
+      # pull/build/recrear el contenedor tras recibir el webhook, asi que sin
+      # esta espera el primer intento de abajo caia casi siempre en el hueco
+      # (contenedor viejo ya detenido, el nuevo aun no responde).
+      - name: Esperar a que el contenedor termine de levantar (90s)
+        shell: cmd
+        run: timeout /t 90 /nobreak >NUL
+
       # Mismo razonamiento que ci-cd-api.yml - el webhook de arriba
       # solo confirma que Dokploy RECIBIO la orden, nunca que termino el
       # build/deploy real. Este paso detecta al menos "el contenedor nuevo
       # nunca volvio a responder" (crash/timeout de arranque), con reintentos
-      # durante ~2 minutos. Limite conocido (no distingue "redeploy exitoso" de
-      # "el contenedor viejo sigue sano con codigo viejo"): igual que en
-      # ci-cd-api.yml, ver el comentario completo alli.
+      # durante ~2 minutos despues de la espera inicial de arriba. Limite
+      # conocido (no distingue "redeploy exitoso" de "el contenedor viejo sigue
+      # sano con codigo viejo"): igual que en ci-cd-api.yml, ver el comentario
+      # completo alli.
       - name: Verificar que el servicio respondio saludable tras el despliegue
         shell: cmd
         run: |

@@ -144,13 +144,24 @@ jobs:
             -H "X-GitHub-Event: push" ^
             -d "{\"ref\":\"${{ github.ref }}\",\"repository\":{\"full_name\":\"${{ github.repository }}\"}}"
 
+      # El webhook de arriba solo confirma que Dokploy RECIBIO la orden -
+      # Dokploy todavia tiene que hacer pull/build/recrear el contenedor antes
+      # de que el proceso empiece a escuchar. Sin esta espera, el primer
+      # intento de la verificacion de abajo caia casi siempre en el hueco
+      # (contenedor viejo ya detenido, el nuevo aun no responde) y quemaba uno
+      # de los 12 reintentos sin aportar nada.
+      - name: Esperar a que el contenedor termine de levantar (90s)
+        shell: cmd
+        run: timeout /t 90 /nobreak >NUL
+
       # El webhook de arriba solo confirma que Dokploy RECIBIO la
       # orden (curl -f en verde con cualquier 2xx) - nunca que el build/deploy
       # real termino. Ya paso una vez (docs/VERIFICACION_NEXO_CUBICADOR_2026-09-14.md):
       # el build fallo por disco lleno y Dokploy siguio sirviendo la imagen
       # vieja en silencio, con el job de este mismo workflow en verde. Este
       # paso al menos detecta "el contenedor nuevo nunca volvio a responder"
-      # (crash/timeout de arranque) con reintentos durante ~2 minutos.
+      # (crash/timeout de arranque) con reintentos durante ~2 minutos, despues
+      # de la espera inicial de arriba.
       #
       # Limite conocido, a proposito no resuelto aca: un health-check simple
       # NO distingue "se redesplego bien" de "el contenedor VIEJO sigue sano
