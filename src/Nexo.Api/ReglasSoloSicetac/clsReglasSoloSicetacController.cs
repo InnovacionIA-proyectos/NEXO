@@ -3,6 +3,7 @@ using Nexo.Api.Common.RateLimiting;
 using Nexo.Application.CasosDeUso.ReglasSoloSicetac;
 using Nexo.Application.CasosDeUso.ReglasSoloSicetac.DTOs;
 using Nexo.Application.Common.Abstractions;
+using Nexo.Application.Common.Exceptions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -47,7 +48,11 @@ public class clsReglasSoloSicetacController(
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Eliminar(Guid id, CancellationToken ct = default)
-        => await eliminar.Handle(new clsEliminarReglaSoloSicetacCommand(id), ct) ? NoContent() : NotFound();
+    {
+        if (!await eliminar.Handle(new clsEliminarReglaSoloSicetacCommand(id), ct))
+            throw new clsNotFoundException("REGLA_NO_ENCONTRADA", "No existe una regla 'solo SICE-TAC' con ese identificador.");
+        return NoContent();
+    }
 
     /// <summary>Carga masiva desde Excel (.xlsx) con columnas Origen, Destino, Tipo de vehículo.</summary>
     [HttpPost("importar-excel")]

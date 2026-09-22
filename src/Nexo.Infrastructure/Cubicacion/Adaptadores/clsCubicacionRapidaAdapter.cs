@@ -14,7 +14,7 @@ namespace Nexo.Infrastructure.Cubicacion.Adaptadores;
 /// excepción declarada al "solo colas" del resto de Cubicación.
 ///
 /// Llama <c>POST {BaseAddress}api/cubicacion</c> con el mismo Bearer estático que
-/// Cubicador valida en <c>verificar_api_key</c> (<c>clsCubicador3D:OutboundApiKey</c>,
+/// Cubicador valida en <c>verificar_api_key</c> (<c>Cubicador3D:OutboundApiKey</c>,
 /// configurado como header por defecto del <see cref="HttpClient"/> tipado en
 /// DependencyInjection — nunca por request, para no repetir el secreto en el código).
 ///
@@ -65,7 +65,7 @@ public sealed class clsCubicacionRapidaAdapter(HttpClient http, ILogger<clsCubic
             if (respuesta.StatusCode == HttpStatusCode.Unauthorized)
                 throw new clsServiceUnavailableException(
                     "CUBICADOR_CREDENCIAL_INVALIDA",
-                    "Cubicador rechazó el Bearer configurado en clsCubicador3D:OutboundApiKey. ¿Está desactualizado tras una rotación?");
+                    "Cubicador rechazó el Bearer configurado en Cubicador3D:OutboundApiKey. ¿Está desactualizado tras una rotación?");
 
             log.LogWarning(
                 "Cubicador respondió {StatusCode} a la cubicación rápida: {Detalle}",

@@ -30,7 +30,7 @@ public class clsCubicadorApiKeyAuthenticationHandler(
 
     protected override Task<AuthenticateResult> HandleAuthenticateAsync()
     {
-        var keyEsperada = configuration["clsCubicador3D:InboundApiKey"];
+        var keyEsperada = configuration["Cubicador3D:InboundApiKey"];
         if (string.IsNullOrEmpty(keyEsperada))
             return Task.FromResult(AuthenticateResult.NoResult());
 

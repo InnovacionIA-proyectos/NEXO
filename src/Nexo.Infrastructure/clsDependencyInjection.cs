@@ -256,8 +256,8 @@ public static class clsDependencyInjection
         // diferencia de todo lo demás de este módulo. Sin las dos claves configuradas, se
         // registra el adapter "no configurado" (503 accionable) en vez de fallar la DI —
         // mismo criterio que BibliotecaSicetac/SapHistorico más arriba.
-        var cubicadorOutboundBaseUrl = config["clsCubicador3D:OutboundBaseUrl"];
-        var cubicadorOutboundApiKey = config["clsCubicador3D:OutboundApiKey"];
+        var cubicadorOutboundBaseUrl = config["Cubicador3D:OutboundBaseUrl"];
+        var cubicadorOutboundApiKey = config["Cubicador3D:OutboundApiKey"];
         if (!string.IsNullOrWhiteSpace(cubicadorOutboundBaseUrl) && !string.IsNullOrWhiteSpace(cubicadorOutboundApiKey))
         {
             services.AddHttpClient<ICubicacionRapidaPort, clsCubicacionRapidaAdapter>(cliente =>
@@ -268,7 +268,7 @@ public static class clsDependencyInjection
                 // tarda más que esto, conviene que la pantalla se entere pronto en vez de
                 // dejar al usuario mirando un spinner.
                 cliente.Timeout = TimeSpan.FromSeconds(
-                    int.TryParse(config["clsCubicador3D:OutboundTimeoutSegundos"], out var s) ? Math.Clamp(s, 5, 60) : 15);
+                    int.TryParse(config["Cubicador3D:OutboundTimeoutSegundos"], out var s) ? Math.Clamp(s, 5, 60) : 15);
             });
         }
         else

@@ -1,6 +1,7 @@
 using Nexo.Application.CasosDeUso.AjustesVigenciaPlaza;
 using Nexo.Application.CasosDeUso.AjustesVigenciaPlaza.DTOs;
 using Nexo.Application.Common.Abstractions;
+using Nexo.Application.Common.Exceptions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -56,5 +57,9 @@ public class clsTarifasPlazaVigenciaController(
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> QuitarVigencia(int tarifaId, CancellationToken ct = default)
-        => await quitar.Handle(new clsQuitarVigenciaPlazaCommand(tarifaId), ct) ? NoContent() : NotFound();
+    {
+        if (!await quitar.Handle(new clsQuitarVigenciaPlazaCommand(tarifaId), ct))
+            throw new clsNotFoundException("AJUSTE_VIGENCIA_NO_ENCONTRADO", "La tarifa indicada no tiene ningún ajuste local de vigencia para quitar.");
+        return NoContent();
+    }
 }
