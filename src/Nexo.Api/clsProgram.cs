@@ -32,6 +32,7 @@ using Nexo.Application.CasosDeUso.TarifasSicetacAdmin;
 using Nexo.Domain.Enums;
 using Nexo.Infrastructure;
 using Nexo.Infrastructure.Persistence;
+using System.Reflection;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -169,7 +170,15 @@ builder.Services.AddControllers()
     });
 
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(o =>
+{
+    // Sin esto, los /// <summary> de los controllers (varios ya los tenían) nunca
+    // llegaban al contrato que consume el frontend en /swagger - quedaban solo
+    // como comentario para quien lee el código. GenerateDocumentationFile en
+    // Nexo.Api.csproj es el otro lado de este cambio.
+    var xml = Path.Combine(AppContext.BaseDirectory, $"{Assembly.GetExecutingAssembly().GetName().Name}.xml");
+    if (File.Exists(xml)) o.IncludeXmlComments(xml);
+});
 
 // El backend lo consumen dos clientes con orígenes distintos: el frontend standalone
 // (desarrollo) y el módulo cabina-fletes dentro del portal de la Administración —

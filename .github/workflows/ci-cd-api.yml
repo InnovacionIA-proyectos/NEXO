@@ -175,20 +175,40 @@ jobs:
       # /health o un /version nuevo) y comparar contra github.sha, que es un
       # cambio mas grande (toca el Dockerfile y Program.cs) pendiente de
       # decidir aparte.
+      #
+      # 30 intentos x 10s (~5 min), no 12x10s (~2 min): el host de este
+      # servicio se probo manualmente el 2026-09-22 (sesion de QA de
+      # produccion) y la conexion desde fuera de la red corporativa cae de
+      # forma intermitente (timeouts de 8-20s reconectando solos segundos
+      # despues) - 2 minutos de ventana no alcanzaba a cubrir una caida de VPN
+      # o un redeploy de Dokploy mas lento de lo normal, y el job fallaba en
+      # falso con el servicio ya sano. Reintentos adaptativos en vez de una
+      # espera fija mas larga (p.ej. subir el ping de 90s a 180s): con
+      # reintentos el job sigue saliendo ni bien el servicio responde, sin
+      # quemar minutos de runner cuando el deploy es rapido.
+      #
+      # El curl de diagnostico (sin -f, nunca falla el step) imprime el
+      # HTTP real de cada intento en el log - antes un intento fallido no
+      # decia SI fue un timeout de red, un 502/503 de Dokploy, o el propio
+      # /health respondiendo Unhealthy (503 con detalle JSON, ver
+      # clsProgram.cs) - asi el proximo fallo se diagnostica desde el log,
+      # sin tener que reproducirlo a mano.
       - name: Verificar que el servicio respondio saludable tras el despliegue
         shell: cmd
         run: |
           set INTENTOS=0
           :verificar
+          set /a INTENTOS+=1
+          echo Intento %INTENTOS%:
+          curl -s -o NUL -w "  HTTP %%{http_code}\n" "${{ secrets.HEALTH_CHECK_URL_API }}/health"
           curl -f -s -o NUL "${{ secrets.HEALTH_CHECK_URL_API }}/health"
           if not errorlevel 1 goto exito
-          set /a INTENTOS+=1
-          if %INTENTOS% GEQ 12 goto fallo
+          if %INTENTOS% GEQ 30 goto fallo
           ping -n 11 127.0.0.1 >NUL
           goto verificar
           :exito
           echo Servicio respondio saludable tras el despliegue.
           exit /b 0
           :fallo
-          echo El servicio NO respondio saludable tras 12 intentos ^(~2 minutos^) - el despliegue no se confirma.
+          echo El servicio NO respondio saludable tras 30 intentos ^(~5 minutos^) - el despliegue no se confirma.
           exit /b 1

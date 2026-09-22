@@ -10,6 +10,14 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RootNamespace>Nexo.Api</RootNamespace>
+    <!-- Necesario para que los /// <summary> de los controllers lleguen a Swagger
+         (AddSwaggerGen().IncludeXmlComments en clsProgram.cs) - sin esto el
+         frontend solo ve rutas/esquemas en /swagger, nunca la descripción de qué
+         hace cada endpoint. NoWarn CS1591: no todo miembro público (records de
+         DTOs, records de Commands/Queries en otros proyectos, etc.) necesita un
+         /// propio - exigirlo ahí sería ruido, no documentación. -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

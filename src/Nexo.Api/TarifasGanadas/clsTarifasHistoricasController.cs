@@ -31,6 +31,7 @@ public class clsTarifasHistoricasController(
     /// separarlos en dos endpoints queda fuera del alcance de este fix.
     /// </summary>
     [HttpGet]
+    [ProducesResponseType(StatusCodes.Status200OK)]
     [EnableRateLimiting(clsRateLimitingExtensions.PoliticaListadosEstandar)]
     public async Task<ActionResult> Get(
         [FromQuery] string? q,

@@ -32,6 +32,7 @@ public class clsSesionController(ICurrentUser currentUser) : ControllerBase
     };
 
     [HttpGet("actual")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
     public ActionResult<clsSesionActualDto> Actual()
     {
         var idPortal = long.Parse(User.FindFirst(clsIdentidadPortalAuthenticationHandler.ClaimIdPortal)!.Value);

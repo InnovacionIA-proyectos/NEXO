@@ -34,6 +34,7 @@ public class clsBibliotecaSicetacController(
     /// siempre (`{ periodo, total, items }`).
     /// </summary>
     [HttpGet]
+    [ProducesResponseType(StatusCodes.Status200OK)]
     [EnableRateLimiting(clsRateLimitingExtensions.PoliticaListadosPesados)]
     public async Task<ActionResult<clsMatrizSicetacResultDto>> Get(
         [FromQuery] string? q,
@@ -50,11 +51,13 @@ public class clsBibliotecaSicetacController(
 
     /// <summary>Periodos disponibles en el DW (los 12 más recientes).</summary>
     [HttpGet("periodos")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyList<int>>> Periodos(CancellationToken ct = default)
         => Ok(await periodos.Handle(new clsPeriodosSicetacQuery(), ct));
 
     /// <summary>Valores disponibles para los filtros por columna (periodo más reciente).</summary>
     [HttpGet("filtros")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult<clsSicetacFiltrosDto>> Filtros(CancellationToken ct = default)
         => Ok(await filtros.Handle(new clsFiltrosSicetacQuery(), ct));
 }

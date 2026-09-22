@@ -38,6 +38,7 @@ public class clsBibliotecaSapPlazaController(
     /// aditivo: mismo shape de respuesta de siempre (`{ total, items }`).
     /// </summary>
     [HttpGet]
+    [ProducesResponseType(StatusCodes.Status200OK)]
     [EnableRateLimiting(clsRateLimitingExtensions.PoliticaListadosPesados)]
     public async Task<ActionResult<clsSapHistoricoResultDto>> Get(
         [FromQuery] string? q,
@@ -52,6 +53,7 @@ public class clsBibliotecaSapPlazaController(
 
     /// <summary>Valores disponibles para los filtros por columna (solo los usados en la tabla).</summary>
     [HttpGet("filtros")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult<clsSapHistoricoFiltrosDto>> Filtros(CancellationToken ct = default)
         => Ok(await filtros.Handle(new clsFiltrosSapPlazaQuery(), ct));
 }

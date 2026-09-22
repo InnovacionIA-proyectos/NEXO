@@ -19,6 +19,7 @@ public class clsTarifasSicetacController(
 {
     /// <summary>Consultar el piso SICE-TAC por ruta/configuración/carga.</summary>
     [HttpGet]
+    [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyList<clsTarifaSicetacDto>>> Consultar(
         [FromQuery] string? origen, [FromQuery] string? destino, [FromQuery] string? config,
         [FromQuery] string? tipoCarga, [FromQuery] string? unidad, [FromQuery] string? condicion,
@@ -30,6 +31,8 @@ public class clsTarifasSicetacController(
     [HttpPost("importar")]
     [Authorize(Roles = "CoordinadorFletes,Admin")]
     [RequestSizeLimit(10 * 1024 * 1024)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<clsImportResumenDto>> Importar(IFormFile? archivo, CancellationToken ct = default)
     {
         await using var stream = clsExcelUpload.AbrirValidado(archivo);
@@ -38,6 +41,7 @@ public class clsTarifasSicetacController(
 
     /// <summary>Historial de cargas de SICE-TAC.</summary>
     [HttpGet("importaciones")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyList<clsImportacionDto>>> Importaciones(CancellationToken ct = default)
         => Ok(await listarImportaciones.Handle(new clsListarImportacionesSicetacQuery(), ct));
 }

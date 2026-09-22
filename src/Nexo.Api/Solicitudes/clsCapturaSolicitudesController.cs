@@ -14,6 +14,7 @@ namespace Nexo.Api.Solicitudes;
 /// <summary>
 /// Captura de necesidades del equipo comercial: solicitudes puntuales (spot) o
 /// pliegos de licitación, ingresados a mano o importados desde el Excel del cliente.
+/// Solo Comercial/Admin — es la puerta de entrada de nuevas solicitudes.
 /// </summary>
 [ApiController]
 [Authorize(Roles = "Comercial,Admin")]
@@ -34,6 +35,8 @@ public class clsCapturaSolicitudesController(
     /// </summary>
     [HttpPost("analizar-excel")]
     [RequestSizeLimit(MaxTamanoArchivo)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<clsAnalisisExcelDto>> AnalizarExcel(IFormFile? archivo, CancellationToken ct = default)
     {
         await using var stream = clsExcelUpload.AbrirValidado(archivo);
@@ -45,6 +48,8 @@ public class clsCapturaSolicitudesController(
     /// configuraciones de vehículo a partir del texto libre de las líneas.
     /// </summary>
     [HttpPost]
+    [ProducesResponseType(StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<clsCapturaResultDto>> Capturar([FromBody] clsCapturaSolicitudRequest req, CancellationToken ct = default)
     {
         var lineas = req.Lineas.Select(lr => new clsCapturaLineaInput(
@@ -67,6 +72,8 @@ public class clsCapturaSolicitudesController(
     /// Devuelve candidato nulo si la matriz no trae la ruta.
     /// </summary>
     [HttpGet("aprovisionamiento")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<clsAprovisionamientoDto>> Aprovisionamiento(
         [FromQuery] string? levante, [FromQuery] string? origen, [FromQuery] string? configuracion, CancellationToken ct = default)
     {
@@ -82,6 +89,7 @@ public class clsCapturaSolicitudesController(
     /// clientes REALES (DimBPSolicitante) por nombre, NIT o BP; sin él, sobre la tabla local.
     /// </summary>
     [HttpGet("clientes")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyList<clsClienteBusquedaDto>>> Clientes([FromQuery] string? q, CancellationToken ct = default)
         => Ok(await buscarClientes.Handle(new clsBuscarClientesQuery(q), ct));
 }

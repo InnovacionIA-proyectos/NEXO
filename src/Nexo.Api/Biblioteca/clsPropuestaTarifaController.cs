@@ -19,6 +19,8 @@ public class clsPropuestaTarifaController(IQueryHandler<clsProponerPropuestaTari
 {
     /// <summary>Calcula la propuesta para cada línea de la solicitud. No persiste nada.</summary>
     [HttpGet]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<clsPropuestaSolicitudDto>> Get(Guid id, CancellationToken ct = default)
         => Ok(await proponer.Handle(new clsProponerPropuestaTarifaQuery(id), ct));
 }

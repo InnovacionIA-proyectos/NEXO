@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Nexo.Api.Metricas;
 
+/// <summary>Tablero del Líder de proceso: KPIs de cumplimiento y del piloto, solo lectura.</summary>
 [ApiController]
 [Authorize(Roles = "LiderProceso,AdminTarifas,Admin")]
 [Route("api/metricas")]
@@ -16,6 +17,7 @@ public class clsMetricasController(
 {
     /// <summary>KPIs de cumplimiento de SLA y estado de la cola (Tablero del Líder).</summary>
     [HttpGet("cumplimiento")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult<clsCumplimientoDto>> Cumplimiento(CancellationToken ct = default)
         => Ok(await cumplimiento.Handle(new clsObtenerCumplimientoQuery(), ct));
 
@@ -26,6 +28,7 @@ public class clsMetricasController(
     /// Sin filtro de fecha, corre sobre todo el histórico.
     /// </summary>
     [HttpGet("kpis-piloto")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult<clsKpisPilotoDto>> KpisPiloto(
         [FromQuery] DateTimeOffset? desde, [FromQuery] DateTimeOffset? hasta, CancellationToken ct = default)
         => Ok(await kpisPiloto.Handle(new clsObtenerKpisPilotoQuery(desde, hasta), ct));

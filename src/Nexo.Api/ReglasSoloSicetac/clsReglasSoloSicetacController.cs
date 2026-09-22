@@ -25,25 +25,35 @@ public class clsReglasSoloSicetacController(
     ICommandHandler<clsImportarReglasSoloSicetacExcelCommand, clsImportarReglasResultDto> importarExcel)
     : ControllerBase
 {
+    /// <summary>Lista todas las rutas "solo SICE-TAC" demarcadas.</summary>
     [HttpGet]
+    [ProducesResponseType(StatusCodes.Status200OK)]
     [EnableRateLimiting(clsRateLimitingExtensions.PoliticaListadosEstandar)]
     public async Task<ActionResult<IReadOnlyList<clsReglaSoloSicetacDto>>> Listar(CancellationToken ct = default)
         => Ok(await listar.Handle(new clsListarReglasSoloSicetacQuery(), ct));
 
+    /// <summary>Crea una regla "solo SICE-TAC" (origen + destino + tipo de vehículo).</summary>
     [HttpPost]
+    [ProducesResponseType(StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<clsReglaSoloSicetacDto>> Crear([FromBody] clsCrearReglaSoloSicetacRequest req, CancellationToken ct = default)
     {
         var dto = await crear.Handle(new clsCrearReglaSoloSicetacCommand(req.Origen, req.Destino, req.TipoVehiculo), ct);
         return Created($"/api/reglas-solo-sicetac/{dto.Id}", dto);
     }
 
+    /// <summary>Elimina una regla "solo SICE-TAC" por su id.</summary>
     [HttpDelete("{id:guid}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Eliminar(Guid id, CancellationToken ct = default)
         => await eliminar.Handle(new clsEliminarReglaSoloSicetacCommand(id), ct) ? NoContent() : NotFound();
 
     /// <summary>Carga masiva desde Excel (.xlsx) con columnas Origen, Destino, Tipo de vehículo.</summary>
     [HttpPost("importar-excel")]
     [RequestSizeLimit(10 * 1024 * 1024)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<clsImportarReglasResultDto>> ImportarExcel(IFormFile archivo, CancellationToken ct = default)
     {
         await using var stream = clsExcelUpload.AbrirValidado(archivo);

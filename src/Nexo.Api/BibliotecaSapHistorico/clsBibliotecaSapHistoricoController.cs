@@ -26,6 +26,7 @@ public class clsBibliotecaSapHistoricoController(
     /// texto (código DIVIPOLA de origen/destino o detalles) y línea de negocio.
     /// </summary>
     [HttpGet]
+    [ProducesResponseType(StatusCodes.Status200OK)]
     [EnableRateLimiting(clsRateLimitingExtensions.PoliticaListadosEstandar)]
     public async Task<ActionResult<clsSapHistoricoResultDto>> Get(
         [FromQuery] string? q,
@@ -39,6 +40,7 @@ public class clsBibliotecaSapHistoricoController(
 
     /// <summary>Valores disponibles para los filtros por columna (solo los usados en el histórico).</summary>
     [HttpGet("filtros")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult<clsSapHistoricoFiltrosDto>> Filtros(CancellationToken ct = default)
         => Ok(await filtros.Handle(new clsFiltrosSapHistoricoQuery(), ct));
 }
