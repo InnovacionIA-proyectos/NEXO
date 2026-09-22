@@ -11,7 +11,7 @@ namespace CabinaFletes.Application.CasosDeUso.Solicitudes.DTOs;
 
 public record LineaSolicitudDto(
     Guid Id, Guid? RutaId, Guid? ConfigVehiculoId, TipologiaCarga? Tipologia,
-    decimal? Peso, decimal? ValorMercancia, EstadoLinea EstadoLinea);
+    decimal? Peso, decimal? ValorMercancia, EstadoLinea EstadoLinea, string? MotivoPendiente);
 
 public record SolicitudDto(
     Guid Id, Guid ClienteId, string? ClienteNombre, TipoSolicitud Tipo, ModalidadSolicitud? Modalidad,
@@ -84,10 +84,16 @@ public record HojaExcelDto(
 public record AnalisisExcelDto(string Archivo, IReadOnlyList<HojaExcelDto> Hojas);
 
 /// <summary>
-/// Cliente para el formulario de captura. Los reales del DW traen Bp (ClienteId nulo
-/// hasta que se use en una solicitud); los locales traen ClienteId.
+/// Cliente/prospecto para el formulario de captura. Los reales del DW traen Bp
+/// (ClienteId nulo hasta que se use en una solicitud); los locales traen ClienteId.
+/// <c>Origen</c> distingue "cliente" (DimBPSolicitante o tabla local) de "prospecto"
+/// (tblProspectos, HU-005 parte 2) — un prospecto nunca trae Bp ni ClienteId, todavía
+/// no existe como cliente real.
 /// </summary>
-public record ClienteBusquedaDto(Guid? ClienteId, string? Bp, string Nit, string Nombre);
+public record ClienteBusquedaDto(Guid? ClienteId, string? Bp, string Nit, string Nombre, string Origen);
+
+/// <summary>Ciudad para Origen/Destino del formulario de captura (HU-005 parte 3).</summary>
+public record CiudadBusquedaDto(string Municipio, string Departamento);
 
 /// <summary>Estimación del aprovisionamiento del contenedor (viaje vacío levante → origen).</summary>
 public record AprovisionamientoDto(CandidatoTarifaDto? Candidato);

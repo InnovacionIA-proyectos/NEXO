@@ -1,5 +1,6 @@
 using CabinaFletes.Application.CasosDeUso.Solicitudes.DTOs;
 using CabinaFletes.Application.Common.Abstractions;
+using CabinaFletes.Application.Common.Dtos;
 using CabinaFletes.Domain.Solicitudes.Entidades;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -23,11 +24,14 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<RechazarSolicitudCommand, Unit>, RechazarSolicitudCommandHandler>();
         services.AddScoped<ICommandHandler<RecalcularScoreCommand, DesgloseScoreDto>, RecalcularScoreCommandHandler>();
         services.AddScoped<ICommandHandler<CapturarSolicitudCommand, CapturaResultDto>, CapturarSolicitudCommandHandler>();
+        services.AddScoped<ICommandHandler<ResolverCatalogosDeLineasCommand, IReadOnlyList<CatalogoLineaResueltoDto>>, ResolverCatalogosDeLineasCommandHandler>();
 
-        services.AddScoped<IQueryHandler<ObtenerBandejaQuery, IReadOnlyList<BandejaItemDto>>, ObtenerBandejaQueryHandler>();
+        services.AddScoped<IQueryHandler<ObtenerBandejaQuery, PaginaDto<BandejaItemDto>>, ObtenerBandejaQueryHandler>();
         services.AddScoped<IQueryHandler<ObtenerCosteoQuery, SolicitudCosteoDto>, ObtenerCosteoQueryHandler>();
         services.AddScoped<IQueryHandler<AnalizarExcelQuery, AnalisisExcelDto>, AnalizarExcelQueryHandler>();
         services.AddScoped<IQueryHandler<BuscarClientesQuery, IReadOnlyList<DTOs.ClienteBusquedaDto>>, BuscarClientesQueryHandler>();
+        services.AddScoped<IQueryHandler<ListarDepartamentosQuery, IReadOnlyList<string>>, ListarDepartamentosQueryHandler>();
+        services.AddScoped<IQueryHandler<BuscarCiudadesQuery, IReadOnlyList<DTOs.CiudadBusquedaDto>>, BuscarCiudadesQueryHandler>();
         return services;
     }
 }

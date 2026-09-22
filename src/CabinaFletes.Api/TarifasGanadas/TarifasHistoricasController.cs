@@ -1,8 +1,12 @@
+using System.ComponentModel.DataAnnotations;
+using CabinaFletes.Api.Common.RateLimiting;
 using CabinaFletes.Application.CasosDeUso.TarifasGanadas;
 using CabinaFletes.Application.CasosDeUso.TarifasGanadas.DTOs;
 using CabinaFletes.Application.Common.Abstractions;
+using CabinaFletes.Application.Common.Dtos;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace CabinaFletes.Api.TarifasGanadas;
 
@@ -12,21 +16,31 @@ namespace CabinaFletes.Api.TarifasGanadas;
 [Route("api/tarifas-historicas")]
 public class TarifasHistoricasController(
     IQueryHandler<SugerirTarifaHistoricaQuery, IReadOnlyList<BibliotecaItemDto>> sugerir,
-    IQueryHandler<BuscarBibliotecaTarifasQuery, IReadOnlyList<BibliotecaItemDto>> buscar)
+    IQueryHandler<BuscarBibliotecaTarifasQuery, PaginaDto<BibliotecaItemDto>> buscar)
     : ControllerBase
 {
     /// <summary>
-    /// Con ruta/vehículo → sugerencias para el costeo. Con q/mercancia/vigencia/origen →
-    /// búsqueda filtrada de la Biblioteca. Sin nada → las más recientes.
+    /// Con ruta/vehículo → sugerencias para el costeo (siempre las 10 más recientes, sin
+    /// paginar — es una sugerencia puntual, no un listado a recorrer). Con
+    /// q/mercancia/vigencia/origen → búsqueda filtrada de la Biblioteca, PAGINADA
+    /// (issue #166: page/pageSize, respuesta `{ items, total }`). Sin nada → las más
+    /// recientes sin paginar (mismo comportamiento que "sugerir").
+    ///
+    /// El shape de la respuesta depende de la rama (array plano vs. `{items,total}`) -
+    /// a propósito, son dos casos de uso distintos que comparten ruta desde el original;
+    /// separarlos en dos endpoints queda fuera del alcance de este fix.
     /// </summary>
     [HttpGet]
-    public async Task<ActionResult<IReadOnlyList<BibliotecaItemDto>>> Get(
+    [EnableRateLimiting(RateLimitingExtensions.PoliticaListadosEstandar)]
+    public async Task<ActionResult> Get(
         [FromQuery] string? q,
         [FromQuery] Guid? ruta,
         [FromQuery] Guid? vehiculo,
         [FromQuery] string? mercancia,
         [FromQuery] string? vigencia,
         [FromQuery] string? origen,      // "ganada" | "legado"
+        [FromQuery, Range(1, int.MaxValue)] int page = 1,
+        [FromQuery, Range(1, 200)] int pageSize = 50,
         CancellationToken ct = default)
     {
         if (ruta != null || vehiculo != null)
@@ -43,6 +57,6 @@ public class TarifasHistoricasController(
             "legado" => false,
             _ => null,
         };
-        return Ok(await buscar.Handle(new BuscarBibliotecaTarifasQuery(q, mercancia, vigencia, deGanada), ct));
+        return Ok(await buscar.Handle(new BuscarBibliotecaTarifasQuery(q, mercancia, vigencia, deGanada, page, pageSize), ct));
     }
 }

@@ -38,9 +38,15 @@ class _PublisherFalso:
 
     def __init__(self) -> None:
         self.publicados: list[tuple[str, str, dict]] = []
+        self.vehiculos_publicados: list[str] = []
 
     async def publicar_cubicacion_solicitada(self, plan_id: str, tipo: str, solicitud: dict) -> None:
         self.publicados.append((tipo, plan_id, solicitud))
+
+    async def publicar_vehiculo_creado(self, vehiculo_id: str, vehiculo: dict) -> None:
+        # Issue #162: listar_con_siembra() publica esto por cada preset nuevo -
+        # el primer GET /vehiculos de la suite siembra los 9 presets.
+        self.vehiculos_publicados.append(vehiculo_id)
 
 
 @pytest.fixture

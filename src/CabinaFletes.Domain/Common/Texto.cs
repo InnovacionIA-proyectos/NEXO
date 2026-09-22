@@ -36,6 +36,16 @@ public static class Texto
     public static string ClaveRuta(string? origen, string? destino) => $"{Normalizar(origen)}|{Normalizar(destino)}";
 
     /// <summary>
+    /// Clave de ruta + tipo de vehículo (origen|destino|tipoVehiculo) normalizada.
+    /// Issue #17: la regla "Solo SICE-TAC" se DEFINE con estas 3 llaves (ver
+    /// ReglaSoloSicetac), pero se venía APLICANDO solo con las 2 primeras
+    /// (<see cref="ClaveRuta"/>) - marcar un único tipo de vehículo apagaba la
+    /// comparación contra plaza para TODOS los tipos de vehículo de la ruta.
+    /// </summary>
+    public static string ClaveRutaVehiculo(string? origen, string? destino, string? tipoVehiculo) =>
+        $"{ClaveRuta(origen, destino)}|{Normalizar(tipoVehiculo)}";
+
+    /// <summary>
     /// Intenta partir "ORIGEN - DESTINO" (formato de NOMBRERUTA del export SICE-TAC) en sus
     /// dos ciudades. Devuelve null si no hay un separador claro.
     /// </summary>

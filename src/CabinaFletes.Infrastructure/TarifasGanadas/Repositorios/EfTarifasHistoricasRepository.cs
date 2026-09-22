@@ -36,7 +36,8 @@ public sealed class EfTarifasHistoricasRepository(CabinaFletesDbContext db, Time
         return await Materializar(q.OrderByDescending(h => h.Fecha).Take(10), ct);
     }
 
-    public async Task<IReadOnlyList<BibliotecaItemDto>> BuscarAsync(string? q, string? mercancia, string? vigencia, bool? deGanada, CancellationToken ct)
+    public async Task<(IReadOnlyList<BibliotecaItemDto> Items, int Total)> BuscarAsync(
+        string? q, string? mercancia, string? vigencia, bool? deGanada, int page, int pageSize, CancellationToken ct)
     {
         var query = Base();
 
@@ -72,7 +73,9 @@ public sealed class EfTarifasHistoricasRepository(CabinaFletesDbContext db, Time
         if (deGanada.HasValue)
             query = query.Where(h => (h.CotizacionId != null) == deGanada.Value);
 
-        return await Materializar(query.OrderByDescending(h => h.Fecha).Take(50), ct);
+        var total = await query.CountAsync(ct);
+        var pagina = query.OrderByDescending(h => h.Fecha).Skip((page - 1) * pageSize).Take(pageSize);
+        return (await Materializar(pagina, ct), total);
     }
 
     private IQueryable<TarifaHistorica> Base() =>

@@ -21,6 +21,9 @@ appsettings.*.local.json
 # Configuración local de Claude Code (permisos, hosts internos) — no versionar
 .claude/settings.json
 
+# Override local de Docker Compose (puertos/ajustes propios de una máquina) — no versionar
+docker-compose.override.yml
+
 # Logs y temporales
 *.log
 *.tmp
@@ -33,6 +36,16 @@ Thumbs.db
 docs/analisis-dw-sap-baseline-cubicador.md
 docs/captura-prueba-rutas-reales.xlsx
 docs/diccionario-datos-cabinafletes.md
+docs/ejemplo_licitacion.xlsx
 docs/hallazgos-requisitos-estudio-bd.md
 docs/hallazgos-requisitos.md
 docs/propuesta-bd-nexo.md
+
+# Histórico oficial de SICE-TAC (excels ~100-180 MB c/u) — cada archivo supera
+# el límite de 100 MB de GitHub. Pendiente: manifiesto + almacenamiento externo
+# o Git LFS (ver analitica/04-comparativa-y-propuesta-modelo/recomendacion_captura_datos.md).
+# Cubre las 2 carpetas que llegó a tener (2 sesiones en paralelo, nombres distintos)
+# y el patrón de archivo en cualquier ruta, por seguridad.
+analitica/00-fuentes/Historicos_SICE/
+analitica/00-fuentes/historico-sicetac/*.xlsx
+**/SICETAC_*.xlsx

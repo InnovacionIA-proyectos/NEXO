@@ -7,14 +7,19 @@ namespace CabinaFletes.Domain.Priorizacion.Reglas;
 /// <summary>
 /// Calcula el score de priorización (0–100) que reemplaza el FIFO.
 ///
-/// Score = Urgencia (EXCLUSIVAMENTE en función de la fecha límite / deadline).
+/// Score = suma ponderada de 4 componentes (issue #172/#173 — decisión documentada en
+/// docs/decisiones/score-prioridad-4-pesos-vs-solo-urgencia.md tras encontrar que el
+/// repo se contradecía a sí mismo: el código calculaba los 4 componentes pero el total
+/// descartaba 3 de ellos, dejando <see cref="ParametrosScore"/> con 4 pesos editables
+/// por el Admin sin ningún efecto real):
 ///
-/// Por decisión de negocio, la prioridad depende solo de qué tan cerca está el deadline:
 ///  - Urgencia: rampa lineal inversa al tiempo restante hasta el deadline (vencido = 100).
+///  - Valor: escala logarítmica del valor estimado contra un valor de referencia.
+///  - Probabilidad: probabilidad de cierre (0–100).
+///  - Tipo: licitación pesa más que spot.
 ///
-/// Los demás componentes (valor, probabilidad de cierre, tipo) se siguen calculando SOLO
-/// como referencia en el desglose de <see cref="ResultadoScore"/>, pero NO afectan el total.
-/// El horizonte de la rampa vive en <see cref="ParametrosScore"/> (editable por el Admin).
+/// Los 4 pesos (<see cref="ParametrosScore.PesoUrgencia"/> y análogos) son editables por
+/// el Admin y suman 1.0 por defecto, así que el total queda en la misma escala 0–100.
 /// Función pura y determinista: el "ahora" se inyecta para poder probarla.
 /// </summary>
 public static class ScorePrioridadCalculator
@@ -26,9 +31,9 @@ public static class ScorePrioridadCalculator
         var probabilidad = ComponenteProbabilidad(solicitud.ProbabilidadCierre, p.ProbabilidadPorDefecto);
         var tipo = ComponenteTipo(solicitud.Tipo, p.PuntajeLicitacion, p.PuntajeSpot);
 
-        // El total es EXCLUSIVAMENTE la urgencia por deadline. Valor/probabilidad/tipo
-        // quedan en el desglose como referencia, sin ponderarse en el total.
-        var total = urgencia;
+        var total = Math.Clamp(
+            p.PesoUrgencia * urgencia + p.PesoValor * valor + p.PesoProbabilidad * probabilidad + p.PesoTipo * tipo,
+            0, 100);
 
         return new ResultadoScore(
             Redondear(total),

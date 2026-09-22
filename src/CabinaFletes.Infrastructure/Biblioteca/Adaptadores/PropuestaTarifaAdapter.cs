@@ -16,6 +16,7 @@ using CabinaFletes.Domain.Solicitudes.Entidades;
 using CabinaFletes.Infrastructure.External;
 using CabinaFletes.Infrastructure.Persistence;
 using CabinaFletes.Infrastructure.ReglasSoloSicetac.Repositorios;
+using CabinaFletes.Mensajes.Notificaciones;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
@@ -46,13 +47,14 @@ public sealed class PropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuestaDeL
     private readonly IAjustesVigenciaPlazaRepository _ajustes;
     private readonly IClavesSoloSicetacPort _reglas;
     private readonly ISapTarifaFleteEnVivoPort _sapEnVivo;
+    private readonly IPublicadorDeMensajes _publicador;
     private readonly bool _dwConfigurado;
     private readonly bool _dcConfigurado;
 
     public PropuestaTarifaAdapter(
         CabinaFletesDbContext db, IServiceProvider sp, IServiceScopeFactory scopes,
         IMemoryCache cache, TimeProvider clock, IAjustesVigenciaPlazaRepository ajustes,
-        IClavesSoloSicetacPort reglas, ISapTarifaFleteEnVivoPort sapEnVivo)
+        IClavesSoloSicetacPort reglas, ISapTarifaFleteEnVivoPort sapEnVivo, IPublicadorDeMensajes publicador)
     {
         _db = db;
         _scopes = scopes;
@@ -63,6 +65,7 @@ public sealed class PropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuestaDeL
         _ajustes = ajustes;
         _reglas = reglas;
         _sapEnVivo = sapEnVivo;
+        _publicador = publicador;
     }
 
     /// <summary>
@@ -82,7 +85,7 @@ public sealed class PropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuestaDeL
             ?? throw new NotFoundException("LINEA_NO_ENCONTRADA", "Línea de solicitud no encontrada.");
 
         var ajustes = await _ajustes.MapaAsync(ct);
-        var soloSice = await _reglas.ClavesRutaAsync(ct);
+        var soloSice = await _reglas.ClavesRutaVehiculoAsync(ct);
 
         using var scope = _scopes.CreateScope();
         var dw = _dwConfigurado ? scope.ServiceProvider.GetService<DwSiceDbContext>() : null;
@@ -90,7 +93,29 @@ public sealed class PropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuestaDeL
         var tarifario = scope.ServiceProvider.GetRequiredService<ITarifarioSapPort>();
 
         var dto = await ProponerLineaAsync(dw, dc, tarifario, linea, ajustes, soloSice, ct);
+        await PublicarVencidaSiAplicaAsync(dto, ct);
         return new ResultadoDeCosteo(dto.ValorPropuesto, dto.FuentePropuesta, dto.Justificacion);
+    }
+
+    /// <summary>
+    /// Sección 9 del documento de entendimiento: alerta de urgencia Alta cuando el
+    /// costeo descarta una tarifa de plaza por vencida (RN-02). Solo desde el camino
+    /// por línea (ProponerParaLineaAsync), nunca desde el camino por solicitud
+    /// (ProponerAsync): ese último corre sus grupos en paralelo sobre el MISMO
+    /// DbContext, y el publicador de mensajes escribe en él — hacerlo ahí sería una
+    /// carrera de datos. Deduplicado por día: un pliego con 300 líneas de la misma
+    /// ruta vencida no debe mandar 300 correos.
+    /// </summary>
+    private async Task PublicarVencidaSiAplicaAsync(PropuestaLineaDto dto, CancellationToken ct)
+    {
+        if (!dto.Vencida) return;
+
+        var clave = $"tarifa-vencida-avisada:{dto.Ruta}|{dto.Vehiculo}|{_clock.GetUtcNow():yyyy-MM-dd}";
+        if (_cache.TryGetValue(clave, out _)) return;
+        _cache.Set(clave, true, TimeSpan.FromHours(24));
+
+        await _publicador.PublicarAsync(
+            new TarifaVencidaDetectada(dto.LineaId, dto.Justificacion, _clock.GetUtcNow()), ct);
     }
 
     public async Task<PropuestaSolicitudDto> ProponerAsync(Guid solicitudId, CancellationToken ct = default)
@@ -108,7 +133,7 @@ public sealed class PropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuestaDeL
         var lineas = solicitud.Lineas.ToList();
 
         var ajustes = await _ajustes.MapaAsync(ct);
-        var soloSice = await _reglas.ClavesRutaAsync(ct);
+        var soloSice = await _reglas.ClavesRutaVehiculoAsync(ct);
 
         static string Huella(LineaSolicitud l) => string.Join('|',
             l.Ruta?.Origen, l.Ruta?.Destino, l.ConfiguracionVehiculo?.TipoVehiculo, l.ConfiguracionVehiculo?.Carroceria,
@@ -129,6 +154,18 @@ public sealed class PropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuestaDeL
                 var tarifario = scope.ServiceProvider.GetRequiredService<ITarifarioSapPort>();
                 var dto = await ProponerLineaAsync(dw, dc, tarifario, grupo.First(), ajustes, soloSice, ct);
                 return grupo.Select(l => dto with { LineaId = l.Id }).ToList();
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+            {
+                // Regla inviolable 6: un grupo que falla (fuente caída, timeout) NO puede
+                // llevarse los demás. Task.WhenAll falla rápido y descarta hasta los grupos
+                // que ya habían terminado bien si uno solo lanza — por eso el catch va AQUÍ,
+                // por grupo, y no alrededor del WhenAll. Issue #131.
+                var primera = grupo.First();
+                var justificacion = $"No se pudo consultar la Biblioteca para esta línea: {ex.Message}";
+                return grupo.Select(l => new PropuestaLineaDto(
+                    l.Id, $"{primera.Ruta?.Origen} → {primera.Ruta?.Destino}", primera.ConfiguracionVehiculo?.TipoVehiculo,
+                    l.Peso, null, null, null, null, null, justificacion)).ToList();
             }
             finally
             {
@@ -160,7 +197,11 @@ public sealed class PropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuestaDeL
         // repositorio que las lee. Antes se comparaban los valores crudos de la ruta
         // contra claves ya normalizadas, y la regla no se aplicaba en silencio: ver
         // ClaveDeRutaTests en Domain.Tests y el comentario de cierre de la issue #16.
-        if (soloSice.Contains(Texto.ClaveRuta(linea.Ruta.Origen, linea.Ruta.Destino)))
+        //
+        // Issue #17: las 3 llaves (ruta + tipo de vehículo), no solo las 2 de la ruta -
+        // antes, marcar un único tipo de vehículo como "solo SICE-TAC" apagaba la
+        // comparación contra plaza para TODOS los tipos de vehículo de esa ruta.
+        if (soloSice.Contains(Texto.ClaveRutaVehiculo(linea.Ruta.Origen, linea.Ruta.Destino, vehiculo)))
         {
             var sice = dw is null ? null : await CandidatoSicetacAsync(dw, origen, destino, vehiculo, linea.Tipologia, linea.ConfiguracionVehiculo?.Carroceria, ct);
             var justif = sice is not null
@@ -182,19 +223,33 @@ public sealed class PropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuestaDeL
                 linea.RetornaContenedor, linea.CiudadDevolucionContenedor), ct);
         }
 
-        CandidatoTarifaDto? sicetac;
         CandidatoTarifaDto? plaza;
         var vencida = oficial?.Vencida == true;
         if (oficial is not null)
         {
             plaza = oficial.Tarifa;
-            sicetac = oficial.SicetacOficial;
         }
         else
         {
-            sicetac = dw is null ? null : await CandidatoSicetacAsync(dw, origen, destino, vehiculo, linea.Tipologia, linea.ConfiguracionVehiculo?.Carroceria, ct);
             plaza = dc is null ? null : await CandidatoSapAsync(dc, dc.TarifasPlazaSap, "plaza", origen, destino, vehiculo, linea.Peso, soloVigentes: true, ajustesVigencia, ct);
         }
+
+        // Issue #175/#176: TarifarioSapAdapter.SicetacOficialAsync (réplica 1:1 de la
+        // lógica SAP legada) exige match exacto de Configuracion/TipoCarga/
+        // UnidadTransporte/ViaEstandar sin fallback, y solo aplica a Contenedor/Cupo
+        // (nunca a CargaSuelta/Extradimensionado) - eso deja sin piso automático rutas
+        // que sí existen y son encontrables (reproducido con Medellín-Guarne),
+        // obligando a marcar "Solo SICE-TAC" a mano para que aparezcan (la ruta
+        // siempre fue encontrable: esa marca usa CandidatoSicetacAsync, el selector
+        // tolerante de abajo). Si el camino oficial no encuentra nada, se reintenta con
+        // ESE MISMO selector antes de rendirse, así el camino normal encuentra como
+        // mínimo lo mismo que "Solo SICE-TAC". El camino oficial se prueba primero y no
+        // se toca: sigue gobernando sin cambios cuando sí encuentra algo (verificado
+        // contra datos reales en tests/QA/hu-13.4-verificacion-reglas-negocio-datos-reales).
+        var sicetac = oficial?.SicetacOficial;
+        if (sicetac is null && dw is not null)
+            sicetac = await CandidatoSicetacAsync(dw, origen, destino, vehiculo, linea.Tipologia, linea.ConfiguracionVehiculo?.Carroceria, ct);
+
         var historico = dc is null ? null : await CandidatoSapAsync(dc, dc.TarifasLogSap, "historico_sap", origen, destino, vehiculo, linea.Peso, soloVigentes: false, ajustesVigencia, ct);
 
         // S2-HU-09.1/09.3 (#31/#33): conexión SAP NUEVA (plaza en vivo), todavía no
@@ -224,6 +279,13 @@ public sealed class PropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuestaDeL
             ADominio(sicetac), ADominio(plaza), ADominio(historico), vencida);
         var (valor, fuente, justificacion) = (decision.Valor, decision.Fuente, decision.Justificacion);
 
+        // Issue #169: cuando la propuesta final es plaza y ese candidato viene del
+        // fallback conservador (no un match exacto por vehículo/peso), la advertencia
+        // se anexa a la MISMA justificación que ya se le muestra al usuario - no hace
+        // falta que el frontend sepa leer un campo aparte para enterarse.
+        if (fuente == "plaza" && plaza?.Advertencia is { } advertenciaPlaza)
+            justificacion += $" ⚠ {advertenciaPlaza}";
+
         if (oficial?.Retorno is { } retorno)
             justificacion += $" Retorno del contenedor a {linea.CiudadDevolucionContenedor}: {retorno.Valor:C0} (línea devolución, exclusivo).";
         else if (linea.RetornaContenedor)
@@ -236,7 +298,8 @@ public sealed class PropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuestaDeL
             linea.Peso,
             sicetac, plaza, historico,
             valor, fuente, justificacion,
-            oficial?.Retorno);
+            oficial?.Retorno,
+            Vencida: vencida);
     }
 
     // La decisión vive en Domain (Costeo/Reglas/ReglaDeCosteo): son invariantes del

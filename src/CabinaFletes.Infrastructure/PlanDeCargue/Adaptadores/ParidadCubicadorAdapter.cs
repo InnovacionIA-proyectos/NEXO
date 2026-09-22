@@ -25,7 +25,11 @@ public sealed class ParidadCubicadorAdapter(IConfiguration config, ILogger<Parid
     {
         get
         {
-            var verificada = config.GetValue<bool>("Cubicacion:ParidadVerificada");
+            // Issue #183: config.GetValue<bool>(...) usa Convert.ChangeType, que lanza
+            // FormatException sin controlar con el valor por defecto real de esta clave
+            // (cadena vacía, no ausente): un despliegue nuevo sin encender la compuerta
+            // crasheaba con 500 en vez de responder el 503 documentado.
+            var verificada = bool.TryParse(config["Cubicacion:ParidadVerificada"], out var v) && v;
             var evidencia = config["Cubicacion:ParidadEvidencia"];
             var fechaTexto = config["Cubicacion:ParidadFecha"];
             var fecha = DateOnly.TryParse(fechaTexto, out var f) ? f : (DateOnly?)null;

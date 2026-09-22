@@ -84,7 +84,19 @@ public static class DependencyInjection
         {
             services.AddDbContext<DwSiceDbContext>(options =>
                 options.UseSqlServer(dwSice, sql =>
-                    sql.EnableRetryOnFailure(maxRetryCount: 3, maxRetryDelay: TimeSpan.FromSeconds(5), errorNumbersToAdd: null)));
+                {
+                    sql.EnableRetryOnFailure(maxRetryCount: 3, maxRetryDelay: TimeSpan.FromSeconds(5), errorNumbersToAdd: null);
+                    // Issue #167: tblRutasSicetac (~2.14M filas) no tiene NINGÚN índice sobre
+                    // Periodo/NombreRuta/Configuracion/NombreUnidadTransporte - NEXO no
+                    // gestiona el esquema de esa base (DwSiceDbContext es solo lectura, sin
+                    // migraciones propias: la tabla la mantiene el ETL del DW corporativo),
+                    // así que el índice real es una petición al equipo de datos, no un fix
+                    // de código acá. Mientras tanto, el default de 30s de SqlClient coincide
+                    // exactamente con el síntoma reportado ("Execution Timeout Expired" al
+                    // filtrar) - subirlo evita el 500 duro en consultas legítimamente lentas
+                    // sin pretender resolver la causa raíz.
+                    sql.CommandTimeout(90);
+                }));
         }
 
         // DW de cubos de operaciones (DWCubosOperacionesEBS.DimBPSolicitante, SOLO
@@ -167,6 +179,7 @@ public static class DependencyInjection
             services.AddScoped<ICorreoPort, SmtpCorreoAdapter>();
         }
         services.AddSingleton<IExportadorCotizacionExcelPort, ExportadorCotizacionExcelClosedXml>(); // sin estado
+        services.AddScoped<IDestinatariosDeAlertaPort, DestinatariosDeAlertaAdapter>();
 
         // Reglas "solo SICE-TAC" (el mismo repositorio implementa el puerto de lectura
         // cacheada que consume Biblioteca).
@@ -213,6 +226,12 @@ public static class DependencyInjection
         services.AddScoped<IConfiguracionesVehiculoPort, EfConfiguracionesVehiculoRepository>();
         services.AddScoped<IClientesPort, EfClientesRepository>();
         services.AddScoped<IClientesDwPort, ClientesDwAdapter>();
+        // Prospectos (dbSolucionesTI.tblProspectos, HU-005 parte 2): mismo criterio que
+        // ClientesDwAdapter — se registra siempre, y se degrada sola (Configurado=false)
+        // si DbSolucionesTiDbContext no está registrado (ver dbSolucionesTiConfigurado arriba).
+        services.AddScoped<IProspectosDwPort, ProspectosDwAdapter>();
+        // Ciudades para Origen/Destino (HU-005 parte 3): mismo criterio de degradación.
+        services.AddScoped<ICiudadesDwPort, CiudadesDwAdapter>();
         services.AddScoped<IExcelSolicitudesPort, ExcelSolicitudesAdapter>();
         services.AddScoped<ITarifasCosteoPort, EfTarifasCosteoRepository>();
 

@@ -166,8 +166,23 @@ Ejemplo:       FO 301291984 — Clase Expedición FWO = "LTL (carga incompleta d
 Hipótesis:     N/A — confirmado.
 Verificación:  Consulta directa a FactFWOFUFO, fila completa del FO.
 Severidad:     Baja (caso único, ya explicado)
-Impacto:       Ninguno adicional — es un ajuste de negocio legítimo, no requiere corrección ni exclusión del análisis.
-Recomendación: Reclasificar de "por_confirmar" a "caso_legítimo" en cualquier análisis de outliers (ya reclasificado aquí).
+Impacto:       Ninguno adicional para el EDA — es un ajuste de negocio legítimo, no requiere corrección ni exclusión del análisis descriptivo. Para el futuro modelo predictivo sí es relevante: es el único valor negativo de la variable objetivo, y una transformación logarítmica del flete (necesaria por las colas largas, ver notebook 04) no admite valores negativos.
+Recomendación: Reclasificar de "por_confirmar" a "caso_legítimo" en cualquier análisis de outliers (ya reclasificado aquí). Para el modelo predictivo de Flete Producción FO: excluir esta fila (FO 301291984) del set de entrenamiento, documentando el motivo explícitamente (descuento operacional aplicado, no error) — no descartarla en silencio.
+```
+
+## H-013 🔎
+
+```
+ID:            H-013
+Título:        "1" en ID Medio Transporte FO es un valor de relleno del sistema ("0001"), no un código de vehículo real — confirmado a escala de toda la compañía
+Dimensión:     Calidad / Exactitud
+Evidencia:     2 registros del extracto (FO 301231729, FO 301358477) con idMedioTransporteFo = "1". Consultados directamente en FactFWOFUFO: el valor real es "0001" (texto), no "1" — la exportación a Excel lo leyó como número y perdió los ceros a la izquierda. A escala de toda la compañía, "0001" aparece en 1.114 registros de FactFWOFUFO (~0,56% de los ~199.219 FO de la ventana, ver H-004), asociado a decenas de combinaciones incompatibles de Clase Equipo FOP/Grupo de Equipo FWOP — camiones chicos, camiones de 34 toneladas, contenedores de 20 y 40 pies, en ambos grupos CAM y CN — imposible si fuera el código real de un tipo de vehículo específico.
+Ejemplo:       FO 301231729 (Clase Equipo FOP=CNT20.ST, Grupo=CN) y FO 301358477 (Clase Equipo FOP=C2.8T, Grupo=CAM) — mismo "0001" en ambos, con configuraciones de equipo totalmente distintas.
+Hipótesis:     N/A — confirmado en dos partes: (1) el "1" del extracto es un bug de exportación (conversión numérica que quita los ceros a la izquierda de "0001"); (2) "0001" en sí es un valor de relleno/placeholder del sistema origen, no un código de vehículo real. (Una primera hipótesis de esta misma investigación — inferir el valor real cruzando con `Tipo`, ej. TC_TURBO/TC_SENCI — se descartó al consultar FactFWOFUFO directamente: no aplica, el valor real ya era "0001").
+Verificación:  Consulta directa a FactFWOFUFO por los 2 FO del extracto, y conteo a escala de toda la compañía (WHERE "ID Medio Transporte FO" = '0001') — 2026-09-14.
+Severidad:     Baja para este extracto (2 de 41.237 filas, 0,005%); a vigilar si se amplía el alcance geográfico (1.114 de ~199.219 FO a nivel compañía, ~0,56%)
+Impacto:       No se puede recuperar el tipo de vehículo real de estas filas con la información disponible — cualquier intento de inferirlo (ej. por `Tipo`) no es confiable.
+Recomendación: Para el futuro modelo, no eliminar estas filas (el resto de sus datos — peso, distancia, ruta, flete — sigue siendo válido) ni inventar un valor — codificar `ID Medio Transporte FO` como categoría explícita "sin_clasificar"/"desconocido" en vez de un tipo de vehículo real. Reportar al negocio como hallazgo de escala de compañía (1.114 registros), no como anécdota local de Buenaventura.
 ```
 
 ---
@@ -188,23 +203,25 @@ Toda decisión tomada ante ambigüedad en este EDA, con su justificación y qué
 
 ## Recomendaciones al negocio
 
-**(a) Campos a agregar en la próxima extracción:**
-- Fecha/hora de salida, llegada y entrega real (no solo creación administrativa del FO).
-- Estado del viaje (para no depender de cruzar contra `FactFWOFUFO`).
-- Costo real de operación (combustible, peajes, mantenimiento).
-- `BP Conductor FO` (ya existe en la fuente, no se trajo a este extracto).
-- Coordenadas, o al menos la zona de tarificación explícita (`tblZonasTarificacionRelacion`).
-- Número de contrato/tarifario aplicado por viaje.
-- Unidad de `Peso Neto` confirmada explícitamente (kg vs t).
+**(a) Campos a agregar en la próxima extracción** — fuente de cada uno, verificada 2026-09-14 contra el inventario completo de columnas de `FactFWOFUFO` y el código del backend de CabinaFletes:
+
+| Campo | Estado | Dónde se consigue |
+|---|---|---|
+| Fecha/hora de salida, llegada y entrega real (no solo creación administrativa del FO) | ✅ Localizada | `FactFWOFUFO`: `Fecha Hora Recogida FWOP`, `Fecha Hora Entrega FWOP`, `Fecha Inicio Cargue`/`Fecha Fin Cargue`, `Fecha Inicio Descargue`/`Fecha Fin Descargue`, `Fecha Llegada Cliente`/`Fecha Descargue Cliente`, `Fecha Hora Último Descargue`. Solo falta incluirlas en el extracto |
+| Estado del viaje (para no depender de cruzar contra `FactFWOFUFO`) | ✅ Localizada | `FactFWOFUFO`: `Estado Ejecución FO`/`FU`/`FWO` y `Estado Ciclo Vida FO`/`FU`/`FWO` (ya usadas para verificar H-004 por consulta aparte; falta incluirlas directamente en el extracto) |
+| `BP Conductor FO` (ya existe en la fuente, no se trajo a este extracto) | ✅ Confirmada | Columna `BP Conductor FO`, presente tal cual en `FactFWOFUFO` |
+| Coordenadas, o al menos la zona de tarificación explícita | ✅ Confirmada (H-008) | Tabla `tblZonasTarificacionRelacion`, en la base operativa de SAP (no en `DWCubos`/`FactFWOFUFO`). Pista sin confirmar: `FactFWOFUFO.Ruta FO` y `.Corredor` podrían ya traer la ruta resuelta o el corredor comercial — pendiente inspeccionar valores de muestra |
+| Unidad de `Peso Neto` confirmada explícitamente (kg vs t) | ✅ Ya confirmada = KG | Dato directo de `FactFWOFUFO` (ver inciso (c) abajo) — falta que la próxima extracción la declare explícitamente desde el inicio, sin depender de ese cruce puntual |
+| Número de contrato/tarifario aplicado por viaje | ❌ No localizada como campo directo | Revisado el inventario completo de `FactFWOFUFO`: no hay `IdTarifa`/`NumContrato` explícito (`Importe Contrato Vinculación FWO` es otro concepto — el contrato de vinculación del vehículo, no la tarifa aplicada). 3 alternativas, de más a menos directa: (1) reconstruirlo por coincidencia de valor cruzando cada viaje contra `tblSAPTarifas`/`tblSAPTarifasLog` por ruta+vehículo+vigencia+valor exacto — método ya validado en EDA-2 (H-005/H-007, 32/32 líneas resueltas así); (2) preguntar a IT/SAP si el sistema transaccional (no el cubo) guarda un ID de condición de tarifa no replicado al cubo; (3) si nada resuelve, usar un proxy (cercanía del flete pagado al rango legítimo de `tblSAPTarifas`) en vez del ID exacto |
 
 **(b) Reglas de validación a implementar en origen:**
 - Alertar cuando `Tarifa Venta al Cliente` = `Flete Producción FO` exactamente (posible default no actualizado, hoy 72,2% del set).
 - Alertar cuando el flete exceda el techo de `tblSAPTarifas` para esa ruta (hubiera evitado el error de $46,8M).
 - Corregir el registro de `Clase Equipo FOP = CNT40.HC` mal clasificado bajo grupo `CAM`.
-- Revisar por qué `"1"` aparece como `ID Medio Transporte FO` válido (valor basura, 2 registros).
+- Por qué `"1"` aparece como `ID Medio Transporte FO` válido — **resuelto** (H-013): es el valor de relleno `"0001"`, no un código de vehículo real; afecta 1.114 registros a nivel compañía (2 en este extracto). Alertar/corregir en origen cuando `ID Medio Transporte FO = "0001"`.
 
 **(c) Definiciones a formalizar en el diccionario:**
-- ~~Confirmar si `FO` puede representar carga consolidada de varios clientes~~ — **confirmado** (H-001), ya no es pregunta abierta.
-- ~~Unidad de `Peso Neto`~~ — **confirmada = KG** (dato directo de `FactFWOFUFO`). ~~Moneda de las columnas monetarias~~ — **confirmada = COP**. Sigue abierto solo si los montos incluyen IVA o no.
+- Confirmar si `FO` puede representar carga consolidada de varios clientes — **confirmado** (H-001), ya no es pregunta abierta.
+- Unidad de `Peso Neto` — **confirmada = KG** (dato directo de `FactFWOFUFO`). Moneda de las columnas monetarias — **confirmada = COP**. Sigue abierto solo si los montos incluyen IVA o no.
 - Las 3 líneas de negocio del catálogo (`OHUC`, `OPSC`, `OPXL`) **sí existen y se usan a nivel de toda la compañía** (`OHUC`: 1.028 registros, `OPSC`: 29.646, `OPXL`: 4 — verificado en `FactFWOFUFO`, sin filtro de ubicación). La pregunta ya no es "¿existen?" sino **¿por qué no aparecen en el corredor de Buenaventura en esta ventana?** — probable especialización por puerto (ej. la contenerización `OHUC` podría concentrarse en puertos del Caribe, no en Buenaventura, que es predominantemente descontenerización). Pendiente confirmar con negocio.
 - Confirmar formalmente el criterio de extracción y los estados excluidos (ya tenemos evidencia fuerte: `Concluido`/`Ejecutado` únicamente).

@@ -1,8 +1,12 @@
+using System.ComponentModel.DataAnnotations;
+using CabinaFletes.Api.Common.RateLimiting;
 using CabinaFletes.Application.CasosDeUso.Solicitudes;
 using CabinaFletes.Application.CasosDeUso.Solicitudes.DTOs;
 using CabinaFletes.Application.Common.Abstractions;
+using CabinaFletes.Application.Common.Dtos;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace CabinaFletes.Api.Solicitudes;
 
@@ -10,26 +14,31 @@ namespace CabinaFletes.Api.Solicitudes;
 [Authorize]
 [Route("api/solicitudes")]
 public class SolicitudesController(
-    IQueryHandler<ObtenerBandejaQuery, IReadOnlyList<BandejaItemDto>> bandeja,
+    IQueryHandler<ObtenerBandejaQuery, PaginaDto<BandejaItemDto>> bandeja,
     IQueryHandler<ObtenerCosteoQuery, SolicitudCosteoDto> costeo,
     ICommandHandler<CrearSolicitudCommand, Guid> crear,
     ICommandHandler<CargarLineasBulkCommand, Guid> cargarLineas,
     ICommandHandler<RechazarSolicitudCommand, Unit> rechazar,
-    ICommandHandler<RecalcularScoreCommand, DesgloseScoreDto> recalcular)
+    ICommandHandler<RecalcularScoreCommand, DesgloseScoreDto> recalcular,
+    ICommandHandler<ResolverCatalogosDeLineasCommand, IReadOnlyList<CatalogoLineaResueltoDto>> resolverCatalogos)
     : ControllerBase
 {
     /// <summary>
     /// Bandeja Priorizada (anti-FIFO). Filtros: estado de la solicitud, atención
     /// (pendientes | automatico | administrador | atendidas | todas) y rango de fecha
     /// de captura (desde/hasta). Sin filtros muestra la cola de pendientes.
+    /// Issue #166: pagina (page/pageSize, respuesta `{ items, total }`).
     /// </summary>
     [HttpGet]
-    public async Task<ActionResult<IReadOnlyList<BandejaItemDto>>> GetBandeja(
+    [EnableRateLimiting(RateLimitingExtensions.PoliticaListadosEstandar)]
+    public async Task<ActionResult<PaginaDto<BandejaItemDto>>> GetBandeja(
         [FromQuery] string? estado, [FromQuery] string? atencion, [FromQuery] DateTimeOffset? desde,
         [FromQuery] DateTimeOffset? hasta, [FromQuery] string? vigencia,
         [FromQuery] string orderBy = "score", // vestigial, como en el original: siempre ordena por score
+        [FromQuery, Range(1, int.MaxValue)] int page = 1,
+        [FromQuery, Range(1, 200)] int pageSize = 50,
         CancellationToken ct = default)
-        => Ok(await bandeja.Handle(new ObtenerBandejaQuery(new BandejaFiltro(estado, atencion, desde, hasta, vigencia)), ct));
+        => Ok(await bandeja.Handle(new ObtenerBandejaQuery(new BandejaFiltro(estado, atencion, desde, hasta, vigencia), page, pageSize), ct));
 
     /// <summary>Abrir solicitud: devuelve el costo base pre-armado (SICE-TAC + históricos) por línea.</summary>
     [HttpGet("{id:guid}")]
@@ -44,6 +53,21 @@ public class SolicitudesController(
         var linea = req.Linea is null ? null : new CrearLineaInput(req.Linea.RutaId, req.Linea.ConfigVehiculoId, req.Linea.Tipologia, req.Linea.Peso, req.Linea.ValorMercancia);
         var id = await crear.Handle(new CrearSolicitudCommand(req.ClienteId, req.Tipo, req.Modalidad, req.Deadline, req.ValorEstimado, req.ProbabilidadCierre, linea), ct);
         return Created($"/api/solicitudes/{id}", new { id });
+    }
+
+    /// <summary>
+    /// Resuelve texto libre (origen/destino/tipo de vehículo) a RutaId/ConfigVehiculoId,
+    /// creando lo que falte en el catálogo. NO crea ninguna solicitud: es el paso previo
+    /// para que un formulario de captura pueda alimentar a lineas:bulk, que ya exige esos
+    /// IDs resueltos y no los resuelve por su cuenta (issue #131).
+    /// </summary>
+    [HttpPost("resolver-catalogos")]
+    [Authorize(Roles = "Comercial,CoordinadorFletes,Admin")]
+    public async Task<ActionResult<IReadOnlyList<CatalogoLineaResueltoDto>>> ResolverCatalogos(
+        [FromBody] List<ResolverCatalogoLineaRequest> req, CancellationToken ct = default)
+    {
+        var lineas = req.Select(lr => new ResolverCatalogoLineaInput(lr.Origen, lr.Destino, lr.TipoVehiculo, lr.Carroceria)).ToList();
+        return Ok(await resolverCatalogos.Handle(new ResolverCatalogosDeLineasCommand(lineas), ct));
     }
 
     /// <summary>

@@ -81,3 +81,28 @@ jobs:
             -H "Content-Type: application/json" ^
             -H "X-GitHub-Event: push" ^
             -d "{\"ref\":\"${{ github.ref }}\",\"repository\":{\"full_name\":\"${{ github.repository }}\"}}"
+
+      # Issue #163: mismo razonamiento que ci-cd-api.yml - el webhook de arriba
+      # solo confirma que Dokploy RECIBIO la orden, nunca que termino el
+      # build/deploy real. Este paso detecta al menos "el contenedor nuevo
+      # nunca volvio a responder" (crash/timeout de arranque), con reintentos
+      # durante ~2 minutos. Limite conocido (no distingue "redeploy exitoso" de
+      # "el contenedor viejo sigue sano con codigo viejo"): igual que en
+      # ci-cd-api.yml, ver el comentario completo alli.
+      - name: Verificar que el servicio respondio saludable tras el despliegue
+        shell: cmd
+        run: |
+          set INTENTOS=0
+          :verificar
+          curl -f -s -o NUL "${{ secrets.HEALTH_CHECK_URL_CUBICADOR_API }}/health"
+          if not errorlevel 1 goto exito
+          set /a INTENTOS+=1
+          if %INTENTOS% GEQ 12 goto fallo
+          timeout /t 10 /nobreak >NUL
+          goto verificar
+          :exito
+          echo Servicio respondio saludable tras el despliegue.
+          exit /b 0
+          :fallo
+          echo El servicio NO respondio saludable tras 12 intentos ^(~2 minutos^) - el despliegue no se confirma.
+          exit /b 1

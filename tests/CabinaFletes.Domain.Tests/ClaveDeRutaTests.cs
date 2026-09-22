@@ -67,4 +67,33 @@ public class ClaveDeRutaTests
         // corrección: un solo criterio para quien escribe la regla y quien la compara.
         Assert.Equal(claveCanonica, Texto.ClaveRuta(origenComoLoGuardabaLaRegla, destino));
     }
+
+    /// <summary>
+    /// EVIDENCIA DEL DEFECTO CORREGIDO EN LA ISSUE #17.
+    ///
+    /// La regla "solo SICE-TAC" se DEFINE con 3 llaves (Origen, Destino, TipoVehiculo -
+    /// ver ReglaSoloSicetac), pero PropuestaTarifaAdapter aplicaba la excepción
+    /// comparando solo por Texto.ClaveRuta (2 llaves). Marcar UN tipo de vehículo
+    /// apagaba la comparación contra plaza para TODOS los tipos de vehículo de esa
+    /// ruta. Texto.ClaveRutaVehiculo agrega la tercera llave al mismo criterio canónico.
+    /// </summary>
+    [Fact]
+    public void Distintos_tipos_de_vehiculo_en_la_misma_ruta_dan_claves_distintas()
+    {
+        var claveTurbo = Texto.ClaveRutaVehiculo("Bogotá", "Cali", "Turbo");
+        var clave3S3 = Texto.ClaveRutaVehiculo("Bogotá", "Cali", "3S3");
+
+        Assert.NotEqual(claveTurbo, clave3S3);
+        // Sin la 3ra llave, ambas colapsarían a la misma clave de ruta - la causa del bug.
+        Assert.Equal(Texto.ClaveRuta("Bogotá", "Cali"), Texto.ClaveRuta("Bogotá", "Cali"));
+    }
+
+    [Theory]
+    [InlineData("3S3", "3s3")]
+    [InlineData("Turbo", "TURBO")]
+    [InlineData(" 2L3 ", "2L3")]
+    public void El_tipo_de_vehiculo_se_normaliza_igual_que_la_ruta(string escrito, string otraForma)
+        => Assert.Equal(
+            Texto.ClaveRutaVehiculo("Bogotá", "Cali", escrito),
+            Texto.ClaveRutaVehiculo("Bogotá", "Cali", otraForma));
 }

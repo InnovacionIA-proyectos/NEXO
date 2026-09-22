@@ -1,4 +1,3 @@
-using CabinaFletes.Application.CasosDeUso.Cotizaciones.Excepciones;
 using CabinaFletes.Application.CasosDeUso.Cotizaciones;
 using CabinaFletes.Application.CasosDeUso.Cotizaciones.Interfaces;
 using CabinaFletes.Application.Common;
@@ -21,11 +20,12 @@ public class MarcarResultadoCommandTests
     private readonly Mock<IAuditoriaPort> _auditoria = new();
     private readonly Mock<ICurrentUserPort> _usuarioActual = new();
     private readonly FakeTimeProvider _clock = new();
+    private readonly Mock<IPublicadorDeMensajes> _publicador = new();
     private readonly Mock<IUnitOfWork> _uow = new();
 
     private MarcarResultadoCommandHandler Handler() => new(
         _cotizaciones.Object, _solicitudes.Object, _tarifasHistoricas.Object,
-        _auditoria.Object, _usuarioActual.Object, _clock, _uow.Object);
+        _auditoria.Object, _usuarioActual.Object, _clock, _publicador.Object, _uow.Object);
 
     private static Cotizacion Entregada(Guid solicitudId, ResultadoCotizacion resultado = ResultadoCotizacion.SinDefinir) => new()
     {
@@ -76,6 +76,13 @@ public class MarcarResultadoCommandTests
             Handler().Handle(new MarcarResultadoCommand(cotizacionId, "perdida", "precio", null)));
     }
 
+    /// <summary>
+    /// Issue #171: ANTES, una cotización en Borrador con líneas SÍ podía marcar
+    /// resultado directo (sin pasar por /entregar), registrando una "entrega
+    /// implícita" que ponía EntregadaAt sin que nadie hubiera entregado de verdad -
+    /// contaminaba entregadaAt/SLA/cotizaciones emitidas en el tablero de KPIs del
+    /// piloto. Ahora SIEMPRE exige Estado == Entregada, sin importar si tiene líneas.
+    /// </summary>
     [Fact]
     public async Task Borrador_sin_lineas_no_puede_marcar_resultado()
     {
@@ -83,8 +90,29 @@ public class MarcarResultadoCommandTests
         var c = new Cotizacion { SolicitudId = Guid.NewGuid(), Estado = EstadoCotizacion.Borrador, Lineas = [] };
         _cotizaciones.Setup(r => r.ObtenerParaMarcarResultadoAsync(cotizacionId, default)).ReturnsAsync(c);
 
-        await Assert.ThrowsAsync<CotizacionSinFleteException>(() =>
+        var ex = await Assert.ThrowsAsync<ConflictException>(() =>
             Handler().Handle(new MarcarResultadoCommand(cotizacionId, "ganada", null, null)));
+        Assert.Equal("COTIZACION_NO_ENTREGADA", ex.Code);
+    }
+
+    [Fact]
+    public async Task Borrador_con_lineas_tampoco_puede_marcar_resultado_ni_marca_entregadaAt()
+    {
+        var cotizacionId = Guid.NewGuid();
+        var c = new Cotizacion
+        {
+            SolicitudId = Guid.NewGuid(), Estado = EstadoCotizacion.Borrador,
+            Lineas = [new CotizacionLinea { ValorFlete = 100_000m }],
+        };
+        _cotizaciones.Setup(r => r.ObtenerParaMarcarResultadoAsync(cotizacionId, default)).ReturnsAsync(c);
+
+        var ex = await Assert.ThrowsAsync<ConflictException>(() =>
+            Handler().Handle(new MarcarResultadoCommand(cotizacionId, "ganada", null, null)));
+
+        Assert.Equal("COTIZACION_NO_ENTREGADA", ex.Code);
+        Assert.Null(c.EntregadaAt);
+        Assert.Equal(EstadoCotizacion.Borrador, c.Estado);
+        _uow.Verify(u => u.SaveChangesAsync(default), Times.Never);
     }
 
     [Fact]

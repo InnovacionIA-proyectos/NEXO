@@ -27,7 +27,7 @@ public sealed class SapHistoricoNoConfiguradoAdapter : ISapHistoricoPort
 
     public Task<SapHistoricoResultDto> BuscarPlazaAsync(
         string? q, int? lineaNegocio, string? tipoVehiculo, string? tipoCarroseria, int? claseViaje,
-        int top, CancellationToken ct = default)
+        int top, int page = 1, CancellationToken ct = default)
         => throw Error();
 
     public Task<SapHistoricoFiltrosDto> FiltrosPlazaAsync(CancellationToken ct = default)

@@ -1,9 +1,11 @@
 using CabinaFletes.Api.Common.Errors;
+using CabinaFletes.Api.Common.RateLimiting;
 using CabinaFletes.Application.CasosDeUso.ReglasSoloSicetac;
 using CabinaFletes.Application.CasosDeUso.ReglasSoloSicetac.DTOs;
 using CabinaFletes.Application.Common.Abstractions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace CabinaFletes.Api.ReglasSoloSicetac;
 
@@ -24,6 +26,7 @@ public class ReglasSoloSicetacController(
     : ControllerBase
 {
     [HttpGet]
+    [EnableRateLimiting(RateLimitingExtensions.PoliticaListadosEstandar)]
     public async Task<ActionResult<IReadOnlyList<ReglaSoloSicetacDto>>> Listar(CancellationToken ct = default)
         => Ok(await listar.Handle(new ListarReglasSoloSicetacQuery(), ct));
 

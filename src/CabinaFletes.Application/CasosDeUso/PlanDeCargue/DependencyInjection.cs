@@ -1,5 +1,6 @@
 using CabinaFletes.Application.CasosDeUso.PlanDeCargue.DTOs;
 using CabinaFletes.Application.Common.Abstractions;
+using CabinaFletes.Application.Common.Dtos;
 using CabinaFletes.Mensajes.Cubicacion;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -24,8 +25,8 @@ public static class DependencyInjection
         // hacia directo contra Cubicador, y sin ella S3-HU-05 no puede cerrar.
         .AddScoped<ICommandHandler<EliminarVehiculoCommand, ComandoAceptadoDto>, EliminarVehiculoCommandHandler>()
         // S3-HU-03 (issue #112): lectura del visor 3D, toda contra la proyección local.
-        .AddScoped<IQueryHandler<ListarVehiculosQuery, IReadOnlyList<VehiculoCubicacionDto>>, ListarVehiculosQueryHandler>()
-        .AddScoped<IQueryHandler<ListarPlanesCargueQuery, IReadOnlyList<PlanCargueDto>>, ListarPlanesCargueQueryHandler>()
+        .AddScoped<IQueryHandler<ListarVehiculosQuery, PaginaDto<VehiculoCubicacionDto>>, ListarVehiculosQueryHandler>()
+        .AddScoped<IQueryHandler<ListarPlanesCargueQuery, PaginaDto<PlanCargueDto>>, ListarPlanesCargueQueryHandler>()
         .AddScoped<IQueryHandler<ObtenerResultadoPlanQuery, ResultadoPlanDto>, ObtenerResultadoPlanQueryHandler>()
         .AddScoped<IQueryHandler<ObtenerFlotaPlanQuery, IReadOnlyList<PlanFlotaItemDto>>, ObtenerFlotaPlanQueryHandler>()
         .AddScoped<IQueryHandler<ObtenerMetricasPlanQuery, MetricasCubicacionEvento?>, ObtenerMetricasPlanQueryHandler>()

@@ -1,9 +1,13 @@
+using System.ComponentModel.DataAnnotations;
+using CabinaFletes.Api.Common.RateLimiting;
 using CabinaFletes.Application.CasosDeUso.PlanDeCargue;
 using CabinaFletes.Application.CasosDeUso.PlanDeCargue.DTOs;
 using CabinaFletes.Application.Common.Abstractions;
+using CabinaFletes.Application.Common.Dtos;
 using CabinaFletes.Mensajes.Cubicacion;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace CabinaFletes.Api.PlanDeCargue;
 
@@ -39,7 +43,7 @@ public record GuardarVehiculoRequest(
 public class VehiculosController(
     ICommandHandler<GuardarVehiculoCommand, ComandoAceptadoDto> guardar,
     ICommandHandler<EliminarVehiculoCommand, ComandoAceptadoDto> eliminar,
-    IQueryHandler<ListarVehiculosQuery, IReadOnlyList<VehiculoCubicacionDto>> listar)
+    IQueryHandler<ListarVehiculosQuery, PaginaDto<VehiculoCubicacionDto>> listar)
     : ControllerBase
 {
     [Authorize(Roles = "Comercial,CoordinadorFletes,Admin")]
@@ -62,22 +66,28 @@ public class VehiculosController(
     /// todos los planes, a diferencia del alta, que un comercial puede necesitar en medio
     /// de una cotización.
     ///
-    /// Responde 202 sin comprobar si el vehículo existe o si tiene planes asociados: NEXO
-    /// no mantiene espejo del catálogo (issue #108), así que no puede saberlo sin
-    /// preguntarle a Cubicador. Si está en uso, Cubicador rechaza con VEHICULO_EN_USO por
-    /// `cubicacion.rechazada`.
+    /// Issue #155: responde 409 VEHICULO_EN_USO si algún plan de cargue todavía referencia
+    /// el vehículo (validado síncrono contra la fila espejo de PlanCargue, ver
+    /// EliminarVehiculoCommandHandler). Solo si no hay ningún plan asociado se publica el
+    /// comando y responde 202.
     /// </summary>
     [Authorize(Roles = "Admin")]
     [HttpDelete("{id:guid}")]
     [ProducesResponseType(StatusCodes.Status202Accepted)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<ActionResult<ComandoAceptadoDto>> Eliminar(Guid id, CancellationToken ct = default)
         => Accepted(await eliminar.Handle(new EliminarVehiculoCommand(id), ct));
-    /// <summary>S3-HU-03 (issue #112): catálogo completo, contra la proyección local.
+    /// <summary>S3-HU-03 (issue #112): catálogo contra la proyección local.
     /// [Authorize] sin rol específico — mismo criterio que el resto de las consultas
-    /// del sistema (docs/ROLES_Y_PERMISOS.md).</summary>
+    /// del sistema (docs/ROLES_Y_PERMISOS.md). Issue #166: pagina (page/pageSize,
+    /// mismo patrón que /api/servicios-conexos) aunque el catálogo hoy sea chico.</summary>
     [Authorize]
     [HttpGet]
     [ProducesResponseType(StatusCodes.Status200OK)]
-    public async Task<ActionResult<IReadOnlyList<VehiculoCubicacionDto>>> Listar(CancellationToken ct = default)
-        => Ok(await listar.Handle(new ListarVehiculosQuery(), ct));
+    [EnableRateLimiting(RateLimitingExtensions.PoliticaListadosEstandar)]
+    public async Task<ActionResult<PaginaDto<VehiculoCubicacionDto>>> Listar(
+        [FromQuery, Range(1, int.MaxValue)] int page = 1,
+        [FromQuery, Range(1, 200)] int pageSize = 50,
+        CancellationToken ct = default)
+        => Ok(await listar.Handle(new ListarVehiculosQuery(page, pageSize), ct));
 }

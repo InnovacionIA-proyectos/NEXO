@@ -1,9 +1,13 @@
+using System.ComponentModel.DataAnnotations;
+using CabinaFletes.Api.Common.RateLimiting;
 using CabinaFletes.Application.CasosDeUso.PlanDeCargue;
 using CabinaFletes.Application.CasosDeUso.PlanDeCargue.DTOs;
 using CabinaFletes.Application.Common.Abstractions;
+using CabinaFletes.Application.Common.Dtos;
 using CabinaFletes.Mensajes.Cubicacion;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace CabinaFletes.Api.PlanDeCargue;
 
@@ -50,7 +54,7 @@ public class PlanesCargueController(
     ICommandHandler<EliminarPlanCommand, ComandoAceptadoDto> eliminarPlan,
     ICommandHandler<AjustarColocacionCommand, ComandoAceptadoDto> ajustarColocacion,
     IQueryHandler<ObtenerPlanCargueQuery, PlanCargueDto> consultar,
-    IQueryHandler<ListarPlanesCargueQuery, IReadOnlyList<PlanCargueDto>> listar,
+    IQueryHandler<ListarPlanesCargueQuery, PaginaDto<PlanCargueDto>> listar,
     IQueryHandler<ObtenerResultadoPlanQuery, ResultadoPlanDto> obtenerResultado,
     IQueryHandler<ObtenerFlotaPlanQuery, IReadOnlyList<PlanFlotaItemDto>> obtenerFlota,
     IQueryHandler<ObtenerPlanesPorLineaQuery, IReadOnlyList<PlanFlotaItemDto>> obtenerPlanesPorLinea,
@@ -216,12 +220,17 @@ public class PlanesCargueController(
     // sistema (docs/ROLES_Y_PERMISOS.md — "cualquiera de los 6 roles puede consultar").
     // ----------------------------------------------------------------------------
 
-    /// <summary>GET /api/planes-cargue — listado (100 más recientes) contra la proyección local.</summary>
+    /// <summary>GET /api/planes-cargue — listado contra la proyección local. Issue #166:
+    /// pagina (page/pageSize) en vez del tope fijo de 100 que tenía antes.</summary>
     [Authorize]
     [HttpGet]
     [ProducesResponseType(StatusCodes.Status200OK)]
-    public async Task<ActionResult<IReadOnlyList<PlanCargueDto>>> Listar(CancellationToken ct = default)
-        => Ok(await listar.Handle(new ListarPlanesCargueQuery(), ct));
+    [EnableRateLimiting(RateLimitingExtensions.PoliticaListadosEstandar)]
+    public async Task<ActionResult<PaginaDto<PlanCargueDto>>> Listar(
+        [FromQuery, Range(1, int.MaxValue)] int page = 1,
+        [FromQuery, Range(1, 200)] int pageSize = 50,
+        CancellationToken ct = default)
+        => Ok(await listar.Handle(new ListarPlanesCargueQuery(page, pageSize), ct));
 
     /// <summary>
     /// [S3-HU-04.3, issue #78] GET /api/planes-cargue/por-linea/{lineaId} — sondeo de la

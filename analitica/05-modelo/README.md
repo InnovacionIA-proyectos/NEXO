@@ -1,15 +1,18 @@
 # Modelo predictivo — reservado, sin HU asignada todavía
 
-Sin contenido todavía. Parte de las conclusiones de los dos EDA de S2-HU-11:
+Sin contenido todavía. Parte de las conclusiones de los dos EDA de S2-HU-11 y
+de la comparativa que los contrasta:
 [`../02-eda-viajes-btura/`](../02-eda-viajes-btura/) (grano y variable
-objetivo — predecir `Flete Producción FO` — se deciden ahí) y
+objetivo — predecir `Flete Producción FO` — se deciden ahí),
 [`../03-eda-extraccion-4-fuentes/`](../03-eda-extraccion-4-fuentes/) (señal
-de contexto de mercado: piso SICE-TAC, plaza SAP).
+de contexto de mercado: piso SICE-TAC, plaza SAP) y
+[`../04-comparativa-y-propuesta-modelo/`](../04-comparativa-y-propuesta-modelo/)
+(la propuesta de modelo(s) con su objetivo, grano, features y supuestos).
 
 Estructura esperada (a confirmar cuando exista la HU):
 
 ```
-04-modelo/
+05-modelo/
 ├── features/         Ingeniería de variables derivadas del EDA
 ├── entrenamiento/     Código de entrenamiento
 └── artefactos/        Modelos entrenados

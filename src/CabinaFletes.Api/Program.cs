@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using CabinaFletes.Api.Common.Auth;
 using CabinaFletes.Api.Common.Errors;
 using CabinaFletes.Api.Common.Middleware;
+using CabinaFletes.Api.Common.RateLimiting;
 using CabinaFletes.Api.Bandeja;
 using CabinaFletes.Api.PlanDeCargue;
 using CabinaFletes.Api.Priorizacion;
@@ -21,6 +22,7 @@ using CabinaFletes.Application.CasosDeUso.BibliotecaSapHistorico;
 using CabinaFletes.Application.CasosDeUso.Cotizaciones;
 using CabinaFletes.Application.CasosDeUso.Cubicacion;
 using CabinaFletes.Application.CasosDeUso.Metricas;
+using CabinaFletes.Application.CasosDeUso.Notificaciones;
 using CabinaFletes.Application.CasosDeUso.Priorizacion;
 using CabinaFletes.Application.CasosDeUso.ReglasSoloSicetac;
 using CabinaFletes.Application.CasosDeUso.ServiciosConexos;
@@ -78,6 +80,7 @@ builder.Services.AddScoped<INotificadorDePlanCargue, NotificadorPlanCargueSignal
 builder.Services.AddPlanDeCargueUseCases();
 builder.Services.AddCubicacionUseCases();
 builder.Services.AddCotizacionesUseCases();
+builder.Services.AddNotificacionesUseCases();
 builder.Services.AddReglasSoloSicetacUseCases();
 builder.Services.AddAjustesVigenciaPlazaUseCases();
 builder.Services.AddBibliotecaUseCases();
@@ -146,6 +149,10 @@ builder.Services.Configure<ForwardedHeadersOptions>(o =>
     o.KnownProxies.Clear();
 });
 
+// Issue #168: rate limiting básico (por rol/IP) en los endpoints de listado más
+// pesados - ver RateLimitingExtensions para el detalle de las dos políticas.
+builder.Services.AddRateLimitingNexo();
+
 // --------------------------------------------------------------- Controllers + JSON
 builder.Services.AddControllers()
     .AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()))
@@ -162,7 +169,33 @@ builder.Services.AddControllers()
     });
 
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(o =>
+{
+    // Conveniencia SOLO para pruebas manuales en Swagger (Development, ver más abajo):
+    // el esquema real (IdentidadPortalAuthenticationHandler) valida el encabezado
+    // X-Portal-Usuario-Id en cada request, no un bearer token. Declararlo como
+    // "apiKey" acá le pone a Swagger un botón "Authorize" normal donde se pega el id
+    // una sola vez y queda aplicado a todas las llamadas de prueba.
+    var esquema = new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+    {
+        Name = IdentidadPortalAuthenticationHandler.HeaderIdUsuario,
+        In = Microsoft.OpenApi.Models.ParameterLocation.Header,
+        Type = Microsoft.OpenApi.Models.SecuritySchemeType.ApiKey,
+        Description = "Id de portal de un usuario ya sembrado (tabla Usuarios), ej. 1007 (Comercial).",
+    };
+    o.AddSecurityDefinition(IdentidadPortalAuthenticationHandler.SchemeName, esquema);
+    o.AddSecurityRequirement(new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
+    {
+        [new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+        {
+            Reference = new Microsoft.OpenApi.Models.OpenApiReference
+            {
+                Type = Microsoft.OpenApi.Models.ReferenceType.SecurityScheme,
+                Id = IdentidadPortalAuthenticationHandler.SchemeName,
+            },
+        }] = []
+    });
+});
 
 // El backend lo consumen dos clientes con orígenes distintos: el frontend standalone
 // (desarrollo) y el módulo cabina-fletes dentro del portal de la Administración
@@ -230,6 +263,10 @@ app.UseMiddleware<ErrorHandlingMiddleware>();
 app.UseCors(ClientesCors);
 app.UseAuthentication();
 app.UseAuthorization();
+// Después de Authorization: el particionado por rol (RateLimitingExtensions)
+// necesita que User.FindFirst(ClaimTypes.Role) ya esté resuelto. Antes de
+// MapControllers para que el 429 se decida sin llegar a ningún handler.
+app.UseRateLimiter();
 
 app.MapControllers();
 

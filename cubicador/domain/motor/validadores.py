@@ -160,6 +160,32 @@ def validar_apilamiento(
         if soporte.item.fragil and item.peso_kg > soporte.item.peso_kg:
             return f"'{soporte.item.descripcion}' es fragil y no debe cargar una unidad mas pesada que ella"
 
+        # Issue #154: el peso tambien baja hacia los ancestros INDIRECTOS de la
+        # pila (2+ niveles debajo) - `_acumular_peso_encima` ya se lo suma a toda
+        # la cadena via `soporte_id`, pero antes solo se comparaba contra
+        # `max_peso_encima_kg` del soporte DIRECTO. Con 3 niveles A-B-C, colocar C
+        # nunca revalidaba el limite de A aunque el peso de C SI le llegara.
+        ancestro = (
+            next((c for c in colocadas if c.item.id == soporte.soporte_id), None)
+            if soporte.soporte_id is not None else None
+        )
+        visitados = 0
+        while ancestro is not None and visitados < 50:
+            if (
+                ancestro.item.max_peso_encima_kg >= 0
+                and ancestro.peso_encima_kg + peso_recibido > ancestro.item.max_peso_encima_kg
+            ):
+                return (
+                    f"'{ancestro.item.descripcion}' soporta maximo {ancestro.item.max_peso_encima_kg:.0f} kg "
+                    f"encima (lleva {ancestro.peso_encima_kg:.0f} kg y la cadena de apilamiento le agregaria "
+                    f"{peso_recibido:.0f} kg)"
+                )
+            ancestro = (
+                next((c for c in colocadas if c.item.id == ancestro.soporte_id), None)
+                if ancestro.soporte_id is not None else None
+            )
+            visitados += 1
+
     return None
 
 
@@ -276,14 +302,22 @@ def anotar_accesibilidad(colocadas: list[Colocacion], cont: Contenedor) -> list[
 
         violaciones = [b for b in bloqueadores if b.item.secuencia_entrega > c.item.secuencia_entrega]
         c.accesibilidad = "bloqueada" if violaciones else "parcialmente_bloqueada"
-        for v in violaciones:
+        if violaciones:
+            # Issue #153: UNA sola incidencia consolidada por colocacion bloqueada,
+            # aunque la tapen varios bloqueadores a la vez (caso realista: varias
+            # cajas apiladas/adyacentes en el corredor) - antes se agregaba una
+            # IncidenciaValidacion POR CADA bloqueador, duplicando la misma
+            # SECUENCIA_BLOQUEADA para el mismo colocacion_item_id.
+            detalles = "; ".join(
+                f"'{b.item.descripcion}' (entrega {b.item.secuencia_entrega})"
+                for b in sorted(violaciones, key=lambda b: b.item.secuencia_entrega)
+            )
             incidencias.append(
                 IncidenciaValidacion(
                     "advertencia", "SECUENCIA_BLOQUEADA",
                     "Secuencia de entrega bloqueada",
                     f"'{c.item.descripcion}' (entrega {c.item.secuencia_entrega}) queda detras de "
-                    f"'{v.item.descripcion}' (entrega {v.item.secuencia_entrega}): habra movimientos "
-                    "adicionales en la descarga.",
+                    f"{detalles}: habra movimientos adicionales en la descarga.",
                     "Reoptimizar priorizando secuencia de entrega o ajustar manualmente.",
                     c.item.id,
                 )

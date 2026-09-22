@@ -8,14 +8,12 @@ namespace CabinaFletes.Domain.Tests.Priorizacion;
 /// verificaba, porque tampoco había forma de editarlos. Al abrir el endpoint de
 /// recalibración eso deja de ser un comentario.
 ///
-/// IMPORTANTE PARA NO MALINTERPRETAR ESTAS PRUEBAS: hoy los pesos no entran en el total.
-/// El calculador devuelve exclusivamente la urgencia por deadline, por decisión de
-/// negocio, así que cambiar un peso no mueve ningún puntaje —comprobado contra la
-/// aplicación levantada: 12 solicitudes revisadas, cero actualizadas—. El único parámetro
-/// que mueve el total es HorizonteHoras.
-///
-/// La regla vale igual: mantiene coherente una configuración que está dormida, para que
-/// el día que el total vuelva a ser una suma ponderada no arranque ya torcida.
+/// Desde el fix de issue #173 (ver docs/decisiones/score-prioridad-4-pesos-vs-solo-urgencia.md)
+/// los 4 pesos SÍ entran en el total: <see cref="ScorePrioridadCalculator"/> calcula
+/// total = PesoUrgencia·urgencia + PesoValor·valor + PesoProbabilidad·probabilidad + PesoTipo·tipo.
+/// Esta regla ya no valida una configuración dormida: cambiar un peso ahora mueve el
+/// puntaje real de la bandeja priorizada, así que la validación de rango es la única
+/// barrera contra que el Admin deje una combinación inconsistente.
 /// </summary>
 public class ReglaDeParametrosScoreTests
 {

@@ -45,6 +45,12 @@ async def listar_vehiculos(repo: IVehiculoCubicacionRepository) -> list[Vehiculo
     return await repo.listar_con_siembra()
 
 
+async def republicar_catalogo(repo: IVehiculoCubicacionRepository) -> list[VehiculoCubicacion]:
+    """Issue #162: reparo manual, una sola vez, de la desincronizacion ya
+    existente entre el catalogo de Cubicador y la proyeccion de NEXO."""
+    return await repo.republicar_todos()
+
+
 async def guardar_vehiculo(repo: IVehiculoCubicacionRepository, vehiculo: VehiculoCubicacion) -> VehiculoCubicacion:
     _validar(vehiculo)
     return await repo.guardar(vehiculo)

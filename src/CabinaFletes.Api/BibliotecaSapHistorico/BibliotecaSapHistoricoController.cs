@@ -1,9 +1,11 @@
 using System.ComponentModel.DataAnnotations;
+using CabinaFletes.Api.Common.RateLimiting;
 using CabinaFletes.Application.CasosDeUso.BibliotecaSapHistorico;
 using CabinaFletes.Application.CasosDeUso.BibliotecaSapHistorico.DTOs;
 using CabinaFletes.Application.Common.Abstractions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace CabinaFletes.Api.BibliotecaSapHistorico;
 
@@ -24,6 +26,7 @@ public class BibliotecaSapHistoricoController(
     /// texto (código DIVIPOLA de origen/destino o detalles) y línea de negocio.
     /// </summary>
     [HttpGet]
+    [EnableRateLimiting(RateLimitingExtensions.PoliticaListadosEstandar)]
     public async Task<ActionResult<SapHistoricoResultDto>> Get(
         [FromQuery] string? q,
         [FromQuery] int? lineaNegocio,

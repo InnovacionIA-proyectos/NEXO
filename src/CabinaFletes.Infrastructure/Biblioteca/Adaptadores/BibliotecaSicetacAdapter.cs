@@ -17,13 +17,22 @@ namespace CabinaFletes.Infrastructure.Biblioteca.Adaptadores;
 public sealed class BibliotecaSicetacAdapter(DwSiceDbContext dw, IMemoryCache cache) : IBibliotecaSicetacPort
 {
     private const int MaxTop = 200;
-    private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(15);
+    // Issue #167: en frío, PeriodosAsync dispara un DISTINCT sobre Periodo en las
+    // ~2.14M filas de tblRutasSicetac (sin índice - ver DependencyInjection.cs)
+    // - probablemente la causa principal de los ~33s reportados "sin filtros"
+    // (BuscarAsync resuelve el periodo más reciente por acá antes de filtrar la
+    // matriz). Los periodos SICE-TAC cambian con baja frecuencia (mensual), así
+    // que subir el TTL de 15 min a 6 horas reduce drásticamente cuántas veces al
+    // día se paga ese costo, sin arriesgar servir un periodo desactualizado por
+    // más que unas horas.
+    private static readonly TimeSpan CacheTtl = TimeSpan.FromHours(6);
 
     public async Task<MatrizSicetacResultDto> BuscarAsync(
         string? q, int? periodo, string? configuracion, string? tipoCarga, string? unidadTransporte,
-        string? condicionCarga, string? viaEstandar, int top, CancellationToken ct = default)
+        string? condicionCarga, string? viaEstandar, int top, int page = 1, CancellationToken ct = default)
     {
         top = Math.Clamp(top, 1, MaxTop);
+        page = Math.Max(1, page);
         var periodoEfectivo = periodo ?? await PeriodoMasRecienteAsync(ct);
 
         var query = dw.RutasSicetac.Where(r => r.Periodo == periodoEfectivo);
@@ -47,6 +56,7 @@ public sealed class BibliotecaSicetacAdapter(DwSiceDbContext dw, IMemoryCache ca
         var total = await query.CountAsync(ct);
         var items = await query
             .OrderBy(r => r.NombreRuta).ThenBy(r => r.Configuracion).ThenBy(r => r.NombreUnidadTransporte)
+            .Skip((page - 1) * top)
             .Take(top)
             .Select(r => new RutaSicetacItemDto(
                 r.Id, r.Periodo, r.NombreRuta, r.Origen, r.Destino,

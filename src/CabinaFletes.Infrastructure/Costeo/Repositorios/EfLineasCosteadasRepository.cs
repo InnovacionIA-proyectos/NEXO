@@ -20,5 +20,14 @@ public sealed class EfLineasCosteadasRepository(CabinaFletesDbContext db) : ILin
         var linea = await db.LineasSolicitud.FirstOrDefaultAsync(l => l.Id == lineaId, ct);
         if (linea is null) return;
         linea.EstadoLinea = EstadoLinea.AutoResuelta;
+        linea.MotivoPendiente = null;
+    }
+
+    public async Task MarcarPendienteAsync(Guid lineaId, string motivo, CancellationToken ct = default)
+    {
+        var linea = await db.LineasSolicitud.FirstOrDefaultAsync(l => l.Id == lineaId, ct);
+        if (linea is null) return;
+        linea.EstadoLinea = EstadoLinea.PorCostear;
+        linea.MotivoPendiente = motivo.Length <= 500 ? motivo : motivo[..500];
     }
 }

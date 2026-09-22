@@ -10,4 +10,12 @@ public interface ILineasCosteadasPort
     /// debe poder mostrar de dónde salió. Un valor sin fuente no es auditable.
     /// </summary>
     Task MarcarAutoResueltaAsync(Guid lineaId, decimal valor, string fuente, CancellationToken ct = default);
+
+    /// <summary>
+    /// Deja la línea pendiente con el motivo visible: sin tarifa válida (requiere al
+    /// Administrador de Tarifas) o una fuente que agotó sus reintentos. Sin esto, el motivo
+    /// solo vivía en el mensaje del bus y en el registro de pendientes, sin que ningún DTO
+    /// de la línea lo expusiera (issue #131).
+    /// </summary>
+    Task MarcarPendienteAsync(Guid lineaId, string motivo, CancellationToken ct = default);
 }

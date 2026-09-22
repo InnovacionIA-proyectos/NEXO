@@ -25,6 +25,7 @@ services:
       interval: 3s
       timeout: 3s
       retries: 10
+    restart: unless-stopped
 
   api:
     build:
@@ -56,6 +57,7 @@ services:
       timeout: 3s
       retries: 10
       start_period: 5s
+    restart: unless-stopped
 
   worker:
     build:
@@ -88,6 +90,12 @@ services:
     networks:
       - default
       - nexo_shared
+    # Sin política de reinicio, un crash del worker (p. ej. RabbitMQ del stack raíz de
+    # NEXO todavía no listo cuando este arrancó) lo deja detenido para siempre: la
+    # cubicación se queda encolada en cubicador.optimizar sin que nadie la consuma, y
+    # nada lo notifica porque este servicio no tiene healthcheck HTTP. Es el candidato
+    # más probable a "todo se queda y nunca vuelve a salir, ni cubicación ni el worker".
+    restart: unless-stopped
 
 networks:
   default: {}
