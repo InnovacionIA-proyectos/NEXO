@@ -70,15 +70,21 @@ public class clsCapturaSolicitudesController(
     /// Estima el valor del aprovisionamiento del contenedor: piso SICE-TAC del viaje
     /// VACÍO (Res. 16075) desde la ciudad de levante hasta el origen del cargue.
     /// Devuelve candidato nulo si la matriz no trae la ruta. levante/origen son
-    /// obligatorios (400 PARAMETROS_REQUERIDOS si faltan) — tipados sin "?" para que
-    /// Swagger los refleje como requeridos; el binder igual puede dejarlos en null si
-    /// el query string no los trae, por eso la validación explícita de abajo se mantiene.
+    /// obligatorios (400 PARAMETROS_REQUERIDOS si faltan).
+    ///
+    /// A propósito "string?" y no "string": con Nullable Reference Types habilitado,
+    /// [ApiController] trata un parámetro [FromQuery] no-nullable como implícitamente
+    /// [Required] y devuelve su propio 400 VALIDATION_ERROR genérico (en inglés, sin pasar
+    /// por este método) antes de llegar aquí — se probó en producción (2026-09-22) y
+    /// reemplazaba el código/mensaje de negocio de abajo. Swagger los marca como
+    /// opcionales por este mismo motivo (limitación conocida, no corregida): preferible a
+    /// cambiar el contrato de error que ya consume el frontend.
     /// </summary>
     [HttpGet("aprovisionamiento")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<clsAprovisionamientoDto>> Aprovisionamiento(
-        [FromQuery] string levante, [FromQuery] string origen, [FromQuery] string? configuracion, CancellationToken ct = default)
+        [FromQuery] string? levante, [FromQuery] string? origen, [FromQuery] string? configuracion, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(levante) || string.IsNullOrWhiteSpace(origen))
             throw new clsValidationFailedException("PARAMETROS_REQUERIDOS", "Indica la ciudad de levante y el origen del cargue.");
