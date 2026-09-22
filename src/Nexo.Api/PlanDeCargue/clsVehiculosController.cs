@@ -28,8 +28,12 @@ public record clsGuardarVehiculoRequest(
     // validador del mensaje a publicar (clsCubicacionSolicitadaValidador) y volvía
     // como un 400 que mencionaba "clsCubicacionSolicitada"/"clsSolicitud" — nombres
     // internos de mensajería, no del contrato HTTP — en vez de VALIDATION_ERROR.
-    [property: Required]
-    [property: RegularExpression("(?i)^(trasera|frontal|costado_izquierdo|costado_derecho)$",
+    // record con constructor primario: la metadata de validación debe ir sobre el
+    // parámetro (sin "property:") — con "property:" ASP.NET Core la ignora y además
+    // tira 500 al validar ("validation metadata ... must be associated with the
+    // constructor parameter"), como se vio al probar esto en producción.
+    [Required]
+    [RegularExpression("(?i)^(trasera|frontal|costado_izquierdo|costado_derecho)$",
         ErrorMessage = "puertaPosicion debe ser trasera, frontal, costado_izquierdo o costado_derecho.")]
     string PuertaPosicion,
     IReadOnlyList<clsEjeVehiculoRequest> Ejes,
