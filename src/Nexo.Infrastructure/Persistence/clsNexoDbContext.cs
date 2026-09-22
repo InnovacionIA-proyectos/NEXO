@@ -357,6 +357,11 @@ public class clsNexoDbContext : DbContext
             e.ToTable("tbl_items_plan_cargue");
             foreach (var p in new[] { "LargoMm", "AnchoMm", "AltoMm", "PesoKg", "MaxPesoEncimaKg" })
                 e.Property(p).HasColumnType("decimal(12,2)");
+            // La propiedad se llama clsCliente (dato suelto del ítem, no navegación a
+            // clsCliente la entidad) pero la columna real en tbl_items_plan_cargue —
+            // ver ESQUEMA_NEXO.sql — siempre fue [Cliente]. Sin este mapeo EF genera
+            // "Invalid column name 'clsCliente'" en cualquier lectura/escritura de items.
+            e.Property(x => x.clsCliente).HasColumnName("Cliente");
         });
 
         b.Entity<clsColocacionCargue>(e =>

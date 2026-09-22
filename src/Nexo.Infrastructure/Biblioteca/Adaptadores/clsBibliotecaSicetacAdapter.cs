@@ -53,16 +53,22 @@ public sealed class clsBibliotecaSicetacAdapter(clsDwSiceDbContext dw, IMemoryCa
             query = query.Where(r => r.ViaEstandar == viaEstandar.Trim());
 
         var total = await query.CountAsync(ct);
-        var items = await query
+        // DWSice corre en compatibility level 100 (SQL Server 2008): no soporta OFFSET/FETCH,
+        // que es lo que EF genera para Skip().Take() ("Incorrect syntax near 'OFFSET'").
+        // No es negociable subir el compatibility level de un Data Warehouse corporativo
+        // desde este repo, así que la página se recorta del lado del cliente: Take(page*top)
+        // sigue traduciendo a TOP (soportado desde SQL 2000), y el Skip queda en memoria.
+        // MaxTop=200 acota el costo por página incluso en páginas altas.
+        var candidatos = await query
             .OrderBy(r => r.NombreRuta).ThenBy(r => r.Configuracion).ThenBy(r => r.NombreUnidadTransporte)
-            .Skip((page - 1) * top)
-            .Take(top)
+            .Take(page * top)
             .Select(r => new clsRutaSicetacItemDto(
                 r.Id, r.Periodo, r.NombreRuta, r.Origen, r.Destino,
                 r.Configuracion, r.NombreTipoCarga, r.NombreUnidadTransporte, r.CondicionCarga,
                 r.Valor, r.ValorHora, r.ValorSiceConHora, r.HorasRecorrido, r.HorasPactadas,
                 r.ViaEstandar, r.FechaCreacion, r.FechaModificacion))
             .ToListAsync(ct);
+        var items = candidatos.Skip((page - 1) * top).ToList();
 
         return new clsMatrizSicetacResultDto(periodoEfectivo, total, items);
     }

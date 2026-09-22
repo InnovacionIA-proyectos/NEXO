@@ -160,6 +160,47 @@ scriptea el predicado WHERE de un índice filtrado. El modelo C#
 (`clsNexoDbContext.cs`, `HasFilter(...)`) y `ESQUEMA_NEXO.sql` sí lo traen
 bien — no requiere cambios.
 
+## Hallazgo 2026-09-22: MetricasJson faltante + mapeo de clsCliente roto
+
+Probando `/api/planes-cargue` en vivo (deploy de prueba) aparecieron dos
+errores SQL en TODA lectura/escritura del módulo de plan de cargue:
+
+```
+Invalid column name 'MetricasJson'.
+Invalid column name 'clsCliente'.
+```
+
+Dos causas distintas, dos fixes distintos:
+
+1. **`MetricasJson` (tbl_planes_cargue) — columna que de verdad nunca existió.**
+   `clsPlanCargue.cs` la declara desde que NEXO empezó a guardar el `metricas`
+   que llega en el evento `plan-de-cargue.generado` (cubicador/CONTRATO.md
+   §3.2), pero ni `ESQUEMA_NEXO.sql` ni la base real la tenían. Se agregó al
+   DDL (este commit). Para una base ya creada (no arranca "en cero"), el fix
+   es un `ALTER TABLE` aditivo, idempotente y sin downtime:
+   ```sql
+   IF NOT EXISTS (
+       SELECT 1 FROM sys.columns
+       WHERE object_id = OBJECT_ID(N'[db_NEXO].[tbl_planes_cargue]') AND name = 'MetricasJson'
+   )
+       ALTER TABLE [db_NEXO].[tbl_planes_cargue] ADD [MetricasJson] nvarchar(max) NULL;
+   ```
+
+2. **`clsCliente` (tbl_items_plan_cargue) — NO era una columna faltante.**
+   La columna real siempre fue `[Cliente]` (`ESQUEMA_NEXO.sql` línea ~430);
+   el modelo C# (`clsItemPlanCargue.clsCliente`, un dato de texto suelto del
+   ítem — cliente al que pertenece esa mercancía, no navegación a la entidad
+   `clsCliente`) nunca declaró el mapeo, así que EF asumía por convención que
+   la columna se llamaba igual que la propiedad. Fix en
+   `clsNexoDbContext.cs`: `e.Property(x => x.clsCliente).HasColumnName("Cliente")`.
+   Cero cambio de esquema, cero cambio de contrato (JSON de la API y mensaje
+   con Cubicador siguen llamándose `clsCliente`/`cliente` igual que siempre).
+
+Consecuencia práctica: hasta que el hotfix del punto 1 corra, cualquier plan
+de cargue creado (incluso por `POST /api/planes-cargue/demo`, que es async)
+queda en la base sin poder leerse ni borrarse por API — el mismo 500 aplica
+a `GET`, `DELETE` y a `POST .../items`.
+
 ## Otros entornos con la base ya creada (dev local de cada quien)
 
 Si alguien más tiene una base de desarrollo LOCAL (no la compartida de

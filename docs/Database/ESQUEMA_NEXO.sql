@@ -412,6 +412,7 @@ CREATE TABLE [db_NEXO].[tbl_planes_cargue] (
     [UtilizacionPiso] decimal(6,2) NOT NULL,
     [Puntaje] decimal(6,2) NOT NULL,
     [IncidenciasJson] nvarchar(max) NOT NULL,
+    [MetricasJson] nvarchar(max) NULL,
     [CreatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset()),
     [UpdatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset()),
     [LineaSolicitudId] uniqueidentifier NULL,

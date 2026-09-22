@@ -23,6 +23,14 @@ public record clsGuardarVehiculoRequest(
     decimal TaraKg,
     decimal PuertaAnchoMm,
     decimal PuertaAltoMm,
+    // Valores documentados en cubicador/CONTRATO.md junto a VehiculoCubicacionDto.
+    // Sin este [RegularExpression], un valor inválido pasaba de largo hasta el
+    // validador del mensaje a publicar (clsCubicacionSolicitadaValidador) y volvía
+    // como un 400 que mencionaba "clsCubicacionSolicitada"/"clsSolicitud" — nombres
+    // internos de mensajería, no del contrato HTTP — en vez de VALIDATION_ERROR.
+    [property: Required]
+    [property: RegularExpression("(?i)^(trasera|frontal|costado_izquierdo|costado_derecho)$",
+        ErrorMessage = "puertaPosicion debe ser trasera, frontal, costado_izquierdo o costado_derecho.")]
     string PuertaPosicion,
     IReadOnlyList<clsEjeVehiculoRequest> Ejes,
     decimal ToleranciaParedesMm = 0,
@@ -55,7 +63,8 @@ public class clsVehiculosController(
     {
         var r = await guardar.Handle(new clsGuardarVehiculoCommand(
             body.Nombre, body.Descripcion, body.LargoInternoMm, body.AnchoInternoMm, body.AltoInternoMm,
-            body.CapacidadKg, body.TaraKg, body.PuertaAnchoMm, body.PuertaAltoMm, body.PuertaPosicion,
+            body.CapacidadKg, body.TaraKg, body.PuertaAnchoMm, body.PuertaAltoMm,
+            body.PuertaPosicion.Trim().ToLowerInvariant(),
             body.Ejes.Select(e => new clsEjeVehiculoInput(e.PosicionMm, e.CapacidadKg)).ToList(),
             body.ToleranciaParedesMm, body.ToleranciaEntreUnidadesMm), ct);
         return Accepted(r);
