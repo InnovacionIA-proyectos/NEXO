@@ -27,7 +27,7 @@ public class clsLineasSolicitudCubicacionControllerTests(clsApiFixture fixture)
             builder.ConfigureAppConfiguration((_, cfg) =>
                 cfg.AddInMemoryCollection(new Dictionary<string, string?>
                 {
-                    ["clsCubicador3D:InboundApiKey"] = ApiKey,
+                    ["Cubicador3D:InboundApiKey"] = ApiKey,
                 })));
         return factory.CreateClient();
     }
