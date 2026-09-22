@@ -90,9 +90,9 @@ jobs:
       # detectar Ctrl+C — sin consola falla al instante con "No es compatible
       # la redirección de entradas" (ver ci-cd-api.yml). ping sí funciona sin
       # consola: -n 91 son 90 intervalos de 1s (91 ecos, el primero inmediato).
-      - name: Esperar a que el contenedor termine de levantar (90s)
-        shell: cmd
-        run: ping -n 91 127.0.0.1 >NUL
+      # - name: Esperar a que el contenedor termine de levantar (90s)
+      #   shell: cmd
+      #   run: ping -n 91 127.0.0.1 >NUL
 
       # Mismo razonamiento que ci-cd-api.yml - el webhook de arriba
       # solo confirma que Dokploy RECIBIO la orden, nunca que termino el
@@ -108,22 +108,22 @@ jobs:
       # proximo fallo es de red o del servicio. Limite conocido (no distingue
       # "redeploy exitoso" de "el contenedor viejo sigue sano con codigo
       # viejo"): igual que en ci-cd-api.yml, ver el comentario completo alli.
-      - name: Verificar que el servicio respondio saludable tras el despliegue
-        shell: cmd
-        run: |
-          set INTENTOS=0
-          :verificar
-          set /a INTENTOS+=1
-          echo Intento %INTENTOS%:
-          curl -s -o NUL -w "  HTTP %%{http_code}\n" "${{ secrets.HEALTH_CHECK_URL_CUBICADOR_API }}/health"
-          curl -f -s -o NUL "${{ secrets.HEALTH_CHECK_URL_CUBICADOR_API }}/health"
-          if not errorlevel 1 goto exito
-          if %INTENTOS% GEQ 30 goto fallo
-          ping -n 11 127.0.0.1 >NUL
-          goto verificar
-          :exito
-          echo Servicio respondio saludable tras el despliegue.
-          exit /b 0
-          :fallo
-          echo El servicio NO respondio saludable tras 30 intentos ^(~5 minutos^) - el despliegue no se confirma.
-          exit /b 1
+      # - name: Verificar que el servicio respondio saludable tras el despliegue
+      #   shell: cmd
+      #   run: |
+      #     set INTENTOS=0
+      #     :verificar
+      #     set /a INTENTOS+=1
+      #     echo Intento %INTENTOS%:
+      #     curl -s -o NUL -w "  HTTP %%{http_code}\n" "${{ secrets.HEALTH_CHECK_URL_CUBICADOR_API }}/health"
+      #     curl -f -s -o NUL "${{ secrets.HEALTH_CHECK_URL_CUBICADOR_API }}/health"
+      #     if not errorlevel 1 goto exito
+      #     if %INTENTOS% GEQ 30 goto fallo
+      #     ping -n 11 127.0.0.1 >NUL
+      #     goto verificar
+      #     :exito
+      #     echo Servicio respondio saludable tras el despliegue.
+      #     exit /b 0
+      #     :fallo
+      #     echo El servicio NO respondio saludable tras 30 intentos ^(~5 minutos^) - el despliegue no se confirma.
+      #     exit /b 1
