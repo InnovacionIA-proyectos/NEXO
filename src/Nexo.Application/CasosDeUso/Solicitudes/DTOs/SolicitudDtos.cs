@@ -85,9 +85,13 @@ public record clsAnalisisExcelDto(string Archivo, IReadOnlyList<clsHojaExcelDto>
 
 /// <summary>
 /// clsCliente para el formulario de captura. Los reales del DW traen Bp (ClienteId nulo
-/// hasta que se use en una solicitud); los locales traen ClienteId.
+/// hasta que se use en una solicitud); los locales traen ClienteId. Origen distingue
+/// "cliente" (ya tiene BP real) de "prospecto" (tblProspectos, todavía sin BP asignado).
 /// </summary>
-public record clsClienteBusquedaDto(Guid? ClienteId, string? Bp, string Nit, string Nombre);
+public record clsClienteBusquedaDto(Guid? ClienteId, string? Bp, string Nit, string Nombre, string Origen);
+
+/// <summary>Municipio costeable para Origen/Destino del formulario de captura.</summary>
+public record clsCiudadBusquedaDto(string Municipio, string Departamento);
 
 /// <summary>Estimación del aprovisionamiento del contenedor (viaje vacío levante → origen).</summary>
 public record clsAprovisionamientoDto(clsCandidatoTarifaDto? Candidato);

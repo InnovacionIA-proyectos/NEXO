@@ -66,6 +66,9 @@ services:
       # flag debe quedar OFF a propósito, ver ApiFixture.cs), acá SÍ hay que crear el
       # esquema o los 171 tests de Api.Tests fallan contra una base sin tablas.
       TEST_DB_MIGRATE_ON_STARTUP: "true"
+      # OBLIGATORIA (ver clsEsquemaNexo.cs) — sin ella, OnModelCreating explota antes
+      # de llegar a migrar, mismo error para los 75 tests que usan clsApiFixture.
+      Database__Esquema: db_NEXO
     networks:
       - ci
     command:
@@ -89,6 +92,8 @@ services:
       TEST_DB_CONNECTION: "Server=db-pruebas,1433;Database=Nexo_Test;User Id=sa;Password=${TEST_DB_PASSWORD:-Pruebas_Nexo_2026!};TrustServerCertificate=True;Encrypt=True;"
       # Mismo motivo que en 'pruebas' arriba - db-pruebas nace vacía.
       TEST_DB_MIGRATE_ON_STARTUP: "true"
+      # OBLIGATORIA (ver clsEsquemaNexo.cs), mismo motivo que en 'pruebas' arriba.
+      Database__Esquema: db_NEXO
     networks:
       - ci
     command:

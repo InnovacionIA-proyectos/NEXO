@@ -23,6 +23,8 @@ public class clsCapturaSolicitudesController(
     IQueryHandler<clsAnalizarExcelQuery, clsAnalisisExcelDto> analizarExcel,
     ICommandHandler<clsCapturarSolicitudCommand, clsCapturaResultDto> capturar,
     IQueryHandler<clsBuscarClientesQuery, IReadOnlyList<clsClienteBusquedaDto>> buscarClientes,
+    IQueryHandler<clsListarDepartamentosQuery, IReadOnlyList<string>> listarDepartamentos,
+    IQueryHandler<clsBuscarCiudadesQuery, IReadOnlyList<clsCiudadBusquedaDto>> buscarCiudades,
     IPropuestaTarifaPort propuestas)
     : ControllerBase
 {
@@ -101,4 +103,20 @@ public class clsCapturaSolicitudesController(
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyList<clsClienteBusquedaDto>>> Clientes([FromQuery] string? q, CancellationToken ct = default)
         => Ok(await buscarClientes.Handle(new clsBuscarClientesQuery(q), ct));
+
+    /// <summary>Departamentos del catálogo de ciudades costeables.</summary>
+    [HttpGet("departamentos")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<string>>> Departamentos(CancellationToken ct = default)
+        => Ok(await listarDepartamentos.Handle(new clsListarDepartamentosQuery(), ct));
+
+    /// <summary>
+    /// Búsqueda de ciudades para Origen/Destino, filtrable por departamento y/o texto —
+    /// mismo catálogo "costeable" en ambos casos.
+    /// </summary>
+    [HttpGet("ciudades")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<clsCiudadBusquedaDto>>> Ciudades(
+        [FromQuery] string? departamento, [FromQuery] string? q, CancellationToken ct = default)
+        => Ok(await buscarCiudades.Handle(new clsBuscarCiudadesQuery(departamento, q), ct));
 }
