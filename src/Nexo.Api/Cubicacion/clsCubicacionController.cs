@@ -1,6 +1,7 @@
 using Nexo.Application.CasosDeUso.Cubicacion;
 using Nexo.Application.CasosDeUso.Cubicacion.DTOs;
 using Nexo.Application.Common.Abstractions;
+using Nexo.Application.Common.Exceptions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -13,9 +14,18 @@ public record clsItemCubicacionRequest(
     public clsItemCubicacionRapidaDto ADto() => new(Descripcion, Cantidad, LargoCm, AnchoCm, AltoCm, PesoKg, TipoMercancia);
 }
 
-public record clsCubicarRequest(IReadOnlyList<clsItemCubicacionRequest> Items, IReadOnlyList<string>? UnidadIds, string? ClaseViaje)
+/// <summary>
+/// "Items" es obligatorio en negocio (400 ITEMS_REQUERIDOS si falta o viene vacío) pero
+/// se tipa como <c>IReadOnlyList&lt;...&gt;?</c> y no sin "?" a propósito: con Nullable
+/// Reference Types habilitado, [ApiController] trata un parámetro de body no-nullable
+/// como implícitamente [Required] y responde su propio 400 VALIDATION_ERROR genérico (en
+/// inglés, sin pasar por el método) antes de llegar a la validación explícita de abajo —
+/// mismo problema ya documentado y revertido en <see cref="Api.Solicitudes.clsCapturaSolicitudesController.Aprovisionamiento"/>.
+/// La validación explícita del controller se mantiene por eso.
+/// </summary>
+public record clsCubicarRequest(IReadOnlyList<clsItemCubicacionRequest>? Items, IReadOnlyList<string>? UnidadIds, string? ClaseViaje)
 {
-    public clsCubicacionRapidaSolicitud ASolicitud() => new(Items.Select(i => i.ADto()).ToList(), UnidadIds, ClaseViaje);
+    public clsCubicacionRapidaSolicitud ASolicitud() => new(Items!.Select(i => i.ADto()).ToList(), UnidadIds, ClaseViaje);
 }
 
 /// <summary>
@@ -41,5 +51,10 @@ public class clsCubicacionController(IQueryHandler<clsCubicarRapidoQuery, clsCub
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
     public async Task<ActionResult<clsCubicacionRapidaResultado>> Cubicar([FromBody] clsCubicarRequest body, CancellationToken ct = default)
-        => Ok(await cubicar.Handle(new clsCubicarRapidoQuery(body.ASolicitud()), ct));
+    {
+        if (body.Items is null || body.Items.Count == 0)
+            throw new clsValidationFailedException("ITEMS_REQUERIDOS", "Debe indicar al menos un ítem para cubicar.");
+
+        return Ok(await cubicar.Handle(new clsCubicarRapidoQuery(body.ASolicitud()), ct));
+    }
 }

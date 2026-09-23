@@ -9,7 +9,7 @@ namespace Nexo.Api.Common.Auth;
 
 /// <summary>
 /// Esquema de servicio-a-servicio para el microservicio Cubicador (Python): valida
-/// "Authorization: Bearer &lt;clsCubicador3D:InboundApiKey&gt;" en vez de la sesión del
+/// "Authorization: Bearer &lt;Cubicador3D:InboundApiKey&gt;" en vez de la sesión del
 /// portal — no identifica una persona ni un rol de negocio, solo autoriza "quién puede
 /// llamar este endpoint" (ver cubicador/CONTRATO.md sección 7). Mismo valor que
 /// NEXO_CALLBACK_API_KEY en el .env del Cubicador — es el mismo secreto compartido,
