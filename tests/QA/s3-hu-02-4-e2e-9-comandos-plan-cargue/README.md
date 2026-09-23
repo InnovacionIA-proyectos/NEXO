@@ -59,7 +59,7 @@ verificación'") — **crashea con 500 no controlado**:
 System.InvalidOperationException: Failed to convert configuration value ''
 at 'Cubicacion:ParidadVerificada' to type 'System.Boolean'.
  ---> System.FormatException: String '' was not recognized as a valid Boolean.
-   at CabinaFletes.Infrastructure.PlanDeCargue.Adaptadores.ParidadCubicadorAdapter.get_Habilitada()
+   at Nexo.Infrastructure.PlanDeCargue.Adaptadores.ParidadCubicadorAdapter.get_Habilitada()
      en ParidadCubicadorAdapter.cs:línea 28
    at SolicitarOptimizacionCommandHandler.Handle(...)
 ```

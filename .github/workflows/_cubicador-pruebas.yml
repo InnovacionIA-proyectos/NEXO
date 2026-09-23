@@ -3,16 +3,16 @@ name: (reusable) Pruebas de Cubicador
 # Workflow REUSABLE (on: workflow_call) — no dispara solo, ver ci-cd-cubicador-api.yml
 # y ci-cd-cubicador-worker.yml, que son los que de verdad se disparan por push/PR.
 #
-# S3-HU-11.5 (issue #138): api y worker comparten la MISMA base de código Python
+# api y worker comparten la MISMA base de código Python
 # (domain/, application/, infrastructure/) y el mismo docker-compose.yml — no hay
 # forma (ni falta que haga) de correr "solo las pruebas del api" o "solo las del
 # worker": pytest y el smoke test de Docker Compose ya ejercitan el stack
 # integrado (api + worker + Postgres + RabbitMQ juntos). Por eso este job vive
 # UNA sola vez acá y los dos workflows de servicio lo llaman — así, cuando algo
-# compartido cambia y dispara los dos pipelines (issue #138), no corren dos
+# compartido cambia y dispara los dos pipelines, no corren dos
 # copias del mismo texto que puedan divergir con el tiempo.
 #
-# Reemplaza a cubicador-ci.yml (retirado en S3-HU-11): mismo contenido exacto,
+# Reemplaza a cubicador-ci.yml (ya retirado): mismo contenido exacto,
 # solo que ahora cada servicio decide CUÁNDO llamarlo (paths filter propio) y
 # qué hacer si pasa (su propio job de deploy).
 on:

@@ -13,7 +13,7 @@ el demo nace con su vehículo y sus ítems ya puestos, y esquivaba varios de est
 | Suite | Resultado |
 |---|---|
 | Cubicador `pytest` | ✅ 118/118 (eran 109) |
-| `CabinaFletes.Application.Tests` | ✅ 142/142 |
+| `Nexo.Application.Tests` | ✅ 142/142 |
 | `ci_docker_smoke.py` (Postgres + RabbitMQ + api + worker) | ✅ 2 corridas |
 
 ## Los 6 de Cubicador, verificados contra Postgres real

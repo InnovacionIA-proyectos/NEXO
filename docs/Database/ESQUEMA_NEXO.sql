@@ -1,23 +1,29 @@
 -- =============================================================================
--- Esquema de NEXO (Cabina de Fletes) — dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba
+-- Esquema de NEXO (Nexo) — dbInformesAutomatizados_Pruebas.db_NEXO
 -- =============================================================================
 -- dbInformesAutomatizados_Pruebas es una base COMPARTIDA con otra app ajena a
 -- NEXO (esa otra app ya vivía en 'dbo' y tiene su propio esquema 'dbo_prueba').
--- Por eso CabinaFletesDbContext fija HasDefaultSchema("dbo_NEXO_prueba"): así
+-- Por eso NexoDbContext fija HasDefaultSchema(clsEsquemaNexo.Nombre): así
 -- las tablas de NEXO no se mezclan con las de esa otra app.
 --
--- Este archivo es DOCUMENTACIÓN, no la fuente de la verdad: se generó
--- consultando el catálogo (sys.tables/sys.columns/sys.foreign_keys/sys.indexes)
--- de la base real ya migrada, el 2026-09-01. La fuente de la verdad real son
--- las migraciones EF Core en
--- src/CabinaFletes.Infrastructure/Persistence/Migrations/ — cualquier cambio
--- de esquema se hace ahí (dotnet ef migrations add), nunca editando la BD a
--- mano ni este archivo.
+-- "db_NEXO" (usado en todo este archivo) es el NOMBRE POR DEFECTO documentado
+-- en .env.example, no un valor fijo en código: el esquema real se lee de la
+-- variable de entorno Database__Esquema (ver clsEsquemaNexo.cs), obligatoria y
+-- sin default en el código (fail-closed). Para desplegar contra otro nombre de
+-- esquema, cambie esa variable — no hace falta tocar este archivo ni el código,
+-- solo reemplazar mentalmente "db_NEXO" por el valor configurado al leer este DDL.
+--
+-- Este archivo es DOCUMENTACIÓN, no la fuente de la verdad: refleja el esquema
+-- final consolidado en la migración InitialCreate (ver
+-- src/Nexo.Infrastructure/Persistence/Migrations/) — una sola migración
+-- estructural, sin datos, pensada para que producción arranque desde cero.
+-- Cualquier cambio de esquema se hace en las migraciones EF Core (dotnet ef
+-- migrations add), nunca editando la BD a mano ni este archivo.
 --
 -- Orden: 1) tablas agrupadas por módulo de negocio, cada una con un comentario
 -- corto de su objetivo; 2) llaves foráneas; 3) índices. Las FK van aparte
--- porque varias tablas se referencian cruzado (p. ej. cotizaciones <->
--- tarifas_historicas) y así el orden de creación de las tablas no importa.
+-- porque varias tablas se referencian cruzado (p. ej. tbl_cotizaciones <->
+-- tbl_tarifas_historicas) y así el orden de creación de las tablas no importa.
 -- =============================================================================
 
 -- =============================================================================
@@ -29,9 +35,9 @@
 -- (X-Portal-Usuario-Id en cada petición, ver docs/contrato-integracion). Estas
 -- dos tablas son la copia local de esa identidad y la traducción de sus roles.
 
--- Cuenta local de cada persona que ha entrado a Cabina de Fletes: nombre, email,
+-- Cuenta local de cada persona que ha entrado a Nexo: nombre, email,
 -- uno de los 6 roles de Nexo y (si vino del portal real) su IdentidadPortalId.
-CREATE TABLE [dbo_NEXO_prueba].[usuarios] (
+CREATE TABLE [db_NEXO].[tbl_usuarios] (
     [Id] uniqueidentifier NOT NULL,
     [Nombre] nvarchar(200) NOT NULL,
     [Email] nvarchar(256) NOT NULL,
@@ -46,7 +52,7 @@ CREATE TABLE [dbo_NEXO_prueba].[usuarios] (
 -- Traduce el rol/permiso tal como lo nombra el portal (por id o por texto) a
 -- uno de los 6 roles de Nexo. Sin esta fila, el usuario se autentica pero
 -- queda sin rol (403, nunca 401 — ver IdentidadPortalAuthenticationHandler).
-CREATE TABLE [dbo_NEXO_prueba].[mapeo_rol_portal] (
+CREATE TABLE [db_NEXO].[tbl_mapeo_rol_portal] (
     [Id] uniqueidentifier NOT NULL,
     [IdRolPortal] bigint NULL,
     [DescripcionRolPortal] nvarchar(200) NULL,
@@ -60,7 +66,7 @@ CREATE TABLE [dbo_NEXO_prueba].[mapeo_rol_portal] (
 -- ciudades, en qué tipo de vehículo y con qué servicios adicionales.
 
 -- Cliente al que se le cotiza el flete (razón social, NIT único, teléfonos).
-CREATE TABLE [dbo_NEXO_prueba].[clientes] (
+CREATE TABLE [db_NEXO].[tbl_clientes] (
     [Id] uniqueidentifier NOT NULL,
     [Nombre] nvarchar(200) NOT NULL,
     [Nit] nvarchar(20) NOT NULL,
@@ -72,7 +78,7 @@ CREATE TABLE [dbo_NEXO_prueba].[clientes] (
 );
 
 -- Par origen-destino (único por par) sobre el que se cotiza y se cargan tarifas.
-CREATE TABLE [dbo_NEXO_prueba].[rutas] (
+CREATE TABLE [db_NEXO].[tbl_rutas] (
     [Id] uniqueidentifier NOT NULL,
     [Origen] nvarchar(150) NOT NULL,
     [Destino] nvarchar(150) NOT NULL,
@@ -82,7 +88,7 @@ CREATE TABLE [dbo_NEXO_prueba].[rutas] (
 );
 
 -- Tipo/carrocería/rango de peso del vehículo que puede prestar el servicio.
-CREATE TABLE [dbo_NEXO_prueba].[configuraciones_vehiculo] (
+CREATE TABLE [db_NEXO].[tbl_configuraciones_vehiculo] (
     [Id] uniqueidentifier NOT NULL,
     [TipoVehiculo] nvarchar(100) NOT NULL,
     [Carroceria] nvarchar(100) NULL,
@@ -93,9 +99,9 @@ CREATE TABLE [dbo_NEXO_prueba].[configuraciones_vehiculo] (
 );
 
 -- Dimensiones/capacidad físicas reales de un vehículo, para el Plan de Cargue
--- (cubicación 3D): distinto de configuraciones_vehiculo, que es solo catálogo
+-- (cubicación 3D): distinto de tbl_configuraciones_vehiculo, que es solo catálogo
 -- comercial (tipo/carrocería), no geometría.
-CREATE TABLE [dbo_NEXO_prueba].[vehiculos_cubicacion] (
+CREATE TABLE [db_NEXO].[tbl_vehiculos_cubicacion] (
     [Id] uniqueidentifier NOT NULL,
     [Nombre] nvarchar(100) NOT NULL,
     [Descripcion] nvarchar(300) NULL,
@@ -118,7 +124,7 @@ CREATE TABLE [dbo_NEXO_prueba].[vehiculos_cubicacion] (
 
 -- Servicio adicional facturable (cargue, descargue, etc.) que se agrega a una
 -- cotización; lo mantiene ServiciosLogisticos/AdminTarifas/Admin.
-CREATE TABLE [dbo_NEXO_prueba].[servicios_conexos] (
+CREATE TABLE [db_NEXO].[tbl_servicios_conexos] (
     [Id] uniqueidentifier NOT NULL,
     [Nombre] nvarchar(120) NOT NULL,
     [ReglaCobro] nvarchar(max) NULL,
@@ -139,7 +145,7 @@ CREATE TABLE [dbo_NEXO_prueba].[servicios_conexos] (
 
 -- Cabecera de una solicitud de flete (spot/licitación), con el score que la
 -- prioriza en la bandeja del CoordinadorFletes.
-CREATE TABLE [dbo_NEXO_prueba].[solicitudes] (
+CREATE TABLE [db_NEXO].[tbl_solicitudes] (
     [Id] uniqueidentifier NOT NULL,
     [ClienteId] uniqueidentifier NOT NULL,
     [Tipo] nvarchar(20) NOT NULL,
@@ -159,7 +165,7 @@ CREATE TABLE [dbo_NEXO_prueba].[solicitudes] (
 
 -- Cada tramo/línea de carga dentro de una solicitud: ruta, vehículo, peso,
 -- dimensiones — la unidad real que se termina costeando o cargando.
-CREATE TABLE [dbo_NEXO_prueba].[lineas_solicitud] (
+CREATE TABLE [db_NEXO].[tbl_lineas_solicitud] (
     [Id] uniqueidentifier NOT NULL,
     [SolicitudId] uniqueidentifier NOT NULL,
     [RutaId] uniqueidentifier NULL,
@@ -180,7 +186,8 @@ CREATE TABLE [dbo_NEXO_prueba].[lineas_solicitud] (
     [ValorAprovisionamiento] decimal(18,2) NULL,
     [CiudadDevolucionContenedor] nvarchar(150) NULL,
     [Consolidado] bit NOT NULL DEFAULT (CONVERT([bit],(0))),
-    [RetornaContenedor] bit NOT NULL DEFAULT (CONVERT([bit],(0)))
+    [RetornaContenedor] bit NOT NULL DEFAULT (CONVERT([bit],(0))),
+    [MotivoPendiente] nvarchar(500) NULL
     , CONSTRAINT [PK_lineas_solicitud] PRIMARY KEY ([Id])
 );
 
@@ -188,7 +195,7 @@ CREATE TABLE [dbo_NEXO_prueba].[lineas_solicitud] (
 -- tarifa, dato técnico, etc.), con el motivo — para que alguien las resuelva
 -- a mano. Un solo sitio para el motivo: dos sitios contando lo mismo acaban
 -- contradiciéndose.
-CREATE TABLE [dbo_NEXO_prueba].[lineas_pendientes_de_costeo] (
+CREATE TABLE [db_NEXO].[tbl_lineas_pendientes_de_costeo] (
     [Id] uniqueidentifier NOT NULL,
     [TrabajoId] uniqueidentifier NOT NULL,
     [SolicitudId] uniqueidentifier NOT NULL,
@@ -205,7 +212,7 @@ CREATE TABLE [dbo_NEXO_prueba].[lineas_pendientes_de_costeo] (
 -- líneas se resolvieron solas, cuántas quedaron pendientes y por qué. Vive
 -- aquí y no en otra base porque ES la respuesta al cliente que pregunta por
 -- su trabajo: un reinicio no puede borrarla.
-CREATE TABLE [dbo_NEXO_prueba].[trabajos_auto_costeo] (
+CREATE TABLE [db_NEXO].[tbl_trabajos_auto_costeo] (
     [CorrelationId] uniqueidentifier NOT NULL,
     [Version] int NOT NULL,
     [CurrentState] nvarchar(64) NOT NULL,
@@ -228,7 +235,7 @@ CREATE TABLE [dbo_NEXO_prueba].[trabajos_auto_costeo] (
 
 -- Cabecera de la cotización de una solicitud: estado (Borrador→Entregada),
 -- resultado (ganada/perdida) y total.
-CREATE TABLE [dbo_NEXO_prueba].[cotizaciones] (
+CREATE TABLE [db_NEXO].[tbl_cotizaciones] (
     [Id] uniqueidentifier NOT NULL,
     [SolicitudId] uniqueidentifier NOT NULL,
     [Estado] nvarchar(20) NOT NULL DEFAULT (N'Borrador'),
@@ -244,7 +251,7 @@ CREATE TABLE [dbo_NEXO_prueba].[cotizaciones] (
 
 -- Valor del flete cotizado para una línea de solicitud puntual, y de dónde
 -- salió ese valor (Fuente: SAP/SICE-TAC/histórico/manual).
-CREATE TABLE [dbo_NEXO_prueba].[cotizacion_lineas] (
+CREATE TABLE [db_NEXO].[tbl_cotizacion_lineas] (
     [Id] uniqueidentifier NOT NULL,
     [CotizacionId] uniqueidentifier NOT NULL,
     [LineaSolicitudId] uniqueidentifier NULL,
@@ -259,7 +266,7 @@ CREATE TABLE [dbo_NEXO_prueba].[cotizacion_lineas] (
 
 -- Servicio conexo aplicado a una cotización, con la cantidad y el valor que
 -- realmente se cobró (puede diferir del ValorBase del catálogo).
-CREATE TABLE [dbo_NEXO_prueba].[cotizacion_conexos] (
+CREATE TABLE [db_NEXO].[tbl_cotizacion_conexos] (
     [Id] uniqueidentifier NOT NULL,
     [CotizacionId] uniqueidentifier NOT NULL,
     [ServicioConexoId] uniqueidentifier NULL,
@@ -276,7 +283,7 @@ CREATE TABLE [dbo_NEXO_prueba].[cotizacion_conexos] (
 
 -- Piso de tarifa SICE-TAC importado desde Excel (matriz oficial del
 -- Ministerio): único por periodo+ruta DANE+configuración+tipo de carga.
-CREATE TABLE [dbo_NEXO_prueba].[tarifas_sicetac] (
+CREATE TABLE [db_NEXO].[tbl_tarifas_sicetac] (
     [Id] uniqueidentifier NOT NULL,
     [SiceId] bigint NULL,
     [Periodo] int NOT NULL,
@@ -303,9 +310,9 @@ CREATE TABLE [dbo_NEXO_prueba].[tarifas_sicetac] (
     , CONSTRAINT [PK_tarifas_sicetac] PRIMARY KEY ([Id])
 );
 
--- Lo que REALMENTE se cobró en cotizaciones pasadas (Tarifas Ganadas), para
+-- Lo que REALMENTE se cobró en tbl_cotizaciones pasadas (Tarifas Ganadas), para
 -- proponer tarifa por precedente cuando SAP/SICE-TAC no alcanzan.
-CREATE TABLE [dbo_NEXO_prueba].[tarifas_historicas] (
+CREATE TABLE [db_NEXO].[tbl_tarifas_historicas] (
     [Id] uniqueidentifier NOT NULL,
     [RutaId] uniqueidentifier NULL,
     [ConfigVehiculoId] uniqueidentifier NULL,
@@ -320,7 +327,7 @@ CREATE TABLE [dbo_NEXO_prueba].[tarifas_historicas] (
 
 -- Ruta+vehículo donde SOLO aplica SICE-TAC (se excluye la plaza SAP de la
 -- propuesta) — decisión manual de AdminTarifas/Admin, única por combinación.
-CREATE TABLE [dbo_NEXO_prueba].[reglas_solo_sicetac] (
+CREATE TABLE [db_NEXO].[tbl_reglas_solo_sicetac] (
     [Id] uniqueidentifier NOT NULL,
     [Origen] nvarchar(150) NOT NULL,
     [Destino] nvarchar(150) NOT NULL,
@@ -333,7 +340,7 @@ CREATE TABLE [dbo_NEXO_prueba].[reglas_solo_sicetac] (
 
 -- Corrección manual de la vigencia de una tarifa de plaza SAP puntual (única
 -- por TarifaPlazaId), con quién y por qué la ajustó.
-CREATE TABLE [dbo_NEXO_prueba].[ajustes_vigencia_plaza] (
+CREATE TABLE [db_NEXO].[tbl_ajustes_vigencia_plaza] (
     [Id] uniqueidentifier NOT NULL,
     [TarifaPlazaId] int NOT NULL,
     [VigenciaAjustada] datetime2 NOT NULL,
@@ -351,7 +358,7 @@ CREATE TABLE [dbo_NEXO_prueba].[ajustes_vigencia_plaza] (
 -- Estado de la SAGA (MassTransit) que rearma el score de una solicitud cada
 -- vez que cambian sus datos o pasa el reloj — el reloj vive en el broker, no
 -- en el proceso del API, así que escalar a más réplicas no lo duplica.
-CREATE TABLE [dbo_NEXO_prueba].[cadena_priorizacion] (
+CREATE TABLE [db_NEXO].[tbl_cadena_priorizacion] (
     [CorrelationId] uniqueidentifier NOT NULL,
     [Version] int NOT NULL,
     [CurrentState] nvarchar(64) NOT NULL,
@@ -366,7 +373,7 @@ CREATE TABLE [dbo_NEXO_prueba].[cadena_priorizacion] (
 
 -- Pesos y constantes de la fórmula del score (urgencia/valor/probabilidad/
 -- tipo) — fila única de configuración, editable solo por Admin.
-CREATE TABLE [dbo_NEXO_prueba].[parametros_score] (
+CREATE TABLE [db_NEXO].[tbl_parametros_score] (
     [Id] int IDENTITY(1,1) NOT NULL,
     [PesoUrgencia] float NOT NULL,
     [PesoValor] float NOT NULL,
@@ -390,7 +397,7 @@ CREATE TABLE [dbo_NEXO_prueba].[parametros_score] (
 
 -- Un plan de cargue optimizado para un vehículo: estrategia usada, algoritmo,
 -- utilización lograda y las incidencias encontradas.
-CREATE TABLE [dbo_NEXO_prueba].[planes_cargue] (
+CREATE TABLE [db_NEXO].[tbl_planes_cargue] (
     [Id] uniqueidentifier NOT NULL,
     [Nombre] nvarchar(150) NOT NULL,
     [VehiculoId] uniqueidentifier NOT NULL,
@@ -405,6 +412,7 @@ CREATE TABLE [dbo_NEXO_prueba].[planes_cargue] (
     [UtilizacionPiso] decimal(6,2) NOT NULL,
     [Puntaje] decimal(6,2) NOT NULL,
     [IncidenciasJson] nvarchar(max) NOT NULL,
+    [MetricasJson] nvarchar(max) NULL,
     [CreatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset()),
     [UpdatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset()),
     [LineaSolicitudId] uniqueidentifier NULL,
@@ -414,7 +422,7 @@ CREATE TABLE [dbo_NEXO_prueba].[planes_cargue] (
 
 -- Mercancía a cargar dentro de un plan: dimensiones, peso, y reglas físicas
 -- (apilable, frágil, peligroso, refrigerado) que el algoritmo debe respetar.
-CREATE TABLE [dbo_NEXO_prueba].[items_plan_cargue] (
+CREATE TABLE [db_NEXO].[tbl_items_plan_cargue] (
     [Id] uniqueidentifier NOT NULL,
     [PlanCargueId] uniqueidentifier NOT NULL,
     [Sku] nvarchar(60) NOT NULL,
@@ -448,7 +456,7 @@ CREATE TABLE [dbo_NEXO_prueba].[items_plan_cargue] (
 
 -- Dónde quedó colocada (X/Y/Z, orientación, secuencia) cada unidad de un ítem
 -- dentro del vehículo, y si el algoritmo la rechazó y por qué.
-CREATE TABLE [dbo_NEXO_prueba].[colocaciones_cargue] (
+CREATE TABLE [db_NEXO].[tbl_colocaciones_cargue] (
     [Id] uniqueidentifier NOT NULL,
     [PlanCargueId] uniqueidentifier NOT NULL,
     [ItemPlanCargueId] uniqueidentifier NOT NULL,
@@ -479,7 +487,7 @@ CREATE TABLE [dbo_NEXO_prueba].[colocaciones_cargue] (
 -- --- Auditoría -----------------------------------------------------------------------
 
 -- Rastro de quién cambió qué (entidad + diff) y cuándo, para trazabilidad.
-CREATE TABLE [dbo_NEXO_prueba].[audit_log] (
+CREATE TABLE [db_NEXO].[tbl_audit_log] (
     [Id] uniqueidentifier NOT NULL,
     [UsuarioId] uniqueidentifier NULL,
     [Entidad] nvarchar(100) NULL,
@@ -496,7 +504,7 @@ CREATE TABLE [dbo_NEXO_prueba].[audit_log] (
 
 -- Deduplicación de mensajes entrantes por consumidor (evita procesar dos veces
 -- el mismo mensaje si el broker lo reentrega).
-CREATE TABLE [dbo_NEXO_prueba].[InboxState] (
+CREATE TABLE [db_NEXO].[InboxState] (
     [Id] bigint IDENTITY(1,1) NOT NULL,
     [MessageId] uniqueidentifier NOT NULL,
     [ConsumerId] uniqueidentifier NOT NULL,
@@ -513,7 +521,7 @@ CREATE TABLE [dbo_NEXO_prueba].[InboxState] (
 
 -- Cola transaccional de mensajes salientes: se escriben aquí en la MISMA
 -- transacción del caso de uso, y un proceso aparte los publica al broker.
-CREATE TABLE [dbo_NEXO_prueba].[OutboxMessage] (
+CREATE TABLE [db_NEXO].[OutboxMessage] (
     [SequenceNumber] bigint IDENTITY(1,1) NOT NULL,
     [EnqueueTime] datetime2 NULL,
     [SentTime] datetime2 NOT NULL,
@@ -540,7 +548,7 @@ CREATE TABLE [dbo_NEXO_prueba].[OutboxMessage] (
 
 -- Un outbox por unidad lógica de trabajo (p. ej. una saga): agrupa y ordena
 -- los OutboxMessage que le pertenecen.
-CREATE TABLE [dbo_NEXO_prueba].[OutboxState] (
+CREATE TABLE [db_NEXO].[OutboxState] (
     [OutboxId] uniqueidentifier NOT NULL,
     [LockId] uniqueidentifier NOT NULL,
     [RowVersion] timestamp NULL,
@@ -553,7 +561,7 @@ CREATE TABLE [dbo_NEXO_prueba].[OutboxState] (
 -- --- Libro de control de EF Core ------------------------------------------------------
 -- Qué migraciones ya se aplicaron contra esta base. La mantiene EF Core solo
 -- (dotnet ef / Database.Migrate()) — nunca se edita a mano.
-CREATE TABLE [dbo_NEXO_prueba].[__EFMigrationsHistory] (
+CREATE TABLE [db_NEXO].[__EFMigrationsHistory] (
     [MigrationId] nvarchar(150) NOT NULL,
     [ProductVersion] nvarchar(32) NOT NULL,
     CONSTRAINT [PK___EFMigrationsHistory] PRIMARY KEY ([MigrationId])
@@ -563,31 +571,31 @@ CREATE TABLE [dbo_NEXO_prueba].[__EFMigrationsHistory] (
 -- 2. LLAVES FORÁNEAS
 -- =============================================================================
 -- Todas se agregan después de crear las tablas para no depender del orden de
--- creación (hay referencias cruzadas, p. ej. cotizaciones <-> tarifas_historicas).
+-- creación (hay referencias cruzadas, p. ej. tbl_cotizaciones <-> tbl_tarifas_historicas).
 
-ALTER TABLE [dbo_NEXO_prueba].[audit_log] ADD CONSTRAINT [FK_audit_log_usuarios_UsuarioId] FOREIGN KEY ([UsuarioId]) REFERENCES [dbo_NEXO_prueba].[usuarios] ([Id]);
-ALTER TABLE [dbo_NEXO_prueba].[colocaciones_cargue] ADD CONSTRAINT [FK_colocaciones_cargue_items_plan_cargue_ItemPlanCargueId] FOREIGN KEY ([ItemPlanCargueId]) REFERENCES [dbo_NEXO_prueba].[items_plan_cargue] ([Id]);
-ALTER TABLE [dbo_NEXO_prueba].[colocaciones_cargue] ADD CONSTRAINT [FK_colocaciones_cargue_planes_cargue_PlanCargueId] FOREIGN KEY ([PlanCargueId]) REFERENCES [dbo_NEXO_prueba].[planes_cargue] ([Id]) ON DELETE CASCADE;
-ALTER TABLE [dbo_NEXO_prueba].[cotizacion_conexos] ADD CONSTRAINT [FK_cotizacion_conexos_cotizaciones_CotizacionId] FOREIGN KEY ([CotizacionId]) REFERENCES [dbo_NEXO_prueba].[cotizaciones] ([Id]) ON DELETE CASCADE;
-ALTER TABLE [dbo_NEXO_prueba].[cotizacion_conexos] ADD CONSTRAINT [FK_cotizacion_conexos_servicios_conexos_ServicioConexoId] FOREIGN KEY ([ServicioConexoId]) REFERENCES [dbo_NEXO_prueba].[servicios_conexos] ([Id]);
-ALTER TABLE [dbo_NEXO_prueba].[cotizacion_lineas] ADD CONSTRAINT [FK_cotizacion_lineas_cotizaciones_CotizacionId] FOREIGN KEY ([CotizacionId]) REFERENCES [dbo_NEXO_prueba].[cotizaciones] ([Id]) ON DELETE CASCADE;
-ALTER TABLE [dbo_NEXO_prueba].[cotizacion_lineas] ADD CONSTRAINT [FK_cotizacion_lineas_lineas_solicitud_LineaSolicitudId] FOREIGN KEY ([LineaSolicitudId]) REFERENCES [dbo_NEXO_prueba].[lineas_solicitud] ([Id]);
-ALTER TABLE [dbo_NEXO_prueba].[cotizaciones] ADD CONSTRAINT [FK_cotizaciones_solicitudes_SolicitudId] FOREIGN KEY ([SolicitudId]) REFERENCES [dbo_NEXO_prueba].[solicitudes] ([Id]);
-ALTER TABLE [dbo_NEXO_prueba].[cotizaciones] ADD CONSTRAINT [FK_cotizaciones_usuarios_EntregadaPor] FOREIGN KEY ([EntregadaPor]) REFERENCES [dbo_NEXO_prueba].[usuarios] ([Id]);
-ALTER TABLE [dbo_NEXO_prueba].[items_plan_cargue] ADD CONSTRAINT [FK_items_plan_cargue_planes_cargue_PlanCargueId] FOREIGN KEY ([PlanCargueId]) REFERENCES [dbo_NEXO_prueba].[planes_cargue] ([Id]) ON DELETE CASCADE;
-ALTER TABLE [dbo_NEXO_prueba].[lineas_solicitud] ADD CONSTRAINT [FK_lineas_solicitud_configuraciones_vehiculo_ConfigVehiculoId] FOREIGN KEY ([ConfigVehiculoId]) REFERENCES [dbo_NEXO_prueba].[configuraciones_vehiculo] ([Id]);
-ALTER TABLE [dbo_NEXO_prueba].[lineas_solicitud] ADD CONSTRAINT [FK_lineas_solicitud_rutas_RutaId] FOREIGN KEY ([RutaId]) REFERENCES [dbo_NEXO_prueba].[rutas] ([Id]);
-ALTER TABLE [dbo_NEXO_prueba].[lineas_solicitud] ADD CONSTRAINT [FK_lineas_solicitud_solicitudes_SolicitudId] FOREIGN KEY ([SolicitudId]) REFERENCES [dbo_NEXO_prueba].[solicitudes] ([Id]) ON DELETE CASCADE;
-ALTER TABLE [dbo_NEXO_prueba].[OutboxMessage] ADD CONSTRAINT [FK_OutboxMessage_InboxState_InboxMessageId_InboxConsumerId] FOREIGN KEY ([InboxMessageId], [InboxConsumerId]) REFERENCES [dbo_NEXO_prueba].[InboxState] ([MessageId], [ConsumerId]);
-ALTER TABLE [dbo_NEXO_prueba].[OutboxMessage] ADD CONSTRAINT [FK_OutboxMessage_OutboxState_OutboxId] FOREIGN KEY ([OutboxId]) REFERENCES [dbo_NEXO_prueba].[OutboxState] ([OutboxId]);
-ALTER TABLE [dbo_NEXO_prueba].[planes_cargue] ADD CONSTRAINT [FK_planes_cargue_vehiculos_cubicacion_VehiculoId] FOREIGN KEY ([VehiculoId]) REFERENCES [dbo_NEXO_prueba].[vehiculos_cubicacion] ([Id]);
-ALTER TABLE [dbo_NEXO_prueba].[servicios_conexos] ADD CONSTRAINT [FK_servicios_conexos_usuarios_ActualizadoPor] FOREIGN KEY ([ActualizadoPor]) REFERENCES [dbo_NEXO_prueba].[usuarios] ([Id]);
-ALTER TABLE [dbo_NEXO_prueba].[solicitudes] ADD CONSTRAINT [FK_solicitudes_clientes_ClienteId] FOREIGN KEY ([ClienteId]) REFERENCES [dbo_NEXO_prueba].[clientes] ([Id]);
-ALTER TABLE [dbo_NEXO_prueba].[solicitudes] ADD CONSTRAINT [FK_solicitudes_usuarios_CreadoPor] FOREIGN KEY ([CreadoPor]) REFERENCES [dbo_NEXO_prueba].[usuarios] ([Id]);
-ALTER TABLE [dbo_NEXO_prueba].[tarifas_historicas] ADD CONSTRAINT [FK_tarifas_historicas_configuraciones_vehiculo_ConfigVehiculoId] FOREIGN KEY ([ConfigVehiculoId]) REFERENCES [dbo_NEXO_prueba].[configuraciones_vehiculo] ([Id]);
-ALTER TABLE [dbo_NEXO_prueba].[tarifas_historicas] ADD CONSTRAINT [FK_tarifas_historicas_cotizaciones_CotizacionId] FOREIGN KEY ([CotizacionId]) REFERENCES [dbo_NEXO_prueba].[cotizaciones] ([Id]);
-ALTER TABLE [dbo_NEXO_prueba].[tarifas_historicas] ADD CONSTRAINT [FK_tarifas_historicas_rutas_RutaId] FOREIGN KEY ([RutaId]) REFERENCES [dbo_NEXO_prueba].[rutas] ([Id]);
-ALTER TABLE [dbo_NEXO_prueba].[tarifas_sicetac] ADD CONSTRAINT [FK_tarifas_sicetac_rutas_RutaId] FOREIGN KEY ([RutaId]) REFERENCES [dbo_NEXO_prueba].[rutas] ([Id]);
+ALTER TABLE [db_NEXO].[tbl_audit_log] ADD CONSTRAINT [FK_audit_log_usuarios_UsuarioId] FOREIGN KEY ([UsuarioId]) REFERENCES [db_NEXO].[tbl_usuarios] ([Id]);
+ALTER TABLE [db_NEXO].[tbl_colocaciones_cargue] ADD CONSTRAINT [FK_colocaciones_cargue_items_plan_cargue_ItemPlanCargueId] FOREIGN KEY ([ItemPlanCargueId]) REFERENCES [db_NEXO].[tbl_items_plan_cargue] ([Id]);
+ALTER TABLE [db_NEXO].[tbl_colocaciones_cargue] ADD CONSTRAINT [FK_colocaciones_cargue_planes_cargue_PlanCargueId] FOREIGN KEY ([PlanCargueId]) REFERENCES [db_NEXO].[tbl_planes_cargue] ([Id]) ON DELETE CASCADE;
+ALTER TABLE [db_NEXO].[tbl_cotizacion_conexos] ADD CONSTRAINT [FK_cotizacion_conexos_cotizaciones_CotizacionId] FOREIGN KEY ([CotizacionId]) REFERENCES [db_NEXO].[tbl_cotizaciones] ([Id]) ON DELETE CASCADE;
+ALTER TABLE [db_NEXO].[tbl_cotizacion_conexos] ADD CONSTRAINT [FK_cotizacion_conexos_servicios_conexos_ServicioConexoId] FOREIGN KEY ([ServicioConexoId]) REFERENCES [db_NEXO].[tbl_servicios_conexos] ([Id]);
+ALTER TABLE [db_NEXO].[tbl_cotizacion_lineas] ADD CONSTRAINT [FK_cotizacion_lineas_cotizaciones_CotizacionId] FOREIGN KEY ([CotizacionId]) REFERENCES [db_NEXO].[tbl_cotizaciones] ([Id]) ON DELETE CASCADE;
+ALTER TABLE [db_NEXO].[tbl_cotizacion_lineas] ADD CONSTRAINT [FK_cotizacion_lineas_lineas_solicitud_LineaSolicitudId] FOREIGN KEY ([LineaSolicitudId]) REFERENCES [db_NEXO].[tbl_lineas_solicitud] ([Id]);
+ALTER TABLE [db_NEXO].[tbl_cotizaciones] ADD CONSTRAINT [FK_cotizaciones_solicitudes_SolicitudId] FOREIGN KEY ([SolicitudId]) REFERENCES [db_NEXO].[tbl_solicitudes] ([Id]);
+ALTER TABLE [db_NEXO].[tbl_cotizaciones] ADD CONSTRAINT [FK_cotizaciones_usuarios_EntregadaPor] FOREIGN KEY ([EntregadaPor]) REFERENCES [db_NEXO].[tbl_usuarios] ([Id]);
+ALTER TABLE [db_NEXO].[tbl_items_plan_cargue] ADD CONSTRAINT [FK_items_plan_cargue_planes_cargue_PlanCargueId] FOREIGN KEY ([PlanCargueId]) REFERENCES [db_NEXO].[tbl_planes_cargue] ([Id]) ON DELETE CASCADE;
+ALTER TABLE [db_NEXO].[tbl_lineas_solicitud] ADD CONSTRAINT [FK_lineas_solicitud_configuraciones_vehiculo_ConfigVehiculoId] FOREIGN KEY ([ConfigVehiculoId]) REFERENCES [db_NEXO].[tbl_configuraciones_vehiculo] ([Id]);
+ALTER TABLE [db_NEXO].[tbl_lineas_solicitud] ADD CONSTRAINT [FK_lineas_solicitud_rutas_RutaId] FOREIGN KEY ([RutaId]) REFERENCES [db_NEXO].[tbl_rutas] ([Id]);
+ALTER TABLE [db_NEXO].[tbl_lineas_solicitud] ADD CONSTRAINT [FK_lineas_solicitud_solicitudes_SolicitudId] FOREIGN KEY ([SolicitudId]) REFERENCES [db_NEXO].[tbl_solicitudes] ([Id]) ON DELETE CASCADE;
+ALTER TABLE [db_NEXO].[OutboxMessage] ADD CONSTRAINT [FK_OutboxMessage_InboxState_InboxMessageId_InboxConsumerId] FOREIGN KEY ([InboxMessageId], [InboxConsumerId]) REFERENCES [db_NEXO].[InboxState] ([MessageId], [ConsumerId]);
+ALTER TABLE [db_NEXO].[OutboxMessage] ADD CONSTRAINT [FK_OutboxMessage_OutboxState_OutboxId] FOREIGN KEY ([OutboxId]) REFERENCES [db_NEXO].[OutboxState] ([OutboxId]);
+ALTER TABLE [db_NEXO].[tbl_planes_cargue] ADD CONSTRAINT [FK_planes_cargue_vehiculos_cubicacion_VehiculoId] FOREIGN KEY ([VehiculoId]) REFERENCES [db_NEXO].[tbl_vehiculos_cubicacion] ([Id]);
+ALTER TABLE [db_NEXO].[tbl_servicios_conexos] ADD CONSTRAINT [FK_servicios_conexos_usuarios_ActualizadoPor] FOREIGN KEY ([ActualizadoPor]) REFERENCES [db_NEXO].[tbl_usuarios] ([Id]);
+ALTER TABLE [db_NEXO].[tbl_solicitudes] ADD CONSTRAINT [FK_solicitudes_clientes_ClienteId] FOREIGN KEY ([ClienteId]) REFERENCES [db_NEXO].[tbl_clientes] ([Id]);
+ALTER TABLE [db_NEXO].[tbl_solicitudes] ADD CONSTRAINT [FK_solicitudes_usuarios_CreadoPor] FOREIGN KEY ([CreadoPor]) REFERENCES [db_NEXO].[tbl_usuarios] ([Id]);
+ALTER TABLE [db_NEXO].[tbl_tarifas_historicas] ADD CONSTRAINT [FK_tarifas_historicas_configuraciones_vehiculo_ConfigVehiculoId] FOREIGN KEY ([ConfigVehiculoId]) REFERENCES [db_NEXO].[tbl_configuraciones_vehiculo] ([Id]);
+ALTER TABLE [db_NEXO].[tbl_tarifas_historicas] ADD CONSTRAINT [FK_tarifas_historicas_cotizaciones_CotizacionId] FOREIGN KEY ([CotizacionId]) REFERENCES [db_NEXO].[tbl_cotizaciones] ([Id]);
+ALTER TABLE [db_NEXO].[tbl_tarifas_historicas] ADD CONSTRAINT [FK_tarifas_historicas_rutas_RutaId] FOREIGN KEY ([RutaId]) REFERENCES [db_NEXO].[tbl_rutas] ([Id]);
+ALTER TABLE [db_NEXO].[tbl_tarifas_sicetac] ADD CONSTRAINT [FK_tarifas_sicetac_rutas_RutaId] FOREIGN KEY ([RutaId]) REFERENCES [db_NEXO].[tbl_rutas] ([Id]);
 
 -- =============================================================================
 -- 3. ÍNDICES
@@ -596,47 +604,47 @@ ALTER TABLE [dbo_NEXO_prueba].[tarifas_sicetac] ADD CONSTRAINT [FK_tarifas_sicet
 -- usuario, etc.). El resto son de rendimiento, sobre las columnas por las que
 -- de verdad se filtra (FKs, bandeja por Estado+ScorePrioridad, etc.).
 
-CREATE UNIQUE INDEX [IX_ajustes_vigencia_plaza_TarifaPlazaId] ON [dbo_NEXO_prueba].[ajustes_vigencia_plaza] ([TarifaPlazaId]);
-CREATE INDEX [IX_audit_log_Entidad_EntidadId] ON [dbo_NEXO_prueba].[audit_log] ([Entidad], [EntidadId]);
-CREATE INDEX [IX_audit_log_UsuarioId] ON [dbo_NEXO_prueba].[audit_log] ([UsuarioId]);
-CREATE UNIQUE INDEX [IX_clientes_Nit] ON [dbo_NEXO_prueba].[clientes] ([Nit]);
-CREATE INDEX [IX_colocaciones_cargue_ItemPlanCargueId] ON [dbo_NEXO_prueba].[colocaciones_cargue] ([ItemPlanCargueId]);
-CREATE INDEX [IX_colocaciones_cargue_PlanCargueId_Cargada] ON [dbo_NEXO_prueba].[colocaciones_cargue] ([PlanCargueId], [Cargada]);
-CREATE INDEX [IX_cotizacion_conexos_CotizacionId] ON [dbo_NEXO_prueba].[cotizacion_conexos] ([CotizacionId]);
-CREATE INDEX [IX_cotizacion_conexos_ServicioConexoId] ON [dbo_NEXO_prueba].[cotizacion_conexos] ([ServicioConexoId]);
-CREATE INDEX [IX_cotizacion_lineas_CotizacionId] ON [dbo_NEXO_prueba].[cotizacion_lineas] ([CotizacionId]);
-CREATE INDEX [IX_cotizacion_lineas_LineaSolicitudId] ON [dbo_NEXO_prueba].[cotizacion_lineas] ([LineaSolicitudId]);
-CREATE INDEX [IX_cotizaciones_EntregadaPor] ON [dbo_NEXO_prueba].[cotizaciones] ([EntregadaPor]);
-CREATE INDEX [IX_cotizaciones_SolicitudId] ON [dbo_NEXO_prueba].[cotizaciones] ([SolicitudId]);
-CREATE UNIQUE INDEX [AK_InboxState_MessageId_ConsumerId] ON [dbo_NEXO_prueba].[InboxState] ([MessageId], [ConsumerId]);
-CREATE INDEX [IX_InboxState_Delivered] ON [dbo_NEXO_prueba].[InboxState] ([Delivered]);
-CREATE INDEX [IX_items_plan_cargue_PlanCargueId] ON [dbo_NEXO_prueba].[items_plan_cargue] ([PlanCargueId]);
+CREATE UNIQUE INDEX [IX_ajustes_vigencia_plaza_TarifaPlazaId] ON [db_NEXO].[tbl_ajustes_vigencia_plaza] ([TarifaPlazaId]);
+CREATE INDEX [IX_audit_log_Entidad_EntidadId] ON [db_NEXO].[tbl_audit_log] ([Entidad], [EntidadId]);
+CREATE INDEX [IX_audit_log_UsuarioId] ON [db_NEXO].[tbl_audit_log] ([UsuarioId]);
+CREATE UNIQUE INDEX [IX_clientes_Nit] ON [db_NEXO].[tbl_clientes] ([Nit]);
+CREATE INDEX [IX_colocaciones_cargue_ItemPlanCargueId] ON [db_NEXO].[tbl_colocaciones_cargue] ([ItemPlanCargueId]);
+CREATE INDEX [IX_colocaciones_cargue_PlanCargueId_Cargada] ON [db_NEXO].[tbl_colocaciones_cargue] ([PlanCargueId], [Cargada]);
+CREATE INDEX [IX_cotizacion_conexos_CotizacionId] ON [db_NEXO].[tbl_cotizacion_conexos] ([CotizacionId]);
+CREATE INDEX [IX_cotizacion_conexos_ServicioConexoId] ON [db_NEXO].[tbl_cotizacion_conexos] ([ServicioConexoId]);
+CREATE INDEX [IX_cotizacion_lineas_CotizacionId] ON [db_NEXO].[tbl_cotizacion_lineas] ([CotizacionId]);
+CREATE INDEX [IX_cotizacion_lineas_LineaSolicitudId] ON [db_NEXO].[tbl_cotizacion_lineas] ([LineaSolicitudId]);
+CREATE INDEX [IX_cotizaciones_EntregadaPor] ON [db_NEXO].[tbl_cotizaciones] ([EntregadaPor]);
+CREATE INDEX [IX_cotizaciones_SolicitudId] ON [db_NEXO].[tbl_cotizaciones] ([SolicitudId]);
+CREATE UNIQUE INDEX [AK_InboxState_MessageId_ConsumerId] ON [db_NEXO].[InboxState] ([MessageId], [ConsumerId]);
+CREATE INDEX [IX_InboxState_Delivered] ON [db_NEXO].[InboxState] ([Delivered]);
+CREATE INDEX [IX_items_plan_cargue_PlanCargueId] ON [db_NEXO].[tbl_items_plan_cargue] ([PlanCargueId]);
 -- Filtrado a las pendientes: indexar las ya resueltas no aporta y la tabla crece.
-CREATE INDEX [IX_lineas_pendientes_de_costeo_SolicitudId] ON [dbo_NEXO_prueba].[lineas_pendientes_de_costeo] ([SolicitudId]) WHERE ([ResueltaEn] IS NULL);
-CREATE INDEX [IX_lineas_pendientes_de_costeo_TrabajoId_LineaSolicitudId_Tipo] ON [dbo_NEXO_prueba].[lineas_pendientes_de_costeo] ([TrabajoId], [LineaSolicitudId], [Tipo]);
-CREATE INDEX [IX_lineas_solicitud_ConfigVehiculoId] ON [dbo_NEXO_prueba].[lineas_solicitud] ([ConfigVehiculoId]);
-CREATE INDEX [IX_lineas_solicitud_RutaId] ON [dbo_NEXO_prueba].[lineas_solicitud] ([RutaId]);
-CREATE INDEX [IX_lineas_solicitud_SolicitudId] ON [dbo_NEXO_prueba].[lineas_solicitud] ([SolicitudId]);
-CREATE UNIQUE INDEX [IX_mapeo_rol_portal_IdRolPortal] ON [dbo_NEXO_prueba].[mapeo_rol_portal] ([IdRolPortal]) WHERE ([IdRolPortal] IS NOT NULL);
-CREATE INDEX [IX_OutboxMessage_EnqueueTime] ON [dbo_NEXO_prueba].[OutboxMessage] ([EnqueueTime]);
-CREATE INDEX [IX_OutboxMessage_ExpirationTime] ON [dbo_NEXO_prueba].[OutboxMessage] ([ExpirationTime]);
-CREATE UNIQUE INDEX [IX_OutboxMessage_InboxMessageId_InboxConsumerId_SequenceNumber] ON [dbo_NEXO_prueba].[OutboxMessage] ([InboxMessageId], [InboxConsumerId], [SequenceNumber]) WHERE ([InboxMessageId] IS NOT NULL AND [InboxConsumerId] IS NOT NULL);
-CREATE UNIQUE INDEX [IX_OutboxMessage_OutboxId_SequenceNumber] ON [dbo_NEXO_prueba].[OutboxMessage] ([OutboxId], [SequenceNumber]) WHERE ([OutboxId] IS NOT NULL);
-CREATE INDEX [IX_OutboxState_Created] ON [dbo_NEXO_prueba].[OutboxState] ([Created]);
-CREATE INDEX [IX_planes_cargue_LineaSolicitudId] ON [dbo_NEXO_prueba].[planes_cargue] ([LineaSolicitudId]);
-CREATE INDEX [IX_planes_cargue_VehiculoId] ON [dbo_NEXO_prueba].[planes_cargue] ([VehiculoId]);
-CREATE UNIQUE INDEX [IX_reglas_solo_sicetac_Origen_Destino_TipoVehiculo] ON [dbo_NEXO_prueba].[reglas_solo_sicetac] ([Origen], [Destino], [TipoVehiculo]);
-CREATE UNIQUE INDEX [IX_rutas_Origen_Destino] ON [dbo_NEXO_prueba].[rutas] ([Origen], [Destino]);
-CREATE INDEX [IX_servicios_conexos_ActualizadoPor] ON [dbo_NEXO_prueba].[servicios_conexos] ([ActualizadoPor]);
-CREATE INDEX [IX_solicitudes_ClienteId] ON [dbo_NEXO_prueba].[solicitudes] ([ClienteId]);
-CREATE INDEX [IX_solicitudes_CreadoPor] ON [dbo_NEXO_prueba].[solicitudes] ([CreadoPor]);
-CREATE INDEX [IX_solicitudes_Deadline] ON [dbo_NEXO_prueba].[solicitudes] ([Deadline]);
+CREATE INDEX [IX_lineas_pendientes_de_costeo_SolicitudId] ON [db_NEXO].[tbl_lineas_pendientes_de_costeo] ([SolicitudId]) WHERE ([ResueltaEn] IS NULL);
+CREATE INDEX [IX_lineas_pendientes_de_costeo_TrabajoId_LineaSolicitudId_Tipo] ON [db_NEXO].[tbl_lineas_pendientes_de_costeo] ([TrabajoId], [LineaSolicitudId], [Tipo]);
+CREATE INDEX [IX_lineas_solicitud_ConfigVehiculoId] ON [db_NEXO].[tbl_lineas_solicitud] ([ConfigVehiculoId]);
+CREATE INDEX [IX_lineas_solicitud_RutaId] ON [db_NEXO].[tbl_lineas_solicitud] ([RutaId]);
+CREATE INDEX [IX_lineas_solicitud_SolicitudId] ON [db_NEXO].[tbl_lineas_solicitud] ([SolicitudId]);
+CREATE UNIQUE INDEX [IX_mapeo_rol_portal_IdRolPortal] ON [db_NEXO].[tbl_mapeo_rol_portal] ([IdRolPortal]) WHERE ([IdRolPortal] IS NOT NULL);
+CREATE INDEX [IX_OutboxMessage_EnqueueTime] ON [db_NEXO].[OutboxMessage] ([EnqueueTime]);
+CREATE INDEX [IX_OutboxMessage_ExpirationTime] ON [db_NEXO].[OutboxMessage] ([ExpirationTime]);
+CREATE UNIQUE INDEX [IX_OutboxMessage_InboxMessageId_InboxConsumerId_SequenceNumber] ON [db_NEXO].[OutboxMessage] ([InboxMessageId], [InboxConsumerId], [SequenceNumber]) WHERE ([InboxMessageId] IS NOT NULL AND [InboxConsumerId] IS NOT NULL);
+CREATE UNIQUE INDEX [IX_OutboxMessage_OutboxId_SequenceNumber] ON [db_NEXO].[OutboxMessage] ([OutboxId], [SequenceNumber]) WHERE ([OutboxId] IS NOT NULL);
+CREATE INDEX [IX_OutboxState_Created] ON [db_NEXO].[OutboxState] ([Created]);
+CREATE INDEX [IX_planes_cargue_LineaSolicitudId] ON [db_NEXO].[tbl_planes_cargue] ([LineaSolicitudId]);
+CREATE INDEX [IX_planes_cargue_VehiculoId] ON [db_NEXO].[tbl_planes_cargue] ([VehiculoId]);
+CREATE UNIQUE INDEX [IX_reglas_solo_sicetac_Origen_Destino_TipoVehiculo] ON [db_NEXO].[tbl_reglas_solo_sicetac] ([Origen], [Destino], [TipoVehiculo]);
+CREATE UNIQUE INDEX [IX_rutas_Origen_Destino] ON [db_NEXO].[tbl_rutas] ([Origen], [Destino]);
+CREATE INDEX [IX_servicios_conexos_ActualizadoPor] ON [db_NEXO].[tbl_servicios_conexos] ([ActualizadoPor]);
+CREATE INDEX [IX_solicitudes_ClienteId] ON [db_NEXO].[tbl_solicitudes] ([ClienteId]);
+CREATE INDEX [IX_solicitudes_CreadoPor] ON [db_NEXO].[tbl_solicitudes] ([CreadoPor]);
+CREATE INDEX [IX_solicitudes_Deadline] ON [db_NEXO].[tbl_solicitudes] ([Deadline]);
 -- La consulta real de la bandeja del CoordinadorFletes: filtra por estado y ordena por score.
-CREATE INDEX [IX_solicitudes_Estado_ScorePrioridad] ON [dbo_NEXO_prueba].[solicitudes] ([Estado], [ScorePrioridad]);
-CREATE INDEX [IX_tarifas_historicas_ConfigVehiculoId] ON [dbo_NEXO_prueba].[tarifas_historicas] ([ConfigVehiculoId]);
-CREATE INDEX [IX_tarifas_historicas_CotizacionId] ON [dbo_NEXO_prueba].[tarifas_historicas] ([CotizacionId]);
-CREATE INDEX [IX_tarifas_historicas_RutaId_ConfigVehiculoId_Tipologia] ON [dbo_NEXO_prueba].[tarifas_historicas] ([RutaId], [ConfigVehiculoId], [Tipologia]);
-CREATE UNIQUE INDEX [IX_tarifas_sicetac_Periodo_OrigenDane_DestinoDane_Configuracion_TipoCarga_UnidadTransporte_CondicionCarga] ON [dbo_NEXO_prueba].[tarifas_sicetac] ([Periodo], [OrigenDane], [DestinoDane], [Configuracion], [TipoCarga], [UnidadTransporte], [CondicionCarga]);
-CREATE INDEX [IX_tarifas_sicetac_RutaId] ON [dbo_NEXO_prueba].[tarifas_sicetac] ([RutaId]);
-CREATE UNIQUE INDEX [IX_usuarios_Email] ON [dbo_NEXO_prueba].[usuarios] ([Email]);
-CREATE UNIQUE INDEX [IX_usuarios_IdentidadPortalId] ON [dbo_NEXO_prueba].[usuarios] ([IdentidadPortalId]) WHERE ([IdentidadPortalId] IS NOT NULL);
+CREATE INDEX [IX_solicitudes_Estado_ScorePrioridad] ON [db_NEXO].[tbl_solicitudes] ([Estado], [ScorePrioridad]);
+CREATE INDEX [IX_tarifas_historicas_ConfigVehiculoId] ON [db_NEXO].[tbl_tarifas_historicas] ([ConfigVehiculoId]);
+CREATE INDEX [IX_tarifas_historicas_CotizacionId] ON [db_NEXO].[tbl_tarifas_historicas] ([CotizacionId]);
+CREATE INDEX [IX_tarifas_historicas_RutaId_ConfigVehiculoId_Tipologia] ON [db_NEXO].[tbl_tarifas_historicas] ([RutaId], [ConfigVehiculoId], [Tipologia]);
+CREATE UNIQUE INDEX [IX_tarifas_sicetac_Periodo_OrigenDane_DestinoDane_Configuracion_TipoCarga_UnidadTransporte_CondicionCarga] ON [db_NEXO].[tbl_tarifas_sicetac] ([Periodo], [OrigenDane], [DestinoDane], [Configuracion], [TipoCarga], [UnidadTransporte], [CondicionCarga]);
+CREATE INDEX [IX_tarifas_sicetac_RutaId] ON [db_NEXO].[tbl_tarifas_sicetac] ([RutaId]);
+CREATE UNIQUE INDEX [IX_usuarios_Email] ON [db_NEXO].[tbl_usuarios] ([Email]);
+CREATE UNIQUE INDEX [IX_usuarios_IdentidadPortalId] ON [db_NEXO].[tbl_usuarios] ([IdentidadPortalId]) WHERE ([IdentidadPortalId] IS NOT NULL);

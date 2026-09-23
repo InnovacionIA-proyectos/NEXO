@@ -46,8 +46,8 @@ async def listar_vehiculos(repo: IVehiculoCubicacionRepository) -> list[Vehiculo
 
 
 async def republicar_catalogo(repo: IVehiculoCubicacionRepository) -> list[VehiculoCubicacion]:
-    """Issue #162: reparo manual, una sola vez, de la desincronizacion ya
-    existente entre el catalogo de Cubicador y la proyeccion de NEXO."""
+    """Reparo manual, una sola vez, de la desincronizacion ya existente
+    entre el catalogo de Cubicador y la proyeccion de NEXO."""
     return await repo.republicar_todos()
 
 

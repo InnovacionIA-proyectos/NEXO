@@ -1,12 +1,11 @@
 """Composition root de la API - equivalente a Program.cs de NEXO.
 
-Sin middleware CORS a proposito (S3-HU-05, issue #116): ningun navegador
-llama a esta API directo desde que S3-HU-02/03/04 movieron toda escritura y
-lectura del plan de cargue a traves de NEXO. Esta API sigue existiendo para
-consumidores server-to-server (worker propio, scripts de CI/smoke) - esos
-nunca necesitaron CORS. Si algun dia vuelve a hacer falta un frontend
-hablandole directo a este servicio, es una decision nueva que hay que
-tomar a proposito, no reabrir la variable vieja."""
+Sin middleware CORS a proposito: ningun navegador llama a esta API
+directo desde que se movio toda escritura y lectura del plan de cargue a
+traves de NEXO. Esta API sigue existiendo para consumidores server-to-server
+(worker propio, scripts de CI/smoke) - esos nunca necesitaron CORS. Si algun
+dia vuelve a hacer falta un frontend hablandole directo a este servicio, es
+una decision nueva que hay que tomar a proposito, no reabrir la variable vieja."""
 
 from __future__ import annotations
 
@@ -48,10 +47,6 @@ app = FastAPI(
         "integracion completos en CONTRATO.md."
     ),
     lifespan=lifespan,
-#    servers=[
-        # {"url": "http://localhost:8081", "description": "Docker Compose local (host)"},
-        # {"url": "http://localhost:8000", "description": "Fuera de Docker (uvicorn --reload)"},
-#
 )
 
 app.include_router(cubicacion.router)

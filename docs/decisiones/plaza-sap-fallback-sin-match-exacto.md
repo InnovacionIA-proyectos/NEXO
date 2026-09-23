@@ -1,10 +1,10 @@
 # Decisión — advertencia explícita cuando la plaza SAP cae al fallback sin match exacto
 
-**Estado:** aceptada · **Fecha:** 2026-09-18 · **Issue:** #169 (S4-HU-04)
+**Estado:** aceptada · **Fecha:** 2026-09-18
 
 ## Qué se pidió originalmente
 
-El issue #169 pedía "conectar `ISapTarifaFleteEnVivoPort` a la plaza SAP real ya
+La petición original era "conectar `ISapTarifaFleteEnVivoPort` a la plaza SAP real ya
 disponible", asumiendo que el motor de decisión (RN-01) nunca producía un
 candidato de plaza real.
 
@@ -64,10 +64,10 @@ en 3 y 4 (peso exacto / catálogo de vehículo, según corresponda).
 
 ## Limitación conocida (no resuelta aquí)
 
-No hay un proyecto de tests para la capa `CabinaFletes.Infrastructure` en este
+No hay un proyecto de tests para la capa `Nexo.Infrastructure` en este
 repo — `TarifarioSapAdapter`/`PropuestaTarifaAdapter` no tienen cobertura
 automatizada de regresión (ni la tenían antes de este fix). La verificación de
-esta issue se hizo de forma real pero manual (SQL Server efímero + datos
+este fix se hizo de forma real pero manual (SQL Server efímero + datos
 sintéticos, sin tocar ninguna base real), no queda como test que corra en CI.
-Vale la pena un issue de seguimiento si se decide invertir en
-`CabinaFletes.Infrastructure.Tests`.
+Vale la pena abrir seguimiento aparte si se decide invertir en
+`Nexo.Infrastructure.Tests`.

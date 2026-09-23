@@ -1,4 +1,4 @@
-# Puente de mensajería con Cubicador (issue #28, S2-HU-075)
+# Puente de mensajería con Cubicador
 
 Documento de cierre del criterio "contrato de mensajes documentado". Cubicador
 (`cubicador/`, microservicio Python, mismo repo) ya documenta este mismo
@@ -10,20 +10,20 @@ aplican de este lado.
 previa con RabbitMQ.Client directo (probada primero, descartada). Todo sigue
 viajando por el mismo broker RabbitMQ compartido.
 
-## 0. Cumplimiento contra el texto original de la HU-075
+## 0. Cumplimiento contra el objetivo original
 
 > Objetivo: el servicio Python consume los trabajos de cubicación desde
 > RabbitMQ y publica resultados/rechazos por cola de respuesta — NADA
 > síncrono entre backend y motor. Reintentos y DLQ según la topología de
-> S2-HU-04.1. Conecta con la saga de HU-04 y alimenta el flujo de entrega de
-> HU-08.
+> mensajería ya documentada. Conecta con la saga de auto-costeo y alimenta el
+> flujo de entrega.
 
 | Frase del objetivo | Estado |
 |---|---|
 | "el servicio Python consume los trabajos... y publica resultados/rechazos por cola" | ✅ Cumple |
 | "NADA síncrono entre backend y motor" | ⚠️ El puente en sí no hace ninguna llamada HTTP — pero sigue sin resolver cómo se crea el plan+ítems en la base de Cubicador antes de solicitar la cubicación (ver sección 2, precondición) |
-| "Reintentos y DLQ según la topología de S2-HU-04.1" | ✅ **Ahora literal**: `UseMessageRetry`/`Fault<T>` reales de MassTransit — mismo mecanismo, mismos intervalos (1s/5s/15s/60s), que el resto de NEXO. Verificado con infraestructura real, ver sección 3 |
-| "Conecta con la saga de HU-04 y alimenta el flujo de entrega de HU-08" | ❌ No implementado — decisión explícita: `AutoCosteoSaga` es puramente de costeo por diseño, y HU-08 no tiene ningún artefacto en el repo todavía |
+| "Reintentos y DLQ según la topología de mensajería ya documentada" | ✅ **Ahora literal**: `UseMessageRetry`/`Fault<T>` reales de MassTransit — mismo mecanismo, mismos intervalos (1s/5s/15s/60s), que el resto de NEXO. Verificado con infraestructura real, ver sección 3 |
+| "Conecta con la saga de auto-costeo y alimenta el flujo de entrega" | ❌ No implementado — decisión explícita: `AutoCosteoSaga` es puramente de costeo por diseño, y el flujo de entrega no tiene ningún artefacto en el repo todavía |
 
 Los 3 criterios de cierre cumplen — ver `tests/QA/28-s2-hu-075-.../README.md`
 para la evidencia completa.
@@ -118,7 +118,7 @@ código que la usara).
 **`cubicacion.rechazada`**: `{ "correlationId", "planId", "codigo",
 "mensaje" }` → marca `PlanCargue.Estado = "error"`.
 
-Ambos shapes protegidos por `tests/CabinaFletes.Api.Tests/Cubicacion/
+Ambos shapes protegidos por `tests/Nexo.Api.Tests/Cubicacion/
 ContratoCubicacionTests.cs` (sin broker, solo (de)serialización) — copiados
 literal de lo que publica `RabbitMqEventosPublisher` del lado de Cubicador.
 
@@ -129,7 +129,7 @@ reintentos manuales), `PlanDeCargueGeneradoConsumer`/
 `CubicacionRechazadaConsumer` son `IConsumer<T>` REALES: heredan
 `UseMessageRetry` (1s/5s/15s/60s) y el `Fault<T>` automático de
 `Tuberia<T>` — exactamente la misma tubería que usa el resto de NEXO. La
-alerta es literal la misma clase genérica de la #13
+alerta es literalmente la misma clase genérica ya usada en el resto de NEXO
 (`AlertaDeFalloConsumer<PlanDeCargueGenerado>`/`<CubicacionRechazada>`), cero
 código nuevo de alerta.
 
@@ -143,14 +143,14 @@ al final). Log real:
 ```
 21:32:00 warn: R-RETRY rabbitmq://rabbit/Cubicacion.PlanDeCargueGenerado ...
   System.NullReferenceException: Object reference not set to an instance of an object.
-  at CabinaFletes.Infrastructure.Cubicacion.PlanDeCargueGeneradoConsumer.Consume(...)
-21:33:21 dbug: SEND rabbitmq://rabbit/MassTransit:Fault--CabinaFletes.Mensajes.Cubicacion:PlanDeCargueGenerado-- ...
-  MassTransit.Fault<CabinaFletes.Mensajes.Cubicacion.PlanDeCargueGenerado>
+  at Nexo.Infrastructure.Cubicacion.PlanDeCargueGeneradoConsumer.Consume(...)
+21:33:21 dbug: SEND rabbitmq://rabbit/MassTransit:Fault--Nexo.Mensajes.Cubicacion:PlanDeCargueGenerado-- ...
+  MassTransit.Fault<Nexo.Mensajes.Cubicacion.PlanDeCargueGenerado>
 21:33:21 fail: R-FAULT rabbitmq://rabbit/Cubicacion.PlanDeCargueGenerado ... (agotados los reintentos)
 21:33:21 info: SmtpCorreoAdapter Correo enviado a scalderon@boterosoto.com.co: [NEXO] Mensaje PlanDeCargueGenerado cayó a la cola de error
   (... 5 correos más, uno por destinatario)
 21:33:21 dbug: RECEIVE rabbitmq://rabbit/PlanDeCargueGenerado ... Fault<PlanDeCargueGenerado>
-  AlertaDeFalloConsumer<CabinaFletes.Mensajes.Cubicacion.PlanDeCargueGenerado>
+  AlertaDeFalloConsumer<Nexo.Mensajes.Cubicacion.PlanDeCargueGenerado>
 ```
 
 81 segundos entre el primer `R-RETRY` (21:32:00) y el `Fault` (21:33:21) — 
@@ -218,19 +218,17 @@ manual — funciona con el Cubicador real, tal como quedó en esta rama.
 
 ---
 
-## 6. S3-HU-02 — los 8 comandos de escritura del plan de cargue (issue #108)
+## 6. Los 8 comandos de escritura del plan de cargue
 
-Contrato publicado para que el frontend (S3-HU-04 en
+Contrato publicado para que el frontend (visor 3D en
 `administracion_embarqa_nexo`) pueda construir en paralelo. **Si algo de esto
-cambia después de publicado, se avisa en la issue #108 — nunca en silencio**
-(compromiso explícito de la HU).
+cambia después de publicado, se avisa explícitamente — nunca en silencio.**
 
-Las 2 decisiones de diseño detrás de esta sección (S3-HU-01) están registradas
+Las 2 decisiones de diseño detrás de esta sección están registradas
 como ADR en `docs/decisiones/`:
 [`ADR-planid-generado-por-nexo.md`](../decisiones/ADR-planid-generado-por-nexo.md)
-(issue #102) y
-[`ADR-ajuste-manual-async.md`](../decisiones/ADR-ajuste-manual-async.md)
-(issue #101).
+y
+[`ADR-ajuste-manual-async.md`](../decisiones/ADR-ajuste-manual-async.md).
 
 ### 6.0 Qué cambia
 
@@ -244,7 +242,7 @@ reintentos 1s/5s/15s/60s, mismo DLQ, misma alerta. La única pieza compartida
 con `optimizar` es el tipo de mensaje `CubicacionSolicitada`: su campo
 `Solicitud` pasó de `SolicitudDeCubicacion` fijo a `object` — cada uno de los
 9 "Tipo" posibles (`optimizar` + los 8 de abajo) trae su propio payload, y
-`CubicacionSolicitadaValidador` (issue #103) valida cuál corresponde a cuál.
+`CubicacionSolicitadaValidador` valida cuál corresponde a cuál.
 A propósito, ninguno de los 8 pasa por `IParidadCubicadorPort`: son
 operaciones de datos, no de cálculo — la compuerta de paridad solo bloquea
 `optimizar`.
@@ -263,8 +261,9 @@ operaciones de datos, no de cálculo — la compuerta de paridad solo bloquea
 | 8 | `PATCH /api/planes-cargue/{id}/colocaciones/{colocacionId}` | `AjustarColocacionCommand` | `ajustar_colocacion` | **202** `ComandoAceptadoDto` |
 | 9 | `DELETE /api/vehiculos/{id}` | `EliminarVehiculoCommand` | `eliminar_vehiculo` | **202** `ComandoAceptadoDto` |
 
-> **Por qué son 9 y no 8.** El #9 no venía en la lista original de la HU, y se
-> agregó porque su ausencia bloqueaba S3-HU-05. El frontend llama
+> **Por qué son 9 y no 8.** El #9 no venía en la lista original, y se
+> agregó porque su ausencia bloqueaba el cierre de CORS y rotación de claves
+> de Cubicador (`docs/CHECKLIST_DESPLIEGUE.md`, sección 2). El frontend llama
 > `eliminarVehiculo()` (`cubicador-api.service.ts`), así que sin este comando esa
 > escritura seguiría saliendo del navegador directo a Cubicador con la API key en
 > el bundle — y retirar el CORS y rotar la clave exige **cero** llamadas de
@@ -286,7 +285,7 @@ public record ComandoAceptadoDto(Guid CorrelationId, string Estado);
 
 ### 6.2 Por qué los 8 responden 202 (no 200/201/204) — decisión documentada
 
-La issue #104 pide decidir esto endpoint por endpoint. La decisión fue
+Había que decidir esto endpoint por endpoint. La decisión fue
 **202 para los 8, sin excepción**, por consistencia con el resto del
 contrato de trabajos pesados (sección 4 de `docs/contrato-integracion/
 README.md`) — incluso donde un `200`/`201`/`204` síncrono hubiera sido
@@ -309,7 +308,7 @@ defendible:
 #### ⚠️ Cambio de contrato — `POST /api/planes-cargue` devuelve `procesando`
 
 **Publicado el 2026-09-09**, después de la publicación inicial del contrato.
-Se avisa acá y en el hilo de la issue, según el compromiso de S3-HU-02.6 (los
+Se avisa acá explícitamente (los
 cambios de contrato no se hacen en silencio).
 
 **Qué cambia:** el campo `estado` del `202` pasa de `"borrador"` a
@@ -335,7 +334,7 @@ es lo que hace posible un vigilante de timeout del lado NEXO para los comandos
 de Cubo 2 — hoy imposible, porque no había ningún estado que significara
 inequívocamente "esperando confirmación".
 
-**Impacto en el frontend (S3-HU-04):** ninguno si la UI trata el 202 como el
+**Impacto en el frontend:** ninguno si la UI trata el 202 como el
 resto del contrato de trabajos pesados — de hecho lo alinea con la UX descrita
 para Cubo 2 (spinner mientras el estado sea `procesando`, la fila aparece
 cuando llega el aviso por SignalR). Sí rompe a quien haya asumido literalmente
@@ -348,7 +347,7 @@ comando perdido. Cubrirlos exige un registro explícito de comandos en vuelo.
 ### 6.3 Payload de cada comando en la cola
 
 Mismo sobre de siempre (routing key `cubicacion.solicitada`), con
-`solicitud` variando por tipo — ver `CabinaFletes.Mensajes.Cubicacion.
+`solicitud` variando por tipo — ver `Nexo.Mensajes.Cubicacion.
 MensajesDeCubicacion.cs` para el shape exacto (records `CrearPlanInput`,
 `GuardarVehiculoInput`, `GuardarItemInput`, `ImportarItemsInput`,
 `EliminarItemInput`, `EliminarPlanInput`, `AjustarColocacionInput`) y
@@ -423,8 +422,8 @@ esta HU y hay que leerla antes de construir la pantalla.
 
 ### 6.5 Limitaciones conocidas de ESTOS 8 comandos, honestas
 
-- ~~`crear_plan_demo` no tiene seguimiento por id todavía.~~ **RESUELTO en
-  S3-HU-03 (ver sección 7.1)**: el evento `plan-de-cargue.generado` ahora
+- ~~`crear_plan_demo` no tiene seguimiento por id todavía.~~ **RESUELTO
+  (ver sección 7.1)**: el evento `plan-de-cargue.generado` ahora
   trae el `PlanCargueId` real que Cubicador generó (además del `Nombre`/
   `VehiculoId` que eligió), y `PlanDeCargueGeneradoConsumer` inserta la fila
   si no existía — el correlationId del 202 ya no es el único rastro; el
@@ -432,8 +431,8 @@ esta HU y hay que leerla antes de construir la pantalla.
   específico (el frontend no sabe el `PlanCargueId` real hasta que polling o
   un futuro aviso por correlación lo revele), pero `GET /api/planes-cargue`
   (sección 7.2) ya lo lista.
-- **`guardar_vehiculo` no tiene aviso de éxito ni de fallo.** Antes de
-  S3-HU-03 NEXO no mantenía espejo de vehículos en absoluto; ahora sí (ver
+- **`guardar_vehiculo` no tiene aviso de éxito ni de fallo.** Antes
+  NEXO no mantenía espejo de vehículos en absoluto; ahora sí (ver
   sección 7), pero la sincronización llega por `vehiculo.creado`/
   `vehiculo.actualizado` — un RECHAZO (`cubicacion.rechazada`) sigue sin
   encontrar ninguna fila de `PlanCargue` que marcar (un vehículo no es un
@@ -450,17 +449,18 @@ esta HU y hay que leerla antes de construir la pantalla.
   de NEXO** (solo `Id` + `Nombre` = el mismo id, sin dimensiones) — existe
   ÚNICAMENTE para satisfacer la FK de `PlanCargue.VehiculoId` en la base de
   NEXO. Nadie más lee esa fila; no es una fuente de verdad de vehículos
-  (aunque S3-HU-03 la actualiza con datos reales en cuanto llega el primer
+  (aunque la proyección de la sección 7 la actualiza con datos reales en
+  cuanto llega el primer
   `plan-de-cargue.generado` o `vehiculo.creado`/`vehiculo.actualizado` para
   ese id — ver sección 7).
 
 ---
 
-## 7. S3-HU-03 — proyección de lectura del visor 3D (issue #115)
+## 7. Proyección de lectura del visor 3D
 
-Contrato publicado para que el frontend (S3-HU-04 en
+Contrato publicado para que el frontend (visor 3D en
 `administracion_embarqa_nexo`) construya el visor en paralelo. **Si algo de
-esto cambia después de publicado, se avisa en la issue #115 — nunca en
+esto cambia después de publicado, se avisa explícitamente — nunca en
 silencio.**
 
 ### 7.0 Qué cambia
@@ -472,13 +472,12 @@ se acaba: **NEXO proyecta el detalle completo en su propia base** y expone 7
 endpoints `GET` nuevos que leen EXCLUSIVAMENTE de esa proyección — ninguno
 reenvía la consulta a Cubicador (criterio no-negociable de la HU).
 
-Antes de tocar código se midió el tamaño real del evento enriquecido (issue
-#109) — ver
+Antes de tocar código se midió el tamaño real del evento enriquecido — ver
 [`docs/decisiones/medicion-evento-enriquecido-plan-cargue.md`](../decisiones/medicion-evento-enriquecido-plan-cargue.md):
 165 KB para un plan grande típico, 2.9 MB en el techo teórico de una sola
 importación — se aceptó tal cual, sin paginar ni comprimir, con un umbral de
-revisión documentado. Las 2 decisiones de arquitectura de fondo (S3-HU-01)
-siguen siendo las mismas de S3-HU-02: ver
+revisión documentado. Las 2 decisiones de arquitectura de fondo
+siguen siendo las mismas descritas en la sección 6: ver
 [`ADR-planid-generado-por-nexo.md`](../decisiones/ADR-planid-generado-por-nexo.md)
 y
 [`ADR-ajuste-manual-async.md`](../decisiones/ADR-ajuste-manual-async.md).
@@ -509,14 +508,14 @@ siempre; `resultado` pasó de `{estado, puntaje, colocaciones: int}` al
 }
 ```
 
-Shape exacto de cada objeto: `CabinaFletes.Mensajes.Cubicacion.
+Shape exacto de cada objeto: `Nexo.Mensajes.Cubicacion.
 MensajesDeCubicacion.cs` (`PlanCargueEvento`/`ItemPlanCargueEvento`/
 `ColocacionCargueEvento`/`MetricasCubicacionEvento`/
 `IncidenciaValidacionEvento`) del lado C#, `ResultadoPlanDto` (cubicador/
 CONTRATO.md §3.2) del lado Python — son el mismo contrato, dos lenguajes.
 
 **`vehiculo.creado`/`vehiculo.actualizado` — NUEVOS.** Se publican desde
-`worker/main.py` cuando el comando `guardar_vehiculo` (S3-HU-02) se ejecuta
+`worker/main.py` cuando el comando `guardar_vehiculo` (sección 6) se ejecuta
 con éxito — "creado" si el `Id` no existía antes en la base de Cubicador,
 "actualizado" si ya existía:
 
@@ -566,11 +565,11 @@ para lecturas —
 roles puede consultar (listados, detalles, exportar) casi todo el sistema".
 Ninguna de estas 7 consultas escribe ni cambia estado; no hay razón para
 restringirlas por rol — mismo criterio que ya usaba
-`GET /api/planes-cargue/{id}` desde S2-HU-08.1.
+`GET /api/planes-cargue/{id}` desde su versión original.
 
 Los DTOs completos (`VehiculoCubicacionDto`, `PlanCargueDetalleDto`,
 `ItemPlanCargueDetalleDto`, `ColocacionCargueDto`, `ResultadoPlanDto`,
-`PlanFlotaItemDto`) están en `CabinaFletes.Application.CasosDeUso.
+`PlanFlotaItemDto`) están en `Nexo.Application.CasosDeUso.
 PlanDeCargue.DTOs.PlanCargueDtos.cs` — espejan 1:1 los DTOs de Cubicador
 citados en cubicador/CONTRATO.md §3.2, con `Guid`/`decimal` en vez de
 `string`/`float` (convención del resto de la API HTTP de NEXO).
@@ -593,61 +592,62 @@ citados en cubicador/CONTRATO.md §3.2, con `Guid`/`decimal` en vez de
 
 ---
 
-## 8. Cobertura para S3-HU-04 — qué tiene y qué le falta al frontend
+## 8. Cobertura para el visor 3D — qué tiene y qué le falta al frontend
 
 Inventario 1 a 1 de lo que `administracion_embarqa_nexo` llama hoy contra lo que
 NEXO expone, verificado con `git grep` sobre `origin/main` del frontend y sobre
-los controladores de este repo. Es el insumo de **S3-HU-04.1** (tabla de
-equivalencia) y de **S3-HU-04.5** (punto de coordinación).
+los controladores de este repo. Es el insumo de la tabla de
+equivalencia y del punto de coordinación con el frontend.
 
-> **Por qué existe esta sección.** S3-HU-05 (#116) retiró el CORS del Cubicador
-> y rotó la clave, dando por hecho que *"el visor 3D (S3-HU-04) ya consume solo
-> esos endpoints de NEXO"*. **Eso todavía no ocurrió**: el frontend sigue con
-> 12 puntos de llamada directa (`cubicadorBaseUrl` en `cubicador-api.service.ts`
-> y `captura-api.service.ts`) — nadie cambió esos call-sites todavía. Lo que sí
-> avanzó (issue #78, S3-HU-04.3) es el lado NEXO: los 20 de 20 métodos ya tienen
-> equivalente — los 3 que faltaban (`desde-linea`, `por-linea`, `colocaciones`,
-> ver 8.1) más `cubicar()`, resuelto como excepción HTTP declarada y acotada
-> (ver 8.2) en vez de forzarlo al patrón de cola. Migrar el frontend a los 20
-> endpoints ya disponibles sigue siendo trabajo pendiente de esa HU — punto de
-> coordinación con Juan Pablo (responsable de S3-HU-04).
+> **Por qué existe esta sección.** El retiro del CORS de Cubicador y la
+> rotación de la clave (`docs/CHECKLIST_DESPLIEGUE.md`, sección 2) dieron por
+> hecho que *"el visor 3D ya consume solo esos endpoints de NEXO"*. **Eso
+> todavía no ocurrió**: el frontend sigue con 12 puntos de llamada directa
+> (`cubicadorBaseUrl` en `cubicador-api.service.ts` y
+> `captura-api.service.ts`) — nadie cambió esos call-sites todavía. Lo que sí
+> avanzó es el lado NEXO: los 20 de 20 métodos ya tienen equivalente — los 3
+> que faltaban (`desde-linea`, `por-linea`, `colocaciones`, ver 8.1) más
+> `cubicar()`, resuelto como excepción HTTP declarada y acotada (ver 8.2) en
+> vez de forzarlo al patrón de cola. Migrar el frontend a los 20 endpoints ya
+> disponibles sigue siendo trabajo pendiente — punto de coordinación con Juan
+> Pablo, responsable del visor 3D.
 
 ### 8.1 Con equivalente en NEXO (20 de 20)
 
 | Método del frontend | Endpoint en NEXO | Desde |
 |---|---|---|
-| `optimizar()` | `POST /api/planes-cargue/{id}/optimizar` | S2-HU-08 |
-| `obtenerResumen()` | `GET /api/planes-cargue/{id}` | S2-HU-08 |
-| `crearPlan()` | `POST /api/planes-cargue` | S3-HU-02 |
-| `crearPlanDemo()` | `POST /api/planes-cargue/demo` | S3-HU-02 |
-| `eliminarPlan()` | `DELETE /api/planes-cargue/{id}` | S3-HU-02 |
-| `guardarItem()` | `POST /api/planes-cargue/{id}/items` | S3-HU-02 |
-| `importarItems()` | `POST /api/planes-cargue/{id}/items/importar` | S3-HU-02 |
-| `eliminarItem()` | `DELETE /api/planes-cargue/{id}/items/{itemId}` | S3-HU-02 |
-| `ajustarColocacion()` | `PATCH /api/planes-cargue/{id}/colocaciones/{colocacionId}` | S3-HU-02 |
-| `guardarVehiculo()` | `POST /api/vehiculos` | S3-HU-02 |
-| `eliminarVehiculo()` | `DELETE /api/vehiculos/{id}` | este PR |
-| `vehiculos()` | `GET /api/vehiculos` | S3-HU-03 |
-| `planes()` | `GET /api/planes-cargue` | S3-HU-03 |
-| `resultado()` | `GET /api/planes-cargue/{id}/resultado` | S3-HU-03 |
-| `flota()` | `GET /api/planes-cargue/{id}/flota` | S3-HU-03 |
-| `metricas()` | `GET /api/planes-cargue/{id}/metricas` | S3-HU-03 |
-| `noCargadas()` | `GET /api/planes-cargue/{id}/no-cargadas` | S3-HU-03 |
-| `exportar()` | `GET /api/planes-cargue/{id}/exportar` | S3-HU-03 |
-| `crearPlanDesdeLinea()` | `POST /api/planes-cargue/desde-linea/{lineaId}` | S3-HU-04.3 (issue #78) |
-| `porLinea()` | `GET /api/planes-cargue/por-linea/{lineaId}` | S3-HU-04.3 (issue #78) |
-| `colocaciones()` | `GET /api/planes-cargue/{id}/colocaciones` | S3-HU-04.3 (issue #78) |
-| `cubicar()` (`captura-api.service.ts`) | `POST /api/cubicacion` | S3-HU-04.3 (issue #78) — ver 8.2, excepción HTTP |
+| `optimizar()` | `POST /api/planes-cargue/{id}/optimizar` | Ya existente |
+| `obtenerResumen()` | `GET /api/planes-cargue/{id}` | Ya existente |
+| `crearPlan()` | `POST /api/planes-cargue` | Comandos de escritura (sección 6) |
+| `crearPlanDemo()` | `POST /api/planes-cargue/demo` | Comandos de escritura (sección 6) |
+| `eliminarPlan()` | `DELETE /api/planes-cargue/{id}` | Comandos de escritura (sección 6) |
+| `guardarItem()` | `POST /api/planes-cargue/{id}/items` | Comandos de escritura (sección 6) |
+| `importarItems()` | `POST /api/planes-cargue/{id}/items/importar` | Comandos de escritura (sección 6) |
+| `eliminarItem()` | `DELETE /api/planes-cargue/{id}/items/{itemId}` | Comandos de escritura (sección 6) |
+| `ajustarColocacion()` | `PATCH /api/planes-cargue/{id}/colocaciones/{colocacionId}` | Comandos de escritura (sección 6) |
+| `guardarVehiculo()` | `POST /api/vehiculos` | Comandos de escritura (sección 6) |
+| `eliminarVehiculo()` | `DELETE /api/vehiculos/{id}` | Este cambio |
+| `vehiculos()` | `GET /api/vehiculos` | Proyección de lectura (sección 7) |
+| `planes()` | `GET /api/planes-cargue` | Proyección de lectura (sección 7) |
+| `resultado()` | `GET /api/planes-cargue/{id}/resultado` | Proyección de lectura (sección 7) |
+| `flota()` | `GET /api/planes-cargue/{id}/flota` | Proyección de lectura (sección 7) |
+| `metricas()` | `GET /api/planes-cargue/{id}/metricas` | Proyección de lectura (sección 7) |
+| `noCargadas()` | `GET /api/planes-cargue/{id}/no-cargadas` | Proyección de lectura (sección 7) |
+| `exportar()` | `GET /api/planes-cargue/{id}/exportar` | Proyección de lectura (sección 7) |
+| `crearPlanDesdeLinea()` | `POST /api/planes-cargue/desde-linea/{lineaId}` | Agregado después |
+| `porLinea()` | `GET /api/planes-cargue/por-linea/{lineaId}` | Agregado después |
+| `colocaciones()` | `GET /api/planes-cargue/{id}/colocaciones` | Agregado después |
+| `cubicar()` (`captura-api.service.ts`) | `POST /api/cubicacion` | Agregado después — ver 8.2, excepción HTTP |
 
 ⚠️ **Cambio de ruta que hay que mirar**: los 3 de vehículos viven en
 `/api/vehiculos`, no en `/api/planes-cargue/vehiculos` como los pide el
 frontend hoy. No es un `replace` del host: cambia el prefijo.
 
-⚠️ **Limitación conocida de `porLinea()` (issue #78)**: hoy el worker de
+⚠️ **Limitación conocida de `porLinea()`**: hoy el worker de
 Cubicador (`crear_desde_linea`) solo reporta el PRIMER vehículo de una flota
 que necesitó varios — `application/plan_cargue/desde_linea.py` arma toda la
 flota pero solo publica `plan-de-cargue.generado` para el primero. Mientras
-eso no se arregle del lado del motor (issue nueva, fuera de alcance de #78),
+eso no se arregle del lado del motor (fuera de alcance de este cambio),
 `porLinea()` puede devolver una lista incompleta para líneas que requieran
 más de un vehículo.
 
@@ -655,15 +655,16 @@ más de un vehículo.
 (¿redundante con `resultado()`, que ya trae las colocaciones adentro?) se
 resolvió implementándolo como equivalente 1:1 en vez de forzar un refactor del
 frontend — costaba poco (`ResultadoPlanMapper.AColocacion` ya existía) y evita
-un cambio de contrato no pedido por la issue.
+un cambio de contrato que nadie pidió.
 
 ### 8.2 `cubicar()` — resuelto como excepción HTTP declarada, no como cola
 
 `cubicar()` (`captura-api.service.ts`, usado por `captura-page` y
 `mesa-costeo-page`) pide `POST /api/cubicacion`: una cubicación rápida
 (SICE), sin persistencia. No encajaba ni en el patrón de escritura del
-dominio (S3-HU-02, que asume un plan con Id que guardar) ni en el de
-proyección (S3-HU-03, que asume un evento que proyectar) — no hay plan, no
+dominio (los comandos de escritura de la sección 6, que asumen un plan con
+Id que guardar) ni en el de proyección (la proyección de la sección 7, que
+asume un evento que proyectar) — no hay plan, no
 hay Id, no hay nada que una cola o una proyección pudieran servir después.
 
 **Decisión tomada**: NEXO expone `POST /api/cubicacion`

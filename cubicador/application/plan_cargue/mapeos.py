@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     # Import solo para chequeo de tipos (evita que `application` dependa en
     # runtime de `api` - la inversion de capas que se ve rara pero es la unica
     # forma de compartir este mapeo Pydantic-a-dominio entre el router
-    # sincrono y el worker de colas sin duplicarlo, ver issue #105).
+    # sincrono y el worker de colas sin duplicarlo).
     from api.dtos.plan_cargue import GuardarItemPlanCargueInput, GuardarVehiculoInput
 
 
@@ -62,8 +62,8 @@ def expandir_items(items: list[ItemPlanCargue]) -> list[ItemCarga]:
 
 # ------------------------------------------------------------- Pydantic (API/cola) -> dominio
 #
-# Movidos ahi desde api/routers/planes_cargue.py (S3-HU-02, issue #105): el router
-# sincrono y el worker de colas (worker/main.py) necesitan EXACTAMENTE el mismo mapeo
+# Movidos ahi desde api/routers/planes_cargue.py: el router sincrono y el
+# worker de colas (worker/main.py) necesitan EXACTAMENTE el mismo mapeo
 # input-a-entidad para guardar_vehiculo/guardar_item - antes solo lo tenia el router.
 
 

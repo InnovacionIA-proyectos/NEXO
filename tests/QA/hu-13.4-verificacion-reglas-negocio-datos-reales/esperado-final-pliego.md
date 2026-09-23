@@ -2,7 +2,7 @@
 
 S2-HU-13.4 (issue #43). Verificación de la Regla 1 (regla del mayor) y Regla
 2 (piso inviolable) contra la app real, usando un pliego de 15 líneas reales
-subido de verdad a CabinaFletes. Documenta: qué se esperaba, qué salió
+subido de verdad a Nexo. Documenta: qué se esperaba, qué salió
 realmente (`cotizacion-agencia-de-aduanas-jf-asociados-s-a-s-nivel-1-7667da46.pdf`),
 los errores propios cometidos en el camino (para que quede la trazabilidad),
 y las 2 desviaciones reales encontradas.
@@ -92,7 +92,7 @@ parte en esta versión de la tabla — ver sección 5 para el detalle completo.
 
 ### 4.1 Piso SICE-TAC — `SicetacOficialAsync`
 
-(ver `src/CabinaFletes.Infrastructure/Biblioteca/Adaptadores/TarifarioSapAdapter.cs`,
+(ver `src/Nexo.Infrastructure/Biblioteca/Adaptadores/TarifarioSapAdapter.cs`,
 líneas 322-373): para Clase de Viaje = Contenedor, resuelve el vehículo por
 rango de peso del contenedor (`ConfigPorRangoPesoAsync`, tabla
 `tblContenedorRangoPeso`/`tblRangoPeso`), no por el vehículo declarado en la
@@ -190,7 +190,7 @@ las descarta sin ninguna traza visible para el usuario.
   ninguna propuesta quedó por debajo del piso SICE-TAC (de hecho, todas
   fueron exactamente el piso).
 - **Regla 3 (solo SICE-TAC):** consultada la Parte C contra `reglas_solo_sicetac`
-  (base de la app, `dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba`) —
+  (base de la app, `dbInformesAutomatizados_Pruebas.db_NEXO`) —
   existen 3 reglas configuradas (Medellín→Bogotá 3S3; Cali→Medellín 3S3;
   Barranquilla→Pereira 2S3, estas 2 últimas creadas el mismo día). Ninguna
   coincide con las 15 líneas del pliego ya subido, así que **no se pudo

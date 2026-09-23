@@ -18,7 +18,7 @@ internamente convierte a metros como el prototipo.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 # ---- UMBRALES GOBERNADOS (SICCE-005) - cualquier cambio debe documentarse como nueva version de la regla.
 _UMBRAL_ADVERTENCIA_PESO_EJE = 0.90  # 90-100% de un eje: advertencia

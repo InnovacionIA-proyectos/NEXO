@@ -1,0 +1,59 @@
+using Nexo.Application.CasosDeUso.Biblioteca.DTOs;
+using Nexo.Application.CasosDeUso.Biblioteca.Interfaces;
+using Nexo.Application.Common.Dtos;
+using Nexo.Domain.Common;
+
+namespace Nexo.Infrastructure.Biblioteca.Adaptadores;
+
+/// <summary>
+/// Dataset PROVISIONAL de plaza mientras la conexión SAP en vivo no exista. Valores
+/// representativos de fletes reales de Botero Soto para las rutas más frecuentes —
+/// PENDIENTE de validación formal por negocio: no son un promedio calculado, son
+/// estimaciones razonables a partir de las tarifas ya sembradas en clsDataSeeder.cs
+/// para las mismas rutas.
+///
+/// Se activa SOLO por configuración (`SapTarifaFleteEnVivo:Modo=Mock`,
+/// clsDependencyInjection.cs) — nunca reemplaza a <see cref="ITarifarioSapPort"/> (la
+/// fuente REAL de plaza, vía DbSolucionesTi, que sigue intacta) salvo que un operador
+/// lo encienda a propósito.
+/// </summary>
+public sealed class clsSapTarifaFleteEnVivoMockAdapter : ISapTarifaFleteEnVivoPort
+{
+    public bool Configurado => true;
+
+    /// <summary>Clave: ruta normalizada (clsTexto.ClaveRuta). Valor: tarifa base en COP,
+    /// para un vehículo estándar (Turbo/Sencillo) y peso de referencia (~8 ton).</summary>
+    private static readonly IReadOnlyDictionary<string, decimal> Dataset = new Dictionary<string, decimal>
+    {
+        [clsTexto.ClaveRuta("Bogota", "Medellin")] = 2_850_000m,
+        [clsTexto.ClaveRuta("Medellin", "Bogota")] = 2_850_000m,
+        [clsTexto.ClaveRuta("Bogota", "Cali")] = 3_100_000m,
+        [clsTexto.ClaveRuta("Cali", "Bogota")] = 3_100_000m,
+        [clsTexto.ClaveRuta("Bogota", "Barranquilla")] = 4_600_000m,
+        [clsTexto.ClaveRuta("Barranquilla", "Bogota")] = 4_600_000m,
+        [clsTexto.ClaveRuta("Medellin", "Cartagena")] = 3_900_000m,
+        [clsTexto.ClaveRuta("Cartagena", "Medellin")] = 3_900_000m,
+        [clsTexto.ClaveRuta("Bogota", "Bucaramanga")] = 2_400_000m,
+        [clsTexto.ClaveRuta("Bucaramanga", "Bogota")] = 2_400_000m,
+    };
+
+    public Task<clsCandidatoTarifaDto?> ConsultarPlazaAsync(clsConsultaTarifarioSap consulta, CancellationToken ct = default)
+    {
+        var clave = clsTexto.ClaveRuta(consulta.Origen, consulta.Destino);
+        if (!Dataset.TryGetValue(clave, out var baseCop))
+            return Task.FromResult<clsCandidatoTarifaDto?>(null);
+
+        // Ajuste simple por peso: la base es para ~8 ton, escala linealmente con piso de
+        // 60% (un flete no baja de más de la mitad aunque la carga sea liviana) — es una
+        // aproximación deliberadamente simple, PROVISIONAL, no una tarifa SAP real.
+        var factor = consulta.Peso is > 0
+            ? Math.Clamp(consulta.Peso.Value / 8000m, 0.6m, 1.6m)
+            : 1m;
+        var valor = Math.Round(baseCop * factor, 0);
+
+        return Task.FromResult<clsCandidatoTarifaDto?>(new clsCandidatoTarifaDto(
+            "sap_en_vivo_mock", valor,
+            $"{consulta.Origen} → {consulta.Destino} · dataset provisional, pendiente de validación formal por negocio",
+            $"mock: ruta {clave}, factor de peso {factor:0.00}", 1));
+    }
+}

@@ -73,7 +73,7 @@ carpeta QA:
 ### 1) `BandejaCargaTests.cs` — a nivel de saga, en memoria (mismo patrón que HU-04.3/04.4)
 
 No forma parte del PR. Para reproducirla: copiar dentro de
-`tests/CabinaFletes.Api.Tests/Mensajeria/` y correr
+`tests/Nexo.Api.Tests/Mensajeria/` y correr
 `dotnet test --filter FullyQualifiedName~BandejaCarga`. No necesita infraestructura real
 — usa el transporte en memoria del arnés de MassTransit.
 
@@ -85,7 +85,7 @@ delataría.
 
 **Resultado:**
 ```
-Passed CabinaFletes.Api.Tests.Mensajeria.BandejaCargaTests
+Passed Nexo.Api.Tests.Mensajeria.BandejaCargaTests
   .Pliegos_concurrentes_de_tamanos_distintos_producen_exactamente_un_aviso_cada_uno [3 s]
 ```
 Exactamente 20 avisos de bandeja (`trabajo-terminado`) para los 20 pliegos — ni uno

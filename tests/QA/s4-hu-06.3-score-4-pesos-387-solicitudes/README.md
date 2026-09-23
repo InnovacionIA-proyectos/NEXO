@@ -6,7 +6,7 @@ Este sandbox no tiene conectividad hacia la base de datos donde viven las 387
 solicitudes de prueba mencionadas en el issue (mismo límite que ya se dio en HUs
 anteriores de esta sesión: no hay acceso a bases compartidas/corporativas desde acá).
 El fix en sí (issue #173) ya está verificado con pruebas unitarias deterministas
-(`tests/CabinaFletes.Domain.Tests/ScorePrioridadCalculatorTests.cs`), pero la
+(`tests/Nexo.Domain.Tests/ScorePrioridadCalculatorTests.cs`), pero la
 reverificación específica que pide #174 — contra las 387 solicitudes reales, con los
 números de antes/después — requiere correrla contra esa base.
 

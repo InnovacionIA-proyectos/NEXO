@@ -1,6 +1,6 @@
-# Contrato de integración — Nexo (Cabina de Fletes) ↔ Portal de la Administración
+# Contrato de integración — Nexo (Nexo) ↔ Portal de la Administración
 
-**Versión 1.6.0** · Sprint 2 · Issues #7, #15, #16, #17, #19, #20 y #21
+**Versión 1.6.0**
 
 Este documento manda. El módulo `cabina-fletes` del portal está en desarrollo y no
 es la referencia: lo que hoy tenga construido se adapta a lo que diga aquí, no al
@@ -27,7 +27,7 @@ nombre.
 | D7 | Trabajos pesados con aceptado + identificador | Definida | Backend |
 | D8 | Avisos por SignalR con consulta de respaldo | Definida | Backend |
 | D9 | Forma única de error | Definida | Backend |
-| P1 | Opciones de Cabina de Fletes en la tabla de permisos | Pendiente | TI |
+| P1 | Opciones de Nexo en la tabla de permisos | Pendiente | TI |
 | P2 | Equivalencia de los roles del portal a los 6 de Nexo | Pendiente | Negocio |
 | P3 | Precedencia cuando un usuario tiene varios roles | Pendiente | Negocio |
 | P4 | Token de sesión verificable | Pendiente | Equipo del portal, sin fecha |
@@ -38,7 +38,7 @@ nombre.
 
 ### Cómo llega
 
-El módulo de Cabina de Fletes solo es alcanzable después de que la persona ya
+El módulo de Nexo solo es alcanzable después de que la persona ya
 inició sesión en el portal. Nexo no pide credenciales, no emite tokens y no
 guarda sesión propia.
 
@@ -64,21 +64,21 @@ Consecuencia directa: **falsificar un rol editando el navegador no funciona.** E
 es el escenario que la auditoría de QA dejó como criterio vigente.
 
 Lo que sí sigue siendo posible es cambiar el identificador por el de otra persona
-y recibir sus permisos. La identidad no viaja firmada. Está aceptado a conciencia
-para este sprint y está escrito en [`ADR-001`](ADR-001-identidad-sin-token.md) con
-las condiciones que obligan a revisarlo.
+y recibir sus permisos. La identidad no viaja firmada. Está aceptado a conciencia y está escrito en
+[`ADR-001`](ADR-001-identidad-sin-token.md) con las condiciones que obligan a
+revisarlo.
 
 ### Qué valida el backend
 
 En **cada** petición, sin caché de sesión:
 
 1. Que el identificador exista en la tabla de usuarios de la administración.
-2. Que esa persona tenga permiso sobre Cabina de Fletes.
+2. Que esa persona tenga permiso sobre Nexo.
 3. Que su permiso corresponda a alguno de los 6 roles de Nexo.
 
 Si cualquiera de los tres falla, la petición se rechaza. **No hay rol por
 defecto.** No existe un modo permisivo, ni siquiera en desarrollo: el esquema
-`X-Rol` del prototipo se retira en la issue #11.
+`X-Rol` del prototipo ya fue retirado.
 
 ### Endpoint de sesión
 
@@ -101,7 +101,7 @@ X-Portal-Usuario-Id: 10123
 |---|---|---|
 | `200` | Sesión válida | Entrar al módulo |
 | `401` | El identificador no existe en la tabla | Devolver a la persona al portal |
-| `403` | Existe, pero sin permiso sobre Cabina de Fletes | Mensaje y salida al portal |
+| `403` | Existe, pero sin permiso sobre Nexo | Mensaje y salida al portal |
 
 Un `401` **nunca** significa "muestra una pantalla de acceso de Nexo", porque esa
 pantalla no existe. Significa que la sesión del portal no sirve y la persona tiene
@@ -146,7 +146,7 @@ contra roles existentes o si se pide crearlos.
 La unidad de acceso en la administración no es el rol sino la **opción**: cada
 permiso es un par de rol y opción, y es la opción la que abre una pantalla.
 
-Por eso conviene pedir a TI las **opciones de Cabina de Fletes** y que las cuelgue
+Por eso conviene pedir a TI las **opciones de Nexo** y que las cuelgue
 de los roles que ya existen, en vez de pedir tres roles nuevos. Es una solicitud
 más pequeña, no ensucia el catálogo con roles que solo usa un módulo, y deja la
 asignación de personas donde ya la administran.
@@ -453,9 +453,9 @@ pantalla, es política de operación.
 }
 ```
 
-### Los 4 pesos mueven el puntaje (fix issue #173)
+### Los 4 pesos mueven el puntaje
 
-Hasta issue #173 el puntaje total era exclusivamente la urgencia por deadline y los
+Antes, el puntaje total era exclusivamente la urgencia por deadline y los
 pesos eran configuración dormida (ver
 `docs/decisiones/score-prioridad-4-pesos-vs-solo-urgencia.md`). Eso ya no es así: el
 total es la suma ponderada de los 4 componentes, así que mover cualquier peso sí cambia
@@ -529,9 +529,8 @@ la entrega responde en **~100 ms** con la salida de correo caída.
 
 ### La notificación es interna
 
-Va al correo corporativo de quien pidió la consulta de flete. **Nunca al cliente.** La
-HU-06.2 (#22) deriva el destinatario de la sesión y deja una prueba automatizada de que
-ninguna dirección de cliente puede ser destinataria.
+Va al correo corporativo de quien pidió la consulta de flete. **Nunca al cliente.** El backend deriva el destinatario de la sesión y deja una prueba automatizada de
+que ninguna dirección de cliente puede ser destinataria.
 
 ### Si el correo falla
 
@@ -611,5 +610,5 @@ de parche.
 |---|---|
 | `README.md` | Este documento |
 | `openapi.yaml` | La superficie del contrato, ejecutable |
-| `escenarios.feature` | Los escenarios que implementan las issues #9, #10 y #11 |
+| `escenarios.feature` | Los escenarios que implementan el contrato |
 | `ADR-001-identidad-sin-token.md` | Por qué la identidad no viaja firmada |

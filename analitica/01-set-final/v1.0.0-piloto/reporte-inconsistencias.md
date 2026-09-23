@@ -62,7 +62,7 @@ están en la vista `analitica.inconsistencias` completa, no en este set.
 | Fecha | 2026-08-24 |
 
 **Causa:** `rutas` se crea dinámicamente a partir del texto libre capturado en
-la solicitud (confirmado en `docs/diccionario-datos-cabinafletes.md`, sección
+la solicitud (confirmado en `diccionario-y-linaje.md`, sección
 de la tabla `rutas`) — no hay validación de longitud mínima ni de que el texto
 sea un nombre de ciudad real. Esta fila probablemente vino de una prueba
 manual rápida con datos de relleno.

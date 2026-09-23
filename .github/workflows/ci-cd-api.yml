@@ -1,24 +1,24 @@
 name: CI/CD API
 
-# S3-HU-11.1 (issue #134): dispara SOLO por cambios que puedan afectar al
+# Dispara SOLO por cambios que puedan afectar al
 # servicio API (.NET) — nunca por cambios exclusivos de cubicador/ (ese
 # servicio tiene sus propios workflows, ver ci-cd-cubicador-api.yml/
 # ci-cd-cubicador-worker.yml). Ver docs/CI_CD_RUTAS_COMPARTIDAS.md para la
 # convención completa de qué ruta dispara qué pipeline.
 on:
   push:
-    branches: [main, Pre-Despliegue-BACKEND]
+    branches: [main, DEPLOY]
     paths:
       - "src/**"
       - "tests/**"
-      - "CabinaFletes.Clean.sln"
+      - "Nexo.Clean.sln"
       - ".github/workflows/ci-cd-api.yml"
   pull_request:
-    branches: [main, Pre-Despliegue-BACKEND]
+    branches: [main, DEPLOY]
     paths:
       - "src/**"
       - "tests/**"
-      - "CabinaFletes.Clean.sln"
+      - "Nexo.Clean.sln"
       - ".github/workflows/ci-cd-api.yml"
 
 jobs:
@@ -64,25 +64,25 @@ jobs:
         run: echo ${{ runner.tool_cache }}\dotnet>>"%GITHUB_PATH%"
 
       - name: Restaurar dependencias
-        run: dotnet restore CabinaFletes.Clean.sln
+        run: dotnet restore Nexo.Clean.sln
 
       - name: Compilar (Release)
-        run: dotnet build CabinaFletes.Clean.sln -c Release --no-restore
+        run: dotnet build Nexo.Clean.sln -c Release --no-restore
 
-      # CabinaFletes.Api.Tests corre contra dbInformesAutomatizados_Pruebas —
-      # la BD de pruebas REAL de la red corporativa (issue #134, criterio de
-      # cierre de NEXO#3/NEXO#128), NUNCA un contenedor efímero. TEST_DB_CONNECTION
-      # es un secreto de GitHub (el mismo valor que ConnectionStrings__CabinaFletes
+      # Nexo.Api.Tests corre contra dbInformesAutomatizados_Pruebas —
+      # la BD de pruebas REAL de la red corporativa, NUNCA un contenedor
+      # efímero. TEST_DB_CONNECTION
+      # es un secreto de GitHub (el mismo valor que ConnectionStrings__Nexo
       # en el .env raíz, o el que corresponda a esa base de pruebas) — nunca un
       # valor en el repo. Domain.Tests/Application.Tests no tocan ninguna base —
       # dotnet test sobre el .sln completo los corre a los tres en una sola
       # pasada (mismo criterio que docker-compose.ci.yml: sin filtro, para que
       # un proyecto de test nuevo entre solo).
       #
-      # CRÍTICO — no tocar sin leer esto: ApiFixture.cs (tests/CabinaFletes.
+      # CRÍTICO — no tocar sin leer esto: ApiFixture.cs (tests/Nexo.
       # Api.Tests/Infra/ApiFixture.cs) NUNCA debe volver a llamar
       # Database.EnsureDeleted() mientras TEST_DB_CONNECTION apunte a esta base
-      # — se retiró a propósito en esta misma HU (S3-HU-11.1) precisamente para
+      # — se retiró a propósito precisamente para
       # que este workflow no la borre. Migrate() es aditivo y DataSeeder.SeedAsync
       # ya es idempotente (no-op si ya hay datos), así que correr esto repetidas
       # veces contra la MISMA base es seguro en cuanto al esquema/semilla — lo
@@ -93,7 +93,7 @@ jobs:
       #
       # Sin service container de SQL Server acá: esta base ya está corriendo,
       # alcanzable directo desde este runner — no hay contenedor que esperar
-      # ("Recovery is complete"). Ese detalle de NEXO#128 sigue siendo real SI
+      # ("Recovery is complete"). Ese detalle sigue siendo real SI
       # algún día se vuelve a levantar SQL Server como contenedor efímero para
       # otro propósito (ver docker-compose.ci.yml, que sí usa uno).
       #
@@ -108,21 +108,22 @@ jobs:
       # Se definen con el MISMO nombre de variable que lee IConfiguration
       # (ConnectionStrings__*, doble guion bajo) — ASP.NET Core las mapea solo,
       # cero cambio de código.
-      - name: "Ejecutar toda la suite (dotnet test CabinaFletes.Clean.sln)"
+      - name: "Ejecutar toda la suite (dotnet test Nexo.Clean.sln)"
         env:
           TEST_DB_CONNECTION: ${{ secrets.TEST_DB_CONNECTION }}
           ConnectionStrings__DwSice: ${{ secrets.CONNECTIONSTRINGS_DWSICE }}
           ConnectionStrings__DbSolucionesTi: ${{ secrets.CONNECTIONSTRINGS_DBSOLUCIONESTI }}
           ConnectionStrings__DwCubos: ${{ secrets.CONNECTIONSTRINGS_DWCUBOS }}
           ConnectionStrings__IdentidadPortal: ${{ secrets.CONNECTIONSTRINGS_IDENTIDADPORTAL }}
-        run: dotnet test CabinaFletes.Clean.sln -c Release --no-build --logger "console;verbosity=normal"
+          Database__Esquema: ${{ secrets.DATABASE_ESQUEMA }}
+        run: dotnet test Nexo.Clean.sln -c Release --no-build --logger "console;verbosity=normal"
 
   # El despliegue queda atado estructuralmente a que la suite haya pasado en ESTE
   # commit — nunca se dispara si "build-and-test" falla. Solo en push directo (nunca
   # en PRs). Dokploy construye con el Dockerfile del servicio API al recibir esto.
   deploy:
     needs: build-and-test
-    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/Pre-Despliegue-BACKEND') && github.event_name == 'push'
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/DEPLOY') && github.event_name == 'push'
 
     # Self-hosted: corre en la red donde vive Dokploy — es la única forma de alcanzar
     # su webhook, inalcanzable desde runners ubuntu-latest.
@@ -143,13 +144,29 @@ jobs:
             -H "X-GitHub-Event: push" ^
             -d "{\"ref\":\"${{ github.ref }}\",\"repository\":{\"full_name\":\"${{ github.repository }}\"}}"
 
-      # Issue #163: el webhook de arriba solo confirma que Dokploy RECIBIO la
+      # El webhook de arriba solo confirma que Dokploy RECIBIO la orden -
+      # Dokploy todavia tiene que hacer pull/build/recrear el contenedor antes
+      # de que el proceso empiece a escuchar. Sin esta espera, el primer
+      # intento de la verificacion de abajo caia casi siempre en el hueco
+      # (contenedor viejo ya detenido, el nuevo aun no responde) y quemaba uno
+      # de los 12 reintentos sin aportar nada.
+      # ping en vez de timeout: el runner self-hosted corre como servicio de
+      # Windows, sin consola adjunta, y "timeout" intenta leer stdin para
+      # detectar Ctrl+C — sin consola falla al instante con "No es compatible
+      # la redirección de entradas". ping sí funciona sin consola: -n 91 son
+      # 90 intervalos de 1s (91 ecos, el primero es inmediato).
+      # - name: Esperar a que el contenedor termine de levantar (90s)
+      #   shell: cmd
+      #   run: ping -n 91 127.0.0.1 >NUL
+
+      # El webhook de arriba solo confirma que Dokploy RECIBIO la
       # orden (curl -f en verde con cualquier 2xx) - nunca que el build/deploy
       # real termino. Ya paso una vez (docs/VERIFICACION_NEXO_CUBICADOR_2026-09-14.md):
       # el build fallo por disco lleno y Dokploy siguio sirviendo la imagen
       # vieja en silencio, con el job de este mismo workflow en verde. Este
       # paso al menos detecta "el contenedor nuevo nunca volvio a responder"
-      # (crash/timeout de arranque) con reintentos durante ~2 minutos.
+      # (crash/timeout de arranque) con reintentos durante ~2 minutos, despues
+      # de la espera inicial de arriba.
       #
       # Limite conocido, a proposito no resuelto aca: un health-check simple
       # NO distingue "se redesplego bien" de "el contenedor VIEJO sigue sano
@@ -158,20 +175,40 @@ jobs:
       # /health o un /version nuevo) y comparar contra github.sha, que es un
       # cambio mas grande (toca el Dockerfile y Program.cs) pendiente de
       # decidir aparte.
-      - name: Verificar que el servicio respondio saludable tras el despliegue
-        shell: cmd
-        run: |
-          set INTENTOS=0
-          :verificar
-          curl -f -s -o NUL "${{ secrets.HEALTH_CHECK_URL_API }}/health"
-          if not errorlevel 1 goto exito
-          set /a INTENTOS+=1
-          if %INTENTOS% GEQ 12 goto fallo
-          timeout /t 10 /nobreak >NUL
-          goto verificar
-          :exito
-          echo Servicio respondio saludable tras el despliegue.
-          exit /b 0
-          :fallo
-          echo El servicio NO respondio saludable tras 12 intentos ^(~2 minutos^) - el despliegue no se confirma.
-          exit /b 1
+      #
+      # 30 intentos x 10s (~5 min), no 12x10s (~2 min): el host de este
+      # servicio se probo manualmente el 2026-09-22 (sesion de QA de
+      # produccion) y la conexion desde fuera de la red corporativa cae de
+      # forma intermitente (timeouts de 8-20s reconectando solos segundos
+      # despues) - 2 minutos de ventana no alcanzaba a cubrir una caida de VPN
+      # o un redeploy de Dokploy mas lento de lo normal, y el job fallaba en
+      # falso con el servicio ya sano. Reintentos adaptativos en vez de una
+      # espera fija mas larga (p.ej. subir el ping de 90s a 180s): con
+      # reintentos el job sigue saliendo ni bien el servicio responde, sin
+      # quemar minutos de runner cuando el deploy es rapido.
+      #
+      # El curl de diagnostico (sin -f, nunca falla el step) imprime el
+      # HTTP real de cada intento en el log - antes un intento fallido no
+      # decia SI fue un timeout de red, un 502/503 de Dokploy, o el propio
+      # /health respondiendo Unhealthy (503 con detalle JSON, ver
+      # clsProgram.cs) - asi el proximo fallo se diagnostica desde el log,
+      # sin tener que reproducirlo a mano.
+      # - name: Verificar que el servicio respondio saludable tras el despliegue
+      #   shell: cmd
+      #   run: |
+      #     set INTENTOS=0
+      #     :verificar
+      #     set /a INTENTOS+=1
+      #     echo Intento %INTENTOS%:
+      #     curl -s -o NUL -w "  HTTP %%{http_code}\n" "${{ secrets.HEALTH_CHECK_URL_API }}/health"
+      #     curl -f -s -o NUL "${{ secrets.HEALTH_CHECK_URL_API }}/health"
+      #     if not errorlevel 1 goto exito
+      #     if %INTENTOS% GEQ 30 goto fallo
+      #     ping -n 11 127.0.0.1 >NUL
+      #     goto verificar
+      #     :exito
+      #     echo Servicio respondio saludable tras el despliegue.
+      #     exit /b 0
+      #     :fallo
+      #     echo El servicio NO respondio saludable tras 30 intentos ^(~5 minutos^) - el despliegue no se confirma.
+      #     exit /b 1

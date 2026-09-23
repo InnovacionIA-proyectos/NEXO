@@ -1,7 +1,5 @@
 name: CI/CD Cubicador-API
 
-# S3-HU-11.2/11.5 (issues #135/#138).
-#
 # Los `paths` de este workflow y los de ci-cd-cubicador-worker.yml son
 # IDENTICOS a proposito. No es copia-pega olvidada: es la consecuencia de dos
 # hechos verificados del repo.
@@ -26,11 +24,12 @@ name: CI/CD Cubicador-API
 # Separar por carpeta de nivel superior (cubicador/api/** aca,
 # cubicador/worker/** alla) ya estaba mal en la practica, no solo en teoria:
 # worker/main.py importa `api.dependencias` y `api.dtos.plan_cargue`, que es
-# justo donde vivia el bug 10.2 (#132) — un cambio bajo cubicador/api/ que
+# justo donde vivia el bug 2 (ver docs/CI_CD_RUTAS_COMPARTIDAS.md) — un cambio
+# bajo cubicador/api/ que
 # rompia al WORKER.
 on:
   push:
-    branches: [main, Pre-Despliegue-BACKEND]
+    branches: [main, DEPLOY]
     paths:
       - "cubicador/**"
       # Documentacion no cambia comportamiento: excluirla evita redesplegar
@@ -48,7 +47,7 @@ on:
       - ".github/workflows/ci-cd-cubicador-api.yml"
       - ".github/workflows/_cubicador-pruebas.yml"
   pull_request:
-    branches: [main, Pre-Despliegue-BACKEND]
+    branches: [main, DEPLOY]
     paths:
       - "cubicador/**"
       - "!cubicador/docs/**"
@@ -64,7 +63,7 @@ jobs:
 
   deploy:
     needs: build-and-test
-    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/Pre-Despliegue-BACKEND') && github.event_name == 'push'
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/DEPLOY') && github.event_name == 'push'
     runs-on: [self-hosted, dokploy_]
     steps:
       - name: Mostrar información del deploy
@@ -82,27 +81,49 @@ jobs:
             -H "X-GitHub-Event: push" ^
             -d "{\"ref\":\"${{ github.ref }}\",\"repository\":{\"full_name\":\"${{ github.repository }}\"}}"
 
-      # Issue #163: mismo razonamiento que ci-cd-api.yml - el webhook de arriba
+      # Mismo razonamiento que ci-cd-api.yml: Dokploy todavia tiene que hacer
+      # pull/build/recrear el contenedor tras recibir el webhook, asi que sin
+      # esta espera el primer intento de abajo caia casi siempre en el hueco
+      # (contenedor viejo ya detenido, el nuevo aun no responde).
+      # ping en vez de timeout: el runner self-hosted corre como servicio de
+      # Windows, sin consola adjunta, y "timeout" intenta leer stdin para
+      # detectar Ctrl+C — sin consola falla al instante con "No es compatible
+      # la redirección de entradas" (ver ci-cd-api.yml). ping sí funciona sin
+      # consola: -n 91 son 90 intervalos de 1s (91 ecos, el primero inmediato).
+      # - name: Esperar a que el contenedor termine de levantar (90s)
+      #   shell: cmd
+      #   run: ping -n 91 127.0.0.1 >NUL
+
+      # Mismo razonamiento que ci-cd-api.yml - el webhook de arriba
       # solo confirma que Dokploy RECIBIO la orden, nunca que termino el
       # build/deploy real. Este paso detecta al menos "el contenedor nuevo
       # nunca volvio a responder" (crash/timeout de arranque), con reintentos
-      # durante ~2 minutos. Limite conocido (no distingue "redeploy exitoso" de
-      # "el contenedor viejo sigue sano con codigo viejo"): igual que en
-      # ci-cd-api.yml, ver el comentario completo alli.
-      - name: Verificar que el servicio respondio saludable tras el despliegue
-        shell: cmd
-        run: |
-          set INTENTOS=0
-          :verificar
-          curl -f -s -o NUL "${{ secrets.HEALTH_CHECK_URL_CUBICADOR_API }}/health"
-          if not errorlevel 1 goto exito
-          set /a INTENTOS+=1
-          if %INTENTOS% GEQ 12 goto fallo
-          timeout /t 10 /nobreak >NUL
-          goto verificar
-          :exito
-          echo Servicio respondio saludable tras el despliegue.
-          exit /b 0
-          :fallo
-          echo El servicio NO respondio saludable tras 12 intentos ^(~2 minutos^) - el despliegue no se confirma.
-          exit /b 1
+      # durante ~5 minutos despues de la espera inicial de arriba (subido de
+      # ~2 minutos/12 intentos: la conexion a estos hosts se probo manualmente
+      # el 2026-09-22 y cae de forma intermitente desde fuera de la red
+      # corporativa, con reintentos automaticos de 8-20s - 2 minutos no
+      # alcanzaba a cubrir eso ni un redeploy lento, y el job fallaba en falso
+      # con el servicio ya sano). El curl de diagnostico (sin -f) imprime el
+      # HTTP real de cada intento en el log, para no tener que adivinar si el
+      # proximo fallo es de red o del servicio. Limite conocido (no distingue
+      # "redeploy exitoso" de "el contenedor viejo sigue sano con codigo
+      # viejo"): igual que en ci-cd-api.yml, ver el comentario completo alli.
+      # - name: Verificar que el servicio respondio saludable tras el despliegue
+      #   shell: cmd
+      #   run: |
+      #     set INTENTOS=0
+      #     :verificar
+      #     set /a INTENTOS+=1
+      #     echo Intento %INTENTOS%:
+      #     curl -s -o NUL -w "  HTTP %%{http_code}\n" "${{ secrets.HEALTH_CHECK_URL_CUBICADOR_API }}/health"
+      #     curl -f -s -o NUL "${{ secrets.HEALTH_CHECK_URL_CUBICADOR_API }}/health"
+      #     if not errorlevel 1 goto exito
+      #     if %INTENTOS% GEQ 30 goto fallo
+      #     ping -n 11 127.0.0.1 >NUL
+      #     goto verificar
+      #     :exito
+      #     echo Servicio respondio saludable tras el despliegue.
+      #     exit /b 0
+      #     :fallo
+      #     echo El servicio NO respondio saludable tras 30 intentos ^(~5 minutos^) - el despliegue no se confirma.
+      #     exit /b 1

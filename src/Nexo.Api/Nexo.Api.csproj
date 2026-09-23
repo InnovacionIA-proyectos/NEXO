@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <!--
+    Capa Api (Adapters In): controllers finos, autenticación/autorización, mapeo
+    HTTP <-> Commands/Queries de Application. Referencia Infrastructure SOLO como
+    composition root (DI en Program.cs) — los controllers no usan tipos de Infrastructure.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Nexo.Api</RootNamespace>
+    <!-- Necesario para que los /// <summary> de los controllers lleguen a Swagger
+         (AddSwaggerGen().IncludeXmlComments en clsProgram.cs) - sin esto el
+         frontend solo ve rutas/esquemas en /swagger, nunca la descripción de qué
+         hace cada endpoint. NoWarn CS1591: no todo miembro público (records de
+         DTOs, records de Commands/Queries en otros proyectos, etc.) necesita un
+         /// propio - exigirlo ahí sería ruido, no documentación. -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="10.0.0" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Nexo.Application\Nexo.Application.csproj" />
+    <ProjectReference Include="..\Nexo.Infrastructure\Nexo.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

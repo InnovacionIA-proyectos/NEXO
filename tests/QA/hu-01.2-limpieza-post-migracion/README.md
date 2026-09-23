@@ -35,8 +35,8 @@ Para el smoke/regresión se reutilizó el arnés de la HU-01.1:
 ```
 docker compose -f docker-compose.ci.yml build
 docker compose -f docker-compose.ci.yml run --rm build
-docker compose -f docker-compose.ci.yml run --rm build dotnet test tests/CabinaFletes.Domain.Tests
-docker compose -f docker-compose.ci.yml run --rm build dotnet test tests/CabinaFletes.Application.Tests
+docker compose -f docker-compose.ci.yml run --rm build dotnet test tests/Nexo.Domain.Tests
+docker compose -f docker-compose.ci.yml run --rm build dotnet test tests/Nexo.Application.Tests
 ```
 
 ## Nota sobre las 2 fallas de `Application.Tests`

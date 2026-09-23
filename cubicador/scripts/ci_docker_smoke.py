@@ -21,8 +21,8 @@ No cubre el vigilante de timeout de punta a punta (docs/DECISIONES_TECNICAS.md
 mensaje y llamar a `_revisar_timeouts` directo contra la base, lo que acopla
 este script a la topologia interna de docker-compose de una forma que no
 vale la pena en CI - sigue siendo verificacion manual (ver PRUEBAS_DE_
-INTEGRACION.md seccion 2.4 punto (c)). Lo que SI esta automatizado desde
-S3-HU-06.1 es la logica del vigilante con dobles de prueba, incluido el orden
+INTEGRACION.md seccion 2.4 punto (c)). Lo que SI esta automatizado es la
+logica del vigilante con dobles de prueba, incluido el orden
 publicar-antes-de-marcar: tests/worker/test_vigilante_timeouts.py.
 """
 
@@ -160,8 +160,8 @@ async def flujo_resultado_por_cola(client: httpx.AsyncClient) -> None:
         evento = await asyncio.wait_for(_esperar_evento_del_plan(cola, plan["id"]), timeout=30)
         assert evento["planId"] == plan["id"], evento
         assert evento["correlationId"] == plan["id"], evento
-        # S3-HU-03 (issue #110): "resultado" ya no es {estado, puntaje, colocaciones: int}
-        # - es el ResultadoPlanDto completo (mismo shape que ya usa GET .../resultado,
+        # "resultado" ya no es {estado, puntaje, colocaciones: int} - es el
+        # ResultadoPlanDto completo (mismo shape que ya usa GET .../resultado,
         # ver flujo_optimizar_async arriba).
         assert evento["resultado"]["plan"]["estado"] == "optimizado", evento
         assert len(evento["resultado"]["colocaciones"]) == 2, evento
@@ -175,7 +175,7 @@ async def _esperar_evento_del_plan(cola: aio_pika.abc.AbstractQueue, plan_id: st
         async for mensaje in mensajes:
             async with mensaje.process():
                 cuerpo = json.loads(mensaje.body)
-                # Issue #28: NEXO consume este mismo evento con un IConsumer<T> de
+                # NEXO consume este mismo evento con un IConsumer<T> de
                 # MassTransit, así que ahora se publica envuelto (ver
                 # infrastructure/mensajeria/rabbitmq.py::_sobre_masstransit) - se
                 # desenvuelve aquí para que las aserciones de abajo no cambien.

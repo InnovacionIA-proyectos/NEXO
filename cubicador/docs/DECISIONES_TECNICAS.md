@@ -47,7 +47,7 @@ podría introducir imprecisión (igual que el original usaba `Math.Round` ahí
 mismo) — verificado: las 31 reglas pasan sin ajustes contra la implementación
 en `float`.
 
-## 3. Comparación automatizada cross-motor (revertido — ver S2-HU-07.3)
+## 3. Comparación automatizada cross-motor (revertido)
 
 **Decisión ORIGINAL (ya no vigente)**: no se construía un arnés que corriera
 el motor Python y el motor C# original lado a lado con el mismo input y
@@ -55,15 +55,15 @@ comparara la salida en tiempo de ejecución. Razón entonces: el motor
 original iba a dejar de existir, y no parecía buen uso del tiempo invertir
 en comparar contra una versión temporal.
 
-**Por qué se revirtió**: una HU posterior (S2-HU-07.3) pidió exactamente
-eso como criterio de liberación del motor nuevo (hotspot H5) — "verde solo
-con 26/26", con reporte de diferencias por caso y evidencia repetible. La
+**Por qué se revirtió**: un requisito posterior pidió exactamente eso como
+criterio de liberación del motor nuevo — "verde solo con 26/26", con reporte
+de diferencias por caso y evidencia repetible. La
 razón original (no vale la pena comparar contra algo temporal) sigue siendo
 válida como argumento, pero el negocio decidió que la evidencia de paridad
 en sí es lo que importa para liberar, no si el motor viejo sigue vivo
 después.
 
-**Lo que se construyó** (S2-HU-07.3): `herramientas/generador_casos_dorados/`
+**Lo que se construyó**: `herramientas/generador_casos_dorados/`
 — un harness .NET que referencia el `.csproj` REAL de `cabinaFletes` (sin
 tocarlo, solo lo compila/ejecuta) y corre cada uno de los 26 casos de
 `MotorCubicacion3DTests.cs` contra el motor C# de verdad, grabando su salida
@@ -88,7 +88,7 @@ nombre, mismo orden, mismo escenario — confirmado comparando ambos archivos
 método por método antes de construir el harness. Esa cobertura por lectura
 ya daba confianza informal de que el port era fiel; el harness + la suite
 de `tests/paridad/` (arriba) la reemplazan por evidencia formal y
-automatizada — exactamente lo que S2-HU-07.3 pedía y que antes,
+automatizada — exactamente lo que se pedía y que antes,
 correctamente, no existía.
 
 La pasada de humo end-to-end (crear plan, optimizar, ajustar) contra el
@@ -127,12 +127,12 @@ se diseñó esto mismo en NEXO (`ValidarAjusteAsync` se resuelve siempre local
 ahí, por la misma razón). Aquí ni siquiera hace falta un puerto separado para
 lograrlo: `ajustar.py` llama directo a `domain.motor.validadores` en memoria.
 
-**Eventos** (ya nombrados en la historia de usuario original, se usan tal
+**Eventos** (ya nombrados desde el diseño original, se usan tal
 cual): `CubicaciónSolicitada`, `PlanDeCargueGenerado`, `CubicaciónRechazada`.
 (`PlanDeCargueAjustado`, nombrado originalmente acá como reservado, nunca se
 implementó — ver la actualización siguiente.)
 
-**Actualización (S3-HU-02, ADR-ajuste-manual-async.md del lado de NEXO)**: el
+**Actualización (ver ADR-ajuste-manual-async.md del lado de NEXO)**: el
 razonamiento de arriba ("el ajuste manual NO va por cola") sigue siendo
 válido para la API SÍNCRONA de Cubicador (`PATCH /{id}/colocaciones/{id}`,
 que no cambió) — pero NEXO, para no exponer Cubicador directo al navegador,
@@ -254,7 +254,7 @@ solo funciona desde `localhost`, y aquí se expone el puerto a otro host).
 todavía era (o se planeaba como) un repo separado. Al moverlo a
 `NEXO/cubicador/` (ver la actualización que ya estaba aquí), ambos servicios
 quedaron en el MISMO repo, y además NEXO ya construyó un broker RabbitMQ
-propio con su topología para issue #13/S2-HU-041 (`docker-compose.yml` raíz,
+propio con su topología (`docker-compose.yml` raíz,
 servicio `rabbit`, ver `docs/mensajeria/TOPOLOGIA.md` en la raíz de NEXO).
 Mantener un SEGUNDO broker RabbitMQ solo para Cubicador significaba
 infraestructura duplicada sin ningún beneficio real ya que "mover RabbitMQ a
@@ -303,13 +303,13 @@ de NEXO — es el mismo broker, el mismo usuario. `.env.example` lo documenta.
 no para escala masiva):
 - Timeout de vigilancia (`worker/main.py:_vigilante_de_timeouts`, cada 60s y
   5 min de umbral por defecto, ambos configurables vía
-  `CUBICADOR_INTERVALO_VIGILANTE_SEGUNDOS`/`CUBICADOR_TIMEOUT_PROCESANDO_MINUTOS`
-  desde S3-HU-06.1): si un plan lleva más de eso en `procesando` sin recibir el
+  `CUBICADOR_INTERVALO_VIGILANTE_SEGUNDOS`/`CUBICADOR_TIMEOUT_PROCESANDO_MINUTOS`):
+  si un plan lleva más de eso en `procesando` sin recibir el
   evento de respuesta, el worker publica `cubicacion.rechazada` con
   `codigo: "TIMEOUT_PROCESAMIENTO"` y **después** lo marca `error`
   (`obtener_atascados` + `marcar_error`, en ese orden — ver CONTRATO.md 6.4:
   publicar antes de persistir es lo que evita que un broker caído deje el plan
-  fuera de `procesando` sin haber avisado a nadie). Hasta S3-HU-06.1 solo
+  fuera de `procesando` sin haber avisado a nadie). Antes, el vigilante solo
   marcaba `error` sin publicar, y NEXO se quedaba en `procesando` para siempre.
 - Reintentos limitados vía un contador manual en la cabecera del mensaje
   (`x-intentos`, no vía TTL/DLX nativo de RabbitMQ — más simple de razonar
@@ -319,7 +319,7 @@ no para escala masiva):
   marca/reporta una sola vez, porque reintentar da siempre el mismo
   resultado; solo un error inesperado (bug, DB caída) entra al ciclo de
   reintentos.
-- **Mensaje ilegible: 0 reintentos, directo a la DLQ** (S3-HU-10.1, issue #131).
+- **Mensaje ilegible: 0 reintentos, directo a la DLQ**.
   Si el cuerpo no se puede ni interpretar —no es JSON, es un JSON que no es un
   objeto, le falta `correlationId`, o la cabecera `x-intentos` no es numérica—
   no hay reintento que pueda cambiar el resultado, así que va a
@@ -337,13 +337,13 @@ no para escala masiva):
   bastaban para que el worker dejara de procesar cualquier cosa**, y reiniciar el
   contenedor no ayudaba: RabbitMQ los reentrega y se vuelven a atascar. Perder un
   mensaje corrupto es aceptable; perder el worker, no.
-- **Alerta al equipo** (2026-08-27, criterio de cierre de la HU: "Reintentos
+- **Alerta al equipo** (2026-08-27, agregada para cubrir "Reintentos
   + DLQ + alerta ante fallos repetidos del motor"): al caer un mensaje en
   `cubicacion.dlq`, además del log, se envía un correo al equipo técnico —
   `infrastructure/alertas/correo.py::alertar_mensaje_en_dlq`, llamado desde
   `worker/main.py::_mover_a_dlq`. SMTP directo (sin depender de que NEXO esté
   arriba), mismo destinatarios por defecto que la alerta equivalente de NEXO
-  (#13, `Alertas:EquipoTecnico`). Nadie CONSUME `cubicacion.dlq`
+  (`Alertas:EquipoTecnico`). Nadie CONSUME `cubicacion.dlq`
   automáticamente (el mensaje sigue ahí para inspección manual) — pero ya no
   hace falta ir a mirar la cola para enterarse de que algo falló.
 - Idempotencia por diseño: reprocesar el mismo plan (por un reintento) no
@@ -426,7 +426,7 @@ detrás de flag) es justo la situación mixta que se quería evitar.
 explícito, qué archivos/tablas se retiran — para que no queden restos a medio
 camino en ninguno de los dos lados.
 
-## 12. Interoperabilidad con MassTransit (issue #28, S2-HU-075)
+## 12. Interoperabilidad con MassTransit
 
 **Contexto**: NEXO construyó un puente hacia Cubicador con `IConsumer<T>`
 reales de MassTransit (decisión del equipo: MassTransit nativo, no un cliente
@@ -455,7 +455,7 @@ más profundo del que hace falta. El único costo real que se acepta es el
 `messageType`, que debe coincidir exacto con el namespace/nombre de la clase
 C# del otro lado — un acoplamiento cruzado real, sin verificación en tiempo
 de compilación en ninguno de los dos lados, protegido hoy solo por las
-pruebas de contrato de cada lado (`tests/CabinaFletes.Api.Tests/Cubicacion/
+pruebas de contrato de cada lado (`tests/Nexo.Api.Tests/Cubicacion/
 ContratoCubicacionTests.cs` en NEXO, y la verificación E2E documentada en
 `tests/QA/28-.../README.md` de NEXO).
 

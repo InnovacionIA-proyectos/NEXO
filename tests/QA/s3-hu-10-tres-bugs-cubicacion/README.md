@@ -73,7 +73,7 @@ conservando el plan intacto.
 Dos apuntes de montaje, por si hay que repetirlo: el `.env` del repo apunta a
 `Server=localhost;Trusted_Connection=True` (para `dotnet run` en Windows, no sirve
 desde Docker), así que se levantó un SQL Server propio en la red `nexo_internal` y se
-sobrescribió `ConnectionStrings__CabinaFletes`. Y el encabezado
+sobrescribió `ConnectionStrings__Nexo`. Y el encabezado
 `X-Portal-Usuario-Id` espera el **`IdentidadPortalId` numérico** de `Usuarios`
 (`long.TryParse` en `IdentidadPortalAuthenticationHandler`), no el `Id` GUID — con el
 GUID responde `401 SESION_INVALIDA`.

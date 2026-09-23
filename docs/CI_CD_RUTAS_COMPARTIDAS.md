@@ -1,4 +1,4 @@
-# CI/CD — convención de rutas por servicio (S3-HU-11)
+# CI/CD — convención de rutas por servicio
 
 Cada uno de los 4 servicios (API .NET, Cubicador-API, Cubicador-Worker,
 RabbitMQ) tiene su propio workflow en `.github/workflows/`, disparado por
@@ -26,7 +26,7 @@ completa en el encabezado de ese archivo).
 
 | Ruta que cambió | `ci-cd-api` | `ci-cd-cubicador-api` | `ci-cd-cubicador-worker` | `ci-cd-rabbitmq` |
 |---|:---:|:---:|:---:|:---:|
-| `src/**`, `tests/**`, `CabinaFletes.Clean.sln` | ✅ | | | |
+| `src/**`, `tests/**`, `Nexo.Clean.sln` | ✅ | | | |
 | `cubicador/**` (código, Dockerfiles, `requirements.txt`, `pyproject.toml`, `tests/`, `scripts/`, `docker-compose.yml`) | | ✅ | ✅ | |
 | `cubicador/docs/**`, `cubicador/**.md` | | | | |
 | `docker-compose.yml` (raíz) | | ✅ | ✅ | ✅ |
@@ -65,16 +65,16 @@ Dokploy le avisan**: `DOKPLOY_DEPLOY_WEBHOOK_URL_CUBICADOR_API` contra
 
 ### Por qué esto importa de verdad (no es prolijidad)
 
-Los 3 bugs cerrados en S3-HU-10 (`tests/QA/s3-hu-10-tres-bugs-cubicacion/`)
-son el caso de prueba, y **los tres caen en carpetas distintas**:
+Los 3 bugs corregidos y documentados en
+`tests/QA/s3-hu-10-tres-bugs-cubicacion/` son el caso de prueba, y **los tres caen en carpetas distintas**:
 
 | Bug | Archivo | Rompía a |
 |---|---|---|
-| 10.1 (#131) | `cubicador/worker/main.py` | el worker |
-| 10.2 (#132) | `cubicador/api/dtos/plan_cargue.py` | **el worker** |
-| 10.3 (#133) | `cubicador/infrastructure/persistence/repositorios/plan_cargue_repo.py` | los dos |
+| 1 | `cubicador/worker/main.py` | el worker |
+| 2 | `cubicador/api/dtos/plan_cargue.py` | **el worker** |
+| 3 | `cubicador/infrastructure/persistence/repositorios/plan_cargue_repo.py` | los dos |
 
-El 10.2 es el que desarma cualquier convención basada en carpetas: vivía bajo
+El bug 2 es el que desarma cualquier convención basada en carpetas: vivía bajo
 `cubicador/api/` y el síntoma era que el **worker** mandaba ítems a la DLQ.
 Con un filtro que tratara `cubicador/api/**` como exclusivo de la API, ese
 arreglo habría desplegado solo la API y dejado al worker con el código roto.
@@ -108,8 +108,9 @@ contrasta contra la convención de esta página, archivo por archivo. Sale con
 código 1 si algo no se cumple, así que sirve para detectar el día que alguien
 "limpie" un filtro y rompa la coordinación sin darse cuenta.
 
-Los huecos conocidos de `ci-cd-api.yml` y `ci-cd-rabbitmq.yml` (issues #134 y
-#137) los reporta como avisos, no como fallas: no son parte de S3-HU-11.2/11.3.
+Los huecos conocidos de `ci-cd-api.yml` y `ci-cd-rabbitmq.yml`
+los reporta como avisos, no como fallas: son limitaciones aceptadas, no
+errores a corregir.
 
 ## Convención para código nuevo: ¿dónde lo ubico?
 
@@ -126,7 +127,7 @@ dispara los dos). La primera sigue importando para que el código se entienda:
 - **`api/`** — handlers HTTP y los DTOs de request/response. **No es privado
   de la API**: el worker reusa a propósito los DTOs de `api/dtos/` para no
   tener dos definiciones del mismo contrato que puedan divergir (que es
-  exactamente el bug que S3-HU-06.2 vigila entre C# y Python).
+  exactamente el tipo de bug que esto evita entre C# y Python).
 - **`worker/`** — el bucle de consumo de cola, reintentos y DLQ.
 
 Lo que **no** hay que hacer es duplicar un archivo dentro de `api/` y `worker/`
@@ -138,7 +139,7 @@ pruebas.
 
 No comparten código con Cubicador, así que sus `paths:` son autocontenidos
 (salvo `docker-compose.yml` y `build/Dockerfile.rabbit`, ya explicados). La
-única razón por la que `ci-cd-api.yml` incluye `CabinaFletes.Clean.sln` en su
+única razón por la que `ci-cd-api.yml` incluye `Nexo.Clean.sln` en su
 lista (y no solo `src/**`) es que agregar un proyecto nuevo a la solución
 cambia ese archivo; sin incluirlo, un `.csproj` nuevo podría no disparar el
 pipeline la primera vez que se referencia.

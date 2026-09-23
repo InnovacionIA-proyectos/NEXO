@@ -64,7 +64,7 @@ class OptimizadorExtremePoints(ABC):
     ) -> tuple[list[Colocacion], list[Rechazo]]:
         colocadas: list[Colocacion] = list(fijas or [])
         rechazos: list[Rechazo] = []
-        # Issue #158: el punto extremo inicial es la primera esquina candidata
+        # El punto extremo inicial es la primera esquina candidata
         # que `dentro_de_limites` puede aceptar. Esa funcion exige x >= t / y >= t
         # (tolerancia_paredes_mm) - sembrar el origen en (0,0,0) cuando t > 0 deja
         # ese punto SIEMPRE invalido, y como ningun item llega a colocarse nunca se
@@ -214,8 +214,8 @@ def _acumular_peso_encima(soportes, peso_kg: float, colocadas: list[Colocacion])
 
 
 def _cabe_en_alguna_orientacion(item: ItemCarga, cont: Contenedor) -> bool:
-    """Issue #152: ¿alguna orientacion del item entra en las dimensiones internas
-    del vehiculo, sin importar colocadas/tolerancias? Si NINGUNA entra, el
+    """¿Alguna orientacion del item entra en las dimensiones internas del
+    vehiculo, sin importar colocadas/tolerancias? Si NINGUNA entra, el
     rechazo no tiene nada que ver con fragmentacion - el item no cabria ni en
     un vehiculo completamente vacio."""
     return any(

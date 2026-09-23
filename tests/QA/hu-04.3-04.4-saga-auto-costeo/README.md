@@ -30,7 +30,7 @@ A diferencia del conflicto de la HU-01.7 (una discrepancia real de negocio), est
 | `CargarLineasBulkCommand.cs` + su test | Registra el trabajo ANTES de publicar (cierra ventana de 404 en `/api/trabajos/{id}`) |
 | `Program.cs` | DI de los módulos Costeo y Trabajos |
 | `docker-compose.yml` | Imagen propia de RabbitMQ con el plugin de retardo (necesario para los timeouts de saga — sin él, el reloj se pierde si la API se reinicia a mitad de un pliego) |
-| `CabinaFletesDbContext.cs` + snapshot de migraciones | Tablas nuevas `trabajos_auto_costeo` y `lineas_pendientes_de_costeo` |
+| `NexoDbContext.cs` + snapshot de migraciones | Tablas nuevas `trabajos_auto_costeo` y `lineas_pendientes_de_costeo` |
 | `OutboxConsistenciaTests.cs` | Timeout de comando ampliado (180s) para que la prueba no se vuelva intermitente con más migraciones |
 
 **Verificación extra por ser código generado (el snapshot de migraciones):** no me limité a confiar en el merge de texto — apliqué las migraciones de verdad contra SQL Server real (`db.Database.MigrateAsync()` dentro de `OutboxConsistenciaTests`) y confirmé por consulta directa que `trabajos_auto_costeo` y `lineas_pendientes_de_costeo` existen con la estructura esperada.

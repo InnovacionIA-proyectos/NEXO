@@ -1,10 +1,10 @@
-# Roles y permisos — NEXO (Cabina de Fletes)
+# Roles y permisos — NEXO (Nexo)
 
 Nexo no tiene login propio: la identidad y el rol llegan resueltos desde el portal
 de la Administración en cada petición (encabezado `X-Portal-Usuario-Id`, sin caché
 de sesión — ver [`docs/contrato-integracion/ADR-001-identidad-sin-token.md`](contrato-integracion/ADR-001-identidad-sin-token.md)).
 Un usuario tiene **exactamente uno** de los 6 roles siguientes (`RolUsuario`,
-[`src/CabinaFletes.Domain/Enums/Enums.cs`](../src/CabinaFletes.Domain/Enums/Enums.cs)); sin un rol
+[`src/Nexo.Domain/Enums/Enums.cs`](../src/Nexo.Domain/Enums/Enums.cs)); sin un rol
 válido, la petición se rechaza (403 `SIN_PERMISO_CABINA_FLETES`) aunque la
 identidad sea válida.
 
@@ -22,9 +22,9 @@ sin rol específico. Lo que diferencia a los roles es quién puede **escribir**
 | **AdminTarifas** | Administra el catálogo de tarifas (Biblioteca, vigencia, reglas Solo-SICETAC) y los servicios conexos. | `verBiblioteca`, `ajustarVigencia`, `editarReglasSoloSicetac`, `gestionarCotizacion`, `editarServiciosConexos` |
 | **ServiciosLogisticos** | Mantiene el catálogo de servicios conexos (cargues, descargues, etc.). | `editarServiciosConexos` |
 | **LiderProceso** | Supervisa el proceso: solo consulta métricas de cumplimiento. | `verMetricas` |
-| **Admin** | Control total sobre Cabina de Fletes, incluida la priorización (único rol con acceso). | `*` (todas) |
+| **Admin** | Control total sobre Nexo, incluida la priorización (único rol con acceso). | `*` (todas) |
 
-*(Capacidades tomadas de `CapacidadesPorRol` en [`SesionController.cs`](../src/CabinaFletes.Api/Sesion/SesionController.cs) — las usa el frontend para decidir qué pinta; la autorización real vive en el backend, en la tabla siguiente.)*
+*(Capacidades tomadas de `CapacidadesPorRol` en [`SesionController.cs`](../src/Nexo.Api/Sesion/SesionController.cs) — las usa el frontend para decidir qué pinta; la autorización real vive en el backend, en la tabla siguiente.)*
 
 ## Qué puede hacer cada uno (además de consultar)
 
@@ -63,4 +63,4 @@ sin rol específico. Lo que diferencia a los roles es quién puede **escribir**
 
 Detalle completo, ruta por ruta, con request/response y errores en
 [`CONTRATO.md`](../CONTRATO.md). Fuente de la verdad real: los atributos
-`[Authorize(Roles=...)]` en `src/CabinaFletes.Api/*/*Controller.cs`.
+`[Authorize(Roles=...)]` en `src/Nexo.Api/*/*Controller.cs`.

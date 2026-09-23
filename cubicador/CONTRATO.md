@@ -31,17 +31,17 @@
 
 ⚠️ Punto que no es obvio desde afuera: NEXO **no llama** a la API REST de
 este servicio para nada de Plan de Cargue. El contrato real backend↔motor es
-**por colas** (RabbitMQ + MassTransit, mismo broker que el resto de NEXO —
-issue #28). Ver sección 3 más abajo para el mensaje de entrada y los eventos
+**por colas** (RabbitMQ + MassTransit, mismo broker que el resto de NEXO).
+Ver sección 3 más abajo para el mensaje de entrada y los eventos
 de salida.
 
-**Única excepción, acotada a un solo endpoint** (S3-HU-04.3, issue #78):
+**Única excepción, acotada a un solo endpoint**:
 `POST /api/cubicacion` (cubicación rápida, sin persistencia — sección 3.1).
 Al no haber plan ni Id que guardar ni proyectar, no hay cola que lo procese
 ni proyección que lo sirva después — NEXO lo llama directo con el mismo
 Bearer de esta sección (`CUBICADOR_API_KEY`), guardado en su configuración
 como `Cubicador3D:OutboundApiKey` (nunca en el navegador). Ver
-`NEXO/src/CabinaFletes.Application/CasosDeUso/Cubicacion/Interfaces/ICubicacionRapidaPort.cs`
+`NEXO/src/Nexo.Application/CasosDeUso/Cubicacion/Interfaces/ICubicacionRapidaPort.cs`
 para el razonamiento completo de por qué esto no reabre la puerta a más
 llamadas HTTP.
 
@@ -57,12 +57,12 @@ no importa para nada** — lo que hace falta es:
   encendida — si no, `POST /api/planes-cargue/{id}/optimizar` en NEXO
   responde `503` sin publicar nada a la cola.
 
-### 1.2 Frontend — YA NO habla REST directo (cerrado en S3-HU-05, issue #116)
+### 1.2 Frontend — YA NO habla REST directo (ya cerrado)
 
-**Hasta S3-HU-02/03/04** un frontend podía hablarle REST directo a este
+**Anteriormente** un frontend podía hablarle REST directo a este
 servicio (con `CUBICADOR_CORS_ORIGENES` + `CUBICADOR_API_KEY` en el
-navegador). Eso se cerró a propósito: toda escritura del plan de cargue pasa
-por NEXO desde S3-HU-02 y toda lectura desde S3-HU-03. **No queda
+navegador). Eso se cerró a propósito: toda escritura y toda lectura del plan
+de cargue pasan ahora por NEXO. **No queda
 middleware CORS en el código** (`api/main.py`) ni la variable
 `CUBICADOR_CORS_ORIGENES` en `.env`/`.env.example`/`docker-compose.yml` — no
 es que esté vacía por defecto, es que la capacidad se retiró del todo. Si
@@ -78,8 +78,8 @@ servicio — nadie tocó esos call-sites todavía. El CORS se retiró igual, y e
 bien que así sea —la capacidad no debe existir— pero conviene no leer esta
 sección como si la migración del portal ya estuviera hecha.
 
-Del lado NEXO sí hubo avance (issue #78, S3-HU-04.3): de los 4 endpoints que
-faltaban para que esa HU pudiera cerrar, ya se agregaron 3 (`desde-linea/{id}`,
+Del lado NEXO sí hubo avance: de los 4 endpoints que
+faltaban para completar esa migración, ya se agregaron 3 (`desde-linea/{id}`,
 `por-linea/{id}`, `{id}/colocaciones`) sobre el `crear_desde_linea` que este
 servicio ya implementaba de punta a punta — solo faltaba que NEXO lo publicara
 en vez de que lo disparara el navegador. Los 20 de 20 ya tienen equivalente del lado NEXO: `POST /api/cubicacion` se
@@ -89,8 +89,8 @@ en `NEXO/docs/mensajeria/CUBICACION.md` §8.
 
 `CUBICADOR_API_KEY` (sección 4/5) sigue existiendo — protege la API para
 consumidores server-to-server legítimos (hoy: scripts de CI/verificación
-manual, `tests/api/test_smoke.py`, `scripts/ci_docker_smoke.py`). Rotada en
-S3-HU-05 (issue #117) porque el valor anterior estuvo expuesto en el bundle
+manual, `tests/api/test_smoke.py`, `scripts/ci_docker_smoke.py`). Rotada
+porque el valor anterior estuvo expuesto en el bundle
 público del portal mientras el navegador todavía llamaba directo.
 
 ### 1.3 Checklist antes de integrar
@@ -214,9 +214,9 @@ class DeteccionExtradimensionDto(ApiModel):
 
 | Método | Ruta | Notas |
 |---|---|---|
-| GET/POST | `/vehiculos` | catálogo de tipos de vehículo (siembra los 9 presets en el primer GET; issue #162: cada preset sembrado publica `vehiculo.creado`, igual que un alta normal, para que la proyección de NEXO no vuelva a quedarse atrás) |
+| GET/POST | `/vehiculos` | catálogo de tipos de vehículo (siembra los 9 presets en el primer GET; cada preset sembrado publica `vehiculo.creado`, igual que un alta normal, para que la proyección de NEXO no vuelva a quedarse atrás) |
 | DELETE | `/vehiculos/{id}` | `409 VEHICULO_EN_USO` si tiene planes asociados |
-| POST | `/vehiculos/republicar-catalogo` | issue #162: reparo manual — republica `vehiculo.creado` para TODO el catálogo actual (no solo lo nuevo). Idempotente del lado NEXO (upsert por Id); no forma parte de ningún flujo automático, se invoca a mano si la proyección de NEXO vuelve a desincronizarse |
+| POST | `/vehiculos/republicar-catalogo` | Reparo manual — republica `vehiculo.creado` para TODO el catálogo actual (no solo lo nuevo). Idempotente del lado NEXO (upsert por Id); no forma parte de ningún flujo automático, se invoca a mano si la proyección de NEXO vuelve a desincronizarse |
 | GET/POST | `` (raíz) | listar / crear plan vacío |
 | GET | `/{id}` | plan con sus ítems |
 | GET | `/{id}/flota` | vehículos (planes) de la misma flota |
@@ -229,7 +229,7 @@ class DeteccionExtradimensionDto(ApiModel):
 | POST | `/desde-linea/{lineaSolicitudId}` | puente Mesa de Costeo → 3D — **asíncrono**, responde `202 SolicitudEncoladaDto` (ver ⚠️ sección 5) |
 | GET | `/por-linea/{lineaSolicitudId}` | flota resultante del `POST` de arriba — lista vacía mientras sigue `procesando` |
 
-**S3-HU-02 (NEXO, issue #108)**: los endpoints de esta sección que hoy el
+En NEXO, los endpoints de esta sección que hoy el
 navegador podía llamar DIRECTO (alta/borrado de vehículos, planes, ítems, y el
 PATCH de colocaciones de la fila de arriba) ahora tienen un camino alterno
 **recomendado** desde NEXO (`POST /api/planes-cargue`,
@@ -472,7 +472,7 @@ class SolicitudEncoladaDto(ApiModel):
     estado: str = "procesando"
 ```
 
-> **`sku` acepta `null` explícito** (S3-HU-10.2, issue #132). `GuardarItemRequest.Sku`
+> **`sku` acepta `null` explícito**. `GuardarItemRequest.Sku`
 > en NEXO es `string?` —un ítem sin SKU es un caso de negocio legítimo— y cuando no lo
 > tiene, NEXO manda la clave con `null`, no la omite. En Pydantic el default solo aplica
 > si la clave **falta**, así que ese `null` se rechazaba contra un campo `str`: el ítem
@@ -547,15 +547,15 @@ Authorization: Bearer <secreto correspondiente>
   uno de estos consumidores, pero solo para un endpoint** (`POST
   /api/cubicacion`, sección 1.1) — todo lo demás sigue siendo solo por
   colas. NEXO guarda este mismo valor como `Cubicador3D__OutboundApiKey`.
-  Los otros consumidores son CI/scripts de verificación manual; hasta
-  S3-HU-05 (issue #116) también la usaba el navegador vía CORS — cerrado, y
-  la clave rotada en la misma HU (issue #117) porque ese valor estuvo
+  Los otros consumidores son CI/scripts de verificación manual;
+  anteriormente también la usaba el navegador vía CORS — ya cerrado, y
+  la clave fue rotada porque ese valor estuvo
   expuesto en el bundle público del portal.
 - Este servicio → NEXO (llamada de `crear_desde_linea`, ver sección 7): NEXO
   valida contra `Cubicador3D__InboundApiKey`
   (`CubicadorApiKeyAuthenticationHandler`, esquema `CubicadorApiKey` aparte
   de la sesión del portal) — debe ser IDÉNTICA a `NEXO_CALLBACK_API_KEY` acá.
-  También rotada en S3-HU-05 (issue #117), como higiene general aunque este
+  También rotada, como higiene general aunque este
   par no fue el que se filtró.
 
 Sin identidad de usuario ni roles en ninguno de los dos sentidos — es un
@@ -568,8 +568,8 @@ secreto de servicio, no un login.
 ### 6.1 Comando entrante: `CubicaciónSolicitada`
 
 Publicado por la API al recibir `POST /{id}/optimizar` o
-`POST /desde-linea/{id}` (payload plano, sin sobre) — **o por NEXO**
-(issue #28, S2-HU-075), que lo publica con `IPublishEndpoint` de MassTransit
+`POST /desde-linea/{id}` (payload plano, sin sobre) — **o por NEXO**,
+que lo publica con `IPublishEndpoint` de MassTransit
 real, envuelto en su "sobre" estándar (`messageType`/`message`). El worker
 acepta ambos formatos: si el JSON trae `message`+`messageType`, se
 desenvuelve primero; si no, se usa tal cual (`worker/main.py::_procesar`).
@@ -579,11 +579,11 @@ desenvuelve primero; si no, se usa tal cual (`worker/main.py::_procesar`).
   "tipo": "optimizar" | "crear_desde_linea" | "crear_plan" | "crear_plan_demo" | "guardar_vehiculo" | "guardar_item" | "importar_items" | "eliminar_item" | "eliminar_plan" | "ajustar_colocacion",
   "planId": "uuid",
   "correlationId": "uuid",
-  "solicitud": { "...": "shape distinto por tipo, ver NEXO/docs/mensajeria/CUBICACION.md seccion 6.3 (S3-HU-02) para el detalle de los 8 nuevos" }
+  "solicitud": { "...": "shape distinto por tipo, ver NEXO/docs/mensajeria/CUBICACION.md seccion 6.3 para el detalle de los 8 nuevos" }
 }
 ```
 
-Los 8 tipos nuevos (S3-HU-02, issue #105) son operaciones de datos, no de
+Los 8 tipos nuevos son operaciones de datos, no de
 cálculo — comparten exchange/routing-key/reintentos con `optimizar`, pero
 NO pasan por ninguna compuerta de paridad. `ajustar_colocacion` reemplaza el
 PATCH síncrono que existía antes en `/{id}/colocaciones/{colocacionId}` (ver
@@ -599,7 +599,7 @@ de HTTP directo.
   (`optimizar`, `crear_desde_linea`, `crear_plan`, `crear_plan_demo`,
   `guardar_item`, `importar_items`, `eliminar_item`, `ajustar_colocacion` —
   no para `guardar_vehiculo`/`eliminar_plan`, que no tienen plan que
-  reportar). **Enriquecido en S3-HU-03** (issue #110): `resultado` ya no es
+  reportar). **Enriquecido después**: `resultado` ya no es
   `{estado, puntaje, colocaciones: int}` — es el `ResultadoPlanDto` completo
   (items, colocaciones con geometría, métricas, incidencias). No existe un
   evento separado para el ajuste manual: reutiliza este mismo, es la misma
@@ -607,7 +607,7 @@ de HTTP directo.
 - **`CubicaciónRechazada`**: `{ correlationId, planId, codigo: string, mensaje: string }`
   — para CUALQUIERA de los 9 tipos que falle (ver `worker/main.py::_procesar`,
   `marcar_error` es un no-op seguro si el id no corresponde a un plan real).
-- **`VehiculoCreado`/`VehiculoActualizado`** (S3-HU-03, issue #110): `{ correlationId, vehiculo: {...VehiculoCubicacionDto...} }`
+- **`VehiculoCreado`/`VehiculoActualizado`**: `{ correlationId, vehiculo: {...VehiculoCubicacionDto...} }`
   — se publican cuando `guardar_vehiculo` crea o actualiza una fila,
   respectivamente (según si el `id` ya existía antes de guardar).
 
@@ -620,7 +620,7 @@ espera ese formato para deserializar:
 ```json
 {
   "messageId": "uuid",
-  "messageType": ["urn:message:CabinaFletes.Mensajes.Cubicacion:PlanDeCargueGenerado"],
+  "messageType": ["urn:message:Nexo.Mensajes.Cubicacion:PlanDeCargueGenerado"],
   "message": { "correlationId": "uuid", "planId": "uuid", "resultado": {...} },
   "sentTime": "2026-08-27T21:00:00.000Z"
 }
@@ -638,7 +638,7 @@ si el mensaje deja de entregarse.
 
 - Exchange: `cubicador.eventos` (topic).
 - Routing keys: `cubicacion.solicitada`, `plan-de-cargue.generado`,
-  `cubicacion.rechazada` y, desde S3-HU-03, `vehiculo.creado`/
+  `cubicacion.rechazada` y también `vehiculo.creado`/
   `vehiculo.actualizado`/`vehiculo.eliminado` (los 3 del catálogo: el último
   lo publica `eliminar_vehiculo`, y solo si el borrado se aplicó de verdad —
   ver `NEXO/docs/mensajeria/CUBICACION.md` §7.1).
@@ -649,7 +649,7 @@ si el mensaje deja de entregarse.
   vía `ALERTAS_SMTP_*`/`ALERTAS_EQUIPO_TECNICO`); sin SMTP configurado,
   degrada a un log sin romper el worker.
 
-### 6.4 Vigilante de timeouts (S3-HU-06.1)
+### 6.4 Vigilante de timeouts
 
 Cubre el caso que el reintento por `x-intentos` **no** cubre: que el worker se
 caiga a mitad de un mensaje, sin llegar ni a fallar ni a completar — no hay

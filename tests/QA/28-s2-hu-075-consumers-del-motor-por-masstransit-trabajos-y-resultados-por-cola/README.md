@@ -25,21 +25,21 @@ pieza aislada, lista para que quien dispare esto en el futuro solo llame a
 
 ## 1. Qué trae este PR
 
-- `src/CabinaFletes.Mensajes/Cubicacion/MensajesDeCubicacion.cs` — DTOs del
+- `src/Nexo.Mensajes/Cubicacion/MensajesDeCubicacion.cs` — DTOs del
   contrato + `CubicacionSolicitadaValidador`.
-- `src/CabinaFletes.Application/Common/Ports/ICubicacionPort.cs`.
-- `src/CabinaFletes.Infrastructure/Cubicacion/`:
+- `src/Nexo.Application/Common/Ports/ICubicacionPort.cs`.
+- `src/Nexo.Infrastructure/Cubicacion/`:
   - `CubicacionPublicadorAdapter.cs` — implementa el puerto con
     `IPublishEndpoint` de MassTransit (routing key fijado por mensaje, ver
     `docs/mensajeria/CUBICACION.md` #1 para el porqué).
   - `PlanDeCargueGeneradoConsumer.cs`/`CubicacionRechazadaConsumer.cs` —
     `IConsumer<T>` reales, actualizan `PlanCargue`.
-- `src/CabinaFletes.Infrastructure/Common/Mensajeria/
+- `src/Nexo.Infrastructure/Common/Mensajeria/
   MensajeriaDependencyInjection.cs` — registro de los 2 consumers + 2
   `AlertaDeFalloConsumer<T>` + topología manual (exchange/routing keys de
   Cubicador) + exclusión de `ConfigureEndpoints` para evitar colisión de
   endpoints (ver hallazgos abajo).
-- `tests/CabinaFletes.Api.Tests/Cubicacion/ContratoCubicacionTests.cs` — 3
+- `tests/Nexo.Api.Tests/Cubicacion/ContratoCubicacionTests.cs` — 3
   pruebas de (de)serialización, sin broker.
 - `docs/mensajeria/CUBICACION.md` — contrato + decisiones + compatibilidad
   con el envelope de MassTransit del lado de Cubicador (implementada y
@@ -109,15 +109,15 @@ Log real (timestamps reales):
 ```
 21:32:00 warn: MassTransit.ReceiveTransport R-RETRY rabbitmq://rabbit/Cubicacion.PlanDeCargueGenerado
   System.NullReferenceException: Object reference not set to an instance of an object.
-  at CabinaFletes.Infrastructure.Cubicacion.PlanDeCargueGeneradoConsumer.Consume(...)
+  at Nexo.Infrastructure.Cubicacion.PlanDeCargueGeneradoConsumer.Consume(...)
 
-21:33:21 dbug: SEND rabbitmq://rabbit/MassTransit:Fault--CabinaFletes.Mensajes.Cubicacion:PlanDeCargueGenerado--
-  MassTransit.Fault<CabinaFletes.Mensajes.Cubicacion.PlanDeCargueGenerado>
+21:33:21 dbug: SEND rabbitmq://rabbit/MassTransit:Fault--Nexo.Mensajes.Cubicacion:PlanDeCargueGenerado--
+  MassTransit.Fault<Nexo.Mensajes.Cubicacion.PlanDeCargueGenerado>
 21:33:21 fail: R-FAULT rabbitmq://rabbit/Cubicacion.PlanDeCargueGenerado (agotados los reintentos)
 21:33:21 info: SmtpCorreoAdapter Correo enviado a scalderon@boterosoto.com.co: [NEXO] Mensaje PlanDeCargueGenerado cayó a la cola de error
   (... 5 correos más)
 21:33:21 dbug: RECEIVE rabbitmq://rabbit/PlanDeCargueGenerado ... Fault<PlanDeCargueGenerado>
-  AlertaDeFalloConsumer<CabinaFletes.Mensajes.Cubicacion.PlanDeCargueGenerado>
+  AlertaDeFalloConsumer<Nexo.Mensajes.Cubicacion.PlanDeCargueGenerado>
 ```
 
 **81 segundos** entre el primer `R-RETRY` (21:32:00) y el `Fault` (21:33:21)
@@ -155,7 +155,7 @@ por la misma cola durante la verificación.
 
 ## 5. Regresión
 
-`dotnet test CabinaFletes.Clean.sln` contra infraestructura real: **193/193**
+`dotnet test Nexo.Clean.sln` contra infraestructura real: **193/193**
 (Domain 61, Application 75, Api 57 — 54 + 3 nuevas de
 `ContratoCubicacionTests`). Sin regresiones.
 

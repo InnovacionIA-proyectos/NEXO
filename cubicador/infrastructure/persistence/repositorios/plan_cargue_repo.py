@@ -34,8 +34,8 @@ class SqlPlanCargueRepository:
         self, nombre: str, vehiculo_id: str, linea_solicitud_id: str | None = None, numero_vehiculo: int = 1,
         id: str | None = None,
     ) -> PlanCargue:
-        # `id`: S3-HU-02 (issue #105) - "crear_plan" desde NEXO manda el id ya generado
-        # alla (S3-HU-01.2); sin id (POST sincrono, demo, crear_desde_linea) se genera acá.
+        # `id`: "crear_plan" desde NEXO manda el id ya generado alla; sin id
+        # (POST sincrono, demo, crear_desde_linea) se genera acá.
         fila = PlanCargueModel(
             id=id or str(uuid.uuid4()), nombre=nombre, vehiculo_id=vehiculo_id,
             linea_solicitud_id=linea_solicitud_id, numero_vehiculo=numero_vehiculo,
@@ -60,8 +60,8 @@ class SqlPlanCargueRepository:
         if fila is None:
             return
 
-        # S3-HU-10.3 (issue #133): las colocaciones van PRIMERO, mismo orden que ya
-        # respeta `eliminar_item`. `ColocacionCargueModel` tiene FK a `planes_cargue`
+        # Las colocaciones van PRIMERO, mismo orden que ya respeta
+        # `eliminar_item`. `ColocacionCargueModel` tiene FK a `planes_cargue`
         # y a `items_plan_cargue` pero NO tiene relationship ni cascada, asi que el
         # `delete(fila)` de abajo (que si arrastra los items, por el cascade
         # delete-orphan de PlanCargueModel.items) dejaba las colocaciones apuntando a
@@ -153,8 +153,8 @@ class SqlPlanCargueRepository:
             fila.peso_encima_kg = col.peso_encima_kg
             fila.estado_estabilidad = col.estado_estabilidad
             fila.accesibilidad = col.accesibilidad
-            # Issue #151: cada reoptimizacion borra TODAS las filas y las
-            # reconstruye desde resultado.colocaciones (incluidas las `fijas` que
+            # Cada reoptimizacion borra TODAS las filas y las reconstruye desde
+            # resultado.colocaciones (incluidas las `fijas` que
             # entraron con bloqueada=True desde optimizar.py). Sin esta linea la
             # fila nueva se queda en el default=False del modelo y el flag se
             # pierde en cada ciclo de "Reoptimizar (respetar bloqueadas)".
@@ -193,8 +193,8 @@ class SqlPlanCargueRepository:
             await self._s.commit()
 
     async def marcar_error(self, plan_id: str | None, mensaje: str) -> None:
-        # S3-HU-10.1 (issue #131): `plan_id` puede ser None - lo llama el manejador de
-        # errores del worker con `cuerpo.get("planId")`, y un mensaje malformado puede
+        # `plan_id` puede ser None - lo llama el manejador de errores del
+        # worker con `cuerpo.get("planId")`, y un mensaje malformado puede
         # no traer la clave. Sin esta guarda, `get(Modelo, None)` emite hoy un
         # SAWarning ("fully NULL primary key identity") y SQLAlchemy avisa que podria
         # LANZAR en una version futura - lo que reintroduciria el atasco exacto que
@@ -286,8 +286,8 @@ class SqlPlanCargueRepository:
         await self._s.commit()
 
     async def eliminar_planes_de_linea(self, linea_solicitud_id: str) -> None:
-        # S3-HU-10.3 (issue #133): mismo defecto que tenia `eliminar()`, y aqui es
-        # PEOR - un `delete()` masivo no dispara la cascada del ORM, asi que sin este
+        # Mismo defecto que tenia `eliminar()`, y aqui es PEOR - un `delete()`
+        # masivo no dispara la cascada del ORM, asi que sin este
         # borrado explicito quedaban huerfanos los items ADEMAS de las colocaciones.
         #
         # No es teorico: lo llama `crear_plan_desde_linea` para reconstruir la flota,
