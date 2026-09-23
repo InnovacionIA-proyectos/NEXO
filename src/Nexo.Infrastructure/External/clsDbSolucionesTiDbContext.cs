@@ -27,6 +27,7 @@ public class clsDbSolucionesTiDbContext : DbContext
     public DbSet<clsSapContenedorRangoPeso> ContenedorRangosPeso => Set<clsSapContenedorRangoPeso>();
     public DbSet<clsSapParametro> Parametros => Set<clsSapParametro>();
     public DbSet<clsSapClaseContenedorCatalogo> ClasesContenedor => Set<clsSapClaseContenedorCatalogo>();
+    public DbSet<clsProspecto> Prospectos => Set<clsProspecto>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -96,6 +97,12 @@ public class clsDbSolucionesTiDbContext : DbContext
         par.Property(x => x.IdParametro).HasColumnName("IDPARAMETRO");
         par.Property(x => x.ValorParametro).HasColumnName("VALORPARAMETRO").HasMaxLength(200);
         par.Property(x => x.NombreParametro).HasColumnName("NOMBREPARAMETRO").HasMaxLength(200);
+
+        var pr = modelBuilder.Entity<clsProspecto>();
+        pr.ToTable("tblProspectos", "dbo");
+        pr.HasKey(x => x.Nit);
+        pr.Property(x => x.Nit).HasColumnName("NIT").HasMaxLength(15);
+        pr.Property(x => x.Cliente).HasColumnName("CLIENTE").HasMaxLength(100);
 
         var cc = modelBuilder.Entity<clsSapClaseContenedorCatalogo>();
         cc.ToTable("tblSAPClaseContenedor", "dbo");

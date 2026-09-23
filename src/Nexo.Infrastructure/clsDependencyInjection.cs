@@ -225,6 +225,8 @@ public static class clsDependencyInjection
         services.AddScoped<IConfiguracionesVehiculoPort, clsEfConfiguracionesVehiculoRepository>();
         services.AddScoped<IClientesPort, clsEfClientesRepository>();
         services.AddScoped<IClientesDwPort, clsClientesDwAdapter>();
+        services.AddScoped<IProspectosDwPort, clsProspectosDwAdapter>();
+        services.AddScoped<ICiudadesDwPort, clsCiudadesDwAdapter>();
         services.AddScoped<IExcelSolicitudesPort, clsExcelSolicitudesAdapter>();
         services.AddScoped<ITarifasCosteoPort, clsEfTarifasCosteoRepository>();
 
