@@ -37,28 +37,48 @@ public sealed record clsResultadoDeCosteo(decimal? Valor, string? Fuente, string
 /// Las reglas que aplica:
 ///
 ///   1. Nunca por debajo del piso SICE-TAC vigente. Cotizar bajo el piso es sanción.
-///   2. Regla del mayor: propuesta = MAX(tarifa de plaza, piso SICE-TAC).
-///   3. Si falta una de las dos, gobierna la que haya.
-///   4. Tarifa vencida se marca y no se propone: se descarta la plaza y gobierna el piso.
+///   2. Regla del mayor: propuesta = MAX(tarifa de plaza, histórico de plaza (últimos
+///      3 meses), piso SICE-TAC). El histórico solo compite cuando hay piso vigente
+///      con el cual validar que no está desactualizado (ver regla 6).
+///   3. Si falta plaza y falta piso, gobierna el que haya.
+///   4. Tarifa vencida se marca y no se propone: se descarta la plaza y gobierna el
+///      piso (el histórico sigue compitiendo; no depende de la vigencia del tarifario).
 ///   5. Trazabilidad de fuente: toda propuesta dice de dónde salió.
-///   6. Sin plaza ni piso, la línea es de una persona. El histórico se ofrece como
-///      referencia pero NO se propone solo.
+///   6. Sin piso vigente, el histórico NUNCA compite ni se propone solo: no hay piso
+///      contra el cual validar que no esté desactualizado. Se ofrece solo como
+///      referencia para que una persona decida.
 /// </summary>
 public static class clsReglaDeCosteo
 {
     public static clsResultadoDeCosteo Decidir(
         clsCandidatoDeTarifa? sicetac, clsCandidatoDeTarifa? plaza, clsCandidatoDeTarifa? historico)
     {
-        if (plaza is not null && sicetac is not null)
+        if (sicetac is not null)
         {
-            // El empate lo gana la plaza: es la tarifa comercial y respeta el piso.
-            var mayor = plaza.Valor >= sicetac.Valor ? plaza : sicetac;
-            var diferencia = Math.Abs(plaza.Valor - sicetac.Valor);
-            var porcentaje = sicetac.Valor > 0 ? Math.Round(diferencia / sicetac.Valor * 100, 1) : 0;
+            // Con piso vigente, plaza e histórico compiten por el mayor; el empate
+            // entre ambos lo gana la plaza, por ser la tarifa comercial vigente.
+            var mejorComercial = plaza is not null && historico is not null
+                ? (plaza.Valor >= historico.Valor ? plaza : historico)
+                : plaza ?? historico;
 
-            var justificacion = plaza.Valor >= sicetac.Valor
-                ? $"El flete de plaza ({plaza.Valor:C0}) supera el piso SICE-TAC ({sicetac.Valor:C0}) en {porcentaje}%: se propone plaza."
-                : $"El piso SICE-TAC ({sicetac.Valor:C0}) supera el flete de plaza ({plaza.Valor:C0}) en {porcentaje}%: se propone SICE-TAC para no cotizar bajo el piso.";
+            if (mejorComercial is null)
+                return new clsResultadoDeCosteo(sicetac.Valor, sicetac.Fuente,
+                    "Solo se encontró piso SICE-TAC; sin tarifa de plaza ni histórico comparable para la ruta.");
+
+            var mayor = mejorComercial.Valor >= sicetac.Valor ? mejorComercial : sicetac;
+            var diferencia = Math.Abs(mejorComercial.Valor - sicetac.Valor);
+            var porcentaje = sicetac.Valor > 0 ? Math.Round(diferencia / sicetac.Valor * 100, 1) : 0;
+            // Fraseo idéntico al histórico de "El flete de plaza ... supera/es superado
+            // por el piso SICE-TAC" cuando el comercial es la plaza (no romper el
+            // fraseo ya validado contra datos reales, ver clsPliegoDatasetValidacionTests);
+            // el histórico usa el mismo patrón con su propio sujeto.
+            var (sujeto, sujetoObjeto) = mejorComercial.Fuente == "plaza"
+                ? ("El flete de plaza", "el flete de plaza")
+                : ("El histórico de plaza (últimos 3 meses)", "el histórico de plaza (últimos 3 meses)");
+
+            var justificacion = mejorComercial.Valor >= sicetac.Valor
+                ? $"{sujeto} ({mejorComercial.Valor:C0}) supera el piso SICE-TAC ({sicetac.Valor:C0}) en {porcentaje}%: se propone {mejorComercial.Fuente}."
+                : $"El piso SICE-TAC ({sicetac.Valor:C0}) supera {sujetoObjeto} ({mejorComercial.Valor:C0}) en {porcentaje}%: se propone SICE-TAC para no cotizar bajo el piso.";
 
             return new clsResultadoDeCosteo(mayor.Valor, mayor.Fuente, justificacion);
         }
@@ -67,12 +87,8 @@ public static class clsReglaDeCosteo
             return new clsResultadoDeCosteo(plaza.Valor, plaza.Fuente,
                 "Solo se encontró flete de plaza; sin piso SICE-TAC comparable para la ruta.");
 
-        if (sicetac is not null)
-            return new clsResultadoDeCosteo(sicetac.Valor, sicetac.Fuente,
-                "Solo se encontró piso SICE-TAC; sin tarifa de plaza vigente para la ruta.");
-
-        // El histórico viaja como referencia, no como propuesta: proponerlo sería
-        // costear sin saber si respeta el piso vigente.
+        // Sin piso vigente, el histórico viaja como referencia, no como propuesta:
+        // proponerlo sería costear sin saber si respeta el piso vigente.
         var referencia = historico is not null
             ? $" Referencia disponible: histórico SAP {historico.Valor:C0} (el Administrador de Fletes decide manualmente)."
             : string.Empty;
@@ -92,12 +108,19 @@ public static class clsReglaDeCosteo
         if (!tarifarioVencido) return Decidir(sicetac, plaza, historico);
 
         var sinPlaza = Decidir(sicetac, plaza: null, historico);
+        var aviso = "El tarifario está INACTIVO (vigencia vencida): se descarta la plaza; el tarifario vencido queda solo como referencia. ";
 
-        var justificacion = sicetac is not null
-            ? $"El tarifario está INACTIVO (vigencia vencida): se propone el piso SICE-TAC vigente ({sicetac.Valor:C0}); " +
-              "nunca cotiza por debajo del piso legal. El tarifario vencido queda solo como referencia."
-            : "La tarifa del tarifario está INACTIVA (vigencia vencida) y no hay piso SICE-TAC vigente para la ruta: " +
-              "requiere revisión manual del Administrador de Fletes.";
+        // El histórico puede seguir compitiendo contra el piso (regla 4): si gana, la
+        // justificación de Decidir ya lo explica y solo se antepone el aviso de plaza
+        // vencida. Si nadie más que el piso queda en pie, se aclara que nunca cotiza
+        // por debajo de él.
+        var justificacion = sinPlaza.Fuente switch
+        {
+            "sicetac" => aviso + $"Se propone el piso SICE-TAC vigente ({sicetac!.Valor:C0}); nunca cotiza por debajo del piso legal.",
+            null => "La tarifa del tarifario está INACTIVA (vigencia vencida) y no hay piso SICE-TAC vigente para la ruta: " +
+                    "requiere revisión manual del Administrador de Fletes.",
+            _ => aviso + sinPlaza.Justificacion,
+        };
 
         return sinPlaza with { Justificacion = justificacion };
     }

@@ -60,6 +60,44 @@ public class clsReglaDeCosteoTests
         Assert.Contains("plaza", r.Justificacion, StringComparison.OrdinalIgnoreCase);
     }
 
+    // ------------------------------------------------ histórico como comparador
+
+    [Fact]
+    public void Con_piso_presente_el_historico_gana_cuando_es_mayor_que_plaza_y_que_el_piso()
+    {
+        var r = clsReglaDeCosteo.Decidir(Sicetac(1_000_000m), Plaza(1_100_000m), Historico(1_500_000m));
+
+        Assert.Equal(1_500_000m, r.Valor);
+        Assert.Equal("historico_sap", r.Fuente);
+    }
+
+    [Fact]
+    public void Empatados_plaza_e_historico_gana_la_plaza()
+    {
+        var r = clsReglaDeCosteo.Decidir(Sicetac(1_000_000m), Plaza(1_500_000m), Historico(1_500_000m));
+
+        Assert.Equal(1_500_000m, r.Valor);
+        Assert.Equal("plaza", r.Fuente);
+    }
+
+    [Fact]
+    public void Sin_plaza_pero_con_piso_el_historico_compite_solo_contra_el_piso()
+    {
+        var r = clsReglaDeCosteo.Decidir(Sicetac(1_000_000m), plaza: null, Historico(1_200_000m));
+
+        Assert.Equal(1_200_000m, r.Valor);
+        Assert.Equal("historico_sap", r.Fuente);
+    }
+
+    [Fact]
+    public void Nunca_se_propone_por_debajo_del_piso_aunque_el_historico_sea_el_mayor_de_los_tres()
+    {
+        var r = clsReglaDeCosteo.Decidir(Sicetac(2_000_000m), Plaza(1_000_000m), Historico(1_500_000m));
+
+        Assert.Equal(2_000_000m, r.Valor);
+        Assert.Equal("sicetac", r.Fuente);
+    }
+
     // ------------------------------------------------ una sola fuente
 
     [Fact]
