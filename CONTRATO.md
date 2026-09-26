@@ -222,7 +222,7 @@ interface CapturaResultDto {
 }
 interface HojaExcelDto { nombre: string; filaEncabezado: number; encabezados: string[]; filas: string[][]; totalFilas: number }
 interface AnalisisExcelDto { archivo: string; hojas: HojaExcelDto[] }
-interface ClienteBusquedaDto { clienteId: UUID | null; bp: string | null; nit: string; nombre: string }
+interface ClienteBusquedaDto { clienteId: UUID | null; bp: string | null; nit: string; nitCliente: string; nombre: string; origen: string } // origen: "cliente" | "prospecto"; nitCliente es alias de nit (mismo valor) para Cotifly
 interface CandidatoTarifaDto {
   fuente: string; valor: Decimal; detalle: string; criterio: string; coincidencias: number
   advertencia: string | null // no-nulo cuando NO es un match exacto (fallback "mayor valor vigente" por peso fuera de rango o vehículo no resuelto en el catálogo SAP) — mostrar al usuario antes de confirmar
