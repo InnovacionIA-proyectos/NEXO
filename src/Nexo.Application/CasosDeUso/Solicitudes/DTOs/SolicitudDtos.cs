@@ -95,3 +95,13 @@ public record clsCiudadBusquedaDto(string Municipio, string Departamento);
 
 /// <summary>Estimación del aprovisionamiento del contenedor (viaje vacío levante → origen).</summary>
 public record clsAprovisionamientoDto(clsCandidatoTarifaDto? Candidato);
+
+/// <summary>Resultado de la siembra única del catálogo de municipios (S4-HU-09.1).</summary>
+public record clsResultadoSiembraMunicipiosDto(
+    int TotalInsertados, int Colombia, int Venezuela, int Ecuador,
+    int ConNombreTarifasPlaza, int ConZonaTarificacion, int ZcSinRelacionOficial);
+
+/// <summary>Fila completa del catálogo de municipios (todas las columnas de la tabla).</summary>
+public record clsMunicipioDto(
+    int Id, string CodigoDane, string Municipio, string Departamento, string Pais,
+    string? NombreTarifasPlaza, string? ZonaTarificacion);

@@ -1,0 +1,34 @@
+"role_name","codigo","descripcion"
+jefe_operaciones,gestionar_formularios,Otorgar/quitar acceso a formularios por rol o por usuario.
+jefe_operaciones,ver_informes_todos,"Ver embarques/informes de todos los embarcadores, no solo los propios."
+jefe_operaciones,ver_usuarios,Consultar el listado/detalle de usuarios (solo lectura).
+comercial,ver_informes_todos,"Ver embarques/informes de todos los embarcadores, no solo los propios."
+admin,gestionar_formularios,Otorgar/quitar acceso a formularios por rol o por usuario.
+admin,gestionar_usuarios,Crear/editar/activar-inactivar/resetear password de usuarios.
+admin,inhabilitar_informes,Inhabilitar un informe (queda marcado para repetirse) y notificar al jefe de operaciones y al embarcador.
+admin,ver_informes_todos,"Ver embarques/informes de todos los embarcadores, no solo los propios."
+admin,nivel_administracion,"Nivel de administración — sensible, exclusivo de super_admin otorgarlo."
+admin,ver_historial_informes,"Ver el historial completo de versiones de una FO (activas e inhabilitadas, con motivo/autor/fecha) y su documento."
+admin,ver_usuarios,Consultar el listado/detalle de usuarios (solo lectura).
+super_admin,gestionar_formularios,Otorgar/quitar acceso a formularios por rol o por usuario.
+super_admin,gestionar_usuarios,Crear/editar/activar-inactivar/resetear password de usuarios.
+super_admin,inhabilitar_informes,Inhabilitar un informe (queda marcado para repetirse) y notificar al jefe de operaciones y al embarcador.
+super_admin,ver_informes_todos,"Ver embarques/informes de todos los embarcadores, no solo los propios."
+super_admin,nivel_administracion,"Nivel de administración — sensible, exclusivo de super_admin otorgarlo."
+super_admin,super_administracion,"Nivel super_admin — sensible, exclusivo de super_admin otorgarlo."
+super_admin,ver_historial_informes,"Ver el historial completo de versiones de una FO (activas e inhabilitadas, con motivo/autor/fecha) y su documento."
+super_admin,ver_usuarios,Consultar el listado/detalle de usuarios (solo lectura).
+qa_rol_64ed2e9ab0,ver_usuarios,Consultar el listado/detalle de usuarios (solo lectura).
+qa_rol_89638cb200,ver_usuarios,Consultar el listado/detalle de usuarios (solo lectura).
+qa_rol_c2b28a45fc,ver_usuarios,Consultar el listado/detalle de usuarios (solo lectura).
+qa_rol_805436ea98,ver_usuarios,Consultar el listado/detalle de usuarios (solo lectura).
+qa_rol_ab9910a60e,ver_usuarios,Consultar el listado/detalle de usuarios (solo lectura).
+qa_rol_c318e1015c,ver_usuarios,Consultar el listado/detalle de usuarios (solo lectura).
+qa_rol_3e2e7c3b28,ver_usuarios,Consultar el listado/detalle de usuarios (solo lectura).
+qa_rol_1277786945,ver_usuarios,Consultar el listado/detalle de usuarios (solo lectura).
+qa_rol_87dab52055,ver_usuarios,Consultar el listado/detalle de usuarios (solo lectura).
+qa_rol_f9d4240eb7,ver_usuarios,Consultar el listado/detalle de usuarios (solo lectura).
+qa_rol_720705d1a3,ver_usuarios,Consultar el listado/detalle de usuarios (solo lectura).
+qa_rol_cd5214b363,ver_usuarios,Consultar el listado/detalle de usuarios (solo lectura).
+qa_rol_30e9b880a0,ver_usuarios,Consultar el listado/detalle de usuarios (solo lectura).
+qa_rol_f0d4b63273,ver_usuarios,Consultar el listado/detalle de usuarios (solo lectura).
