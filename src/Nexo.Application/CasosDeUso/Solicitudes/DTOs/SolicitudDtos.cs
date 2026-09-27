@@ -88,7 +88,16 @@ public record clsAnalisisExcelDto(string Archivo, IReadOnlyList<clsHojaExcelDto>
 /// hasta que se use en una solicitud); los locales traen ClienteId. Origen distingue
 /// "cliente" (ya tiene BP real) de "prospecto" (tblProspectos, todavía sin BP asignado).
 /// </summary>
-public record clsClienteBusquedaDto(Guid? ClienteId, string? Bp, string Nit, string Nombre, string Origen);
+public record clsClienteBusquedaDto(Guid? ClienteId, string? Bp, string Nit, string Nombre, string Origen)
+{
+    /// <summary>
+    /// Alias de <see cref="Nit"/>: nombre de campo que espera Cotifly como identificador
+    /// estable de cliente (reemplaza el uso de ClienteId/Bp, que son internos de Nexo y
+    /// pueden venir nulos). Mismo valor que <see cref="Nit"/>, expuesto también con este
+    /// nombre para no romper el consumidor actual de "nit".
+    /// </summary>
+    public string NitCliente => Nit;
+}
 
 /// <summary>Municipio costeable para Origen/Destino del formulario de captura.</summary>
 public record clsCiudadBusquedaDto(string Municipio, string Departamento);
