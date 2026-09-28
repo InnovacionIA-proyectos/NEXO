@@ -27,9 +27,6 @@ using Nexo.Application.CasosDeUso.Priorizacion;
 using Nexo.Application.CasosDeUso.ReglasSoloSicetac;
 using Nexo.Application.CasosDeUso.ServiciosConexos;
 using Nexo.Application.CasosDeUso.Solicitudes;
-using Nexo.Application.CasosDeUso.Solicitudes.DTOs;
-using Nexo.Application.CasosDeUso.Solicitudes.Interfaces;
-using Nexo.Application.Common.Abstractions;
 using Nexo.Application.CasosDeUso.TarifasGanadas;
 using Nexo.Application.CasosDeUso.TarifasSicetacAdmin;
 using Nexo.Domain.Enums;
@@ -238,40 +235,6 @@ if (app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
 
     if (app.Configuration.GetValue<bool>("Database:SeedOnStartup"))
         await clsDataSeeder.SeedAsync(db);
-}
-
-// --------------------------------------------------------------- Siembra del catálogo de municipios (S4-HU-09.1)
-// Independiente de Database:SeedOnStartup a propósito: ese flag es para datos de DEMO
-// (clsDataSeeder) que NUNCA deben tocar producción; este catálogo es un dato de
-// referencia real (tblSAPDANE/tblZonasTarificacionRelacion/tblSAPTarifas del
-// datacenter corporativo) que sí conviene tener sembrado en cualquier ambiente,
-// incluida producción. Idempotente (no hace nada si la tabla ya tiene filas — mismo
-// criterio que clsDataSeeder) y no rompe el arranque si ConnectionStrings:DbSolucionesTi
-// no está configurada en este ambiente: se omite con un log, igual que el resto de
-// adapters opcionales de ese DW (degradación, no fail-closed — a diferencia de
-// IdentidadPortal/RabbitMq, este catálogo no es indispensable para que la Api levante).
-if (app.Configuration.GetValue<bool>("Database:SembrarMunicipiosOnStartup"))
-{
-    using var scope = app.Services.CreateScope();
-    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
-    var fuenteMunicipios = scope.ServiceProvider.GetRequiredService<IMunicipiosSiembraPort>();
-    var municipiosRepo = scope.ServiceProvider.GetRequiredService<IMunicipiosRepository>();
-
-    if (!fuenteMunicipios.Configurado)
-        logger.LogWarning(
-            "Database:SembrarMunicipiosOnStartup está activo pero ConnectionStrings:DbSolucionesTi " +
-            "no está configurada en este ambiente — se omite la siembra del catálogo de municipios.");
-    else if (await municipiosRepo.ExisteAlgunoAsync(default))
-        logger.LogInformation("Catálogo de municipios ya estaba sembrado — se omite.");
-    else
-    {
-        var sembrarMunicipios = scope.ServiceProvider
-            .GetRequiredService<ICommandHandler<clsSembrarMunicipiosCommand, clsResultadoSiembraMunicipiosDto>>();
-        var resultado = await sembrarMunicipios.Handle(new clsSembrarMunicipiosCommand());
-        logger.LogInformation(
-            "Catálogo de municipios sembrado al arrancar: {Total} filas (CO {Co}, VE {Ve}, EC {Ec}).",
-            resultado.TotalInsertados, resultado.Colombia, resultado.Venezuela, resultado.Ecuador);
-    }
 }
 
 app.UseForwardedHeaders();

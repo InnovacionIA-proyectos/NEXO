@@ -98,24 +98,6 @@ CREATE TABLE [db_NEXO].[tbl_configuraciones_vehiculo] (
     , CONSTRAINT [PK_configuraciones_vehiculo] PRIMARY KEY ([Id])
 );
 
--- Catálogo propio de municipios (Colombia/Venezuela/Ecuador) para el
--- desplegable de Origen/Destino en Captura de Solicitudes (S4-HU-09.1).
--- Sembrado UNA SOLA VEZ desde tblSAPDANE/tblZonasTarificacionRelacion/
--- tblSAPTarifas(Log) del datacenter corporativo — sin sincronización
--- periódica (ver docs/Database/SQUASH-MIGRACIONES.md). CodigoDane no es
--- único por sí solo (choca entre Venezuela y Ecuador) — Id es autoincremental
--- a propósito, la llave natural real es (CodigoDane, Pais).
-CREATE TABLE [db_NEXO].[tbl_municipios] (
-    [Id] int NOT NULL IDENTITY,
-    [CodigoDane] nvarchar(20) NOT NULL,
-    [Municipio] nvarchar(150) NOT NULL,
-    [Departamento] nvarchar(150) NOT NULL,
-    [Pais] nvarchar(2) NOT NULL,
-    [NombreTarifasPlaza] nvarchar(60) NULL,
-    [ZonaTarificacion] nvarchar(60) NULL
-    , CONSTRAINT [PK_municipios] PRIMARY KEY ([Id])
-);
-
 -- Dimensiones/capacidad físicas reales de un vehículo, para el Plan de Cargue
 -- (cubicación 3D): distinto de tbl_configuraciones_vehiculo, que es solo catálogo
 -- comercial (tipo/carrocería), no geometría.
@@ -644,9 +626,6 @@ CREATE INDEX [IX_lineas_solicitud_ConfigVehiculoId] ON [db_NEXO].[tbl_lineas_sol
 CREATE INDEX [IX_lineas_solicitud_RutaId] ON [db_NEXO].[tbl_lineas_solicitud] ([RutaId]);
 CREATE INDEX [IX_lineas_solicitud_SolicitudId] ON [db_NEXO].[tbl_lineas_solicitud] ([SolicitudId]);
 CREATE UNIQUE INDEX [IX_mapeo_rol_portal_IdRolPortal] ON [db_NEXO].[tbl_mapeo_rol_portal] ([IdRolPortal]) WHERE ([IdRolPortal] IS NOT NULL);
--- Llave natural real (el código DANE solo no es único, choca entre Venezuela y Ecuador).
-CREATE UNIQUE INDEX [IX_municipios_CodigoDane_Pais] ON [db_NEXO].[tbl_municipios] ([CodigoDane], [Pais]);
-CREATE INDEX [IX_municipios_NombreTarifasPlaza] ON [db_NEXO].[tbl_municipios] ([NombreTarifasPlaza]);
 CREATE INDEX [IX_OutboxMessage_EnqueueTime] ON [db_NEXO].[OutboxMessage] ([EnqueueTime]);
 CREATE INDEX [IX_OutboxMessage_ExpirationTime] ON [db_NEXO].[OutboxMessage] ([ExpirationTime]);
 CREATE UNIQUE INDEX [IX_OutboxMessage_InboxMessageId_InboxConsumerId_SequenceNumber] ON [db_NEXO].[OutboxMessage] ([InboxMessageId], [InboxConsumerId], [SequenceNumber]) WHERE ([InboxMessageId] IS NOT NULL AND [InboxConsumerId] IS NOT NULL);

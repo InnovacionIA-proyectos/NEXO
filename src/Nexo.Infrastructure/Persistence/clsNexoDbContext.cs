@@ -43,7 +43,6 @@ public class clsNexoDbContext : DbContext
     public DbSet<clsPlanCargue> PlanesCargue => Set<clsPlanCargue>();
     public DbSet<clsItemPlanCargue> ItemsPlanCargue => Set<clsItemPlanCargue>();
     public DbSet<clsColocacionCargue> ColocacionesCargue => Set<clsColocacionCargue>();
-    public DbSet<clsMunicipio> Municipios => Set<clsMunicipio>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -388,17 +387,6 @@ public class clsNexoDbContext : DbContext
             e.ToTable("tbl_reglas_solo_sicetac");
             // Clave natural única: no repetir la misma ruta + tipo de vehículo.
             e.HasIndex(x => new { x.Origen, x.Destino, x.TipoVehiculo }).IsUnique();
-        });
-
-        b.Entity<clsMunicipio>(e =>
-        {
-            e.ToTable("tbl_municipios");
-            e.Property(x => x.Id).ValueGeneratedOnAdd();
-            // Clave natural real: el código DANE por sí solo choca entre Venezuela y
-            // Ecuador (verificado contra datos reales, S4-HU-09.1) — la combinación con
-            // el país sí es única.
-            e.HasIndex(x => new { x.CodigoDane, x.Pais }).IsUnique();
-            e.HasIndex(x => x.NombreTarifasPlaza);
         });
 
         b.Entity<clsParametrosScore>(e =>
