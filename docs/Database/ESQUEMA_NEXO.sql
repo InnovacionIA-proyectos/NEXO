@@ -100,10 +100,10 @@ CREATE TABLE [db_NEXO].[tbl_configuraciones_vehiculo] (
 
 -- Catálogo propio de municipios (Colombia/Venezuela/Ecuador) para el
 -- desplegable de Origen/Destino en Captura de Solicitudes (S4-HU-09.1).
--- Sembrado UNA SOLA VEZ desde tblSAPDANE/tblZonasTarificacionRelacion/
+-- Poblada UNA SOLA VEZ desde tblSAPDANE/tblZonasTarificacionRelacion/
 -- tblSAPTarifas(Log) del datacenter corporativo — sin sincronización
--- periódica (ver docs/Database/SQUASH-MIGRACIONES.md). CodigoDane no es
--- único por sí solo (choca entre Venezuela y Ecuador) — Id es autoincremental
+-- periódica, con un script de poblado aparte (no por migración de EF Core).
+-- CodigoDane no es único por sí solo (choca entre Venezuela y Ecuador) — Id es autoincremental
 -- a propósito, la llave natural real es (CodigoDane, Pais).
 CREATE TABLE [db_NEXO].[tbl_municipios] (
     [Id] int NOT NULL IDENTITY,
