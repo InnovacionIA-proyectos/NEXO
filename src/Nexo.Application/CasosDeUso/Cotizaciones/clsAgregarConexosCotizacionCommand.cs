@@ -36,9 +36,9 @@ public sealed class clsAgregarConexosCotizacionCommandHandler(
             var servicio = await serviciosConexos.ObtenerPorIdAsync(item.ServicioConexoId, ct)
                 ?? throw new clsValidationFailedException("SERVICIO_INVALIDO", $"Servicio logístico {item.ServicioConexoId} no existe.");
             if (!servicio.Activo)
-                throw new clsValidationFailedException("SERVICIO_INACTIVO", $"El servicio '{servicio.Nombre}' está inactivo.");
+                throw new clsValidationFailedException("SERVICIO_INACTIVO", $"El servicio '{servicio.TipoServicio}' está inactivo.");
 
-            var valor = item.ValorAplicado ?? (servicio.ValorBase ?? 0m) * item.Cantidad;
+            var valor = item.ValorAplicado ?? servicio.CostoUnitario * item.Cantidad;
             var conexo = new clsCotizacionConexo
             {
                 CotizacionId = c.Id,

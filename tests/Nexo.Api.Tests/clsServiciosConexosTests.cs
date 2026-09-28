@@ -12,6 +12,18 @@ public class clsServiciosConexosTests
     private readonly clsApiFixture _fx;
     public clsServiciosConexosTests(clsApiFixture fx) => _fx = fx;
 
+    // Payload mínimo válido (S4-HU-15.1/#223): las dimensiones (origen/destino/puerto/
+    // ruta/tipoMaquina) son opcionales, se normalizan a "NO APLICA" si no vienen.
+    private static object PayloadValido(string codigo, string tipo = "Precinto", decimal costo = 1000, string? categoria = null) => new
+    {
+        codigoServicio = codigo,
+        tipoServicio = tipo,
+        costoUnitario = costo,
+        unidad = "Por unidad",
+        vigencia = "2026-12-31",
+        categoria,
+    };
+
     // 1) Happy path — respuesta paginada { items, total }
     [Fact]
     public async Task Listar_devuelve_catalogo_paginado()
@@ -22,12 +34,12 @@ public class clsServiciosConexosTests
     }
 
     [Fact]
-    public async Task Listar_busca_por_nombre_y_filtra_por_categoria()
+    public async Task Listar_busca_por_tipo_y_filtra_por_categoria()
     {
         var pagina = await _fx.Client().GetFromJsonAsync<JsonElement>("/api/servicios-conexos?q=carg&categoria=logistico");
         foreach (var it in pagina.GetProperty("items").EnumerateArray())
         {
-            Assert.Contains("arg", it.GetProperty("nombre").GetString(), StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("arg", it.GetProperty("tipoServicio").GetString(), StringComparison.OrdinalIgnoreCase);
             Assert.Equal("logistico", it.GetProperty("categoria").GetString());
         }
     }
@@ -35,20 +47,18 @@ public class clsServiciosConexosTests
     [Fact]
     public async Task Crear_servicio_valido_devuelve_201()
     {
-        var resp = await _fx.Client("ServiciosLogisticos").PostJson("/api/servicios-conexos", new
-        {
-            nombre = $"Servicio {Guid.NewGuid():N}",
-            reglaCobro = "{\"tipo\":\"fijo\",\"valor\":1000}",
-            valorBase = 1000
-        });
+        var resp = await _fx.Client("ServiciosLogisticos").PostJson("/api/servicios-conexos",
+            PayloadValido($"COD_{Guid.NewGuid():N}"[..20]));
         Assert.Equal(HttpStatusCode.Created, resp.StatusCode);
+        var dto = await resp.Json();
+        Assert.Equal("NO APLICA", dto.GetProperty("origen").GetString());
     }
 
     // 2) Validación
     [Fact]
-    public async Task Crear_sin_nombre_devuelve_400()
+    public async Task Crear_sin_codigo_ni_tipo_devuelve_400()
     {
-        var resp = await _fx.Client("Admin").PostJson("/api/servicios-conexos", new { valorBase = 1000 });
+        var resp = await _fx.Client("Admin").PostJson("/api/servicios-conexos", new { costoUnitario = 1000, unidad = "Por unidad", vigencia = "2026-12-31" });
         Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
         Assert.Equal("VALIDATION_ERROR", await resp.ErrorCode());
     }
@@ -58,7 +68,7 @@ public class clsServiciosConexosTests
     public async Task Crear_con_categoria_invalida_devuelve_400_con_forma_uniforme()
     {
         var resp = await _fx.Client("Admin").PostJson("/api/servicios-conexos",
-            new { nombre = $"Cat {Guid.NewGuid():N}", categoria = "opcional" });
+            PayloadValido($"CAT_{Guid.NewGuid():N}"[..20], categoria: "opcional"));
         Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
         var err = await resp.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal("CATEGORIA_INVALIDA", err.GetProperty("code").GetString());
@@ -77,7 +87,7 @@ public class clsServiciosConexosTests
     [Fact]
     public async Task Editar_id_inexistente_devuelve_404()
     {
-        var resp = await _fx.Client("Admin").PatchJson($"/api/servicios-conexos/{Guid.NewGuid()}", new { valorBase = 99 });
+        var resp = await _fx.Client("Admin").PatchJson($"/api/servicios-conexos/{Guid.NewGuid()}", new { costoUnitario = 99 });
         Assert.Equal(HttpStatusCode.NotFound, resp.StatusCode);
         Assert.Equal("SERVICIO_NO_ENCONTRADO", await resp.ErrorCode());
     }
@@ -86,16 +96,16 @@ public class clsServiciosConexosTests
     [Fact] // permiso: el coordinador NO puede gestionar el catálogo -> 403
     public async Task Crear_con_rol_no_autorizado_devuelve_403()
     {
-        var resp = await _fx.Client("CoordinadorFletes").PostJson("/api/servicios-conexos", new { nombre = "X" });
+        var resp = await _fx.Client("CoordinadorFletes").PostJson("/api/servicios-conexos", PayloadValido("X"));
         Assert.Equal(HttpStatusCode.Forbidden, resp.StatusCode);
     }
 
-    [Fact] // nombre duplicado -> 409
+    [Fact] // misma combinación de las 6 dimensiones -> 409
     public async Task Crear_servicio_duplicado_devuelve_409()
     {
-        var nombre = $"Dup {Guid.NewGuid():N}";
-        await _fx.Client("Admin").PostJson("/api/servicios-conexos", new { nombre });
-        var resp = await _fx.Client("Admin").PostJson("/api/servicios-conexos", new { nombre });
+        var codigo = $"DUP_{Guid.NewGuid():N}"[..20];
+        await _fx.Client("Admin").PostJson("/api/servicios-conexos", PayloadValido(codigo));
+        var resp = await _fx.Client("Admin").PostJson("/api/servicios-conexos", PayloadValido(codigo));
         Assert.Equal(HttpStatusCode.Conflict, resp.StatusCode);
         Assert.Equal("SERVICIO_DUPLICADO", await resp.ErrorCode());
     }
@@ -103,12 +113,13 @@ public class clsServiciosConexosTests
     [Fact] // PATCH parcial: solo actualiza los campos enviados
     public async Task Editar_parcial_actualiza_solo_lo_enviado()
     {
-        var crear = await _fx.Client("Admin").PostJson("/api/servicios-conexos", new { nombre = $"Edit {Guid.NewGuid():N}", valorBase = 100 });
+        var crear = await _fx.Client("Admin").PostJson("/api/servicios-conexos", PayloadValido($"EDIT_{Guid.NewGuid():N}"[..20], costo: 100));
         var id = (await crear.Json()).GetProperty("id").GetGuid();
         var resp = await _fx.Client("Admin").PatchJson($"/api/servicios-conexos/{id}", new { activo = false });
         Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
         var dto = await resp.Json();
         Assert.False(dto.GetProperty("activo").GetBoolean());
-        Assert.Equal(100, dto.GetProperty("valorBase").GetDecimal()); // se conservó
+        Assert.Equal(100, dto.GetProperty("costoUnitario").GetDecimal()); // se conservó
     }
 }
+

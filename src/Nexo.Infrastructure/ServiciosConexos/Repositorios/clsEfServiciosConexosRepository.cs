@@ -46,18 +46,23 @@ public sealed class clsEfServiciosConexosRepository(clsNexoDbContext db) : IServ
         if (!string.IsNullOrWhiteSpace(q))
         {
             var t = q.Trim();
-            query = query.Where(s => EF.Functions.Like(s.Nombre, $"%{t}%"));
+            query = query.Where(s => EF.Functions.Like(s.TipoServicio, $"%{t}%") || EF.Functions.Like(s.CodigoServicio, $"%{t}%"));
         }
 
         var total = await query.CountAsync(ct);
-        var items = await query.OrderBy(s => s.Nombre)
+        var items = await query.OrderBy(s => s.TipoServicio).ThenBy(s => s.Origen)
             .Skip(Math.Max(0, (page - 1) * pageSize)).Take(pageSize)
             .ToListAsync(ct);
         return new clsPaginaServiciosDto(items.Select(s => s.ToDto()).ToList(), total);
     }
 
-    public Task<bool> ExisteNombreAsync(string nombre, CancellationToken ct) =>
-        db.ServiciosConexos.AnyAsync(s => s.Nombre == nombre, ct);
+    public Task<bool> ExisteDimensionesAsync(
+        string codigoServicio, string origen, string destino, string puerto, string ruta, string tipoMaquina,
+        Guid? excluirId, CancellationToken ct) =>
+        db.ServiciosConexos.AnyAsync(s =>
+            s.CodigoServicio == codigoServicio && s.Origen == origen && s.Destino == destino &&
+            s.Puerto == puerto && s.Ruta == ruta && s.TipoMaquina == tipoMaquina &&
+            (excluirId == null || s.Id != excluirId), ct);
 
     public void Agregar(clsServicioConexo servicio)
     {
@@ -65,7 +70,7 @@ public sealed class clsEfServiciosConexosRepository(clsNexoDbContext db) : IServ
         db.AuditLogs.Add(new clsAuditLog
         {
             UsuarioId = servicio.ActualizadoPor, Entidad = "servicios_conexos", EntidadId = servicio.Id,
-            Accion = "crear", Diff = $"{{\"nombre\":\"{servicio.Nombre}\"}}",
+            Accion = "crear", Diff = $"{{\"codigoServicio\":\"{servicio.CodigoServicio}\",\"tipoServicio\":\"{servicio.TipoServicio}\"}}",
         });
     }
 
@@ -90,52 +95,88 @@ public sealed class clsEfServiciosConexosRepository(clsNexoDbContext db) : IServ
             var filas = usado.RowsUsed().ToList();
             static string Txt(IXLRangeRow r, int c) => c > 0 ? r.Cell(c).GetString().Trim() : "";
 
-            // Mapeo de columnas por encabezado. Si la primera fila no parece encabezado, se
-            // asume Nombre | Valor base | Vigente hasta en las 3 primeras columnas.
-            int cNombre = 1, cValor = 2, cVigente = 3, cCategoria = 0, cActivo = 0, primeraDataIdx = 0;
+            // Mapeo de columnas por encabezado (S4-HU-15.1/#223: plantilla única con las 13
+            // columnas de negocio; las dimensiones que no apliquen al servicio de una fila se
+            // dejan vacías y se normalizan a "NO APLICA"). Si la primera fila no parece
+            // encabezado, se asume Codigo | Tipo | Costo en las 3 primeras columnas.
+            int cCodigo = 1, cTipo = 2, cCosto = 3, cOrigen = 0, cDestino = 0, cPuerto = 0, cRuta = 0,
+                cMaquina = 0, cUnidad = 0, cVigencia = 0, cCategoria = 0, cActivo = 0, primeraDataIdx = 0;
             var cols = usado.ColumnCount();
             var enc = filas.First();
             string H(int c) => clsTexto.Normalizar(Txt(enc, c));
             bool pareceEncabezado = Enumerable.Range(1, cols).Select(H)
-                .Any(h => h.Contains("NOMBRE") || h.Contains("SERVICIO") || h.Contains("VALOR") || h.Contains("VIGEN") || h.Contains("CATEGOR") || h.Contains("ESTADO") || h.Contains("ACTIVO"));
+                .Any(h => h.Contains("CODIGO") || h.Contains("TIPO SERVICIO") || h.Contains("COSTO") || h.Contains("VIGEN"));
             if (pareceEncabezado)
             {
                 for (var c = 1; c <= cols; c++)
                 {
                     var h = H(c);
-                    if (h.Contains("NOMBRE") || h.Contains("SERVICIO")) cNombre = c;
-                    else if (h.Contains("VALOR")) cValor = c;
-                    else if (h.Contains("VIGEN")) cVigente = c;
+                    if (h.Contains("CODIGO")) cCodigo = c;
+                    else if (h.Contains("TIPO SERVICIO") || h.Contains("SERVICIO")) cTipo = c;
+                    else if (h.Contains("ORIGEN")) cOrigen = c;
+                    else if (h.Contains("DESTINO")) cDestino = c;
+                    else if (h.Contains("PUERTO")) cPuerto = c;
+                    else if (h.Contains("RUTA")) cRuta = c;
+                    else if (h.Contains("MAQUINA") || h.Contains("MÁQUINA")) cMaquina = c;
+                    else if (h.Contains("COSTO") || h.Contains("VALOR")) cCosto = c;
+                    else if (h.Contains("UNIDAD")) cUnidad = c;
+                    else if (h.Contains("VIGEN")) cVigencia = c;
                     else if (h.Contains("CATEGOR")) cCategoria = c;
                     else if (h.Contains("ACTIVO") || h.Contains("ESTADO")) cActivo = c;
                 }
                 primeraDataIdx = 1;
             }
 
-            // Nombres ya existentes (para no duplicar; el HashSet también detecta repetidos en el archivo).
-            var nombres = (await db.ServiciosConexos.AsNoTracking().Select(s => s.Nombre).ToListAsync(ct))
-                .Select(n => n.Trim().ToUpperInvariant()).ToHashSet();
+            // Claves ya existentes en BD (6 dimensiones); el HashSet también detecta
+            // duplicados DENTRO del archivo.
+            var existentes = (await db.ServiciosConexos.AsNoTracking()
+                    .Select(s => new { s.CodigoServicio, s.Origen, s.Destino, s.Puerto, s.Ruta, s.TipoMaquina })
+                    .ToListAsync(ct))
+                .Select(s => $"{s.CodigoServicio}|{s.Origen}|{s.Destino}|{s.Puerto}|{s.Ruta}|{s.TipoMaquina}")
+                .ToHashSet();
 
             int leidas = 0, creadas = 0, duplicadas = 0, invalidas = 0;
             var nuevos = new List<clsServicioConexo>();
 
             foreach (var fila in filas.Skip(primeraDataIdx))
             {
-                var nombre = Txt(fila, cNombre);
-                var valorTxt = Txt(fila, cValor);
-                if (nombre.Length == 0 && valorTxt.Length == 0) continue; // fila vacía
+                var codigo = Txt(fila, cCodigo);
+                var tipo = Txt(fila, cTipo);
+                var costoTxt = Txt(fila, cCosto);
+                if (codigo.Length == 0 && tipo.Length == 0 && costoTxt.Length == 0) continue; // fila vacía
                 leidas++;
-                if (nombre.Length == 0) { invalidas++; continue; }
-                if (!nombres.Add(nombre.ToUpperInvariant())) { duplicadas++; continue; }
+
+                var costo = LeerDecimal(fila.Cell(cCosto));
+                var unidad = cUnidad > 0 ? Txt(fila, cUnidad) : "";
+                if (codigo.Length == 0 || tipo.Length == 0 || costo is null || unidad.Length == 0)
+                { invalidas++; continue; }
+
+                var origen = NoVacio(cOrigen > 0 ? Txt(fila, cOrigen) : null);
+                var destino = NoVacio(cDestino > 0 ? Txt(fila, cDestino) : null);
+                var puerto = NoVacio(cPuerto > 0 ? Txt(fila, cPuerto) : null);
+                var ruta = NoVacio(cRuta > 0 ? Txt(fila, cRuta) : null);
+                var maquina = NoVacio(cMaquina > 0 ? Txt(fila, cMaquina) : null);
+
+                var clave = $"{codigo}|{origen}|{destino}|{puerto}|{ruta}|{maquina}";
+                if (!existentes.Add(clave)) { duplicadas++; continue; }
 
                 var categoria = cCategoria > 0 ? Txt(fila, cCategoria) : "";
                 var activoTxt = cActivo > 0 ? clsTexto.Normalizar(Txt(fila, cActivo)) : "";
+                var vigencia = cVigencia > 0 ? LeerFecha(fila.Cell(cVigencia)) : null;
+
                 nuevos.Add(new clsServicioConexo
                 {
-                    Nombre = nombre,
+                    CodigoServicio = codigo,
+                    TipoServicio = tipo,
+                    Origen = origen,
+                    Destino = destino,
+                    Puerto = puerto,
+                    Ruta = ruta,
+                    TipoMaquina = maquina,
+                    CostoUnitario = costo.Value,
+                    Unidad = unidad,
+                    Vigencia = vigencia ?? DateOnly.FromDateTime(DateTime.UtcNow),
                     Categoria = clsServicioConexoCategoria.Normalizada(categoria),
-                    ValorBase = LeerDecimal(fila.Cell(cValor)),
-                    VigenteHasta = cVigente > 0 ? LeerFecha(fila.Cell(cVigente)) : null,
                     // Activo por defecto; solo "no"/"inactivo"/"false"/"0" lo desactiva.
                     Activo = !(activoTxt is "NO" or "INACTIVO" or "FALSE" or "0"),
                     ActualizadoPor = usuarioId,
@@ -156,6 +197,9 @@ public sealed class clsEfServiciosConexosRepository(clsNexoDbContext db) : IServ
             return new clsImportarServiciosResultDto(leidas, creadas, duplicadas, invalidas);
         }
     }
+
+    private static string NoVacio(string? dimension) =>
+        string.IsNullOrWhiteSpace(dimension) ? clsServicioConexo.NoAplica : dimension.Trim();
 
     /// <summary>Lee un valor decimal de una celda: numérica nativa (valor exacto) o texto
     /// ("$ 780.077", "1.250.000,50", "1500.50"), vía <see cref="clsImporteParser"/>.</summary>

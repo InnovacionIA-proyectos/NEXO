@@ -93,16 +93,24 @@ public static class clsDataSeeder
         db.ConfiguracionesVehiculo.AddRange(configs);
 
         // ----------------------------------------------------------------- Servicios conexos (10)
-        var sCargue = new clsServicioConexo { Nombre = "Cargue", ReglaCobro = "{\"tipo\":\"por_tonelada\",\"valor\":12000}", ValorBase = 12000m, VigenteHasta = new DateOnly(2026, 12, 31), ActualizadoPorUsuario = sl1 };
-        var sDescargue = new clsServicioConexo { Nombre = "Descargue", ReglaCobro = "{\"tipo\":\"por_tonelada\",\"valor\":12000}", ValorBase = 12000m, VigenteHasta = new DateOnly(2026, 12, 31), ActualizadoPorUsuario = sl1 };
-        var sStandby = new clsServicioConexo { Nombre = "Stand-by", ReglaCobro = "{\"tipo\":\"por_hora\",\"valor\":45000}", ValorBase = 45000m, VigenteHasta = new DateOnly(2026, 12, 31), ActualizadoPorUsuario = sl1 };
-        var sCandado = new clsServicioConexo { Nombre = "Candado satelital", ReglaCobro = "{\"tipo\":\"fijo\",\"valor\":85000}", ValorBase = 85000m, VigenteHasta = new DateOnly(2026, 12, 31), ActualizadoPorUsuario = sl2 };
-        var sAlmac = new clsServicioConexo { Nombre = "Almacenamiento", ReglaCobro = "{\"tipo\":\"por_dia_m2\",\"valor\":3500}", ValorBase = 3500m, VigenteHasta = new DateOnly(2026, 12, 31), ActualizadoPorUsuario = sl2 };
-        var sMultipunto = new clsServicioConexo { Nombre = "Distribución multipunto", ReglaCobro = "{\"tipo\":\"por_punto\",\"valor\":60000}", ValorBase = 60000m, VigenteHasta = new DateOnly(2026, 12, 31), ActualizadoPorUsuario = sl1 };
-        var sItr = new clsServicioConexo { Nombre = "ITR", ReglaCobro = "{\"tipo\":\"fijo\",\"valor\":120000}", ValorBase = 120000m, VigenteHasta = new DateOnly(2026, 9, 30), ActualizadoPorUsuario = sl1 };
-        var sEscolta = new clsServicioConexo { Nombre = "Escolta", ReglaCobro = "{\"tipo\":\"por_viaje\",\"valor\":900000}", ValorBase = 900000m, VigenteHasta = new DateOnly(2026, 6, 30), ActualizadoPorUsuario = sl2 }; // edge: por vencer
-        var sReexp = new clsServicioConexo { Nombre = "Reexpedición", ReglaCobro = "{\"tipo\":\"por_viaje\",\"valor\":250000}", ValorBase = 250000m, VigenteHasta = new DateOnly(2026, 3, 31), ActualizadoPorUsuario = sl1 }; // edge: vencida
-        var sMonta = new clsServicioConexo { Nombre = "Montacargas", ValorBase = 70000m, Activo = false, ActualizadoPorUsuario = sl2 }; // edge: inactivo y regla nula
+        // Reestructurado en #223 (S4-HU-15.1): estos 10 son la variante "valor único" (sin
+        // dimensión de ciudad/ruta/puerto, Origen/Destino/Puerto/Ruta/TipoMaquina = NoAplica).
+        clsServicioConexo ServicioValorUnico(string codigo, decimal costo, DateOnly vigencia, clsUsuario actualizador, bool activo = true) =>
+            new()
+            {
+                CodigoServicio = codigo, TipoServicio = codigo, CostoUnitario = costo, Unidad = "Por unidad",
+                Vigencia = vigencia, Activo = activo, ActualizadoPorUsuario = actualizador,
+            };
+        var sCargue = ServicioValorUnico("Cargue", 12000m, new DateOnly(2026, 12, 31), sl1);
+        var sDescargue = ServicioValorUnico("Descargue", 12000m, new DateOnly(2026, 12, 31), sl1);
+        var sStandby = ServicioValorUnico("Stand-by", 45000m, new DateOnly(2026, 12, 31), sl1);
+        var sCandado = ServicioValorUnico("Candado satelital", 85000m, new DateOnly(2026, 12, 31), sl2);
+        var sAlmac = ServicioValorUnico("Almacenamiento", 3500m, new DateOnly(2026, 12, 31), sl2);
+        var sMultipunto = ServicioValorUnico("Distribución multipunto", 60000m, new DateOnly(2026, 12, 31), sl1);
+        var sItr = ServicioValorUnico("ITR", 120000m, new DateOnly(2026, 9, 30), sl1);
+        var sEscolta = ServicioValorUnico("Escolta", 900000m, new DateOnly(2026, 6, 30), sl2); // edge: por vencer
+        var sReexp = ServicioValorUnico("Reexpedición", 250000m, new DateOnly(2026, 3, 31), sl1); // edge: vencida
+        var sMonta = ServicioValorUnico("Montacargas", 70000m, new DateOnly(2026, 12, 31), sl2, activo: false); // edge: inactivo
         db.ServiciosConexos.AddRange(sCargue, sDescargue, sStandby, sCandado, sAlmac, sMultipunto, sItr, sEscolta, sReexp, sMonta);
 
         // ----------------------------------------------------------------- Solicitudes + líneas (17)

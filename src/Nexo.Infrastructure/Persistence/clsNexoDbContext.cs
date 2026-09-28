@@ -250,9 +250,18 @@ public class clsNexoDbContext : DbContext
         b.Entity<clsServicioConexo>(e =>
         {
             e.ToTable("tbl_servicios_conexos");
-            e.Property(x => x.ValorBase).HasColumnType("decimal(18,2)");
+            e.Property(x => x.CostoUnitario).HasColumnType("decimal(18,2)");
+            e.Property(x => x.Origen).HasDefaultValue(clsServicioConexo.NoAplica);
+            e.Property(x => x.Destino).HasDefaultValue(clsServicioConexo.NoAplica);
+            e.Property(x => x.Puerto).HasDefaultValue(clsServicioConexo.NoAplica);
+            e.Property(x => x.Ruta).HasDefaultValue(clsServicioConexo.NoAplica);
+            e.Property(x => x.TipoMaquina).HasDefaultValue(clsServicioConexo.NoAplica);
             e.Property(x => x.Activo).HasDefaultValue(true);
-            e.Property(x => x.RowVersion).IsRowVersion();
+            // Única real (S4-HU-15/#223): un mismo CodigoServicio puede repetirse con
+            // dimensiones distintas (Almacenamiento en dos ciudades), nunca la misma
+            // combinación completa.
+            e.HasIndex(x => new { x.CodigoServicio, x.Origen, x.Destino, x.Puerto, x.Ruta, x.TipoMaquina }).IsUnique();
+            e.HasIndex(x => x.CodigoServicio);
             e.HasOne(x => x.ActualizadoPorUsuario)
              .WithMany()
              .HasForeignKey(x => x.ActualizadoPor)

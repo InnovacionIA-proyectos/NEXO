@@ -20,6 +20,6 @@ public static class clsCotizacionDtoMappers
                 l.Id, l.LineaSolicitudId, l.ValorFlete, l.Fuente,
                 l.ValorAprovisionamiento, l.ValorRetornoContenedor)).ToList(),
             c.Conexos.Select(x => new clsCotizacionConexoDto(
-                x.Id, x.ServicioConexoId, x.clsServicioConexo?.Nombre,
+                x.Id, x.ServicioConexoId, x.clsServicioConexo?.TipoServicio,
                 x.clsServicioConexo?.Categoria ?? "logistico", x.Cantidad, x.ValorAplicado)).ToList());
 }
