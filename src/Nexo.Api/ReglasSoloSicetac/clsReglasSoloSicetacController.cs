@@ -23,7 +23,8 @@ public class clsReglasSoloSicetacController(
     IQueryHandler<clsListarReglasSoloSicetacQuery, IReadOnlyList<clsReglaSoloSicetacDto>> listar,
     ICommandHandler<clsCrearReglaSoloSicetacCommand, clsReglaSoloSicetacDto> crear,
     ICommandHandler<clsEliminarReglaSoloSicetacCommand, bool> eliminar,
-    ICommandHandler<clsImportarReglasSoloSicetacExcelCommand, clsImportarReglasResultDto> importarExcel)
+    ICommandHandler<clsImportarReglasSoloSicetacExcelCommand, clsImportarReglasResultDto> importarExcel,
+    IQueryHandler<clsObtenerPlantillaReglasSoloSicetacQuery, clsArchivoDto> plantillaExcel)
     : ControllerBase
 {
     /// <summary>Lista todas las rutas "solo SICE-TAC" demarcadas.</summary>
@@ -63,5 +64,14 @@ public class clsReglasSoloSicetacController(
     {
         await using var stream = clsExcelUpload.AbrirValidado(archivo);
         return Ok(await importarExcel.Handle(new clsImportarReglasSoloSicetacExcelCommand(stream), ct));
+    }
+
+    /// <summary>Plantilla Excel descargable para la carga masiva (columnas Origen, Destino, Tipo de vehículo).</summary>
+    [HttpGet("plantilla-excel")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> PlantillaExcel(CancellationToken ct = default)
+    {
+        var archivo = await plantillaExcel.Handle(new clsObtenerPlantillaReglasSoloSicetacQuery(), ct);
+        return File(archivo.Contenido, archivo.ContentType, archivo.NombreArchivo);
     }
 }

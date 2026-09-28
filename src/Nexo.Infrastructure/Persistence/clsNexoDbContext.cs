@@ -43,6 +43,8 @@ public class clsNexoDbContext : DbContext
     public DbSet<clsItemPlanCargue> ItemsPlanCargue => Set<clsItemPlanCargue>();
     public DbSet<clsColocacionCargue> ColocacionesCargue => Set<clsColocacionCargue>();
     public DbSet<clsMunicipio> Municipios => Set<clsMunicipio>();
+    public DbSet<clsRangoPeso> RangosPeso => Set<clsRangoPeso>();
+    public DbSet<clsTarifaPlaza> TarifasPlaza => Set<clsTarifaPlaza>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -377,6 +379,30 @@ public class clsNexoDbContext : DbContext
             // el país sí es única.
             e.HasIndex(x => new { x.CodigoDane, x.Pais }).IsUnique();
             e.HasIndex(x => x.NombreTarifasPlaza);
+        });
+
+        // tbl_pesos/tbl_tarifas_plaza (+ tbl_tarifas_plaza_historico, no mapeada: la
+        // llena solo un trigger de BD) creadas y pobladas a mano en S4-HU-10.1 —
+        // mismo criterio "sin migración de EF Core" que tbl_municipios.
+        b.Entity<clsRangoPeso>(e =>
+        {
+            e.ToTable("tbl_pesos");
+            e.Property(x => x.Id).ValueGeneratedOnAdd();
+            e.HasIndex(x => new { x.PesoMinimo, x.PesoMaximo }).IsUnique();
+        });
+
+        b.Entity<clsTarifaPlaza>(e =>
+        {
+            // UseSqlOutputClause(false): tbl_tarifas_plaza tiene un trigger (histórico de
+            // vigencia) y SQL Server prohíbe combinar la cláusula OUTPUT (la que usa EF Core
+            // por defecto para leer valores generados) con triggers en la misma tabla —
+            // sin esto, cualquier INSERT/UPDATE lanza "the target table has database
+            // triggers" (confirmado con datos reales al verificar esta issue).
+            e.ToTable("tbl_tarifas_plaza", tb => tb.UseSqlOutputClause(false));
+            e.HasIndex(x => new { x.LineaNegocio, x.ClaseViaje, x.OrigenMunicipioId, x.DestinoMunicipioId, x.ClaseContenedor, x.PesoId, x.TipoVehiculo }).IsUnique();
+            e.HasOne(x => x.Origen).WithMany().HasForeignKey(x => x.OrigenMunicipioId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Destino).WithMany().HasForeignKey(x => x.DestinoMunicipioId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Peso).WithMany().HasForeignKey(x => x.PesoId).OnDelete(DeleteBehavior.Restrict);
         });
 
         b.Entity<clsParametrosScore>(e =>
