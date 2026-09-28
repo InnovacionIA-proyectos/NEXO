@@ -312,7 +312,7 @@ Llave natural única: `(Periodo, OrigenDane, DestinoDane, Configuracion, TipoCar
 | `CotizacionId` | Guid | No | FK → `cotizaciones` (cascada) |
 | `ServicioConexoId` | Guid | Sí | FK → `servicios_conexos` |
 | `Cantidad` | decimal | No | Toneladas, horas, puntos, etc. según la regla del servicio |
-| `ValorAplicado` | decimal | No | `ValorBase × Cantidad`, o valor manual si se especifica |
+| `ValorAplicado` | decimal | No | `CostoUnitario × Cantidad` (antes `ValorBase`), o valor manual si se especifica |
 | `CreatedAt`/`UpdatedAt` | fecha | No | Auditoría estándar |
 
 **FK:** `CotizacionId` → `cotizaciones` (**Cascade**), `ServicioConexoId` → `servicios_conexos` (`Restrict`).

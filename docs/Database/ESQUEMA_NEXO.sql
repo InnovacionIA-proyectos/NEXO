@@ -306,7 +306,7 @@ CREATE TABLE [db_NEXO].[tbl_cotizacion_lineas] (
 );
 
 -- Servicio conexo aplicado a una cotización, con la cantidad y el valor que
--- realmente se cobró (puede diferir del ValorBase del catálogo).
+-- realmente se cobró (puede diferir del CostoUnitario del catálogo).
 CREATE TABLE [db_NEXO].[tbl_cotizacion_conexos] (
     [Id] uniqueidentifier NOT NULL,
     [CotizacionId] uniqueidentifier NOT NULL,
