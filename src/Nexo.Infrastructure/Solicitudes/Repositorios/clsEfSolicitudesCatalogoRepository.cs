@@ -37,9 +37,13 @@ public sealed class clsEfSolicitudesCatalogoRepository(clsNexoDbContext db) : IS
             .FirstOrDefaultAsync(x => x.Id == id, ct);
 
     public async Task<IReadOnlyList<clsBandejaFilaRaw>> BandejaFilasAsync(
-        string? atencion, EstadoSolicitud? estado, DateTimeOffset? desde, DateTimeOffset? hasta, CancellationToken ct)
+        string? atencion, EstadoSolicitud? estado, DateTimeOffset? desde, DateTimeOffset? hasta,
+        Guid? creadoPor, CancellationToken ct)
     {
         var q = db.Solicitudes.AsNoTracking().AsQueryable();
+
+        // Aislamiento por comercial (issue #199): null para los roles que ven todo.
+        if (creadoPor is { } cp) q = q.Where(s => s.CreadoPor == cp);
 
         if (estado is { } e)
             q = q.Where(s => s.Estado == e);

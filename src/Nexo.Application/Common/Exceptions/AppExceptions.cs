@@ -34,3 +34,6 @@ public class clsConflictException(string code, string message) : clsAppException
 
 /// <summary>Una dependencia externa no está configurada o no responde (Api la traduce a 503).</summary>
 public class clsServiceUnavailableException(string code, string message) : clsAppException(code, message);
+
+/// <summary>El usuario autenticado no es dueño del recurso (Api la traduce a 403).</summary>
+public class clsForbiddenException(string code, string message) : clsAppException(code, message);
