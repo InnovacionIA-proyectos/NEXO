@@ -13,17 +13,23 @@
 -- esquema, cambie esa variable — no hace falta tocar este archivo ni el código,
 -- solo reemplazar mentalmente "db_NEXO" por el valor configurado al leer este DDL.
 --
--- Este archivo es DOCUMENTACIÓN, no la fuente de la verdad: refleja el esquema
--- final consolidado en la migración InitialCreate (ver
--- src/Nexo.Infrastructure/Persistence/Migrations/) — una sola migración
--- estructural, sin datos, pensada para que producción arranque desde cero.
--- Cualquier cambio de esquema se hace en las migraciones EF Core (dotnet ef
--- migrations add), nunca editando la BD a mano ni este archivo.
+-- Este archivo ES la fuente de la verdad del esquema — este proyecto NO usa
+-- migraciones de EF Core. Para crear la base la primera vez (producción o
+-- cualquier ambiente nuevo), correr este script completo, de una sola pasada,
+-- contra una base vacía. Cualquier cambio de esquema se hace editando
+-- directamente este archivo (y aplicándolo a mano contra cada base existente),
+-- nunca con `dotnet ef migrations add` — no hay carpeta Migrations en el
+-- proyecto. Después de crear el esquema, ver docs/Database/seeder/README.md
+-- para los catálogos que hay que poblar con datos ya calculados (tampoco por
+-- migración).
 --
 -- Orden: 1) tablas agrupadas por módulo de negocio, cada una con un comentario
--- corto de su objetivo; 2) llaves foráneas; 3) índices. Las FK van aparte
--- porque varias tablas se referencian cruzado (p. ej. tbl_cotizaciones <->
--- tbl_tarifas_historicas) y así el orden de creación de las tablas no importa.
+-- corto de su objetivo; 2) llaves foráneas; 3) índices; 4) triggers. Las FK
+-- van aparte porque varias tablas se referencian cruzado (p. ej.
+-- tbl_cotizaciones <-> tbl_tarifas_historicas) y así el orden de creación de
+-- las tablas no importa. Los triggers van al final porque necesitan que sus
+-- tablas ya existan (SQL Server exige que `CREATE TRIGGER` sea la única
+-- sentencia de su lote — por eso llevan `GO` antes y después).
 -- =============================================================================
 
 -- =============================================================================
@@ -103,8 +109,8 @@ CREATE TABLE [db_NEXO].[tbl_configuraciones_vehiculo] (
 -- Poblada UNA SOLA VEZ desde tblSAPDANE/tblZonasTarificacionRelacion/
 -- tblSAPTarifas(Log) del datacenter corporativo — sin sincronización
 -- periódica, con un script de poblado aparte (no por migración de EF Core).
--- CodigoDane no es único por sí solo (choca entre Venezuela y Ecuador) — Id es autoincremental
--- a propósito, la llave natural real es (CodigoDane, Pais).
+-- CodigoDane no es único por sí solo (choca entre Venezuela y Ecuador) — Id
+-- es autoincremental a propósito, la llave natural real es (CodigoDane, Pais).
 CREATE TABLE [db_NEXO].[tbl_municipios] (
     [Id] int NOT NULL IDENTITY,
     [CodigoDane] nvarchar(20) NOT NULL,
@@ -114,6 +120,19 @@ CREATE TABLE [db_NEXO].[tbl_municipios] (
     [NombreTarifasPlaza] nvarchar(60) NULL,
     [ZonaTarificacion] nvarchar(60) NULL
     , CONSTRAINT [PK_municipios] PRIMARY KEY ([Id])
+);
+
+-- Catálogo CRUD propio de bandas de peso (kg) para el formulario de Tarifas de
+-- Plaza (S4-HU-10.1) — reemplaza el número libre del sistema externo. Poblada
+-- inicialmente con las 7 bandas de negocio vía docs/Database/seeder/pesos.csv
+-- (no por migración de EF Core). El CRUD (crear/editar/eliminar/listar) es
+-- trabajo pendiente de backend, no está en este repo todavía.
+-- PesoMaximo NULL = banda abierta (PBV +10500).
+CREATE TABLE [db_NEXO].[tbl_pesos] (
+    [Id] int NOT NULL IDENTITY,
+    [PesoMinimo] int NOT NULL,
+    [PesoMaximo] int NULL
+    , CONSTRAINT [PK_pesos] PRIMARY KEY ([Id])
 );
 
 -- Dimensiones/capacidad físicas reales de un vehículo, para el Plan de Cargue
@@ -343,6 +362,72 @@ CREATE TABLE [db_NEXO].[tbl_ajustes_vigencia_plaza] (
     [CreatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset()),
     [UpdatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset())
     , CONSTRAINT [PK_ajustes_vigencia_plaza] PRIMARY KEY ([Id])
+);
+
+-- Tarifa de plaza gobernada por Nexo (S4-HU-10.1) — recrea el formulario de
+-- captura que hoy vive en un sistema externo; NO es una copia de solo lectura
+-- de tblSAPTarifas (a diferencia de tbl_tarifas_sicetac).
+--
+-- Origen/Destino referencian el catálogo propio de municipios
+-- (tbl_municipios). RangoPeso (PesoId, catálogo tbl_pesos) y TipoVehiculo
+-- (código "2S2"/"3S3"/"C2", igual que clsConfiguracionVehiculo.TipoVehiculo)
+-- son dos dimensiones alternativas — contenedor por peso vs. tarifa nacional
+-- por tipo de vehículo (Turbo/Sencillo/Mini Mula/Mula) — una tarifa real usa
+-- solo una de las dos, por eso ambas son NULLABLE.
+--
+-- LineaNegocio/ClaseViaje/ClaseContenedor guardan el NOMBRE completo (no el
+-- ID) de su catálogo externo (tblSAPLineaNegocio/tblSAPClaseViaje/
+-- tblSAPClaseContenedor, dbSolucionesTI): ese ID no significa nada dentro de
+-- Nexo (otra base de datos, otro servidor, sin FK real posible), así que el
+-- nombre deja la fila legible sin consultar el catálogo externo.
+-- ClaseContenedor es NULL cuando la tarifa no es de contenedor (ej. carga
+-- suelta nacional).
+--
+-- Única por sus 7 dimensiones (línea de negocio + clase de viaje + origen +
+-- destino + clase de contenedor + rango de peso + tipo de vehículo);
+-- Valor/Vigencia/DetallesTarifa es lo que cambia con el tiempo para una misma
+-- combinación — ver tbl_tarifas_plaza_historico, que guarda cada valor
+-- anterior.
+CREATE TABLE [db_NEXO].[tbl_tarifas_plaza] (
+    [Id] uniqueidentifier NOT NULL,
+    [LineaNegocio] nvarchar(100) NOT NULL,
+    [ClaseViaje] nvarchar(50) NOT NULL,
+    [OrigenMunicipioId] int NOT NULL,
+    [DestinoMunicipioId] int NOT NULL,
+    [ClaseContenedor] nvarchar(50) NULL,
+    [PesoId] int NULL,
+    [TipoVehiculo] nvarchar(40) NULL,
+    [Valor] decimal(18,2) NOT NULL,
+    [Vigencia] date NOT NULL,
+    [DetallesTarifa] nvarchar(2000) NOT NULL,
+    [CreadoPor] uniqueidentifier NULL,
+    [CreatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset()),
+    [UpdatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset())
+    , CONSTRAINT [PK_tarifas_plaza] PRIMARY KEY ([Id])
+    , CONSTRAINT [UQ_tarifas_plaza_dimensiones] UNIQUE ([LineaNegocio], [ClaseViaje], [OrigenMunicipioId], [DestinoMunicipioId], [ClaseContenedor], [PesoId], [TipoVehiculo])
+);
+
+-- Snapshot del valor ANTERIOR de una tarifa de plaza, cada vez que se
+-- actualiza una fila de tbl_tarifas_plaza — igual que tblSAPTarifasLog es al
+-- tblSAPTarifas del sistema externo. La llena sola el trigger
+-- TRG_tarifas_plaza_historico (sección 4, TRIGGERS) — no se escribe a mano.
+CREATE TABLE [db_NEXO].[tbl_tarifas_plaza_historico] (
+    [Id] uniqueidentifier NOT NULL,
+    [TarifaPlazaId] uniqueidentifier NOT NULL,
+    [LineaNegocio] nvarchar(100) NOT NULL,
+    [ClaseViaje] nvarchar(50) NOT NULL,
+    [OrigenMunicipioId] int NOT NULL,
+    [DestinoMunicipioId] int NOT NULL,
+    [ClaseContenedor] nvarchar(50) NULL,
+    [PesoId] int NULL,
+    [TipoVehiculo] nvarchar(40) NULL,
+    [Valor] decimal(18,2) NOT NULL,
+    [Vigencia] date NOT NULL,
+    [DetallesTarifa] nvarchar(2000) NOT NULL,
+    [CreadoPor] uniqueidentifier NULL,
+    [CreatedAt] datetimeoffset NOT NULL,
+    [ReemplazadoAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset())
+    , CONSTRAINT [PK_tarifas_plaza_historico] PRIMARY KEY ([Id])
 );
 
 -- --- Priorización ------------------------------------------------------------------
@@ -588,6 +673,10 @@ ALTER TABLE [db_NEXO].[tbl_solicitudes] ADD CONSTRAINT [FK_solicitudes_usuarios_
 ALTER TABLE [db_NEXO].[tbl_tarifas_historicas] ADD CONSTRAINT [FK_tarifas_historicas_configuraciones_vehiculo_ConfigVehiculoId] FOREIGN KEY ([ConfigVehiculoId]) REFERENCES [db_NEXO].[tbl_configuraciones_vehiculo] ([Id]);
 ALTER TABLE [db_NEXO].[tbl_tarifas_historicas] ADD CONSTRAINT [FK_tarifas_historicas_cotizaciones_CotizacionId] FOREIGN KEY ([CotizacionId]) REFERENCES [db_NEXO].[tbl_cotizaciones] ([Id]);
 ALTER TABLE [db_NEXO].[tbl_tarifas_historicas] ADD CONSTRAINT [FK_tarifas_historicas_rutas_RutaId] FOREIGN KEY ([RutaId]) REFERENCES [db_NEXO].[tbl_rutas] ([Id]);
+ALTER TABLE [db_NEXO].[tbl_tarifas_plaza] ADD CONSTRAINT [FK_tarifas_plaza_municipios_OrigenMunicipioId] FOREIGN KEY ([OrigenMunicipioId]) REFERENCES [db_NEXO].[tbl_municipios] ([Id]);
+ALTER TABLE [db_NEXO].[tbl_tarifas_plaza] ADD CONSTRAINT [FK_tarifas_plaza_municipios_DestinoMunicipioId] FOREIGN KEY ([DestinoMunicipioId]) REFERENCES [db_NEXO].[tbl_municipios] ([Id]);
+ALTER TABLE [db_NEXO].[tbl_tarifas_plaza] ADD CONSTRAINT [FK_tarifas_plaza_pesos_PesoId] FOREIGN KEY ([PesoId]) REFERENCES [db_NEXO].[tbl_pesos] ([Id]);
+ALTER TABLE [db_NEXO].[tbl_tarifas_plaza_historico] ADD CONSTRAINT [FK_tarifas_plaza_historico_tarifas_plaza_TarifaPlazaId] FOREIGN KEY ([TarifaPlazaId]) REFERENCES [db_NEXO].[tbl_tarifas_plaza] ([Id]) ON DELETE CASCADE;
 
 -- =============================================================================
 -- 3. ÍNDICES
@@ -639,5 +728,45 @@ CREATE INDEX [IX_solicitudes_Estado_ScorePrioridad] ON [db_NEXO].[tbl_solicitude
 CREATE INDEX [IX_tarifas_historicas_ConfigVehiculoId] ON [db_NEXO].[tbl_tarifas_historicas] ([ConfigVehiculoId]);
 CREATE INDEX [IX_tarifas_historicas_CotizacionId] ON [db_NEXO].[tbl_tarifas_historicas] ([CotizacionId]);
 CREATE INDEX [IX_tarifas_historicas_RutaId_ConfigVehiculoId_Tipologia] ON [db_NEXO].[tbl_tarifas_historicas] ([RutaId], [ConfigVehiculoId], [Tipologia]);
+CREATE INDEX [IX_tarifas_plaza_OrigenMunicipioId] ON [db_NEXO].[tbl_tarifas_plaza] ([OrigenMunicipioId]);
+CREATE INDEX [IX_tarifas_plaza_DestinoMunicipioId] ON [db_NEXO].[tbl_tarifas_plaza] ([DestinoMunicipioId]);
+CREATE INDEX [IX_tarifas_plaza_PesoId] ON [db_NEXO].[tbl_tarifas_plaza] ([PesoId]);
+CREATE INDEX [IX_tarifas_plaza_historico_TarifaPlazaId] ON [db_NEXO].[tbl_tarifas_plaza_historico] ([TarifaPlazaId]);
 CREATE UNIQUE INDEX [IX_usuarios_Email] ON [db_NEXO].[tbl_usuarios] ([Email]);
 CREATE UNIQUE INDEX [IX_usuarios_IdentidadPortalId] ON [db_NEXO].[tbl_usuarios] ([IdentidadPortalId]) WHERE ([IdentidadPortalId] IS NOT NULL);
+
+-- =============================================================================
+-- 4. TRIGGERS
+-- =============================================================================
+
+GO
+
+-- Cada vez que se actualiza el Valor, la Vigencia o los DetallesTarifa de una
+-- fila de tbl_tarifas_plaza, archiva el valor ANTERIOR completo (todas sus
+-- dimensiones) en tbl_tarifas_plaza_historico antes de perderlo. No dispara en un
+-- UPDATE que no toque esas 3 columnas (ej. si algo más las vuelve a guardar
+-- igual). Soporta actualizar varias filas en una sola sentencia (opera sobre
+-- toda la pseudo-tabla "deleted", no fila por fila).
+CREATE TRIGGER [db_NEXO].[TRG_tarifas_plaza_historico]
+ON [db_NEXO].[tbl_tarifas_plaza]
+AFTER UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    IF NOT (UPDATE(Valor) OR UPDATE(Vigencia) OR UPDATE(DetallesTarifa))
+        RETURN;
+
+    INSERT INTO [db_NEXO].[tbl_tarifas_plaza_historico] (
+        [Id], [TarifaPlazaId], [LineaNegocio], [ClaseViaje], [OrigenMunicipioId],
+        [DestinoMunicipioId], [ClaseContenedor], [PesoId], [TipoVehiculo], [Valor],
+        [Vigencia], [DetallesTarifa], [CreadoPor], [CreatedAt], [ReemplazadoAt]
+    )
+    SELECT
+        NEWID(), d.[Id], d.[LineaNegocio], d.[ClaseViaje], d.[OrigenMunicipioId],
+        d.[DestinoMunicipioId], d.[ClaseContenedor], d.[PesoId], d.[TipoVehiculo], d.[Valor],
+        d.[Vigencia], d.[DetallesTarifa], d.[CreadoPor], d.[CreatedAt], sysdatetimeoffset()
+    FROM deleted d;
+END;
+
+GO

@@ -1,0 +1,18 @@
+Tabla,Unidad,PesoMaximoKgConTara,CategoriaVehiculo,Valor
+interno,X20,8500,RIGIDO,X
+interno,X20,14000,2S2,X
+interno,X20,20000,2S3,X
+interno,X20,30000,3S3,X
+interno,X40,18000,2S2,X
+interno,X40,22000,2S3,X
+interno,X40,34000,3S3,X
+sicetac,X20,8500,RIGIDO,Sice Camion PBV mas de 10500 kg
+sicetac,X20,14000,2S2,Sice MM 2S2
+sicetac,X20,20000,3S2,Flete Sice Tmula 3S2
+sicetac,X20,26000,3S3,Sice Tmula 3S3
+sicetac,X20,30000,3S3,Sice Tmula 3S3 Yunque
+sicetac,X20,32000,3S3,Sice Tmula 3S3 ExtraYunque+Diferencial segun la ruta
+sicetac,X40,18000,2S2,Sice MM 2S2
+sicetac,X40,20000,2S3,Flete Sice Poderosa 2S3
+sicetac,X40,22000,3S2,Flete Sice Tmula 3S2
+sicetac,X40,34000,3S3,Sice Tmula 3S3
