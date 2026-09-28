@@ -105,45 +105,6 @@ public static class clsDataSeeder
         var sMonta = new clsServicioConexo { Nombre = "Montacargas", ValorBase = 70000m, Activo = false, ActualizadoPorUsuario = sl2 }; // edge: inactivo y regla nula
         db.ServiciosConexos.AddRange(sCargue, sDescargue, sStandby, sCandado, sAlmac, sMultipunto, sItr, sEscolta, sReexp, sMonta);
 
-        // ----------------------------------------------------------------- Tarifas SICE-TAC (12)
-        clsTarifaSicetac Sice(int periodo, clsRuta ruta, string oDane, string dDane, string config, string tipo, string unidad,
-            CondicionCarga cond, decimal valor, decimal? valorHora, decimal? horasPact, decimal? horasRec, bool via) => new()
-        {
-            Periodo = periodo,
-            clsRuta = ruta,
-            OrigenDane = oDane,
-            DestinoDane = dDane,
-            NombreRuta = $"{ruta.Origen} - {ruta.Destino}".ToUpperInvariant(),
-            Configuracion = config,
-            TipoCarga = tipo,
-            UnidadTransporte = unidad,
-            CondicionCarga = cond,
-            ValorPiso = valor,
-            ValorHora = valorHora,
-            HorasPactadas = horasPact,
-            HorasRecorrido = horasRec,
-            ValorSiceHora = valorHora.HasValue && horasPact.HasValue ? valor + valorHora.Value * horasPact.Value : null,
-            ViaEstandar = via,
-            FechaCreacionSice = new DateTimeOffset(2026, 6, 1, 9, 16, 0, TimeSpan.Zero),
-        };
-
-        var sicetac = new[]
-        {
-            Sice(202606, r1, "66170000", "05615000", "2L2", "General", "Estibas", CondicionCarga.Cargado, 995457m, 40112m, 8m, 6.38m, true),
-            Sice(202606, r1, "66170000", "05615000", "2L2", "Sin carga", "Furgón", CondicionCarga.Vacio, 788496m, null, null, 5.19m, true), // edge: vacío, sin valor hora
-            Sice(202606, r1, "66170000", "05615000", "2L1", "Granel Sólido", "Estacas", CondicionCarga.Cargado, 1046361m, 44306m, 8m, 6.38m, true),
-            Sice(202606, r1, "66170000", "05615000", "3S3", "Carga Refrigerada", "Furgón Refrigerado", CondicionCarga.Cargado, 2280098m, 92437m, 8m, 8.13m, true),
-            Sice(202605, r1, "66170000", "05615000", "2L2", "General", "Estibas", CondicionCarga.Cargado, 980000m, 39500m, 8m, 6.38m, true), // edge: periodo anterior (vencida)
-            Sice(202606, r2, "05001000", "11001000", "3S2", "General", "Estibas", CondicionCarga.Cargado, 1850000m, 60000m, 10m, 9.20m, true),
-            Sice(202606, r2, "05001000", "11001000", "3S3", "Carga Refrigerada", "Furgón Refrigerado", CondicionCarga.Cargado, 2950000m, 95000m, 10m, 9.20m, true),
-            Sice(202606, r3, "13001000", "25754000", "3S3", "General", "Plataforma", CondicionCarga.Cargado, 3200000m, 98000m, 12m, 18.50m, true),
-            Sice(202606, r6, "54001000", "76001000", "3S2", "General", "Furgón", CondicionCarga.Cargado, 2600000m, 80000m, 10m, 14.10m, false), // edge: vía no estándar
-            Sice(202606, r7, "76109000", "11001000", "3S3", "General", "Plataforma", CondicionCarga.Cargado, 2100000m, 70000m, 10m, 9.80m, true),
-            Sice(202606, r8, "08001000", "05001000", "3S2", "Granel Sólido", "Volco", CondicionCarga.Cargado, 2400000m, 75000m, 10m, 13.20m, true),
-            Sice(202606, r9, "11001000", "68001000", "C3", "General", "Furgón", CondicionCarga.Cargado, 1250000m, 50000m, 8m, 6.50m, true),
-        };
-        db.TarifasSicetac.AddRange(sicetac);
-
         // ----------------------------------------------------------------- Solicitudes + líneas (17)
         var tipos = new[] { TipologiaCarga.CargaSeca, TipologiaCarga.GranelSolido, TipologiaCarga.Refrigerados, TipologiaCarga.Contenedor, TipologiaCarga.Alimentos, TipologiaCarga.CargaSuelta, TipologiaCarga.GranelLiquido };
         var estadosLinea = new[] { EstadoLinea.PorCostear, EstadoLinea.AutoResuelta, EstadoLinea.Revisada };
@@ -295,7 +256,7 @@ public static class clsDataSeeder
             Hist(r2, v2, TipologiaCarga.CargaSeca, 1_870_000m, new DateOnly(2026, 6, 1), null)
         );
 
-        // ----------------------------------------------------------------- Auditoría (12)
+        // ----------------------------------------------------------------- Auditoría (11)
         clsAuditLog Audit(clsUsuario u, string entidad, Guid entidadId, string accion, string diff, DateTimeOffset at) =>
             new() { clsUsuario = u, Entidad = entidad, EntidadId = entidadId, Accion = accion, Diff = diff, CreatedAt = at };
 
@@ -310,8 +271,7 @@ public static class clsDataSeeder
             Audit(coord1, "cotizaciones", c13.Id, "marcar_resultado", "{\"resultado\":\"ganada\"}", new DateTimeOffset(2026, 5, 21, 17, 0, 0, TimeSpan.Zero)),
             Audit(coord2, "cotizaciones", c14.Id, "marcar_resultado", "{\"resultado\":\"perdida\"}", new DateTimeOffset(2026, 5, 23, 17, 0, 0, TimeSpan.Zero)),
             Audit(lider1, "solicitudes", s10.Id, "actualizar", "{\"estado\":[\"pendiente\",\"descartada\"]}", new DateTimeOffset(2026, 6, 16, 13, 0, 0, TimeSpan.Zero)),
-            Audit(sl1, "servicios_conexos", sStandby.Id, "actualizar", "{\"valor_base\":[42000,45000]}", new DateTimeOffset(2026, 6, 2, 11, 0, 0, TimeSpan.Zero)),
-            Audit(admin2, "tarifas_sicetac", sicetac[0].Id, "importar", "{\"periodo\":202606,\"filas\":12}", new DateTimeOffset(2026, 6, 1, 9, 20, 0, TimeSpan.Zero))
+            Audit(sl1, "servicios_conexos", sStandby.Id, "actualizar", "{\"valor_base\":[42000,45000]}", new DateTimeOffset(2026, 6, 2, 11, 0, 0, TimeSpan.Zero))
         );
 
         await db.SaveChangesAsync();

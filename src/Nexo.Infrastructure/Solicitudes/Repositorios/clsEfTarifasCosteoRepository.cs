@@ -1,27 +1,30 @@
 using Nexo.Application.CasosDeUso.Solicitudes.DTOs;
 using Nexo.Application.CasosDeUso.Solicitudes.Interfaces;
+using Nexo.Application.Common.Ports;
 using Nexo.Domain.Enums;
 using Nexo.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace Nexo.Infrastructure.Solicitudes.Repositorios;
 
-public sealed class clsEfTarifasCosteoRepository(clsNexoDbContext db) : ITarifasCosteoPort
+public sealed class clsEfTarifasCosteoRepository(clsNexoDbContext db, IPropuestaTarifaPort propuestas) : ITarifasCosteoPort
 {
-    public async Task<clsPisoSicetacDto?> PisoVigenteAsync(Guid rutaId, int periodoActual, CancellationToken ct)
+    /// <summary>
+    /// Issue #179: antes leía una caché local (tbl_tarifas_sicetac) alimentada solo a
+    /// mano por Excel, sin evidencia de uso real y desactualizada (nunca cubría el
+    /// período vigente). Ahora lee la misma fuente DWSice que ya usa el motor
+    /// automático de costeo (<see cref="IPropuestaTarifaPort.PisoSicetacVigenteAsync"/>),
+    /// así que "vencida" ya no aplica: DWSice solo trae el período actual.
+    /// </summary>
+    public async Task<clsPisoSicetacDto?> PisoVigenteAsync(
+        string origen, string destino, string? vehiculo, TipologiaCarga? tipologia,
+        string? carroceria, CancellationToken ct)
     {
-        // Orden determinista: periodo más reciente y, a igualdad, por Id, para no
-        // devolver una fila arbitraria. CARGADO (el VACÍO es el aprovisionamiento, otro concepto).
-        var piso = await db.TarifasSicetac.AsNoTracking()
-            .Where(t => t.RutaId == rutaId && t.CondicionCarga == CondicionCarga.Cargado)
-            .OrderByDescending(t => t.Periodo)
-            .ThenBy(t => t.Id)
-            .FirstOrDefaultAsync(ct);
+        var piso = await propuestas.PisoSicetacVigenteAsync(origen, destino, vehiculo, tipologia, carroceria, ct);
 
         return piso is null ? null : new clsPisoSicetacDto(
-            piso.Id, piso.ValorPiso, piso.ValorHora, piso.HorasPactadas, piso.Periodo,
-            piso.Periodo >= periodoActual ? "vigente" : "vencida",
-            piso.Configuracion, piso.TipoCarga, piso.UnidadTransporte, piso.CondicionCarga.ToString());
+            Guid.Empty, piso.ValorPiso, piso.ValorHora, piso.HorasPactadas, piso.Periodo,
+            "vigente", piso.Configuracion, piso.TipoCarga, piso.UnidadTransporte, piso.CondicionCarga);
     }
 
     public async Task<IReadOnlyList<clsHistoricaSugeridaDto>> HistoricasSugeridasAsync(

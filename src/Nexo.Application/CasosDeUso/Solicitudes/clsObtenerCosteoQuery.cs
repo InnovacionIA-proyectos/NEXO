@@ -26,12 +26,15 @@ public sealed class clsObtenerCosteoQueryHandler(
             throw new clsConflictException("SOLICITUD_DESCARTADA", "La solicitud está descartada y no puede costearse.");
 
         var ahora = clock.GetUtcNow();
-        var periodoActual = ahora.Year * 100 + ahora.Month;
 
         var lineas = new List<clsLineaCosteoDto>();
         foreach (var l in s.Lineas)
         {
-            var piso = l.RutaId is { } rutaId ? await tarifas.PisoVigenteAsync(rutaId, periodoActual, ct) : null;
+            var piso = l.clsRuta is { } ruta
+                ? await tarifas.PisoVigenteAsync(
+                    ruta.Origen, ruta.Destino, l.clsConfiguracionVehiculo?.TipoVehiculo, l.Tipologia,
+                    l.clsConfiguracionVehiculo?.Carroceria, ct)
+                : null;
             var historicas = l.RutaId is { } rutaId2
                 ? await tarifas.HistoricasSugeridasAsync(rutaId2, l.Tipologia, ahora, 5, ct)
                 : [];

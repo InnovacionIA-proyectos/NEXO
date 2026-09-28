@@ -331,8 +331,50 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
         clsDwSiceDbContext dw, string origen, string destino, string? vehiculo, string condicionCarga,
         TipologiaCarga? tipologia, string? carroceria, CancellationToken ct)
     {
+        var (fila, criterio) = await ResolverFilaSiceAsync(dw, origen, destino, vehiculo, condicionCarga, tipologia, carroceria, ct);
+        if (fila is null) return null;
+
+        var valor = fila.ValorSiceConHora ?? fila.Valor;
+        return new clsCandidatoTarifaDto(
+            "sicetac", valor,
+            $"{fila.NombreRuta} · {fila.Configuracion} · {fila.NombreTipoCarga} · {fila.NombreUnidadTransporte}",
+            criterio, 1);
+    }
+
+    /// <summary>
+    /// Piso SICE-TAC vigente con desglose de horas para Mesa de Costeo (issue #179):
+    /// misma fuente DWSice que ya usa el motor automático, no la caché local que se
+    /// retiró (import manual de Excel, sin evidencia de uso real y desactualizada).
+    /// </summary>
+    public async Task<clsPisoSicetacVigenteDto?> PisoSicetacVigenteAsync(
+        string origen, string destino, string? vehiculo, TipologiaCarga? tipologia,
+        string? carroceria, CancellationToken ct = default)
+    {
+        if (!_dwConfigurado) return null;
+        using var scope = _scopes.CreateScope();
+        var dw = scope.ServiceProvider.GetService<clsDwSiceDbContext>();
+        if (dw is null) return null;
+
+        var (fila, _) = await ResolverFilaSiceAsync(
+            dw, Normalizar(origen), Normalizar(destino), vehiculo, "CARGADO", tipologia, carroceria, ct);
+        if (fila is null) return null;
+
+        return new clsPisoSicetacVigenteDto(
+            fila.Periodo, fila.Valor, fila.ValorHora, fila.HorasPactadas,
+            fila.Configuracion, fila.NombreTipoCarga, fila.NombreUnidadTransporte,
+            fila.CondicionCarga ?? "CARGADO");
+    }
+
+    /// <summary>Resuelve la fila de DWSice: mismo camino para la propuesta automática
+    /// (<see cref="CandidatoSicetacAsync(clsDwSiceDbContext, string, string, string?, string, TipologiaCarga?, string?, CancellationToken)"/>)
+    /// y para Mesa de Costeo (<see cref="PisoSicetacVigenteAsync"/>) — una sola consulta
+    /// a mantener, dos formas distintas de exponer el resultado.</summary>
+    private async Task<(clsRutaSicetacDw? Fila, string Criterio)> ResolverFilaSiceAsync(
+        clsDwSiceDbContext dw, string origen, string destino, string? vehiculo, string condicionCarga,
+        TipologiaCarga? tipologia, string? carroceria, CancellationToken ct)
+    {
         var periodo = await PeriodoSiceAsync(dw, ct);
-        if (periodo == 0) return null;
+        if (periodo == 0) return (null, string.Empty);
 
         var baseQ = dw.RutasSicetac.AsNoTracking().Where(r =>
             r.Periodo == periodo &&
@@ -350,13 +392,7 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
             if (fila is not null) criterio += $" · configuración {config}";
         }
         fila ??= SeleccionarSice(await FilasSiceCacheadasAsync($"{claveBase}:*", baseQ, ct), tipologia, carroceria);
-        if (fila is null) return null;
-
-        var valor = fila.ValorSiceConHora ?? fila.Valor;
-        return new clsCandidatoTarifaDto(
-            "sicetac", valor,
-            $"{fila.NombreRuta} · {fila.Configuracion} · {fila.NombreTipoCarga} · {fila.NombreUnidadTransporte}",
-            criterio, 1);
+        return (fila, criterio);
     }
 
     internal static clsRutaSicetacDw? SeleccionarSice(

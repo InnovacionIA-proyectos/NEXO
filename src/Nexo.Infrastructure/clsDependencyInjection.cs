@@ -10,7 +10,6 @@ using Nexo.Application.CasosDeUso.PlanDeCargue.Interfaces;
 using Nexo.Application.CasosDeUso.Priorizacion.Interfaces;
 using Nexo.Application.CasosDeUso.Solicitudes.Interfaces;
 using Nexo.Application.CasosDeUso.TarifasGanadas.Interfaces;
-using Nexo.Application.CasosDeUso.TarifasSicetacAdmin.Interfaces;
 using Nexo.Application.Common.Abstractions;
 using Nexo.Application.Common.Ports;
 using Nexo.Infrastructure.AjustesVigenciaPlaza.Adaptadores;
@@ -35,7 +34,6 @@ using Nexo.Infrastructure.PlanDeCargue.Adaptadores;
 using Nexo.Infrastructure.PlanDeCargue.Repositorios;
 using Nexo.Infrastructure.Solicitudes.Repositorios;
 using Nexo.Infrastructure.TarifasGanadas.Repositorios;
-using Nexo.Infrastructure.TarifasSicetacAdmin.Repositorios;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
@@ -244,9 +242,6 @@ public static class clsDependencyInjection
         services.AddScoped<clsEfServiciosConexosRepository>();
         services.AddScoped<IServiciosConexosRepository>(sp => sp.GetRequiredService<clsEfServiciosConexosRepository>());
         services.AddScoped<IServiciosConexosPort>(sp => sp.GetRequiredService<clsEfServiciosConexosRepository>());
-
-        // Caché local del piso SICE-TAC (import periódico admin)
-        services.AddScoped<ITarifasSicetacRepository, clsEfTarifasSicetacRepository>();
 
         // Métricas (Tablero del Líder)
         services.AddScoped<IMetricasPort, clsMetricasAdapter>();

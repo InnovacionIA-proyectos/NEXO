@@ -29,7 +29,6 @@ public class clsNexoDbContext : DbContext
     public DbSet<clsLineaSolicitud> LineasSolicitud => Set<clsLineaSolicitud>();
     public DbSet<clsRuta> Rutas => Set<clsRuta>();
     public DbSet<clsConfiguracionVehiculo> ConfiguracionesVehiculo => Set<clsConfiguracionVehiculo>();
-    public DbSet<clsTarifaSicetac> TarifasSicetac => Set<clsTarifaSicetac>();
     public DbSet<clsTarifaHistorica> TarifasHistoricas => Set<clsTarifaHistorica>();
     public DbSet<clsServicioConexo> ServiciosConexos => Set<clsServicioConexo>();
     public DbSet<clsCotizacion> Cotizaciones => Set<clsCotizacion>();
@@ -225,27 +224,6 @@ public class clsNexoDbContext : DbContext
         });
 
         b.Entity<clsConfiguracionVehiculo>(e => e.ToTable("tbl_configuraciones_vehiculo"));
-
-        b.Entity<clsTarifaSicetac>(e =>
-        {
-            e.ToTable("tbl_tarifas_sicetac");
-            e.Property(x => x.CondicionCarga).HasConversion<string>().HasMaxLength(20);
-            e.Property(x => x.ValorPiso).HasColumnType("decimal(18,2)");
-            e.Property(x => x.ValorHora).HasColumnType("decimal(18,2)");
-            e.Property(x => x.ValorSiceHora).HasColumnType("decimal(18,2)");
-            e.Property(x => x.HorasPactadas).HasColumnType("decimal(9,2)");
-            e.Property(x => x.HorasRecorrido).HasColumnType("decimal(9,2)");
-            // Llave natural del piso (resolución al abrir una línea).
-            e.HasIndex(x => new
-            {
-                x.Periodo, x.OrigenDane, x.DestinoDane, x.Configuracion,
-                x.TipoCarga, x.UnidadTransporte, x.CondicionCarga
-            }).IsUnique();
-            e.HasOne(x => x.clsRuta)
-             .WithMany()
-             .HasForeignKey(x => x.RutaId)
-             .OnDelete(DeleteBehavior.Restrict);
-        });
 
         b.Entity<clsTarifaHistorica>(e =>
         {
