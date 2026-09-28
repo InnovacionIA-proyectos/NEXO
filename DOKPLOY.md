@@ -57,6 +57,8 @@ Un desfase breve de arranque no es crítico: `cubicador-worker` reintenta la con
 - `nexo-rabbit`: consola de administración en el puerto 15672 (usuario/clave = `RABBITMQ_DEFAULT_USER`/`RABBITMQ_DEFAULT_PASS` de `.env.dokploy`).
 - Logs de `cubicador-worker`: debe conectar a RabbitMQ sin quedarse reintentando indefinidamente.
 
-## 5. Migraciones de base de datos
+## 5. Esquema de base de datos
 
-El backend (`nexo-api`) aplica migraciones de EF Core al arrancar si `Database__MigrateOnStartup=true`. Dejar en `false` salvo el primer arranque contra una base nueva y vacía (ver `docs/Database/SQUASH-MIGRACIONES.md`, Paso 4) — después, volver a `false`. `Database__SeedOnStartup` debe quedar **siempre en `false`** en Producción: `clsDataSeeder.cs` es 100% datos ficticios de demo.
+Este proyecto no usa migraciones de EF Core — el esquema se crea/actualiza corriendo `docs/Database/ESQUEMA_NEXO.sql` a mano contra la base (una sola vez, en el primer despliegue contra una base nueva y vacía). `Database__MigrateOnStartup` debe quedar **siempre en `false`**: no hay migraciones que aplicar. `Database__SeedOnStartup` debe quedar **siempre en `false`** en Producción: `clsDataSeeder.cs` es 100% datos ficticios de demo.
+
+Después de crear el esquema, hay catálogos que se pueblan igual de manual, con los datos ya calculados (no por migración ni por ningún comando/endpoint de la app) — ver `docs/Database/seeder/README.md` para la lista completa y cómo cargar cada CSV (`BULK INSERT`). Es poblado de **una sola vez**: si la fuente original cambia después, el CSV no se entera solo.

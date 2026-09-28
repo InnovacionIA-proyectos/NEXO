@@ -25,7 +25,6 @@ public static class clsDependencyInjection
         services.AddScoped<ICommandHandler<clsRecalcularScoreCommand, clsDesgloseScoreDto>, clsRecalcularScoreCommandHandler>();
         services.AddScoped<ICommandHandler<clsCapturarSolicitudCommand, clsCapturaResultDto>, clsCapturarSolicitudCommandHandler>();
         services.AddScoped<ICommandHandler<clsResolverCatalogosDeLineasCommand, IReadOnlyList<clsCatalogoLineaResueltoDto>>, clsResolverCatalogosDeLineasCommandHandler>();
-        services.AddScoped<ICommandHandler<clsSembrarMunicipiosCommand, DTOs.clsResultadoSiembraMunicipiosDto>, clsSembrarMunicipiosCommandHandler>();
 
         services.AddScoped<IQueryHandler<clsObtenerBandejaQuery, clsPaginaDto<clsBandejaItemDto>>, clsObtenerBandejaQueryHandler>();
         services.AddScoped<IQueryHandler<clsObtenerCosteoQuery, clsSolicitudCosteoDto>, clsObtenerCosteoQueryHandler>();

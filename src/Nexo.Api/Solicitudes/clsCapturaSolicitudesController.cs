@@ -26,7 +26,6 @@ public class clsCapturaSolicitudesController(
     IQueryHandler<clsListarDepartamentosQuery, IReadOnlyList<string>> listarDepartamentos,
     IQueryHandler<clsBuscarCiudadesQuery, IReadOnlyList<clsCiudadBusquedaDto>> buscarCiudades,
     IPropuestaTarifaPort propuestas,
-    ICommandHandler<clsSembrarMunicipiosCommand, clsResultadoSiembraMunicipiosDto> sembrarMunicipios,
     IQueryHandler<clsListarMunicipiosQuery, IReadOnlyList<clsMunicipioDto>> listarMunicipios)
     : ControllerBase
 {
@@ -123,25 +122,11 @@ public class clsCapturaSolicitudesController(
         => Ok(await buscarCiudades.Handle(new clsBuscarCiudadesQuery(departamento, q), ct));
 
     /// <summary>
-    /// Siembra ÚNICA del catálogo de municipios (S4-HU-09.1) — foto fija desde
-    /// tblSAPDANE/tblZonasTarificacionRelacion/tblSAPTarifas(Log), sin sincronización
-    /// periódica. Falla con 409 si ya se corrió antes; con 503 si
-    /// ConnectionStrings:DbSolucionesTi no está configurada. Solo Admin — no hace
-    /// falta darle este botón a Comercial.
-    /// </summary>
-    [HttpPost("municipios/sembrar")]
-    [Authorize(Roles = "Admin")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status409Conflict)]
-    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
-    public async Task<ActionResult<clsResultadoSiembraMunicipiosDto>> SembrarMunicipios(CancellationToken ct = default)
-        => Ok(await sembrarMunicipios.Handle(new clsSembrarMunicipiosCommand(), ct));
-
-    /// <summary>
     /// Catálogo completo de municipios (S4-HU-09.1), todas las columnas — para poblar
     /// el desplegable de Origen/Destino de una sola vez en el cliente (~3.800 filas,
     /// sin paginar ni filtrar: pensado para cargarse una vez y quedar en memoria del
-    /// front, no para consultarse en cada tecleo).
+    /// front, no para consultarse en cada tecleo). Tabla creada y poblada por script
+    /// (ver docs/Database/ESQUEMA_NEXO.sql y el script de poblado), no por migración.
     /// </summary>
     [HttpGet("municipios")]
     [ProducesResponseType(StatusCodes.Status200OK)]

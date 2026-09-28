@@ -5,10 +5,11 @@ namespace Nexo.Domain.Catalogos.Entidades;
 /// <summary>
 /// Catálogo propio de municipios (Colombia/Venezuela/Ecuador) para el desplegable de
 /// Origen/Destino en Captura de Solicitudes — evita que el comercial digite el nombre
-/// de la ciudad a mano. Sembrado UNA SOLA VEZ (S4-HU-09.1) desde tblSAPDANE +
+/// de la ciudad a mano. Poblado UNA SOLA VEZ (S4-HU-09.1) cruzando tblSAPDANE +
 /// tblZonasTarificacionRelacion + tblSAPTarifas/tblSAPTarifasLog del datacenter
-/// corporativo; no hay sincronización periódica (ver
-/// <c>clsSembrarMunicipiosCommandHandler</c>). El motor de costeo usa internamente
+/// corporativo; no hay sincronización periódica ni comando que la vuelva a poblar —
+/// la tabla se crea con docs/Database/ESQUEMA_NEXO.sql y se puebla con un script
+/// aparte, con los valores ya calculados. El motor de costeo usa internamente
 /// <see cref="CodigoDane"/> para SICE-TAC (join directo contra
 /// DWSice.tblRutasSicetac.ORIGEN/DESTINO, que ya son códigos DANE) y
 /// <see cref="NombreTarifasPlaza"/>/<see cref="ZonaTarificacion"/> para el Tarifario SAP
