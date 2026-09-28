@@ -35,3 +35,46 @@ existe ningún proceso automático que lo mantenga sincronizado.
 - **Cómo cargarlo en una base nueva:** después de correr `ESQUEMA_NEXO.sql`,
   cargar `municipios.csv` con `BULK INSERT` (o el método de carga masiva que
   prefiera quien administre esa base) contra `db_NEXO.tbl_municipios`.
+
+## `servicios_conexos.csv`
+
+**Poblado UNA SOLA VEZ (S4-HU-15.1) — sin sincronización periódica.** Si el
+Excel de costos 2026 cambia (nueva ciudad, nuevo puerto, nueva ruta), este CSV
+**no se entera solo** — hay que regenerar el archivo a mano.
+
+- **Tabla destino:** `db_NEXO.tbl_servicios_conexos` (reestructurada en esta HU
+  para soportar dimensiones de precio distintas por categoría — ver
+  `ESQUEMA_NEXO.sql` y `docs/diccionario-datos-cabinafletes.md`, catálogo
+  `servicios_conexos`, para el detalle completo de columnas).
+- **De dónde salió:** cruce de `docs_raw/conexos costos.xlsx` (2 hojas,
+  4 tablas: Almacenamiento por ciudad, ITR por puerto+máquina+movimiento,
+  Precinto por ruta, Acompañamiento vehicular por origen-destino) contra
+  `tbl_municipios`, más los 10 servicios de valor único ya sembrados hoy
+  (Cargue, Descargue, Stand-by, Candado satelital, Almacenamiento,
+  Distribución multipunto, ITR, Escolta, Reexpedición, Montacargas), que pasan
+  a ser su propia variante "genérica" (`Origen`/`Destino`/`Puerto`/`Ruta`/
+  `TipoMaquina` = `'NO APLICA'`) dentro de esta misma tabla.
+- **Filas:** 1.346 (10 valor-único + 9 Almacenamiento + 21 ITR + 5 Precinto por
+  ruta + 1.301 Acompañamiento vehicular por origen-destino) — ya aplicadas
+  contra `dbInformesAutomatizados_Pruebas.db_NEXO` (2026-09-28). La tabla
+  anterior se limpió por completo (incluyendo ~217 filas de ruido de pruebas
+  automatizadas tipo `Dup <guid>` y las filas dependientes de
+  `tbl_cotizacion_conexos` que las referenciaban — datos de test, no de
+  negocio real).
+- ⚠️ **`Origen`/`Destino` son texto plano, NO FK a `tbl_municipios`.** El Excel
+  de acompañamiento vehicular mezcla ciudades reales con peajes/corredores
+  viales (ej. "Peaje De Occidente", "Cali - Yumbo", "Ye De Cienaga") que no
+  corresponden a un único municipio. La regla aplicada: si el nombre cruza
+  (normalizado, sin tildes/mayúsculas, con un pequeño diccionario de alias para
+  casos como "Bogota"→"BOGOTA, D.C." o "Cartagena"→"CARTAGENA DE INDIAS") se
+  guarda el nombre canónico de `tbl_municipios`; si no cruza, se guarda el
+  texto tal cual viene del Excel. Del total de filas de acompañamiento
+  vehicular, ~55% cruzó limpio, ~36% no tenía equivalente real (peaje/corredor)
+  y quedó como texto crudo, ~9% tenía nombre ambiguo (mismo nombre en 2+
+  departamentos, ej. "Rionegro" en Antioquia y Santander) resuelto guardando
+  solo el nombre del municipio sin desambiguar departamento (no aplica aquí
+  porque no es FK).
+- **Cómo cargarlo en una base nueva:** después de correr `ESQUEMA_NEXO.sql`,
+  cargar `servicios_conexos.csv` con `BULK INSERT` (o el método de carga
+  masiva que prefiera quien administre esa base) contra
+  `db_NEXO.tbl_servicios_conexos`.

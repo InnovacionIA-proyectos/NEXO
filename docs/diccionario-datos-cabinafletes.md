@@ -323,26 +323,36 @@ Llave natural única: `(Periodo, OrigenDane, DestinoDane, Configuracion, TipoCar
 
 ## 12. `servicios_conexos`
 
-**Entidad:** `ServicioConexo` — **Para qué sirve:** catálogo de servicios adicionales al flete (cargue, descargue, almacenamiento, escolta, candado satelital, etc.), mantenido por el área de Servicios Logísticos.
+**Entidad:** `ServicioConexo` — **Para qué sirve:** catálogo de servicios adicionales al flete (cargue, descargue, almacenamiento, ITR, escolta, candado satelital, acompañamiento vehicular, etc.), mantenido por el área de Servicios Logísticos.
+
+> **Reestructurada en S4-HU-15.1:** antes era un catálogo de valor único (`Nombre`+`ValorBase`+`ReglaCobro`). Ahora unifica en una sola tabla dos categorías con dimensiones de precio distintas: **Servicios Logísticos** (Almacenamiento por ciudad; ITR por puerto + tipo de máquina + movimiento) y **Servicios Adicionales** (por ruta, o por origen-destino según el servicio, ej. acompañamiento vehicular). Los 10 servicios ya sembrados de valor único (Cargue, Descargue, Stand-by, Candado satelital, Almacenamiento, Distribución multipunto, ITR, Escolta, Reexpedición, Montacargas) siguen funcionando: son su propia variante "genérica" dentro de esta misma tabla, con `'NO APLICA'` en las columnas de dimensión que no les aplican.
 
 | Columna | Tipo | Nullable | Descripción |
 |---|---|---|---|
-| `Nombre` | texto(120) | No | Nombre del servicio |
+| `CodigoServicio` | texto(30) | No | Código corto del servicio (ej. `PRE_BSAT`, `AVT_AUTO`); si el servicio no trae un código propio, se usa el mismo valor de `TipoServicio` |
+| `TipoServicio` | texto(120) | No | Nombre/descripción del servicio (antes `Nombre`) |
+| `Origen` | texto(150) | No | Ciudad (logísticos) u origen (adicionales). Texto plano, NO FK a `municipios`: nombre canónico si cruza con un municipio real, texto crudo del Excel si es un peaje/corredor sin equivalente. Default `'NO APLICA'` |
+| `Destino` | texto(150) | No | Solo aplica al servicio de acompañamiento vehicular (par origen-destino); misma regla que `Origen`. Default `'NO APLICA'` |
+| `Puerto` | texto(50) | No | Terminal del puerto (solo ITR, ej. `Tcbuen - Sprbun`, `Aguadulce`). Default `'NO APLICA'` |
+| `Ruta` | texto(50) | No | Tipo de ruta (solo servicios por ruta, ej. `Urbano`, `Colombia a Ecuador`). Default `'NO APLICA'` |
+| `TipoMaquina` | texto(60) | No | Máquina + cantidad de movimientos combinados (solo ITR, ej. `Maquina 3.5 - 2 Movimientos`). Default `'NO APLICA'` |
+| `CostoUnitario` | decimal | No | Valor unitario (antes `ValorBase`) |
+| `Unidad` | texto(30) | No | Unidad de cobro (`Por estiba` en logísticos, `Por unidad` en el resto por ahora) |
+| `Vigencia` | fecha | No | Fecha de vigencia del valor pactado (antes `VigenteHasta`) |
 | `Categoria` | texto(20) | No | `"logistico"` (default) o `"adicional"` |
-| `ReglaCobro` | JSON | Sí | Fórmula de cobro (ej. `{"tipo":"por_tonelada","valor":12000}`) |
-| `ValorBase` | decimal | Sí | Valor unitario base |
-| `VigenteHasta` | fecha | Sí | Fecha de vencimiento del valor pactado |
 | `Activo` | booleano | No | Default `true` |
 | `ActualizadoPor` | Guid | Sí | FK → `usuarios` |
 | `CreatedAt`/`UpdatedAt` | fecha | No | Auditoría estándar |
-| `RowVersion` | binario | Sí | Control de concurrencia optimista |
 
-**FK:** `ActualizadoPor` → `usuarios` (`Restrict`).
+**FK:** `ActualizadoPor` → `usuarios` (`Restrict`). Sin FK a `municipios` (`Origen`/`Destino` son texto plano, ver nota arriba).
+
+**Único:** `(CodigoServicio, Origen, Destino, Puerto, Ruta, TipoMaquina)` — evita variantes de precio duplicadas para la misma combinación de dimensiones.
 
 **De dónde salen los datos:**
 - Entrada manual (crear/editar desde la pantalla de servicios conexos).
-- **Importación masiva de Excel** (Nombre, Valor base, Vigente hasta, Categoría, Activo).
-- `DataSeeder.cs` siembra 10 servicios de demostración. Nota: existe una migración que en algún momento "vació" este catálogo en producción, así que puede empezar limpio en ambientes reales.
+- **Importación masiva de Excel** (por servicio, según sus dimensiones aplicables).
+- `DataSeeder.cs` sigue sembrando 10 servicios de demostración para ambientes locales/tests (ver nota de reestructuración arriba).
+- **Seeder real (S4-HU-15.1):** [`docs/Database/seeder/servicios_conexos.csv`](./Database/seeder/README.md) — 1346 filas construidas a partir de `docs_raw/conexos costos.xlsx` (2 hojas, 4 tablas) + los 10 servicios de valor único ya existentes, cruzando ciudades contra `tbl_municipios`.
 
 ---
 
