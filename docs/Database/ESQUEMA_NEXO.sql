@@ -159,21 +159,44 @@ CREATE TABLE [db_NEXO].[tbl_vehiculos_cubicacion] (
     , CONSTRAINT [PK_vehiculos_cubicacion] PRIMARY KEY ([Id])
 );
 
--- Servicio adicional facturable (cargue, descargue, etc.) que se agrega a una
--- cotización; lo mantiene ServiciosLogisticos/AdminTarifas/Admin.
+-- Servicio adicional facturable (cargue, descargue, ITR, almacenamiento,
+-- acompañamiento vehicular, etc.) que se agrega a una cotización; lo mantiene
+-- ServiciosLogisticos/AdminTarifas/Admin.
+--
+-- Reestructurada en S4-HU-15.1 para unificar en una sola tabla dos categorías
+-- con dimensiones de precio distintas (antes solo tenía Nombre+ValorBase de
+-- valor único): Servicios Logísticos (Almacenamiento por ciudad; ITR por
+-- puerto+tipo de máquina+movimiento) y Servicios Adicionales (por ruta, o por
+-- origen-destino, según el servicio). Los 10 servicios ya sembrados de valor
+-- único (Cargue, Descargue, Stand-by, Candado satelital, Almacenamiento,
+-- Distribución multipunto, ITR, Escolta, Reexpedición, Montacargas) siguen
+-- funcionando igual: son su propia variante "genérica" dentro de esta misma
+-- tabla, con 'NO APLICA' en las columnas de dimensión que no les aplican.
+--
+-- Origen/Destino son texto plano (NO FK a tbl_municipios): cuando el nombre
+-- del Excel de costos cruza con un municipio real se guarda su nombre
+-- canónico (ej. "CARTAGENA DE INDIAS"), y cuando es un peaje/corredor vial sin
+-- equivalente (ej. "Peaje De Occidente", "Cali - Yumbo") se guarda tal cual,
+-- porque no siempre corresponden a un único municipio.
 CREATE TABLE [db_NEXO].[tbl_servicios_conexos] (
     [Id] uniqueidentifier NOT NULL,
-    [Nombre] nvarchar(120) NOT NULL,
-    [ReglaCobro] nvarchar(max) NULL,
-    [ValorBase] decimal(18,2) NULL,
-    [VigenteHasta] date NULL,
+    [CodigoServicio] nvarchar(30) NOT NULL,
+    [TipoServicio] nvarchar(120) NOT NULL,
+    [Origen] nvarchar(150) NOT NULL DEFAULT (N'NO APLICA'),
+    [Destino] nvarchar(150) NOT NULL DEFAULT (N'NO APLICA'),
+    [Puerto] nvarchar(50) NOT NULL DEFAULT (N'NO APLICA'),
+    [Ruta] nvarchar(50) NOT NULL DEFAULT (N'NO APLICA'),
+    [TipoMaquina] nvarchar(60) NOT NULL DEFAULT (N'NO APLICA'),
+    [CostoUnitario] decimal(18,2) NOT NULL,
+    [Unidad] nvarchar(30) NOT NULL,
+    [Vigencia] date NOT NULL,
+    [Categoria] nvarchar(20) NOT NULL DEFAULT (N'logistico'),
     [Activo] bit NOT NULL DEFAULT (CONVERT([bit],(1))),
     [ActualizadoPor] uniqueidentifier NULL,
     [CreatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset()),
-    [UpdatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset()),
-    [RowVersion] timestamp NULL,
-    [Categoria] nvarchar(20) NOT NULL DEFAULT (N'logistico')
+    [UpdatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset())
     , CONSTRAINT [PK_servicios_conexos] PRIMARY KEY ([Id])
+    , CONSTRAINT [UQ_servicios_conexos_dimensiones] UNIQUE ([CodigoServicio], [Origen], [Destino], [Puerto], [Ruta], [TipoMaquina])
 );
 
 -- --- Solicitudes y costeo -------------------------------------------------------
@@ -720,6 +743,7 @@ CREATE INDEX [IX_planes_cargue_VehiculoId] ON [db_NEXO].[tbl_planes_cargue] ([Ve
 CREATE UNIQUE INDEX [IX_reglas_solo_sicetac_Origen_Destino_TipoVehiculo] ON [db_NEXO].[tbl_reglas_solo_sicetac] ([Origen], [Destino], [TipoVehiculo]);
 CREATE UNIQUE INDEX [IX_rutas_Origen_Destino] ON [db_NEXO].[tbl_rutas] ([Origen], [Destino]);
 CREATE INDEX [IX_servicios_conexos_ActualizadoPor] ON [db_NEXO].[tbl_servicios_conexos] ([ActualizadoPor]);
+CREATE INDEX [IX_servicios_conexos_CodigoServicio] ON [db_NEXO].[tbl_servicios_conexos] ([CodigoServicio]);
 CREATE INDEX [IX_solicitudes_ClienteId] ON [db_NEXO].[tbl_solicitudes] ([ClienteId]);
 CREATE INDEX [IX_solicitudes_CreadoPor] ON [db_NEXO].[tbl_solicitudes] ([CreadoPor]);
 CREATE INDEX [IX_solicitudes_Deadline] ON [db_NEXO].[tbl_solicitudes] ([Deadline]);
