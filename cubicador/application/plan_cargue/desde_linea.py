@@ -56,7 +56,17 @@ async def crear_plan_desde_linea(
                      else respuesta.sugerencia_flota.unidad_id if respuesta.sugerencia_flota else None)
     nombre_preset = _PRESET_POR_UNIDAD_RAPIDA.get(unidad_rapida, "Tractocamion furgon 13.6 m")
     catalogo = await vehiculos.listar_con_siembra()
-    vehiculo = next(v for v in catalogo if v.nombre == nombre_preset)
+    vehiculo = next((v for v in catalogo if v.nombre == nombre_preset), None)
+    if vehiculo is None:
+        # Antes: `next(...)` sin default lanzaba StopIteration, que el worker
+        # trata como fallo INESPERADO (3 reintentos identicos y funestos, luego
+        # DLQ) en vez de un rechazo de negocio inmediato y explicito. Puede
+        # pasar si el preset sugerido por el cubicador rapido (tabla de arriba)
+        # fue renombrado o borrado del catalogo editable.
+        raise ValidationFailedException(
+            "PRESET_VEHICULO_NO_ENCONTRADO",
+            f"El vehiculo sugerido '{nombre_preset}' no existe en el catalogo: revisa que no haya sido renombrado o eliminado.",
+        )
 
     # Una FLOTA de planes por linea (Vehiculo 1..N): si ya existia se reconstruye.
     await planes.eliminar_planes_de_linea(linea_solicitud_id)
