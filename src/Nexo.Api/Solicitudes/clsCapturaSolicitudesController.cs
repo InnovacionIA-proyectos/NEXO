@@ -25,7 +25,8 @@ public class clsCapturaSolicitudesController(
     IQueryHandler<clsBuscarClientesQuery, IReadOnlyList<clsClienteBusquedaDto>> buscarClientes,
     IQueryHandler<clsListarDepartamentosQuery, IReadOnlyList<string>> listarDepartamentos,
     IQueryHandler<clsBuscarCiudadesQuery, IReadOnlyList<clsCiudadBusquedaDto>> buscarCiudades,
-    IPropuestaTarifaPort propuestas)
+    IPropuestaTarifaPort propuestas,
+    IQueryHandler<clsListarMunicipiosQuery, IReadOnlyList<clsMunicipioDto>> listarMunicipios)
     : ControllerBase
 {
     private const long MaxTamanoArchivo = 10 * 1024 * 1024; // 10 MB
@@ -119,4 +120,16 @@ public class clsCapturaSolicitudesController(
     public async Task<ActionResult<IReadOnlyList<clsCiudadBusquedaDto>>> Ciudades(
         [FromQuery] string? departamento, [FromQuery] string? q, CancellationToken ct = default)
         => Ok(await buscarCiudades.Handle(new clsBuscarCiudadesQuery(departamento, q), ct));
+
+    /// <summary>
+    /// Catálogo completo de municipios (S4-HU-09.1), todas las columnas — para poblar
+    /// el desplegable de Origen/Destino de una sola vez en el cliente (~3.800 filas,
+    /// sin paginar ni filtrar: pensado para cargarse una vez y quedar en memoria del
+    /// front, no para consultarse en cada tecleo). Tabla creada y poblada por script
+    /// (ver docs/Database/ESQUEMA_NEXO.sql y el script de poblado), no por migración.
+    /// </summary>
+    [HttpGet("municipios")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<clsMunicipioDto>>> Municipios(CancellationToken ct = default)
+        => Ok(await listarMunicipios.Handle(new clsListarMunicipiosQuery(), ct));
 }

@@ -27,6 +27,7 @@ using Nexo.Application.CasosDeUso.Priorizacion;
 using Nexo.Application.CasosDeUso.ReglasSoloSicetac;
 using Nexo.Application.CasosDeUso.ServiciosConexos;
 using Nexo.Application.CasosDeUso.Solicitudes;
+using Nexo.Application.Common.Abstractions;
 using Nexo.Application.CasosDeUso.TarifasGanadas;
 using Nexo.Application.CasosDeUso.TarifasSicetacAdmin;
 using Nexo.Domain.Enums;
@@ -236,6 +237,7 @@ if (app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
     if (app.Configuration.GetValue<bool>("Database:SeedOnStartup"))
         await clsDataSeeder.SeedAsync(db);
 }
+
 
 app.UseForwardedHeaders();
 if (app.Environment.IsDevelopment())

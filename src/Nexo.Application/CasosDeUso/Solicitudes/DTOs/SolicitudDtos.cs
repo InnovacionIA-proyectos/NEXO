@@ -104,3 +104,8 @@ public record clsCiudadBusquedaDto(string Municipio, string Departamento);
 
 /// <summary>Estimación del aprovisionamiento del contenedor (viaje vacío levante → origen).</summary>
 public record clsAprovisionamientoDto(clsCandidatoTarifaDto? Candidato);
+
+/// <summary>Fila completa del catálogo de municipios (todas las columnas de la tabla).</summary>
+public record clsMunicipioDto(
+    int Id, string CodigoDane, string Municipio, string Departamento, string Pais,
+    string? NombreTarifasPlaza, string? ZonaTarificacion);
