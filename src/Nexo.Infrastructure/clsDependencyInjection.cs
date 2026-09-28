@@ -61,7 +61,14 @@ public static class clsDependencyInjection
         services.AddDbContext<clsNexoDbContext>(options =>
             options.UseSqlServer(
                 config.GetConnectionString("Nexo"),
-                sql => sql.EnableRetryOnFailure(maxRetryCount: 5, maxRetryDelay: TimeSpan.FromSeconds(10), errorNumbersToAdd: null)));
+                sql =>
+                {
+                    sql.EnableRetryOnFailure(maxRetryCount: 5, maxRetryDelay: TimeSpan.FromSeconds(10), errorNumbersToAdd: null);
+                    // Mismo motivo que clsNexoDbContextFactory (herramientas de diseño de
+                    // EF): la tabla __EFMigrationsHistory real vive en el esquema propio de
+                    // NEXO, no en "dbo".
+                    sql.MigrationsHistoryTable("__EFMigrationsHistory", clsEsquemaNexo.Nombre);
+                }));
 
 // Datacenter corporativo (dbsolucionesTI, SOLO LECTURA): tarifario SAP TM
         // (clsTarifarioSapAdapter/clsPropuestaTarifaAdapter) y vigencia de tarifas de plaza.
@@ -227,6 +234,8 @@ public static class clsDependencyInjection
         services.AddScoped<IClientesDwPort, clsClientesDwAdapter>();
         services.AddScoped<IProspectosDwPort, clsProspectosDwAdapter>();
         services.AddScoped<ICiudadesDwPort, clsCiudadesDwAdapter>();
+        services.AddScoped<IMunicipiosSiembraPort, clsMunicipiosSiembraAdapter>();
+        services.AddScoped<IMunicipiosRepository, clsEfMunicipiosRepository>();
         services.AddScoped<IExcelSolicitudesPort, clsExcelSolicitudesAdapter>();
         services.AddScoped<ITarifasCosteoPort, clsEfTarifasCosteoRepository>();
 
