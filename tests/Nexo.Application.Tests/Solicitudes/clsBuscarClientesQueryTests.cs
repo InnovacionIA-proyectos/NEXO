@@ -34,6 +34,8 @@ public class clsBuscarClientesQueryTests
         Assert.Equal("cliente", cliente.Origen);
         Assert.Equal("BP001", cliente.Bp);
         Assert.Null(cliente.ClienteId);
+        Assert.Equal("900123456", cliente.Nit);
+        Assert.Equal(cliente.Nit, cliente.NitCliente);
         _prospectosDw.Verify(p => p.ListarAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 
@@ -54,6 +56,7 @@ public class clsBuscarClientesQueryTests
         Assert.Null(prospecto.Bp);
         Assert.Null(prospecto.ClienteId);
         Assert.Equal("900555444", prospecto.Nit);
+        Assert.Equal("900555444", prospecto.NitCliente);
     }
 
     [Fact]
