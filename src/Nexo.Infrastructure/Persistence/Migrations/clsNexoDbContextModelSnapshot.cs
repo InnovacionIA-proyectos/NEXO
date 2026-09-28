@@ -271,104 +271,6 @@ namespace Nexo.Infrastructure.Persistence.Migrations
                     b.ToTable("tbl_tarifas_historicas", "db_NEXO");
                 });
 
-            modelBuilder.Entity("Nexo.Domain.BibliotecaTarifas.Entidades.clsTarifaSicetac", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("CondicionCarga")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<string>("Configuracion")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("datetimeoffset")
-                        .HasDefaultValueSql("SYSDATETIMEOFFSET()");
-
-                    b.Property<string>("DestinoDane")
-                        .IsRequired()
-                        .HasMaxLength(12)
-                        .HasColumnType("nvarchar(12)");
-
-                    b.Property<DateTimeOffset?>("FechaCreacionSice")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<DateTimeOffset?>("FechaModificacionSice")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<decimal?>("HorasPactadas")
-                        .HasColumnType("decimal(9,2)");
-
-                    b.Property<decimal?>("HorasRecorrido")
-                        .HasColumnType("decimal(9,2)");
-
-                    b.Property<DateTimeOffset>("ImportadoAt")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<Guid?>("ImportadoPor")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("NombreRuta")
-                        .HasMaxLength(300)
-                        .HasColumnType("nvarchar(300)");
-
-                    b.Property<string>("OrigenDane")
-                        .IsRequired()
-                        .HasMaxLength(12)
-                        .HasColumnType("nvarchar(12)");
-
-                    b.Property<int>("Periodo")
-                        .HasColumnType("int");
-
-                    b.Property<Guid?>("RutaId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<long?>("SiceId")
-                        .HasColumnType("bigint");
-
-                    b.Property<string>("TipoCarga")
-                        .IsRequired()
-                        .HasMaxLength(80)
-                        .HasColumnType("nvarchar(80)");
-
-                    b.Property<string>("UnidadTransporte")
-                        .IsRequired()
-                        .HasMaxLength(80)
-                        .HasColumnType("nvarchar(80)");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("datetimeoffset")
-                        .HasDefaultValueSql("SYSDATETIMEOFFSET()");
-
-                    b.Property<decimal?>("ValorHora")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<decimal>("ValorPiso")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<decimal?>("ValorSiceHora")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<bool?>("ViaEstandar")
-                        .HasColumnType("bit");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("RutaId");
-
-                    b.HasIndex("Periodo", "OrigenDane", "DestinoDane", "Configuracion", "TipoCarga", "UnidadTransporte", "CondicionCarga")
-                        .IsUnique();
-
-                    b.ToTable("tbl_tarifas_sicetac", "db_NEXO");
-                });
-
             modelBuilder.Entity("Nexo.Domain.Catalogos.Entidades.clsCliente", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1724,16 +1626,6 @@ namespace Nexo.Infrastructure.Persistence.Migrations
                     b.Navigation("clsConfiguracionVehiculo");
 
                     b.Navigation("clsCotizacion");
-
-                    b.Navigation("clsRuta");
-                });
-
-            modelBuilder.Entity("Nexo.Domain.BibliotecaTarifas.Entidades.clsTarifaSicetac", b =>
-                {
-                    b.HasOne("Nexo.Domain.Catalogos.Entidades.clsRuta", "clsRuta")
-                        .WithMany()
-                        .HasForeignKey("RutaId")
-                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("clsRuta");
                 });

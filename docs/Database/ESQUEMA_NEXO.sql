@@ -299,34 +299,9 @@ CREATE TABLE [db_NEXO].[tbl_cotizacion_conexos] (
 -- Las fuentes de precio que alimentan la propuesta de tarifa: piso SICE-TAC
 -- oficial, histórico de lo realmente cobrado, y ajustes/reglas manuales.
 
--- Piso de tarifa SICE-TAC importado desde Excel (matriz oficial del
--- Ministerio): único por periodo+ruta DANE+configuración+tipo de carga.
-CREATE TABLE [db_NEXO].[tbl_tarifas_sicetac] (
-    [Id] uniqueidentifier NOT NULL,
-    [SiceId] bigint NULL,
-    [Periodo] int NOT NULL,
-    [RutaId] uniqueidentifier NULL,
-    [OrigenDane] nvarchar(12) NOT NULL,
-    [DestinoDane] nvarchar(12) NOT NULL,
-    [NombreRuta] nvarchar(300) NULL,
-    [Configuracion] nvarchar(50) NOT NULL,
-    [TipoCarga] nvarchar(80) NOT NULL,
-    [UnidadTransporte] nvarchar(80) NOT NULL,
-    [CondicionCarga] nvarchar(20) NOT NULL,
-    [ValorPiso] decimal(18,2) NOT NULL,
-    [ValorHora] decimal(18,2) NULL,
-    [HorasPactadas] decimal(9,2) NULL,
-    [HorasRecorrido] decimal(9,2) NULL,
-    [ValorSiceHora] decimal(18,2) NULL,
-    [ViaEstandar] bit NULL,
-    [FechaCreacionSice] datetimeoffset NULL,
-    [FechaModificacionSice] datetimeoffset NULL,
-    [ImportadoAt] datetimeoffset NOT NULL,
-    [ImportadoPor] uniqueidentifier NULL,
-    [CreatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset()),
-    [UpdatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset())
-    , CONSTRAINT [PK_tarifas_sicetac] PRIMARY KEY ([Id])
-);
+-- Piso SICE-TAC: se resuelve en vivo contra DWSice (issue #179), no hay tabla
+-- local. La caché manual que existía aquí (tbl_tarifas_sicetac, import Excel)
+-- se retiró: sin evidencia de uso real y nunca cubría el período vigente.
 
 -- Lo que REALMENTE se cobró en tbl_cotizaciones pasadas (Tarifas Ganadas), para
 -- proponer tarifa por precedente cuando SAP/SICE-TAC no alcanzan.
@@ -613,7 +588,6 @@ ALTER TABLE [db_NEXO].[tbl_solicitudes] ADD CONSTRAINT [FK_solicitudes_usuarios_
 ALTER TABLE [db_NEXO].[tbl_tarifas_historicas] ADD CONSTRAINT [FK_tarifas_historicas_configuraciones_vehiculo_ConfigVehiculoId] FOREIGN KEY ([ConfigVehiculoId]) REFERENCES [db_NEXO].[tbl_configuraciones_vehiculo] ([Id]);
 ALTER TABLE [db_NEXO].[tbl_tarifas_historicas] ADD CONSTRAINT [FK_tarifas_historicas_cotizaciones_CotizacionId] FOREIGN KEY ([CotizacionId]) REFERENCES [db_NEXO].[tbl_cotizaciones] ([Id]);
 ALTER TABLE [db_NEXO].[tbl_tarifas_historicas] ADD CONSTRAINT [FK_tarifas_historicas_rutas_RutaId] FOREIGN KEY ([RutaId]) REFERENCES [db_NEXO].[tbl_rutas] ([Id]);
-ALTER TABLE [db_NEXO].[tbl_tarifas_sicetac] ADD CONSTRAINT [FK_tarifas_sicetac_rutas_RutaId] FOREIGN KEY ([RutaId]) REFERENCES [db_NEXO].[tbl_rutas] ([Id]);
 
 -- =============================================================================
 -- 3. ÍNDICES
@@ -665,7 +639,5 @@ CREATE INDEX [IX_solicitudes_Estado_ScorePrioridad] ON [db_NEXO].[tbl_solicitude
 CREATE INDEX [IX_tarifas_historicas_ConfigVehiculoId] ON [db_NEXO].[tbl_tarifas_historicas] ([ConfigVehiculoId]);
 CREATE INDEX [IX_tarifas_historicas_CotizacionId] ON [db_NEXO].[tbl_tarifas_historicas] ([CotizacionId]);
 CREATE INDEX [IX_tarifas_historicas_RutaId_ConfigVehiculoId_Tipologia] ON [db_NEXO].[tbl_tarifas_historicas] ([RutaId], [ConfigVehiculoId], [Tipologia]);
-CREATE UNIQUE INDEX [IX_tarifas_sicetac_Periodo_OrigenDane_DestinoDane_Configuracion_TipoCarga_UnidadTransporte_CondicionCarga] ON [db_NEXO].[tbl_tarifas_sicetac] ([Periodo], [OrigenDane], [DestinoDane], [Configuracion], [TipoCarga], [UnidadTransporte], [CondicionCarga]);
-CREATE INDEX [IX_tarifas_sicetac_RutaId] ON [db_NEXO].[tbl_tarifas_sicetac] ([RutaId]);
 CREATE UNIQUE INDEX [IX_usuarios_Email] ON [db_NEXO].[tbl_usuarios] ([Email]);
 CREATE UNIQUE INDEX [IX_usuarios_IdentidadPortalId] ON [db_NEXO].[tbl_usuarios] ([IdentidadPortalId]) WHERE ([IdentidadPortalId] IS NOT NULL);
