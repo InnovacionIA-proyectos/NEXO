@@ -37,14 +37,8 @@ public sealed class clsNexoDbContextFactory : IDesignTimeDbContextFactory<clsNex
                      ?? Environment.GetEnvironmentVariable("ConnectionStrings__Nexo")
                      ?? CadenaDeDiseno;
 
-        // MigrationsHistoryTable en el esquema propio de NEXO (no el "dbo" por defecto de
-        // EF) — así coincide con la tabla __EFMigrationsHistory que ya existe de verdad en
-        // dbInformesAutomatizados_Pruebas (ver docs/Database/ESQUEMA_NEXO.sql y
-        // SQUASH-MIGRACIONES.md). Sin esto, una migración nueva generada aquí apunta a
-        // "dbo.__EFMigrationsHistory" — una tabla distinta a la real, que nunca vería las
-        // migraciones ya aplicadas.
         var opciones = new DbContextOptionsBuilder<clsNexoDbContext>()
-            .UseSqlServer(cadena, sql => sql.MigrationsHistoryTable("__EFMigrationsHistory", clsEsquemaNexo.Nombre))
+            .UseSqlServer(cadena)
             .Options;
 
         return new clsNexoDbContext(opciones);

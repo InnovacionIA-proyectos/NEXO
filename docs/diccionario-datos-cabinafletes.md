@@ -516,7 +516,7 @@ Llave natural única: `(Periodo, OrigenDane, DestinoDane, Configuracion, TipoCar
 
 ## 21. `municipios`
 
-**Entidad:** `clsMunicipio` — **Para qué sirve:** catálogo propio de municipios (Colombia/Venezuela/Ecuador) para el desplegable de Origen/Destino en Captura de Solicitudes — evita que el comercial digite la ciudad a mano. Sembrado **una sola vez** (S4-HU-09.1, foto fija, sin sincronización periódica) desde `tblSAPDANE` + `tblZonasTarificacionRelacion` + `tblSAPTarifas`/`tblSAPTarifasLog` del datacenter corporativo (`dbSolucionesTI`).
+**Entidad:** `clsMunicipio` — **Para qué sirve:** catálogo propio de municipios (Colombia/Venezuela/Ecuador) para el desplegable de Origen/Destino en Captura de Solicitudes — evita que el comercial digite la ciudad a mano. Poblado **una sola vez** (S4-HU-09.1, foto fija, sin sincronización periódica) cruzando `tblSAPDANE` + `tblZonasTarificacionRelacion` + `tblSAPTarifas`/`tblSAPTarifasLog` del datacenter corporativo (`dbSolucionesTI`) — el cruce se hizo una vez con consultas SQL directas, no con un adaptador de la app.
 
 | Columna | Tipo | Nullable | Descripción |
 |---|---|---|---|
@@ -534,7 +534,7 @@ Llave natural única: `(Periodo, OrigenDane, DestinoDane, Configuracion, TipoCar
 
 **De dónde salen los datos:**
 - No hay CRUD — un CRUD sobre esta tabla queda **fuera de alcance** de S4-HU-09.1, es trabajo futuro.
-- Se puebla con `POST /api/captura-solicitudes/municipios/sembrar` (rol Admin), que falla con 409 si la tabla ya tiene filas — está pensado para correr **una sola vez** por ambiente.
+- Tabla creada corriendo `docs/Database/ESQUEMA_NEXO.sql` a mano (no por migración de EF Core) y poblada corriendo el script de poblado con las filas ya calculadas — no hay endpoint ni comando que la siembre en vivo.
 - Se lee con `GET /api/captura-solicitudes/municipios` (Comercial/Admin) — todas las columnas, sin filtro ni paginación.
 - Ya ejecutado contra `dbInformesAutomatizados_Pruebas` (2026-09-26): 3.804 filas (Colombia 1.128, Venezuela 1.424, Ecuador 1.252).
 
