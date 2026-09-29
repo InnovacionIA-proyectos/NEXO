@@ -295,6 +295,88 @@ async def test_la_siembra_adopta_una_fila_anterior_a_la_issue_en_vez_de_duplicar
     assert adoptada.codigo == "cama_baja"
 
 
+async def test_una_fila_anterior_a_la_issue_recupera_tambien_su_clasificacion():
+    """El bug que aparecio probando contra un PostgreSQL real con datos.
+
+    El backfill rellenaba solo el `codigo`. Los presets que YA existian quedaban
+    con `geometria` y `control_ambiental` en NULL -sus columnas nacieron vacias-
+    y el motor rapido descarta a quien no los tenga. Medido sobre la base real:
+    de 10 vehiculos quedaba UNO evaluable, el unico preset nuevo. Una instalacion
+    que actualizara perdia el catalogo entero para cubicar.
+
+    No lo veian las pruebas porque todas arrancan de una base vacia, donde la
+    siembra inserta filas completas. Este test arranca de una fila incompleta,
+    que es el estado real de cualquier instalacion anterior a S4-HU-12.1.
+    """
+    async with SessionLocal() as sesion:
+        await sesion.execute(text(
+            "INSERT INTO vehiculos_cubicacion "
+            "(id, nombre, largo_interno_mm, ancho_interno_mm, alto_interno_mm, capacidad_kg, tara_kg, "
+            " puerta_ancho_mm, puerta_alto_mm, puerta_posicion, ejes_json, "
+            " tolerancia_paredes_mm, tolerancia_entre_unidades_mm, es_preset, created_at, updated_at) "
+            "VALUES ('anterior-1', 'Turbo con estacas', 6200, 2200, 2000, 6300, 4200, "
+            "2200, 1950, 'trasera', '[]', 0, 0, 1, '2026-01-01 00:00:00', '2026-01-01 00:00:00')"
+        ))
+        await sesion.commit()
+        repo = SqlVehiculoCubicacionRepository(sesion)
+
+        catalogo = await repo.listar_con_siembra()
+        evaluables = await unidades_evaluables(repo)
+
+    adoptada = next(v for v in catalogo if v.id == "anterior-1")
+    assert adoptada.codigo == "turbo_estacas"
+    assert adoptada.geometria == "semicerrada", "sin esto el motor rapido la descarta"
+    assert adoptada.control_ambiental == "ninguno"
+    assert adoptada.config_vehiculo == "2L3", "sin esto el costeo no puede resolver la tarifa"
+    assert "turbo_estacas" in [u.id for u in evaluables], "la consecuencia observable: vuelve a ser ofrecible"
+
+
+async def test_el_backfill_completa_huecos_pero_no_pisa_lo_que_el_usuario_puso():
+    """Rellenar no es reimponer la siembra. Si alguien corrigio la carroceria de
+    un vehiculo para que calce con su flota, ese valor manda."""
+    async with SessionLocal() as sesion:
+        await sesion.execute(text(
+            "INSERT INTO vehiculos_cubicacion "
+            "(id, nombre, largo_interno_mm, ancho_interno_mm, alto_interno_mm, capacidad_kg, tara_kg, "
+            " puerta_ancho_mm, puerta_alto_mm, puerta_posicion, ejes_json, "
+            " tolerancia_paredes_mm, tolerancia_entre_unidades_mm, es_preset, carroceria, "
+            " created_at, updated_at) "
+            "VALUES ('anterior-2', 'Plataforma (tractomula)', 12200, 2500, 2800, 27500, 6500, "
+            "2500, 2800, 'trasera', '[]', 0, 0, 1, 'CARROCERIA PROPIA', "
+            "'2026-01-01 00:00:00', '2026-01-01 00:00:00')"
+        ))
+        await sesion.commit()
+
+        catalogo = await SqlVehiculoCubicacionRepository(sesion).listar_con_siembra()
+
+    fila = next(v for v in catalogo if v.id == "anterior-2")
+    assert fila.carroceria == "CARROCERIA PROPIA", "lo que el usuario puso se respeta"
+    assert fila.geometria == "abierta", "y lo que faltaba se completa igual"
+
+
+async def test_los_datos_fisicos_no_se_tocan_aunque_difieran_de_la_siembra():
+    """La capacidad, la tara y las dimensiones pueden estar ajustadas a la flota
+    real. El backfill solo completa clasificacion; tocar lo fisico seria
+    sobrescribir una correccion deliberada con nuestro valor por defecto."""
+    async with SessionLocal() as sesion:
+        await sesion.execute(text(
+            "INSERT INTO vehiculos_cubicacion "
+            "(id, nombre, largo_interno_mm, ancho_interno_mm, alto_interno_mm, capacidad_kg, tara_kg, "
+            " puerta_ancho_mm, puerta_alto_mm, puerta_posicion, ejes_json, "
+            " tolerancia_paredes_mm, tolerancia_entre_unidades_mm, es_preset, created_at, updated_at) "
+            "VALUES ('anterior-3', 'Cama baja (lowboy)', 12500, 2600, 1600, 33333, 8888, "
+            "2600, 1600, 'trasera', '[]', 0, 0, 1, '2026-01-01 00:00:00', '2026-01-01 00:00:00')"
+        ))
+        await sesion.commit()
+
+        catalogo = await SqlVehiculoCubicacionRepository(sesion).listar_con_siembra()
+
+    fila = next(v for v in catalogo if v.id == "anterior-3")
+    assert fila.capacidad_kg == 33333, "la capacidad ajustada por el usuario no se pisa"
+    assert fila.tara_kg == 8888
+    assert fila.geometria == "abierta", "pero la clasificacion que faltaba si se completa"
+
+
 async def test_una_fila_vieja_ya_renombrada_no_se_adivina():
     """Si el usuario habia renombrado la fila antes de 12.1, no hay forma de
     saber a que preset corresponde. Se deja sin codigo y el preset se siembra

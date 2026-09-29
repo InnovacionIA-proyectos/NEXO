@@ -56,19 +56,57 @@ class SqlVehiculoCubicacionRepository:
         filas = (await self._s.execute(select(VehiculoCubicacionModel).order_by(VehiculoCubicacionModel.nombre))).scalars().all()
         return [_a_entidad(f) for f in filas]
 
+    # Campos que la siembra aporta y que una fila anterior a S4-HU-12.1 no puede
+    # tener: las columnas nacieron vacias. NO incluye los fisicos (dimensiones,
+    # capacidad, tara, puerta, ejes), que el usuario pudo haber ajustado a su
+    # flota real y no se deben tocar nunca.
+    _CAMPOS_DE_CLASIFICACION = (
+        "config_vehiculo", "carroceria", "clase_viaje", "clase_contenedor",
+        "geometria", "control_ambiental",
+    )
+
     async def _backfill_codigos(self) -> None:
-        sin_codigo = (await self._s.execute(
-            select(VehiculoCubicacionModel).where(VehiculoCubicacionModel.codigo.is_(None))
+        """Completa lo que a una fila anterior a S4-HU-12.1 le falta.
+
+        Dos pasos, y el segundo se descubrio probando contra un Postgres real
+        con datos: rellenar solo el `codigo` dejaba a los presets que YA existian
+        sin `geometria` ni `control_ambiental`, y el motor rapido descarta a
+        quien no los tenga. Una instalacion que actualizara se quedaba con el
+        catalogo entero fuera de la cubicacion - todo menos los presets nuevos.
+        No se veia en las pruebas porque todas arrancan de una base vacia, donde
+        la siembra inserta filas completas.
+
+        Solo se rellena lo que esta en NULL. Un valor que el usuario haya puesto
+        -o corregido- se respeta: esto completa huecos, no reimpone la siembra.
+        """
+        filas = (await self._s.execute(
+            select(VehiculoCubicacionModel).where(
+                VehiculoCubicacionModel.codigo.is_(None)
+                | VehiculoCubicacionModel.geometria.is_(None)
+            )
         )).scalars().all()
-        if not sin_codigo:
+        if not filas:
             return
-        por_nombre = {p.nombre: p.codigo for p in presets()}
+
+        por_nombre = {p.nombre: p for p in presets()}
+        por_codigo = {p.codigo: p for p in presets()}
         tocadas = 0
-        for fila in sin_codigo:
-            codigo = por_nombre.get(fila.nombre)
-            if codigo is not None:
-                fila.codigo = codigo
+
+        for fila in filas:
+            # Por codigo si ya lo tiene; si no, por nombre. Una fila que el
+            # usuario renombro antes de 12.1 no matchea por ninguno de los dos y
+            # se deja como esta: no se adivina a que preset corresponde.
+            preset = por_codigo.get(fila.codigo) if fila.codigo else por_nombre.get(fila.nombre)
+            if preset is None:
+                continue
+            if fila.codigo is None:
+                fila.codigo = preset.codigo
                 tocadas += 1
+            for campo in self._CAMPOS_DE_CLASIFICACION:
+                if getattr(fila, campo) is None and getattr(preset, campo) is not None:
+                    setattr(fila, campo, getattr(preset, campo))
+                    tocadas += 1
+
         if tocadas:
             await self._s.commit()
 
