@@ -12,24 +12,26 @@ namespace Nexo.Application.CasosDeUso.Solicitudes;
 
 /// <summary>Alta de una solicitud spot (o cabecera de licitación; las líneas se cargan luego en bulk).</summary>
 public sealed record clsCrearSolicitudCommand(
-    Guid ClienteId, string Tipo, string? Modalidad, DateTimeOffset? Deadline,
+    Guid? ClienteId, string? ClienteBp, string Tipo, string? Modalidad, DateTimeOffset? Deadline,
     decimal? ValorEstimado, decimal? ProbabilidadCierre, clsCrearLineaInput? Linea) : ICommand<Guid>;
 
 public sealed record clsCrearLineaInput(Guid? RutaId, Guid? ConfigVehiculoId, string? Tipologia, decimal? Peso, decimal? ValorMercancia);
 
 public sealed class clsCrearSolicitudCommandHandler(
-    ISolicitudesRepository solicitudes, IClientesPort clientes, IAuditoriaPort auditoria,
+    ISolicitudesRepository solicitudes, IClientesPort clientes, IClientesDwPort clientesDw, IAuditoriaPort auditoria,
     ICurrentUserPort usuarioActual, TimeProvider clock, IPublicadorDeMensajes publicador, IUnitOfWork uow)
     : ICommandHandler<clsCrearSolicitudCommand, Guid>
 {
     public async Task<Guid> Handle(clsCrearSolicitudCommand command, CancellationToken ct = default)
     {
-        if (!await clientes.ExisteAsync(command.ClienteId, ct))
-            throw new clsValidationFailedException("CLIENTE_INVALIDO", "El cliente indicado no existe.");
+        // Issue #206: el buscador de clientes nunca traía un clienteId ya resuelto para
+        // un cliente real del catálogo DW — clienteBp resuelve/crea el espejo local por
+        // NIT, mismo mecanismo ya probado en clsCapturarSolicitudCommand.
+        var clienteId = await clsResolucionDeCliente.ResolverAsync(command.ClienteId, command.ClienteBp, clientes, clientesDw, ct);
 
         var solicitud = new clsSolicitud
         {
-            ClienteId = command.ClienteId,
+            ClienteId = clienteId,
             Tipo = ParseEnum<TipoSolicitud>(command.Tipo, "tipo"),
             Modalidad = command.Modalidad is null ? null : ParseEnum<ModalidadSolicitud>(command.Modalidad, "modalidad"),
             Deadline = command.Deadline,

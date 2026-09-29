@@ -16,15 +16,30 @@ public class clsCrearServicioConexoCommandTests
 
     private clsCrearServicioConexoCommandHandler Handler() => new(_repo.Object, _usuarioActual.Object, _uow.Object);
 
+    private static clsCrearServicioConexoCommand Comando(
+        string codigo = "PRE_BSAT", string tipo = "Precinto", string? origen = null, string? destino = null,
+        string? puerto = null, string? ruta = null, string? tipoMaquina = null, decimal costo = 5000m,
+        string unidad = "Por unidad", string? categoria = "adicional") =>
+        new(codigo, tipo, origen, destino, puerto, ruta, tipoMaquina, costo, unidad, new DateOnly(2026, 12, 31), categoria, true);
+
+    private void SinDuplicados() =>
+        _repo.Setup(r => r.ExisteDimensionesAsync(
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
+                It.IsAny<Guid?>(), default))
+            .ReturnsAsync(false);
+
     [Fact]
-    public async Task Nombre_duplicado_lanza_ConflictException()
+    public async Task Combinacion_de_dimensiones_duplicada_lanza_ConflictException()
     {
-        _repo.Setup(r => r.ExisteNombreAsync("Flete adicional", default)).ReturnsAsync(true);
+        _repo.Setup(r => r.ExisteDimensionesAsync(
+                "PRE_BSAT", clsServicioConexo.NoAplica, clsServicioConexo.NoAplica, clsServicioConexo.NoAplica,
+                "BSAT", clsServicioConexo.NoAplica, null, default))
+            .ReturnsAsync(true);
 
         await Assert.ThrowsAsync<clsConflictException>(() =>
-            Handler().Handle(new clsCrearServicioConexoCommand("Flete adicional", null, null, null, null, true)));
+            Handler().Handle(Comando(ruta: "BSAT")));
 
-        _repo.Verify(r => r.Agregar(It.IsAny<Domain.Catalogos.Entidades.clsServicioConexo>()), Times.Never);
+        _repo.Verify(r => r.Agregar(It.IsAny<clsServicioConexo>()), Times.Never);
     }
 
     [Theory]
@@ -35,12 +50,11 @@ public class clsCrearServicioConexoCommandTests
     [InlineData("ADICIONAL", "adicional")]
     public async Task Categoria_se_normaliza_o_usa_el_valor_por_defecto(string? entrada, string esperada)
     {
-        _repo.Setup(r => r.ExisteNombreAsync(It.IsAny<string>(), default)).ReturnsAsync(false);
-        Domain.Catalogos.Entidades.clsServicioConexo? guardado = null;
-        _repo.Setup(r => r.Agregar(It.IsAny<Domain.Catalogos.Entidades.clsServicioConexo>()))
-            .Callback<Domain.Catalogos.Entidades.clsServicioConexo>(s => guardado = s);
+        SinDuplicados();
+        clsServicioConexo? guardado = null;
+        _repo.Setup(r => r.Agregar(It.IsAny<clsServicioConexo>())).Callback<clsServicioConexo>(s => guardado = s);
 
-        await Handler().Handle(new clsCrearServicioConexoCommand("Servicio X", entrada, null, null, null, true));
+        await Handler().Handle(Comando(categoria: entrada));
 
         Assert.Equal(esperada, guardado!.Categoria);
     }
@@ -48,23 +62,36 @@ public class clsCrearServicioConexoCommandTests
     [Fact]
     public async Task Categoria_no_reconocida_lanza_ValidationFailedException()
     {
-        _repo.Setup(r => r.ExisteNombreAsync(It.IsAny<string>(), default)).ReturnsAsync(false);
+        SinDuplicados();
 
         var ex = await Assert.ThrowsAsync<clsValidationFailedException>(() =>
-            Handler().Handle(new clsCrearServicioConexoCommand("Servicio X", "opcional", null, null, null, true)));
+            Handler().Handle(Comando(categoria: "opcional")));
 
         Assert.Equal("CATEGORIA_INVALIDA", ex.Code);
     }
 
     [Fact]
-    public async Task Nombre_valido_crea_el_servicio_y_guarda()
+    public async Task Dimensiones_vacias_se_normalizan_a_NO_APLICA()
     {
-        _repo.Setup(r => r.ExisteNombreAsync(It.IsAny<string>(), default)).ReturnsAsync(false);
+        SinDuplicados();
+        clsServicioConexo? guardado = null;
+        _repo.Setup(r => r.Agregar(It.IsAny<clsServicioConexo>())).Callback<clsServicioConexo>(s => guardado = s);
 
-        var dto = await Handler().Handle(new clsCrearServicioConexoCommand("  Servicio Y  ", "adicional", null, 5000m, null, true));
+        await Handler().Handle(Comando(origen: null, destino: "  "));
 
-        Assert.Equal("Servicio Y", dto.Nombre); // se recorta
-        _repo.Verify(r => r.Agregar(It.IsAny<Domain.Catalogos.Entidades.clsServicioConexo>()), Times.Once);
+        Assert.Equal(clsServicioConexo.NoAplica, guardado!.Origen);
+        Assert.Equal(clsServicioConexo.NoAplica, guardado.Destino);
+    }
+
+    [Fact]
+    public async Task Datos_validos_crea_el_servicio_y_guarda()
+    {
+        SinDuplicados();
+
+        var dto = await Handler().Handle(Comando(tipo: "  Precinto de seguridad  "));
+
+        Assert.Equal("Precinto de seguridad", dto.TipoServicio); // se recorta
+        _repo.Verify(r => r.Agregar(It.IsAny<clsServicioConexo>()), Times.Once);
         _uow.Verify(u => u.SaveChangesAsync(default), Times.Once);
     }
 }

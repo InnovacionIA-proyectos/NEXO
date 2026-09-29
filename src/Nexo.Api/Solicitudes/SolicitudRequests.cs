@@ -5,8 +5,14 @@ namespace Nexo.Api.Solicitudes;
 /// <summary>Alta de una solicitud spot (o cabecera de licitación; las líneas se cargan luego en bulk).</summary>
 public class clsCrearSolicitudRequest
 {
-    [Required]
-    public Guid ClienteId { get; set; }
+    /// <summary>
+    /// Issue #206: uno de los dos es obligatorio (lo valida el handler, no aquí, para
+    /// devolver el mismo código CLIENTE_REQUERIDO que ya usa Captura). ClienteBp resuelve
+    /// o crea el espejo local del cliente real del catálogo DW por NIT.
+    /// </summary>
+    public Guid? ClienteId { get; set; }
+
+    public string? ClienteBp { get; set; }
 
     [Required]
     [RegularExpression("(?i)^(spot|licitacion)$", ErrorMessage = "Tipo debe ser 'spot' o 'licitacion'.")]

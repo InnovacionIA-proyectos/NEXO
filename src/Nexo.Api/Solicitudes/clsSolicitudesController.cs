@@ -58,7 +58,7 @@ public class clsSolicitudesController(
     public async Task<ActionResult> Crear([FromBody] clsCrearSolicitudRequest req, CancellationToken ct = default)
     {
         var linea = req.Linea is null ? null : new clsCrearLineaInput(req.Linea.RutaId, req.Linea.ConfigVehiculoId, req.Linea.Tipologia, req.Linea.Peso, req.Linea.ValorMercancia);
-        var id = await crear.Handle(new clsCrearSolicitudCommand(req.ClienteId, req.Tipo, req.Modalidad, req.Deadline, req.ValorEstimado, req.ProbabilidadCierre, linea), ct);
+        var id = await crear.Handle(new clsCrearSolicitudCommand(req.ClienteId, req.ClienteBp, req.Tipo, req.Modalidad, req.Deadline, req.ValorEstimado, req.ProbabilidadCierre, linea), ct);
         return Created($"/api/solicitudes/{id}", new { id });
     }
 

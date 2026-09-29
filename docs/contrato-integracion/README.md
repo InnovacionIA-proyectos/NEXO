@@ -50,6 +50,12 @@ GET /api/sesion/actual HTTP/1.1
 X-Portal-Usuario-Id: 10123
 ```
 
+> ⚠️ **Discrepancia abierta:** el backend hoy lee el header
+> `X-Portal-clsUsuario-Id` (constante `HeaderIdUsuario` en
+> `clsIdentidadPortalAuthenticationHandler`), no `X-Portal-Usuario-Id`. Hasta que
+> se corrija, un cliente que siga este documento recibe `401`. Estado y resto de
+> discrepancias: [`CONTRATO.md` §7](../../CONTRATO.md#7-discrepancias-conocidas-entre-código-y-contrato).
+
 ### Qué NO se envía y por qué
 
 El objeto que el portal deja en el navegador incluye la lista de permisos de la

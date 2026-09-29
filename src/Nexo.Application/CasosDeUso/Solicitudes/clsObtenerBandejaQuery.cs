@@ -1,5 +1,6 @@
 using Nexo.Application.CasosDeUso.Solicitudes.DTOs;
 using Nexo.Application.CasosDeUso.Solicitudes.Interfaces;
+using Nexo.Application.Common;
 using Nexo.Application.Common.Abstractions;
 using Nexo.Application.Common.Dtos;
 using Nexo.Domain.Catalogos.Entidades;
@@ -24,7 +25,8 @@ namespace Nexo.Application.CasosDeUso.Solicitudes;
 /// </summary>
 public sealed record clsObtenerBandejaQuery(clsBandejaFiltro Filtro, int Page = 1, int PageSize = 50) : IQuery<clsPaginaDto<clsBandejaItemDto>>;
 
-public sealed class clsObtenerBandejaQueryHandler(ISolicitudesRepository solicitudes, TimeProvider clock)
+public sealed class clsObtenerBandejaQueryHandler(
+    ISolicitudesRepository solicitudes, TimeProvider clock, ICurrentUserPort usuarioActual)
     : IQueryHandler<clsObtenerBandejaQuery, clsPaginaDto<clsBandejaItemDto>>
 {
     public async Task<clsPaginaDto<clsBandejaItemDto>> Handle(clsObtenerBandejaQuery query, CancellationToken ct = default)
@@ -38,7 +40,12 @@ public sealed class clsObtenerBandejaQueryHandler(ISolicitudesRepository solicit
         if (!string.IsNullOrWhiteSpace(filtro.Estado) && Enum.TryParse<EstadoSolicitud>(filtro.Estado, ignoreCase: true, out var e) && Enum.IsDefined(e))
             estado = e;
 
-        var filas = await solicitudes.BandejaFilasAsync(atencion, estado, filtro.Desde, filtro.Hasta, ct);
+        // Aislamiento por comercial (issue #199, S4-HU-19.1): un Comercial solo ve lo
+        // que él mismo creó. El resto de los roles (Mesa de Costeo/CoordinadorFletes,
+        // Admin, etc.) siguen viendo la bandeja completa, sin restricción.
+        var creadoPorFiltro = usuarioActual.Rol == RolUsuario.Comercial ? usuarioActual.Id : (Guid?)null;
+
+        var filas = await solicitudes.BandejaFilasAsync(atencion, estado, filtro.Desde, filtro.Hasta, creadoPorFiltro, ct);
 
         var limiteVigencia = ahora.AddDays(-7);
         var vigenciaFiltro = filtro.Vigencia?.Trim().ToLowerInvariant();

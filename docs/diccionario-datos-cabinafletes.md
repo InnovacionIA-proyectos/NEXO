@@ -1,6 +1,6 @@
 # Diccionario de datos — Base de datos `CabinaFletes`
 
-Descripción completa de las 21 tablas del sistema: qué contienen, qué significa cada columna, para qué sirven, sus llaves foráneas, y de dónde salen sus datos en la práctica (entrada manual, importación, generación automática, o siembra de demostración).
+Descripción completa de las 24 tablas del sistema: qué contienen, qué significa cada columna, para qué sirven, sus llaves foráneas, y de dónde salen sus datos en la práctica (entrada manual, importación, generación automática, o siembra de demostración).
 
 **Cómo usar este documento:** está organizado por área de negocio, en el orden en que probablemente tenga sentido explorarlo en DBeaver. Si tienes una duda puntual sobre algo que no quede claro aquí, pregúntame directamente.
 
@@ -44,6 +44,9 @@ Descripción completa de las 21 tablas del sistema: qué contienen, qué signifi
 
 **H. Catálogos agregados después (post-renombrado a Nexo)**
 21. [`municipios`](#21-municipios)
+22. [`pesos`](#22-pesos)
+23. [`tarifas_plaza`](#23-tarifas_plaza)
+24. [`tarifas_plaza_historico`](#24-tarifas_plaza_historico)
 
 **[Apéndice: todos los enums](#apéndice-enums-usados-en-todo-el-sistema)**
 
@@ -323,26 +326,36 @@ Llave natural única: `(Periodo, OrigenDane, DestinoDane, Configuracion, TipoCar
 
 ## 12. `servicios_conexos`
 
-**Entidad:** `ServicioConexo` — **Para qué sirve:** catálogo de servicios adicionales al flete (cargue, descargue, almacenamiento, escolta, candado satelital, etc.), mantenido por el área de Servicios Logísticos.
+**Entidad:** `ServicioConexo` — **Para qué sirve:** catálogo de servicios adicionales al flete (cargue, descargue, almacenamiento, ITR, escolta, candado satelital, acompañamiento vehicular, etc.), mantenido por el área de Servicios Logísticos.
+
+> **Reestructurada en S4-HU-15.1:** antes era un catálogo de valor único (`Nombre`+`ValorBase`+`ReglaCobro`). Ahora unifica en una sola tabla dos categorías con dimensiones de precio distintas: **Servicios Logísticos** (Almacenamiento por ciudad; ITR por puerto + tipo de máquina + movimiento) y **Servicios Adicionales** (por ruta, o por origen-destino según el servicio, ej. acompañamiento vehicular). Los 10 servicios ya sembrados de valor único (Cargue, Descargue, Stand-by, Candado satelital, Almacenamiento, Distribución multipunto, ITR, Escolta, Reexpedición, Montacargas) siguen funcionando: son su propia variante "genérica" dentro de esta misma tabla, con `'NO APLICA'` en las columnas de dimensión que no les aplican.
 
 | Columna | Tipo | Nullable | Descripción |
 |---|---|---|---|
-| `Nombre` | texto(120) | No | Nombre del servicio |
+| `CodigoServicio` | texto(30) | No | Código corto del servicio (ej. `PRE_BSAT`, `AVT_AUTO`); si el servicio no trae un código propio, se usa el mismo valor de `TipoServicio` |
+| `TipoServicio` | texto(120) | No | Nombre/descripción del servicio (antes `Nombre`) |
+| `Origen` | texto(150) | No | Ciudad (logísticos) u origen (adicionales). Texto plano, NO FK a `municipios`: nombre canónico si cruza con un municipio real, texto crudo del Excel si es un peaje/corredor sin equivalente. Default `'NO APLICA'` |
+| `Destino` | texto(150) | No | Solo aplica al servicio de acompañamiento vehicular (par origen-destino); misma regla que `Origen`. Default `'NO APLICA'` |
+| `Puerto` | texto(50) | No | Terminal del puerto (solo ITR, ej. `Tcbuen - Sprbun`, `Aguadulce`). Default `'NO APLICA'` |
+| `Ruta` | texto(50) | No | Tipo de ruta (solo servicios por ruta, ej. `Urbano`, `Colombia a Ecuador`). Default `'NO APLICA'` |
+| `TipoMaquina` | texto(60) | No | Máquina + cantidad de movimientos combinados (solo ITR, ej. `Maquina 3.5 - 2 Movimientos`). Default `'NO APLICA'` |
+| `CostoUnitario` | decimal | No | Valor unitario (antes `ValorBase`) |
+| `Unidad` | texto(30) | No | Unidad de cobro (`Por estiba` en logísticos, `Por unidad` en el resto por ahora) |
+| `Vigencia` | fecha | No | Fecha de vigencia del valor pactado (antes `VigenteHasta`) |
 | `Categoria` | texto(20) | No | `"logistico"` (default) o `"adicional"` |
-| `ReglaCobro` | JSON | Sí | Fórmula de cobro (ej. `{"tipo":"por_tonelada","valor":12000}`) |
-| `ValorBase` | decimal | Sí | Valor unitario base |
-| `VigenteHasta` | fecha | Sí | Fecha de vencimiento del valor pactado |
 | `Activo` | booleano | No | Default `true` |
 | `ActualizadoPor` | Guid | Sí | FK → `usuarios` |
 | `CreatedAt`/`UpdatedAt` | fecha | No | Auditoría estándar |
-| `RowVersion` | binario | Sí | Control de concurrencia optimista |
 
-**FK:** `ActualizadoPor` → `usuarios` (`Restrict`).
+**FK:** `ActualizadoPor` → `usuarios` (`Restrict`). Sin FK a `municipios` (`Origen`/`Destino` son texto plano, ver nota arriba).
+
+**Único:** `(CodigoServicio, Origen, Destino, Puerto, Ruta, TipoMaquina)` — evita variantes de precio duplicadas para la misma combinación de dimensiones.
 
 **De dónde salen los datos:**
 - Entrada manual (crear/editar desde la pantalla de servicios conexos).
-- **Importación masiva de Excel** (Nombre, Valor base, Vigente hasta, Categoría, Activo).
-- `DataSeeder.cs` siembra 10 servicios de demostración. Nota: existe una migración que en algún momento "vació" este catálogo en producción, así que puede empezar limpio en ambientes reales.
+- **Importación masiva de Excel** (por servicio, según sus dimensiones aplicables).
+- `DataSeeder.cs` sigue sembrando 10 servicios de demostración para ambientes locales/tests (ver nota de reestructuración arriba).
+- **Seeder real (S4-HU-15.1):** [`docs/Database/seeder/servicios_conexos.csv`](./Database/seeder/README.md) — 1346 filas construidas a partir de `docs_raw/conexos costos.xlsx` (2 hojas, 4 tablas) + los 10 servicios de valor único ya existentes, cruzando ciudades contra `tbl_municipios`.
 
 ---
 
@@ -376,7 +389,7 @@ Llave natural única: `(Periodo, OrigenDane, DestinoDane, Configuracion, TipoCar
 
 | Columna | Tipo | Nullable | Descripción |
 |---|---|---|---|
-| `Origen`/`Destino` | texto(150) | No | Ciudades, normalizadas |
+| `Origen`/`Destino` | texto(150) | No | Ciudades, normalizadas — **⚠️ desde S4-HU-10.1, las 348 filas sembradas por `docs/Database/seeder/reglas_solo_sicetac.csv` usan código DANE (ej. `76109000`) en vez de texto libre de ciudad; el resto del sistema/matching de reglas puede seguir esperando texto — revisar antes de confiar en el match** |
 | `TipoVehiculo` | texto(40) | No | Tipo/configuración de vehículo |
 | `CreadoPor` | Guid | Sí | Usuario que la creó |
 | `CreatedAt`/`UpdatedAt` | fecha | No | Auditoría estándar |
@@ -385,7 +398,7 @@ Llave natural única: `(Periodo, OrigenDane, DestinoDane, Configuracion, TipoCar
 
 **FK:** ninguna relacional formal.
 
-**De dónde salen los datos:** entrada manual, o **importación masiva de Excel** (columnas Origen/Destino/Tipo de vehículo). No tiene siembra de demostración.
+**De dónde salen los datos:** entrada manual, o **importación masiva de Excel** (columnas Origen/Destino/Tipo de vehículo). No tiene siembra de demostración — salvo las 348 filas de S4-HU-10.1 (ver `docs/Database/seeder/README.md`).
 
 ---
 
@@ -537,6 +550,71 @@ Llave natural única: `(Periodo, OrigenDane, DestinoDane, Configuracion, TipoCar
 - Tabla creada corriendo `docs/Database/ESQUEMA_NEXO.sql` a mano (no por migración de EF Core) y poblada corriendo el script de poblado con las filas ya calculadas — no hay endpoint ni comando que la siembre en vivo.
 - Se lee con `GET /api/captura-solicitudes/municipios` (Comercial/Admin) — todas las columnas, sin filtro ni paginación.
 - Ya ejecutado contra `dbInformesAutomatizados_Pruebas` (2026-09-26): 3.804 filas (Colombia 1.128, Venezuela 1.424, Ecuador 1.252).
+
+---
+
+## 22. `pesos`
+
+**Entidad:** `clsPeso` — **Para qué sirve:** catálogo CRUD propio de bandas de peso (kg) para el formulario de Tarifas de Plaza (S4-HU-10.1) — reemplaza el número libre que tenía el sistema externo.
+
+| Columna | Tipo | Nullable | Descripción |
+|---|---|---|---|
+| `Id` | int (autoincremental) | No | PK |
+| `PesoMinimo` | int | No | Límite inferior de la banda (kg) |
+| `PesoMaximo` | int | Sí | Límite superior (kg); `NULL` = banda abierta, sin tope (ej. PBV +10500) |
+
+**FK:** ninguna saliente. Referenciada por `tarifas_plaza.PesoId` (`Restrict`).
+
+**De dónde salen los datos:**
+- Tabla creada corriendo `ESQUEMA_NEXO.sql` y poblada con `docs/Database/seeder/pesos.csv` (8 filas: las 7 bandas de negocio + 1 banda real verificada en vivo en el sistema externo que no calzaba con ninguna de las 7 — ver el seeder README).
+- **No es un catálogo cerrado**: el sistema externo permite peso inferior/superior libres por tarifa puntual, así que este catálogo va a necesitar bandas nuevas con el tiempo. El CRUD (`api/pesos`, pendiente de construir por backend) es justo para eso.
+
+---
+
+## 23. `tarifas_plaza`
+
+**Entidad:** *(pendiente — solo existe como tabla, sin entidad/CRUD de C# todavía, ver nota de alcance abajo)* — **Para qué sirve:** tarifa de plaza gobernada por Nexo (S4-HU-10.1), recrea el formulario de captura que hoy vive en un sistema externo. **NO** es una copia de solo lectura de `tblSAPTarifas` (a diferencia de `tarifas_sicetac`).
+
+| Columna | Tipo | Nullable | Descripción |
+|---|---|---|---|
+| `Id` | Guid | No | PK |
+| `LineaNegocio` | texto(100) | No | Nombre completo de `tblSAPLineaNegocio` (dbSolucionesTI) — texto, no el `ID`: ese `ID` no significa nada dentro de Nexo |
+| `ClaseViaje` | texto(50) | No | Nombre completo de `tblSAPClaseViaje` — mismo criterio |
+| `OrigenMunicipioId`/`DestinoMunicipioId` | int | No | FK real a `municipios.Id` (el autoincremental de Nexo, **no** el código DANE) |
+| `ClaseContenedor` | texto(50) | Sí | Código de `tblSAPClaseContenedor` (ej. `CNT40.HC`); `NULL` cuando la tarifa no es de contenedor (ej. carga suelta nacional) |
+| `PesoId` | int | Sí | FK a `pesos.Id` — solo aplica a tarifas de contenedor por peso |
+| `TipoVehiculo` | texto(40) | Sí | Código tipo `"2S2"`/`"3S3"`, o el nombre real (`"TURBO"`/`"SENCILLO"`) cuando el catálogo oficial no distingue variantes con precio distinto |
+| `Valor` | decimal(18,2) | No | Valor de la tarifa (COP) |
+| `Vigencia` | fecha | No | Fecha de vigencia |
+| `DetallesTarifa` | texto(2000) | No | Texto libre obligatorio (condiciones, advertencias de negocio) |
+| `CreadoPor` | Guid | Sí | Usuario que la creó |
+| `CreatedAt`/`UpdatedAt` | fecha | No | Auditoría estándar |
+
+Índice único: `(LineaNegocio, ClaseViaje, OrigenMunicipioId, DestinoMunicipioId, ClaseContenedor, PesoId, TipoVehiculo)` — sus 7 dimensiones; `Valor`/`Vigencia`/`DetallesTarifa` es lo que cambia con el tiempo para una misma combinación.
+
+**FK:** `OrigenMunicipioId`/`DestinoMunicipioId` → `municipios` (`Restrict`), `PesoId` → `pesos` (`Restrict`).
+
+**De dónde salen los datos:**
+- Tabla creada corriendo `ESQUEMA_NEXO.sql` (no por migración de EF Core) y poblada con `docs/Database/seeder/tarifas_plaza.csv` — 271 filas extraídas de `docs_raw/fletes-plaza-normalizado-plaza.csv`, verificadas contra `tblSAPTarifas` real (valores en el mismo rango, una coincidencia exacta).
+- **No hay CRUD todavía** — entidad/comandos/endpoint quedan como trabajo pendiente de backend (Ismael); esta HU solo dejó el esquema + el dato ya poblado.
+- El trigger `TRG_tarifas_plaza_historico` archiva el valor anterior en `tarifas_plaza_historico` cada vez que alguien actualice `Valor`/`Vigencia`/`DetallesTarifa` de una fila existente.
+
+---
+
+## 24. `tarifas_plaza_historico`
+
+**Entidad:** *(pendiente, igual que `tarifas_plaza`)* — **Para qué sirve:** snapshot del valor ANTERIOR de una tarifa de plaza — igual que `tblSAPTarifasLog` es al `tblSAPTarifas` del sistema externo.
+
+| Columna | Tipo | Nullable | Descripción |
+|---|---|---|---|
+| `Id` | Guid | No | PK |
+| `TarifaPlazaId` | Guid | No | FK → `tarifas_plaza.Id` |
+| (resto de columnas) | — | — | Espejo exacto de `tarifas_plaza` en el momento en que se reemplazó (mismas 7 dimensiones + `Valor`/`Vigencia`/`DetallesTarifa`/`CreadoPor`/`CreatedAt` originales) |
+| `ReemplazadoAt` | fecha | No | Cuándo se archivó esta fila (cuándo se hizo el `UPDATE` que la reemplazó) |
+
+**FK:** `TarifaPlazaId` → `tarifas_plaza` (**Cascade**).
+
+**De dónde salen los datos:** **100% automático, por el trigger `TRG_tarifas_plaza_historico`** — nadie escribe aquí a mano ni por API. Nace vacía; se llena sola la primera vez que alguien actualice una fila de `tarifas_plaza`.
 
 ---
 

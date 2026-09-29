@@ -4,6 +4,7 @@ using Nexo.Application.Common;
 using Nexo.Application.Common.Abstractions;
 using Nexo.Application.Common.Exceptions;
 using Nexo.Application.Common.Ports;
+using Nexo.Domain.Catalogos.Entidades;
 using Nexo.Domain.Priorizacion.Entidades;
 using Nexo.Domain.Solicitudes.Entidades;
 using Nexo.Mensajes.Bandeja;
@@ -15,6 +16,7 @@ public class clsCrearSolicitudCommandTests
 {
     private readonly Mock<ISolicitudesRepository> _solicitudes = new();
     private readonly Mock<IClientesPort> _clientes = new();
+    private readonly Mock<IClientesDwPort> _clientesDw = new();
     private readonly Mock<IAuditoriaPort> _auditoria = new();
     private readonly Mock<ICurrentUserPort> _usuarioActual = new();
     private readonly Mock<IUnitOfWork> _uow = new();
@@ -22,7 +24,7 @@ public class clsCrearSolicitudCommandTests
     private static readonly TimeProvider Clock = TimeProvider.System;
 
     private clsCrearSolicitudCommandHandler Handler() => new(
-        _solicitudes.Object, _clientes.Object, _auditoria.Object, _usuarioActual.Object, Clock,
+        _solicitudes.Object, _clientes.Object, _clientesDw.Object, _auditoria.Object, _usuarioActual.Object, Clock,
         _publicador.Object, _uow.Object);
 
     private void PermitirClienteYParametros(Guid clienteId)
@@ -38,7 +40,7 @@ public class clsCrearSolicitudCommandTests
         _clientes.Setup(c => c.ExisteAsync(clienteId, default)).ReturnsAsync(false);
 
         await Assert.ThrowsAsync<clsValidationFailedException>(() =>
-            Handler().Handle(new clsCrearSolicitudCommand(clienteId, "Spot", null, null, null, null, null)));
+            Handler().Handle(new clsCrearSolicitudCommand(clienteId, null, "Spot", null, null, null, null, null)));
 
         _solicitudes.Verify(s => s.Agregar(It.IsAny<clsSolicitud>()), Times.Never);
     }
@@ -50,7 +52,7 @@ public class clsCrearSolicitudCommandTests
         PermitirClienteYParametros(clienteId);
 
         await Assert.ThrowsAsync<clsValidationFailedException>(() =>
-            Handler().Handle(new clsCrearSolicitudCommand(clienteId, "NoExiste", null, null, null, null, null)));
+            Handler().Handle(new clsCrearSolicitudCommand(clienteId, null, "NoExiste", null, null, null, null, null)));
     }
 
     [Fact]
@@ -61,7 +63,7 @@ public class clsCrearSolicitudCommandTests
         clsSolicitud? guardada = null;
         _solicitudes.Setup(s => s.Agregar(It.IsAny<clsSolicitud>())).Callback<clsSolicitud>(s => guardada = s);
 
-        var id = await Handler().Handle(new clsCrearSolicitudCommand(clienteId, "Licitacion", null, null, 10_000_000m, 0.5m, null));
+        var id = await Handler().Handle(new clsCrearSolicitudCommand(clienteId, null, "Licitacion", null, null, 10_000_000m, 0.5m, null));
 
         Assert.NotNull(guardada);
         Assert.Equal(id, guardada!.Id);
@@ -79,7 +81,7 @@ public class clsCrearSolicitudCommandTests
         _solicitudes.Setup(s => s.Agregar(It.IsAny<clsSolicitud>())).Callback<clsSolicitud>(s => guardada = s);
 
         var linea = new clsCrearLineaInput(Guid.NewGuid(), Guid.NewGuid(), "CargaSeca", 500m, 1_000_000m);
-        await Handler().Handle(new clsCrearSolicitudCommand(clienteId, "Spot", null, null, null, null, linea));
+        await Handler().Handle(new clsCrearSolicitudCommand(clienteId, null, "Spot", null, null, null, null, linea));
 
         Assert.Single(guardada!.Lineas);
         Assert.Equal(linea.RutaId, guardada.Lineas.First().RutaId);
@@ -93,7 +95,7 @@ public class clsCrearSolicitudCommandTests
         var clienteId = Guid.NewGuid();
         PermitirClienteYParametros(clienteId);
 
-        await Handler().Handle(new clsCrearSolicitudCommand(clienteId, "Spot", null, null, null, null, null));
+        await Handler().Handle(new clsCrearSolicitudCommand(clienteId, null, "Spot", null, null, null, null, null));
 
         _publicador.Verify(p => p.PublicarAsync(
             It.Is<clsBandejaCambio>(m => m.Motivo == clsMotivoDeCambio.SolicitudNueva),
@@ -114,7 +116,7 @@ public class clsCrearSolicitudCommandTests
         _uow.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
             .Callback(() => orden.Add("guardar")).ReturnsAsync(1);
 
-        await Handler().Handle(new clsCrearSolicitudCommand(clienteId, "Spot", null, null, null, null, null));
+        await Handler().Handle(new clsCrearSolicitudCommand(clienteId, null, "Spot", null, null, null, null, null));
 
         Assert.Equal(new[] { "publicar", "guardar" }, orden);
     }
@@ -128,8 +130,44 @@ public class clsCrearSolicitudCommandTests
         _clientes.Setup(c => c.ExisteAsync(clienteId, default)).ReturnsAsync(false);
 
         await Assert.ThrowsAsync<clsValidationFailedException>(() =>
-            Handler().Handle(new clsCrearSolicitudCommand(clienteId, "Spot", null, null, null, null, null)));
+            Handler().Handle(new clsCrearSolicitudCommand(clienteId, null, "Spot", null, null, null, null, null)));
 
         _publicador.VerifyNoOtherCalls();
+    }
+
+    // ------------------------------------------------ resolución por clienteBp (issue #206)
+
+    [Fact]
+    public async Task Con_clienteBp_en_vez_de_clienteId_resuelve_y_crea_el_cliente_local()
+    {
+        var bp = "BP-500";
+        var nit = "900123456";
+        _solicitudes.Setup(s => s.ParametrosScoreAsync(default)).ReturnsAsync(new clsParametrosScore());
+        _clientesDw.SetupGet(d => d.Configurado).Returns(true);
+        _clientesDw.Setup(d => d.ListarAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new clsClienteDwDto(bp, nit, "Cliente Real S.A.S.")]);
+        _clientes.Setup(c => c.ObtenerPorNitAsync(nit, It.IsAny<CancellationToken>())).ReturnsAsync((clsCliente?)null);
+        clsCliente? clienteCreado = null;
+        _clientes.Setup(c => c.Agregar(It.IsAny<clsCliente>())).Callback<clsCliente>(c => clienteCreado = c);
+        clsSolicitud? guardada = null;
+        _solicitudes.Setup(s => s.Agregar(It.IsAny<clsSolicitud>())).Callback<clsSolicitud>(s => guardada = s);
+
+        await Handler().Handle(new clsCrearSolicitudCommand(null, bp, "Spot", null, null, null, null, null));
+
+        Assert.NotNull(clienteCreado);
+        Assert.Equal(nit, clienteCreado!.Nit);
+        Assert.NotNull(guardada);
+        Assert.Equal(clienteCreado.Id, guardada!.ClienteId);
+    }
+
+    [Fact]
+    public async Task Sin_clienteId_ni_clienteBp_lanza_CLIENTE_REQUERIDO()
+    {
+        _solicitudes.Setup(s => s.ParametrosScoreAsync(default)).ReturnsAsync(new clsParametrosScore());
+
+        var ex = await Assert.ThrowsAsync<clsValidationFailedException>(() =>
+            Handler().Handle(new clsCrearSolicitudCommand(null, null, "Spot", null, null, null, null, null)));
+
+        Assert.Equal("CLIENTE_REQUERIDO", ex.Code);
     }
 }

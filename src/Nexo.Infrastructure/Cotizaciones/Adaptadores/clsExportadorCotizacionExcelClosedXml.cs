@@ -14,7 +14,7 @@ public sealed class clsExportadorCotizacionExcelClosedXml : IExportadorCotizacio
     public (byte[] Contenido, string NombreArchivo) Generar(clsCotizacion c)
     {
         // Catálogo de los servicios usados: nombre + categoría (logístico | adicional).
-        string Nombre(clsCotizacionConexo x) => x.clsServicioConexo?.Nombre ?? "Servicio";
+        string Nombre(clsCotizacionConexo x) => x.clsServicioConexo?.TipoServicio ?? "Servicio";
         string Categoria(clsCotizacionConexo x) => x.clsServicioConexo?.Categoria == "adicional" ? "adicional" : "logistico";
 
         var logisticos = c.Conexos.Where(x => Categoria(x) == "logistico").ToList();
