@@ -16,7 +16,9 @@ public record clsLineaSolicitudDto(
 public record clsSolicitudDto(
     Guid Id, Guid ClienteId, string? ClienteNombre, TipoSolicitud Tipo, ModalidadSolicitud? Modalidad,
     DateTimeOffset? Deadline, decimal? ProbabilidadCierre, decimal? ValorEstimado, decimal ScorePrioridad,
-    EstadoSolicitud Estado, DateTimeOffset CreatedAt, IReadOnlyList<clsLineaSolicitudDto> Lineas);
+    EstadoSolicitud Estado, DateTimeOffset CreatedAt, IReadOnlyList<clsLineaSolicitudDto> Lineas,
+    /// <summary>Notas u observaciones comerciales (S4-HU-18.10/#227).</summary>
+    string? Notas = null);
 
 /// <summary>Fila de la Bandeja Priorizada (anti-FIFO).</summary>
 public record clsBandejaItemDto(

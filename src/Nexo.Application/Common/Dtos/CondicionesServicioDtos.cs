@@ -23,7 +23,11 @@ public record clsTiemposLogisticosDto(decimal HorasCargue, decimal HorasDescargu
 public record clsCondicionesServicioDto(
     string? Referencia,
     clsTiemposLogisticosDto? TiemposLogisticos,
-    clsMotivoRechazoDto? Rechazo = null)
+    clsMotivoRechazoDto? Rechazo = null,
+    /// <summary>Notas u observaciones comerciales de la solicitud (S4-HU-18.10/#227) —
+    /// libres, del comercial que captura, no confundir con <see cref="Referencia"/>
+    /// (referencia/PO del cliente).</summary>
+    string? Notas = null)
 {
     /// <summary>Opciones de (de)serialización del JSON de condiciones (camelCase, tolerante).</summary>
     public static readonly JsonSerializerOptions Json = new()
