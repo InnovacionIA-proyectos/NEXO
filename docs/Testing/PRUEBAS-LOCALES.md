@@ -31,6 +31,33 @@ docker compose -f docker-compose.ci.yml run --rm pruebas-reales
 Compose lee `.env` directamente (sin pasar por ninguna shell), así que no hay
 riesgo de que una variable no propague.
 
+## Limitación conocida — DWSice desde Docker (Opción 2) no funciona en local
+
+Cualquier prueba que dispare una consulta real a DWSice (piso SICE-TAC, cuando
+la línea de la solicitud tiene una ruta con origen/destino resuelto — ver
+`clsObtenerCosteoQueryHandler`) falla con `500 Internal Server Error` al
+correr `pruebas-reales`/`pruebas-reales-completas` en Docker en local. En la
+Opción 1 (PowerShell, sin Docker) las mismas pruebas pasan sin problema.
+
+**Causa:** DWSice corre en SQL Server 2008 R2 (SP3), con soporte TLS muy
+limitado. El cliente .NET nativo de Windows (SChannel) y un cliente JDBC
+(DBeaver) completan el handshake TLS con él sin problema; el cliente .NET de
+Linux (OpenSSL, el que corre dentro del contenedor) no — el servidor cierra
+la conexión justo después de recibir el ClientHello, sin responder nunca.
+Se probó a fondo (cifrados/versión TLS, `Encrypt`, MTU, los tres modos de red
+de Docker Desktop, `netsh portproxy`, incluso forzar OpenSSL 1.1 en vez de
+3.0) sin que nada cambiara el resultado — no es algo ajustable desde este
+repo ni desde la imagen Docker de pruebas.
+
+**Para QA:** si una prueba abre/costea una solicitud con una ruta real
+(origen/destino que resuelve), usar la **Opción 1 (PowerShell nativo)**. La
+Opción 2 (Docker) sigue sirviendo para todo lo demás: build, `Domain.Tests`,
+`Application.Tests`, y la mayoría de `Api.Tests` (los que no tocan DWSice).
+
+El pipeline real de CI (`.github/workflows/ci-cd-api.yml`, runner self-hosted
+`dokploy_`) no tiene este problema — corre nativo en Windows, en la misma red
+donde vive Dokploy, y sí llega a DWSice sin problema.
+
 ## Qué NO hacer
 
 - **No usar `pruebas` ni `pruebas-integracion`** de `docker-compose.ci.yml` para
@@ -50,3 +77,4 @@ riesgo de que una variable no propague.
 | Error de red al conectar a `10.10.40.85` | VPN corporativa desconectada. Verificar con `Test-NetConnection -ComputerName 10.10.40.85 -Port 1433`. |
 | `Invalid object name 'db_NEXO.tbl_...'` | El esquema/tabla todavía no existe en la base real — ver `docs/Database/MIGRACION-PREFIJO-TBL.md`. |
 | Timeout solo dentro de Docker (Opción 2), pero el host sí conecta | La VPN puede hacer split-tunneling que excluye la red virtual de Docker — confirmar conectividad desde dentro del contenedor. |
+| `500 Internal Server Error` al abrir/costear una solicitud con ruta real, solo en Docker (Opción 2) | DWSice no completa el TLS handshake con el cliente .NET Linux del contenedor — ver "Limitación conocida" arriba. Usar Opción 1. |
