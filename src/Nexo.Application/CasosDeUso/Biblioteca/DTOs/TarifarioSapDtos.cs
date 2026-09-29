@@ -16,7 +16,11 @@ public record clsConsultaTarifarioSap(
     bool Exclusivo,
     bool Consolidado,
     bool RetornaContenedor = false,
-    string? CiudadDevolucion = null);
+    string? CiudadDevolucion = null,
+    /// <summary>Horas de cargue+descargue REALES de la solicitud (S4-HU-14.1/#221) — para
+    /// recalcular el piso SICE-TAC oficial en vez de asumir las horas pactadas. Null cuando
+    /// no hay contexto de solicitud.</summary>
+    decimal? HorasSolicitud = null);
 
 /// <summary>
 /// Resultado del motor: la tarifa de plaza seleccionada por las reglas (si está
