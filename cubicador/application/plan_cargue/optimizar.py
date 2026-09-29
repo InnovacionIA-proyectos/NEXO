@@ -22,6 +22,7 @@ from domain.motor.motor import MotorCubicacion3D
 from domain.motor.optimizadores import algoritmos_disponibles
 
 from . import mapeos
+from .vehiculos import apto_para_plan_3d
 from .resultado import ResultadoPlan, obtener_resultado
 
 _motor = MotorCubicacion3D()
@@ -79,6 +80,12 @@ async def optimizar_plan(
     vehiculo = await vehiculos.obtener(plan.vehiculo_id)
     if vehiculo is None:
         raise NotFoundException("VEHICULO_NO_ENCONTRADO", "El vehiculo del plan ya no existe.")
+    if not apto_para_plan_3d(vehiculo):
+        raise ValidationFailedException(
+            "VEHICULO_SIN_DATOS_PARA_PLAN",
+            f"El vehiculo '{vehiculo.nombre}' no tiene medidas de puerta o posiciones de eje, "
+            "que el motor 3D necesita. Completalas en el catalogo antes de optimizar.",
+        )
 
     contenedor = mapeos.a_contenedor(vehiculo)
     items = mapeos.expandir_items(plan.items)

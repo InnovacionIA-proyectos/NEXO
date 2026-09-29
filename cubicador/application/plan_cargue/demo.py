@@ -6,13 +6,26 @@ from __future__ import annotations
 
 from datetime import datetime
 
+from application.excepciones import ValidationFailedException
 from application.ports.repositorios import IPlanCargueRepository, IVehiculoCubicacionRepository
 from domain.entidades.entidades import ItemPlanCargue, PlanCargue
 
+_CODIGO_VEHICULO_DEMO = "furgon_semirremolque"
+
 
 async def crear_plan_demo(planes: IPlanCargueRepository, vehiculos: IVehiculoCubicacionRepository) -> PlanCargue:
+    # S4-HU-12.1: busqueda por codigo. Antes era `"13.6" in v.nombre`, una
+    # subcadena del NOMBRE, que el usuario edita desde la interfaz: renombrar el
+    # furgon dejaba esta funcion sin vehiculo. Y el `next()` sin default lanzaba
+    # StopIteration, que el worker trata como fallo INESPERADO -tres reintentos
+    # identicos y luego DLQ- en vez de un rechazo de negocio.
     catalogo = await vehiculos.listar_con_siembra()
-    vehiculo = next(v for v in catalogo if "13.6" in v.nombre)
+    vehiculo = next((v for v in catalogo if v.codigo == _CODIGO_VEHICULO_DEMO), None)
+    if vehiculo is None:
+        raise ValidationFailedException(
+            "PRESET_VEHICULO_NO_ENCONTRADO",
+            f"El vehiculo de la demostracion ('{_CODIGO_VEHICULO_DEMO}') no existe en el catalogo.",
+        )
     plan = await planes.crear(f"Demo cubicacion {datetime.now():%Y-%m-%d %H:%M}", vehiculo.id)
 
     def demo(

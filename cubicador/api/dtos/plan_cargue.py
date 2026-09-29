@@ -10,7 +10,11 @@ from .comun import ApiModel
 
 
 class EjeVehiculoDto(ApiModel):
-    posicion_mm: float
+    # `posicion_mm` opcional desde S4-HU-12.1: el contenedor refrigerado de 40
+    # solo existia en el catalogo del motor rapido, que guarda capacidades por
+    # eje pero no sus posiciones. CAMBIA EL CONTRATO del evento
+    # vehiculo.creado/actualizado que consume NEXO -> ver el contrato de la HU.
+    posicion_mm: float | None = None
     capacidad_kg: float
 
 
@@ -23,13 +27,26 @@ class VehiculoCubicacionDto(ApiModel):
     alto_interno_mm: float
     capacidad_kg: float
     tara_kg: float
-    puerta_ancho_mm: float
-    puerta_alto_mm: float
+    # Opcionales desde S4-HU-12.1 por la misma razon que EjeVehiculoDto:
+    # un vehiculo puede tener la puerta DESCONOCIDA. CAMBIA EL CONTRATO.
+    puerta_ancho_mm: float | None = None
+    puerta_alto_mm: float | None = None
     puerta_posicion: str
     ejes: list[EjeVehiculoDto]
     tolerancia_paredes_mm: float
     tolerancia_entre_unidades_mm: float
     es_preset: bool
+
+    # Campos nuevos del catalogo unificado (S4-HU-12.1). Viajan en el evento
+    # para que NEXO pueda resolver la ConfiguracionVehiculo de cada linea con
+    # `config_vehiculo` (codigo de tblSAPTiposVehiculoTarifario) sin adivinarlo.
+    codigo: str | None = None
+    config_vehiculo: str | None = None
+    carroceria: str | None = None
+    clase_viaje: str | None = None
+    clase_contenedor: str | None = None
+    geometria: str | None = None
+    control_ambiental: str | None = None
 
 
 class GuardarVehiculoInput(ApiModel):
@@ -41,12 +58,27 @@ class GuardarVehiculoInput(ApiModel):
     alto_interno_mm: float
     capacidad_kg: float
     tara_kg: float
-    puerta_ancho_mm: float
-    puerta_alto_mm: float
+    # Opcionales desde S4-HU-12.1: un vehiculo puede tener la puerta desconocida.
+    puerta_ancho_mm: float | None = None
+    puerta_alto_mm: float | None = None
     puerta_posicion: str
     ejes: list[EjeVehiculoDto]
     tolerancia_paredes_mm: float = 0.0
     tolerancia_entre_unidades_mm: float = 0.0
+
+    # Clasificacion y evaluacion (S4-HU-12.1). Sin estos, un vehiculo creado
+    # desde la interfaz nace incompleto: no se ofrece en la cubicacion rapida
+    # -no se le puede suponer si lleva refrigeracion- y no tiene con que
+    # resolver la tarifa. Todos opcionales para no romper a NEXO mientras
+    # actualiza su lado; quien no los mande sigue creando vehiculos, solo que
+    # limitados. `codigo` NO se acepta: es identidad de este servicio y se
+    # genera aqui.
+    config_vehiculo: str | None = None
+    carroceria: str | None = None
+    clase_viaje: str | None = None
+    clase_contenedor: str | None = None
+    geometria: str | None = None
+    control_ambiental: str | None = None
 
 
 class ItemPlanCargueDto(ApiModel):
