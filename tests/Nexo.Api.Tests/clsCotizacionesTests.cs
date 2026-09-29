@@ -131,4 +131,33 @@ public class clsCotizacionesTests
         var despues = _fx.WithDb(db => db.TarifasHistoricas.Count());
         Assert.True(despues > antes, "Una cotización ganada debe crear una tarifa histórica.");
     }
+
+    // 6) S4-HU-11.1/#213 — solo Comercial y Admin deciden si una cotización se ganó o se perdió.
+    [Theory]
+    [InlineData("AdminTarifas")]
+    [InlineData("CoordinadorFletes")]
+    public async Task Marcar_resultado_con_rol_no_autorizado_devuelve_403(string rol)
+    {
+        var (sid, lid) = await NuevaSolicitudConLinea();
+        var admin = _fx.Client();
+        var cid = (await (await admin.PostJson("/api/cotizaciones", new { solicitudId = sid })).Json()).GetProperty("id").GetGuid();
+        await admin.PostJson($"/api/cotizaciones/{cid}/lineas", new { lineaSolicitudId = lid, valorFlete = 1000, fuente = "manual" });
+        await admin.PostAsync($"/api/cotizaciones/{cid}/entregar", null);
+
+        var resp = await _fx.Client(rol).PostJson($"/api/cotizaciones/{cid}/resultado", new { resultado = "ganada" });
+        Assert.Equal(HttpStatusCode.Forbidden, resp.StatusCode);
+    }
+
+    [Fact] // sin regresión: Comercial sigue pudiendo marcar el resultado.
+    public async Task Marcar_resultado_con_rol_Comercial_devuelve_200()
+    {
+        var (sid, lid) = await NuevaSolicitudConLinea();
+        var admin = _fx.Client();
+        var cid = (await (await admin.PostJson("/api/cotizaciones", new { solicitudId = sid })).Json()).GetProperty("id").GetGuid();
+        await admin.PostJson($"/api/cotizaciones/{cid}/lineas", new { lineaSolicitudId = lid, valorFlete = 1000, fuente = "manual" });
+        await admin.PostAsync($"/api/cotizaciones/{cid}/entregar", null);
+
+        var resp = await _fx.Client("Comercial").PostJson($"/api/cotizaciones/{cid}/resultado", new { resultado = "ganada" });
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+    }
 }
