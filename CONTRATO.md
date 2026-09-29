@@ -294,6 +294,7 @@ interface SolicitudDto {
   deadline: FechaISO | null; probabilidadCierre: Decimal | null; valorEstimado: Decimal | null
   scorePrioridad: Decimal; estado: "Pendiente" | "EnCosteo" | "Entregada" | "Descartada"
   createdAt: FechaISO; lineas: LineaSolicitudDto[]
+  notas: string | null                           // observaciones comerciales (#227)
 }
 interface BandejaItemDto {                       // fila de GET /api/solicitudes
   id: UUID; cliente: string; tipo: string; estado: string
@@ -463,6 +464,22 @@ interface CubicacionRapidaResultado {
 // shape completo en Nexo.Application/CasosDeUso/PlanDeCargue/DTOs/PlanCargueDtos.cs y
 // Nexo.Application/CasosDeUso/Cubicacion/DTOs/CubicacionRapidaDtos.cs; espejan 1:1 lo
 // documentado en cubicador/CONTRATO.md §3.2.
+
+interface TipoVehiculoDto { codigo: string; descripcion: string; esCatalogoOficial: boolean } // false = los 5 casos especiales sin código SAP (§3.19)
+interface LineaNegocioDto { id: number; descripcion: string }
+interface ClaseViajeDto { id: number; descripcion: string }
+interface ClaseContenedorDto { id: number; descripcion: string; tamanoContenedor: number | null; pesoInfCnt: number | null; pesoSupCnt: number | null }
+
+interface RangoPesoDto { id: number; pesoMinimo: number; pesoMaximo: number | null } // pesoMaximo null = banda abierta
+
+interface TarifaPlazaDto {
+  id: UUID; lineaNegocio: string; claseViaje: string
+  origenMunicipioId: number; origen: string; zonaOrigen: string | null
+  destinoMunicipioId: number; destino: string; zonaDestino: string | null
+  claseContenedor: string | null; pesoId: number | null; rangoPeso: string | null; tipoVehiculo: string | null
+  valor: Decimal; vigencia: Fecha; detallesTarifa: string; createdAt: FechaISO
+}
+interface ImportarTarifasPlazaResultDto { procesadas: number; insertadas: number; actualizadas: number; rechazadas: number; errores: string[] } // errores: tope 20 mensajes
 ```
 
 ---
@@ -604,6 +621,7 @@ Resuelve o crea rutas y vehículos a partir del texto libre de las líneas.
 | `referencia` | *opcional* | string | |
 | `horasCargue` | *opcional* | decimal | 0–240 |
 | `horasDescargue` | *opcional* | decimal | 0–240 |
+| `notas` | *opcional* | string | máx. 2000. Observaciones comerciales (distinto de `referencia`) |
 | `lineas` | **requerido** | array | mínimo 1 |
 
 | Cada línea | | Tipo | Restricción |
@@ -719,7 +737,9 @@ Marca la entrega y envía la cotización por correo al comercial responsable
 Si `resultado = "ganada"`, realimenta la biblioteca de Tarifas Ganadas.
 **Siempre hay que entregar primero** (`/entregar`).
 
-- **Roles**: `Comercial`, `AdminTarifas`, `CoordinadorFletes`, `Admin`.
+- **Roles**: `Comercial`, `Admin` (#213 — decidir si una cotización se ganó
+  o se perdió es criterio del Comercial dueño del negocio; ni AdminTarifas
+  ni CoordinadorFletes tienen este permiso).
 
 | Body | | Tipo | Restricción |
 |---|---|---|---|
@@ -1157,6 +1177,102 @@ Cubicador rechaza el vehículo. Envíalas siempre.
 - **Auth**: ninguna (anónimo).
 - **→** `200` / `503` `{ status, duracion, chequeos: { [nombre]: { status, descripcion, error } } }`
 
+### 3.19 Catálogos — `/api/catalogos`
+
+Catálogos oficiales de solo lectura (S4-HU-09/S4-HU-10) para los desplegables
+de Reglas Solo-SICETAC y Tarifas de Plaza — reemplazan el texto libre.
+**Todo el controller**: los 6 roles (solo requiere sesión válida).
+
+| Endpoint | Fuente | → |
+|---|---|---|
+| `GET /api/catalogos/tipos-vehiculo` | `tblSAPTiposVehiculoTarifario` + 5 casos especiales sin código SAP | `200 TipoVehiculoDto[]` |
+| `GET /api/catalogos/lineas-negocio` | `tblSAPLineaNegocio` | `200 LineaNegocioDto[]` |
+| `GET /api/catalogos/clases-viaje` | `tblSAPClaseViaje` | `200 ClaseViajeDto[]` |
+| `GET /api/catalogos/clases-contenedor` | `tblSAPClaseContenedor` | `200 ClaseContenedorDto[]` |
+
+### 3.20 Rangos de peso — `/api/pesos`
+
+Bandas de peso (kg) propias de Nexo para Tarifas de Plaza (S4-HU-10.1) — **no
+es un catálogo cerrado**, se pueden agregar bandas nuevas con el tiempo.
+`pesoMaximo = null` es una banda abierta (p. ej. "+10500 kg").
+**Todo el controller**: `AdminTarifas`, `Admin`.
+
+#### `GET /api/pesos`
+- **→** `200 RangoPesoDto[]`
+
+#### `POST /api/pesos` — crear banda
+
+| Body | | Tipo | Restricción |
+|---|---|---|---|
+| `pesoMinimo` | **requerido** | int | ≥ 0 |
+| `pesoMaximo` | *opcional* | int | > `pesoMinimo` si viene; `null` = banda abierta |
+
+- **→** `201 RangoPesoDto`, header `Location: /api/pesos/{id}`
+- **Errores**: `400 RANGO_PESO_INVALIDO` (mínimo negativo, o máximo ≤ mínimo) · `409 RANGO_PESO_DUPLICADO`
+
+#### `PUT /api/pesos/{id}` — editar banda
+Mismo body y errores que crear, más `404 RANGO_PESO_NO_ENCONTRADO`.
+- **→** `200 RangoPesoDto`
+
+#### `DELETE /api/pesos/{id}`
+- **→** `204`
+- **Errores**: `404 RANGO_PESO_NO_ENCONTRADO`
+
+### 3.21 Tarifas de plaza — `/api/tarifas-plaza`
+
+CRUD de tarifas de plaza gobernadas por Nexo (S4-HU-10.2) — recrea el
+formulario de captura que hoy vive en un sistema externo, con carga/descarga
+masiva por Excel. `zonaOrigen`/`zonaDestino` se resuelven solos desde el
+catálogo de municipios al elegir `origenMunicipioId`/`destinoMunicipioId`.
+Al menos uno de `pesoId`/`tipoVehiculo` es obligatorio — **no son mutuamente
+excluyentes**: las tarifas de contenedor traen ambos (el tipo de vehículo se
+deriva de la banda de peso), las nacionales solo `tipoVehiculo`.
+**Todo el controller**: `AdminTarifas`, `Admin`.
+
+#### `GET /api/tarifas-plaza`
+- **→** `200 TarifaPlazaDto[]`
+
+#### `POST /api/tarifas-plaza` — crear
+
+| Body | | Tipo | Restricción |
+|---|---|---|---|
+| `lineaNegocio` | **requerido** | string | debe existir en el catálogo real (§3.19) |
+| `claseViaje` | **requerido** | string | debe existir en el catálogo real (§3.19) |
+| `origenMunicipioId` | **requerido** | int | debe existir |
+| `destinoMunicipioId` | **requerido** | int | debe existir |
+| `claseContenedor` | *opcional* | string | |
+| `pesoId` | *opcional* | int | debe existir en `/api/pesos`; ver regla de arriba |
+| `tipoVehiculo` | *opcional* | string | ver regla de arriba |
+| `valor` | **requerido** | decimal | > 0 |
+| `vigencia` | **requerido** | fecha | |
+| `detallesTarifa` | **requerido** | string | |
+
+- **→** `201 TarifaPlazaDto`, header `Location: /api/tarifas-plaza/{id}`
+- **Errores**: `400 TARIFA_PLAZA_INVALIDA` · `400 MUNICIPIO_INVALIDO` · `400 RANGO_PESO_INVALIDO` · `409 TARIFA_PLAZA_DUPLICADA` (misma combinación exacta de las 7 dimensiones)
+
+#### `PUT /api/tarifas-plaza/{id}` — editar
+Mismo body y errores que crear, más `404 TARIFA_PLAZA_NO_ENCONTRADA`. Editar
+`valor`/`vigencia`/`detallesTarifa` archiva el valor anterior en el
+histórico — nada especial que hacer del lado del cliente.
+- **→** `200 TarifaPlazaDto`
+
+#### `DELETE /api/tarifas-plaza/{id}`
+- **→** `204`
+- **Errores**: `404 TARIFA_PLAZA_NO_ENCONTRADA`
+
+#### `POST /api/tarifas-plaza/importar-excel`
+Upsert por línea de negocio + clase de viaje + origen + destino + clase de
+contenedor + rango de peso + tipo de vehículo (las 7 dimensiones).
+
+- **Body**: `multipart/form-data`, campo `archivo` (§1.9), tope 10 MB.
+- **→** `200 ImportarTarifasPlazaResultDto`
+- **Errores**: `400 ARCHIVO_REQUERIDO` · `400 FORMATO_NO_SOPORTADO` (solo `.xlsx`/`.xlsm`)
+
+#### `GET /api/tarifas-plaza/exportar-excel`
+Descarga el catálogo completo — el mismo archivo sirve de plantilla para
+`importar-excel`.
+- **→** `200`, archivo `.xlsx` (`Content-Type` de Excel)
+
 ---
 
 ## 4. Hubs de SignalR — conexión
@@ -1192,7 +1308,8 @@ abiertos a los 6 roles.
 | `POST /api/solicitudes/{id}/lineas:bulk` | | ✅ | | | | ✅ |
 | `POST /api/solicitudes/{id}/rechazar` | ✅ | ✅ | | | | ✅ |
 | `POST /api/solicitudes/{id}/recalcular-score` | | ✅ | | | | ✅ |
-| `POST /api/cotizaciones` · `aplicar-propuestas` · `resultado` | ✅ | ✅ | ✅ | | | ✅ |
+| `POST /api/cotizaciones` · `aplicar-propuestas` | ✅ | ✅ | ✅ | | | ✅ |
+| `POST /api/cotizaciones/{id}/resultado` | ✅ | | | | | ✅ |
 | `POST /api/cotizaciones/{id}/lineas` · `entregar` | | ✅ | ✅ | | | ✅ |
 | `POST /api/cotizaciones/{id}/conexos` | ✅ | ✅ | | | | ✅ |
 | Vigencia plaza SAP (`PATCH`, `POST masivo`, `DELETE`) | | ✅ | ✅ | | | ✅ |
@@ -1205,6 +1322,8 @@ abiertos a los 6 roles.
 | Escrituras de `/api/planes-cargue` | ✅ | ✅ | | | | ✅ |
 | `POST /api/vehiculos` | ✅ | ✅ | | | | ✅ |
 | `DELETE /api/vehiculos/{id}` | | | | | | ✅ |
+| `/api/pesos` (todo, incluido `GET`) | | | ✅ | | | ✅ |
+| `/api/tarifas-plaza` (todo, incluido `GET`) | | | ✅ | | | ✅ |
 
 ---
 
