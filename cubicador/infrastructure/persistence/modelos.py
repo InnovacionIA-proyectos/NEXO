@@ -29,13 +29,39 @@ class VehiculoCubicacionModel(Base):
     alto_interno_mm: Mapped[float] = mapped_column(Float)
     capacidad_kg: Mapped[float] = mapped_column(Float)
     tara_kg: Mapped[float] = mapped_column(Float)
-    puerta_ancho_mm: Mapped[float] = mapped_column(Float)
-    puerta_alto_mm: Mapped[float] = mapped_column(Float)
+    puerta_ancho_mm: Mapped[float | None] = mapped_column(Float, nullable=True)
+    puerta_alto_mm: Mapped[float | None] = mapped_column(Float, nullable=True)
     puerta_posicion: Mapped[str] = mapped_column(String(20), default="trasera")
     ejes_json: Mapped[str] = mapped_column(Text, default="[]")
     tolerancia_paredes_mm: Mapped[float] = mapped_column(Float, default=0.0)
     tolerancia_entre_unidades_mm: Mapped[float] = mapped_column(Float, default=0.0)
     es_preset: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    # --- S4-HU-12.1: catalogo unico -----------------------------------------
+    # Estas 7 columnas vivian en la constante CATALOGO de
+    # domain/motor/cubicacion_rapida.py, que describia los mismos vehiculos
+    # con otros campos. Al unificarse, esta tabla es la UNICA fuente.
+    #
+    # Nullable a proposito, no por descuido:
+    #   - `codigo` porque una fila creada ANTES de 12.1 no lo tiene (un
+    #     ADD COLUMN NOT NULL fallaria sobre la tabla ya poblada). El seeder lo
+    #     rellena para los presets y lo genera para los vehiculos nuevos.
+    #   - el resto porque el contrato de POST /api/vehiculos todavia no los
+    #     expone, asi que un vehiculo creado desde la interfaz nace sin ellos.
+    #     Es un estado TRANSITORIO: se cierra cuando entren los contratos de
+    #     back y front (ver la HU).
+    codigo: Mapped[str | None] = mapped_column(String(40), nullable=True, unique=True, index=True)
+    config_vehiculo: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    carroceria: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    clase_viaje: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    clase_contenedor: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    geometria: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    control_ambiental: Mapped[str | None] = mapped_column(String(20), nullable=True)
+
+    # El peso bruto NO se guarda: se deriva sumando capacidad_kg + tara_kg.
+    # CATALOGO guardaba bruto y vacio, y derivaba la capacidad restando; esta
+    # tabla guarda capacidad y tara. Guardar los tres permitiria que se
+    # contradigan entre si, que es exactamente la divergencia que 12.1 corrige.
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_ahora)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_ahora, onupdate=_ahora)
 

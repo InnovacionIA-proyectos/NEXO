@@ -19,11 +19,16 @@ internamente convierte a metros como el prototipo.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from math import ceil
 
 # ---- UMBRALES GOBERNADOS (SICCE-005) - cualquier cambio debe documentarse como nueva version de la regla.
 _UMBRAL_ADVERTENCIA_PESO_EJE = 0.90  # 90-100% de un eje: advertencia
 _UMBRAL_ADVERTENCIA_UTILIZACION = 0.95  # >95% del volumen util: advertencia
 _MARGEN_ESTABILIDAD_CG = 0.30  # CG a +-30% del centro geometrico
+
+# Tope de camiones que se propone en una flota. Mismo valor que usa
+# application/plan_cargue/desde_linea.py al repartir en cascada.
+_MAX_VEHICULOS_FLOTA = 20
 
 # Incompatibilidades declaradas entre categorias (segregacion SICCE-002).
 _INCOMPATIBILIDADES: list[tuple[str, str, str]] = [
@@ -141,6 +146,11 @@ class SugerenciaFlota:
     clase_viaje: str | None
     clase_contenedor: str | None
     disposiciones: list[Disposicion]
+    # S4-HU-12.2: el reparto por peso, que es LA respuesta de la HU.
+    # `peso_por_vehiculo_kg` es igual para todos los camiones: esa es la
+    # "distribucion equilibrada" que pide el criterio de aceptacion.
+    peso_total_kg: float = 0.0
+    peso_por_vehiculo_kg: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -192,46 +202,27 @@ class _Bulto:
 
 
 # ------------------------------------------------------------- catalogo de arquetipos (SICCE-004)
-
-CATALOGO: list[UnidadCubicacion] = [
-    UnidadCubicacion("turbo_estacas", "Turbo con estacas", "semicerrada", "ninguno",
-                     6.20, 2.20, 2.00, 10500, 4200, [3500, 7000],
-                     "2L3", "ESTACAS", "Carga Suelta", None),
-    UnidadCubicacion("sencillo_estacas", "Sencillo con estacas", "semicerrada", "ninguno",
-                     7.20, 2.35, 2.20, 17500, 7500, [6000, 11000],
-                     "2", "ESTACAS", "Carga Suelta", None),
-    UnidadCubicacion("dobletroque_estacas", "Dobletroque con estacas", "semicerrada", "ninguno",
-                     7.80, 2.40, 2.30, 28000, 10500, [6000, 22000],
-                     "3", "ESTACAS", "Carga Suelta", None),
-    UnidadCubicacion("furgon_semirremolque", "Semirremolque furgon", "cerrada", "ninguno",
-                     12.20, 2.45, 2.70, 34000, 7000, [6000, 10500, 10500],
-                     "3S3", "FURGON", "Carga Suelta", None),
-    UnidadCubicacion("plataforma_sencilla", "Plataforma (tractomula)", "abierta", "ninguno",
-                     12.20, 2.50, 2.80, 34000, 6500, [6000, 10500, 10500],
-                     "3S3", "PLATAFORMA", "Carga Suelta", None),
-    UnidadCubicacion("cama_baja", "Cama baja (lowboy)", "abierta", "ninguno",
-                     12.50, 2.60, 1.60, 48000, 9000, [6000, 10500, 10500, 10500],
-                     "3S3", "CAMABAJA", "Extradimensionado", None),
-    UnidadCubicacion("contenedor_seco_20", "Contenedor seco 20 pies", "cerrada", "ninguno",
-                     5.90, 2.35, 2.39, 24000, 2200, [10900, 10900],
-                     "2S2", "PORTACONTENEDORES", "Contenedor", "CNT20.ST"),
-    UnidadCubicacion("contenedor_seco_40", "Contenedor seco 40 pies", "cerrada", "ninguno",
-                     12.03, 2.35, 2.39, 30480, 3800, [13340, 13340],
-                     "3S3", "PORTACONTENEDORES", "Contenedor", "CNT40.HC"),
-    UnidadCubicacion("contenedor_refrigerado_40", "Contenedor refrigerado 40 pies (reefer)", "cerrada", "refrigeracion",
-                     11.56, 2.28, 2.25, 29500, 4800, [12350, 12350],
-                     "3S3", "PORTACONTENEDORES", "Contenedor", "CNT40.RE"),
-]
+#
+# S4-HU-12.1: aqui vivia la constante CATALOGO con 9 UnidadCubicacion escritas
+# a mano. Ya no existe. El catalogo es UNO SOLO y vive en la tabla
+# `vehiculos_cubicacion`; quien llama a `cubicar` trae las unidades y este
+# modulo sigue siendo dominio puro, sin saber de donde salieron.
+#
+# La traduccion de fila de catalogo a UnidadCubicacion la hace la capa de
+# aplicacion (application/cubicacion_rapida/casos_de_uso.py::unidad_desde_vehiculo).
 
 
-def catalogo() -> list[UnidadCubicacion]:
-    return CATALOGO
+def cubicar(
+    request: CubicacionRequest, medidas: MedidasEstandar, unidades: list[UnidadCubicacion],
+) -> CubicacionResponse:
+    """Evalua compatibilidad + disposicion, sugiere vehiculo y detecta extradimension.
 
-
-def cubicar(request: CubicacionRequest, medidas: MedidasEstandar) -> CubicacionResponse:
-    """Evalua compatibilidad + disposicion, sugiere vehiculo y detecta extradimension."""
+    `unidades` entra como parametro desde S4-HU-12.1 (antes era la constante
+    CATALOGO de este mismo modulo). El dominio sigue siendo puro: no sabe que
+    detras hay una tabla.
+    """
     candidatas = (
-        [u for u in CATALOGO if u.id in request.unidad_ids] if request.unidad_ids else CATALOGO
+        [u for u in unidades if u.id in request.unidad_ids] if request.unidad_ids else unidades
     )
 
     matrices: list[MatrizCubicacion] = []
@@ -257,6 +248,21 @@ def cubicar(request: CubicacionRequest, medidas: MedidasEstandar) -> CubicacionR
         sugerencia_flota = _sugerir_flota(request.items, candidatas, request.clase_viaje)
 
     globales: list[str] = []
+
+    # S4-HU-12.2: sin peso no hay recomendacion de cuantos camiones. El DTO de
+    # la API ya lo exige, pero el puente `crear_desde_linea` arma los items
+    # desde `PosicionCarga`, cuyo `peso_kg` SI puede venir nulo desde NEXO.
+    # `_expandir` convierte ese None en 0.0, asi que sin este aviso la flota
+    # devolveria "ninguna" sin decir que el problema es un dato que falta, no
+    # que la carga quepa en un vehiculo.
+    sin_peso = [i.descripcion or "sin descripcion" for i in request.items if i.peso_kg is None]
+    if sin_peso:
+        globales.append(
+            f"{len(sin_peso)} item(s) sin peso: no se puede calcular cuantos vehiculos hacen falta. "
+            f"Captura el peso de {', '.join(sin_peso[:3])}"
+            + (f" y {len(sin_peso) - 3} mas." if len(sin_peso) > 3 else ".")
+        )
+
     if sugerencia_flota is not None:
         globales.append(
             f"La carga no cabe en un solo vehiculo: se requieren "
@@ -347,36 +353,83 @@ def _sugerir(matrices: list[MatrizCubicacion], clase_viaje: str | None) -> Suger
 def _sugerir_flota(
     items: list[ItemCubicacion], unidades: list[UnidadCubicacion], clase_viaje: str | None,
 ) -> SugerenciaFlota | None:
-    """Reparto voraz de la carga en VARIAS unidades del mismo tipo: llena un
-    vehiculo con la heuristica de estanterias (respetando su capacidad de
-    peso) y lo que sobra pasa al siguiente. Elige el tipo que requiera menos
-    vehiculos, prefiriendo la clase de viaje de la linea."""
-    max_vehiculos = 20
-    opciones: list[tuple[UnidadCubicacion, list[Disposicion]]] = []
+    """Cuantos camiones hacen falta y cuanto lleva cada uno, POR PESO (S4-HU-12.2).
+
+    Antes esto era un reparto VORAZ: se llenaba un vehiculo con la heuristica de
+    estanterias hasta donde cupiera -por volumen o por peso, lo que se agotara
+    primero- y el sobrante pasaba al siguiente. El ultimo camion quedaba casi
+    vacio. La HU pide lo contrario: "una distribucion equilibrada", "no solo la
+    primera combinacion que quepa".
+
+    Ahora manda el peso:
+
+      cantidad = techo(peso_total / capacidad_de_carga)
+      por cami0n = peso_total / cantidad        <- iguales, no el tope y el resto
+
+    El empaque 3D se sigue haciendo, pero con el reparto equilibrado como TECHO
+    de cada camion (`limite_peso_kg`), para que las disposiciones digan lo mismo
+    que la recomendacion. Si se empacara con la capacidad plena, el primer
+    vehiculo se llenaria al maximo y los numeros reportados y los reales se
+    contradirian.
+
+    Que veh0culo se elige NO cambia en esta issue: se mantiene el criterio que
+    ya existia -clase de viaje, menos camiones, mayor utilizacion- por decision
+    explicita de no inventar una regla de negocio que negocio no dio. El texto
+    de la issue dice "solo peso (no dimensiones)"; se interpreta que eso aplica
+    a CUANTOS camiones, no a cual. Esta diferencia esta documentada a proposito.
+    """
+    peso_total = sum(b.peso for b in _expandir(items))
+    if peso_total <= 0:
+        return None  # sin peso no hay nada que repartir: lo resuelve `_sugerir`
+
+    opciones: list[tuple[UnidadCubicacion, list[Disposicion], float]] = []
 
     for unidad in unidades:
         if _evaluar_ambiental(items, unidad).resultado != "aprobado":
             continue
-
-        restantes = _expandir(items)
-        if any(not _cabe_en_alguna_orientacion(b, unidad) or b.peso > unidad.capacidad_carga_kg for b in restantes):
+        if unidad.capacidad_carga_kg <= 0:
             continue
 
-        disposiciones: list[Disposicion] = []
-        while restantes and len(disposiciones) < max_vehiculos:
-            colocaciones, sobrantes = _empacar(restantes, unidad)
-            if not colocaciones:
-                break  # no progresa: tipo no viable
-            disposiciones.append(_medir(colocaciones, [], unidad))
-            restantes = sobrantes
+        bultos = _expandir(items)
+        if any(not _cabe_en_alguna_orientacion(b, unidad) or b.peso > unidad.capacidad_carga_kg for b in bultos):
+            continue
 
-        if not restantes and len(disposiciones) > 1:
-            opciones.append((unidad, disposiciones))
+        # El peso da el MINIMO de camiones, no el numero final: una carga
+        # voluminosa y liviana puede caber de sobra en peso y no caber en
+        # volumen. Se arranca por el minimo y se sube hasta que la carga entre
+        # de verdad, repartiendo equilibrado en cada intento.
+        cantidad = ceil(peso_total / unidad.capacidad_carga_kg)
+        resultado: list[Disposicion] | None = None
+        while cantidad <= _MAX_VEHICULOS_FLOTA:
+            por_vehiculo = peso_total / cantidad
+            disposiciones: list[Disposicion] = []
+            restantes = bultos
+            while restantes and len(disposiciones) < cantidad:
+                # Ultimo camion sin techo: se lleva lo que quede. El reparto por
+                # peso es exacto, pero los bultos son indivisibles y el redondeo
+                # deja unos kilos fuera del objetivo.
+                es_ultimo = len(disposiciones) == cantidad - 1
+                colocaciones, sobrantes = _empacar(restantes, unidad, None if es_ultimo else por_vehiculo)
+                if not colocaciones:
+                    break  # no progresa: este tipo no sirve con ningun reparto
+                disposiciones.append(_medir(colocaciones, [], unidad))
+                restantes = sobrantes
+            if not restantes and disposiciones:
+                resultado = disposiciones
+                break
+            if not disposiciones:
+                break
+            cantidad += 1  # la geometria pide mas de lo que pedia el peso
+
+        if resultado is None or len(resultado) < 2:
+            continue  # un solo camion es trabajo de `_sugerir`
+
+        opciones.append((unidad, resultado, peso_total / len(resultado)))
 
     if not opciones:
         return None
 
-    mejor_unidad, mejor_disp = min(
+    mejor_unidad, mejor_disp, mejor_por_vehiculo = min(
         opciones,
         key=lambda o: (
             0 if clase_viaje is not None and o[0].clase_viaje == clase_viaje else 1,
@@ -389,6 +442,8 @@ def _sugerir_flota(
         mejor_unidad.id, mejor_unidad.nombre, len(mejor_disp), round(utilizacion_prom, 3),
         mejor_unidad.config_vehiculo, mejor_unidad.carroceria,
         mejor_unidad.clase_viaje, mejor_unidad.clase_contenedor, mejor_disp,
+        peso_total_kg=round(peso_total, 2),
+        peso_por_vehiculo_kg=round(mejor_por_vehiculo, 2),
     )
 
 
@@ -611,16 +666,27 @@ def _expandir(items: list[ItemCubicacion]) -> list[_Bulto]:
     return sorted(bultos, key=lambda b: b.peso, reverse=True)
 
 
-def _empacar(bultos: list[_Bulto], unidad: UnidadCubicacion) -> tuple[list[ColocacionDisposicion], list[_Bulto]]:
+def _empacar(
+    bultos: list[_Bulto], unidad: UnidadCubicacion, limite_peso_kg: float | None = None,
+) -> tuple[list[ColocacionDisposicion], list[_Bulto]]:
     """Coloca los bultos en la unidad respetando geometria Y capacidad de
     peso; lo que no quepa vuelve como sobrante (en la flota pasa al siguiente
-    vehiculo)."""
+    vehiculo).
+
+    `limite_peso_kg` (S4-HU-12.2) baja el techo de peso por debajo de la
+    capacidad del vehiculo. Lo usa el reparto de flota para que cada camion se
+    cargue hasta su porcion EQUILIBRADA y no hasta el tope: sin esto el empaque
+    llena el primero al maximo y el ultimo queda casi vacio, que es justo el
+    reparto voraz que esta issue vino a reemplazar. Nunca sube por encima de la
+    capacidad real.
+    """
+    tope = unidad.capacidad_carga_kg if limite_peso_kg is None else min(limite_peso_kg, unidad.capacidad_carga_kg)
     colocaciones: list[ColocacionDisposicion] = []
     sobrantes: list[_Bulto] = []
     x = y = z = alto_fila = alto_nivel = peso_acumulado = 0.0
 
     for b in bultos:
-        if peso_acumulado + b.peso > unidad.capacidad_carga_kg:
+        if peso_acumulado + b.peso > tope:
             sobrantes.append(b)
             continue
         if y + b.ancho > unidad.ancho_util_m:

@@ -25,10 +25,20 @@ class SqlVehiculoCubicacionRepository:
         self._publisher = publisher
 
     async def listar_con_siembra(self) -> list[VehiculoCubicacion]:
-        # Siembra por NOMBRE: si el catalogo de presets crece, los faltantes
-        # se agregan sin duplicar los existentes (que el usuario pudo haber editado).
-        nombres = (await self._s.execute(select(VehiculoCubicacionModel.nombre))).scalars().all()
-        faltantes = [p for p in presets() if p.nombre not in nombres]
+        # Siembra por CODIGO desde S4-HU-12.1. Antes era por NOMBRE, que el
+        # usuario puede editar desde la interfaz: renombrar un preset lo volvia
+        # "faltante" y lo sembraba de nuevo, duplicado. El codigo es opaco y no
+        # se edita.
+        #
+        # Backfill primero: las filas creadas ANTES de 12.1 no tienen codigo
+        # (la columna nacio nullable, ver db.py). Se les asigna por nombre, una
+        # sola vez. Una fila cuyo nombre el usuario ya habia editado no matchea
+        # y queda sin codigo - se comporta igual que antes de este cambio, el
+        # preset se vuelve a sembrar. No se adivina a que preset corresponde.
+        await self._backfill_codigos()
+
+        codigos = set((await self._s.execute(select(VehiculoCubicacionModel.codigo))).scalars().all())
+        faltantes = [p for p in presets() if p.codigo not in codigos]
         if faltantes:
             self._s.add_all([_a_modelo(p) for p in faltantes])
             await self._s.commit()
@@ -46,6 +56,22 @@ class SqlVehiculoCubicacionRepository:
         filas = (await self._s.execute(select(VehiculoCubicacionModel).order_by(VehiculoCubicacionModel.nombre))).scalars().all()
         return [_a_entidad(f) for f in filas]
 
+    async def _backfill_codigos(self) -> None:
+        sin_codigo = (await self._s.execute(
+            select(VehiculoCubicacionModel).where(VehiculoCubicacionModel.codigo.is_(None))
+        )).scalars().all()
+        if not sin_codigo:
+            return
+        por_nombre = {p.nombre: p.codigo for p in presets()}
+        tocadas = 0
+        for fila in sin_codigo:
+            codigo = por_nombre.get(fila.nombre)
+            if codigo is not None:
+                fila.codigo = codigo
+                tocadas += 1
+        if tocadas:
+            await self._s.commit()
+
     async def republicar_todos(self) -> list[VehiculoCubicacion]:
         """Repara una desincronizacion ya existente entre el catalogo de
         Cubicador y la proyeccion de NEXO: republica vehiculo.creado para
@@ -62,9 +88,14 @@ class SqlVehiculoCubicacionRepository:
         fila = await self._s.get(VehiculoCubicacionModel, id)
         return _a_entidad(fila) if fila else None
 
-    async def buscar_por_nombre(self, nombre: str) -> VehiculoCubicacion | None:
+    async def buscar_por_codigo(self, codigo: str) -> VehiculoCubicacion | None:
+        """La UNICA forma de buscar un vehiculo. Hasta S4-HU-12.1 existia tambien
+        `buscar_por_nombre`, y el nombre es editable desde la interfaz:
+        renombrar un preset rompia a quien lo buscara asi. Se elimino en vez de
+        dejarla como alternativa - tres sitios distintos habian caido en esa
+        trampa (desde_linea, demo y la propia siembra)."""
         fila = (await self._s.execute(
-            select(VehiculoCubicacionModel).where(VehiculoCubicacionModel.nombre == nombre)
+            select(VehiculoCubicacionModel).where(VehiculoCubicacionModel.codigo == codigo)
         )).scalar_one_or_none()
         return _a_entidad(fila) if fila else None
 
@@ -104,7 +135,11 @@ def _a_modelo(v: VehiculoCubicacion) -> VehiculoCubicacionModel:
         puerta_ancho_mm=v.puerta_ancho_mm, puerta_alto_mm=v.puerta_alto_mm, puerta_posicion=v.puerta_posicion,
         ejes_json=json.dumps([{"posicionMm": e.posicion_mm, "capacidadKg": e.capacidad_kg} for e in v.ejes]),
         tolerancia_paredes_mm=v.tolerancia_paredes_mm, tolerancia_entre_unidades_mm=v.tolerancia_entre_unidades_mm,
-        es_preset=v.es_preset, created_at=v.created_at, updated_at=v.updated_at,
+        es_preset=v.es_preset,
+        codigo=v.codigo, config_vehiculo=v.config_vehiculo, carroceria=v.carroceria,
+        clase_viaje=v.clase_viaje, clase_contenedor=v.clase_contenedor,
+        geometria=v.geometria, control_ambiental=v.control_ambiental,
+        created_at=v.created_at, updated_at=v.updated_at,
     )
 
 
@@ -121,7 +156,10 @@ def _a_evento_payload(v: VehiculoCubicacion) -> dict:
 
 def _a_entidad(f: VehiculoCubicacionModel) -> VehiculoCubicacion:
     try:
-        ejes = [EjeVehiculoRow(e["posicionMm"], e["capacidadKg"]) for e in json.loads(f.ejes_json)]
+        # .get("posicionMm"): desde S4-HU-12.1 la posicion puede faltar (el
+        # reefer no la tiene). Un JSON viejo siempre la trae, asi que el .get
+        # tambien cubre el caso legado sin ramas extra.
+        ejes = [EjeVehiculoRow(e.get("posicionMm"), e["capacidadKg"]) for e in json.loads(f.ejes_json)]
     except (json.JSONDecodeError, KeyError, TypeError):
         ejes = []  # tolerante a datos legados/corruptos, igual que el original
     return VehiculoCubicacion(
@@ -130,5 +168,9 @@ def _a_entidad(f: VehiculoCubicacionModel) -> VehiculoCubicacion:
         capacidad_kg=f.capacidad_kg, tara_kg=f.tara_kg,
         puerta_ancho_mm=f.puerta_ancho_mm, puerta_alto_mm=f.puerta_alto_mm, puerta_posicion=f.puerta_posicion,
         ejes=ejes, tolerancia_paredes_mm=f.tolerancia_paredes_mm, tolerancia_entre_unidades_mm=f.tolerancia_entre_unidades_mm,
-        es_preset=f.es_preset, created_at=f.created_at, updated_at=f.updated_at,
+        es_preset=f.es_preset,
+        codigo=f.codigo, config_vehiculo=f.config_vehiculo, carroceria=f.carroceria,
+        clase_viaje=f.clase_viaje, clase_contenedor=f.clase_contenedor,
+        geometria=f.geometria, control_ambiental=f.control_ambiental,
+        created_at=f.created_at, updated_at=f.updated_at,
     )

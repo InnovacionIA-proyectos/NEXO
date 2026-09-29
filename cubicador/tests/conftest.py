@@ -13,7 +13,7 @@ veces escribiendo los tests de S3-HU-10:
    `test_eliminar_vehiculo_borra_y_publica_vehiculo_eliminado` falla con
    VEHICULO_EN_USO.
 2. Agregar un vehiculo rompe `test_flujo_completo_crear_optimizar`, que afirma
-   `len(vehiculos) == 9`.
+   `len(vehiculos) == 10` (9 hasta S4-HU-12.1).
 
 Lo peor no es que fallen: es que fallan en OTRO archivo, con un error que no
 menciona al test culpable. Se pierde mas tiempo buscando una regresion que no

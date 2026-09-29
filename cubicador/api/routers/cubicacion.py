@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends
 
-from api.dependencias import obtener_parametros_repo, verificar_api_key
+from api.dependencias import obtener_parametros_repo, obtener_vehiculo_repo, verificar_api_key
 from api.dtos.cubicacion_rapida import CubicacionRequestDto, CubicacionResponseDto, MedidasEstandarDto, UnidadCubicacionDto
 from application.cubicacion_rapida import casos_de_uso as cu
 from domain.motor import cubicacion_rapida as motor
@@ -28,14 +28,20 @@ def _a_request_dominio(req: CubicacionRequestDto) -> motor.CubicacionRequest:
 
 
 @router.post("", response_model=CubicacionResponseDto)
-async def cubicar(request: CubicacionRequestDto, parametros_repo=Depends(obtener_parametros_repo)):
-    respuesta = await cu.evaluar_cubicacion(parametros_repo, _a_request_dominio(request))
+async def cubicar(
+    request: CubicacionRequestDto,
+    parametros_repo=Depends(obtener_parametros_repo),
+    vehiculos_repo=Depends(obtener_vehiculo_repo),
+):
+    # S4-HU-12.1: las unidades ya no son una constante del motor, salen del
+    # catalogo unico. Por eso este endpoint ahora toca la base.
+    respuesta = await cu.evaluar_cubicacion(parametros_repo, vehiculos_repo, _a_request_dominio(request))
     return CubicacionResponseDto.model_validate(respuesta)
 
 
 @router.get("/unidades", response_model=list[UnidadCubicacionDto])
-async def unidades():
-    return [UnidadCubicacionDto.model_validate(u) for u in cu.catalogo_unidades()]
+async def unidades(vehiculos_repo=Depends(obtener_vehiculo_repo)):
+    return [UnidadCubicacionDto.model_validate(u) for u in await cu.catalogo_unidades(vehiculos_repo)]
 
 
 @router.get("/medidas-estandar", response_model=MedidasEstandarDto)

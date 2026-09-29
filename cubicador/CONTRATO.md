@@ -638,6 +638,7 @@ si el mensaje deja de entregarse.
 
 - Exchange: `cubicador.eventos` (topic).
 - Routing keys: `cubicacion.solicitada`, `plan-de-cargue.generado`,
+  `flota-de-cargue.generada` (S4-HU-12.3),
   `cubicacion.rechazada` y también `vehiculo.creado`/
   `vehiculo.actualizado`/`vehiculo.eliminado` (los 3 del catálogo: el último
   lo publica `eliminar_vehiculo`, y solo si el borrado se aplicó de verdad —
@@ -727,3 +728,467 @@ nombre de proyecto Compose) evita la ambigüedad.
 - `PATCH .../colocaciones/{id}` es la única operación de escritura que
   **nunca** pasa por cola — todo el resto de mutaciones sobre un plan
   (crear, optimizar, reoptimizar, crear-desde-línea) son asíncronas.
+
+---
+
+## 9. S4-HU-12 — qué tiene que hacer el backend (NEXO)
+
+> **Destinatario: vasco-dev.** Este equipo solo construye dentro de
+> `cubicador/`; todo lo que cambie en NEXO se documenta aquí y lo ejecuta el
+> backend. Esta sección se escribe a medida que cada issue de la HU termina,
+> así que crece: lo que está marcado **LISTO** ya está implementado de este
+> lado y espera su contraparte; lo marcado **PENDIENTE** todavía no.
+
+### 9.1 (12.1 · LISTO de este lado) El catálogo de vehículos cambió de forma
+
+Hasta ahora había **dos** fuentes describiendo los mismos vehículos con campos
+distintos: la tabla `vehiculos_cubicacion` (dimensiones, capacidad, tara,
+puerta, ejes) y una constante en el código del motor rápido (clasificación
+SICE/SAP). Ninguna alcanzaba sola. Se unificaron en la tabla, que ahora es la
+única fuente.
+
+**Tres consecuencias para NEXO, en orden de urgencia.**
+
+#### a) El evento `VehiculoCreado`/`VehiculoActualizado` ya no cabe en el DTO actual
+
+`VehiculoCubicacionDto` gana siete campos y relaja tres. El payload que viaja
+en `{ correlationId, vehiculo: {...} }` queda así:
+
+```jsonc
+{
+  "id": "uuid", "nombre": "Contenedor refrigerado 40", "descripcion": "...",
+  "largoInternoMm": 11560, "anchoInternoMm": 2280, "altoInternoMm": 2250,
+  "capacidadKg": 24700, "taraKg": 4800,
+
+  "puertaAnchoMm": null,          // ← AHORA PUEDE SER NULL
+  "puertaAltoMm": null,           // ← AHORA PUEDE SER NULL
+  "puertaPosicion": "trasera",
+  "ejes": [ { "posicionMm": null, "capacidadKg": 12350 } ],   // ← posicionMm PUEDE SER NULL
+
+  "toleranciaParedesMm": 0, "toleranciaEntreUnidadesMm": 0, "esPreset": true,
+
+  "codigo": "contenedor_refrigerado_40",   // ← NUEVO
+  "configVehiculo": "3S3",                 // ← NUEVO
+  "carroceria": "PORTACONTENEDORES",       // ← NUEVO
+  "claseViaje": "Contenedor",              // ← NUEVO
+  "claseContenedor": "CNT40.RE",           // ← NUEVO
+  "geometria": "cerrada",                  // ← NUEVO
+  "controlAmbiental": "refrigeracion"      // ← NUEVO
+}
+```
+
+**Esto rompe hoy**, y está verificado contra el código de NEXO, no supuesto.
+Los tres campos que pasan a admitir `null` están declarados como `decimal` no
+anulable, que en C# es un tipo por valor: un `null` en el JSON revienta al
+deserializar, antes de llegar a la base.
+
+| Dónde | Qué dice hoy |
+|---|---|
+| `src/Nexo.Mensajes/Cubicacion/MensajesDeCubicacion.cs:74` | `record clsEjeVehiculoInput(decimal PosicionMm, decimal CapacidadKg)` |
+| `src/Nexo.Mensajes/Cubicacion/MensajesDeCubicacion.cs:87` y `:259` | `decimal PuertaAnchoMm, decimal PuertaAltoMm` |
+| `src/Nexo.Domain/PlanDeCargue/Entidades/clsPlanCargue.cs:29-30` | `public decimal PuertaAnchoMm { get; set; }` |
+
+Hay que pasarlos a `decimal?` en los tres sitios, hacer anulables las columnas
+correspondientes de `tbl_vehiculos_cubicacion` y agregar las siete nuevas. Los
+ejes viajan serializados en `EjesJson` (`clsPlanCargue.cs:37`), así que ahí no
+hay columna que alterar, pero sí el record que los parsea.
+
+**Por qué hay nulos y no valores por defecto.** El reefer solo existía en la
+constante del motor, que nunca guardó puerta ni posiciones de eje. Se decidió
+dejarlos en `null` en vez de copiarlos del contenedor de 40 seco: sería un dato
+inventado, y la puerta la usa el motor 3D para decidir si la carga entra.
+`null` significa *desconocido*, no *cero*.
+
+#### b) `configVehiculo` es el puente hacia `ConfiguracionVehiculo`
+
+Es el código de `tblSAPTiposVehiculoTarifario`, y es el campo que permite
+resolver o crear la `clsConfiguracionVehiculo` de una línea sin adivinarla.
+Hasta ahora el Cubicador no lo exponía y el back no tenía de dónde sacarlo.
+
+Dos correcciones que viajan en él y que **arreglan un fallo silencioso que ya
+existe en producción**:
+
+| Vehículo | Antes | Ahora | Por qué |
+|---|---|---|---|
+| Camión rígido dobletroque | `3` | `C3` | `3` **no existe** en `tblSAPTiposVehiculoTarifario`. Cuando `TipoVehiculo` no matchea ningún `CODIGO`, `IdVehiculoSapAsync` devuelve null y el costeo **deja de filtrar por vehículo, sin error ni log**. `C3` está activo y su descripción es literalmente "Dobletroque" |
+| Contenedor 40 High Cube | mapeado al reefer | fila propia | Eran dos vehículos distintos emparejados por error |
+
+#### c) El catálogo pasa de 9 a 10 vehículos
+
+Al separar el High Cube seco del refrigerado. Cualquier prueba o pantalla que
+asuma nueve deja de valer.
+
+#### d) `POST /api/vehiculos` tiene que **mandar** la clasificación, no solo recibirla
+
+Esto es lo inverso de (a): ahí el evento viaja de Cubicador hacia NEXO; aquí el
+comando viaja de NEXO hacia Cubicador, y **también le faltan campos**.
+
+El `GuardarVehiculoInput` de este servicio ya los acepta (todos opcionales, para
+no romper a NEXO mientras se actualiza):
+
+```jsonc
+{
+  "nombre": "...", "largoInternoMm": 12000, /* ...lo de siempre... */
+
+  "puertaAnchoMm": null,      // ← ahora admite null
+  "puertaAltoMm": null,       // ← ahora admite null
+  "ejes": [ { "posicionMm": null, "capacidadKg": 8000 } ],
+
+  "configVehiculo": "3S3",       // ← NEXO debe enviarlos
+  "carroceria": "FURGON",
+  "claseViaje": "Carga Suelta",
+  "claseContenedor": null,
+  "geometria": "cerrada",
+  "controlAmbiental": "ninguno"
+}
+```
+
+**Qué pasa si NEXO no los manda** — y pasa hoy: el vehículo se crea, aparece en
+`GET /api/vehiculos`, pero **queda fuera de la cubicación rápida**. Sin
+`geometria` ni `controlAmbiental` no se puede evaluar, y no se les supone un
+valor por defecto a propósito: con carga refrigerada, suponer que el vehículo la
+tiene y suponer que no son dos errores caros, y el primero no se nota hasta que
+la mercancía llega dañada.
+
+Para el usuario eso se ve como *"creé un camión y nunca me lo sugiere"*, sin
+ninguna explicación. Por eso el mismo campo va también al contrato del frontend:
+el formulario tiene que pedirlos. Mientras las dos partes no estén, conviene que
+la interfaz avise que el vehículo quedará limitado.
+
+**`codigo` NO se envía.** Es identidad de este servicio y se genera aquí — ver
+el punto siguiente.
+
+#### e) `codigo` viene siempre, también en los vehículos que crea el usuario
+
+Es la identidad **estable** del vehículo: se genera una sola vez, al crearlo, a
+partir del nombre (minúsculas, sin tildes, sin paréntesis, sin palabras vacías)
+y **no se recalcula al renombrar**. Esa es justamente su razón de ser — el
+nombre es editable desde la interfaz y no sirve como identidad.
+
+Del lado de NEXO conviene usarlo como clave al proyectar el espejo y al
+referirse a un vehículo desde cualquier otro sitio, en vez del nombre. Si dos
+vehículos comparten nombre, el segundo recibe un sufijo (`camion_prestado_2`).
+
+---
+
+### 9.2 (12.2 · LISTO de este lado) La recomendación pasa a calcularse por peso
+
+#### a) `pesoKg` deja de ser opcional — **es ruptura**
+
+En `POST /api/cubicacion`, cada ítem tenía `pesoKg` opcional. Ahora es
+obligatorio, porque de él sale cuántos camiones hacen falta.
+
+Del lado de NEXO hay que cambiarlo en
+`src/Nexo.Application/CasosDeUso/Cubicacion/DTOs/CubicacionRapidaDtos.cs:11`:
+
+```csharp
+public sealed record clsItemCubicacionRapidaDto(
+    string? Descripcion, int Cantidad, decimal LargoCm, decimal AnchoCm, decimal AltoCm,
+    decimal? PesoKg, string? TipoMercancia);   // ← PesoKg deja de ser decimal?
+```
+
+Conviene validarlo en NEXO y devolver un `400` propio en vez de dejar que
+Cubicador responda un error de validación menos claro.
+
+**Ojo con un caso que no pasa por ahí.** El puente `crear_desde_linea` arma los
+ítems desde `PosicionCarga`, cuyo `pesoKg` **sí puede venir nulo** desde NEXO
+(`GET /api/lineas-solicitud/{id}/cubicacion`). Ese camino no lo cubre la
+validación del API. El motor ya lo rechazaba —veta por seguridad cuando falta
+el peso— pero desde 12.2 además lo dice explícitamente:
+
+> `3 item(s) sin peso: no se puede calcular cuantos vehiculos hacen falta.
+> Captura el peso de ...`
+
+Ese texto viaja en `advertencias`. Vale la pena que NEXO lo propague a la Mesa
+de Costeo, porque hoy el usuario solo ve que no hay sugerencia.
+
+#### b) La respuesta gana el reparto por peso
+
+`clsSugerenciaFlotaDto` (`CubicacionRapidaDtos.cs:43`) necesita dos campos:
+
+```csharp
+public sealed record clsSugerenciaFlotaDto(
+    string UnidadId, string UnidadNombre, int CantidadVehiculos, decimal UtilizacionPromedio,
+    string? ConfigVehiculo, string? Carroceria, string? ClaseViaje, string? ClaseContenedor,
+    IReadOnlyList<clsDisposicionDto> Disposiciones,
+    decimal PesoTotalKg,          // ← NUEVO
+    decimal PesoPorVehiculoKg);   // ← NUEVO: igual para todos los camiones
+```
+
+`PesoPorVehiculoKg` es **la respuesta de la HU**: la carga que le toca a cada
+camión, repartida en partes iguales. Es el número que hay que mostrar y el que
+alimenta la creación de líneas de 12.3.
+
+#### c) Qué cambia en el comportamiento, para que no sorprenda
+
+La cantidad de camiones ya no sale del empaque 3D. Sale del peso
+—`techo(peso_total / capacidad)`— y **sube si la geometría exige más**: una
+carga voluminosa y liviana puede caber de sobra en peso y necesitar tres
+camiones por volumen. El peso fija el mínimo, no el número final.
+
+Y el reparto dejó de ser voraz. Antes se llenaba el primer camión al tope y el
+último quedaba con lo que sobrara; ahora todos llevan lo mismo:
+
+| 18.000 kg en camiones de 10.000 | Antes | Ahora |
+|---|---|---|
+| Reparto | 10.000 + 8.000 | 9.000 + 9.000 |
+
+Eso **cambia el precio**: el costeo elige tarifa por banda de peso
+(`peso >= RangoPesoInf && peso <= RangoPesoSup`), y dos camiones de 9.000 pueden
+caer en una banda distinta que uno de 10.000 y otro de 8.000.
+
+### 9.3 (12.3 · LISTO de este lado) Evento de flota, y las N líneas de solicitud
+
+Esta es la issue donde **la mayor parte del trabajo es tuyo**. De este lado solo
+se podía crear la flota y contarla: `lineas_solicitud` vive en el SQL Server de
+NEXO y el puerto de este servicio es de solo lectura por diseño (§7).
+
+#### a) Evento nuevo: `flota-de-cargue.generada`
+
+Routing key `flota-de-cargue.generada`, exchange `cubicador.eventos`, con el
+mismo sobre de MassTransit que los demás (`messageType`
+`...Cubicacion:FlotaDeCargueGenerada`). Se publica al terminar
+`crear_desde_linea`:
+
+```jsonc
+{
+  "correlationId": "<lineaSolicitudId>",
+  "lineaSolicitudId": "aaaaaaaa-1111-2222-3333-444444444444",
+  "cantidadVehiculos": 2,
+  "pesoTotalKg": 30000.0,
+
+  // Va UNA vez, no por camión: la recomendación son N camiones del MISMO tipo.
+  // Repetirlo N veces solo invita a que diverjan.
+  "vehiculo": {
+    "codigo": "contenedor_seco_40",
+    "nombre": "Contenedor 40 pies",
+    "capacidadKg": 26680.0,
+    "configVehiculo": "3S3",          // ← con esto resuelves la ConfiguracionVehiculo
+    "carroceria": "PORTACONTENEDORES",
+    "claseViaje": "Contenedor",
+    "claseContenedor": "CNT40.HC"
+  },
+
+  "camiones": [
+    { "numeroVehiculo": 1, "planCargueId": "e1bf...", "pesoAsignadoKg": 15000.0 },
+    { "numeroVehiculo": 2, "planCargueId": "b6f9...", "pesoAsignadoKg": 15000.0 }
+  ]
+}
+```
+
+**Se publica ADEMÁS de `plan-de-cargue.generado`**, que se sigue emitiendo para
+el primer plan. Quitarlo dejaría sin datos a la proyección que la Mesa de Costeo
+ya consulta con `GET /api/planes-cargue/por-linea/{id}`, y eso sí sería una
+regresión visible hoy.
+
+#### b) Lo que hay que construir en NEXO
+
+1. **Consumer de `FlotaDeCargueGenerada`.** Mismo patrón que
+   `clsPlanDeCargueGeneradoConsumer`: `IConsumer<T>` real, hereda reintentos,
+   DLQ y alerta.
+2. **Una línea de solicitud por camión.** Según lo acordado con negocio el
+   28-sep: la **línea original se reusa como camión 1** —conserva su Id, se le
+   ajusta el peso a `pesoAsignadoKg`— y se crean las N-1 restantes. No se borra
+   ni se deja en cero: conservar el Id es lo que evita romper la línea de
+   cotización que ya la referencia y la auditoría.
+3. **`ConfigVehiculoId` de cada línea**, resolviendo o creando la
+   `clsConfiguracionVehiculo` con `vehiculo.configVehiculo` y
+   `vehiculo.carroceria`. **Antes de esto hay que corregir `ClaveVehiculo`**
+   (§9.1), que compara sin quitar tildes: si no, cada alta ensucia la tabla con
+   duplicados.
+4. **Una línea de cotización por línea de solicitud**, poblando
+   `clsCotizacionLinea.LineaSolicitudId`. El campo ya existe y es anulable: no
+   hace falta cambio de esquema.
+
+#### c) Tres efectos que conviene medir antes de soltarlo
+
+Partir una línea en N toca a tres consumidores del conteo de líneas, y nadie lo
+ha medido: el **puntaje de la Bandeja Priorizada**, los **contadores de la saga
+de auto-costeo** y lo que llega a **Tarifas Ganadas**. Una solicitud de 10
+líneas puede pasar a tener 25.
+
+#### d) Por qué el peso de cada camión importa tanto
+
+`pesoAsignadoKg` es lo que se escribe en cada línea, y el costeo elige tarifa
+por banda de peso (`peso >= RangoPesoInf && peso <= RangoPesoSup`). El reparto
+ahora es **equilibrado**: dos camiones de 15.000 en vez de uno de 20.000 y otro
+de 10.000. Eso puede cambiar la banda, y por lo tanto el precio.
+
+Se corrigió en esta issue: la cascada de `crear_desde_linea` seguía siendo voraz
+aunque 12.2 ya había equilibrado el cubicador rápido, así que el desbalance se
+habría propagado hasta la cotización.
+
+---
+
+## 10. S4-HU-12 — qué tiene que hacer el frontend
+
+> **Destinatario: juanpablo.** El frontend **no habla con este servicio** — eso
+> se cerró (§1.2). Todo lo de abajo le llega a través de NEXO, así que la
+> contraparte de vasco-dev (§9) tiene que existir primero o estos campos no
+> viajan.
+>
+> Cuando se implemente, el cambio debe reflejarse además en
+> `NEXO/docs/contrato-integracion/`, que es el contrato versionado del portal.
+> Su propia regla dice que *"un cambio que rompa a quien ya consume sube la
+> versión mayor y se anuncia antes de implementarse"* — y varios de estos
+> rompen.
+>
+> Igual que §9, esta sección crece a medida que cada issue termina.
+
+### 10.1 (12.1) El catálogo de vehículos
+
+#### a) La interfaz `VehiculoCubicacion` gana campos y relaja tres
+
+En `src/app/cabina-fletes/models/cubicador.models.ts`:
+
+```ts
+export interface VehiculoCubicacion {
+  // ...lo de siempre...
+  puertaAnchoMm: number | null;   // ← antes number
+  puertaAltoMm:  number | null;   // ← antes number
+
+  codigo: string | null;           // ← NUEVO, ver (c)
+  configVehiculo: string | null;   // ← NUEVO
+  carroceria: string | null;       // ← NUEVO
+  claseViaje: string | null;       // ← NUEVO
+  claseContenedor: string | null;  // ← NUEVO
+  geometria: string | null;        // ← NUEVO: cerrada | semicerrada | abierta
+  controlAmbiental: string | null; // ← NUEVO: ninguno | refrigeracion
+}
+
+export interface EjeVehiculoDto {
+  posicionMm: number | null;       // ← antes number
+  capacidadKg: number;
+}
+```
+
+**Donde se muestren, `null` no es `0`.** Un vehículo sin puerta medida no es un
+vehículo con una puerta de cero milímetros. Conviene pintar "sin dato" o dejar
+la celda vacía; mostrar `0` haría creer que no entra nada por ahí.
+
+Hoy hay un vehículo así: el **contenedor refrigerado de 40**, que solo existía
+en el catálogo interno del motor y del que nunca se midieron la puerta ni las
+posiciones de eje. No se copiaron las del contenedor seco a propósito.
+
+#### b) El editor de vehículos debe pedir la clasificación
+
+`cubicador-page.component.ts` (`vehiculoEdit`, `guardarVehiculo()`) crea y edita
+vehículos con los campos físicos nada más. Hay que agregar al menos
+`geometria` y `controlAmbiental`, y preferiblemente también `configVehiculo`,
+`carroceria`, `claseViaje` y `claseContenedor`.
+
+**Qué pasa si no se agregan** — y pasa hoy: el vehículo se crea y aparece en la
+lista, **pero nunca se ofrece en la cubicación**. Sin saber si lleva
+refrigeración no se puede evaluar, y no se le supone un valor por defecto:
+suponer que la tiene y suponer que no son dos errores caros, y uno de ellos no
+se nota hasta que la mercancía llega dañada.
+
+Para el usuario eso se ve como *"creé un camión y el sistema nunca me lo
+sugiere"*, sin ninguna explicación. Mientras el formulario no pida esos campos,
+vale la pena que la pantalla avise que el vehículo quedará limitado.
+
+#### c) `codigo` es de solo lectura
+
+Es la identidad estable del vehículo: se genera al crearlo, a partir del nombre,
+y **no cambia al renombrarlo**. Se puede mostrar, no se debe editar ni enviar en
+`POST /api/vehiculos`.
+
+El detalle que importa para la interfaz: **renombrar un vehículo ya no rompe
+nada**. Antes el sistema lo buscaba por nombre, así que renombrar un preset
+dejaba el plan de cargue de una línea atascado sin explicación. Si hay algún
+aviso o restricción en la UI puesta por ese motivo, ya no hace falta.
+
+#### d) El catálogo pasa de 9 a 10 vehículos
+
+Se separó el **Contenedor 40 pies High Cube** (seco) del **Contenedor
+refrigerado 40**, que hasta ahora eran el mismo registro por error. Cualquier
+selector, conteo o prueba que asuma nueve deja de valer — por ejemplo el
+`vehiculosDisponibles` de `cubicador-page.component.ts:57`.
+
+### 10.2 (12.2) La recomendación por peso
+
+#### a) El peso pasa a ser obligatorio en el formulario — **es ruptura**
+
+`ItemCubicacionRequest` (`captura-api.models.ts`) tiene `pesoKg` opcional. Pasa
+a obligatorio, y la interfaz debería exigirlo antes de dejar cubicar: sin peso
+no hay forma de decir cuántos camiones hacen falta.
+
+Es el cambio que obliga a subir versión mayor en
+`docs/contrato-integracion/` y a anunciarlo antes de implementarlo, según la
+regla del propio contrato.
+
+#### b) Mostrar el reparto, que es la respuesta que el usuario espera
+
+`SugerenciaFlotaDto` (`captura-api.models.ts:164`) gana dos campos:
+
+```ts
+export interface SugerenciaFlotaDto {
+  // ...lo de siempre...
+  pesoTotalKg: number;        // ← NUEVO
+  pesoPorVehiculoKg: number;  // ← NUEVO: el mismo para todos los camiones
+}
+```
+
+Con `cantidadVehiculos` —que la interfaz ya recibe— alcanza para pintar la
+frase completa: *"2 camiones, 9.000 kg cada uno"*. Hoy solo se muestra el
+vehículo sugerido, sin decir cuánto lleva cada uno.
+
+#### c) Dos comportamientos que van a cambiar en pantalla
+
+**La cantidad de camiones puede subir.** Antes salía del empaque 3D; ahora sale
+del peso, y sube si la geometría exige más. Una carga liviana y voluminosa que
+antes mostraba un vehículo ahora puede mostrar tres.
+
+**El reparto deja de estar desbalanceado.** Antes el primer camión iba al tope y
+el último con lo que sobrara (10.000 + 8.000); ahora todos llevan lo mismo
+(9.000 + 9.000). Si hay alguna pantalla que muestre las disposiciones por
+vehículo, los números van a verse distintos aunque la carga sea la misma.
+
+#### d) Un aviso nuevo que conviene mostrar
+
+Cuando algún ítem llega sin peso, la respuesta trae en `advertencias`:
+
+> `3 item(s) sin peso: no se puede calcular cuantos vehiculos hacen falta.
+> Captura el peso de ...`
+
+Pasa sobre todo en la Mesa de Costeo, donde los ítems salen de las posiciones
+capturadas y el peso puede faltar. Hoy el usuario solo ve que no hay sugerencia,
+sin saber que el problema es un dato que falta y que puede completar él mismo.
+
+### 10.3 (12.3) Una línea por camión, y lo que eso cambia en pantalla
+
+Depende por completo de que exista la parte de vasco-dev (§9.3): sin el consumer
+que crea las N líneas, la Mesa de Costeo sigue viendo lo de hoy.
+
+#### a) La Mesa de Costeo verá N camiones donde hoy ve uno
+
+`porLinea()` devolvía siempre un solo vehículo — no porque el front lo limitara,
+sino porque el Cubicador reportaba uno solo. Eso ya está corregido. El comentario
+de `cubicador-api.service.ts` que dice *"Solo reporta el primer vehículo de una
+flota multi-vehículo: limitación del motor Cubicador"* **deja de ser cierto** y
+conviene quitarlo para que nadie programe alrededor de él.
+
+#### b) Una línea de la Bandeja puede volverse varias
+
+Es el cambio más visible y no es cosmético: una solicitud de 10 líneas puede
+pasar a tener 25. Vale revisar los sitios donde se cuentan o se listan líneas, y
+cómo se muestra que varias son el mismo despacho repartido —`numeroVehiculo`
+viaja en la proyección para eso.
+
+#### c) El sondeo sin límite de `porLinea` se vuelve más peligroso
+
+`mesa-costeo-page.component.ts` sondea cada 3 segundos **sin límite de
+intentos**: solo para cuando aparece una flota. Si el plan se rechaza, gira para
+siempre y el usuario ve un spinner eterno sin saber que falló.
+
+Con N camiones eso empeora, porque hay más formas de que el proceso se
+interrumpa a mitad. Dos mitigaciones que conviene meter juntas: un tope de
+intentos con mensaje de error, y consumir el aviso de rechazo que vasco-dev
+tiene que exponer por línea (§9.1 del contrato del back lo menciona como
+pendiente de esa parte).
+
+#### d) Nada de esto exige cambios de modelo en el front
+
+`PlanFlotaItem` ya trae `numeroVehiculo` y `totalVehiculos`: el front **ya modela
+flotas**, solo que nunca recibía más de un elemento. Lo que cambia es la
+cantidad de datos que llegan, no su forma.

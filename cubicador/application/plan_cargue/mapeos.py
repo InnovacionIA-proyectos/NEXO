@@ -75,6 +75,9 @@ def vehiculo_de_input(v: "GuardarVehiculoInput") -> VehiculoCubicacion:
         puerta_ancho_mm=v.puerta_ancho_mm, puerta_alto_mm=v.puerta_alto_mm, puerta_posicion=v.puerta_posicion,
         ejes=[EjeVehiculoRow(e.posicion_mm, e.capacidad_kg) for e in v.ejes],
         tolerancia_paredes_mm=v.tolerancia_paredes_mm, tolerancia_entre_unidades_mm=v.tolerancia_entre_unidades_mm,
+        config_vehiculo=v.config_vehiculo, carroceria=v.carroceria,
+        clase_viaje=v.clase_viaje, clase_contenedor=v.clase_contenedor,
+        geometria=v.geometria, control_ambiental=v.control_ambiental,
     )
     return VehiculoCubicacion(id=v.id, **kwargs) if v.id else VehiculoCubicacion(**kwargs)
 
