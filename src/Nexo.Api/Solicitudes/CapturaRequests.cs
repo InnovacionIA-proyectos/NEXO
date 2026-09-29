@@ -35,6 +35,11 @@ public class clsCapturaSolicitudRequest
     [Range(typeof(decimal), "0", "240", ParseLimitsInInvariantCulture = true)]
     public decimal? HorasDescargue { get; set; }
 
+    /// <summary>Notas u observaciones comerciales (S4-HU-18.10/#227) — distinto de
+    /// <see cref="Referencia"/> (referencia/PO del cliente).</summary>
+    [MaxLength(2000)]
+    public string? Notas { get; set; }
+
     [Required, MinLength(1, ErrorMessage = "La solicitud debe traer al menos una línea.")]
     public List<clsCapturaLineaRequest> Lineas { get; set; } = [];
 }

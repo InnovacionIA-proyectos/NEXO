@@ -28,7 +28,10 @@ public sealed record clsCapturaLineaInput(
 public sealed record clsCapturarSolicitudCommand(
     Guid? ClienteId, string? ClienteBp, string Tipo, string? Modalidad, DateTimeOffset? Deadline,
     decimal? ValorEstimado, string? Referencia, decimal? HorasCargue, decimal? HorasDescargue,
-    IReadOnlyList<clsCapturaLineaInput> Lineas) : ICommand<clsCapturaResultDto>;
+    IReadOnlyList<clsCapturaLineaInput> Lineas,
+    /// <summary>Notas u observaciones comerciales (S4-HU-18.10/#227) — distinto de
+    /// <see cref="Referencia"/> (referencia/PO del cliente).</summary>
+    string? Notas = null) : ICommand<clsCapturaResultDto>;
 
 /// <summary>
 /// Captura de necesidades del comercial (licitación o spot): resuelve/crea clsCliente,
@@ -266,7 +269,8 @@ public sealed class clsCapturarSolicitudCommandHandler(
     {
         var condiciones = new clsCondicionesServicioDto(
             string.IsNullOrWhiteSpace(command.Referencia) ? null : command.Referencia.Trim(),
-            new clsTiemposLogisticosDto(command.HorasCargue ?? 4m, command.HorasDescargue ?? 4m));
+            new clsTiemposLogisticosDto(command.HorasCargue ?? 4m, command.HorasDescargue ?? 4m),
+            Notas: string.IsNullOrWhiteSpace(command.Notas) ? null : command.Notas.Trim());
         return System.Text.Json.JsonSerializer.Serialize(condiciones, clsCondicionesServicioDto.Json);
     }
 

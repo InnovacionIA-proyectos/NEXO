@@ -64,7 +64,7 @@ public class clsCapturaSolicitudesController(
 
         var command = new clsCapturarSolicitudCommand(
             req.ClienteId, req.ClienteBp, req.Tipo, req.Modalidad, req.Deadline, req.ValorEstimado,
-            req.Referencia, req.HorasCargue, req.HorasDescargue, lineas);
+            req.Referencia, req.HorasCargue, req.HorasDescargue, lineas, req.Notas);
         var result = await capturar.Handle(command, ct);
         return Created($"/api/solicitudes/{result.Id}", result);
     }
