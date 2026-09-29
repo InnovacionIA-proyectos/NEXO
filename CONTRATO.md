@@ -1,155 +1,259 @@
 # Contrato de la API — NEXO (Nexo)
 
-Referencia completa, endpoint por endpoint, para que el frontend sepa qué llamar,
-qué mandar y qué esperar. Es un **complemento** de
+Referencia completa, endpoint por endpoint, de **lo que el backend exige hoy**:
+header de identidad, rol, parámetros, campos obligatorios con sus límites,
+respuesta de éxito y códigos de error. Está verificada contra el código de
+`src/Nexo.Api` (controllers, DTOs de request y validadores de Application).
+
+Es un **complemento** de
 [`docs/contrato-integracion/README.md`](docs/contrato-integracion/README.md), que
-explica el *porqué* de la identidad, los trabajos pesados y los avisos en vivo —
-acá solo van las reglas cortas + la superficie completa de la API. Ante cualquier
-contradicción entre los dos, gana `docs/contrato-integracion/README.md`.
+explica el *porqué* de la identidad, los trabajos pesados y los avisos en vivo.
+En reglas de diseño, gana el README. **En campos, rutas, roles y validaciones,
+gana el código**: si este documento y el código difieren, el código es la
+verdad y este documento debe corregirse.
 
 Base URL: la que publique cada ambiente (`ASPNETCORE_URLS` / `API_PORT`, ver
-`.env.example`). Swagger vive en `/swagger`, solo en Development.
+`.env.example`). Local con `dotnet run`: `http://localhost:5080`. Docker compose:
+`http://localhost:${API_PORT:-8080}`. Swagger vive en `/swagger`, **solo en
+Development**.
 
 ---
 
 ## 1. Convenciones generales
 
-### Autenticación
+### 1.1 Autenticación de usuarios (identidad del portal)
 
-No hay login propio. Cada petición manda el id de la persona ya autenticada en
-el portal:
+No hay login, no hay contraseña y no hay token. Cada petición manda el id
+numérico (`long`) de la persona ya autenticada en el portal de la
+Administración, en un header:
 
 ```http
-X-Portal-Usuario-Id: 10123
+X-Portal-clsUsuario-Id: 10123
 ```
 
-Sin este header, o si el id no resuelve a una identidad válida → **401**. Con
-identidad válida pero sin uno de los 6 roles de Nexo sobre Nexo →
-**403**. Ningún endpoint es público salvo `GET /health`. Detalle completo:
-[`docs/contrato-integracion/README.md`, sección 1](docs/contrato-integracion/README.md#1-identidad).
+> ⚠️ **Discrepancia abierta — nombre del header.** El código
+> (`clsIdentidadPortalAuthenticationHandler.HeaderIdUsuario`) espera hoy
+> **`X-Portal-clsUsuario-Id`**. El contrato acordado con el portal
+> ([README §1](docs/contrato-integracion/README.md#1-identidad),
+> [ADR-001](docs/contrato-integracion/ADR-001-identidad-sin-token.md),
+> [`openapi.yaml`](docs/contrato-integracion/openapi.yaml)), los e2e
+> (`build/e2e/recorrido.py`) y los scripts de QA usan **`X-Portal-Usuario-Id`**.
+> Todo indica que el renombrado masivo con prefijo `cls` alcanzó también esta
+> constante. Mientras no se corrija, **solo funciona `X-Portal-clsUsuario-Id`**;
+> un cliente que mande `X-Portal-Usuario-Id` recibe `401 SESION_INVALIDA` en
+> todos los endpoints. Cuando se corrija el código, esta sección vuelve a
+> `X-Portal-Usuario-Id`.
 
-### Los 6 roles
+Cómo se resuelve cada petición (sin caché de sesión):
+
+| Situación | Respuesta |
+|---|---|
+| Falta el header, o su valor no es un número entero | `401 SESION_INVALIDA` |
+| El id no existe en la tabla de usuarios del portal | `401 SESION_INVALIDA` (mismo mensaje; no revela si el id existe) |
+| El id existe, pero la persona no tiene uno de los 6 roles de Nexo | `403 SIN_PERMISO_CABINA_FLETES` en **todos** los endpoints |
+| Tiene rol de Nexo, pero no uno de los que exige el endpoint | `403 SIN_PERMISO_CABINA_FLETES` |
+
+La FallbackPolicy (`clsProgram.cs`) exige identidad **y** un rol válido en todo
+endpoint que no diga otra cosa. Únicas excepciones:
+
+- `GET /health`: anónimo.
+- `GET /api/lineas-solicitud/{id}/cubicacion`: servicio a servicio (§1.2).
+
+Qué se envía y qué no (la lista de permisos del portal nunca viaja):
+[README §1](docs/contrato-integracion/README.md#1-identidad).
+
+### 1.2 Autenticación servicio a servicio (Cubicador)
+
+Solo para `GET /api/lineas-solicitud/{id}/cubicacion`, que consume el
+microservicio Cubicador (Python), no el frontend:
+
+```http
+Authorization: Bearer <valor de Cubicador3D:InboundApiKey>
+```
+
+El valor es un secreto compartido de configuración (el mismo que
+`NEXO_CALLBACK_API_KEY` del lado del Cubicador). Nunca se documenta ni se
+comparte fuera de la configuración de cada ambiente. Sin clave configurada, sin
+header o con un valor distinto → `401 NO_AUTORIZADO`. El header de identidad del
+portal **no** sirve en este endpoint.
+
+### 1.3 Los 6 roles
 
 `Comercial · CoordinadorFletes · AdminTarifas · ServiciosLogisticos · LiderProceso · Admin`
 
-`Admin` pasa todo. Qué puede hacer cada uno: [`docs/ROLES_Y_PERMISOS.md`](docs/ROLES_Y_PERMISOS.md).
+Un usuario tiene exactamente uno. `Admin` está incluido en todos los endpoints
+restringidos. La matriz completa está en la [sección 5](#5-matriz-de-permisos) y
+en [`docs/ROLES_Y_PERMISOS.md`](docs/ROLES_Y_PERMISOS.md).
 
-### Formato de error (siempre el mismo)
+### 1.4 Formato de error (siempre el mismo)
 
 ```ts
 interface ApiError {
-  code: string          // estable, para ramificar (ej. "SOLICITUD_INVALIDA")
+  code: string          // estable, para ramificar (ej. "SOLICITUD_NO_ENCONTRADA")
   message: string        // en español, para mostrar — no decidir con esto
   timestamp: string       // ISO 8601
-  details?: unknown        // ej. { "campo": ["error1", "error2"] } en 400 de validación
+  details?: unknown        // en 400 VALIDATION_ERROR: { "Campo": ["mensaje", ...] }
 }
 ```
 
-| HTTP | Código típico | Cuándo |
+| HTTP | Código | Cuándo |
 |---|---|---|
-| `400` | `VALIDATION_ERROR` (bind/DataAnnotations) u otro específico | Input inválido o regla de negocio |
+| `400` | `VALIDATION_ERROR` | Falló la validación automática del body/query (DataAnnotations o JSON mal formado) |
+| `400` | código específico (ver cada endpoint) | Regla de negocio de Application |
 | `401` | `SESION_INVALIDA` | Sin identidad válida del portal |
+| `401` | `NO_AUTORIZADO` | Bearer de servicio inválido (solo §1.2) |
 | `403` | `SIN_PERMISO_CABINA_FLETES` | Identidad válida, rol insuficiente |
 | `404` | específico del recurso | No existe |
 | `409` | específico, o `CONFLICTO_CONCURRENCIA` | Conflicto de estado o edición simultánea (RowVersion) |
+| `429` | `DEMASIADAS_SOLICITUDES` | Rate limit (§1.8), con header `Retry-After: 30` |
 | `503` | específico | Fuente externa no configurada o no responde |
-| `500` | `INTERNAL_ERROR` | Error no controlado |
+| `500` | `INTERNAL_ERROR` | Error no controlado (en Production el mensaje es genérico) |
 
-`400` de validación automática (DataAnnotations) trae `details` como
-`{ "campoDelBody": ["mensaje"] }` por cada campo que falló.
+Detalle de `400 VALIDATION_ERROR`:
 
-### Enums: se mandan y devuelven como texto
+- `details` trae una entrada por campo que falló. La clave es el nombre del
+  campo como lo ve el model binder (puede venir en PascalCase o con ruta, ej.
+  `"Lineas[0].Origen"`, `"$.deadline"` para JSON inválido).
+- Los mensajes de las DataAnnotations sin `ErrorMessage` propio salen en el
+  idioma por defecto del framework (inglés). No se debe ramificar por el
+  mensaje, solo por `code` y por la clave del campo.
+
+### 1.5 Reglas de validación comunes
+
+Aplican a todos los bodies JSON salvo que el endpoint diga otra cosa.
+
+- **Campos obligatorios.** Se marcan como **requerido** en cada tabla. Un campo
+  de texto requerido que falta, es `null` o viene vacío produce
+  `400 VALIDATION_ERROR`.
+- **Tipos de referencia no anulables en records.** En los endpoints de
+  plan de cargue y vehículos, los campos de texto no anulables (ej. `nombre`,
+  `descripcion`) son obligatorios implícitamente por Nullable Reference Types.
+  Faltarlos da `400 VALIDATION_ERROR`.
+- **Números sin `?` no son obligatorios.** Si se omiten, llegan como `0` o
+  `false` (ej. `valorFlete`, `largoMm`). El endpoint puede rechazarlos luego
+  por regla de negocio, pero no por falta del campo.
+- **Guid no anulable.** `clienteId`, `solicitudId`, `servicioConexoId` son
+  obligatorios y deben ser un Guid válido. Un Guid mal formado da
+  `400 VALIDATION_ERROR`.
+- **Fechas.** ISO 8601. `DateTimeOffset` acepta `"2026-09-30"` o
+  `"2026-09-30T17:00:00-05:00"`. `DateOnly` (`vigenteHasta`) acepta solo
+  `"2026-09-30"`.
+- **Decimales monetarios.** Rango `0`–`9999999999999.99` salvo que se indique
+  otro.
+- **Rutas con `{id}`.** Todos los ids de ruta son Guid (`{id:guid}`) salvo
+  `tarifaId`, que es entero (`{tarifaId:int}`). Un id con formato inválido no
+  calza con ninguna ruta y responde `404` sin cuerpo `ApiError`.
+
+### 1.6 Enums: se mandan y devuelven como texto
 
 Todos los enums de C# viajan como **string exacto del nombre del valor**
-(`PascalCase`, ej. `"Ganada"`, `"EnCosteo"`), nunca como número. Valores
-completos en la [sección 6](#6-enums).
+(`PascalCase`, ej. `"Ganada"`, `"EnCosteo"`), nunca como número. El JSON de
+entrada y salida es camelCase. Valores completos en la [sección 6](#6-enums).
 
-**Ojo con la asimetría en tres endpoints de escritura**: el `body` acepta el
-valor en minúscula (`"ganada"`, `"spot"`, `"sicetac"` — validado con regex
-case-insensitive, no es el enum real), pero la respuesta siempre devuelve el
-enum real en PascalCase (`"Ganada"`, `"Spot"`, `"Sicetac"`). Son:
-`MarcarResultado.resultado`, `Crear/CapturarSolicitud.tipo`,
-`AgregarLinea.fuente`.
+**Asimetría en los campos de escritura validados por regex** (case-insensitive,
+no son el enum real): el body acepta el valor en minúscula, pero la respuesta
+devuelve el enum real en PascalCase.
 
-### Paginación
+| Campo | Acepta | Devuelve |
+|---|---|---|
+| `tipo` (crear/capturar solicitud) | `"spot"`, `"licitacion"` | `"Spot"`, `"Licitacion"` |
+| `fuente` (línea de cotización) | `"sicetac"`, `"historica"`, `"manual"`, `"tarifario"` | `"Sicetac"`, ... |
+| `resultado` (cotización) | `"ganada"`, `"perdida"` | `"Ganada"`, `"Perdida"` |
 
-Donde existe es `page` (1-based) + `pageSize`/`top` (según el endpoint), y la
-respuesta trae `{ items, total }` (o el equivalente propio del endpoint, ver
-cada sección). `page`/`pageSize` son opcionales (default `page=1`,
-`pageSize=50` salvo donde se indique otro) — omitirlos no cambia el
-comportamiento de un cliente existente.
+Los campos de texto que se convierten a enum en Application (`modalidad`,
+`tipologia`) aceptan el nombre del valor sin distinguir mayúsculas. Un valor
+desconocido da `400 ENUM_INVALIDO`.
 
-Historial:
-- Servicios Conexos (`page`+`pageSize`, patrón original), Biblioteca
-  SICE-TAC y Biblioteca plaza SAP (`page`+`top`) — medido en vivo, ~2,15 M y
-  ~22,8 K filas respectivamente, truncaban en la primera página sin forma de
-  pedir la siguiente aunque `total` ya viajaba en la respuesta.
-- Se agrega `page`/`pageSize` al resto de los listados
-  — `solicitudes` (Bandeja Priorizada), `tarifas-historicas` (rama "buscar"),
-  `vehiculos`, `planes-cargue` — reemplazando los topes fijos que tenían antes
-  (`Take(50)`, `Take(100)`, sin tope en `solicitudes`). Todos responden
-  `{ items, total }`. `biblioteca-sap-historico` y `reglas-solo-sicetac`
-  siguen SIN paginar (bajo volumen medido, ver
-  `docs/decisiones/paginacion-endpoints-listado.md`).
-- El timeout real de `biblioteca-sicetac` (causa: falta de índice
-  en la tabla del Data Warehouse externo, fuera del alcance de este repo) se
-  mitigó con un `CommandTimeout` más generoso y un caché más largo — ver
-  `docs/decisiones/timeout-biblioteca-sicetac.md`.
+### 1.7 Paginación
 
-### Rate limiting
+Donde existe es `page` (1-based, mínimo 1) + `pageSize` o `top` según el
+endpoint. La respuesta trae `{ items, total }` o el equivalente propio del
+endpoint. Todos los parámetros de paginación son opcionales. Un valor fuera de
+rango da `400 VALIDATION_ERROR`.
 
-Los endpoints de listado tienen rate limiting básico (`Microsoft.AspNetCore.
-RateLimiting`, nativo del framework), particionado por rol del usuario
-autenticado (o IP si no hay rol resuelto). Al exceder el límite responden
-`429` con el mismo shape de error que el resto de la API
-(`{ code: "DEMASIADAS_SOLICITUDES", message, timestamp }`) y un header
-`Retry-After: 30`.
+| Endpoint | Parámetros | Default | Máximo |
+|---|---|---|---|
+| `GET /api/solicitudes` | `page`, `pageSize` | 1, 50 | `pageSize` 200 |
+| `GET /api/tarifas-historicas` (solo rama "búsqueda") | `page`, `pageSize` | 1, 50 | 200 |
+| `GET /api/servicios-conexos` | `page`, `pageSize` | 1, 50 | 200 |
+| `GET /api/vehiculos` | `page`, `pageSize` | 1, 50 | 200 |
+| `GET /api/planes-cargue` | `page`, `pageSize` | 1, 50 | 200 |
+| `GET /api/biblioteca-sicetac` | `page`, `top` | 1, 50 | `top` 500 |
+| `GET /api/biblioteca-sap-plaza` | `page`, `top` | 1, 50 | 500 |
+| `GET /api/biblioteca-sap-historico` | solo `top` (no pagina) | 50 | 500 |
+| `GET /api/reglas-solo-sicetac` | no pagina | — | — |
 
-- **Política estricta** (`biblioteca-sicetac`, `biblioteca-sap-plaza` — bases
-  externas compartidas con otros consumidores corporativos): 20 solicitudes/min
-  por rol (60 para `Admin`/`AdminTarifas`), ventana deslizante.
-- **Política estándar** (resto de los listados — `solicitudes`,
-  `planes-cargue`, `vehiculos`, `tarifas-historicas`, `reglas-solo-sicetac`,
-  `biblioteca-sap-historico`): 120 solicitudes/min, ventana fija.
+Contexto de la decisión: `docs/decisiones/paginacion-endpoints-listado.md` y
+`docs/decisiones/timeout-biblioteca-sicetac.md`.
 
-### Carga de archivos Excel
+### 1.8 Rate limiting
 
-`multipart/form-data`, campo `archivo` (o `formato` en Entregar cotización).
-Límite 10 MB. Solo `.xlsx`/`.xlsm`. Errores: `ARCHIVO_REQUERIDO` (falta o vacío),
-`FORMATO_NO_SOPORTADO` (otra extensión).
+Particionado por rol del usuario autenticado (o IP si no hay rol resuelto). Al
+exceder: `429 DEMASIADAS_SOLICITUDES` + `Retry-After: 30`.
 
-### Trabajos pesados: 202 + consulta de respaldo
+| Política | Endpoints | Límite |
+|---|---|---|
+| Estricta (ventana deslizante) | `GET /api/biblioteca-sicetac`, `GET /api/biblioteca-sap-plaza` | 20/min por rol; 60/min para `Admin` y `AdminTarifas` |
+| Estándar (ventana fija) | `GET` de `solicitudes`, `planes-cargue`, `vehiculos`, `tarifas-historicas`, `reglas-solo-sicetac`, `biblioteca-sap-historico` | 120/min por rol |
 
-Ninguna operación pesada devuelve su resultado en la misma petición. Responde
-**202** con un identificador; el resultado llega por SignalR o se consulta con
-`GET /api/trabajos/{id}` (o el equivalente del módulo). Nunca asumas que el
-aviso llegó — es una mejora, no una garantía. Detalle:
-[`docs/contrato-integracion/README.md`, sección 4](docs/contrato-integracion/README.md#4-trabajos-pesados).
+El resto de endpoints no tiene rate limit.
 
-### Avisos en vivo (SignalR)
+### 1.9 Carga de archivos
+
+`multipart/form-data`. Límite de la petición: 10 MB (`[RequestSizeLimit]`); una
+petición más grande la corta el servidor antes de llegar al endpoint.
+
+| Endpoint | Campo | Extensiones | Si falta el archivo |
+|---|---|---|---|
+| `POST /api/captura-solicitudes/analizar-excel` | `archivo` | `.xlsx`, `.xlsm` | `400 ARCHIVO_REQUERIDO` |
+| `POST /api/tarifas-sicetac/importar` | `archivo` | `.xlsx`, `.xlsm` | `400 ARCHIVO_REQUERIDO` |
+| `POST /api/reglas-solo-sicetac/importar-excel` | `archivo` | `.xlsx`, `.xlsm` | `400 VALIDATION_ERROR` (ver nota) |
+| `POST /api/servicios-conexos/importar-excel` | `archivo` | `.xlsx`, `.xlsm` | `400 VALIDATION_ERROR` (ver nota) |
+| `POST /api/cotizaciones/{id}/entregar` | `formato` (opcional) | PDF, sin validación de extensión | se entrega sin adjunto |
+
+Extensión no permitida → `400 FORMATO_NO_SOPORTADO`. Archivo vacío (0 bytes) →
+`400 ARCHIVO_REQUERIDO`.
+
+> Nota: en reglas-solo-sicetac y servicios-conexos el parámetro `archivo` está
+> declarado no anulable, así que si falta el campo el framework responde
+> `400 VALIDATION_ERROR` con `details.archivo` antes de llegar a la validación
+> propia. Con el campo presente pero vacío sí responde `ARCHIVO_REQUERIDO`.
+
+### 1.10 Trabajos pesados: 202 + consulta de respaldo
+
+Las operaciones pesadas no devuelven su resultado en la misma petición.
+Responden **202** con un identificador; el resultado llega por SignalR o se
+consulta con `GET /api/trabajos/{id}` (pliegos) o `GET /api/planes-cargue/{id}`
+(planes de cargue). El aviso en vivo es una mejora, no una garantía. Detalle:
+[README §4](docs/contrato-integracion/README.md#4-trabajos-pesados).
+
+### 1.11 Avisos en vivo (SignalR)
 
 | Hub | Suscribir | Evento | Trae |
 |---|---|---|---|
-| `/hubs/trabajos` | `Suscribir(trabajoId)` | `"avance"` | `AvisoDeTrabajo` (con `secuencia`, descarta si `<=` la última pintada) |
-| `/hubs/bandeja` | `Suscribir()` (sin parámetro, un solo grupo) | `"bandeja"` | `{ motivo, en }` — **no trae datos**, solo dice "vuelve a consultar `GET /api/solicitudes` con tus filtros" |
-| `/hubs/plan-cargue` | `Suscribir(planCargueId)` | `"avance"` | `AvisoPlanCargueDto` |
+| `/hubs/trabajos` | `Suscribir(trabajoId: Guid)` | `"avance"` | `AvisoDeTrabajo` (descarta si `secuencia <=` la última pintada) |
+| `/hubs/bandeja` | `Suscribir()` (sin parámetro) | `"bandeja"` | `{ motivo, en }` — no trae datos: vuelve a consultar `GET /api/solicitudes` |
+| `/hubs/plan-cargue` | `Suscribir(planCargueId: Guid)` | `"avance"` | `AvisoPlanCargueDto` |
 
-Los tres exigen la misma identidad que el resto del API (`[Authorize]` en la
-conexión). Ninguno reenvía lo perdido mientras el cliente estuvo desconectado —
-al reconectar, se reconsulta por HTTP. Detalle:
-[`docs/contrato-integracion/README.md`, secciones 5 y 5.2](docs/contrato-integracion/README.md#5-avisos-en-vivo).
+Los tres exigen la misma identidad y rol que el resto del API (§1.1) y tienen
+`Desuscribir(...)` con la misma firma. Ninguno reenvía lo perdido mientras el
+cliente estuvo desconectado. Detalle:
+[README §5](docs/contrato-integracion/README.md#5-avisos-en-vivo).
 
 ---
 
 ## 2. Tipos comunes
 
-Referenciados por nombre en los endpoints de abajo, para no repetirlos.
+Referenciados por nombre en los endpoints de abajo. Todos los nombres de campo
+viajan en camelCase.
 
 ```ts
 type UUID = string
 type FechaISO = string          // "2026-08-24T19:40:00Z"
 type Fecha = string             // date-only, "2026-08-24"
 type Decimal = number
+
+interface Pagina<T> { items: T[]; total: number }
 
 interface AvanceTrabajoDto {
   total: number | null          // null hasta que el pliego se reparte
@@ -177,6 +281,7 @@ interface AvisoDeTrabajo {                       // lo que llega por /hubs/traba
   trabajoId: UUID; estado: string; avance: AvanceTrabajoDto
   terminadoEn: FechaISO | null; secuencia: number
 }
+interface TrabajoAceptadoDto { trabajoId: UUID; estado: "Pendiente"; consultarEn: string }
 
 interface LineaSolicitudDto {
   id: UUID; rutaId: UUID | null; configVehiculoId: UUID | null
@@ -189,6 +294,7 @@ interface SolicitudDto {
   deadline: FechaISO | null; probabilidadCierre: Decimal | null; valorEstimado: Decimal | null
   scorePrioridad: Decimal; estado: "Pendiente" | "EnCosteo" | "Entregada" | "Descartada"
   createdAt: FechaISO; lineas: LineaSolicitudDto[]
+  notas: string | null                           // observaciones comerciales (#227)
 }
 interface BandejaItemDto {                       // fila de GET /api/solicitudes
   id: UUID; cliente: string; tipo: string; estado: string
@@ -199,6 +305,12 @@ interface BandejaItemDto {                       // fila de GET /api/solicitudes
   vigencia: "vigente" | "vencida"
 }
 interface DesgloseScoreDto { total: number; urgencia: number; valor: number; probabilidad: number; tipo: number }
+interface CatalogoLineaResueltoDto {             // respuesta de resolver-catalogos
+  indice: number                                 // posición de la línea en el array enviado
+  rutaId: UUID; configVehiculoId: UUID | null
+  rutaCreada: boolean
+  clsVehiculoCreado: boolean                     // ⚠️ así se serializa hoy (artefacto del renombrado "cls"); se esperaría "vehiculoCreado"
+}
 interface PosicionCargaDto {                     // pieza/bulto, dimensiones en CENTÍMETROS
   descripcion: string | null; cantidad: number
   largoCm: Decimal; anchoCm: Decimal; altoCm: Decimal; pesoKg: Decimal | null
@@ -222,10 +334,10 @@ interface CapturaResultDto {
 }
 interface HojaExcelDto { nombre: string; filaEncabezado: number; encabezados: string[]; filas: string[][]; totalFilas: number }
 interface AnalisisExcelDto { archivo: string; hojas: HojaExcelDto[] }
-interface ClienteBusquedaDto { clienteId: UUID | null; bp: string | null; nit: string; nombre: string }
+interface ClienteBusquedaDto { clienteId: UUID | null; bp: string | null; nit: string; nitCliente: string; nombre: string; origen: string } // origen: "cliente" | "prospecto"; nitCliente es alias de nit (mismo valor) para Cotifly
 interface CandidatoTarifaDto {
   fuente: string; valor: Decimal; detalle: string; criterio: string; coincidencias: number
-  advertencia: string | null // no-nulo cuando NO es un match exacto (fallback "mayor valor vigente" por peso fuera de rango o vehículo no resuelto en el catálogo SAP) — mostrar al usuario antes de confirmar
+  advertencia: string | null // no-nulo cuando NO es un match exacto — mostrar al usuario antes de confirmar
 }
 interface AprovisionamientoDto { candidato: CandidatoTarifaDto | null }
 
@@ -282,7 +394,6 @@ interface ReglaSoloSicetacDto { id: UUID; origen: string; destino: string; tipoV
 interface ImportarReglasResultDto { filas: number; creadas: number; duplicadas: number; invalidas: number }
 
 interface ServicioConexoDto { id: UUID; nombre: string; categoria: string; reglaCobro: string | null; valorBase: Decimal | null; vigenteHasta: Fecha | null; activo: boolean }
-interface PaginaServiciosDto { items: ServicioConexoDto[]; total: number }
 interface ImportarServiciosResultDto { filas: number; creadas: number; duplicadas: number; invalidas: number }
 
 interface TarifaSicetacDto {
@@ -303,15 +414,28 @@ interface CumplimientoDto {
   licitacionesTotal: number; licitacionesPerdidas: number; porcentajeLicitacionesPerdidas: number
   entregadasConDeadline: number; entregadasATiempo: number; cumplimientoSla: number
 }
-
-interface ParametrosScoreDto {
-  pesoUrgencia: number; pesoValor: number; pesoProbabilidad: number; pesoTipo: number   // deben sumar 1.0
-  horizonteHoras: number; valorReferencia: Decimal
-  puntajeLicitacion: number; puntajeSpot: number
-  valorPorDefectoSinValor: number; probabilidadPorDefecto: number
+interface KpisPilotoDto {
+  desde: FechaISO | null; hasta: FechaISO | null
+  pliegosResueltos: number
+  tiempoPromedioResolucionMinutos: number | null; tiempoMedianoResolucionMinutos: number | null
+  pliegosBajo10Minutos: number; porcentajePliegosBajo10Minutos: number | null
+  totalLineas: number; lineasAutoCosteadas: number; porcentajeLineasAutoCosteadas: number | null
+  cotizacionesEmitidas: number; lineasConFleteManual: number
 }
 
+interface ParametrosScoreDto {
+  pesoUrgencia: number; pesoValor: number; pesoProbabilidad: number; pesoTipo: number   // cada uno 0–1, suman 1.0 (±0.001)
+  horizonteHoras: number                                                                 // > 0
+  valorReferencia: Decimal                                                               // > 0
+  puntajeLicitacion: number; puntajeSpot: number                                         // 0–100
+  valorPorDefectoSinValor: number; probabilidadPorDefecto: number                        // 0–100
+}
+
+interface SesionActualDto { id: number; nombre: string; rol: RolUsuario; capacidades: string[] }
+
+// ---- Cubicación / plan de cargue
 interface SolicitudDeCubicacionAceptadaDto { planCargueId: UUID; estado: string; consultarEn: string }
+interface ComandoAceptadoDto { correlationId: UUID; estado: string }   // 202 de los comandos por cola
 interface PlanCargueDto {
   id: UUID; nombre: string; estado: string; estrategia: string; algoritmo: string
   puntaje: Decimal; pesoTotalKg: Decimal; volumenUtilizadoM3: Decimal
@@ -319,195 +443,843 @@ interface PlanCargueDto {
   totalItems: number; totalColocaciones: number; updatedAt: FechaISO
 }
 interface AvisoPlanCargueDto { planCargueId: UUID; estado: string; puntaje: Decimal; motivo: string | null }
-
-// Respuesta común de los comandos async del puente Mesa de Costeo → 3D
-interface ComandoAceptadoDto { correlationId: UUID; estado: string }
 interface PlanFlotaItemDto { id: UUID; numeroVehiculo: number; totalVehiculos: number; unidadesCargadas: number; unidadesTotales: number }
-// ColocacionCargueDto: mismo shape que ya devuelve el `resultado` de `.../optimizar` dentro de `colocaciones[]`
-// (geometría + estado de cada bulto) — ver `Nexo.Application.CasosDeUso.PlanDeCargue.DTOs.PlanCargueDtos.cs`
-// para el shape completo; espeja 1:1 el `ColocacionCargueDto` documentado en `cubicador/CONTRATO.md` §3.2.
+interface EjeVehiculoDto { posicionMm: Decimal; capacidadKg: Decimal }
+interface VehiculoCubicacionDto {
+  id: UUID; nombre: string; descripcion: string | null
+  largoInternoMm: Decimal; anchoInternoMm: Decimal; altoInternoMm: Decimal
+  capacidadKg: Decimal; taraKg: Decimal; puertaAnchoMm: Decimal; puertaAltoMm: Decimal; puertaPosicion: string
+  ejes: EjeVehiculoDto[]; toleranciaParedesMm: Decimal; toleranciaEntreUnidadesMm: Decimal
+  esPreset: boolean
+}
+interface LineaParaCubicacionDto { lineaId: UUID; posiciones: PosicionCargaDto[]; origen: string | null; destino: string | null }
+interface CubicacionRapidaResultado {
+  matrices: object[]                 // matriz de evaluación por unidad
+  sugerencia: object | null          // vehículo sugerido
+  advertencias: string[]
+  sugerenciaFlota: object | null
+  extradimension: object | null
+}
+// ResultadoPlanDto (resultado/exportar), ColocacionCargueDto y MetricasCubicacion:
+// shape completo en Nexo.Application/CasosDeUso/PlanDeCargue/DTOs/PlanCargueDtos.cs y
+// Nexo.Application/CasosDeUso/Cubicacion/DTOs/CubicacionRapidaDtos.cs; espejan 1:1 lo
+// documentado en cubicador/CONTRATO.md §3.2.
 
-interface SesionActualDto { id: number; nombre: string; rol: RolUsuario; capacidades: string[] }
+interface TipoVehiculoDto { codigo: string; descripcion: string; esCatalogoOficial: boolean } // false = los 5 casos especiales sin código SAP (§3.19)
+interface LineaNegocioDto { id: number; descripcion: string }
+interface ClaseViajeDto { id: number; descripcion: string }
+interface ClaseContenedorDto { id: number; descripcion: string; tamanoContenedor: number | null; pesoInfCnt: number | null; pesoSupCnt: number | null }
+
+interface RangoPesoDto { id: number; pesoMinimo: number; pesoMaximo: number | null } // pesoMaximo null = banda abierta
+
+interface TarifaPlazaDto {
+  id: UUID; lineaNegocio: string; claseViaje: string
+  origenMunicipioId: number; origen: string; zonaOrigen: string | null
+  destinoMunicipioId: number; destino: string; zonaDestino: string | null
+  claseContenedor: string | null; pesoId: number | null; rangoPeso: string | null; tipoVehiculo: string | null
+  valor: Decimal; vigencia: Fecha; detallesTarifa: string; createdAt: FechaISO
+}
+interface ImportarTarifasPlazaResultDto { procesadas: number; insertadas: number; actualizadas: number; rechazadas: number; errores: string[] } // errores: tope 20 mensajes
 ```
 
 ---
 
 ## 3. Endpoints por módulo
 
-Formato: `MÉTODO ruta` — roles (cuando restringe más que "cualquier rol
-autenticado") — qué hace si no es obvio. `Body`/`Query` cuando aplica.
-`→ NNN Tipo` es la respuesta de éxito.
+Formato de cada endpoint:
 
-### Sesión — `/api/sesion`
+- **Roles**: "Todos" = cualquiera de los 6 roles. Si no, la lista exacta.
+- **Query / Body**: tabla con **requerido** o *opcional*, tipo y restricciones.
+- **→** respuesta de éxito.
+- **Errores**: los propios del endpoint, además de los generales de §1.4
+  (`401`, `403`, `400 VALIDATION_ERROR`, `500`), que aplican siempre.
 
-Detalle completo del flujo en
-[`docs/contrato-integracion/README.md`, sección 1](docs/contrato-integracion/README.md#1-identidad).
+### 3.1 Sesión — `/api/sesion`
 
-- `GET /api/sesion/actual` — cualquier rol → `200 SesionActualDto`
+#### `GET /api/sesion/actual`
+- **Roles**: Todos.
+- **→** `200 SesionActualDto`. No crea sesión; se llama al entrar al módulo.
+- `id` es el id del portal (el mismo del header), no un id interno.
 
-### Bandeja y Solicitudes — `/api/solicitudes` (`[Authorize]`)
+### 3.2 Bandeja y solicitudes — `/api/solicitudes`
 
-- `GET /api/solicitudes` — Bandeja Priorizada.
-  `Query: estado?, atencion? ("pendientes"|"automatico"|"administrador"|"atendidas"|"todas"), desde?, hasta?, vigencia? ("vigente"|"vencida"), page? (>=1, def. 1), pageSize? (1-200, def. 50)`
-  → `200 { items: BandejaItemDto[], total }` (antes devolvía el array completo sin tope; el orden por score se recalcula en memoria y la paginación se aplica después, no reduce el trabajo del backend pero sí el tamaño de la respuesta)
-- `GET /api/solicitudes/{id}` — costeo pre-armado (SICE-TAC + históricos) por línea → `200 SolicitudCosteoDto`
-- `POST /api/solicitudes` — `CoordinadorFletes, Admin`. Alta spot (o cabecera de licitación).
-  `Body: { clienteId, tipo: "spot"|"licitacion", modalidad?, deadline?, valorEstimado?, probabilidadCierre?, linea?: { rutaId?, configVehiculoId?, tipologia?, peso?, valorMercancia? } }`
-  → `201 { id: UUID }`
-- `POST /api/solicitudes/{id}/lineas:bulk` — `CoordinadorFletes, Admin`. Carga masiva de un pliego; el costeo corre en segundo plano (patrón de trabajos pesados).
-  `Body: { lineas: [{ rutaId?, configVehiculoId?, tipologia?, peso?, valorMercancia? }] }`
-  → `202 { trabajoId: UUID, estado: "Pendiente", consultarEn: string }`
-- `POST /api/solicitudes/{id}/rechazar` — `Comercial, CoordinadorFletes, Admin`.
-  `Body: { motivo, comentario? }` → `204`
-- `POST /api/solicitudes/{id}/recalcular-score` — `CoordinadorFletes, Admin` → `200 DesgloseScoreDto`
+#### `GET /api/solicitudes` — Bandeja Priorizada
+- **Roles**: Todos. Rate limit estándar.
 
-### Captura — `/api/captura-solicitudes` (`Comercial, Admin`)
+| Query | | Tipo | Restricción |
+|---|---|---|---|
+| `estado` | *opcional* | string | `EstadoSolicitud` |
+| `atencion` | *opcional* | string | `pendientes` \| `automatico` \| `administrador` \| `atendidas` \| `todas`. Sin filtros → cola de pendientes |
+| `desde`, `hasta` | *opcional* | fecha ISO | rango de fecha de captura |
+| `vigencia` | *opcional* | string | `vigente` \| `vencida` |
+| `orderBy` | *opcional* | string | ignorado: siempre ordena por score |
+| `page` | *opcional* | int | ≥ 1, def. 1 |
+| `pageSize` | *opcional* | int | 1–200, def. 50 |
 
-- `POST /api/captura-solicitudes/analizar-excel` — no persiste; solo lee el Excel para que el usuario mapee columnas.
-  `multipart/form-data: archivo` → `200 AnalisisExcelDto`
-- `POST /api/captura-solicitudes` — crea la solicitud completa; resuelve/crea rutas y vehículos por texto libre.
-  `Body: { clienteId?, clienteBp?, tipo: "spot"|"licitacion", modalidad?, deadline?, valorEstimado?, referencia?, horasCargue?, horasDescargue?, lineas: [{ origen, destino, tipoVehiculo?, carroceria?, tipologia?, lineaNegocio?, claseViaje?, claseContenedor?, exclusivo?, consolidado?, retornaContenedor?, ciudadDevolucionContenedor?, levanteContenedorDiferente?, ciudadLevanteContenedor?, valorAprovisionamiento?, peso?, valorMercancia?, posiciones?: PosicionCargaDto[] }] }`
-  → `201 CapturaResultDto`
-- `GET /api/captura-solicitudes/aprovisionamiento` — piso SICE-TAC del viaje vacío (levante → origen).
-  `Query: levante, origen, configuracion?` → `200 AprovisionamientoDto`
-- `GET /api/captura-solicitudes/clientes` — `Query: q?` → `200 ClienteBusquedaDto[]`
+- **→** `200 Pagina<BandejaItemDto>`
 
-### Propuesta de tarifa — `/api/solicitudes/{id}/propuesta-tarifa` (`[Authorize]`)
+#### `GET /api/solicitudes/{id}` — abrir solicitud (costeo pre-armado)
+- **Roles**: Todos.
+- **→** `200 SolicitudCosteoDto`
+- **Errores**: `404 SOLICITUD_NO_ENCONTRADA` · `409 SOLICITUD_DESCARTADA`
 
-- `GET` — compara plaza SAP / SICE-TAC / histórico y propone el valor más alto por línea. No persiste → `200 PropuestaSolicitudDto`
+#### `POST /api/solicitudes` — alta spot (o cabecera de licitación)
+- **Roles**: `CoordinadorFletes`, `Admin`.
 
-### Cotizaciones — `/api/cotizaciones` (`[Authorize]`)
+| Body | | Tipo | Restricción |
+|---|---|---|---|
+| `clienteId` | **requerido** | UUID | debe existir |
+| `tipo` | **requerido** | string | `spot` \| `licitacion` |
+| `modalidad` | *opcional* | string | `ModalidadSolicitud` |
+| `deadline` | *opcional* | fecha ISO | |
+| `valorEstimado` | *opcional* | decimal | monetario |
+| `probabilidadCierre` | *opcional* | decimal | 0–100 |
+| `linea` | *opcional* | objeto | ver `LineaBulk` abajo |
 
-- `POST /api/cotizaciones` — `Comercial, AdminTarifas, CoordinadorFletes, Admin`. Crea o recupera el borrador de una solicitud.
-  `Body: { solicitudId }` → `201 CotizacionDto`
-- `GET /api/cotizaciones/{id}` → `200 CotizacionDto`
-- `POST /api/cotizaciones/{id}/aplicar-propuestas` — `Comercial, AdminTarifas, CoordinadorFletes, Admin`. Precarga como fletes el valor propuesto por la Biblioteca → `200 AplicarPropuestasResultDto`
-- `POST /api/cotizaciones/{id}/lineas` — `AdminTarifas, CoordinadorFletes, Admin`.
-  `Body: { lineaSolicitudId?, valorFlete, valorRetornoContenedor?, fuente: "sicetac"|"historica"|"manual"|"tarifario" }` → `200 CotizacionDto`
-- `POST /api/cotizaciones/{id}/conexos` — `Comercial, CoordinadorFletes, Admin`.
-  `Body: { items: [{ servicioConexoId, cantidad?, valorAplicado? }] }` (sin `valorAplicado`, se calcula `valorBase × cantidad`) → `200 CotizacionDto`
-- `POST /api/cotizaciones/{id}/entregar` — `AdminTarifas, CoordinadorFletes, Admin`. Ver
-  [nota sobre el correo asíncrono](docs/contrato-integracion/README.md#53-entregar-una-cotización-ya-no-espera-al-correo).
-  `multipart/form-data: formato?` (PDF, opcional, máx. 10 MB) → `200 EntregarCotizacionResultDto`
-- `POST /api/cotizaciones/{id}/resultado` — `Comercial, AdminTarifas, CoordinadorFletes, Admin`. Realimenta Tarifas Ganadas si `resultado="ganada"`.
-  `Body: { resultado: "ganada"|"perdida", motivo?, comentario? }` → `200 CotizacionDto` / `409 COTIZACION_NO_ENTREGADA`
-  si la cotización no está en estado `Entregada` — antes se permitía marcar resultado directo desde
-  `Borrador` ("entrega implícita", sin correo ni evento), lo que ponía `entregadaAt` sin haber pasado por
-  `/entregar` y contaminaba el tablero de KPIs del piloto. Ahora **siempre** hay que entregar primero.
-- `GET /api/cotizaciones/{id}/exportar-excel` → `200`, `Content-Disposition: attachment` (binario .xlsx)
+- **→** `201 { id: UUID }`, header `Location: /api/solicitudes/{id}`
+- **Errores**: `400 CLIENTE_INVALIDO` · `400 ENUM_INVALIDO`
 
-### Biblioteca SICE-TAC (matriz oficial, solo lectura) — `/api/biblioteca-sicetac` (`[Authorize]`)
+`LineaBulk` (usada por `linea` y por `lineas:bulk`):
 
-- `GET` — `Query: q?, periodo?, configuracion?, tipoCarga?, unidadTransporte?, condicionCarga?, viaEstandar?, top? (1-500, def. 50), page? (>=1, def. 1)` → `200 MatrizSicetacResultDto`
-- `GET /periodos` → `200 number[]` (los 12 más recientes)
-- `GET /filtros` → `200 SicetacFiltrosDto`
+| Campo | | Tipo | Restricción |
+|---|---|---|---|
+| `rutaId` | *opcional* | UUID | ruta del catálogo (obtenerla con `resolver-catalogos`) |
+| `configVehiculoId` | *opcional* | UUID | |
+| `tipologia` | *opcional* | string | `TipologiaCarga` |
+| `peso` | *opcional* | decimal | 0–999999.99 kg |
+| `valorMercancia` | *opcional* | decimal | monetario |
 
-### Biblioteca histórico SAP (solo lectura) — `/api/biblioteca-sap-historico` (`[Authorize]`)
+#### `POST /api/solicitudes/resolver-catalogos`
+Resuelve texto libre a `rutaId`/`configVehiculoId`, creando lo que falte en el
+catálogo. No crea ninguna solicitud; es el paso previo a `lineas:bulk`.
 
-- `GET` — `Query: q?, lineaNegocio?, tipoVehiculo?, tipoCarroseria?, claseViaje?, top? (1-500, def. 50)` → `200 SapHistoricoResultDto`
-- `GET /filtros` → `200 SapHistoricoFiltrosDto`
+- **Roles**: `Comercial`, `CoordinadorFletes`, `Admin`.
+- **Body**: **array** (no objeto) de al menos 1 elemento:
 
-### Biblioteca plaza SAP (solo lectura) — `/api/biblioteca-sap-plaza` (`[Authorize]`)
+| Campo | | Tipo | Restricción |
+|---|---|---|---|
+| `origen` | **requerido** | string | máx. 150 |
+| `destino` | **requerido** | string | máx. 150 |
+| `tipoVehiculo` | *opcional* | string | máx. 100 |
+| `carroceria` | *opcional* | string | máx. 100 |
 
-- `GET` — mismos parámetros que el histórico + `page? (>=1, def. 1)` (~22,8 K filas medidas en vivo, este SÍ pagina; el histórico NO — ver nota de la sección de Paginación) → `200 SapHistoricoResultDto`
-- `GET /filtros` → `200 SapHistoricoFiltrosDto`
-- Ajuste **local** de vigencia sobre esta misma ruta (`AdminTarifas, CoordinadorFletes, Admin`):
-  - `PATCH /{tarifaId}/vigencia` — `Body: { nuevaVigencia, motivo? }` → `204`
-  - `POST /vigencia/masivo` — `Body: { tarifaIds: number[], modo: "fecha"|"extender", nuevaVigencia?, cantidad?, unidad?: "dias"|"meses", motivo? }` → `200 AjusteVigenciaResultDto`
-  - `DELETE /{tarifaId}/vigencia` — vuelve a regirse por la vigencia de SAP → `204` / `404`
+- **→** `200 CatalogoLineaResueltoDto[]`
+- **Errores**: `400 SIN_LINEAS` (array vacío)
 
-### Reglas Solo-SICETAC — `/api/reglas-solo-sicetac` (`AdminTarifas, Admin`)
+#### `POST /api/solicitudes/{id}/lineas:bulk` — carga masiva de un pliego
+- **Roles**: `CoordinadorFletes`, `Admin`.
+- **Body**: `{ lineas: LineaBulk[] }`, **requerido**, mínimo 1 línea.
+- **→** `202 TrabajoAceptadoDto`. El costeo corre en segundo plano (§1.10).
+- **Errores**: `404 SOLICITUD_NO_ENCONTRADA` · `409 SOLICITUD_NO_EDITABLE`
 
-- `GET` → `200 ReglaSoloSicetacDto[]`
-- `POST` — `Body: { origen, destino, tipoVehiculo }` → `201 ReglaSoloSicetacDto`
-- `DELETE /{id}` → `204` / `404`
-- `POST /importar-excel` — columnas Origen, Destino, Tipo de vehículo.
-  `multipart/form-data: archivo` → `200 ImportarReglasResultDto`
+#### `POST /api/solicitudes/{id}/rechazar`
+- **Roles**: `Comercial`, `CoordinadorFletes`, `Admin`.
 
-### Servicios conexos — `/api/servicios-conexos` (`[Authorize]`)
+| Body | | Tipo | Restricción |
+|---|---|---|---|
+| `motivo` | **requerido** | string | máx. 100 |
+| `comentario` | *opcional* | string | máx. 500 |
 
-- `GET` — `Query: soloActivos? (def. false), q?, categoria?, page? (def. 1), pageSize? (def. 50, máx. 200)` → `200 PaginaServiciosDto`
-- `POST` — `ServiciosLogisticos, AdminTarifas, Admin`.
-  `Body: { nombre, categoria? ("logistico"|"adicional", def. logistico), reglaCobro?, valorBase?, vigenteHasta?, activo? (def. true) }` → `201 ServicioConexoDto`
-- `PATCH /{id}` — `ServiciosLogisticos, AdminTarifas, Admin`. Solo se actualizan los campos presentes → `200 ServicioConexoDto`
-- `POST /importar-excel` — `ServiciosLogisticos, AdminTarifas, Admin`. Columnas Nombre, Valor base, Vigente hasta, Categoría, Activo.
-  `multipart/form-data: archivo` → `200 ImportarServiciosResultDto`
+- **→** `204`
+- **Errores**: `404 SOLICITUD_NO_ENCONTRADA` · `409 SOLICITUD_YA_DESCARTADA`
 
-### Tarifas Ganadas (biblioteca propia, solo lectura) — `/api/tarifas-historicas` (`[Authorize]`)
+#### `POST /api/solicitudes/{id}/recalcular-score`
+- **Roles**: `CoordinadorFletes`, `Admin`. Sin body.
+- **→** `200 DesgloseScoreDto`
+- **Errores**: `404 SOLICITUD_NO_ENCONTRADA`
 
-- `GET` — con `ruta` o `vehiculo` → sugerencias para el costeo (siempre las 10 más recientes, sin paginar); con `q`/`mercancia`/`vigencia`/`origen` → búsqueda filtrada, PAGINADA; sin nada → las más recientes sin paginar.
-  `Query: q?, ruta? (uuid), vehiculo? (uuid), mercancia?, vigencia?, origen? ("ganada"|"legado"), page? (>=1, def. 1, solo aplica a la búsqueda filtrada), pageSize? (1-200, def. 50, ídem)`
-  → `200 BibliotecaItemDto[]` (sugerencias/recientes) **o** `200 { items: BibliotecaItemDto[], total }` (búsqueda filtrada — antes `Take(50)` fijo sin `total` ni forma de pedir más)
+#### `GET /api/solicitudes/{id}/propuesta-tarifa`
+Compara plaza SAP, SICE-TAC e histórico SAP y propone el valor más alto por
+línea. No persiste nada.
 
-### Tarifas SICE-TAC (caché local admin) — `/api/tarifas-sicetac` (`[Authorize]`)
+- **Roles**: Todos.
+- **→** `200 PropuestaSolicitudDto`
+- **Errores**: `404 SOLICITUD_NO_ENCONTRADA` · `404 LINEA_NO_ENCONTRADA`
 
-- `GET` — `Query: origen?, destino?, config?, tipoCarga?, unidad?, condicion?, periodo?` → `200 TarifaSicetacDto[]`
-- `POST /importar` — `CoordinadorFletes, Admin`. Upsert idempotente.
-  `multipart/form-data: archivo` → `200 ImportResumenDto`
-- `GET /importaciones` → `200 ImportacionDto[]`
+### 3.3 Captura de solicitudes — `/api/captura-solicitudes`
 
-### Métricas — `/api/metricas` (`LiderProceso, AdminTarifas, Admin`)
+**Todo el controller**: `Comercial`, `Admin`.
 
-- `GET /cumplimiento` — KPIs del Tablero del Líder → `200 CumplimientoDto`
+#### `POST /api/captura-solicitudes/analizar-excel`
+No persiste; lee el Excel para que el usuario mapee columnas.
 
-### Priorización — `/api/priorizacion/parametros` (`Admin`)
+- **Body**: `multipart/form-data`, campo `archivo` (§1.9).
+- **→** `200 AnalisisExcelDto`
+- **Errores**: `400 ARCHIVO_REQUERIDO` · `400 FORMATO_NO_SOPORTADO` · `400 EXCEL_INVALIDO` · `400 EXCEL_SIN_DATOS`
 
-Cambiar esto reordena la bandeja de todo el mundo — ver
-[nota sobre qué pesos mueven el puntaje](docs/contrato-integracion/README.md#51-recalibrar-la-priorización).
+#### `POST /api/captura-solicitudes` — crear solicitud completa
+Resuelve o crea rutas y vehículos a partir del texto libre de las líneas.
 
-- `GET` → `200 ParametrosScoreDto`
-- `PUT` — no espera el recálculo (corre aparte). Los 4 pesos deben sumar 1.0 (`400 PARAMETROS_SCORE_INVALIDOS` si no).
-  `Body: ParametrosScoreDto` → `200 ParametrosScoreDto`
+| Body (cabecera) | | Tipo | Restricción |
+|---|---|---|---|
+| `clienteId` | condicional | UUID | **requerido si no viene `clienteBp`**; debe existir |
+| `clienteBp` | condicional | string | máx. 20. **Requerido si no viene `clienteId`**; debe existir en el catálogo del DW |
+| `tipo` | **requerido** | string | `spot` \| `licitacion` |
+| `modalidad` | *opcional* | string | `ModalidadSolicitud` |
+| `deadline` | *opcional* | fecha ISO | |
+| `valorEstimado` | *opcional* | decimal | monetario |
+| `referencia` | *opcional* | string | |
+| `horasCargue` | *opcional* | decimal | 0–240 |
+| `horasDescargue` | *opcional* | decimal | 0–240 |
+| `notas` | *opcional* | string | máx. 2000. Observaciones comerciales (distinto de `referencia`) |
+| `lineas` | **requerido** | array | mínimo 1 |
 
-### Plan de cargue (cubicación 3D) — `/api/planes-cargue`
+| Cada línea | | Tipo | Restricción |
+|---|---|---|---|
+| `origen` | **requerido** | string | máx. 150 |
+| `destino` | **requerido** | string | máx. 150 |
+| `peso` | **condicional** | decimal | 0–999999.99 kg. **Requerido (> 0) si las posiciones no traen peso** |
+| `tipoVehiculo` | *opcional* | string | máx. 100 |
+| `carroceria` | *opcional* | string | máx. 100 |
+| `tipologia` | *opcional* | string | `TipologiaCarga` |
+| `lineaNegocio` | *opcional* | string | máx. 100 |
+| `claseViaje` | *opcional* | string | máx. 50 |
+| `claseContenedor` | *opcional* | string | máx. 20 |
+| `exclusivo`, `consolidado`, `retornaContenedor`, `levanteContenedorDiferente` | *opcional* | boolean | |
+| `ciudadDevolucionContenedor` | *opcional* | string | máx. 150 |
+| `ciudadLevanteContenedor` | *opcional* | string | máx. 150 |
+| `valorAprovisionamiento` | *opcional* | decimal | monetario |
+| `valorMercancia` | *opcional* | decimal | monetario |
+| `posiciones` | *opcional* | array | máx. 200 por línea |
 
-- `GET` — `[Authorize]`. Listado contra la proyección local.
-  `Query: page? (>=1, def. 1), pageSize? (1-200, def. 50)` → `200 { items: PlanCargueDto[], total }`
-  (antes tope fijo de 100 sin `total` ni forma de pedir más)
-- `POST /{id}/optimizar` — `Comercial, CoordinadorFletes, Admin`. No bloquea; `503 CUBICACION_EN_VERIFICACION` si la compuerta de paridad está cerrada, `409` si ya está procesando.
-  `Body?: { estrategia?, algoritmo?, semilla?, respetarBloqueadas? }` → `202 SolicitudDeCubicacionAceptadaDto`
-- `GET /{id}` — `[Authorize]`. Consulta de respaldo → `200 PlanCargueDto` / `404`
-- `POST /desde-linea/{lineaId}` — `Comercial, CoordinadorFletes, Admin`. Puente Mesa
-  de Costeo → 3D: publica `crear_desde_linea` para que Cubicador arme la flota a partir de las posiciones de
-  la línea. No pasa por la compuerta de paridad (es una operación de datos, no de cálculo, mismo criterio que
-  los 8 comandos de la sección 6 de `docs/mensajeria/CUBICACION.md`). `404 LINEA_SOLICITUD_NO_ENCONTRADA` si
-  la línea no existe.
-  → `202 ComandoAceptadoDto`
-- `GET /por-linea/{lineaId}` — `[Authorize]`. Sondeo del `POST` de arriba contra la
-  proyección local: lista vacía mientras Cubicador sigue `procesando`, se llena cuando llega
-  `plan-de-cargue.generado`. ⚠️ Limitación conocida: hoy el worker de Cubicador solo reporta el primer
-  vehículo de una flota multi-vehículo, así que esta lista puede no reflejar el resto de la flota — pendiente
-  de resolver del lado del motor, fuera de alcance de este endpoint.
-  → `200 PlanFlotaItemDto[]`
-- `GET /{id}/colocaciones` — `[Authorize]`. Todas las colocaciones del plan, cargadas
-  y rechazadas — a diferencia de `.../no-cargadas` (sección 7.2 de `docs/mensajeria/CUBICACION.md`), que
-  filtra por `Cargada = false`. `404` si el plan no existe.
-  → `200 ColocacionCargueDto[]`
+| Cada posición | | Tipo | Restricción |
+|---|---|---|---|
+| `largoCm`, `anchoCm`, `altoCm` | **requerido** | decimal | 0.1–999999 |
+| `cantidad` | *opcional* | int | 1–100000, def. 1 |
+| `descripcion` | *opcional* | string | máx. 200 |
+| `pesoKg` | *opcional* | decimal | 0–999999.99 (peso unitario) |
 
-### Catálogo de vehículos (Cubicador) — `/api/vehiculos`
+Regla de peso: el peso de la línea es `peso` si viene; si no, la suma de
+`cantidad × pesoKg` de las posiciones. Debe ser > 0. Si vienen ambos, deben
+coincidir con tolerancia del 1 %.
 
-- `GET` — `[Authorize]`. Catálogo contra la proyección local — nunca llama a Cubicador.
-  `Query: page? (>=1, def. 1), pageSize? (1-200, def. 50)` → `200 { items: VehiculoCubicacionDto[], total }`
-  (antes devolvía el array completo sin tope; catálogo hoy chico, pagina igual por consistencia)
-- `POST` — `Comercial, CoordinadorFletes, Admin`. Alta/edición, publica por cola. → `202 ComandoAceptadoDto`
-- `DELETE /{id}` — `Admin`. `409 VEHICULO_EN_USO` si algún plan de cargue todavía lo referencia.
-  → `202 ComandoAceptadoDto`
+- **→** `201 CapturaResultDto`, header `Location: /api/solicitudes/{id}`
+- **Errores**: `400 CLIENTE_REQUERIDO` · `400 CLIENTE_INVALIDO` · `400 CLIENTE_BP_INVALIDO` · `400 DWCUBOS_NO_CONFIGURADO` (se usó `clienteBp` y el DW no está configurado en el ambiente) · `400 ENUM_INVALIDO` · `400 LINEA_INCOMPLETA` · `400 PESO_REQUERIDO` · `400 PESO_INCONSISTENTE`
 
-### Trabajos — `/api/trabajos` (`[Authorize]`)
+#### `GET /api/captura-solicitudes/aprovisionamiento`
+Piso SICE-TAC del viaje vacío (levante → origen del cargue).
 
-- `GET /{id}` — estado y avance de cualquier trabajo en segundo plano → `200 EstadoTrabajoDto` / `404`
+| Query | | Tipo | Restricción |
+|---|---|---|---|
+| `levante` | **requerido** | string | ciudad de levante del contenedor |
+| `origen` | **requerido** | string | origen del cargue |
+| `configuracion` | *opcional* | string | configuración vehicular |
 
-### Salud — `/health` (anónimo, sin auth)
+- **→** `200 AprovisionamientoDto` (`candidato: null` si la matriz no trae la ruta)
+- **Errores**: `400 PARAMETROS_REQUERIDOS` (falta `levante` u `origen`). Swagger
+  los muestra como opcionales, pero son obligatorios.
 
-- `GET` → `200`/`503` `{ status, duracion, chequeos: { [nombre]: { status, descripcion, error } } }`
+#### `GET /api/captura-solicitudes/clientes`
+- **Query**: `q` *opcional* (nombre, NIT o BP).
+- **→** `200 ClienteBusquedaDto[]`. Con el DW configurado busca en clientes
+  reales; sin él, en la tabla local.
+
+### 3.4 Cotizaciones — `/api/cotizaciones`
+
+#### `POST /api/cotizaciones` — crear o recuperar el borrador
+- **Roles**: `Comercial`, `AdminTarifas`, `CoordinadorFletes`, `Admin`.
+- **Body**: `{ solicitudId: UUID }` **requerido**.
+- **→** `201 CotizacionDto`, header `Location: /api/cotizaciones/{id}`. Si ya
+  existe un borrador para la solicitud, lo devuelve.
+- **Errores**: `400 SOLICITUD_INVALIDA`
+
+#### `GET /api/cotizaciones/{id}`
+- **Roles**: Todos.
+- **→** `200 CotizacionDto`
+- **Errores**: `404 COTIZACION_NO_ENCONTRADA`
+
+#### `POST /api/cotizaciones/{id}/aplicar-propuestas`
+Precarga como fletes el valor más alto propuesto por la Biblioteca en las
+líneas pendientes. Sin body.
+
+- **Roles**: `Comercial`, `AdminTarifas`, `CoordinadorFletes`, `Admin`.
+- **→** `200 AplicarPropuestasResultDto`
+- **Errores**: `404 COTIZACION_NO_ENCONTRADA` · `409 COTIZACION_NO_EDITABLE`
+
+#### `POST /api/cotizaciones/{id}/lineas` — agregar flete de una línea
+- **Roles**: `AdminTarifas`, `CoordinadorFletes`, `Admin`. (`Comercial` **no**.)
+
+| Body | | Tipo | Restricción |
+|---|---|---|---|
+| `fuente` | **requerido** | string | `sicetac` \| `historica` \| `manual` \| `tarifario` |
+| `valorFlete` | *(ver nota)* | decimal | monetario. Si se omite llega como `0` |
+| `lineaSolicitudId` | *opcional* | UUID | debe pertenecer a la solicitud |
+| `valorRetornoContenedor` | *opcional* | decimal | monetario; suma al total aparte |
+
+- **→** `200 CotizacionDto`
+- **Errores**: `400 FUENTE_INVALIDA` · `400 LINEA_INVALIDA` · `404 COTIZACION_NO_ENCONTRADA` · `409 COTIZACION_NO_EDITABLE` · `409 HISTORICA_VENCIDA`
+
+#### `POST /api/cotizaciones/{id}/conexos` — agregar servicios conexos
+- **Roles**: `Comercial`, `CoordinadorFletes`, `Admin`. (`AdminTarifas` **no**.)
+- **Body**: `{ items: [...] }` **requerido**, mínimo 1.
+
+| Cada item | | Tipo | Restricción |
+|---|---|---|---|
+| `servicioConexoId` | **requerido** | UUID | servicio existente y activo |
+| `cantidad` | *opcional* | decimal | 0.01–999999.99, def. 1 |
+| `valorAplicado` | *opcional* | decimal | monetario. Si falta: `valorBase × cantidad` |
+
+- **→** `200 CotizacionDto`
+- **Errores**: `400 SERVICIO_INVALIDO` · `400 SERVICIO_INACTIVO` · `404 COTIZACION_NO_ENCONTRADA` · `409 COTIZACION_NO_EDITABLE`
+
+#### `POST /api/cotizaciones/{id}/entregar`
+Marca la entrega y envía la cotización por correo al comercial responsable
+(el correo es asíncrono, ver
+[README §5.3](docs/contrato-integracion/README.md#53-entregar-una-cotización-ya-no-espera-al-correo)).
+
+- **Roles**: `AdminTarifas`, `CoordinadorFletes`, `Admin`. (`Comercial` **no**.)
+- **Body**: `multipart/form-data`, campo `formato` *opcional* (PDF, máx. 10 MB).
+  Se puede enviar la petición sin cuerpo.
+- **→** `200 EntregarCotizacionResultDto`
+- **Errores**: `400 COTIZACION_SIN_FLETE` · `404 COTIZACION_NO_ENCONTRADA` · `409 COTIZACION_YA_ENTREGADA` · `409 SOLICITUD_NO_TRANSICIONABLE`
+
+#### `POST /api/cotizaciones/{id}/resultado` — ganada/perdida
+Si `resultado = "ganada"`, realimenta la biblioteca de Tarifas Ganadas.
+**Siempre hay que entregar primero** (`/entregar`).
+
+- **Roles**: `Comercial`, `Admin` (#213 — decidir si una cotización se ganó
+  o se perdió es criterio del Comercial dueño del negocio; ni AdminTarifas
+  ni CoordinadorFletes tienen este permiso).
+
+| Body | | Tipo | Restricción |
+|---|---|---|---|
+| `resultado` | **requerido** | string | `ganada` \| `perdida` |
+| `motivo` | *opcional* | string | máx. 100 |
+| `comentario` | *opcional* | string | máx. 500 |
+
+- **→** `200 CotizacionDto`
+- **Errores**: `400 RESULTADO_INVALIDO` · `404 COTIZACION_NO_ENCONTRADA` · `409 COTIZACION_NO_ENTREGADA` · `409 RESULTADO_YA_DEFINIDO` · `409 SOLICITUD_NO_TRANSICIONABLE`
+
+#### `GET /api/cotizaciones/{id}/exportar-excel`
+- **Roles**: Todos.
+- **→** `200` binario `.xlsx` con `Content-Disposition: attachment`.
+- **Errores**: `404 COTIZACION_NO_ENCONTRADA`
+
+### 3.5 Biblioteca SICE-TAC (DW, solo lectura) — `/api/biblioteca-sicetac`
+
+#### `GET /api/biblioteca-sicetac`
+- **Roles**: Todos. Rate limit estricto.
+
+| Query | | Tipo | Restricción |
+|---|---|---|---|
+| `q` | *opcional* | string | texto de ruta |
+| `periodo` | *opcional* | int | def. el más reciente |
+| `configuracion`, `tipoCarga`, `unidadTransporte`, `condicionCarga`, `viaEstandar` | *opcional* | string | valores de `/filtros` |
+| `top` | *opcional* | int | 1–500, def. 50 (tamaño de página) |
+| `page` | *opcional* | int | ≥ 1, def. 1 |
+
+- **→** `200 MatrizSicetacResultDto`
+- **Errores**: `503 DWSICE_SIN_DATOS`
+
+#### `GET /api/biblioteca-sicetac/periodos`
+- **Roles**: Todos. **→** `200 number[]` (los 12 más recientes).
+
+#### `GET /api/biblioteca-sicetac/filtros`
+- **Roles**: Todos. **→** `200 SicetacFiltrosDto` (periodo más reciente).
+
+### 3.6 Biblioteca histórico SAP (solo lectura) — `/api/biblioteca-sap-historico`
+
+#### `GET /api/biblioteca-sap-historico`
+- **Roles**: Todos. Rate limit estándar. **No pagina.**
+
+| Query | | Tipo | Restricción |
+|---|---|---|---|
+| `q` | *opcional* | string | código DIVIPOLA origen/destino o detalle |
+| `lineaNegocio` | *opcional* | **int** | código numérico (de `/filtros`) |
+| `tipoVehiculo`, `tipoCarroseria` | *opcional* | string | código SAP (de `/filtros`) |
+| `claseViaje` | *opcional* | **int** | código numérico (de `/filtros`) |
+| `top` | *opcional* | int | 1–500, def. 50 |
+
+- **→** `200 SapHistoricoResultDto`
+
+#### `GET /api/biblioteca-sap-historico/filtros`
+- **Roles**: Todos. **→** `200 SapHistoricoFiltrosDto`
+
+### 3.7 Biblioteca plaza SAP — `/api/biblioteca-sap-plaza`
+
+#### `GET /api/biblioteca-sap-plaza`
+- **Roles**: Todos. Rate limit estricto.
+- **Query**: los mismos que el histórico (§3.6) + `page` *opcional* (≥ 1, def. 1).
+- **→** `200 SapHistoricoResultDto`
+
+#### `GET /api/biblioteca-sap-plaza/filtros`
+- **Roles**: Todos. **→** `200 SapHistoricoFiltrosDto`
+
+#### Ajuste local de vigencia (no toca SAP)
+**Roles de los tres**: `AdminTarifas`, `CoordinadorFletes`, `Admin`.
+
+##### `PATCH /api/biblioteca-sap-plaza/{tarifaId}/vigencia`
+`tarifaId` es **entero**.
+
+| Body | | Tipo | Restricción |
+|---|---|---|---|
+| `nuevaVigencia` | **requerido** | fecha ISO | ej. `"2026-12-31"` |
+| `motivo` | *opcional* | string | máx. 300 |
+
+- **→** `204`. No valida que `tarifaId` exista en SAP; un id inexistente deja
+  un ajuste huérfano.
+- **Errores**: `400 FECHA_REQUERIDA`
+
+##### `POST /api/biblioteca-sap-plaza/vigencia/masivo`
+
+| Body | | Tipo | Restricción |
+|---|---|---|---|
+| `tarifaIds` | **requerido** | int[] | mínimo 1 |
+| `modo` | **requerido** | string | `fecha` \| `extender` |
+| `nuevaVigencia` | condicional | fecha ISO | **requerido si `modo = fecha`** |
+| `cantidad` | condicional | int | **requerido y > 0 si `modo = extender`** |
+| `unidad` | condicional | string | `dias` \| `meses`. **Requerido si `modo = extender`** |
+| `motivo` | *opcional* | string | máx. 300 |
+
+- **→** `200 AjusteVigenciaResultDto`
+- **Errores**: `400 FECHA_REQUERIDA` · `400 CANTIDAD_INVALIDA` · `400 UNIDAD_REQUERIDA`
+
+##### `DELETE /api/biblioteca-sap-plaza/{tarifaId}/vigencia`
+Quita el ajuste; la tarifa vuelve a regirse por la vigencia de SAP.
+
+- **→** `204`
+- **Errores**: `404 AJUSTE_VIGENCIA_NO_ENCONTRADO`
+
+### 3.8 Reglas Solo-SICETAC — `/api/reglas-solo-sicetac`
+
+**Todo el controller**: `AdminTarifas`, `Admin`.
+
+#### `GET /api/reglas-solo-sicetac`
+- Rate limit estándar. **→** `200 ReglaSoloSicetacDto[]`
+
+#### `POST /api/reglas-solo-sicetac`
+
+| Body | | Tipo | Restricción |
+|---|---|---|---|
+| `origen` | **requerido** | string | máx. 150 |
+| `destino` | **requerido** | string | máx. 150 |
+| `tipoVehiculo` | **requerido** | string | máx. **40** |
+
+- **→** `201 ReglaSoloSicetacDto`
+- **Errores**: `400 REGLA_INVALIDA` (algún campo queda vacío tras normalizar) · `409 REGLA_DUPLICADA`
+
+#### `DELETE /api/reglas-solo-sicetac/{id}`
+- **→** `204`
+- **Errores**: `404 REGLA_NO_ENCONTRADA`
+
+#### `POST /api/reglas-solo-sicetac/importar-excel`
+Columnas: Origen, Destino, Tipo de vehículo.
+
+- **Body**: `multipart/form-data`, campo `archivo` **requerido** (§1.9).
+- **→** `200 ImportarReglasResultDto`
+- **Errores**: `400 ARCHIVO_REQUERIDO` · `400 FORMATO_NO_SOPORTADO` · `400 EXCEL_INVALIDO` · `400 EXCEL_SIN_DATOS`
+
+### 3.9 Servicios conexos — `/api/servicios-conexos`
+
+#### `GET /api/servicios-conexos`
+- **Roles**: Todos.
+
+| Query | | Tipo | Restricción |
+|---|---|---|---|
+| `soloActivos` | *opcional* | boolean | def. `false` |
+| `q` | *opcional* | string | búsqueda por nombre |
+| `categoria` | *opcional* | string | `logistico` \| `adicional` |
+| `page` | *opcional* | int | ≥ 1, def. 1 |
+| `pageSize` | *opcional* | int | 1–200, def. 50 |
+
+- **→** `200 Pagina<ServicioConexoDto>`
+
+#### `POST /api/servicios-conexos`
+- **Roles**: `ServiciosLogisticos`, `AdminTarifas`, `Admin`.
+
+| Body | | Tipo | Restricción |
+|---|---|---|---|
+| `nombre` | **requerido** | string | máx. 120 |
+| `categoria` | *opcional* | string | `logistico` \| `adicional`, def. `logistico`; máx. 20 |
+| `reglaCobro` | *opcional* | string | JSON serializado como texto, ej. `"{\"tipo\":\"por_hora\",\"valor\":45000}"` |
+| `valorBase` | *opcional* | decimal | monetario |
+| `vigenteHasta` | *opcional* | fecha | solo fecha `"2026-12-31"` |
+| `activo` | *opcional* | boolean | def. `true` |
+
+- **→** `201 ServicioConexoDto`
+- **Errores**: `400 CATEGORIA_INVALIDA` · `409 SERVICIO_DUPLICADO` (ya hay uno activo con el mismo nombre)
+
+#### `PATCH /api/servicios-conexos/{id}`
+Actualización parcial: solo cambian los campos enviados y no nulos.
+
+- **Roles**: `ServiciosLogisticos`, `AdminTarifas`, `Admin`.
+- **Body**: los mismos campos que el POST, todos *opcionales*, mismas restricciones.
+- **→** `200 ServicioConexoDto`
+- **Errores**: `400 CATEGORIA_INVALIDA` · `404 SERVICIO_NO_ENCONTRADO`
+
+#### `POST /api/servicios-conexos/importar-excel`
+Columnas: Nombre, Valor base, Vigente hasta, Categoría, Activo.
+
+- **Roles**: `ServiciosLogisticos`, `AdminTarifas`, `Admin`.
+- **Body**: `multipart/form-data`, campo `archivo` **requerido** (§1.9).
+- **→** `200 ImportarServiciosResultDto`
+- **Errores**: `400 ARCHIVO_REQUERIDO` · `400 FORMATO_NO_SOPORTADO` · `400 EXCEL_SIN_DATOS`
+
+### 3.10 Tarifas Ganadas (biblioteca propia) — `/api/tarifas-historicas`
+
+#### `GET /api/tarifas-historicas`
+- **Roles**: Todos. Rate limit estándar.
+
+| Query | | Tipo | Restricción |
+|---|---|---|---|
+| `ruta` | *opcional* | UUID | activa la rama "sugerencias" |
+| `vehiculo` | *opcional* | UUID | activa la rama "sugerencias" |
+| `q`, `mercancia`, `vigencia` | *opcional* | string | activan la rama "búsqueda" |
+| `origen` | *opcional* | string | `ganada` \| `legado`; activa la rama "búsqueda" |
+| `page` | *opcional* | int | ≥ 1, def. 1 (solo rama "búsqueda") |
+| `pageSize` | *opcional* | int | 1–200, def. 50 (solo rama "búsqueda") |
+
+**El tipo de respuesta cambia según la rama:**
+
+| Rama | Condición | Respuesta |
+|---|---|---|
+| Sugerencias | viene `ruta` o `vehiculo` | `200 BibliotecaItemDto[]` (las 10 más recientes) |
+| Búsqueda | viene `q`, `mercancia`, `vigencia` u `origen` (y no `ruta`/`vehiculo`) | `200 Pagina<BibliotecaItemDto>` |
+| Recientes | sin filtros | `200 BibliotecaItemDto[]` |
+
+### 3.11 Tarifas SICE-TAC (caché local) — `/api/tarifas-sicetac`
+
+#### `GET /api/tarifas-sicetac`
+- **Roles**: Todos.
+- **Query**, todos *opcionales*: `origen`, `destino`, `config`, `tipoCarga`,
+  `unidad`, `condicion` (string) y `periodo` (int).
+- **→** `200 TarifaSicetacDto[]`
+
+#### `POST /api/tarifas-sicetac/importar`
+Upsert idempotente del Excel SICE-TAC.
+
+- **Roles**: `CoordinadorFletes`, `Admin`.
+- **Body**: `multipart/form-data`, campo `archivo` **requerido** (§1.9).
+- **→** `200 ImportResumenDto`
+- **Errores**: `400 ARCHIVO_REQUERIDO` · `400 FORMATO_NO_SOPORTADO` · `400 EXCEL_INVALIDO` · `400 EXCEL_VACIO` · `400 EXCEL_COLUMNAS`
+
+#### `GET /api/tarifas-sicetac/importaciones`
+- **Roles**: Todos. **→** `200 ImportacionDto[]`
+
+### 3.12 Métricas — `/api/metricas`
+
+**Todo el controller**: `LiderProceso`, `AdminTarifas`, `Admin`.
+
+#### `GET /api/metricas/cumplimiento`
+- **→** `200 CumplimientoDto`
+
+#### `GET /api/metricas/kpis-piloto`
+Los 4 KPIs del piloto: tiempo de costeo del pliego, % de líneas auto-costeadas,
+cotizaciones emitidas y líneas con flete manual.
+
+- **Query**: `desde`, `hasta` *opcionales* (fecha ISO). Sin filtro, corre sobre
+  todo el histórico.
+- **→** `200 KpisPilotoDto`
+
+### 3.13 Priorización — `/api/priorizacion/parametros`
+
+**Todo el controller**: solo `Admin`. Cambiar esto reordena la bandeja de todo
+el mundo (ver
+[README §5.1](docs/contrato-integracion/README.md#51-recalibrar-la-priorización)).
+
+#### `GET /api/priorizacion/parametros`
+- **→** `200 ParametrosScoreDto`
+
+#### `PUT /api/priorizacion/parametros`
+- **Body**: `ParametrosScoreDto` completo; **los 10 campos son obligatorios en
+  la práctica** (un campo omitido llega como `0` y casi siempre rompe alguna
+  regla).
+- Reglas: cada peso entre 0 y 1; los 4 pesos suman 1.0 (±0.001);
+  `horizonteHoras > 0`; `valorReferencia > 0`; `puntajeLicitacion`,
+  `puntajeSpot`, `valorPorDefectoSinValor` y `probabilidadPorDefecto` entre 0 y
+  100.
+- **→** `200 ParametrosScoreDto`. No espera el recálculo (corre aparte).
+- **Errores**: `400 PARAMETROS_SCORE_INVALIDOS` (el `message` lista todos los motivos)
+
+### 3.14 Cubicación rápida — `/api/cubicacion`
+
+#### `POST /api/cubicacion`
+Cubicación sin persistencia: matrices por unidad y sugerencia de
+vehículo/flota. Es la única llamada HTTP síncrona de NEXO hacia el Cubicador.
+
+- **Roles**: `Comercial`, `CoordinadorFletes`, `Admin`.
+
+| Body | | Tipo | Restricción |
+|---|---|---|---|
+| `items` | **requerido** | array | mínimo 1 |
+| `unidadIds` | *opcional* | string[] | limitar la evaluación a esas unidades |
+| `claseViaje` | *opcional* | string | |
+
+| Cada item | | Tipo | Restricción |
+|---|---|---|---|
+| `cantidad` | **requerido** | int | > 0 (lo valida el Cubicador) |
+| `largoCm`, `anchoCm`, `altoCm` | **requerido** | decimal | > 0 (lo valida el Cubicador) |
+| `descripcion` | *opcional* | string | |
+| `pesoKg` | *opcional* | decimal | |
+| `tipoMercancia` | *opcional* | string | |
+
+- **→** `200 CubicacionRapidaResultado`
+- **Errores**: `400 ITEMS_REQUERIDOS` · `503 CUBICACION_RAPIDA_NO_CONFIGURADA` · `503 CUBICADOR_NO_DISPONIBLE` · `503 CUBICADOR_RESPUESTA_VACIA` · `503 CUBICADOR_CREDENCIAL_INVALIDA` · `503 CUBICADOR_ERROR`
+
+#### `GET /api/lineas-solicitud/{id}/cubicacion` — solo servicio a servicio
+- **Auth**: `Authorization: Bearer <clave de servicio>` (§1.2). No acepta la
+  identidad del portal. **No es para el frontend.**
+- **→** `200 LineaParaCubicacionDto`
+- **Errores**: `401 NO_AUTORIZADO` · `404 LINEA_NO_ENCONTRADA`
+
+### 3.15 Plan de cargue (cubicación 3D) — `/api/planes-cargue`
+
+Todas las escrituras van por cola hacia el Cubicador y responden **202**. Todas
+las lecturas van contra la proyección local de NEXO; ninguna llama al Cubicador.
+
+- **Roles de escritura**: `Comercial`, `CoordinadorFletes`, `Admin`.
+- **Roles de lectura**: Todos.
+
+#### `POST /api/planes-cargue` — crear plan
+
+| Body | | Tipo | Restricción |
+|---|---|---|---|
+| `nombre` | **requerido** | string | no vacío |
+| `vehiculoId` | **requerido** | UUID | vehículo del catálogo |
+
+- **→** `202 SolicitudDeCubicacionAceptadaDto`, header `Location` = `consultarEn`.
+  La fila de NEXO queda creada en estado `procesando` hasta que confirme el
+  Cubicador.
+- **Errores**: `400 NOMBRE_REQUERIDO`
+
+#### `POST /api/planes-cargue/demo`
+Escenario de demostración; el Cubicador elige el vehículo. Sin body.
+
+- **→** `202 ComandoAceptadoDto`. No hay `planCargueId` todavía: el plan
+  resultante se sigue por `/hubs/plan-cargue`.
+
+#### `POST /api/planes-cargue/desde-linea/{lineaId}`
+Puente Mesa de Costeo → 3D: el Cubicador arma la flota a partir de las
+posiciones de la línea. Sin body. No pasa por la compuerta de paridad.
+
+- **→** `202 ComandoAceptadoDto` (`correlationId` = `lineaId`). Sondear con
+  `GET /api/planes-cargue/por-linea/{lineaId}`.
+- **Errores**: `404 LINEA_SOLICITUD_NO_ENCONTRADA`
+
+#### `POST /api/planes-cargue/{id}/optimizar`
+- **Body** *opcional* (se puede omitir entero):
+
+| Campo | | Tipo |
+|---|---|---|
+| `estrategia` | *opcional* | string |
+| `algoritmo` | *opcional* | string |
+| `semilla` | *opcional* | int |
+| `respetarBloqueadas` | *opcional* | boolean |
+
+- **→** `202 SolicitudDeCubicacionAceptadaDto`
+- **Errores**: `404 PLAN_CARGUE_NO_ENCONTRADO` · `409 PLAN_CARGUE_EN_PROCESO` · `503 CUBICACION_EN_VERIFICACION` (compuerta de paridad cerrada)
+
+#### `POST /api/planes-cargue/{id}/items` — alta o edición de un ítem
+`id` nulo o ausente en el body = alta.
+
+| Body | | Tipo | Restricción |
+|---|---|---|---|
+| `descripcion` | **requerido** | string | no vacío |
+| `largoMm`, `anchoMm`, `altoMm` | ver nota | decimal | milímetros |
+| `pesoKg` | ver nota | decimal | |
+| `cantidad` | ver nota | int | |
+| `secuenciaEntrega`, `prioridad`, `maxNiveles` | ver nota | int | |
+| `maxPesoEncimaKg` | ver nota | decimal | |
+| `apilable`, `rotable`, `mantenerVertical`, `fragil`, `peligroso`, `refrigerado` | ver nota | boolean | |
+| `id` | *opcional* | UUID | ítem a editar |
+| `sku`, `pedido`, `destino`, `color`, `tipoEmbalaje`, `grupoCompatibilidad`, `observaciones` | *opcional* | string | |
+| `clsCliente` | *opcional* | string | ⚠️ así se llama hoy el campo (artefacto del renombrado "cls"); se esperaría `cliente` |
+
+Nota: los campos numéricos y booleanos no son anulables. Si se omiten llegan
+como `0` o `false`, y el Cubicador puede rechazar el ítem (el rechazo llega por
+`/hubs/plan-cargue`). Envíalos siempre.
+
+- **→** `202 ComandoAceptadoDto`
+- **Errores**: `400 DESCRIPCION_REQUERIDA` · `404 PLAN_CARGUE_NO_ENCONTRADO`
+
+#### `POST /api/planes-cargue/{id}/items/importar`
+- **Body**: `{ items: Item[] }` **requerido**, entre 1 y 2.000 ítems, con el
+  mismo shape del endpoint anterior (`id` se ignora).
+- **→** `202 ComandoAceptadoDto`
+- **Errores**: `400 IMPORTACION_INVALIDA` · `404 PLAN_CARGUE_NO_ENCONTRADO`
+
+#### `DELETE /api/planes-cargue/{id}/items/{itemId}`
+- **→** `202 ComandoAceptadoDto`
+- **Errores**: `404 PLAN_CARGUE_NO_ENCONTRADO`
+
+#### `DELETE /api/planes-cargue/{id}`
+- **→** `202 ComandoAceptadoDto` (no `204`: NEXO borra su fila de inmediato,
+  pero el borrado en el Cubicador es asíncrono).
+- **Errores**: `404 PLAN_CARGUE_NO_ENCONTRADO`
+
+#### `PATCH /api/planes-cargue/{id}/colocaciones/{colocacionId}` — ajuste manual
+Todos los campos *opcionales*: `x`, `y`, `z` (decimal), `orientacionIndice`
+(int), `bloqueada`, `retirar`, `reinsertar` (boolean).
+
+- **→** `202 ComandoAceptadoDto`. Si el Cubicador lo rechaza, llega un aviso de
+  rechazo por `/hubs/plan-cargue`.
+- **Errores**: `404 PLAN_CARGUE_NO_ENCONTRADO`
+
+#### Lecturas (Todos los roles)
+
+| Endpoint | Query | Respuesta | Errores |
+|---|---|---|---|
+| `GET /api/planes-cargue` | `page` (≥1, def. 1), `pageSize` (1–200, def. 50) | `200 Pagina<PlanCargueDto>` | — (rate limit estándar) |
+| `GET /api/planes-cargue/{id}` | — | `200 PlanCargueDto` | `404 PLAN_CARGUE_NO_ENCONTRADO` |
+| `GET /api/planes-cargue/por-linea/{lineaId}` | — | `200 PlanFlotaItemDto[]` (vacío mientras el Cubicador procesa; nunca 404) | — |
+| `GET /api/planes-cargue/{id}/resultado` | — | `200 ResultadoPlanDto` (ítems, colocaciones, métricas, incidencias) | `404 PLAN_CARGUE_NO_ENCONTRADO` · `404 VEHICULO_NO_ENCONTRADO` |
+| `GET /api/planes-cargue/{id}/flota` | — | `200 PlanFlotaItemDto[]` | — |
+| `GET /api/planes-cargue/{id}/metricas` | — | `200 MetricasCubicacion` o `200 null` si nunca se optimizó | `404 PLAN_CARGUE_NO_ENCONTRADO` |
+| `GET /api/planes-cargue/{id}/no-cargadas` | — | `200 ColocacionCargueDto[]` (solo rechazadas) | `404 PLAN_CARGUE_NO_ENCONTRADO` |
+| `GET /api/planes-cargue/{id}/colocaciones` | — | `200 ColocacionCargueDto[]` (cargadas y rechazadas) | `404 PLAN_CARGUE_NO_ENCONTRADO` |
+| `GET /api/planes-cargue/{id}/exportar` | — | `200 ResultadoPlanDto` (hoy igual a `/resultado`) | `404 PLAN_CARGUE_NO_ENCONTRADO` |
+
+⚠️ Limitación conocida de `por-linea`: hoy el worker del Cubicador solo reporta
+el primer vehículo de una flota multi-vehículo.
+
+### 3.16 Catálogo de vehículos (Cubicador) — `/api/vehiculos`
+
+#### `GET /api/vehiculos`
+- **Roles**: Todos. Rate limit estándar.
+- **Query**: `page` (≥ 1, def. 1), `pageSize` (1–200, def. 50).
+- **→** `200 Pagina<VehiculoCubicacionDto>`
+
+#### `POST /api/vehiculos` — alta/edición (por cola)
+- **Roles**: `Comercial`, `CoordinadorFletes`, `Admin`.
+
+| Body | | Tipo | Restricción |
+|---|---|---|---|
+| `nombre` | **requerido** | string | no vacío |
+| `puertaPosicion` | **requerido** | string | `trasera` \| `frontal` \| `costado_izquierdo` \| `costado_derecho` |
+| `ejes` | **requerido** | array | `[{ posicionMm, capacidadKg }]` |
+| `largoInternoMm`, `anchoInternoMm`, `altoInternoMm` | ver nota | decimal | milímetros |
+| `capacidadKg`, `taraKg` | ver nota | decimal | |
+| `puertaAnchoMm`, `puertaAltoMm` | ver nota | decimal | |
+| `descripcion` | *opcional* | string | |
+| `toleranciaParedesMm`, `toleranciaEntreUnidadesMm` | *opcional* | decimal | def. 0 |
+
+Nota: las dimensiones no son anulables; si se omiten llegan como `0` y el
+Cubicador rechaza el vehículo. Envíalas siempre.
+
+- **→** `202 ComandoAceptadoDto`
+- **Errores**: `400 NOMBRE_REQUERIDO`
+
+#### `DELETE /api/vehiculos/{id}`
+- **Roles**: solo `Admin`.
+- **→** `202 ComandoAceptadoDto`
+- **Errores**: `409 VEHICULO_EN_USO` (algún plan de cargue lo referencia)
+
+### 3.17 Trabajos — `/api/trabajos`
+
+#### `GET /api/trabajos/{id}`
+- **Roles**: Todos.
+- **→** `200 EstadoTrabajoDto`
+- **Errores**: `404 TRABAJO_NO_ENCONTRADO`
+
+### 3.18 Salud — `/health`
+
+#### `GET /health`
+- **Auth**: ninguna (anónimo).
+- **→** `200` / `503` `{ status, duracion, chequeos: { [nombre]: { status, descripcion, error } } }`
+
+### 3.19 Catálogos — `/api/catalogos`
+
+Catálogos oficiales de solo lectura (S4-HU-09/S4-HU-10) para los desplegables
+de Reglas Solo-SICETAC y Tarifas de Plaza — reemplazan el texto libre.
+**Todo el controller**: los 6 roles (solo requiere sesión válida).
+
+| Endpoint | Fuente | → |
+|---|---|---|
+| `GET /api/catalogos/tipos-vehiculo` | `tblSAPTiposVehiculoTarifario` + 5 casos especiales sin código SAP | `200 TipoVehiculoDto[]` |
+| `GET /api/catalogos/lineas-negocio` | `tblSAPLineaNegocio` | `200 LineaNegocioDto[]` |
+| `GET /api/catalogos/clases-viaje` | `tblSAPClaseViaje` | `200 ClaseViajeDto[]` |
+| `GET /api/catalogos/clases-contenedor` | `tblSAPClaseContenedor` | `200 ClaseContenedorDto[]` |
+
+### 3.20 Rangos de peso — `/api/pesos`
+
+Bandas de peso (kg) propias de Nexo para Tarifas de Plaza (S4-HU-10.1) — **no
+es un catálogo cerrado**, se pueden agregar bandas nuevas con el tiempo.
+`pesoMaximo = null` es una banda abierta (p. ej. "+10500 kg").
+**Todo el controller**: `AdminTarifas`, `Admin`.
+
+#### `GET /api/pesos`
+- **→** `200 RangoPesoDto[]`
+
+#### `POST /api/pesos` — crear banda
+
+| Body | | Tipo | Restricción |
+|---|---|---|---|
+| `pesoMinimo` | **requerido** | int | ≥ 0 |
+| `pesoMaximo` | *opcional* | int | > `pesoMinimo` si viene; `null` = banda abierta |
+
+- **→** `201 RangoPesoDto`, header `Location: /api/pesos/{id}`
+- **Errores**: `400 RANGO_PESO_INVALIDO` (mínimo negativo, o máximo ≤ mínimo) · `409 RANGO_PESO_DUPLICADO`
+
+#### `PUT /api/pesos/{id}` — editar banda
+Mismo body y errores que crear, más `404 RANGO_PESO_NO_ENCONTRADO`.
+- **→** `200 RangoPesoDto`
+
+#### `DELETE /api/pesos/{id}`
+- **→** `204`
+- **Errores**: `404 RANGO_PESO_NO_ENCONTRADO`
+
+### 3.21 Tarifas de plaza — `/api/tarifas-plaza`
+
+CRUD de tarifas de plaza gobernadas por Nexo (S4-HU-10.2) — recrea el
+formulario de captura que hoy vive en un sistema externo, con carga/descarga
+masiva por Excel. `zonaOrigen`/`zonaDestino` se resuelven solos desde el
+catálogo de municipios al elegir `origenMunicipioId`/`destinoMunicipioId`.
+Al menos uno de `pesoId`/`tipoVehiculo` es obligatorio — **no son mutuamente
+excluyentes**: las tarifas de contenedor traen ambos (el tipo de vehículo se
+deriva de la banda de peso), las nacionales solo `tipoVehiculo`.
+**Todo el controller**: `AdminTarifas`, `Admin`.
+
+#### `GET /api/tarifas-plaza`
+- **→** `200 TarifaPlazaDto[]`
+
+#### `POST /api/tarifas-plaza` — crear
+
+| Body | | Tipo | Restricción |
+|---|---|---|---|
+| `lineaNegocio` | **requerido** | string | debe existir en el catálogo real (§3.19) |
+| `claseViaje` | **requerido** | string | debe existir en el catálogo real (§3.19) |
+| `origenMunicipioId` | **requerido** | int | debe existir |
+| `destinoMunicipioId` | **requerido** | int | debe existir |
+| `claseContenedor` | *opcional* | string | |
+| `pesoId` | *opcional* | int | debe existir en `/api/pesos`; ver regla de arriba |
+| `tipoVehiculo` | *opcional* | string | ver regla de arriba |
+| `valor` | **requerido** | decimal | > 0 |
+| `vigencia` | **requerido** | fecha | |
+| `detallesTarifa` | **requerido** | string | |
+
+- **→** `201 TarifaPlazaDto`, header `Location: /api/tarifas-plaza/{id}`
+- **Errores**: `400 TARIFA_PLAZA_INVALIDA` · `400 MUNICIPIO_INVALIDO` · `400 RANGO_PESO_INVALIDO` · `409 TARIFA_PLAZA_DUPLICADA` (misma combinación exacta de las 7 dimensiones)
+
+#### `PUT /api/tarifas-plaza/{id}` — editar
+Mismo body y errores que crear, más `404 TARIFA_PLAZA_NO_ENCONTRADA`. Editar
+`valor`/`vigencia`/`detallesTarifa` archiva el valor anterior en el
+histórico — nada especial que hacer del lado del cliente.
+- **→** `200 TarifaPlazaDto`
+
+#### `DELETE /api/tarifas-plaza/{id}`
+- **→** `204`
+- **Errores**: `404 TARIFA_PLAZA_NO_ENCONTRADA`
+
+#### `POST /api/tarifas-plaza/importar-excel`
+Upsert por línea de negocio + clase de viaje + origen + destino + clase de
+contenedor + rango de peso + tipo de vehículo (las 7 dimensiones).
+
+- **Body**: `multipart/form-data`, campo `archivo` (§1.9), tope 10 MB.
+- **→** `200 ImportarTarifasPlazaResultDto`
+- **Errores**: `400 ARCHIVO_REQUERIDO` · `400 FORMATO_NO_SOPORTADO` (solo `.xlsx`/`.xlsm`)
+
+#### `GET /api/tarifas-plaza/exportar-excel`
+Descarga el catálogo completo — el mismo archivo sirve de plantilla para
+`importar-excel`.
+- **→** `200`, archivo `.xlsx` (`Content-Type` de Excel)
 
 ---
 
-## 4. Hubs de SignalR — resumen de conexión
+## 4. Hubs de SignalR — conexión
 
 ```js
 const conn = new signalR.HubConnectionBuilder()
-  .withUrl("/hubs/trabajos", { headers: { "X-Portal-Usuario-Id": id } }) // o negotiate con el header
+  .withUrl("/hubs/trabajos", { headers: { "X-Portal-clsUsuario-Id": id } }) // ver discrepancia en §1.1
   .build();
 conn.on("avance", (aviso) => { /* ... */ });
 await conn.start();
@@ -516,24 +1288,48 @@ await conn.invoke("Suscribir", trabajoId);
 await conn.invoke("Desuscribir", trabajoId);
 ```
 
-Mismo patrón para `/hubs/bandeja` (sin parámetro) y `/hubs/plan-cargue`
-(con `planCargueId`). Detalle de por qué son 3 hubs separados y no uno:
-[`docs/contrato-integracion/README.md`, sección 5](docs/contrato-integracion/README.md#5-avisos-en-vivo).
+Mismo patrón para `/hubs/bandeja` (sin parámetro, evento `"bandeja"`) y
+`/hubs/plan-cargue` (con `planCargueId`, evento `"avance"`). Por qué son 3 hubs
+separados: [README §5](docs/contrato-integracion/README.md#5-avisos-en-vivo).
 
 ---
 
-## 5. Excepciones a "cualquier rol autenticado"
+## 5. Matriz de permisos
 
-Todo lo que no está en esta lista, y no tiene roles anotados arriba en su
-propio endpoint, solo exige una identidad válida con alguno de los 6 roles —
-no importa cuál. Referencia completa de quién puede qué:
-[`docs/ROLES_Y_PERMISOS.md`](docs/ROLES_Y_PERMISOS.md).
+✅ = permitido. Fuente: los atributos `[Authorize(Roles=...)]` de
+`src/Nexo.Api/*/cls*Controller.cs`. Los `GET` que no aparecen aquí están
+abiertos a los 6 roles.
+
+| Operación | Com | Coord | AdmTar | ServLog | Líder | Admin |
+|---|:-:|:-:|:-:|:-:|:-:|:-:|
+| `POST /api/captura-solicitudes/*` y sus `GET` (aprovisionamiento, clientes) | ✅ | | | | | ✅ |
+| `POST /api/solicitudes` | | ✅ | | | | ✅ |
+| `POST /api/solicitudes/resolver-catalogos` | ✅ | ✅ | | | | ✅ |
+| `POST /api/solicitudes/{id}/lineas:bulk` | | ✅ | | | | ✅ |
+| `POST /api/solicitudes/{id}/rechazar` | ✅ | ✅ | | | | ✅ |
+| `POST /api/solicitudes/{id}/recalcular-score` | | ✅ | | | | ✅ |
+| `POST /api/cotizaciones` · `aplicar-propuestas` | ✅ | ✅ | ✅ | | | ✅ |
+| `POST /api/cotizaciones/{id}/resultado` | ✅ | | | | | ✅ |
+| `POST /api/cotizaciones/{id}/lineas` · `entregar` | | ✅ | ✅ | | | ✅ |
+| `POST /api/cotizaciones/{id}/conexos` | ✅ | ✅ | | | | ✅ |
+| Vigencia plaza SAP (`PATCH`, `POST masivo`, `DELETE`) | | ✅ | ✅ | | | ✅ |
+| `/api/reglas-solo-sicetac` (todo, incluido `GET`) | | | ✅ | | | ✅ |
+| `POST/PATCH /api/servicios-conexos`, `importar-excel` | | | ✅ | ✅ | | ✅ |
+| `POST /api/tarifas-sicetac/importar` | | ✅ | | | | ✅ |
+| `/api/metricas/*` | | | ✅ | | ✅ | ✅ |
+| `/api/priorizacion/parametros` (`GET` y `PUT`) | | | | | | ✅ |
+| `POST /api/cubicacion` | ✅ | ✅ | | | | ✅ |
+| Escrituras de `/api/planes-cargue` | ✅ | ✅ | | | | ✅ |
+| `POST /api/vehiculos` | ✅ | ✅ | | | | ✅ |
+| `DELETE /api/vehiculos/{id}` | | | | | | ✅ |
+| `/api/pesos` (todo, incluido `GET`) | | | ✅ | | | ✅ |
+| `/api/tarifas-plaza` (todo, incluido `GET`) | | | ✅ | | | ✅ |
 
 ---
 
 ## 6. Enums
 
-Viajan como el string exacto (ver [sección 1](#enums-se-mandan-y-devuelven-como-texto)).
+Viajan como el string exacto (ver [§1.6](#16-enums-se-mandan-y-devuelven-como-texto)).
 
 ```
 RolUsuario            CoordinadorFletes · LiderProceso · ServiciosLogisticos · Admin · Comercial · AdminTarifas
@@ -551,5 +1347,21 @@ LineaNegocio           PuertoAInterior · InteriorAPuerto · Nacional · Devoluc
 ClaseViaje             Contenedor · Cupo · CargaSuelta · Extradimensionado
 ```
 
-`src/Nexo.Domain/Enums/Enums.cs` es la fuente de la verdad; si este
-apéndice y el código difieren, gana el código.
+`src/Nexo.Domain/Enums/Enums.cs` es la fuente de la verdad; si este apéndice y
+el código difieren, gana el código.
+
+---
+
+## 7. Discrepancias conocidas entre código y contrato
+
+Pendientes de decisión. Mientras sigan abiertas, este documento describe el
+comportamiento real del código.
+
+| # | Dónde | Hoy (código) | Esperado (contrato/docs) | Impacto |
+|---|---|---|---|---|
+| 1 | Header de identidad | `X-Portal-clsUsuario-Id` | `X-Portal-Usuario-Id` | Frontend, e2e y scripts de QA reciben `401` en todo |
+| 2 | `CatalogoLineaResueltoDto` | `clsVehiculoCreado` | `vehiculoCreado` | Nombre de campo JSON en `resolver-catalogos` |
+| 3 | Ítem de plan de cargue | `clsCliente` | `cliente` | Nombre de campo JSON en `items` e `items/importar` |
+| 4 | `importar-excel` de reglas y servicios | sin archivo → `400 VALIDATION_ERROR` | `400 ARCHIVO_REQUERIDO` | Código de error distinto al de los otros uploads |
+
+Los tres primeros parecen efecto del renombrado masivo con prefijo `cls`.

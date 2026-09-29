@@ -81,18 +81,23 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
         var linea = await _db.LineasSolicitud.AsNoTracking()
             .Include(l => l.clsRuta)
             .Include(l => l.clsConfiguracionVehiculo)
+            .Include(l => l.clsSolicitud)
             .FirstOrDefaultAsync(l => l.Id == lineaId, ct)
             ?? throw new clsNotFoundException("LINEA_NO_ENCONTRADA", "Línea de solicitud no encontrada.");
 
         var ajustes = await _ajustes.MapaAsync(ct);
         var soloSice = await _reglas.ClavesRutaVehiculoAsync(ct);
 
+        // S4-HU-14.1/#221: mismas horas reales que usa el camino por solicitud.
+        var tiempos = clsCondicionesServicioDto.Desde(linea.clsSolicitud?.CondicionesServicio).TiemposLogisticos!;
+        var horasSolicitud = tiempos.HorasCargue + tiempos.HorasDescargue;
+
         using var scope = _scopes.CreateScope();
         var dw = _dwConfigurado ? scope.ServiceProvider.GetService<clsDwSiceDbContext>() : null;
         var dc = _dcConfigurado ? scope.ServiceProvider.GetService<clsDbSolucionesTiDbContext>() : null;
         var tarifario = scope.ServiceProvider.GetRequiredService<ITarifarioSapPort>();
 
-        var dto = await ProponerLineaAsync(dw, dc, tarifario, linea, ajustes, soloSice, ct);
+        var dto = await ProponerLineaAsync(dw, dc, tarifario, linea, ajustes, soloSice, horasSolicitud, ct);
         await PublicarVencidaSiAplicaAsync(dto, ct);
         return new clsResultadoDeCosteo(dto.ValorPropuesto, dto.FuentePropuesta, dto.Justificacion);
     }
@@ -135,6 +140,11 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
         var ajustes = await _ajustes.MapaAsync(ct);
         var soloSice = await _reglas.ClavesRutaVehiculoAsync(ct);
 
+        // S4-HU-14.1/#221: horas reales capturadas en la solicitud (Cargue+Descargue),
+        // para recalcular el piso SICE-TAC en vez de asumir las horas pactadas.
+        var tiempos = clsCondicionesServicioDto.Desde(solicitud.CondicionesServicio).TiemposLogisticos!;
+        var horasSolicitud = tiempos.HorasCargue + tiempos.HorasDescargue;
+
         static string Huella(clsLineaSolicitud l) => string.Join('|',
             l.clsRuta?.Origen, l.clsRuta?.Destino, l.clsConfiguracionVehiculo?.TipoVehiculo, l.clsConfiguracionVehiculo?.Carroceria,
             l.Tipologia, l.Peso, l.LineaNegocio, l.ClaseViaje, l.ClaseContenedor,
@@ -152,7 +162,7 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
                 var dw = _dwConfigurado ? scope.ServiceProvider.GetService<clsDwSiceDbContext>() : null;
                 var dc = _dcConfigurado ? scope.ServiceProvider.GetService<clsDbSolucionesTiDbContext>() : null;
                 var tarifario = scope.ServiceProvider.GetRequiredService<ITarifarioSapPort>();
-                var dto = await ProponerLineaAsync(dw, dc, tarifario, grupo.First(), ajustes, soloSice, ct);
+                var dto = await ProponerLineaAsync(dw, dc, tarifario, grupo.First(), ajustes, soloSice, horasSolicitud, ct);
                 return grupo.Select(l => dto with { LineaId = l.Id }).ToList();
             }
             catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
@@ -180,7 +190,7 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
     private async Task<clsPropuestaLineaDto> ProponerLineaAsync(
         clsDwSiceDbContext? dw, clsDbSolucionesTiDbContext? dc, ITarifarioSapPort tarifario,
         clsLineaSolicitud linea, IReadOnlyDictionary<int, DateTime> ajustesVigencia,
-        IReadOnlySet<string> soloSice, CancellationToken ct)
+        IReadOnlySet<string> soloSice, decimal horasSolicitud, CancellationToken ct)
     {
         if (linea.clsRuta is null)
         {
@@ -202,7 +212,7 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
         // TODOS los tipos de vehículo de esa ruta.
         if (soloSice.Contains(clsTexto.ClaveRutaVehiculo(linea.clsRuta.Origen, linea.clsRuta.Destino, vehiculo)))
         {
-            var sice = dw is null ? null : await CandidatoSicetacAsync(dw, origen, destino, vehiculo, linea.Tipologia, linea.clsConfiguracionVehiculo?.Carroceria, ct);
+            var sice = dw is null ? null : await CandidatoSicetacAsync(dw, origen, destino, vehiculo, linea.Tipologia, linea.clsConfiguracionVehiculo?.Carroceria, horasSolicitud, ct);
             var justif = sice is not null
                 ? $"clsRuta marcada como SOLO SICE-TAC por el Administrador: se propone el piso SICE-TAC ({sice.Valor:C0}) sin comparar con plaza ni tarifario."
                 : "clsRuta marcada como SOLO SICE-TAC, pero no hay piso SICE-TAC para la ruta/periodo: la línea requiere atención manual.";
@@ -219,19 +229,20 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
                 linea.LineaNegocio, linea.ClaseViaje, linea.ClaseContenedor,
                 vehiculo, linea.clsConfiguracionVehiculo?.Carroceria,
                 linea.Peso, linea.Exclusivo, linea.Consolidado,
-                linea.RetornaContenedor, linea.CiudadDevolucionContenedor), ct);
+                linea.RetornaContenedor, linea.CiudadDevolucionContenedor, horasSolicitud), ct);
         }
 
-        clsCandidatoTarifaDto? plaza;
+        // El camino "oficial" (ITarifarioSapPort, ver comentario mas abajo) exige match
+        // exacto de ClaseContenedor/peso/vehiculo sin fallback. Cuando no encuentra nada
+        // (oficial es null, o oficial.Tarifa queda null porque el filtro exacto descarto
+        // todo) se reintenta con el mismo selector tolerante que ya usa el camino "Solo
+        // SICE-TAC" de arriba, antes de rendirse. Mismo patron que ya se aplico para el
+        // piso SICE-TAC (ver sicetac mas abajo) y para el bug gemelo documentado en
+        // docs/decisiones/matching-sicetac-oficial-vs-solo-sicetac.md.
+        clsCandidatoTarifaDto? plaza = oficial?.Tarifa;
         var vencida = oficial?.Vencida == true;
-        if (oficial is not null)
-        {
-            plaza = oficial.Tarifa;
-        }
-        else
-        {
-            plaza = dc is null ? null : await CandidatoSapAsync(dc, dc.TarifasPlazaSap, "plaza", origen, destino, vehiculo, linea.Peso, soloVigentes: true, ajustesVigencia, ct);
-        }
+        if (plaza is null && dc is not null)
+            plaza = await CandidatoSapAsync(dc, dc.TarifasPlazaSap, "plaza", origen, destino, vehiculo, linea.Peso, soloVigentes: true, ajustesVigencia, ct);
 
         // clsTarifarioSapAdapter.SicetacOficialAsync (réplica 1:1 de la lógica SAP
         // legada) exige match exacto de Configuracion/TipoCarga/UnidadTransporte/
@@ -246,9 +257,9 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
         // reglas de negocio).
         var sicetac = oficial?.SicetacOficial;
         if (sicetac is null && dw is not null)
-            sicetac = await CandidatoSicetacAsync(dw, origen, destino, vehiculo, linea.Tipologia, linea.clsConfiguracionVehiculo?.Carroceria, ct);
+            sicetac = await CandidatoSicetacAsync(dw, origen, destino, vehiculo, linea.Tipologia, linea.clsConfiguracionVehiculo?.Carroceria, horasSolicitud, ct);
 
-        var historico = dc is null ? null : await CandidatoSapAsync(dc, dc.TarifasLogSap, "historico_sap", origen, destino, vehiculo, linea.Peso, soloVigentes: false, ajustesVigencia, ct);
+        var historico = dc is null ? null : await CandidatoSapAsync(dc, dc.TarifasLogSap, "historico_sap", origen, destino, vehiculo, linea.Peso, soloVigentes: false, ajustesVigencia, ct, ventanaMeses: 3);
 
         // Conexión SAP nueva (plaza en vivo), todavía no construida por "el equipo de
         // conexiones". Con SapTarifaFleteEnVivo:Modo en Deshabilitado (default) o
@@ -317,22 +328,68 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
         var dw = scope.ServiceProvider.GetService<clsDwSiceDbContext>();
         if (dw is null) return null;
 
+        // Sin contexto de solicitud (es una estimación de tramo de posicionamiento, no de
+        // una línea): horasSolicitud null, siempre usa el ValorSiceConHora de DWSice.
         return await CandidatoSicetacAsync(
             dw, Normalizar(ciudadLevante), Normalizar(origen), configuracion,
-            "VACIO", tipologia: null, carroceria: null, ct);
+            "VACIO", tipologia: null, carroceria: null, horasSolicitud: null, ct);
     }
 
     private Task<clsCandidatoTarifaDto?> CandidatoSicetacAsync(
         clsDwSiceDbContext dw, string origen, string destino, string? vehiculo,
-        TipologiaCarga? tipologia, string? carroceria, CancellationToken ct)
-        => CandidatoSicetacAsync(dw, origen, destino, vehiculo, "CARGADO", tipologia, carroceria, ct);
+        TipologiaCarga? tipologia, string? carroceria, decimal? horasSolicitud, CancellationToken ct)
+        => CandidatoSicetacAsync(dw, origen, destino, vehiculo, "CARGADO", tipologia, carroceria, horasSolicitud, ct);
 
     private async Task<clsCandidatoTarifaDto?> CandidatoSicetacAsync(
+        clsDwSiceDbContext dw, string origen, string destino, string? vehiculo, string condicionCarga,
+        TipologiaCarga? tipologia, string? carroceria, decimal? horasSolicitud, CancellationToken ct)
+    {
+        var (fila, criterio) = await ResolverFilaSiceAsync(dw, origen, destino, vehiculo, condicionCarga, tipologia, carroceria, ct);
+        if (fila is null) return null;
+
+        // S4-HU-14.1/#221: piso recalculado con las horas reales de la solicitud en vez
+        // de asumir las pactadas — ver clsPisoConHoras para el criterio de fallback.
+        var valor = clsPisoConHoras.Calcular(fila.Valor, fila.ValorHora, fila.HorasPactadas, fila.ValorSiceConHora, horasSolicitud);
+        return new clsCandidatoTarifaDto(
+            "sicetac", valor,
+            $"{fila.NombreRuta} · {fila.Configuracion} · {fila.NombreTipoCarga} · {fila.NombreUnidadTransporte}",
+            criterio, 1);
+    }
+
+    /// <summary>
+    /// Piso SICE-TAC vigente con desglose de horas para Mesa de Costeo (issue #179):
+    /// misma fuente DWSice que ya usa el motor automático, no la caché local que se
+    /// retiró (import manual de Excel, sin evidencia de uso real y desactualizada).
+    /// </summary>
+    public async Task<clsPisoSicetacVigenteDto?> PisoSicetacVigenteAsync(
+        string origen, string destino, string? vehiculo, TipologiaCarga? tipologia,
+        string? carroceria, CancellationToken ct = default)
+    {
+        if (!_dwConfigurado) return null;
+        using var scope = _scopes.CreateScope();
+        var dw = scope.ServiceProvider.GetService<clsDwSiceDbContext>();
+        if (dw is null) return null;
+
+        var (fila, _) = await ResolverFilaSiceAsync(
+            dw, Normalizar(origen), Normalizar(destino), vehiculo, "CARGADO", tipologia, carroceria, ct);
+        if (fila is null) return null;
+
+        return new clsPisoSicetacVigenteDto(
+            fila.Periodo, fila.Valor, fila.ValorHora, fila.HorasPactadas,
+            fila.Configuracion, fila.NombreTipoCarga, fila.NombreUnidadTransporte,
+            fila.CondicionCarga ?? "CARGADO");
+    }
+
+    /// <summary>Resuelve la fila de DWSice: mismo camino para la propuesta automática
+    /// (<see cref="CandidatoSicetacAsync(clsDwSiceDbContext, string, string, string?, string, TipologiaCarga?, string?, CancellationToken)"/>)
+    /// y para Mesa de Costeo (<see cref="PisoSicetacVigenteAsync"/>) — una sola consulta
+    /// a mantener, dos formas distintas de exponer el resultado.</summary>
+    private async Task<(clsRutaSicetacDw? Fila, string Criterio)> ResolverFilaSiceAsync(
         clsDwSiceDbContext dw, string origen, string destino, string? vehiculo, string condicionCarga,
         TipologiaCarga? tipologia, string? carroceria, CancellationToken ct)
     {
         var periodo = await PeriodoSiceAsync(dw, ct);
-        if (periodo == 0) return null;
+        if (periodo == 0) return (null, string.Empty);
 
         var baseQ = dw.RutasSicetac.AsNoTracking().Where(r =>
             r.Periodo == periodo &&
@@ -350,13 +407,7 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
             if (fila is not null) criterio += $" · configuración {config}";
         }
         fila ??= SeleccionarSice(await FilasSiceCacheadasAsync($"{claveBase}:*", baseQ, ct), tipologia, carroceria);
-        if (fila is null) return null;
-
-        var valor = fila.ValorSiceConHora ?? fila.Valor;
-        return new clsCandidatoTarifaDto(
-            "sicetac", valor,
-            $"{fila.NombreRuta} · {fila.Configuracion} · {fila.NombreTipoCarga} · {fila.NombreUnidadTransporte}",
-            criterio, 1);
+        return (fila, criterio);
     }
 
     internal static clsRutaSicetacDw? SeleccionarSice(
@@ -420,7 +471,8 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
     private async Task<clsCandidatoTarifaDto?> CandidatoSapAsync<T>(
         clsDbSolucionesTiDbContext dc, IQueryable<T> tabla, string fuente, string origen, string destino,
         string? vehiculo, decimal? peso, bool soloVigentes,
-        IReadOnlyDictionary<int, DateTime> ajustesVigencia, CancellationToken ct) where T : clsSapTarifaBase
+        IReadOnlyDictionary<int, DateTime> ajustesVigencia, CancellationToken ct,
+        int? ventanaMeses = null) where T : clsSapTarifaBase
     {
         var codigosOrigen = await CodigosDaneAsync(dc, origen, ct);
         var codigosDestino = await CodigosDaneAsync(dc, destino, ct);
@@ -440,6 +492,13 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
             criterio += " · vigencia efectiva >= hoy";
         }
 
+        if (ventanaMeses is { } meses)
+        {
+            var desde = hoy.AddMonths(-meses);
+            query = query.Where(t => t.FechaCreacion >= desde);
+            criterio += $" · últimos {meses} meses";
+        }
+
         if (!string.IsNullOrWhiteSpace(vehiculo))
         {
             var idVehiculo = await IdVehiculoSapAsync(dc, vehiculo, ct);
@@ -455,7 +514,7 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
         }
 
         var ajustesClave = ajustesVigencia.Count == 0 ? "" : string.Join('-', ajustesVigencia.Keys.OrderBy(k => k));
-        var claveFetch = $"sap-filas:{fuente}:{origen}:{destino}:{vehiculo}:{soloVigentes}:{hoy:yyyyMMdd}:{ajustesClave}";
+        var claveFetch = $"sap-filas:{fuente}:{origen}:{destino}:{vehiculo}:{soloVigentes}:{hoy:yyyyMMdd}:{ajustesClave}:{ventanaMeses}";
         var filas = (await _cache.GetOrCreateAsync(claveFetch, async e =>
         {
             e.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(3);

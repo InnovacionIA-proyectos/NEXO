@@ -16,7 +16,9 @@ public record clsLineaSolicitudDto(
 public record clsSolicitudDto(
     Guid Id, Guid ClienteId, string? ClienteNombre, TipoSolicitud Tipo, ModalidadSolicitud? Modalidad,
     DateTimeOffset? Deadline, decimal? ProbabilidadCierre, decimal? ValorEstimado, decimal ScorePrioridad,
-    EstadoSolicitud Estado, DateTimeOffset CreatedAt, IReadOnlyList<clsLineaSolicitudDto> Lineas);
+    EstadoSolicitud Estado, DateTimeOffset CreatedAt, IReadOnlyList<clsLineaSolicitudDto> Lineas,
+    /// <summary>Notas u observaciones comerciales (S4-HU-18.10/#227).</summary>
+    string? Notas = null);
 
 /// <summary>Fila de la Bandeja Priorizada (anti-FIFO).</summary>
 public record clsBandejaItemDto(
@@ -88,10 +90,24 @@ public record clsAnalisisExcelDto(string Archivo, IReadOnlyList<clsHojaExcelDto>
 /// hasta que se use en una solicitud); los locales traen ClienteId. Origen distingue
 /// "cliente" (ya tiene BP real) de "prospecto" (tblProspectos, todavía sin BP asignado).
 /// </summary>
-public record clsClienteBusquedaDto(Guid? ClienteId, string? Bp, string Nit, string Nombre, string Origen);
+public record clsClienteBusquedaDto(Guid? ClienteId, string? Bp, string Nit, string Nombre, string Origen)
+{
+    /// <summary>
+    /// Alias de <see cref="Nit"/>: nombre de campo que espera Cotifly como identificador
+    /// estable de cliente (reemplaza el uso de ClienteId/Bp, que son internos de Nexo y
+    /// pueden venir nulos). Mismo valor que <see cref="Nit"/>, expuesto también con este
+    /// nombre para no romper el consumidor actual de "nit".
+    /// </summary>
+    public string NitCliente => Nit;
+}
 
 /// <summary>Municipio costeable para Origen/Destino del formulario de captura.</summary>
 public record clsCiudadBusquedaDto(string Municipio, string Departamento);
 
 /// <summary>Estimación del aprovisionamiento del contenedor (viaje vacío levante → origen).</summary>
 public record clsAprovisionamientoDto(clsCandidatoTarifaDto? Candidato);
+
+/// <summary>Fila completa del catálogo de municipios (todas las columnas de la tabla).</summary>
+public record clsMunicipioDto(
+    int Id, string CodigoDane, string Municipio, string Departamento, string Pais,
+    string? NombreTarifasPlaza, string? ZonaTarificacion);

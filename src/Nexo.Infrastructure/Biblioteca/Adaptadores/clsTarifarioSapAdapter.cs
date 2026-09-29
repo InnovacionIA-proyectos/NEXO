@@ -5,6 +5,7 @@ using Nexo.Application.CasosDeUso.Biblioteca.DTOs;
 using Nexo.Application.CasosDeUso.Biblioteca.Interfaces;
 using Nexo.Application.Common.Dtos;
 using Nexo.Domain.Common;
+using Nexo.Domain.Costeo.Reglas;
 using Nexo.Domain.Enums;
 using Nexo.Infrastructure.External;
 using Microsoft.EntityFrameworkCore;
@@ -393,7 +394,12 @@ public sealed class clsTarifarioSapAdapter : ITarifarioSapPort
             .FirstOrDefaultAsync(ct);
         if (top is null) return null;
 
-        var valor = top.ValorSiceConHora is > 0 ? top.ValorSiceConHora.Value : top.Valor;
+        // S4-HU-14.1/#221: bug gemelo del fallback tolerante de PropuestaTarifaAdapter —
+        // este camino "oficial" también tomaba ValorSiceConHora tal cual, asumiendo las
+        // horas pactadas. Mismo helper compartido (clsPisoConHoras), mismo criterio de
+        // fallback: >0 se trata igual que antes, <=0 o null cae a top.Valor.
+        var valorSiceConHora = top.ValorSiceConHora is > 0 ? top.ValorSiceConHora : null;
+        var valor = clsPisoConHoras.Calcular(top.Valor, top.ValorHora, top.HorasPactadas, valorSiceConHora, c.HorasSolicitud);
         return new clsCandidatoTarifaDto(
             "sicetac", valor,
             $"{top.NombreRuta} · {top.Configuracion} · {top.NombreTipoCarga} · {top.NombreUnidadTransporte} · vía estándar",

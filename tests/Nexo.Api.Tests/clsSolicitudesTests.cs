@@ -132,4 +132,103 @@ public class clsSolicitudesTests
         var resp = await _fx.Client().PostJson("/api/solicitudes", new { clienteId = _fx.AnyClienteId(), tipo = "spot" });
         Assert.Equal(HttpStatusCode.Created, resp.StatusCode);
     }
+
+    // 6) Aislamiento por comercial (issue #199, S4-HU-19.1)
+    //
+    // CreadoPor tiene FK a tbl_usuarios: hace falta un usuario real (no un Guid al
+    // azar) para poder crear una solicitud "como" él. La creación en sí se hace con
+    // el rol Admin (POST /api/solicitudes exige CoordinadorFletes/Admin) pero
+    // simulando el Id del comercial vía X-Test-UserId, para que CreadoPor quede en
+    // ese Id — lo que se prueba acá es el aislamiento en LECTURA/escritura puntual,
+    // no el alta (ese flujo real de Comercial es POST /api/captura-solicitudes,
+    // fuera de alcance de esta prueba).
+
+    private Guid CrearUsuarioComercialDePrueba()
+    {
+        var id = Guid.NewGuid();
+        _fx.WithDb(db =>
+        {
+            db.Usuarios.Add(new Nexo.Domain.Usuarios.Entidades.clsUsuario
+            {
+                Id = id,
+                Nombre = "Comercial de prueba " + id.ToString("N")[..8],
+                Email = $"comercial-prueba-{id:N}@boterosoto.com.co",
+                Rol = Nexo.Domain.Enums.RolUsuario.Comercial,
+            });
+            return db.SaveChanges();
+        });
+        return id;
+    }
+
+    private async Task<Guid> CrearComoAsync(Guid comercialId)
+    {
+        var resp = await _fx.Client("Admin", comercialId).PostJson("/api/solicitudes",
+            new { clienteId = _fx.AnyClienteId(), tipo = "spot" });
+        return (await resp.Json()).GetProperty("id").GetGuid();
+    }
+
+    [Fact]
+    public async Task Un_comercial_no_ve_en_la_bandeja_las_solicitudes_de_otro_comercial()
+    {
+        var comercialA = CrearUsuarioComercialDePrueba();
+        var comercialB = CrearUsuarioComercialDePrueba();
+        var idDeA = await CrearComoAsync(comercialA);
+
+        var bandejaDeA = await _fx.Client("Comercial", comercialA).GetFromJsonAsync<JsonElement>("/api/solicitudes?atencion=todas");
+        var bandejaDeB = await _fx.Client("Comercial", comercialB).GetFromJsonAsync<JsonElement>("/api/solicitudes?atencion=todas");
+
+        Assert.Contains(bandejaDeA.GetProperty("items").EnumerateArray(), it => it.GetProperty("id").GetGuid() == idDeA);
+        Assert.DoesNotContain(bandejaDeB.GetProperty("items").EnumerateArray(), it => it.GetProperty("id").GetGuid() == idDeA);
+    }
+
+    [Fact]
+    public async Task Coordinador_de_fletes_sigue_viendo_el_costeo_de_cualquier_comercial()
+    {
+        // Verifica acceso directo por Id en vez de listarla en la Bandeja: la Bandeja
+        // pagina y ordena por score, así que una solicitud recién creada (score bajo)
+        // puede no caer en la página por defecto en una base compartida con cientos de
+        // solicitudes — no es lo que este caso necesita probar (eso ya lo cubre el test
+        // de aislamiento del comercial, que sí filtra por dueño en vez de por score).
+        var idDeA = await CrearComoAsync(CrearUsuarioComercialDePrueba());
+
+        var resp = await _fx.Client("CoordinadorFletes").GetAsync($"/api/solicitudes/{idDeA}");
+
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task Un_comercial_recibe_403_al_pedir_el_costeo_de_una_solicitud_ajena()
+    {
+        var comercialA = CrearUsuarioComercialDePrueba();
+        var comercialB = CrearUsuarioComercialDePrueba();
+        var id = await CrearComoAsync(comercialA);
+
+        var resp = await _fx.Client("Comercial", comercialB).GetAsync($"/api/solicitudes/{id}");
+
+        Assert.Equal(HttpStatusCode.Forbidden, resp.StatusCode);
+        Assert.Equal("SOLICITUD_AJENA", await resp.ErrorCode());
+    }
+
+    [Fact]
+    public async Task El_dueno_si_puede_pedir_el_costeo_de_su_propia_solicitud()
+    {
+        var comercialA = CrearUsuarioComercialDePrueba();
+        var id = await CrearComoAsync(comercialA);
+
+        var resp = await _fx.Client("Comercial", comercialA).GetAsync($"/api/solicitudes/{id}");
+
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task Un_comercial_recibe_403_al_rechazar_una_solicitud_ajena()
+    {
+        var comercialA = CrearUsuarioComercialDePrueba();
+        var comercialB = CrearUsuarioComercialDePrueba();
+        var id = await CrearComoAsync(comercialA);
+
+        var resp = await _fx.Client("Comercial", comercialB).PostJson($"/api/solicitudes/{id}/rechazar", new { motivo = "precio" });
+
+        Assert.Equal(HttpStatusCode.Forbidden, resp.StatusCode);
+    }
 }

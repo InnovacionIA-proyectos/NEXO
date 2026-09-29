@@ -30,8 +30,14 @@ public interface ISolicitudesRepository
     /// <summary>Registra la cotización-borrador que crea el auto-costeo (Cotizaciones aún no expone un puerto de escritura hacia Solicitudes).</summary>
     void AgregarCotizacion(clsCotizacion cotizacion);
 
+    /// <summary>
+    /// <paramref name="creadoPor"/>: aislamiento por comercial (issue #199, S4-HU-19.1) —
+    /// no nulo restringe la bandeja a las solicitudes creadas por ese usuario; nulo trae
+    /// todas (roles distintos de Comercial).
+    /// </summary>
     Task<IReadOnlyList<clsBandejaFilaRaw>> BandejaFilasAsync(
-        string? atencion, EstadoSolicitud? estado, DateTimeOffset? desde, DateTimeOffset? hasta, CancellationToken ct);
+        string? atencion, EstadoSolicitud? estado, DateTimeOffset? desde, DateTimeOffset? hasta,
+        Guid? creadoPor, CancellationToken ct);
 
     Task<clsParametrosScore> ParametrosScoreAsync(CancellationToken ct);
 

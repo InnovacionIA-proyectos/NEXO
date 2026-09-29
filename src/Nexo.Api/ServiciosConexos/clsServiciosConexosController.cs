@@ -41,11 +41,12 @@ public class clsServiciosConexosController(
     public async Task<ActionResult<clsServicioConexoDto>> Crear([FromBody] clsCrearServicioConexoRequest req, CancellationToken ct = default)
     {
         var dto = await crear.Handle(new clsCrearServicioConexoCommand(
-            req.Nombre, req.Categoria, req.ReglaCobro, req.ValorBase, req.VigenteHasta, req.Activo), ct);
+            req.CodigoServicio, req.TipoServicio, req.Origen, req.Destino, req.Puerto, req.Ruta, req.TipoMaquina,
+            req.CostoUnitario, req.Unidad, req.Vigencia, req.Categoria, req.Activo), ct);
         return Created($"/api/servicios-conexos/{dto.Id}", dto);
     }
 
-    /// <summary>Actualizar regla/valor/vigencia de un servicio conexo (solo Servicios Logísticos / Admin).
+    /// <summary>Actualizar un servicio conexo (solo Servicios Logísticos / Admin).
     /// Actualización parcial: solo se cambian los campos enviados.</summary>
     [HttpPatch("{id:guid}")]
     [Authorize(Roles = "ServiciosLogisticos,AdminTarifas,Admin")]
@@ -54,9 +55,11 @@ public class clsServiciosConexosController(
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<clsServicioConexoDto>> Editar(Guid id, [FromBody] clsEditarServicioConexoRequest req, CancellationToken ct = default)
         => Ok(await editar.Handle(new clsEditarServicioConexoCommand(
-            id, req.Nombre, req.Categoria, req.ReglaCobro, req.ValorBase, req.VigenteHasta, req.Activo), ct));
+            id, req.CodigoServicio, req.TipoServicio, req.Origen, req.Destino, req.Puerto, req.Ruta, req.TipoMaquina,
+            req.CostoUnitario, req.Unidad, req.Vigencia, req.Categoria, req.Activo), ct));
 
-    /// <summary>Carga masiva desde Excel (.xlsx): columnas Nombre, Valor base, Vigente hasta, Categoría, Activo.</summary>
+    /// <summary>Carga masiva desde Excel (.xlsx): columnas Codigo, Tipo Servicio, Origen,
+    /// Destino, Puerto, Ruta, Tipo Maquina, Costo Unitario, Unidad, Vigencia, Categoria, Activo.</summary>
     [HttpPost("importar-excel")]
     [Authorize(Roles = "ServiciosLogisticos,AdminTarifas,Admin")]
     [RequestSizeLimit(10 * 1024 * 1024)]

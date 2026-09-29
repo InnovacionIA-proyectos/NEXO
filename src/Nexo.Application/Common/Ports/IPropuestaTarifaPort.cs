@@ -1,4 +1,5 @@
 using Nexo.Application.Common.Dtos;
+using Nexo.Domain.Enums;
 
 namespace Nexo.Application.Common.Ports;
 
@@ -19,4 +20,15 @@ public interface IPropuestaTarifaPort
     /// </summary>
     Task<clsCandidatoTarifaDto?> EstimarAprovisionamientoAsync(
         string ciudadLevante, string origen, string? configuracion, CancellationToken ct = default);
+
+    /// <summary>
+    /// Piso SICE-TAC vigente para una ruta, con el desglose de horas — la misma fuente
+    /// (DWSice, período actual) que usa el motor automático de costeo. Lo usa Mesa de
+    /// Costeo (issue #179: reemplaza la caché local de import manual, que no tenía
+    /// evidencia de uso real y nunca cubría el período vigente). Null si el DW no está
+    /// configurado o no hay piso para la ruta/configuración.
+    /// </summary>
+    Task<clsPisoSicetacVigenteDto?> PisoSicetacVigenteAsync(
+        string origen, string destino, string? vehiculo, TipologiaCarga? tipologia,
+        string? carroceria, CancellationToken ct = default);
 }

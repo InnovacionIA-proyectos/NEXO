@@ -21,6 +21,17 @@ namespace Nexo.Application.Common.Dtos;
 public record clsCandidatoTarifaDto(
     string Fuente, decimal Valor, string Detalle, string Criterio, int Coincidencias, string? Advertencia = null);
 
+/// <summary>
+/// Piso SICE-TAC vigente con el desglose de horas, para Mesa de Costeo
+/// (<see cref="IPropuestaTarifaPort.PisoSicetacVigenteAsync"/>). Separado de
+/// <see cref="clsCandidatoTarifaDto"/> porque ese colapsa el desglose en un string
+/// (<c>Detalle</c>) para la justificación de la propuesta automática — aquí Mesa de
+/// Costeo necesita los campos por separado para mostrarlos en su propia UI.
+/// </summary>
+public record clsPisoSicetacVigenteDto(
+    int Periodo, decimal ValorPiso, decimal? ValorHora, decimal? HorasPactadas,
+    string Configuracion, string TipoCarga, string UnidadTransporte, string CondicionCarga);
+
 public record clsPropuestaLineaDto(
     Guid LineaId,
     string? clsRuta,

@@ -19,16 +19,19 @@ using Nexo.Application.CasosDeUso.PlanDeCargue;
 using Nexo.Application.CasosDeUso.PlanDeCargue.Interfaces;
 using Nexo.Application.CasosDeUso.Biblioteca;
 using Nexo.Application.CasosDeUso.BibliotecaSapHistorico;
+using Nexo.Application.CasosDeUso.Catalogos;
 using Nexo.Application.CasosDeUso.Cotizaciones;
 using Nexo.Application.CasosDeUso.Cubicacion;
 using Nexo.Application.CasosDeUso.Metricas;
 using Nexo.Application.CasosDeUso.Notificaciones;
 using Nexo.Application.CasosDeUso.Priorizacion;
+using Nexo.Application.CasosDeUso.RangosPeso;
 using Nexo.Application.CasosDeUso.ReglasSoloSicetac;
 using Nexo.Application.CasosDeUso.ServiciosConexos;
 using Nexo.Application.CasosDeUso.Solicitudes;
+using Nexo.Application.Common.Abstractions;
 using Nexo.Application.CasosDeUso.TarifasGanadas;
-using Nexo.Application.CasosDeUso.TarifasSicetacAdmin;
+using Nexo.Application.CasosDeUso.TarifasPlaza;
 using Nexo.Domain.Enums;
 using Nexo.Infrastructure;
 using Nexo.Infrastructure.Persistence;
@@ -46,8 +49,9 @@ using Microsoft.EntityFrameworkCore;
 // BibliotecaSapHistorico (histórico y tarifas de plaza SAP TM en vivo),
 // Solicitudes/Captura (Bandeja Priorizada, alta spot/licitación, auto-costeo),
 // ServiciosConexos (catálogo administrado), TarifasGanadas (Biblioteca de
-// tarifas ganadas), TarifasSicetacAdmin (caché local + import Excel) y Métricas
-// (Tablero del Líder). Cubicación 3D y Plan de Cargue son un microservicio
+// tarifas ganadas) y Métricas (Tablero del Líder). El piso SICE-TAC de Mesa de
+// Costeo se resuelve contra DWSice en vivo (issue #179), ya no hay caché local
+// con import de Excel. Cubicación 3D y Plan de Cargue son un microservicio
 // Python aparte (carpeta cubicador/ de este mismo repo) — NEXO no reimplementa
 // el motor, solo le pide trabajos y recibe resultados por cola vía MassTransit
 // (ver AddMensajeria() y docs/mensajeria/CUBICACION.md).
@@ -90,8 +94,10 @@ builder.Services.AddSolicitudesUseCases();
 builder.Services.AddPriorizacionUseCases();
 builder.Services.AddServiciosConexosUseCases();
 builder.Services.AddTarifasGanadasUseCases();
-builder.Services.AddTarifasSicetacAdminUseCases();
 builder.Services.AddMetricasUseCases();
+builder.Services.AddCatalogosUseCases();
+builder.Services.AddRangosPesoUseCases();
+builder.Services.AddTarifasPlazaUseCases();
 // Arma la cadena de priorización al arrancar y se va. NO tiene reloj: el reloj vive en
 // la saga, dentro del broker. Reemplaza al RecalculoScoreHostedService, que llevaba un
 // PeriodicTimer adentro y por lo tanto se duplicaba con cada réplica del API.
@@ -236,6 +242,7 @@ if (app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
     if (app.Configuration.GetValue<bool>("Database:SeedOnStartup"))
         await clsDataSeeder.SeedAsync(db);
 }
+
 
 app.UseForwardedHeaders();
 if (app.Environment.IsDevelopment())

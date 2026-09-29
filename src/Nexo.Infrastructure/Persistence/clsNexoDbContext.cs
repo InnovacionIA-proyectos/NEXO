@@ -29,7 +29,6 @@ public class clsNexoDbContext : DbContext
     public DbSet<clsLineaSolicitud> LineasSolicitud => Set<clsLineaSolicitud>();
     public DbSet<clsRuta> Rutas => Set<clsRuta>();
     public DbSet<clsConfiguracionVehiculo> ConfiguracionesVehiculo => Set<clsConfiguracionVehiculo>();
-    public DbSet<clsTarifaSicetac> TarifasSicetac => Set<clsTarifaSicetac>();
     public DbSet<clsTarifaHistorica> TarifasHistoricas => Set<clsTarifaHistorica>();
     public DbSet<clsServicioConexo> ServiciosConexos => Set<clsServicioConexo>();
     public DbSet<clsCotizacion> Cotizaciones => Set<clsCotizacion>();
@@ -43,6 +42,9 @@ public class clsNexoDbContext : DbContext
     public DbSet<clsPlanCargue> PlanesCargue => Set<clsPlanCargue>();
     public DbSet<clsItemPlanCargue> ItemsPlanCargue => Set<clsItemPlanCargue>();
     public DbSet<clsColocacionCargue> ColocacionesCargue => Set<clsColocacionCargue>();
+    public DbSet<clsMunicipio> Municipios => Set<clsMunicipio>();
+    public DbSet<clsRangoPeso> RangosPeso => Set<clsRangoPeso>();
+    public DbSet<clsTarifaPlaza> TarifasPlaza => Set<clsTarifaPlaza>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -225,27 +227,6 @@ public class clsNexoDbContext : DbContext
 
         b.Entity<clsConfiguracionVehiculo>(e => e.ToTable("tbl_configuraciones_vehiculo"));
 
-        b.Entity<clsTarifaSicetac>(e =>
-        {
-            e.ToTable("tbl_tarifas_sicetac");
-            e.Property(x => x.CondicionCarga).HasConversion<string>().HasMaxLength(20);
-            e.Property(x => x.ValorPiso).HasColumnType("decimal(18,2)");
-            e.Property(x => x.ValorHora).HasColumnType("decimal(18,2)");
-            e.Property(x => x.ValorSiceHora).HasColumnType("decimal(18,2)");
-            e.Property(x => x.HorasPactadas).HasColumnType("decimal(9,2)");
-            e.Property(x => x.HorasRecorrido).HasColumnType("decimal(9,2)");
-            // Llave natural del piso (resolución al abrir una línea).
-            e.HasIndex(x => new
-            {
-                x.Periodo, x.OrigenDane, x.DestinoDane, x.Configuracion,
-                x.TipoCarga, x.UnidadTransporte, x.CondicionCarga
-            }).IsUnique();
-            e.HasOne(x => x.clsRuta)
-             .WithMany()
-             .HasForeignKey(x => x.RutaId)
-             .OnDelete(DeleteBehavior.Restrict);
-        });
-
         b.Entity<clsTarifaHistorica>(e =>
         {
             e.ToTable("tbl_tarifas_historicas");
@@ -269,9 +250,18 @@ public class clsNexoDbContext : DbContext
         b.Entity<clsServicioConexo>(e =>
         {
             e.ToTable("tbl_servicios_conexos");
-            e.Property(x => x.ValorBase).HasColumnType("decimal(18,2)");
+            e.Property(x => x.CostoUnitario).HasColumnType("decimal(18,2)");
+            e.Property(x => x.Origen).HasDefaultValue(clsServicioConexo.NoAplica);
+            e.Property(x => x.Destino).HasDefaultValue(clsServicioConexo.NoAplica);
+            e.Property(x => x.Puerto).HasDefaultValue(clsServicioConexo.NoAplica);
+            e.Property(x => x.Ruta).HasDefaultValue(clsServicioConexo.NoAplica);
+            e.Property(x => x.TipoMaquina).HasDefaultValue(clsServicioConexo.NoAplica);
             e.Property(x => x.Activo).HasDefaultValue(true);
-            e.Property(x => x.RowVersion).IsRowVersion();
+            // Única real (S4-HU-15/#223): un mismo CodigoServicio puede repetirse con
+            // dimensiones distintas (Almacenamiento en dos ciudades), nunca la misma
+            // combinación completa.
+            e.HasIndex(x => new { x.CodigoServicio, x.Origen, x.Destino, x.Puerto, x.Ruta, x.TipoMaquina }).IsUnique();
+            e.HasIndex(x => x.CodigoServicio);
             e.HasOne(x => x.ActualizadoPorUsuario)
              .WithMany()
              .HasForeignKey(x => x.ActualizadoPor)
@@ -387,6 +377,41 @@ public class clsNexoDbContext : DbContext
             e.ToTable("tbl_reglas_solo_sicetac");
             // Clave natural única: no repetir la misma ruta + tipo de vehículo.
             e.HasIndex(x => new { x.Origen, x.Destino, x.TipoVehiculo }).IsUnique();
+        });
+
+        b.Entity<clsMunicipio>(e =>
+        {
+            e.ToTable("tbl_municipios");
+            e.Property(x => x.Id).ValueGeneratedOnAdd();
+            // Clave natural real: el código DANE por sí solo choca entre Venezuela y
+            // Ecuador (verificado contra datos reales, S4-HU-09.1) — la combinación con
+            // el país sí es única.
+            e.HasIndex(x => new { x.CodigoDane, x.Pais }).IsUnique();
+            e.HasIndex(x => x.NombreTarifasPlaza);
+        });
+
+        // tbl_pesos/tbl_tarifas_plaza (+ tbl_tarifas_plaza_historico, no mapeada: la
+        // llena solo un trigger de BD) creadas y pobladas a mano en S4-HU-10.1 —
+        // mismo criterio "sin migración de EF Core" que tbl_municipios.
+        b.Entity<clsRangoPeso>(e =>
+        {
+            e.ToTable("tbl_pesos");
+            e.Property(x => x.Id).ValueGeneratedOnAdd();
+            e.HasIndex(x => new { x.PesoMinimo, x.PesoMaximo }).IsUnique();
+        });
+
+        b.Entity<clsTarifaPlaza>(e =>
+        {
+            // UseSqlOutputClause(false): tbl_tarifas_plaza tiene un trigger (histórico de
+            // vigencia) y SQL Server prohíbe combinar la cláusula OUTPUT (la que usa EF Core
+            // por defecto para leer valores generados) con triggers en la misma tabla —
+            // sin esto, cualquier INSERT/UPDATE lanza "the target table has database
+            // triggers" (confirmado con datos reales al verificar esta issue).
+            e.ToTable("tbl_tarifas_plaza", tb => tb.UseSqlOutputClause(false));
+            e.HasIndex(x => new { x.LineaNegocio, x.ClaseViaje, x.OrigenMunicipioId, x.DestinoMunicipioId, x.ClaseContenedor, x.PesoId, x.TipoVehiculo }).IsUnique();
+            e.HasOne(x => x.Origen).WithMany().HasForeignKey(x => x.OrigenMunicipioId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Destino).WithMany().HasForeignKey(x => x.DestinoMunicipioId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Peso).WithMany().HasForeignKey(x => x.PesoId).OnDelete(DeleteBehavior.Restrict);
         });
 
         b.Entity<clsParametrosScore>(e =>

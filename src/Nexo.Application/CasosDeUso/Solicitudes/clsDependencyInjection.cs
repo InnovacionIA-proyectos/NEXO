@@ -32,6 +32,7 @@ public static class clsDependencyInjection
         services.AddScoped<IQueryHandler<clsBuscarClientesQuery, IReadOnlyList<DTOs.clsClienteBusquedaDto>>, clsBuscarClientesQueryHandler>();
         services.AddScoped<IQueryHandler<clsListarDepartamentosQuery, IReadOnlyList<string>>, clsListarDepartamentosQueryHandler>();
         services.AddScoped<IQueryHandler<clsBuscarCiudadesQuery, IReadOnlyList<DTOs.clsCiudadBusquedaDto>>, clsBuscarCiudadesQueryHandler>();
+        services.AddScoped<IQueryHandler<clsListarMunicipiosQuery, IReadOnlyList<DTOs.clsMunicipioDto>>, clsListarMunicipiosQueryHandler>();
         return services;
     }
 }

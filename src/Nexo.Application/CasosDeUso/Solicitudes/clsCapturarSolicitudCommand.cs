@@ -28,7 +28,10 @@ public sealed record clsCapturaLineaInput(
 public sealed record clsCapturarSolicitudCommand(
     Guid? ClienteId, string? ClienteBp, string Tipo, string? Modalidad, DateTimeOffset? Deadline,
     decimal? ValorEstimado, string? Referencia, decimal? HorasCargue, decimal? HorasDescargue,
-    IReadOnlyList<clsCapturaLineaInput> Lineas) : ICommand<clsCapturaResultDto>;
+    IReadOnlyList<clsCapturaLineaInput> Lineas,
+    /// <summary>Notas u observaciones comerciales (S4-HU-18.10/#227) — distinto de
+    /// <see cref="Referencia"/> (referencia/PO del cliente).</summary>
+    string? Notas = null) : ICommand<clsCapturaResultDto>;
 
 /// <summary>
 /// Captura de necesidades del comercial (licitación o spot): resuelve/crea clsCliente,
@@ -57,7 +60,7 @@ public sealed class clsCapturarSolicitudCommandHandler(
     {
         clsCapturarSolicitudValidador.Validar(command);
 
-        var clienteId = await ResolverClienteAsync(command, ct);
+        var clienteId = await clsResolucionDeCliente.ResolverAsync(command.ClienteId, command.ClienteBp, clientes, clientesDw, ct);
 
         var rutas = await rutasCatalogo.ListarAsync(ct);
         var rutasPorClave = rutas.GroupBy(r => clsResolucionDeCatalogos.ClaveRuta(r.Origen, r.Destino)).ToDictionary(g => g.Key, g => g.First());
@@ -258,31 +261,6 @@ public sealed class clsCapturarSolicitudCommandHandler(
         });
     }
 
-    private async Task<Guid> ResolverClienteAsync(clsCapturarSolicitudCommand command, CancellationToken ct)
-    {
-        if (command.ClienteId is { } id)
-        {
-            if (!await clientes.ExisteAsync(id, ct))
-                throw new clsValidationFailedException("CLIENTE_INVALIDO", "El cliente indicado no existe.");
-            return id;
-        }
-
-        if (!clientesDw.Configurado)
-            throw new clsValidationFailedException("DWCUBOS_NO_CONFIGURADO",
-                "La conexión a los clientes reales no está configurada (ConnectionStrings:DwCubos).");
-
-        // No nulo: clsCapturarSolicitudValidador ya exigió ClienteId o ClienteBp.
-        var bp = command.ClienteBp!.Trim();
-        var real = (await clientesDw.ListarAsync(ct)).FirstOrDefault(c => c.Bp == bp)
-            ?? throw new clsValidationFailedException("CLIENTE_BP_INVALIDO", $"El BP '{bp}' no existe en el catálogo de clientes.");
-
-        var existente = await clientes.ObtenerPorNitAsync(real.Nit, ct);
-        if (existente is not null) return existente.Id;
-
-        var nuevo = new clsCliente { Nombre = real.Nombre, Nit = real.Nit, RazonSocial = real.Nombre };
-        clientes.Agregar(nuevo);
-        return nuevo.Id;
-    }
 
     // ------------------------------------------------------------- helpers
 
@@ -291,7 +269,8 @@ public sealed class clsCapturarSolicitudCommandHandler(
     {
         var condiciones = new clsCondicionesServicioDto(
             string.IsNullOrWhiteSpace(command.Referencia) ? null : command.Referencia.Trim(),
-            new clsTiemposLogisticosDto(command.HorasCargue ?? 4m, command.HorasDescargue ?? 4m));
+            new clsTiemposLogisticosDto(command.HorasCargue ?? 4m, command.HorasDescargue ?? 4m),
+            Notas: string.IsNullOrWhiteSpace(command.Notas) ? null : command.Notas.Trim());
         return System.Text.Json.JsonSerializer.Serialize(condiciones, clsCondicionesServicioDto.Json);
     }
 

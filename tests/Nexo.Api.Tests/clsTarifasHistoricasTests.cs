@@ -2,6 +2,8 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Nexo.Api.Tests.Infra;
+using Nexo.Domain.BibliotecaTarifas.Entidades;
+using Nexo.Domain.Catalogos.Entidades;
 
 namespace Nexo.Api.Tests;
 
@@ -49,5 +51,31 @@ public class clsTarifasHistoricasTests
             var v = it.GetProperty("vigencia").GetString();
             Assert.Contains(v, new[] { "vigente", "por_vencer", "vencida" });
         }
+    }
+
+    // 6) S4-HU-13.1/#219 — corte de 3 meses obligatorio en la sugerencia automática.
+    [Fact]
+    public async Task Sugerencia_por_ruta_y_vehiculo_excluye_tarifas_de_mas_de_3_meses()
+    {
+        var sufijo = Guid.NewGuid().ToString("N")[..8];
+        var (rutaId, vehiculoId, idVieja, idReciente) = _fx.WithDb(db =>
+        {
+            var ruta = new clsRuta { Origen = $"Origen {sufijo}", Destino = $"Destino {sufijo}" };
+            var vehiculo = new clsConfiguracionVehiculo { TipoVehiculo = $"Tipo {sufijo}" };
+            db.Rutas.Add(ruta);
+            db.ConfiguracionesVehiculo.Add(vehiculo);
+
+            var vieja = new clsTarifaHistorica { RutaId = ruta.Id, ConfigVehiculoId = vehiculo.Id, Valor = 1_000_000m, Fecha = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(-4)) };
+            var reciente = new clsTarifaHistorica { RutaId = ruta.Id, ConfigVehiculoId = vehiculo.Id, Valor = 2_000_000m, Fecha = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-5)) };
+            db.TarifasHistoricas.AddRange(vieja, reciente);
+            db.SaveChanges();
+            return (ruta.Id, vehiculo.Id, vieja.Id, reciente.Id);
+        });
+
+        var items = await _fx.Client().GetFromJsonAsync<JsonElement[]>($"/api/tarifas-historicas?ruta={rutaId}&vehiculo={vehiculoId}");
+
+        var ids = items!.Select(i => i.GetProperty("id").GetGuid()).ToList();
+        Assert.DoesNotContain(idVieja, ids); // más de 3 meses: excluida
+        Assert.Contains(idReciente, ids);    // dentro del corte: visible
     }
 }

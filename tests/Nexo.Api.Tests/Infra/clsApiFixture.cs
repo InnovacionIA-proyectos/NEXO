@@ -75,10 +75,16 @@ public class clsApiFixture : IDisposable
     }
 
     // ---- helpers de clientes HTTP ----
-    public HttpClient Client(string role = "Admin")
+    /// <summary>
+    /// <paramref name="userId"/> (issue #199 S4-HU-19.1): simula un usuario Nexo distinto
+    /// del de sistema — para probar aislamiento por dueño del recurso con dos usuarios del
+    /// mismo rol. Sin especificar, se comporta igual que antes.
+    /// </summary>
+    public HttpClient Client(string role = "Admin", Guid? userId = null)
     {
         var c = Factory.CreateClient();
         c.DefaultRequestHeaders.Add(clsTestAuthHandler.RoleHeader, role);
+        if (userId is { } id) c.DefaultRequestHeaders.Add(clsTestAuthHandler.UserIdHeader, id.ToString());
         return c;
     }
 

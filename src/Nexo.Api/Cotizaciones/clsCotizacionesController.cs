@@ -106,9 +106,11 @@ public class clsCotizacionesController(
         return Ok(await entregar.Handle(new clsEntregarCotizacionCommand(id, pdf, formato?.FileName), ct));
     }
 
-    /// <summary>Registrar el resultado (ganada/perdida) y realimentar la Biblioteca.</summary>
+    /// <summary>Registrar el resultado (ganada/perdida) y realimentar la Biblioteca. Solo
+    /// Comercial y Admin (S4-HU-11.1/#213): ni AdminTarifas ni CoordinadorFletes deciden
+    /// si una cotización se ganó o se perdió, eso es criterio del Comercial dueño del negocio.</summary>
     [HttpPost("{id:guid}/resultado")]
-    [Authorize(Roles = "Comercial,AdminTarifas,CoordinadorFletes,Admin")]
+    [Authorize(Roles = "Comercial,Admin")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
