@@ -39,7 +39,12 @@ public sealed class clsExportadorCotizacionExcelClosedXml : IExportadorCotizacio
         ws.Cell(f, 1).Value = $"FLETES ({c.Lineas.Count})";
         ws.Cell(f, 1).Style.Font.SetBold();
         f++;
-        EscribirEncabezado(ws, f, new[] { "clsRuta", "Tipología", "Flete", "Aprovisionamiento", "Retorno contenedor", "Fuente", "Total línea" });
+        // S4-HU-17.4/#230: Fuente, Aprovisionamiento y Retorno contenedor se quitan del
+        // Excel (pedido de frontend, administracion_embarqa_nexo#206). "Flete" queda como
+        // única columna monetaria de la línea, con el TOTAL completo (lo que antes calculaba
+        // "Total línea": ValorFlete + Aprovisionamiento + Retorno contenedor) — no ValorFlete
+        // aislado, que dejaría el número incompleto.
+        EscribirEncabezado(ws, f, new[] { "clsRuta", "Tipología", "Flete" });
         f++;
         decimal totalFletes = 0;
         foreach (var l in c.Lineas)
@@ -48,13 +53,8 @@ public sealed class clsExportadorCotizacionExcelClosedXml : IExportadorCotizacio
             totalFletes += totalLinea;
             ws.Cell(f, 1).Value = l.clsLineaSolicitud?.clsRuta is { } r ? $"{r.Origen} → {r.Destino}" : "—";
             ws.Cell(f, 2).Value = l.clsLineaSolicitud?.Tipologia?.ToString() ?? "—";
-            ws.Cell(f, 3).Value = l.ValorFlete;
-            ws.Cell(f, 4).Value = l.ValorAprovisionamiento ?? 0;
-            ws.Cell(f, 5).Value = l.ValorRetornoContenedor ?? 0;
-            ws.Cell(f, 6).Value = l.Fuente.ToString();
-            ws.Cell(f, 7).Value = totalLinea;
-            ws.Range(f, 3, f, 5).Style.NumberFormat.Format = FormatoMoneda;
-            ws.Cell(f, 7).Style.NumberFormat.Format = FormatoMoneda;
+            ws.Cell(f, 3).Value = totalLinea;
+            ws.Cell(f, 3).Style.NumberFormat.Format = FormatoMoneda;
             f++;
         }
         f++;
