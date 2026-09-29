@@ -13,5 +13,6 @@ public static class clsSolicitudDtoMappers
 
     public static clsSolicitudDto ToDto(this clsSolicitud s) =>
         new(s.Id, s.ClienteId, s.clsCliente?.Nombre, s.Tipo, s.Modalidad, s.Deadline, s.ProbabilidadCierre,
-            s.ValorEstimado, s.ScorePrioridad, s.Estado, s.CreatedAt, s.Lineas.Select(l => l.ToDto()).ToList());
+            s.ValorEstimado, s.ScorePrioridad, s.Estado, s.CreatedAt, s.Lineas.Select(l => l.ToDto()).ToList(),
+            clsCondicionesServicioDto.Desde(s.CondicionesServicio).Notas);
 }
