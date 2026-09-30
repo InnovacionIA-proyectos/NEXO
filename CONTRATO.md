@@ -394,7 +394,11 @@ interface SapHistoricoFiltrosDto { lineasNegocio: OpcionFiltroDto[]; tiposVehicu
 
 interface AjusteVigenciaResultDto { aplicados: number; solicitados: number }
 
-interface ReglaSoloSicetacDto { id: UUID; origen: string; destino: string; tipoVehiculo: string; createdAt: FechaISO }
+interface ReglaSoloSicetacDto {
+  id: UUID; origen: string; destino: string
+  origenMunicipio: string | null; destinoMunicipio: string | null // nombre resuelto para mostrar — null si origen/destino no matchea ningún código DANE conocido
+  tipoVehiculo: string; createdAt: FechaISO
+}
 interface ImportarReglasResultDto { filas: number; creadas: number; duplicadas: number; invalidas: number }
 
 interface ServicioConexoDto { id: UUID; nombre: string; categoria: string; reglaCobro: string | null; valorBase: Decimal | null; vigenteHasta: Fecha | null; activo: boolean }
@@ -859,6 +863,11 @@ Quita el ajuste; la tarifa vuelve a regirse por la vigencia de SAP.
 
 #### `GET /api/reglas-solo-sicetac`
 - Rate limit estándar. **→** `200 ReglaSoloSicetacDto[]`
+- `origen`/`destino` son el valor crudo guardado (código DANE en las filas cargadas por
+  Excel, texto libre en las más viejas) — el frontend debe pintar
+  `origenMunicipio`/`destinoMunicipio` (nombre resuelto), no `origen`/`destino`. Si
+  vienen `null`, el valor crudo no matcheó ningún código DANE conocido; mostrar el
+  crudo como respaldo en ese caso.
 
 #### `POST /api/reglas-solo-sicetac`
 
