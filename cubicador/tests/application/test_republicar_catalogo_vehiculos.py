@@ -26,10 +26,7 @@ async def test_listar_con_siembra_publica_vehiculo_creado_por_cada_preset_nuevo(
 
         catalogo = await repo.listar_con_siembra()
 
-        # 10 y no 9 desde S4-HU-12.1: el catalogo unificado separo el contenedor
-        # refrigerado de 40 del High Cube seco, que estaban mal emparejados
-        # entre las dos fuentes (eran vehiculos distintos).
-        assert len(catalogo) == 10  # los 10 presets, base limpia (conftest.py)
+        assert len(catalogo) == 9  # los 9 presets, base limpia (conftest.py)
         assert set(publisher.publicados) == {v.id for v in catalogo}
 
 
@@ -53,7 +50,7 @@ async def test_sin_publisher_la_siembra_sigue_funcionando_igual_que_antes():
 
         catalogo = await repo.listar_con_siembra()
 
-        assert len(catalogo) == 10
+        assert len(catalogo) == 9
 
 
 async def test_republicar_todos_republica_el_catalogo_completo():
@@ -67,5 +64,5 @@ async def test_republicar_todos_republica_el_catalogo_completo():
 
         # TODOS los vehiculos, no solo los "nuevos" (aqui no hay ninguno nuevo
         # que sembrar) - es el reparo manual de una desincronizacion existente.
-        assert len(catalogo) == 10
+        assert len(catalogo) == 9
         assert set(publisher.publicados) == {v.id for v in catalogo}

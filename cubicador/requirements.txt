@@ -2,12 +2,7 @@ fastapi>=0.115
 uvicorn[standard]>=0.32
 pydantic>=2.9
 pydantic-settings>=2.6
-# [asyncio] arrastra `greenlet`, que SQLAlchemy necesita para su capa async.
-# No venia como dependencia transitiva en python:3.14-slim, asi que la imagen
-# arrancaba y moria en el import: `The SQLAlchemy asyncio module requires that
-# the Python 'greenlet' library is installed`. Localmente no se notaba porque
-# greenlet ya estaba instalado por otra via.
-sqlalchemy[asyncio]>=2.0
+sqlalchemy>=2.0
 aiosqlite>=0.20
 asyncpg>=0.30
 aio-pika>=9.4

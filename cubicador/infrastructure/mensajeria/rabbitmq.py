@@ -130,22 +130,6 @@ class RabbitMqEventosPublisher:
         payload = {"correlationId": plan_id, "planId": plan_id, "resultado": resultado}
         await self._publicar("plan-de-cargue.generado", _sobre_masstransit("PlanDeCargueGenerado", payload))
 
-    async def publicar_flota_generada(self, linea_solicitud_id: str, flota: dict[str, Any]) -> None:
-        """S4-HU-12.3. Hasta ahora `crear_desde_linea` creaba hasta 20 planes y
-        reportaba UNO: NEXO nunca se enteraba de los camiones 2..N, asi que no
-        podia crear la linea de solicitud de cada uno.
-
-        Este evento los lleva todos en un solo mensaje, con el peso que le toca
-        a cada camion y el codigo tarifario del vehiculo - lo que NEXO necesita
-        para crear N lineas y resolver su ConfiguracionVehiculo sin adivinarla.
-
-        Va ADEMAS de `plan-de-cargue.generado`, que se sigue publicando para el
-        primer plan: quitarlo dejaria sin datos a la proyeccion que la Mesa de
-        Costeo ya consulta hoy.
-        """
-        payload = {"correlationId": linea_solicitud_id, **flota}
-        await self._publicar("flota-de-cargue.generada", _sobre_masstransit("FlotaDeCargueGenerada", payload))
-
     async def publicar_cubicacion_rechazada(self, plan_id: str, codigo: str, mensaje: str) -> None:
         payload = {"correlationId": plan_id, "planId": plan_id, "codigo": codigo, "mensaje": mensaje}
         await self._publicar("cubicacion.rechazada", _sobre_masstransit("CubicacionRechazada", payload))

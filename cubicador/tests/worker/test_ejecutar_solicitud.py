@@ -45,10 +45,6 @@ class _PublisherFalso:
         self.vehiculos_actualizados: list[tuple[str, dict]] = []
         self.vehiculos_eliminados: list[str] = []
         self.planes_generados: list[tuple[str, dict]] = []
-        self.flotas_generadas: list[tuple[str, dict]] = []
-
-    async def publicar_flota_generada(self, linea_solicitud_id: str, flota: dict) -> None:
-        self.flotas_generadas.append((linea_solicitud_id, flota))
 
     async def publicar_vehiculo_eliminado(self, vehiculo_id: str) -> None:
         self.vehiculos_eliminados.append(vehiculo_id)
@@ -124,16 +120,6 @@ async def test_ejecutar_solicitud_crear_desde_linea_desempaca_solicitud_anidada(
     plan = await planes.obtener(plan_id)
     assert plan.linea_solicitud_id == linea_id
     assert plan.estado == "optimizado"
-
-    # S4-HU-12.3: ademas del plan, se publica el evento de FLOTA con los N
-    # camiones. Antes solo se devolvia el primer plan y NEXO no se enteraba de
-    # los demas, asi que no podia crear una linea de solicitud por camion.
-    assert len(publisher.flotas_generadas) == 1
-    reportada_para, flota = publisher.flotas_generadas[0]
-    assert reportada_para == linea_id
-    assert flota["cantidadVehiculos"] == len(flota["camiones"]) >= 1
-    assert flota["camiones"][0]["planCargueId"] == plan_id
-    assert flota["vehiculo"]["codigo"] is not None, "el codigo tarifario viaja para que NEXO resuelva la tarifa"
 
 
 # ------------------------------------------------------------- S3-HU-02 (issue #105):

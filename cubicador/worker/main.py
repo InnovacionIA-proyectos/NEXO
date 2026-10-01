@@ -130,16 +130,8 @@ async def _ejecutar_solicitud(
 
     if tipo == "crear_desde_linea":
         lineas = NexoLineaSolicitudClient(NEXO_BASE_URL, NEXO_CALLBACK_API_KEY)
-        linea_id = solicitud["lineaSolicitudId"]
-        flota = await crear_plan_desde_linea(planes, vehiculos, lineas, linea_id)
-
-        # S4-HU-12.3: el evento de FLOTA, con los N camiones. Antes solo se
-        # devolvia el primer plan y NEXO no se enteraba de los demas, asi que no
-        # podia crear una linea de solicitud por camion. Se publica ademas del
-        # "plan-de-cargue.generado" que sale mas abajo para el primero: quitar
-        # ese dejaria sin datos a la proyeccion que la Mesa de Costeo consulta.
-        await publisher.publicar_flota_generada(linea_id, await _flota_a_evento(flota, vehiculos, linea_id))
-        return flota[0].id
+        plan = await crear_plan_desde_linea(planes, vehiculos, lineas, solicitud["lineaSolicitudId"])
+        return plan.id
 
     if tipo == "crear_plan":
         # El plan_id lo genero NEXO: se crea la fila REAL con ESE id,
@@ -209,40 +201,6 @@ async def _ejecutar_solicitud(
         return plan_id
 
     raise ValueError(f"Tipo de mensaje desconocido: {tipo}")
-
-
-async def _flota_a_evento(
-    flota: list, vehiculos: SqlVehiculoCubicacionRepository, linea_solicitud_id: str,
-) -> dict:
-    """Arma el cuerpo de `flota-de-cargue.generada` (ver CONTRATO.md 9.3).
-
-    El vehiculo va UNA vez y no por camion: la recomendacion son N camiones del
-    MISMO tipo, asi que repetirlo N veces solo invita a que diverjan. Lo que
-    cambia por camion es su numero, su plan y el peso que le toca.
-    """
-    vehiculo = await vehiculos.obtener(flota[0].vehiculo_id)
-    return {
-        "lineaSolicitudId": linea_solicitud_id,
-        "cantidadVehiculos": len(flota),
-        "pesoTotalKg": round(sum(p.peso_total_kg for p in flota), 2),
-        "vehiculo": {
-            "codigo": vehiculo.codigo if vehiculo else None,
-            "nombre": vehiculo.nombre if vehiculo else None,
-            "capacidadKg": vehiculo.capacidad_kg if vehiculo else None,
-            "configVehiculo": vehiculo.config_vehiculo if vehiculo else None,
-            "carroceria": vehiculo.carroceria if vehiculo else None,
-            "claseViaje": vehiculo.clase_viaje if vehiculo else None,
-            "claseContenedor": vehiculo.clase_contenedor if vehiculo else None,
-        },
-        "camiones": [
-            {
-                "numeroVehiculo": p.numero_vehiculo,
-                "planCargueId": p.id,
-                "pesoAsignadoKg": round(p.peso_total_kg, 2),
-            }
-            for p in flota
-        ],
-    }
 
 
 async def _procesar(mensaje: aio_pika.IncomingMessage, publisher: RabbitMqEventosPublisher) -> None:

@@ -86,10 +86,7 @@ async def test_flujo_completo_crear_optimizar(client, publisher_falso):
     r = await client.get("/api/planes-cargue/vehiculos", headers=HEADERS)
     assert r.status_code == 200
     vehiculos = r.json()
-    # S4-HU-12.1: 10, no 9 - el catalogo unificado separo el contenedor
-    # refrigerado de 40 del High Cube seco (eran vehiculos distintos mal
-    # emparejados entre las dos fuentes que se unificaron).
-    assert len(vehiculos) == 10
+    assert len(vehiculos) == 9
     furgon = next(v for v in vehiculos if "13.6" in v["nombre"])
 
     # Crear plan vacio.
@@ -140,9 +137,7 @@ async def test_cubicacion_rapida(client):
     )
     assert r.status_code == 200, r.text
     data = r.json()
-    # S4-HU-12.1: 10, no 9. El motor rapido ya no evalua su propia constante de
-    # 9 arquetipos: lee el CATALOGO UNICO, el mismo que usa el plan 3D.
-    assert len(data["matrices"]) == 10  # todo el catalogo evaluado
+    assert len(data["matrices"]) == 9  # todo el catalogo evaluado
     assert data["sugerencia"] is not None
 
 
