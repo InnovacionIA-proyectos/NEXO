@@ -16,7 +16,9 @@ public class clsServiciosConexosController(
     IQueryHandler<clsListarServiciosConexosQuery, clsPaginaServiciosDto> listar,
     ICommandHandler<clsCrearServicioConexoCommand, clsServicioConexoDto> crear,
     ICommandHandler<clsEditarServicioConexoCommand, clsServicioConexoDto> editar,
-    ICommandHandler<clsImportarServiciosConexosExcelCommand, clsImportarServiciosResultDto> importarExcel)
+    ICommandHandler<clsImportarServiciosConexosExcelCommand, clsImportarServiciosResultDto> importarExcel,
+    IQueryHandler<clsExportarServiciosConexosExcelQuery, clsArchivoDto> exportarExcel,
+    IQueryHandler<clsObtenerPlantillaServicioConexoQuery, clsArchivoDto> plantillaExcel)
     : ControllerBase
 {
     /// <summary>
@@ -69,5 +71,26 @@ public class clsServiciosConexosController(
     {
         await using var stream = clsExcelUpload.AbrirValidado(archivo);
         return Ok(await importarExcel.Handle(new clsImportarServiciosConexosExcelCommand(stream), ct));
+    }
+
+    /// <summary>Descarga masiva a Excel del catálogo completo — el mismo archivo sirve para
+    /// editarlo y reimportarlo como actualización (S4-HU-15.3/#249).</summary>
+    [HttpGet("exportar-excel")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> ExportarExcel(CancellationToken ct = default)
+    {
+        var archivo = await exportarExcel.Handle(new clsExportarServiciosConexosExcelQuery(), ct);
+        return File(archivo.Contenido, archivo.ContentType, archivo.NombreArchivo);
+    }
+
+    /// <summary>Plantilla de Excel descargable por tipo de servicio (S4-HU-15.3/#249):
+    /// almacenamiento, itr, precinto, acompanamiento — cada una con solo sus columnas.</summary>
+    [HttpGet("plantilla-excel/{tipo}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> PlantillaExcel(string tipo, CancellationToken ct = default)
+    {
+        var archivo = await plantillaExcel.Handle(new clsObtenerPlantillaServicioConexoQuery(tipo), ct);
+        return File(archivo.Contenido, archivo.ContentType, archivo.NombreArchivo);
     }
 }

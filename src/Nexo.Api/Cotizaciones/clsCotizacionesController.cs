@@ -80,7 +80,7 @@ public class clsCotizacionesController(
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<clsCotizacionDto>> AgregarConexos(Guid id, [FromBody] clsAgregarConexosRequest req, CancellationToken ct = default)
         => Ok(await agregarConexos.Handle(new clsAgregarConexosCotizacionCommand(
-            id, req.Items.Select(i => new clsConexoItem(i.ServicioConexoId, i.Cantidad, i.ValorAplicado)).ToList()), ct));
+            id, req.Items.Select(i => new clsConexoItem(i.LineaId, i.ServicioConexoId, i.Cantidad, i.ValorAplicado)).ToList()), ct));
 
     /// <summary>
     /// Entregar la cotización a Comercial: marca la entrega y envía la cotización

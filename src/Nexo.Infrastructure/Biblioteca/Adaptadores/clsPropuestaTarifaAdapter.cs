@@ -89,8 +89,12 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
         var soloSice = await _reglas.ClavesRutaVehiculoAsync(ct);
 
         // S4-HU-14.1/#221: mismas horas reales que usa el camino por solicitud.
+        // S4-HU-15.5/#251: si ESTA línea ya tiene sus propias horas resueltas (captura
+        // posterior a #251), tienen prioridad sobre las de la solicitud completa —
+        // líneas capturadas ANTES de #251 (HorasCargue/HorasDescargue nulas en la
+        // línea) siguen usando el valor de la solicitud, sin cambio de comportamiento.
         var tiempos = clsCondicionesServicioDto.Desde(linea.clsSolicitud?.CondicionesServicio).TiemposLogisticos!;
-        var horasSolicitud = tiempos.HorasCargue + tiempos.HorasDescargue;
+        var horasSolicitud = HorasEfectivasDeLinea(linea, tiempos.HorasCargue + tiempos.HorasDescargue);
 
         using var scope = _scopes.CreateScope();
         var dw = _dwConfigurado ? scope.ServiceProvider.GetService<clsDwSiceDbContext>() : null;
@@ -142,13 +146,20 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
 
         // S4-HU-14.1/#221: horas reales capturadas en la solicitud (Cargue+Descargue),
         // para recalcular el piso SICE-TAC en vez de asumir las horas pactadas.
+        // S4-HU-15.5/#251: ahora puede variar POR LÍNEA — HorasEfectivasDeLinea prefiere
+        // las de la línea si ya están resueltas (captura posterior a #251), si no cae
+        // al valor de la solicitud completa (líneas viejas, sin cambio de comportamiento).
         var tiempos = clsCondicionesServicioDto.Desde(solicitud.CondicionesServicio).TiemposLogisticos!;
         var horasSolicitud = tiempos.HorasCargue + tiempos.HorasDescargue;
 
-        static string Huella(clsLineaSolicitud l) => string.Join('|',
+        // Horas entra en la huella: dos líneas idénticas en todo lo demás pero con horas
+        // distintas pueden costear distinto (clsPisoConHoras.Calcular) — agruparlas
+        // igual les daría a ambas el piso de UNA sola de las dos.
+        string Huella(clsLineaSolicitud l) => string.Join('|',
             l.clsRuta?.Origen, l.clsRuta?.Destino, l.clsConfiguracionVehiculo?.TipoVehiculo, l.clsConfiguracionVehiculo?.Carroceria,
             l.Tipologia, l.Peso, l.LineaNegocio, l.ClaseViaje, l.ClaseContenedor,
-            l.Exclusivo, l.Consolidado, l.RetornaContenedor, l.CiudadDevolucionContenedor);
+            l.Exclusivo, l.Consolidado, l.RetornaContenedor, l.CiudadDevolucionContenedor,
+            HorasEfectivasDeLinea(l, horasSolicitud));
 
         var grupos = lineas.GroupBy(Huella).ToList();
 
@@ -162,7 +173,8 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
                 var dw = _dwConfigurado ? scope.ServiceProvider.GetService<clsDwSiceDbContext>() : null;
                 var dc = _dcConfigurado ? scope.ServiceProvider.GetService<clsDbSolucionesTiDbContext>() : null;
                 var tarifario = scope.ServiceProvider.GetRequiredService<ITarifarioSapPort>();
-                var dto = await ProponerLineaAsync(dw, dc, tarifario, grupo.First(), ajustes, soloSice, horasSolicitud, ct);
+                var horasGrupo = HorasEfectivasDeLinea(grupo.First(), horasSolicitud);
+                var dto = await ProponerLineaAsync(dw, dc, tarifario, grupo.First(), ajustes, soloSice, horasGrupo, ct);
                 return grupo.Select(l => dto with { LineaId = l.Id }).ToList();
             }
             catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
@@ -186,6 +198,13 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
         var resultados = (await Task.WhenAll(tareas)).SelectMany(x => x).ToList();
         return new clsPropuestaSolicitudDto(solicitud.Id, resultados, advertencias);
     }
+
+    /// <summary>S4-HU-15.5/#251: prefiere las horas YA RESUELTAS de la línea (persistidas
+    /// al capturar — clsResolucionHorasLinea.Resolver) sobre el valor único de la
+    /// solicitud completa. Si la línea no las tiene (capturada antes de #251), cae al
+    /// valor de la solicitud — mismo comportamiento que antes de este cambio.</summary>
+    private static decimal HorasEfectivasDeLinea(clsLineaSolicitud linea, decimal horasSolicitud) =>
+        linea.HorasCargue is { } hc && linea.HorasDescargue is { } hd ? hc + hd : horasSolicitud;
 
     private async Task<clsPropuestaLineaDto> ProponerLineaAsync(
         clsDwSiceDbContext? dw, clsDbSolucionesTiDbContext? dc, ITarifarioSapPort tarifario,

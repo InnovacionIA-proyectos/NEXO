@@ -13,7 +13,7 @@ public record clsCotizacionLineaDto(
     decimal? ValorAprovisionamiento = null, decimal? ValorRetornoContenedor = null);
 
 public record clsCotizacionConexoDto(
-    Guid Id, Guid? ServicioConexoId, string? Nombre, string Categoria, decimal Cantidad, decimal ValorAplicado);
+    Guid Id, Guid CotizacionLineaId, Guid? ServicioConexoId, string? Nombre, string Categoria, decimal Cantidad, decimal ValorAplicado);
 
 public record clsCotizacionDto(
     Guid Id,
@@ -23,7 +23,10 @@ public record clsCotizacionDto(
     decimal Total,
     DateTimeOffset? EntregadaAt,
     IReadOnlyList<clsCotizacionLineaDto> Lineas,
-    IReadOnlyList<clsCotizacionConexoDto> Conexos);
+    IReadOnlyList<clsCotizacionConexoDto> Conexos,
+    /// <summary>S4-HU-15.6/#252: auto-costeada nunca pasa por /entregar — el frontend
+    /// puede usar esto para no ofrecer ese botón en este caso.</summary>
+    bool EsAutoCosteo = false);
 
 /// <summary>Resultado de aplicar las propuestas de la Biblioteca como fletes por defecto.</summary>
 public record clsAplicarPropuestasResultDto(clsCotizacionDto Cotizacion, int Agregadas);

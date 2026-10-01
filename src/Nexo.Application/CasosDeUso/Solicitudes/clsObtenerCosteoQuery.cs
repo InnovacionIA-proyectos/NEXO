@@ -50,7 +50,7 @@ public sealed class clsObtenerCosteoQueryHandler(
             lineas.Add(new clsLineaCosteoDto(
                 l.Id, l.RutaId, l.clsRuta == null ? null : $"{l.clsRuta.Origen} → {l.clsRuta.Destino}",
                 l.Tipologia, l.Peso, l.clsConfiguracionVehiculo?.TipoVehiculo, l.clsConfiguracionVehiculo?.Carroceria,
-                clsPosicionCargaDto.Desde(l.Dimensiones), piso, historicas));
+                clsPosicionCargaDto.Desde(l.Dimensiones), piso, historicas, l.HorasCargue, l.HorasDescargue));
         }
 
         // Al abrir, marca la solicitud en costeo (si estaba pendiente).

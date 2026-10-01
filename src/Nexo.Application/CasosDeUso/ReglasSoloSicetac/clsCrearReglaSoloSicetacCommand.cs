@@ -1,6 +1,7 @@
 using Nexo.Application.CasosDeUso.ReglasSoloSicetac.DTOs;
 using Nexo.Application.CasosDeUso.ReglasSoloSicetac.Interfaces;
 using Nexo.Application.CasosDeUso.ReglasSoloSicetac.Validadores;
+using Nexo.Application.CasosDeUso.Solicitudes.Interfaces;
 using Nexo.Application.Common.Abstractions;
 using Nexo.Application.Common.Exceptions;
 using Nexo.Application.Common.Ports;
@@ -12,7 +13,7 @@ namespace Nexo.Application.CasosDeUso.ReglasSoloSicetac;
 public sealed record clsCrearReglaSoloSicetacCommand(string Origen, string Destino, string TipoVehiculo) : ICommand<clsReglaSoloSicetacDto>;
 
 public sealed class clsCrearReglaSoloSicetacCommandHandler(
-    IReglasSoloSicetacRepository reglas, IUnitOfWork uow)
+    IReglasSoloSicetacRepository reglas, IMunicipiosRepository municipios, IUnitOfWork uow)
     : ICommandHandler<clsCrearReglaSoloSicetacCommand, clsReglaSoloSicetacDto>
 {
     public async Task<clsReglaSoloSicetacDto> Handle(clsCrearReglaSoloSicetacCommand command, CancellationToken ct = default)
@@ -29,6 +30,18 @@ public sealed class clsCrearReglaSoloSicetacCommandHandler(
         var regla = new Domain.Costeo.Entidades.clsReglaSoloSicetac { Origen = origen, Destino = destino, TipoVehiculo = vehiculo };
         reglas.Agregar(regla);
         await uow.SaveChangesAsync(ct);
-        return new clsReglaSoloSicetacDto(regla.Id, regla.Origen, regla.Destino, regla.TipoVehiculo, regla.CreatedAt);
+
+        // Mismo criterio de resolución que el listado (#242-adjacent): Origen/Destino
+        // suelen ser código DANE, se resuelve a nombre de municipio para la respuesta.
+        var catalogo = await municipios.ListarAsync(ct);
+        var porCodigoDane = catalogo
+            .GroupBy(m => m.CodigoDane)
+            .ToDictionary(g => g.Key, g => g.FirstOrDefault(m => m.Pais == "CO") ?? g.First());
+        string? NombreMunicipio(string codigoCrudo) =>
+            porCodigoDane.TryGetValue(codigoCrudo, out var m) ? $"{m.Municipio}, {m.Departamento}" : null;
+
+        return new clsReglaSoloSicetacDto(
+            regla.Id, regla.Origen, regla.Destino, NombreMunicipio(regla.Origen), NombreMunicipio(regla.Destino),
+            regla.TipoVehiculo, regla.CreatedAt);
     }
 }

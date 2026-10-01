@@ -205,6 +205,8 @@ public class clsNexoDbContext : DbContext
             e.Property(x => x.Peso).HasColumnType("decimal(18,2)");
             e.Property(x => x.ValorMercancia).HasColumnType("decimal(18,2)");
             e.Property(x => x.ValorAprovisionamiento).HasColumnType("decimal(18,2)");
+            e.Property(x => x.HorasCargue).HasColumnType("decimal(6,2)");
+            e.Property(x => x.HorasDescargue).HasColumnType("decimal(6,2)");
             e.HasOne(x => x.clsSolicitud)
              .WithMany(s => s.Lineas)
              .HasForeignKey(x => x.SolicitudId)
@@ -276,6 +278,7 @@ public class clsNexoDbContext : DbContext
             e.Property(x => x.Resultado).HasConversion<string>().HasMaxLength(20)
              .HasDefaultValue(ResultadoCotizacion.SinDefinir);
             e.Property(x => x.Total).HasColumnType("decimal(18,2)").HasDefaultValue(0m);
+            e.Property(x => x.EsAutoCosteo).HasDefaultValue(false);
             e.Property(x => x.RowVersion).IsRowVersion();
             e.HasMany(x => x.Lineas).WithOne().HasForeignKey(x => x.CotizacionId).OnDelete(DeleteBehavior.Cascade);
             e.HasMany(x => x.Conexos).WithOne().HasForeignKey(x => x.CotizacionId).OnDelete(DeleteBehavior.Cascade);
@@ -306,6 +309,13 @@ public class clsNexoDbContext : DbContext
             e.HasOne(x => x.clsServicioConexo)
              .WithMany()
              .HasForeignKey(x => x.ServicioConexoId)
+             .OnDelete(DeleteBehavior.Restrict);
+            // Restrict (no Cascade): clsCotizacion ya cascadea hacia Conexos directo
+            // (línea 281) — un segundo camino en cascada Cotizacion→Lineas→Conexos
+            // produciría "multiple cascade paths", que SQL Server rechaza al crear el FK.
+            e.HasOne(x => x.clsCotizacionLinea)
+             .WithMany()
+             .HasForeignKey(x => x.CotizacionLineaId)
              .OnDelete(DeleteBehavior.Restrict);
         });
 

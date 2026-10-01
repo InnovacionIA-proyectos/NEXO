@@ -36,6 +36,11 @@ public class clsAgregarConexosRequest
 
 public class clsConexoItemRequest
 {
+    /// <summary>Línea de la cotización a la que aplica (S4-HU-15.4/#250) — obligatorio,
+    /// ya no existe el conexo "general" sin línea.</summary>
+    [Required]
+    public Guid LineaId { get; set; }
+
     [Required]
     public Guid ServicioConexoId { get; set; }
 

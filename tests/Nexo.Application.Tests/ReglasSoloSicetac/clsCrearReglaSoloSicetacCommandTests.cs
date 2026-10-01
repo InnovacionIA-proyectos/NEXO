@@ -1,7 +1,9 @@
 using Nexo.Application.CasosDeUso.ReglasSoloSicetac;
 using Nexo.Application.CasosDeUso.ReglasSoloSicetac.Interfaces;
+using Nexo.Application.CasosDeUso.Solicitudes.Interfaces;
 using Nexo.Application.Common.Abstractions;
 using Nexo.Application.Common.Exceptions;
+using Nexo.Domain.Catalogos.Entidades;
 using Nexo.Domain.Costeo.Entidades;
 using Moq;
 
@@ -10,9 +12,13 @@ namespace Nexo.Application.Tests.ReglasSoloSicetac;
 public class clsCrearReglaSoloSicetacCommandTests
 {
     private readonly Mock<IReglasSoloSicetacRepository> _reglas = new();
+    private readonly Mock<IMunicipiosRepository> _municipios = new();
     private readonly Mock<IUnitOfWork> _uow = new();
 
-    private clsCrearReglaSoloSicetacCommandHandler Handler() => new(_reglas.Object, _uow.Object);
+    public clsCrearReglaSoloSicetacCommandTests() =>
+        _municipios.Setup(m => m.ListarAsync(It.IsAny<CancellationToken>())).ReturnsAsync(Array.Empty<clsMunicipio>());
+
+    private clsCrearReglaSoloSicetacCommandHandler Handler() => new(_reglas.Object, _municipios.Object, _uow.Object);
 
     [Theory]
     [InlineData("", "Cali", "Turbo")]

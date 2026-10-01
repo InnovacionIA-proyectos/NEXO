@@ -10,5 +10,7 @@ public static class clsDependencyInjection
         .AddScoped<ICommandHandler<clsCrearServicioConexoCommand, clsServicioConexoDto>, clsCrearServicioConexoCommandHandler>()
         .AddScoped<ICommandHandler<clsEditarServicioConexoCommand, clsServicioConexoDto>, clsEditarServicioConexoCommandHandler>()
         .AddScoped<ICommandHandler<clsImportarServiciosConexosExcelCommand, clsImportarServiciosResultDto>, clsImportarServiciosConexosExcelCommandHandler>()
-        .AddScoped<IQueryHandler<clsListarServiciosConexosQuery, clsPaginaServiciosDto>, clsListarServiciosConexosQueryHandler>();
+        .AddScoped<IQueryHandler<clsListarServiciosConexosQuery, clsPaginaServiciosDto>, clsListarServiciosConexosQueryHandler>()
+        .AddScoped<IQueryHandler<clsExportarServiciosConexosExcelQuery, clsArchivoDto>, clsExportarServiciosConexosExcelQueryHandler>()
+        .AddScoped<IQueryHandler<clsObtenerPlantillaServicioConexoQuery, clsArchivoDto>, clsObtenerPlantillaServicioConexoQueryHandler>();
 }

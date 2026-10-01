@@ -22,16 +22,9 @@ def _ahora() -> datetime:
 @dataclass
 class EjeVehiculoRow:
     """Un eje persistido dentro de VehiculoCubicacion (se serializa junto al
-    vehiculo, no es tabla propia - igual que en el original).
+    vehiculo, no es tabla propia - igual que en el original)."""
 
-    `posicion_mm` es nullable desde S4-HU-12.1: el contenedor refrigerado de
-    40 pies solo existia en el catalogo del motor rapido, que guarda las
-    capacidades por eje pero NO sus posiciones. No se copiaron las del
-    contenedor de 40 seco -serian un dato inventado-, asi que queda en None
-    hasta que alguien mida el vehiculo. Un eje sin posicion no sirve para
-    validar distribucion de peso en el plan 3D."""
-
-    posicion_mm: float | None
+    posicion_mm: float
     capacidad_kg: float
 
 
@@ -46,45 +39,14 @@ class VehiculoCubicacion:
     alto_interno_mm: float
     capacidad_kg: float
     tara_kg: float
-    # Nullable desde S4-HU-12.1 por la misma razon que `EjeVehiculoRow.posicion_mm`:
-    # el catalogo del motor rapido no guardaba puerta para ningun vehiculo, asi
-    # que el contenedor refrigerado -que solo existia alli- no tiene el dato. Se
-    # deja en None en vez de copiar el del contenedor seco o poner 0.
-    puerta_ancho_mm: float | None
-    puerta_alto_mm: float | None
+    puerta_ancho_mm: float
+    puerta_alto_mm: float
     puerta_posicion: str = "trasera"  # trasera | frontal | costado_izquierdo | costado_derecho
     ejes: list[EjeVehiculoRow] = field(default_factory=list)
     tolerancia_paredes_mm: float = 0.0
     tolerancia_entre_unidades_mm: float = 0.0
     es_preset: bool = False
     descripcion: str | None = None
-
-    # --- Identidad estable (S4-HU-12.1) -------------------------------------
-    # Identificador OPACO, no un slug vivo: no cambia aunque cambie `nombre`.
-    # Los 10 sembrados conservan el que ya emitia el motor rapido como
-    # `unidadId`; uno nuevo lo genera el seeder a partir del nombre. Antes la
-    # busqueda de vehiculo era por `nombre`, que el usuario puede editar desde
-    # la interfaz -renombrar un preset dejaba el plan de cargue atascado-.
-    codigo: str | None = None
-
-    # --- Clasificacion para tarifar (S4-HU-12.1) ----------------------------
-    # Venian solo del catalogo hardcodeado del motor rapido (CATALOGO), que no
-    # conocia tara ni puerta; los fisicos venian solo de presets(), que no
-    # conocia estos. Ninguna fuente alcanzaba sola: por eso se unificaron.
-    # `config_vehiculo` es el codigo de tblSAPTiposVehiculoTarifario y es el
-    # puente hacia ConfiguracionVehiculo del lado de NEXO.
-    config_vehiculo: str | None = None
-    carroceria: str | None = None
-    clase_viaje: str | None = None
-    clase_contenedor: str | None = None
-
-    # --- Evaluacion del cubicador rapido (S4-HU-12.1) -----------------------
-    # Nulos mientras el contrato de POST /api/vehiculos no los exponga. Un
-    # vehiculo con estos campos en None NO se ofrece en la cubicacion rapida:
-    # asumir "sin refrigeracion" o asumir que la tiene son dos errores caros.
-    geometria: str | None = None          # cerrada | semicerrada | abierta
-    control_ambiental: str | None = None  # ninguno | refrigeracion
-
     id: str = field(default_factory=_uuid)
     created_at: datetime = field(default_factory=_ahora)
     updated_at: datetime = field(default_factory=_ahora)

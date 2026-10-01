@@ -9,6 +9,7 @@ using Nexo.Application.Common.Dtos;
 using Nexo.Application.Common.Exceptions;
 using Nexo.Application.Common.Ports;
 using Nexo.Domain.Catalogos.Entidades;
+using Nexo.Domain.Costeo.Reglas;
 using Nexo.Domain.Cotizaciones.Entidades;
 using Nexo.Domain.Enums;
 using Nexo.Mensajes.Bandeja;
@@ -23,7 +24,11 @@ public sealed record clsCapturaLineaInput(
     string? LineaNegocio, string? ClaseViaje, string? ClaseContenedor, bool? Exclusivo, bool? Consolidado,
     bool? RetornaContenedor, string? CiudadDevolucionContenedor, bool? LevanteContenedorDiferente,
     string? CiudadLevanteContenedor, decimal? ValorAprovisionamiento, decimal? Peso, decimal? ValorMercancia,
-    IReadOnlyList<clsPosicionCargaDto>? Posiciones);
+    IReadOnlyList<clsPosicionCargaDto>? Posiciones,
+    /// <summary>S4-HU-15.5/#251: horas de ESTA línea — null usa el default
+    /// (clsResolucionHorasLinea.Resolver: 2h si RetornaContenedor, si no las de la
+    /// solicitud completa).</summary>
+    decimal? HorasCargue = null, decimal? HorasDescargue = null);
 
 public sealed record clsCapturarSolicitudCommand(
     Guid? ClienteId, string? ClienteBp, string Tipo, string? Modalidad, DateTimeOffset? Deadline,
@@ -83,6 +88,12 @@ public sealed class clsCapturarSolicitudCommandHandler(
             CreadoPor = usuarioActual.Id,
         };
 
+        // S4-HU-15.5/#251: default de la solicitud completa, usado solo cuando una línea
+        // no trae horas propias ni devuelve contenedor — mismo valor que ya serializa
+        // SerializarCondiciones (4h+4h), no uno nuevo.
+        var horasCargueSolicitud = command.HorasCargue ?? 4m;
+        var horasDescargueSolicitud = command.HorasDescargue ?? 4m;
+
         var numeroLinea = 0;
         foreach (var lr in command.Lineas)
         {
@@ -100,6 +111,9 @@ public sealed class clsCapturarSolicitudCommandHandler(
             if (!levanteDiferente) ciudadLevante = null;
 
             var ciudadDevolucion = clsResolucionDeCatalogos.Limpiar(lr.CiudadDevolucionContenedor);
+            var retornaContenedor = (lr.RetornaContenedor ?? false) || ciudadDevolucion is not null;
+            var (horasCargue, horasDescargue) = clsResolucionHorasLinea.Resolver(
+                lr.HorasCargue, lr.HorasDescargue, retornaContenedor, horasCargueSolicitud, horasDescargueSolicitud);
 
             solicitud.Lineas.Add(new clsLineaSolicitud
             {
@@ -114,11 +128,13 @@ public sealed class clsCapturarSolicitudCommandHandler(
                 ClaseContenedor = ParseClaseContenedor(lr.ClaseContenedor),
                 Exclusivo = lr.Exclusivo ?? false,
                 Consolidado = lr.Consolidado ?? false,
-                RetornaContenedor = (lr.RetornaContenedor ?? false) || ciudadDevolucion is not null,
+                RetornaContenedor = retornaContenedor,
                 CiudadDevolucionContenedor = ciudadDevolucion,
                 LevanteContenedorDiferente = (lr.LevanteContenedorDiferente ?? false) || levanteDiferente,
                 CiudadLevanteContenedor = ciudadLevante,
                 ValorAprovisionamiento = levanteDiferente ? lr.ValorAprovisionamiento : null,
+                HorasCargue = horasCargue,
+                HorasDescargue = horasDescargue,
                 Peso = peso,
                 ValorMercancia = lr.ValorMercancia,
                 Dimensiones = lr.Posiciones is { Count: > 0 }
@@ -172,7 +188,7 @@ public sealed class clsCapturarSolicitudCommandHandler(
         try
         {
             var propuesta = await propuestasPort.ProponerAsync(solicitud.Id, ct);
-            var cotizacion = new clsCotizacion { SolicitudId = solicitud.Id, Estado = EstadoCotizacion.Borrador };
+            var cotizacion = new clsCotizacion { SolicitudId = solicitud.Id, Estado = EstadoCotizacion.Borrador, EsAutoCosteo = true };
             var fletes = 0;
 
             foreach (var linea in solicitud.Lineas)

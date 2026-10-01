@@ -11,11 +11,7 @@ class ItemCubicacionDto(ApiModel):
     largo_cm: float
     ancho_cm: float
     alto_cm: float
-    # OBLIGATORIO desde S4-HU-12.2 (antes opcional). Es RUPTURA del contrato y
-    # va anunciada: la recomendacion de cuantos camiones hacen falta se calcula
-    # con el peso, asi que sin el no hay nada que recomendar. Un item sin peso
-    # antes se aceptaba y producia una sugerencia que ignoraba la carga real.
-    peso_kg: float
+    peso_kg: float | None = None
     tipo_mercancia: str | None = None
 
 
@@ -98,10 +94,6 @@ class SugerenciaFlotaDto(ApiModel):
     clase_viaje: str | None
     clase_contenedor: str | None
     disposiciones: list[DisposicionDto]
-    # S4-HU-12.2: el reparto por peso. `pesoPorVehiculoKg` es el mismo para
-    # todos los camiones - esa es la "distribucion equilibrada" que pide la HU.
-    peso_total_kg: float = 0.0
-    peso_por_vehiculo_kg: float = 0.0
 
 
 class MedidasEstandarDto(ApiModel):
