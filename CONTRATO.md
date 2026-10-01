@@ -335,6 +335,10 @@ interface CapturaResultDto {
 interface HojaExcelDto { nombre: string; filaEncabezado: number; encabezados: string[]; filas: string[][]; totalFilas: number }
 interface AnalisisExcelDto { archivo: string; hojas: HojaExcelDto[] }
 interface ClienteBusquedaDto { clienteId: UUID | null; bp: string | null; nit: string; nitCliente: string; nombre: string; origen: string } // origen: "cliente" | "prospecto"; nitCliente es alias de nit (mismo valor) para Cotifly
+interface MunicipioDto { // catálogo completo, ~3.800 filas — id numérico, el mismo que usa TarifaPlazaDto.origenMunicipioId/destinoMunicipioId
+  id: number; codigoDane: string; municipio: string; departamento: string; pais: string
+  nombreTarifasPlaza: string | null; zonaTarificacion: string | null
+}
 interface CandidatoTarifaDto {
   fuente: string; valor: Decimal; detalle: string; criterio: string; coincidencias: number
   advertencia: string | null // no-nulo cuando NO es un match exacto — mostrar al usuario antes de confirmar
@@ -390,7 +394,11 @@ interface SapHistoricoFiltrosDto { lineasNegocio: OpcionFiltroDto[]; tiposVehicu
 
 interface AjusteVigenciaResultDto { aplicados: number; solicitados: number }
 
-interface ReglaSoloSicetacDto { id: UUID; origen: string; destino: string; tipoVehiculo: string; createdAt: FechaISO }
+interface ReglaSoloSicetacDto {
+  id: UUID; origen: string; destino: string
+  origenMunicipio: string | null; destinoMunicipio: string | null // nombre resuelto para mostrar — null si origen/destino no matchea ningún código DANE conocido
+  tipoVehiculo: string; createdAt: FechaISO
+}
 interface ImportarReglasResultDto { filas: number; creadas: number; duplicadas: number; invalidas: number }
 
 interface ServicioConexoDto { id: UUID; nombre: string; categoria: string; reglaCobro: string | null; valorBase: Decimal | null; vigenteHasta: Fecha | null; activo: boolean }
@@ -674,6 +682,15 @@ Piso SICE-TAC del viaje vacío (levante → origen del cargue).
 - **→** `200 ClienteBusquedaDto[]`. Con el DW configurado busca en clientes
   reales; sin él, en la tabla local.
 
+#### `GET /api/captura-solicitudes/municipios`
+Catálogo completo de municipios (S4-HU-09.1), todas las columnas — para
+poblar el desplegable de Origen/Destino. ~3.800 filas sin paginar ni
+filtrar: se carga una sola vez y queda en memoria del front, no se consulta
+en cada tecleo. Mismo catálogo que `GET /api/catalogos/municipios` (§3.19),
+expuesto también ahí porque ese otro controller no está limitado a
+Comercial/Admin.
+- **→** `200 MunicipioDto[]`
+
 ### 3.4 Cotizaciones — `/api/cotizaciones`
 
 #### `POST /api/cotizaciones` — crear o recuperar el borrador
@@ -846,6 +863,11 @@ Quita el ajuste; la tarifa vuelve a regirse por la vigencia de SAP.
 
 #### `GET /api/reglas-solo-sicetac`
 - Rate limit estándar. **→** `200 ReglaSoloSicetacDto[]`
+- `origen`/`destino` son el valor crudo guardado (código DANE en las filas cargadas por
+  Excel, texto libre en las más viejas) — el frontend debe pintar
+  `origenMunicipio`/`destinoMunicipio` (nombre resuelto), no `origen`/`destino`. Si
+  vienen `null`, el valor crudo no matcheó ningún código DANE conocido; mostrar el
+  crudo como respaldo en ese caso.
 
 #### `POST /api/reglas-solo-sicetac`
 
@@ -1189,6 +1211,16 @@ de Reglas Solo-SICETAC y Tarifas de Plaza — reemplazan el texto libre.
 | `GET /api/catalogos/lineas-negocio` | `tblSAPLineaNegocio` | `200 LineaNegocioDto[]` |
 | `GET /api/catalogos/clases-viaje` | `tblSAPClaseViaje` | `200 ClaseViajeDto[]` |
 | `GET /api/catalogos/clases-contenedor` | `tblSAPClaseContenedor` | `200 ClaseContenedorDto[]` |
+| `GET /api/catalogos/municipios` | Catálogo propio de municipios (`tbl_municipios`) | `200 MunicipioDto[]` |
+
+`GET /api/catalogos/municipios` (S4-HU-10.2/#242): resuelve `origenMunicipioId`/
+`destinoMunicipioId` para el formulario de Tarifas de Plaza (§3.21) — es el
+mismo id que trae `TarifaPlazaDto.origenMunicipioId`/`destinoMunicipioId`.
+~3.800 filas sin paginar ni filtrar: se carga una sola vez y queda en
+memoria del front, no se consulta en cada tecleo. Mismo catálogo que
+`GET /api/captura-solicitudes/municipios` (§3.3), expuesto acá también
+porque ese otro controller es solo `Comercial`/`Admin` y `AdminTarifas`
+también lo necesita.
 
 ### 3.20 Rangos de peso — `/api/pesos`
 
