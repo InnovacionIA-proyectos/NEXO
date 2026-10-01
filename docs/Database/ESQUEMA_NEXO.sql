@@ -247,7 +247,9 @@ CREATE TABLE [db_NEXO].[tbl_lineas_solicitud] (
     [CiudadDevolucionContenedor] nvarchar(150) NULL,
     [Consolidado] bit NOT NULL DEFAULT (CONVERT([bit],(0))),
     [RetornaContenedor] bit NOT NULL DEFAULT (CONVERT([bit],(0))),
-    [MotivoPendiente] nvarchar(500) NULL
+    [MotivoPendiente] nvarchar(500) NULL,
+    [HorasCargue] decimal(6,2) NULL, -- S4-HU-15.5/#251: horas efectivas de ESTA línea, resueltas al capturar
+    [HorasDescargue] decimal(6,2) NULL
     , CONSTRAINT [PK_lineas_solicitud] PRIMARY KEY ([Id])
 );
 
@@ -301,6 +303,7 @@ CREATE TABLE [db_NEXO].[tbl_cotizaciones] (
     [Estado] nvarchar(20) NOT NULL DEFAULT (N'Borrador'),
     [Resultado] nvarchar(20) NOT NULL DEFAULT (N'SinDefinir'),
     [Total] decimal(18,2) NOT NULL DEFAULT ((0.0)),
+    [EsAutoCosteo] bit NOT NULL DEFAULT ((0)), -- S4-HU-15.6/#252: auto-costeada nunca pasa por /entregar
     [EntregadaPor] uniqueidentifier NULL,
     [EntregadaAt] datetimeoffset NULL,
     [CreatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset()),
@@ -329,6 +332,7 @@ CREATE TABLE [db_NEXO].[tbl_cotizacion_lineas] (
 CREATE TABLE [db_NEXO].[tbl_cotizacion_conexos] (
     [Id] uniqueidentifier NOT NULL,
     [CotizacionId] uniqueidentifier NOT NULL,
+    [CotizacionLineaId] uniqueidentifier NOT NULL, -- S4-HU-15.4/#250: conexo ligado a UNA línea, ya no "general"
     [ServicioConexoId] uniqueidentifier NULL,
     [Cantidad] decimal(12,2) NOT NULL,
     [ValorAplicado] decimal(18,2) NOT NULL,
@@ -679,6 +683,9 @@ ALTER TABLE [db_NEXO].[tbl_colocaciones_cargue] ADD CONSTRAINT [FK_colocaciones_
 ALTER TABLE [db_NEXO].[tbl_colocaciones_cargue] ADD CONSTRAINT [FK_colocaciones_cargue_planes_cargue_PlanCargueId] FOREIGN KEY ([PlanCargueId]) REFERENCES [db_NEXO].[tbl_planes_cargue] ([Id]) ON DELETE CASCADE;
 ALTER TABLE [db_NEXO].[tbl_cotizacion_conexos] ADD CONSTRAINT [FK_cotizacion_conexos_cotizaciones_CotizacionId] FOREIGN KEY ([CotizacionId]) REFERENCES [db_NEXO].[tbl_cotizaciones] ([Id]) ON DELETE CASCADE;
 ALTER TABLE [db_NEXO].[tbl_cotizacion_conexos] ADD CONSTRAINT [FK_cotizacion_conexos_servicios_conexos_ServicioConexoId] FOREIGN KEY ([ServicioConexoId]) REFERENCES [db_NEXO].[tbl_servicios_conexos] ([Id]);
+-- NO CASCADE: clsCotizacion ya cascadea directo hacia Conexos (constraint de arriba) —
+-- un segundo camino Cotizacion->Lineas->Conexos en cascada violaría "multiple cascade paths".
+ALTER TABLE [db_NEXO].[tbl_cotizacion_conexos] ADD CONSTRAINT [FK_cotizacion_conexos_cotizacion_lineas_CotizacionLineaId] FOREIGN KEY ([CotizacionLineaId]) REFERENCES [db_NEXO].[tbl_cotizacion_lineas] ([Id]);
 ALTER TABLE [db_NEXO].[tbl_cotizacion_lineas] ADD CONSTRAINT [FK_cotizacion_lineas_cotizaciones_CotizacionId] FOREIGN KEY ([CotizacionId]) REFERENCES [db_NEXO].[tbl_cotizaciones] ([Id]) ON DELETE CASCADE;
 ALTER TABLE [db_NEXO].[tbl_cotizacion_lineas] ADD CONSTRAINT [FK_cotizacion_lineas_lineas_solicitud_LineaSolicitudId] FOREIGN KEY ([LineaSolicitudId]) REFERENCES [db_NEXO].[tbl_lineas_solicitud] ([Id]);
 ALTER TABLE [db_NEXO].[tbl_cotizaciones] ADD CONSTRAINT [FK_cotizaciones_solicitudes_SolicitudId] FOREIGN KEY ([SolicitudId]) REFERENCES [db_NEXO].[tbl_solicitudes] ([Id]);
@@ -716,6 +723,7 @@ CREATE INDEX [IX_colocaciones_cargue_ItemPlanCargueId] ON [db_NEXO].[tbl_colocac
 CREATE INDEX [IX_colocaciones_cargue_PlanCargueId_Cargada] ON [db_NEXO].[tbl_colocaciones_cargue] ([PlanCargueId], [Cargada]);
 CREATE INDEX [IX_cotizacion_conexos_CotizacionId] ON [db_NEXO].[tbl_cotizacion_conexos] ([CotizacionId]);
 CREATE INDEX [IX_cotizacion_conexos_ServicioConexoId] ON [db_NEXO].[tbl_cotizacion_conexos] ([ServicioConexoId]);
+CREATE INDEX [IX_cotizacion_conexos_CotizacionLineaId] ON [db_NEXO].[tbl_cotizacion_conexos] ([CotizacionLineaId]);
 CREATE INDEX [IX_cotizacion_lineas_CotizacionId] ON [db_NEXO].[tbl_cotizacion_lineas] ([CotizacionId]);
 CREATE INDEX [IX_cotizacion_lineas_LineaSolicitudId] ON [db_NEXO].[tbl_cotizacion_lineas] ([LineaSolicitudId]);
 CREATE INDEX [IX_cotizaciones_EntregadaPor] ON [db_NEXO].[tbl_cotizaciones] ([EntregadaPor]);

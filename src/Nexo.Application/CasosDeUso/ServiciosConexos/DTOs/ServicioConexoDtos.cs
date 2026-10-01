@@ -13,5 +13,11 @@ public record clsServicioConexoDto(
 /// <summary>Página del catálogo de servicios: los ítems de la página y el total que cumple el filtro.</summary>
 public record clsPaginaServiciosDto(IReadOnlyList<clsServicioConexoDto> Items, int Total);
 
-/// <summary>Resultado de una carga masiva de servicios logísticos desde Excel.</summary>
-public record clsImportarServiciosResultDto(int Filas, int Creadas, int Duplicadas, int Invalidas);
+/// <summary>Resultado de una carga masiva de servicios logísticos desde Excel. S4-HU-15.3/#249:
+/// <see cref="Actualizadas"/> distingue el upsert (reimportar un export previo) de una creación
+/// nueva; <see cref="Duplicadas"/> ahora solo cuenta las 6-dimensiones repetidas DENTRO del
+/// mismo archivo (contra la BD ya no es "duplicada", es "actualizada").</summary>
+public record clsImportarServiciosResultDto(int Filas, int Creadas, int Actualizadas, int Duplicadas, int Invalidas);
+
+/// <summary>Archivo generado (export de catálogo o plantilla por tipo) listo para descargar.</summary>
+public record clsArchivoDto(byte[] Contenido, string NombreArchivo, string ContentType);

@@ -33,6 +33,7 @@ using Nexo.Infrastructure.TarifasPlaza.Adaptadores;
 using Nexo.Infrastructure.TarifasPlaza.Repositorios;
 using Nexo.Infrastructure.ReglasSoloSicetac.Adaptadores;
 using Nexo.Infrastructure.ReglasSoloSicetac.Repositorios;
+using Nexo.Infrastructure.ServiciosConexos.Adaptadores;
 using Nexo.Infrastructure.ServiciosConexos.Repositorios;
 using Nexo.Infrastructure.Solicitudes.Adaptadores;
 using Nexo.Infrastructure.Priorizacion.Repositorios;
@@ -249,6 +250,8 @@ public static class clsDependencyInjection
         services.AddScoped<clsEfServiciosConexosRepository>();
         services.AddScoped<IServiciosConexosRepository>(sp => sp.GetRequiredService<clsEfServiciosConexosRepository>());
         services.AddScoped<IServiciosConexosPort>(sp => sp.GetRequiredService<clsEfServiciosConexosRepository>());
+        services.AddScoped<IExportadorServiciosConexosExcelPort, clsExportadorServiciosConexosExcelAdapter>();
+        services.AddScoped<IPlantillaServicioConexoPort, clsPlantillaServicioConexoAdapter>();
 
         // Métricas (Tablero del Líder)
         services.AddScoped<IMetricasPort, clsMetricasAdapter>();

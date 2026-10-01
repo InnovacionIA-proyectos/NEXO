@@ -55,8 +55,16 @@ public sealed class clsMarcarResultadoCommandHandler(
         // contaminando el cumplimiento de SLA y las cotizaciones emitidas del tablero de
         // KPIs. Por decisión del negocio esa entrega implícita se elimina: SOLO
         // clsEntregarCotizacionCommand (POST /entregar) puede marcar la entrega, sin
-        // excepciones.
-        if (c.Estado != EstadoCotizacion.Entregada)
+        // excepciones — PARA COTIZACIONES MANUALES.
+        //
+        // S4-HU-15.6/#252: en auto-costeo, Tarifas/Coordinador (dueños exclusivos de
+        // /entregar) nunca interviene — el paso de Entregar nunca ocurre, y sin él el
+        // Comercial quedaba bloqueado para siempre marcando el resultado. Se salta la
+        // exigencia de Entregada SOLO cuando EsAutoCosteo es true (no abre el hueco para
+        // cotizaciones manuales: esas siguen exigiendo Entregada como siempre). No se
+        // dispara ningún email/PDF de entrega en este camino — justamente porque
+        // clsEntregarCotizacionCommand nunca se llama.
+        if (c.Estado != EstadoCotizacion.Entregada && !(c.Estado == EstadoCotizacion.Borrador && c.EsAutoCosteo))
             throw new clsConflictException("COTIZACION_NO_ENTREGADA", "Solo se puede marcar el resultado de una cotización entregada.");
 
         var esNuevaGanada = resultado == ResultadoCotizacion.Ganada && c.Resultado != ResultadoCotizacion.Ganada;

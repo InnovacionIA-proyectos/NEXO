@@ -115,6 +115,57 @@ public class clsMarcarResultadoCommandTests
         _uow.Verify(u => u.SaveChangesAsync(default), Times.Never);
     }
 
+    /// <summary>
+    /// S4-HU-15.6/#252: una cotización MANUAL en Borrador (EsAutoCosteo = false, el
+    /// default) sigue exigiendo Entregada sin excepción — el fix NO abre un hueco
+    /// general para saltarse /entregar, solo para el camino de auto-costeo.
+    /// </summary>
+    [Fact]
+    public async Task Borrador_manual_sigue_exigiendo_Entregada_aunque_tenga_lineas()
+    {
+        var cotizacionId = Guid.NewGuid();
+        var c = new clsCotizacion
+        {
+            SolicitudId = Guid.NewGuid(), Estado = EstadoCotizacion.Borrador, EsAutoCosteo = false,
+            Lineas = [new clsCotizacionLinea { ValorFlete = 100_000m }],
+        };
+        _cotizaciones.Setup(r => r.ObtenerParaMarcarResultadoAsync(cotizacionId, default)).ReturnsAsync(c);
+
+        var ex = await Assert.ThrowsAsync<clsConflictException>(() =>
+            Handler().Handle(new clsMarcarResultadoCommand(cotizacionId, "ganada", null, null)));
+
+        Assert.Equal("COTIZACION_NO_ENTREGADA", ex.Code);
+        _uow.Verify(u => u.SaveChangesAsync(default), Times.Never);
+    }
+
+    /// <summary>
+    /// S4-HU-15.6/#252: el problema real — una cotización AUTO-COSTEADA nunca pasa por
+    /// /entregar (Tarifas/Coordinador, dueños exclusivos de ese paso, no interviene en
+    /// auto-costeo), así que quedaba bloqueada para siempre. Con EsAutoCosteo = true,
+    /// Borrador + líneas SÍ puede marcar resultado, sin publicar ningún email/PDF de
+    /// entrega (clsEntregarCotizacionCommand, el único que dispara eso, nunca se llama
+    /// en este camino — ni directa ni indirectamente).
+    /// </summary>
+    [Fact]
+    public async Task Borrador_auto_costeado_SI_puede_marcar_resultado_sin_pasar_por_entregar()
+    {
+        var cotizacionId = Guid.NewGuid();
+        var c = new clsCotizacion
+        {
+            Id = cotizacionId, SolicitudId = Guid.NewGuid(), Estado = EstadoCotizacion.Borrador, EsAutoCosteo = true,
+            Lineas = [new clsCotizacionLinea { ValorFlete = 100_000m, clsLineaSolicitud = null }],
+        };
+        _cotizaciones.Setup(r => r.ObtenerParaMarcarResultadoAsync(cotizacionId, default)).ReturnsAsync(c);
+        _solicitudes.Setup(s => s.ObtenerConClienteAsync(c.SolicitudId, default)).ReturnsAsync((clsSolicitud?)null);
+
+        var dto = await Handler().Handle(new clsMarcarResultadoCommand(cotizacionId, "perdida", "precio", null));
+
+        Assert.Equal(ResultadoCotizacion.Perdida.ToString(), dto.Resultado.ToString());
+        Assert.Equal(EstadoCotizacion.Borrador, c.Estado); // no se toca el Estado de la cotización
+        Assert.Null(c.EntregadaAt); // nunca pasó por /entregar
+        _uow.Verify(u => u.SaveChangesAsync(default), Times.Once);
+    }
+
     [Fact]
     public async Task Nueva_ganada_realimenta_la_biblioteca_una_sola_vez_por_linea_con_LineaSolicitud()
     {

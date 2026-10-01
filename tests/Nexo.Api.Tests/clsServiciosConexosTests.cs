@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text.Json;
+using ClosedXML.Excel;
 using Nexo.Api.Tests.Infra;
 
 namespace Nexo.Api.Tests;
@@ -120,6 +121,112 @@ public class clsServiciosConexosTests
         var dto = await resp.Json();
         Assert.False(dto.GetProperty("activo").GetBoolean());
         Assert.Equal(100, dto.GetProperty("costoUnitario").GetDecimal()); // se conservó
+    }
+
+    // 6) S4-HU-15.3/#249 — exportar catálogo, plantillas por tipo, e importar como upsert.
+
+    [Fact]
+    public async Task ExportarExcel_devuelve_el_catalogo_con_las_12_columnas()
+    {
+        var resp = await _fx.Client().GetAsync("/api/servicios-conexos/exportar-excel");
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+
+        using var wb = new XLWorkbook(new MemoryStream(await resp.Content.ReadAsByteArrayAsync()));
+        var ws = wb.Worksheets.First();
+        var encabezados = ws.Row(1).CellsUsed().Select(c => c.GetString()).ToList();
+        Assert.Equal(["CODIGO", "TIPO SERVICIO", "ORIGEN", "DESTINO", "PUERTO", "RUTA", "TIPO MAQUINA",
+            "COSTO UNITARIO", "UNIDAD", "VIGENCIA", "CATEGORIA", "ACTIVO"], encabezados);
+        Assert.True(ws.RowsUsed().Count() > 1, "debe traer al menos una fila de datos (catálogo sembrado).");
+    }
+
+    [Theory]
+    [InlineData("almacenamiento")]
+    [InlineData("itr")]
+    [InlineData("precinto")]
+    [InlineData("acompanamiento")]
+    public async Task PlantillaExcel_tipo_valido_devuelve_xlsx_con_encabezado_y_ejemplo(string tipo)
+    {
+        var resp = await _fx.Client().GetAsync($"/api/servicios-conexos/plantilla-excel/{tipo}");
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+
+        using var wb = new XLWorkbook(new MemoryStream(await resp.Content.ReadAsByteArrayAsync()));
+        var ws = wb.Worksheets.First();
+        Assert.Equal("CODIGO", ws.Cell(1, 1).GetString());
+        Assert.True(ws.RowsUsed().Count() >= 2, "debe traer la fila de ejemplo.");
+    }
+
+    [Fact]
+    public async Task PlantillaExcel_tipo_invalido_devuelve_400()
+    {
+        var resp = await _fx.Client().GetAsync("/api/servicios-conexos/plantilla-excel/no-existe");
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+        Assert.Equal("TIPO_PLANTILLA_INVALIDO", await resp.ErrorCode());
+    }
+
+    private static HttpContent ArchivoExcel(string[] encabezados, IEnumerable<string[]> filas)
+    {
+        using var wb = new XLWorkbook();
+        var ws = wb.Worksheets.Add("Datos");
+        for (var i = 0; i < encabezados.Length; i++) ws.Cell(1, i + 1).Value = encabezados[i];
+        var fila = 2;
+        foreach (var f in filas)
+        {
+            for (var i = 0; i < f.Length; i++) ws.Cell(fila, i + 1).Value = f[i];
+            fila++;
+        }
+        using var ms = new MemoryStream();
+        wb.SaveAs(ms);
+        var contenido = new MultipartFormDataContent();
+        var parte = new ByteArrayContent(ms.ToArray());
+        parte.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        contenido.Add(parte, "archivo", "import.xlsx");
+        return contenido;
+    }
+
+    [Fact] // reimportar un export previo actualiza en vez de descartar como duplicado.
+    public async Task ImportarExcel_fila_existente_actualiza_fila_nueva_crea()
+    {
+        var admin = _fx.Client("Admin");
+        var codigoExistente = $"UPSERT_{Guid.NewGuid():N}"[..20];
+        var crear = await admin.PostJson("/api/servicios-conexos", PayloadValido(codigoExistente, costo: 1000));
+        Assert.Equal(HttpStatusCode.Created, crear.StatusCode);
+
+        var codigoNuevo = $"NUEVO_{Guid.NewGuid():N}"[..20];
+        var encabezados = new[] { "CODIGO", "TIPO SERVICIO", "COSTO UNITARIO", "UNIDAD", "VIGENCIA", "CATEGORIA" };
+        var archivo = ArchivoExcel(encabezados,
+        [
+            [codigoExistente, "Precinto", "2000", "Por unidad", "2026-12-31", "adicional"], // actualiza
+            [codigoNuevo, "Precinto", "3000", "Por unidad", "2026-12-31", "adicional"],      // crea
+        ]);
+
+        var resp = await admin.PostAsync("/api/servicios-conexos/importar-excel", archivo);
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        var dto = await resp.Json();
+        Assert.Equal(1, dto.GetProperty("actualizadas").GetInt32());
+        Assert.Equal(1, dto.GetProperty("creadas").GetInt32());
+
+        var costoActualizado = _fx.WithDb(db => db.ServiciosConexos.Single(s => s.CodigoServicio == codigoExistente).CostoUnitario);
+        Assert.Equal(2000, costoActualizado);
+        Assert.True(_fx.WithDb(db => db.ServiciosConexos.Any(s => s.CodigoServicio == codigoNuevo)));
+    }
+
+    [Fact]
+    public async Task ImportarExcel_fila_repetida_en_el_archivo_cuenta_como_duplicada()
+    {
+        var codigo = $"FILEDUP_{Guid.NewGuid():N}"[..20];
+        var encabezados = new[] { "CODIGO", "TIPO SERVICIO", "COSTO UNITARIO", "UNIDAD" };
+        var archivo = ArchivoExcel(encabezados,
+        [
+            [codigo, "Precinto", "1000", "Por unidad"],
+            [codigo, "Precinto", "1500", "Por unidad"], // misma llave otra vez en el mismo archivo
+        ]);
+
+        var resp = await _fx.Client("Admin").PostAsync("/api/servicios-conexos/importar-excel", archivo);
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        var dto = await resp.Json();
+        Assert.Equal(1, dto.GetProperty("creadas").GetInt32());
+        Assert.Equal(1, dto.GetProperty("duplicadas").GetInt32());
     }
 }
 

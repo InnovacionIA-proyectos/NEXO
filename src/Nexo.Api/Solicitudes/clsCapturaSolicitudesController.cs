@@ -59,7 +59,8 @@ public class clsCapturaSolicitudesController(
             lr.Origen, lr.Destino, lr.TipoVehiculo, lr.Carroceria, lr.Tipologia, lr.LineaNegocio, lr.ClaseViaje,
             lr.ClaseContenedor, lr.Exclusivo, lr.Consolidado, lr.RetornaContenedor, lr.CiudadDevolucionContenedor,
             lr.LevanteContenedorDiferente, lr.CiudadLevanteContenedor, lr.ValorAprovisionamiento, lr.Peso, lr.ValorMercancia,
-            lr.Posiciones?.Select(p => new clsPosicionCargaDto(p.Descripcion, p.Cantidad, p.LargoCm, p.AnchoCm, p.AltoCm, p.PesoKg)).ToList()
+            lr.Posiciones?.Select(p => new clsPosicionCargaDto(p.Descripcion, p.Cantidad, p.LargoCm, p.AnchoCm, p.AltoCm, p.PesoKg)).ToList(),
+            lr.HorasCargue, lr.HorasDescargue
         )).ToList();
 
         var command = new clsCapturarSolicitudCommand(

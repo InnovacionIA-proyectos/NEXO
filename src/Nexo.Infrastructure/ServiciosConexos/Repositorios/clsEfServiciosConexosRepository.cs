@@ -127,15 +127,18 @@ public sealed class clsEfServiciosConexosRepository(clsNexoDbContext db) : IServ
                 primeraDataIdx = 1;
             }
 
-            // Claves ya existentes en BD (6 dimensiones); el HashSet también detecta
-            // duplicados DENTRO del archivo.
-            var existentes = (await db.ServiciosConexos.AsNoTracking()
-                    .Select(s => new { s.CodigoServicio, s.Origen, s.Destino, s.Puerto, s.Ruta, s.TipoMaquina })
-                    .ToListAsync(ct))
-                .Select(s => $"{s.CodigoServicio}|{s.Origen}|{s.Destino}|{s.Puerto}|{s.Ruta}|{s.TipoMaquina}")
-                .ToHashSet();
+            // S4-HU-15.3/#249: upsert por las 6 dimensiones — permite exportar el catálogo y
+            // reimportarlo para actualizar (en vez de que cada fila ya existente cuente como
+            // "duplicada" y se descarte). Tracked a propósito (sin AsNoTracking) para poder
+            // modificar las filas existentes in-place.
+            var existentesPorClave = (await db.ServiciosConexos.ToListAsync(ct))
+                .ToDictionary(s => $"{s.CodigoServicio}|{s.Origen}|{s.Destino}|{s.Puerto}|{s.Ruta}|{s.TipoMaquina}");
 
-            int leidas = 0, creadas = 0, duplicadas = 0, invalidas = 0;
+            // "Duplicada" ahora solo significa que la MISMA llave aparece más de una vez
+            // DENTRO del archivo (la primera gana, el resto se cuenta y se descarta).
+            var vistosEnArchivo = new HashSet<string>();
+
+            int leidas = 0, creadas = 0, actualizadas = 0, duplicadas = 0, invalidas = 0;
             var nuevos = new List<clsServicioConexo>();
 
             foreach (var fila in filas.Skip(primeraDataIdx))
@@ -158,11 +161,25 @@ public sealed class clsEfServiciosConexosRepository(clsNexoDbContext db) : IServ
                 var maquina = NoVacio(cMaquina > 0 ? Txt(fila, cMaquina) : null);
 
                 var clave = $"{codigo}|{origen}|{destino}|{puerto}|{ruta}|{maquina}";
-                if (!existentes.Add(clave)) { duplicadas++; continue; }
+                if (!vistosEnArchivo.Add(clave)) { duplicadas++; continue; }
 
                 var categoria = cCategoria > 0 ? Txt(fila, cCategoria) : "";
                 var activoTxt = cActivo > 0 ? clsTexto.Normalizar(Txt(fila, cActivo)) : "";
                 var vigencia = cVigencia > 0 ? LeerFecha(fila.Cell(cVigencia)) : null;
+                var activo = !(activoTxt is "NO" or "INACTIVO" or "FALSE" or "0"); // activo por defecto
+
+                if (existentesPorClave.TryGetValue(clave, out var existente))
+                {
+                    existente.TipoServicio = tipo;
+                    existente.CostoUnitario = costo.Value;
+                    existente.Unidad = unidad;
+                    if (vigencia is { } v) existente.Vigencia = v;
+                    if (categoria.Length > 0) existente.Categoria = clsServicioConexoCategoria.Normalizada(categoria);
+                    if (cActivo > 0) existente.Activo = activo;
+                    existente.ActualizadoPor = usuarioId;
+                    actualizadas++;
+                    continue;
+                }
 
                 nuevos.Add(new clsServicioConexo
                 {
@@ -177,24 +194,23 @@ public sealed class clsEfServiciosConexosRepository(clsNexoDbContext db) : IServ
                     Unidad = unidad,
                     Vigencia = vigencia ?? DateOnly.FromDateTime(DateTime.UtcNow),
                     Categoria = clsServicioConexoCategoria.Normalizada(categoria),
-                    // Activo por defecto; solo "no"/"inactivo"/"false"/"0" lo desactiva.
-                    Activo = !(activoTxt is "NO" or "INACTIVO" or "FALSE" or "0"),
+                    Activo = activo,
                     ActualizadoPor = usuarioId,
                 });
                 creadas++;
             }
 
-            if (nuevos.Count > 0)
+            if (nuevos.Count > 0 || actualizadas > 0)
             {
                 db.ServiciosConexos.AddRange(nuevos);
                 db.AuditLogs.Add(new clsAuditLog
                 {
                     UsuarioId = usuarioId, Entidad = "servicios_conexos", EntidadId = Guid.Empty,
-                    Accion = "importar_excel", Diff = $"{{\"creadas\":{creadas}}}",
+                    Accion = "importar_excel", Diff = $"{{\"creadas\":{creadas},\"actualizadas\":{actualizadas}}}",
                 });
                 await db.SaveChangesAsync(ct);
             }
-            return new clsImportarServiciosResultDto(leidas, creadas, duplicadas, invalidas);
+            return new clsImportarServiciosResultDto(leidas, creadas, actualizadas, duplicadas, invalidas);
         }
     }
 

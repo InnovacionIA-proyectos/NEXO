@@ -10,7 +10,9 @@ using Nexo.Domain.Enums;
 
 namespace Nexo.Application.CasosDeUso.Cotizaciones;
 
-public sealed record clsConexoItem(Guid ServicioConexoId, decimal Cantidad, decimal? ValorAplicado);
+/// <summary>LineaId (S4-HU-15.4/#250): a qué línea de la cotización aplica — obligatorio,
+/// ya no existe el conexo "general" sin línea.</summary>
+public sealed record clsConexoItem(Guid LineaId, Guid ServicioConexoId, decimal Cantidad, decimal? ValorAplicado);
 
 /// <summary>Agregar servicios conexos (logísticos/adicionales) a la cotización.</summary>
 public sealed record clsAgregarConexosCotizacionCommand(
@@ -33,6 +35,9 @@ public sealed class clsAgregarConexosCotizacionCommandHandler(
 
         foreach (var item in command.Items)
         {
+            if (c.Lineas.All(l => l.Id != item.LineaId))
+                throw new clsValidationFailedException("LINEA_INVALIDA", $"La línea {item.LineaId} no pertenece a esta cotización.");
+
             var servicio = await serviciosConexos.ObtenerPorIdAsync(item.ServicioConexoId, ct)
                 ?? throw new clsValidationFailedException("SERVICIO_INVALIDO", $"Servicio logístico {item.ServicioConexoId} no existe.");
             if (!servicio.Activo)
@@ -42,6 +47,7 @@ public sealed class clsAgregarConexosCotizacionCommandHandler(
             var conexo = new clsCotizacionConexo
             {
                 CotizacionId = c.Id,
+                CotizacionLineaId = item.LineaId,
                 ServicioConexoId = servicio.Id,
                 clsServicioConexo = servicio, // nav explícita: el DTO denormaliza nombre/categoría
                 Cantidad = item.Cantidad,

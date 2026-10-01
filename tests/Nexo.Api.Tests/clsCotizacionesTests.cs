@@ -37,10 +37,14 @@ public class clsCotizacionesTests
         var cot = await (await cli.PostJson("/api/cotizaciones", new { solicitudId = sid })).Json();
         var cid = cot.GetProperty("id").GetGuid();
 
-        Assert.Equal(HttpStatusCode.OK,
-            (await cli.PostJson($"/api/cotizaciones/{cid}/lineas", new { lineaSolicitudId = lid, valorFlete = 1_850_000, fuente = "sicetac" })).StatusCode);
+        var lineaResp = await cli.PostJson($"/api/cotizaciones/{cid}/lineas", new { lineaSolicitudId = lid, valorFlete = 1_850_000, fuente = "sicetac" });
+        Assert.Equal(HttpStatusCode.OK, lineaResp.StatusCode);
+        // S4-HU-15.4/#250: el id de la línea DE LA COTIZACIÓN (no el de clsLineaSolicitud,
+        // "lid") — es el que ahora exige /conexos.
+        var cotizacionLineaId = (await lineaResp.Json()).GetProperty("lineas")[0].GetProperty("id").GetGuid();
 
-        var conResp = await cli.PostJson($"/api/cotizaciones/{cid}/conexos", new { items = new[] { new { servicioConexoId = _fx.AnyServicioActivoId(), cantidad = 2 } } });
+        var conResp = await cli.PostJson($"/api/cotizaciones/{cid}/conexos",
+            new { items = new[] { new { lineaId = cotizacionLineaId, servicioConexoId = _fx.AnyServicioActivoId(), cantidad = 2 } } });
         Assert.Equal(HttpStatusCode.OK, conResp.StatusCode);
         Assert.True((await conResp.Json()).GetProperty("total").GetDecimal() > 0);
 

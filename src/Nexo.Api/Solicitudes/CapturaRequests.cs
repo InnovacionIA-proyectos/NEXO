@@ -84,6 +84,17 @@ public class clsCapturaLineaRequest
     [Range(typeof(decimal), "0", "9999999999999.99", ParseLimitsInInvariantCulture = true)]
     public decimal? ValorAprovisionamiento { get; set; }
 
+    /// <summary>
+    /// S4-HU-15.5/#251: horas de cargue/descargue de ESTA línea — sobreescribe el
+    /// default (4h+4h, o 2h totales si RetornaContenedor=true) cuando el Comercial las
+    /// conoce de antemano. Sin esto, cae al default de la línea.
+    /// </summary>
+    [Range(typeof(decimal), "0", "240", ParseLimitsInInvariantCulture = true)]
+    public decimal? HorasCargue { get; set; }
+
+    [Range(typeof(decimal), "0", "240", ParseLimitsInInvariantCulture = true)]
+    public decimal? HorasDescargue { get; set; }
+
     [Range(typeof(decimal), "0", "999999.99", ParseLimitsInInvariantCulture = true)]
     public decimal? Peso { get; set; }
 

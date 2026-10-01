@@ -70,6 +70,19 @@ public class clsLineaSolicitud : IAuditable
     [Range(typeof(decimal), "0", "9999999999999.99", ParseLimitsInInvariantCulture = true)]
     public decimal? ValorAprovisionamiento { get; set; }
 
+    /// <summary>
+    /// S4-HU-15.5/#251: horas de cargue/descargue EFECTIVAS de esta línea — ya
+    /// resueltas (clsResolucionHorasLinea.Resolver) al momento de la captura, no el
+    /// valor crudo que mandó el Comercial. Quedan trazadas acá para auditoría/consulta
+    /// posterior de qué horas se usaron realmente en el cálculo SICE de esta línea
+    /// (clsPisoConHoras.Calcular). Nulas en líneas capturadas ANTES de este cambio.
+    /// </summary>
+    [Range(typeof(decimal), "0", "240", ParseLimitsInInvariantCulture = true)]
+    public decimal? HorasCargue { get; set; }
+
+    [Range(typeof(decimal), "0", "240", ParseLimitsInInvariantCulture = true)]
+    public decimal? HorasDescargue { get; set; }
+
     [Range(typeof(decimal), "0", "999999.99", ParseLimitsInInvariantCulture = true)]
     public decimal? Peso { get; set; }
 

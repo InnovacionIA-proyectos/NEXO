@@ -69,7 +69,10 @@ public record clsPosicionCargaDto(
 public record clsLineaCosteoDto(
     Guid LineaId, Guid? RutaId, string? clsRuta, TipologiaCarga? Tipologia, decimal? Peso,
     string? TipoVehiculo, string? Carroceria, IReadOnlyList<clsPosicionCargaDto> Posiciones,
-    clsPisoSicetacDto? PisoSicetac, IReadOnlyList<clsHistoricaSugeridaDto> Historicas);
+    clsPisoSicetacDto? PisoSicetac, IReadOnlyList<clsHistoricaSugeridaDto> Historicas,
+    /// <summary>S4-HU-15.5/#251: horas de cargue/descargue EFECTIVAS con las que se
+    /// resolvió el piso SICE de esta línea — null en líneas capturadas antes de #251.</summary>
+    decimal? HorasCargue = null, decimal? HorasDescargue = null);
 
 public record clsSolicitudCosteoDto(clsSolicitudDto Solicitud, clsTiemposLogisticosDto Tiempos, IReadOnlyList<clsLineaCosteoDto> Lineas);
 

@@ -22,6 +22,16 @@ public class clsCotizacion : IAuditable
     public EstadoCotizacion Estado { get; set; } = EstadoCotizacion.Borrador;
     public ResultadoCotizacion Resultado { get; set; } = ResultadoCotizacion.SinDefinir;
 
+    /// <summary>
+    /// S4-HU-15.6/#252: distingue una cotización auto-costeada (nunca pasa por
+    /// /entregar — no tiene sentido notificar por email al mismo Comercial que la
+    /// generó) de una manual (SÍ exige Entregada antes de marcar resultado, decisión
+    /// de negocio #171). Sin esto, auto-costeo quedaba bloqueado para siempre: el
+    /// paso de Entregar es exclusivo de Tarifas/Coordinador, que nunca interviene
+    /// en ese camino.
+    /// </summary>
+    public bool EsAutoCosteo { get; set; }
+
     [Range(typeof(decimal), "0", "99999999999999.99", ParseLimitsInInvariantCulture = true)]
     public decimal Total { get; set; }
 
@@ -83,6 +93,19 @@ public class clsCotizacionConexo : IAuditable
 
     [Required]
     public Guid CotizacionId { get; set; }
+
+    /// <summary>
+    /// Línea de la cotización a la que aplica este conexo (S4-HU-15.4/#250). Obligatoria
+    /// a propósito: antes un conexo colgaba de la cotización completa sin poder decir a
+    /// cuál línea aplicaba — ya no existe la opción de un conexo "general". Apunta a
+    /// clsCotizacionLinea (no a clsLineaSolicitud): si la solicitud se recostea, cada
+    /// recosteo tiene sus propias líneas de cotización, y el conexo sigue esa misma vida.
+    /// </summary>
+    [Required]
+    public Guid CotizacionLineaId { get; set; }
+
+    [JsonIgnore]
+    public clsCotizacionLinea? clsCotizacionLinea { get; set; }
 
     public Guid? ServicioConexoId { get; set; }
 
