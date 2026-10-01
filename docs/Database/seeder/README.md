@@ -90,35 +90,15 @@ resuelve solo con SICE-TAC".
   reglas contra una solicitud real) probablemente sigue comparando por texto
   libre, backend tiene que revisar si ese matching necesita cambiar también
   antes de que estas reglas realmente apliquen en producción.
-- **Filas:** 348 (después de deduplicar por `(Origen, Destino, TipoVehiculo)`,
-  la llave única real de la tabla).
-- **Excepciones aplicadas al construir el CSV:**
-  - Las 80 filas de "Devolución de contenedor vacío" no traían un tipo de
-    vehículo real (solo tamaño de contenedor + modalidad) — se cargó la
-    categoría (ej. `"CNT20/Consolidado"`) en la columna
-    `TipoVehiculo` tal cual, aunque semánticamente no sea un tipo de
-    vehículo — decisión explícita de negocio.
-  - Las 33 filas de la banda de peso "PBV 7500-8000 kg" tampoco tenían un
-    código de vehículo confirmado en ningún catálogo — se cargaron con
-    `TipoVehiculo = "PBV 7500-8000"`, un valor inventado (no viene de
-    `tblSAPTiposVehiculoTarifario` ni de ningún otro catálogo real) que marca
-    que es un tipo de vehículo pendiente de dar de alta formalmente.
-  - 2 destinos que en el Excel original venían combinados en un solo texto
-    ("cajica-zipaquira-tocancipa", "PEREIRA/ARMENIA") se separaron en una fila
-    de regla por cada municipio real.
-
-> **Nota para quien arme el catálogo/cruce real de tipos de vehículo
-> (`tblSAPTiposVehiculoTarifario` + `tblTipoVehiculosSice` de `DWSice`):**
-> además de los tipos de vehículo "normales" (2, 2S2, 2S3, 3S2, 3S3, C2...),
-> ese trabajo tiene que contemplar también estos 2 casos que aparecen en
-> `reglas_solo_sicetac` pero NO son un tipo de vehículo de ningún catálogo
-> existente:
-> - Los 4 valores de contenedor/modalidad (`"CNT20/Consolidado"`,
->   `"CNT20/Exclusivo"`, `"CNT40/Consolidado"`,
->   `"CNT40/Exclusivo"`).
-> - `"PBV 7500-8000"` — un tipo de vehículo real de negocio (camión
->   liviano PBV 7500-8000 kg) que no calzó con ningún código existente al
->   momento de armar este seeder.
+- **Filas:** 260 (después de deduplicar por `(Origen, Destino, TipoVehiculo)`,
+  la llave única real de la tabla, y de la corrección de códigos de vehículo —
+  ver `DECISIONES-TECNICAS.md` para el detalle completo).
+- **Corrección aplicada (post-carga inicial):** se quitaron las 88 filas de
+  "Devolución de contenedor vacío" (`CNT20/CNT40` Consolidado/Exclusivo — no
+  son un tipo de vehículo real), se renombró `C2` → `2` (Turbo/Sencillo son
+  código `2` para SICE-TAC, `C2` es solo el código de SAP Tarifario), y se
+  renombró `PBV 7500-8000` → `2L3` (equivalente real confirmado para
+  SICE-TAC). Ver `DECISIONES-TECNICAS.md` para el razonamiento completo.
 - **Cómo cargarlo en una base nueva:** después de correr `ESQUEMA_NEXO.sql`,
   cargar `reglas_solo_sicetac.csv` con `BULK INSERT` (columnas `Id`, `Origen`,
   `Destino`, `TipoVehiculo` únicamente) contra `db_NEXO.tbl_reglas_solo_sicetac`.
@@ -128,7 +108,12 @@ resuelve solo con SICE-TAC".
 **Poblado UNA SOLA VEZ, sobre la tabla nueva `tbl_tarifas_plaza` (S4-HU-10.1)
 — sin sincronización periódica.** Extraído de
 `docs_raw/fletes-plaza-normalizado-plaza.csv` (celdas con un valor
-numérico real, no "sice") — 271 filas, todas de origen colombiano.
+numérico real, no "sice") — **107 filas** (originalmente 271; se quitaron
+164 filas de la hoja "Fletes Nacional y Expo" — `TURBO`/`SENCILLO`/`MINI
+MULA`/`MULA` — que venían de una sección del Excel llamada "SICE": son
+referencia contra SICE-TAC, no tarifa real de Plaza, y ya están cubiertas en
+`reglas_solo_sicetac.csv` — ver `DECISIONES-TECNICAS.md`), todas de origen
+colombiano y todas de la hoja "Fletes puertos".
 
 - **Tabla destino:** `db_NEXO.tbl_tarifas_plaza`. Columnas del CSV: `Id`
   (Guid nuevo, igual razón que en `reglas_solo_sicetac.csv`), `LineaNegocio`,
@@ -143,36 +128,20 @@ numérico real, no "sice") — 271 filas, todas de origen colombiano.
   tienen FK declarada). Si alguna vez se recarga este seeder en otra base,
   hay que resolver Origen/Destino contra el `Id` que tenga esa base en ese
   momento, no reusar los números de este CSV tal cual.
-- **Dos "familias" de fila, con dimensiones distintas** (por eso
-  `ClaseContenedor`/`PesoId`/`TipoVehiculo` son todas `NULL`-ables — una
-  tarifa real usa unas u otras, nunca todas a la vez):
-  - **97 filas de importación por contenedor** (hoja "Fletes puertos",
-    `LineaNegocio="Oferta de Expedición Puerto a interior"`,
-    `ClaseViaje="Contenedor"`, `ClaseContenedor="CNT40.HC"`): usan `PesoId`
-    (referencia a `tbl_pesos`) **y además** `TipoVehiculo`, derivado de la
-    misma banda de peso (`PesoId` 1 y 2 → `"2S2"`, 3 → `"2S3"`, 4 → `"3S2"`,
-    5 → `"3S3"`, 6 → `"PBV 7500-8000"`, 7 → `"2"` — mismo criterio que en
-    `reglas_solo_sicetac.csv`) — para que `TipoVehiculo` quede lleno en las
-    271 filas, no solo en las nacionales.
-  - **174 filas nacionales por tipo de vehículo** (hoja "Nacional y Expo",
-    sección "SICE" de columnas numéricas — ver nota de la inversión de
-    nombres en el análisis original —, `ClaseViaje="Carga Suelta"`): usan
-    `TipoVehiculo` y dejan `PesoId`/`ClaseContenedor` en `NULL` (no aplica,
-    no son tarifas de contenedor).
-    - `LineaNegocio` se resolvió fila por fila: `"Oferta de Expedición
-      Interior a Puerto"` si el destino es un puerto (Buenaventura/
-      Cartagena/Barranquilla/Santa Marta — devuelve mercancía nacional hacia
-      el puerto para exportar), `"Oferta de Expedición Nacional"` en
-      cualquier otro caso.
-    - `TipoVehiculo`: **Mini Mula → `"2S2"`, Mula → `"3S3"`** (códigos reales
-      de `tblSAPTiposVehiculoTarifario`, sin ambigüedad). **Turbo y
-      Sencillo se guardan tal cual (`"TURBO"`/`"SENCILLO"`), NO como el
-      código oficial `C2`** — el catálogo real agrupa ambos bajo el mismo
-      código `C2` ("Rígidos, Turbo o Sencillo"), pero Turbo y Sencillo
-      tienen precios distintos para la misma ruta; usar `C2` para los dos
-      los habría colapsado en una sola fila y perdido uno de los dos
-      precios. Backend debe decidir después si formaliza `TURBO`/`SENCILLO`
-      como códigos propios en el catálogo de tipos de vehículo.
+- **Una sola "familia" de fila ahora: importación por contenedor** (hoja
+  "Fletes puertos", `LineaNegocio="Oferta de Expedición Puerto a interior"`,
+  `ClaseViaje="Contenedor"`, `ClaseContenedor="CNT40.HC"`): usan `PesoId`
+  (referencia a `tbl_pesos`) **y además** `TipoVehiculo`, derivado de la
+  misma banda de peso (`PesoId` 1 y 2 → `"2S2"`, 3 → `"2S3"`, 4 → `"3S2"`,
+  5 → `"3S3"`, 6 → `"2L3"`, 7 → `"2"`).
+  - Originalmente había también una "familia" de filas nacionales por tipo
+    de vehículo (hoja "Nacional y Expo", `ClaseViaje="Carga Suelta"`,
+    `TURBO`/`SENCILLO`/`MINI MULA`/`MULA`) — se eliminó por completo (las
+    164 filas, no solo Turbo/Sencillo): toda esa hoja viene de una sección
+    del Excel llamada "SICE" — es referencia contra SICE-TAC, no tarifa real
+    de Plaza, y esas mismas rutas ya están cubiertas en
+    `reglas_solo_sicetac.csv`. Ver corrección 2026-10-01 en
+    `DECISIONES-TECNICAS.md` para el detalle completo.
   - `LineaNegocio`, `ClaseViaje` y `ClaseContenedor` guardan el **nombre
     completo** (no el `ID`) de `tblSAPLineaNegocio`/`tblSAPClaseViaje`/
     `tblSAPClaseContenedor` (`dbSolucionesTI`), verificados en vivo — a

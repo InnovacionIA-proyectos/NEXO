@@ -1,14 +1,4 @@
 ﻿Id,CodigoServicio,TipoServicio,Origen,Destino,Puerto,Ruta,TipoMaquina,CostoUnitario,Unidad,Vigencia,Categoria,Activo
-c68c48a7-128a-496d-ae14-fc6165a4754d,Cargue,Cargue,NO APLICA,NO APLICA,NO APLICA,NO APLICA,NO APLICA,12000.00,Por unidad,2026-12-31,logistico,1
-7baae431-94c5-4b0c-af10-153e80a3e43e,Descargue,Descargue,NO APLICA,NO APLICA,NO APLICA,NO APLICA,NO APLICA,12000.00,Por unidad,2026-12-31,logistico,1
-63351938-fc50-464b-9e89-d0048429abd3,Stand-by,Stand-by,NO APLICA,NO APLICA,NO APLICA,NO APLICA,NO APLICA,45000.00,Por unidad,2026-12-31,logistico,1
-e7fad2e3-2b64-44a1-ae9d-5614c76d2335,Candado satelital,Candado satelital,NO APLICA,NO APLICA,NO APLICA,NO APLICA,NO APLICA,85000.00,Por unidad,2026-12-31,logistico,1
-a020f1a4-23eb-4706-af9a-60c5077d7ef3,Almacenamiento,Almacenamiento,NO APLICA,NO APLICA,NO APLICA,NO APLICA,NO APLICA,3500.00,Por unidad,2026-12-31,logistico,1
-7a631b51-e40e-439d-ac02-6277980c180a,Distribución multipunto,Distribución multipunto,NO APLICA,NO APLICA,NO APLICA,NO APLICA,NO APLICA,60000.00,Por unidad,2026-12-31,logistico,1
-0de30819-435c-4556-83ed-dbd7320937b3,ITR,ITR,NO APLICA,NO APLICA,NO APLICA,NO APLICA,NO APLICA,120000.00,Por unidad,2026-09-30,logistico,1
-a5bdd0b3-0ac5-4a15-a77f-ced75ed1f365,Escolta,Escolta,NO APLICA,NO APLICA,NO APLICA,NO APLICA,NO APLICA,900000.00,Por unidad,2026-06-30,logistico,1
-62cd1d29-1690-4ec1-8c9d-105f2f6a18ed,Reexpedición,Reexpedición,NO APLICA,NO APLICA,NO APLICA,NO APLICA,NO APLICA,250000.00,Por unidad,2026-03-31,logistico,1
-3a721c92-3d4c-43ab-9618-1e1ac6a727bc,Montacargas,Montacargas,NO APLICA,NO APLICA,NO APLICA,NO APLICA,NO APLICA,70000.00,Por unidad,2026-12-31,logistico,0
 13a26b36-e7fd-4d90-a086-003bc67b8585,Almacenamiento,Almacenamiento,CALI,NO APLICA,NO APLICA,NO APLICA,NO APLICA,31694.66,Por estiba,2026-12-31,logistico,1
 7e914379-43c3-4e57-9504-9007d2403208,Almacenamiento,Almacenamiento,MEDELLIN,NO APLICA,NO APLICA,NO APLICA,NO APLICA,36486.52,Por estiba,2026-12-31,logistico,1
 7bac4539-9289-4e85-b47a-694b6dd06147,Almacenamiento,Almacenamiento,"BOGOTA, D.C.",NO APLICA,NO APLICA,NO APLICA,NO APLICA,34601.33,Por estiba,2026-12-31,logistico,1
