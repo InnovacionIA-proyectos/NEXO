@@ -240,7 +240,6 @@ public static class clsDependencyInjection
         services.AddScoped<IClientesPort, clsEfClientesRepository>();
         services.AddScoped<IClientesDwPort, clsClientesDwAdapter>();
         services.AddScoped<IProspectosDwPort, clsProspectosDwAdapter>();
-        services.AddScoped<ICiudadesDwPort, clsCiudadesDwAdapter>();
         services.AddScoped<IMunicipiosRepository, clsEfMunicipiosRepository>();
         services.AddScoped<IExcelSolicitudesPort, clsExcelSolicitudesAdapter>();
         services.AddScoped<ITarifasCosteoPort, clsEfTarifasCosteoRepository>();

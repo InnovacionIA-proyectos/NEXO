@@ -636,6 +636,8 @@ Resuelve o crea rutas y vehículos a partir del texto libre de las líneas.
 |---|---|---|---|
 | `origen` | **requerido** | string | máx. 150 |
 | `destino` | **requerido** | string | máx. 150 |
+| `origenMunicipioId` | *opcional* | int | S5-HU-16.1/#254. `id` elegido en `GET /ciudades` para `origen` — sin esto la línea no resuelve municipio y el motor de costeo (#255/#256) no aplica para ella |
+| `destinoMunicipioId` | *opcional* | int | ídem, para `destino` |
 | `peso` | **condicional** | decimal | 0–999999.99 kg. **Requerido (> 0) si las posiciones no traen peso** |
 | `tipoVehiculo` | *opcional* | string | máx. 100 |
 | `carroceria` | *opcional* | string | máx. 100 |
@@ -681,6 +683,41 @@ Piso SICE-TAC del viaje vacío (levante → origen del cargue).
 - **Query**: `q` *opcional* (nombre, NIT o BP).
 - **→** `200 ClienteBusquedaDto[]`. Con el DW configurado busca en clientes
   reales; sin él, en la tabla local.
+
+#### `GET /api/captura-solicitudes/departamentos`
+Departamentos de Colombia con municipio en el catálogo propio
+(`tbl_municipios`, S5-HU-16.1). **Cambio de fuente**: hasta esta issue
+resolvía contra `tblSAPDANE` en vivo, filtrado a ciudades "costeables" en el
+tarifario SAP; ahora es `tbl_municipios` (más amplio — incluye municipios sin
+tarifa SAP cargada, que de todas formas pueden costear por SICE-TAC).
+- **→** `200 string[]`, ordenados.
+
+#### `GET /api/captura-solicitudes/ciudades`
+Búsqueda de ciudades para Origen/Destino, filtrable por `departamento` y/o
+`q` (texto, sin tildes ni mayúsculas). **Cambio de forma (S5-HU-16.1/#254),
+ruptura**: antes devolvía `{ municipio, departamento }`; ahora devuelve la
+fila completa de `tbl_municipios`, con los datos que #255/#256 necesitan
+para dejar de comparar por texto en el motor de costeo. El frontend debe
+capturar `id` y enviarlo como `origenMunicipioId`/`destinoMunicipioId` al
+crear la solicitud (ver tabla de línea en `POST /api/captura-solicitudes`
+arriba) — sin eso, la línea queda sin municipio resuelto y #255/#256 no
+aplican para ella (cae al comportamiento de siempre, sin error).
+
+| Query | | Tipo | Restricción |
+|---|---|---|---|
+| `departamento` | *opcional* | string | nombre exacto (normalizado sin tildes/mayúsculas) |
+| `q` | *opcional* | string | texto libre sobre el nombre del municipio |
+
+- **→** `200 CiudadBusquedaDto[]`, máx. 50, ordenadas por nombre:
+  `{ id: int, codigoDane: string, municipio: string, departamento: string, nombreTarifasPlaza: string|null, zonaTarificacion: string|null }`
+- `nombreTarifasPlaza`/`zonaTarificacion` (códigos `ZC_`/`ZTC_` del
+  Tarifario SAP) vienen `null` cuando el municipio no tiene movimiento
+  comercial conocido — no es un error, el municipio sigue siendo válido
+  para SICE-TAC.
+- 8 ciudades que existían en el catálogo anterior ya no aparecen: eran
+  zonas agregadas sin código DANE propio (Valle de Aburrá, Urabá, Oriente
+  antioqueño) o localidades sub-municipales sin fila propia en
+  `tbl_municipios` (Don Matías, Catambuco, Doradal, Bolombolo, Chibolo).
 
 #### `GET /api/captura-solicitudes/municipios`
 Catálogo completo de municipios (S4-HU-09.1), todas las columnas — para

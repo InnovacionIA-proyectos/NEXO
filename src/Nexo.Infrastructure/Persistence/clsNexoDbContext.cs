@@ -45,6 +45,7 @@ public class clsNexoDbContext : DbContext
     public DbSet<clsMunicipio> Municipios => Set<clsMunicipio>();
     public DbSet<clsRangoPeso> RangosPeso => Set<clsRangoPeso>();
     public DbSet<clsTarifaPlaza> TarifasPlaza => Set<clsTarifaPlaza>();
+    public DbSet<clsTarifaPlazaHistorico> TarifasPlazaHistorico => Set<clsTarifaPlazaHistorico>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -225,6 +226,8 @@ public class clsNexoDbContext : DbContext
         {
             e.ToTable("tbl_rutas");
             e.HasIndex(x => new { x.Origen, x.Destino }).IsUnique();
+            e.HasOne(x => x.OrigenMunicipio).WithMany().HasForeignKey(x => x.OrigenMunicipioId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.DestinoMunicipio).WithMany().HasForeignKey(x => x.DestinoMunicipioId).OnDelete(DeleteBehavior.Restrict);
         });
 
         b.Entity<clsConfiguracionVehiculo>(e => e.ToTable("tbl_configuraciones_vehiculo"));
@@ -400,9 +403,8 @@ public class clsNexoDbContext : DbContext
             e.HasIndex(x => x.NombreTarifasPlaza);
         });
 
-        // tbl_pesos/tbl_tarifas_plaza (+ tbl_tarifas_plaza_historico, no mapeada: la
-        // llena solo un trigger de BD) creadas y pobladas a mano en S4-HU-10.1 —
-        // mismo criterio "sin migración de EF Core" que tbl_municipios.
+        // tbl_pesos/tbl_tarifas_plaza/tbl_tarifas_plaza_historico creadas y pobladas a
+        // mano en S4-HU-10.1 — mismo criterio "sin migración de EF Core" que tbl_municipios.
         b.Entity<clsRangoPeso>(e =>
         {
             e.ToTable("tbl_pesos");
@@ -422,6 +424,17 @@ public class clsNexoDbContext : DbContext
             e.HasOne(x => x.Origen).WithMany().HasForeignKey(x => x.OrigenMunicipioId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.Destino).WithMany().HasForeignKey(x => x.DestinoMunicipioId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.Peso).WithMany().HasForeignKey(x => x.PesoId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // S5-HU-16.3/#256: mapeo de SOLO LECTURA — la llena únicamente el trigger de
+        // tbl_tarifas_plaza (TRG_tarifas_plaza_historico), nunca esta aplicación. Sin
+        // navegaciones a clsMunicipio/clsRangoPeso: el motor de costeo (#256) solo
+        // necesita los ids crudos para el match exacto, no las entidades relacionadas.
+        b.Entity<clsTarifaPlazaHistorico>(e =>
+        {
+            e.ToTable("tbl_tarifas_plaza_historico");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Valor).HasColumnType("decimal(18,2)");
         });
 
         b.Entity<clsParametrosScore>(e =>

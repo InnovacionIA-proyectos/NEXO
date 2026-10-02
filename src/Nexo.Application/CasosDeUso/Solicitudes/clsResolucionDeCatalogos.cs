@@ -38,14 +38,32 @@ public static class clsResolucionDeCatalogos
         return sb.ToString().Normalize(NormalizationForm.FormC);
     }
 
-    /// <summary>Busca la ruta en el diccionario ya cargado; si no existe, la crea y la agrega al catálogo.</summary>
+    /// <summary>
+    /// Busca la ruta en el diccionario ya cargado; si no existe, la crea y la agrega al
+    /// catálogo. S5-HU-16.1/#254: cuando el frontend ya resolvió Origen/Destino contra el
+    /// buscador de ciudades (tbl_municipios), <paramref name="origenMunicipioId"/>/
+    /// <paramref name="destinoMunicipioId"/> quedan guardados en la ruta — nuevos o sobre
+    /// una ya existente (se sobrescribe; el mismo texto normalizado siempre debería
+    /// resolver al mismo municipio). Null si la línea no los trae (formulario viejo, texto
+    /// libre que no pasó por el buscador).
+    /// </summary>
     public static (clsRuta clsRuta, bool Creada) ResolverRuta(
-        string origen, string destino, IDictionary<string, clsRuta> rutasPorClave, IRutasCatalogoPort catalogo)
+        string origen, string destino, IDictionary<string, clsRuta> rutasPorClave, IRutasCatalogoPort catalogo,
+        int? origenMunicipioId = null, int? destinoMunicipioId = null)
     {
         var clave = ClaveRuta(origen, destino);
-        if (rutasPorClave.TryGetValue(clave, out var ruta)) return (ruta, false);
+        if (rutasPorClave.TryGetValue(clave, out var ruta))
+        {
+            if (origenMunicipioId is not null) ruta.OrigenMunicipioId = origenMunicipioId;
+            if (destinoMunicipioId is not null) ruta.DestinoMunicipioId = destinoMunicipioId;
+            return (ruta, false);
+        }
 
-        ruta = new clsRuta { Origen = Limpiar(origen)!, Destino = Limpiar(destino)! };
+        ruta = new clsRuta
+        {
+            Origen = Limpiar(origen)!, Destino = Limpiar(destino)!,
+            OrigenMunicipioId = origenMunicipioId, DestinoMunicipioId = destinoMunicipioId,
+        };
         catalogo.Agregar(ruta);
         rutasPorClave[clave] = ruta;
         return (ruta, true);
