@@ -85,21 +85,30 @@ límite — una tabla de relación resolvería un problema que no existe hoy.
 
 ---
 
-## Tabla 4 — `relacionVehiculosCarroceria` ✅ revisada
+## Tabla 4 — `relacionVehiculosCarroceria` ✅ revisada (ajustada)
 
 | Columna | Tipo | Notas |
 |---|---|---|
 | `Id` | uuid | PK |
 | `IdTipoVehiculo` | FK → `vehiculos` | |
 | `IdCarroceria` | FK → `TiposCarroceria` | |
+| `UsaCapacidadMaximaDelVehiculo` | booleano | **agregado** — default `true` |
+| `CapacidadMaximaEspecifica` | decimal (kg) | **agregado** — default `0`; solo se lee cuando `UsaCapacidadMaximaDelVehiculo = false` |
 | `CreadoPor` | texto/FK usuario | |
 | `CreatedAt` / `UpdatedAt` | datetime | |
 
 **Llenado:** seeder con Excel "Dimensiones y peso por vehículo".
 
-**Sin cambios sobre el borrador original** — resuelve bien la relación N:N
-entre vehículo y carrocería (un vehículo puede aplicar a varias carrocerías:
-Estacas/Furgón/Plancha, como en el Excel original).
+**Por qué se agregaron esas 2 columnas:** resuelve el caso de la
+"Tractomula Furgón 3S3" — es el mismo vehículo `3S3` (mismo `Codigo`, que
+debe seguir siendo único para hacer matching limpio contra SICE-TAC/
+tarifario), pero con Furgón pesa más vacío y carga menos (30.000 kg) que
+con Estacas/Plataforma (34.000 kg). En vez de crear una segunda fila de
+vehículo con el mismo código (lo que rompería la unicidad), la diferencia
+de capacidad vive en la relación específica vehículo+carrocería: por
+defecto usa la capacidad del vehículo (`UsaCapacidadMaximaDelVehiculo = true`),
+y solo para la combinación `3S3` + `FURGON` se marca `false` y se pone
+`CapacidadMaximaEspecifica = 30000`.
 
 ---
 

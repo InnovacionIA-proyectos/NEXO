@@ -7,6 +7,10 @@ def nid():
 OUT = "."
 
 # ---------- Tabla 1: vehiculos ----------
+# "Tractomula Furgon 3S3" ya NO es una fila aparte -- es el mismo 3S3 (el
+# codigo debe quedar unico para el matching con SICE-TAC/tarifario). La
+# diferencia de capacidad con Furgon (30000 vs 34000 kg) se resuelve en
+# relacionVehiculosCarroceria (ver mas abajo), no duplicando el vehiculo.
 vehiculos = [
     # codigo, nombre, largo, ancho, alto, capacidad_kg
     ("2L2", "Turbo 2L2", 4.5, 2.2, 2.3, 4000),
@@ -14,7 +18,6 @@ vehiculos = [
     ("3", "Dobletroque C3", 8.0, 2.4, 2.6, 17000),
     ("2S2", "Minimula 2S2", 12.2, 2.4, 2.6, 18000),
     ("3S3", "Tractomula 3S3", 12.2, 2.4, 2.6, 34000),
-    ("3S3_FURGON", "Tractomula Furgon 3S3", 12.2, 2.4, 2.6, 30000),
 ]
 vehiculo_ids = {}
 with open(f"{OUT}/vehiculos.csv", "w", newline="", encoding="utf-8") as f:

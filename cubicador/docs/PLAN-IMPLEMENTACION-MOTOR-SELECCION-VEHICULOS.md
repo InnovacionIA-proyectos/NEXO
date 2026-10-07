@@ -95,8 +95,13 @@ el motor no tenga nada hardcodeado — lo exige la propia propuesta madre
 | `DELETE` | `/vehiculos/{id}` | Soft-delete (`Activo=false`) si tiene recomendaciones históricas asociadas; borrado real si no |
 
 **El punto que pediste:** el `POST`/`PUT` reciben el vehículo **y** la lista
-de `IdCarroceria` que aplica, en el mismo payload — no hay una pantalla
-aparte para la Tabla 4. Ejemplo de body:
+de carrocerías que aplica, en el mismo payload — no hay una pantalla aparte
+para la Tabla 4. **Ajustado:** cada carrocería ya no es solo un id suelto —
+va con las 2 columnas nuevas de la Tabla 4
+(`UsaCapacidadMaximaDelVehiculo`/`CapacidadMaximaEspecifica`), para poder
+resolver el caso Tractomula/Tractomula Furgón sin duplicar el código del
+vehículo (ver nota de la Tabla 4 en `PROPUESTA-BD-MOTOR-SELECCION-VEHICULOS.md`).
+Ejemplo de body:
 
 ```json
 {
@@ -106,9 +111,16 @@ aparte para la Tabla 4. Ejemplo de body:
   "anchoPlancha": 2.4,
   "altoCarroceria": 4.4,
   "capacidadMaxima": 34000,
-  "carroceriasIds": ["<id-estacas>", "<id-plataforma>"]
+  "carrocerias": [
+    { "idCarroceria": "<id-estacas>", "usaCapacidadMaximaDelVehiculo": true },
+    { "idCarroceria": "<id-plataforma>", "usaCapacidadMaximaDelVehiculo": true },
+    { "idCarroceria": "<id-furgon>", "usaCapacidadMaximaDelVehiculo": false, "capacidadMaximaEspecifica": 30000 }
+  ]
 }
 ```
+
+Con Estacas y Plataforma usa los 34.000 kg normales del vehículo; con
+Furgón, los 30.000 kg específicos de esa combinación.
 
 El backend borra las filas de `relacionVehiculosCarroceria` que ya no estén
 en la lista y crea las nuevas — no hay que mandar nada a la Tabla 4 por
@@ -218,21 +230,15 @@ igual entre los dos sistemas podría devolver la recomendación equivocada.
 
 ## 5. Otros endpoints que hacen falta, no evidentes a primera vista
 
-1. **Resolver nombre de vehículo en texto libre → código canónico.**
-   Surge de la conversación sobre el "Diccionario de Configuraciones de
-   vehículos para Nexo.xlsx": si Cotifly (o cualquiera) importa un Excel
-   con nombres coloquiales ("Doble troque", "T.MULA", "40HC"), necesita
-   resolverlos contra el catálogo real de Cubicador, no mantener su propia
-   copia.
-
-   | Método | Ruta | Qué hace |
-   |---|---|---|
-   | `GET` | `/vehiculos/resolver?texto=Doble%20troque` | Devuelve el vehículo (y su código canónico) que mejor matchea el texto, usando los sinónimos cargados |
-
-   Esto requiere además una tabla nueva que no estaba en las 9 originales:
-   `vehiculoSinonimos` (`Id`, `IdTipoVehiculo` FK, `Sinonimo` texto) —
-   la mencioné cuando hablamos del Diccionario, pendiente de agregar al
-   diseño de BD si decides construir esto.
+1. ~~Resolver nombre de vehículo en texto libre → código canónico~~ —
+   **decisión tomada: esto NO va en el Cubicador.** Surgió de la
+   conversación sobre el "Diccionario de Configuraciones de vehículos para
+   Nexo.xlsx", pero el Cubicador nunca recibe texto libre — siempre recibe
+   los campos ya identificados/resueltos (`idTipoVehiculo`, etc.), quien
+   se los mande. El diccionario de sinónimos (`vehiculoSinonimos` o como se
+   llame) vive en la base de datos de quien SÍ recibe texto libre e importa
+   Excel con nombres coloquiales — NEXO o Cotifly, está por decidir cuál de
+   los dos. No es una tabla ni un endpoint del Cubicador.
 
 2. **Aprobación obligatoria para mercancía condicionada.**
    Cuando una línea incluye una mercancía con `CondicionadaCubicacion=true`,
