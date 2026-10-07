@@ -49,20 +49,25 @@ with open(f"{OUT}/tiposCarroceria.csv", "w", newline="", encoding="utf-8") as f:
 # La hoja "Dimensiones y Peso" solo habla de Estacas/Furgon/Plancha en
 # terminos genericos (no distingue refrigerado/climatizado/ventilado ni
 # Planchon de Plataforma) -- "Plancha" ahi se interpreta como PLATAFORMA.
+# Cada carrocería va con (usa_capacidad_vehiculo, capacidad_especifica).
+# Por defecto usa la capacidad del vehiculo (true, 0 -- no se lee).
+# 3S3 + FURGON es la unica excepcion real detectada en el Excel: con Furgon
+# carga 30000 kg en vez de los 34000 normales del 3S3 con Estacas/Plataforma.
 rel = {
-    "2L2": ["ESTACAS", "FURGON", "PLATAFORMA"],
-    "2": ["ESTACAS", "FURGON", "PLATAFORMA"],
-    "3": ["ESTACAS", "PLATAFORMA"],
-    "2S2": ["ESTACAS", "FURGON", "PLATAFORMA"],
-    "3S3": ["ESTACAS", "PLATAFORMA"],
-    "3S3_FURGON": ["FURGON"],
+    "2L2": [("ESTACAS", True, 0), ("FURGON", True, 0), ("PLATAFORMA", True, 0)],
+    "2": [("ESTACAS", True, 0), ("FURGON", True, 0), ("PLATAFORMA", True, 0)],
+    "3": [("ESTACAS", True, 0), ("PLATAFORMA", True, 0)],
+    "2S2": [("ESTACAS", True, 0), ("FURGON", True, 0), ("PLATAFORMA", True, 0)],
+    "3S3": [("ESTACAS", True, 0), ("PLATAFORMA", True, 0), ("FURGON", False, 30000)],
 }
 with open(f"{OUT}/relacionVehiculosCarroceria.csv", "w", newline="", encoding="utf-8") as f:
     w = csv.writer(f)
-    w.writerow(["Id", "IdTipoVehiculo", "CodigoVehiculo", "IdCarroceria", "CodigoCarroceria", "CreadoPor"])
+    w.writerow(["Id", "IdTipoVehiculo", "CodigoVehiculo", "IdCarroceria", "CodigoCarroceria",
+                "UsaCapacidadMaximaDelVehiculo", "CapacidadMaximaEspecifica", "CreadoPor"])
     for vcod, cs in rel.items():
-        for c in cs:
-            w.writerow([nid(), vehiculo_ids[vcod], vcod, carroceria_ids[c], c, "seeder"])
+        for c, usa_cap, cap_especifica in cs:
+            w.writerow([nid(), vehiculo_ids[vcod], vcod, carroceria_ids[c], c,
+                        "true" if usa_cap else "false", cap_especifica, "seeder"])
 
 # ---------- Tabla 5: categoriaMercancia ----------
 # Solo categorias que agrupan mercancias REALES de la matriz (nada heredado
