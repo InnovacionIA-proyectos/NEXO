@@ -22,7 +22,7 @@ vehiculos = [
 vehiculo_ids = {}
 with open(f"{OUT}/vehiculos.csv", "w", newline="", encoding="utf-8") as f:
     w = csv.writer(f)
-    w.writerow(["Id", "Codigo", "Nombre", "LargoPlancha", "AnchoPlancha", "AltoCarroceria", "CapacidadMaxima", "Activo", "CreadoPor"])
+    w.writerow(["Id", "CodigoVehiculo", "NombreVehiculo", "LargoPlancha", "AnchoPlancha", "AltoCarroceria", "CapacidadMaxima", "Activo", "CreadoPor"])
     for codigo, nombre, l, a, h, cap in vehiculos:
         vid = nid()
         vehiculo_ids[codigo] = vid

@@ -1,0 +1,15 @@
+Id,IdTipoVehiculo,CodigoVehiculo,IdCarroceria,CodigoCarroceria,UsaCapacidadMaximaDelVehiculo,CapacidadMaximaEspecifica,CreadoPor
+e51d63c7-19e6-4576-a144-c26bf73b23d8,9091f229-2fd7-4732-9af5-388f41091b3b,2L2,0f9f4eb2-e3fb-4dfe-b5d1-5299772b4cf3,ESTACAS,true,0,seeder
+e79e8f67-1930-49c4-9ad0-e95a30f7afe4,9091f229-2fd7-4732-9af5-388f41091b3b,2L2,ba14e015-4f07-458e-a59b-c5600afb2b82,FURGON,true,0,seeder
+49408a61-5129-49f6-93fe-a7ebad50b66b,9091f229-2fd7-4732-9af5-388f41091b3b,2L2,b397ea66-f312-42ae-b087-4956af1c910b,PLATAFORMA,true,0,seeder
+b372e014-a191-4cc0-9ecc-d7130bf3697a,58fc1465-800a-4705-8b17-8873e6bc9cdb,2,0f9f4eb2-e3fb-4dfe-b5d1-5299772b4cf3,ESTACAS,true,0,seeder
+d1adf723-5ef8-4c44-a44b-990aa681b277,58fc1465-800a-4705-8b17-8873e6bc9cdb,2,ba14e015-4f07-458e-a59b-c5600afb2b82,FURGON,true,0,seeder
+7cca549d-5ff4-4ef1-96a6-7bc76c5ed016,58fc1465-800a-4705-8b17-8873e6bc9cdb,2,b397ea66-f312-42ae-b087-4956af1c910b,PLATAFORMA,true,0,seeder
+6f4e139d-28ba-400e-9e49-34fd70b512e0,b649beb7-4529-471d-9a25-bda5aaa4e9ca,3,0f9f4eb2-e3fb-4dfe-b5d1-5299772b4cf3,ESTACAS,true,0,seeder
+5547c97b-2ed7-4625-a87e-65ee6b975d29,b649beb7-4529-471d-9a25-bda5aaa4e9ca,3,b397ea66-f312-42ae-b087-4956af1c910b,PLATAFORMA,true,0,seeder
+944757cb-dcda-4774-b0b5-3e2408563515,cda966c1-be93-4cd5-b8d4-0624b4c6db91,2S2,0f9f4eb2-e3fb-4dfe-b5d1-5299772b4cf3,ESTACAS,true,0,seeder
+50504398-6c06-4827-a3db-293e3d5288b3,cda966c1-be93-4cd5-b8d4-0624b4c6db91,2S2,ba14e015-4f07-458e-a59b-c5600afb2b82,FURGON,true,0,seeder
+c98b4683-ece2-439d-83a9-1d9839441121,cda966c1-be93-4cd5-b8d4-0624b4c6db91,2S2,b397ea66-f312-42ae-b087-4956af1c910b,PLATAFORMA,true,0,seeder
+ec0dd603-a5d7-4cf8-a604-f85130676942,78bd254f-a0bf-43d6-b78c-714c51c04240,3S3,0f9f4eb2-e3fb-4dfe-b5d1-5299772b4cf3,ESTACAS,true,0,seeder
+bf5bcf37-a3ea-47f1-abd3-37c4c61bad0c,78bd254f-a0bf-43d6-b78c-714c51c04240,3S3,b397ea66-f312-42ae-b087-4956af1c910b,PLATAFORMA,true,0,seeder
+1d82157a-05d1-49fd-8bb3-f990032209cd,78bd254f-a0bf-43d6-b78c-714c51c04240,3S3,ba14e015-4f07-458e-a59b-c5600afb2b82,FURGON,false,30000,seeder

@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 """Vuelca el contenido crudo de los 3 Excel fuente a CSV, sin normalizar ni
 interpretar nada -- tal cual estan en el archivo original. Sirve de respaldo
-para auditar las decisiones tomadas en cubicador/docs/seeder/."""
+para auditar las decisiones tomadas en cubicador/database/seeder/."""
 import csv
 import openpyxl
 
-ORIGEN = ".."
+ORIGEN = "."
 
 
 def volcar(nombre_archivo, nombre_hoja, salida):

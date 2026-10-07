@@ -1,0 +1,11 @@
+Id,TipoCarroceria,Activo,CreadoPor
+ba14e015-4f07-458e-a59b-c5600afb2b82,FURGON,true,seeder
+d0a2af01-eafd-49a7-b4fa-4d908b327801,FURGON_REFRIGERADO,true,seeder
+5d7ed30c-20ad-4e97-8836-d246fbd935eb,FURGON_CLIMATIZADO,true,seeder
+75d2d2ae-d1c0-4390-a376-4c2e3e654e6a,FURGON_VENTILADO,true,seeder
+0f9f4eb2-e3fb-4dfe-b5d1-5299772b4cf3,ESTACAS,true,seeder
+b397ea66-f312-42ae-b087-4956af1c910b,PLATAFORMA,true,seeder
+a2fbf957-f3b2-4d52-b502-6823a21d4835,PLANCHON,true,seeder
+655cc196-2913-4034-89ec-645141d0ba45,PORTAVIDRIOS,true,seeder
+a4eb4859-75b8-42b3-af6a-4e7bed352ba0,CONTENEDOR_SECO,true,seeder
+8f9216cd-2c55-4da7-8f21-07de07b1bcb5,CONTENEDOR_REFRIGERADO,true,seeder
