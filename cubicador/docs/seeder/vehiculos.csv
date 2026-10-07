@@ -1,0 +1,7 @@
+Id,Codigo,Nombre,LargoPlancha,AnchoPlancha,AltoCarroceria,CapacidadMaxima,Activo,CreadoPor
+f6be47ce-5881-40de-8a9c-7c65b95871ea,2L2,Turbo 2L2,4.5,2.2,2.3,4000,true,seeder
+a394d412-c705-4aa4-8c40-97e88dd2dda1,2,Sencillo C2,6.5,2.4,2.4,8500,true,seeder
+ecdc113c-3398-483f-876c-e7f4e439abe6,3,Dobletroque C3,8.0,2.4,2.6,17000,true,seeder
+1f7954cf-c803-4bbc-9ee1-18a75021ea77,2S2,Minimula 2S2,12.2,2.4,2.6,18000,true,seeder
+36c16eef-87be-4127-83ea-f7dd054f6475,3S3,Tractomula 3S3,12.2,2.4,2.6,34000,true,seeder
+f4d6aeb9-12cc-48cc-9787-361bf2abcde2,3S3_FURGON,Tractomula Furgon 3S3,12.2,2.4,2.6,30000,true,seeder
