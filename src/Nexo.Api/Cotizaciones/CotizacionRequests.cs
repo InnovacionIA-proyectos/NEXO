@@ -50,6 +50,24 @@ public class clsConexoItemRequest
     /// <summary>Si no se envía, se calcula como ValorBase * Cantidad del servicio.</summary>
     [Range(typeof(decimal), "0", "9999999999999.99", ParseLimitsInInvariantCulture = true)]
     public decimal? ValorAplicado { get; set; }
+
+    /// <summary>
+    /// S5-HU-18/#262: "individual" (default) si el usuario lo agregó a esta línea
+    /// puntualmente, "general" si vino de una acción de "agregar a todas las líneas"
+    /// (que de todas formas manda un ítem por línea, cada uno con su propio LineaId).
+    /// </summary>
+    [RegularExpression("(?i)^(individual|general)$", ErrorMessage = "Origen debe ser 'individual' o 'general'.")]
+    public string Origen { get; set; } = "individual";
+}
+
+public class clsEditarConexoRequest
+{
+    [Range(typeof(decimal), "0.01", "999999.99", ParseLimitsInInvariantCulture = true)]
+    public decimal Cantidad { get; set; }
+
+    /// <summary>Si no se envía, se recalcula como ValorBase * Cantidad del servicio.</summary>
+    [Range(typeof(decimal), "0", "9999999999999.99", ParseLimitsInInvariantCulture = true)]
+    public decimal? ValorAplicado { get; set; }
 }
 
 public class clsMarcarResultadoRequest

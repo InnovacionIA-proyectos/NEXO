@@ -103,7 +103,7 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
         var dc = _dcConfigurado ? scope.ServiceProvider.GetService<clsDbSolucionesTiDbContext>() : null;
         var tarifario = scope.ServiceProvider.GetRequiredService<ITarifarioSapPort>();
 
-        var dto = await ProponerLineaAsync(dw, dc, tarifario, linea, ajustes, soloSice, horasSolicitud, ct);
+        var dto = await ProponerLineaAsync(_db, dw, dc, tarifario, linea, ajustes, soloSice, horasSolicitud, ct);
         await PublicarVencidaSiAplicaAsync(dto, ct);
         return new clsResultadoDeCosteo(dto.ValorPropuesto, dto.FuentePropuesta, dto.Justificacion);
     }
@@ -173,11 +173,19 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
             try
             {
                 using var scope = _scopes.CreateScope();
+                // S5-HU-18/#262: DbContext propio por tarea en paralelo — antes
+                // ProponerLineaAsync usaba `_db` (el de la instancia, compartido) para
+                // tbl_tarifas_plaza/histórico/rangos de peso, mientras que dw/dc sí tenían
+                // scope propio. EF Core no es thread-safe: con varios grupos corriendo a
+                // la vez, eso producía InvalidOperationException intermitentes ("A second
+                // operation was started on this context instance before a previous
+                // operation completed").
+                var dbGrupo = scope.ServiceProvider.GetRequiredService<clsNexoDbContext>();
                 var dw = _dwConfigurado ? scope.ServiceProvider.GetService<clsDwSiceDbContext>() : null;
                 var dc = _dcConfigurado ? scope.ServiceProvider.GetService<clsDbSolucionesTiDbContext>() : null;
                 var tarifario = scope.ServiceProvider.GetRequiredService<ITarifarioSapPort>();
                 var horasGrupo = HorasEfectivasDeLinea(grupo.First(), horasSolicitud);
-                var dto = await ProponerLineaAsync(dw, dc, tarifario, grupo.First(), ajustes, soloSice, horasGrupo, ct);
+                var dto = await ProponerLineaAsync(dbGrupo, dw, dc, tarifario, grupo.First(), ajustes, soloSice, horasGrupo, ct);
                 return grupo.Select(l => dto with { LineaId = l.Id }).ToList();
             }
             catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
@@ -186,8 +194,15 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
                 // llevarse los demás. Task.WhenAll falla rápido y descarta hasta los grupos
                 // que ya habían terminado bien si uno solo lanza — por eso el catch va AQUÍ,
                 // por grupo, y no alrededor del WhenAll.
+                //
+                // S5-HU-18/#262: ya NO se interpola ex.Message en la justificación — antes
+                // un fallo técnico (ej. la carrera de DbContext de arriba, o cualquier otra
+                // excepción de infraestructura) se mostraba crudo en la Mesa de Costeo
+                // ("A second operation was started on this context instance..."). Es un
+                // mensaje de negocio fijo; el detalle técnico queda solo para quien revise
+                // logs del servidor, no para el usuario.
                 var primera = grupo.First();
-                var justificacion = $"No se pudo consultar la Biblioteca para esta línea: {ex.Message}";
+                const string justificacion = "No se pudo consultar la Biblioteca para esta línea. Intente de nuevo o revise manualmente.";
                 return grupo.Select(l => new clsPropuestaLineaDto(
                     l.Id, $"{primera.clsRuta?.Origen} → {primera.clsRuta?.Destino}", primera.clsConfiguracionVehiculo?.TipoVehiculo,
                     l.Peso, null, null, null, null, null, justificacion)).ToList();
@@ -210,7 +225,7 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
         linea.HorasCargue is { } hc && linea.HorasDescargue is { } hd ? hc + hd : horasSolicitud;
 
     private async Task<clsPropuestaLineaDto> ProponerLineaAsync(
-        clsDwSiceDbContext? dw, clsDbSolucionesTiDbContext? dc, ITarifarioSapPort tarifario,
+        clsNexoDbContext db, clsDwSiceDbContext? dw, clsDbSolucionesTiDbContext? dc, ITarifarioSapPort tarifario,
         clsLineaSolicitud linea, IReadOnlyDictionary<int, DateTime> ajustesVigencia,
         IReadOnlySet<string> soloSice, decimal horasSolicitud, CancellationToken ct)
     {
@@ -277,7 +292,7 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
         // ambos municipios (#254); si no, se salta directo al fallback externo, igual
         // que antes de esta issue.
         if (plaza is null && origenMunicipioId is not null && destinoMunicipioId is not null)
-            plaza = await CandidatoPlazaPropiaAsync(origenMunicipioId.Value, destinoMunicipioId.Value, vehiculo, linea.Peso, ct);
+            plaza = await CandidatoPlazaPropiaAsync(db, origenMunicipioId.Value, destinoMunicipioId.Value, vehiculo, linea.Peso, ct);
         if (plaza is null && dc is not null)
             plaza = await CandidatoSapAsync(
                 dc, dc.TarifasPlazaSap, "plaza", linea.clsRuta.OrigenMunicipio, linea.clsRuta.DestinoMunicipio,
@@ -302,7 +317,7 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
         // (propia), si no hay nada ahí, el log externo de SAP.
         clsCandidatoTarifaDto? historico = null;
         if (origenMunicipioId is not null && destinoMunicipioId is not null)
-            historico = await CandidatoHistoricoPropioAsync(origenMunicipioId.Value, destinoMunicipioId.Value, vehiculo, linea.Peso, ct);
+            historico = await CandidatoHistoricoPropioAsync(db, origenMunicipioId.Value, destinoMunicipioId.Value, vehiculo, linea.Peso, ct);
         if (historico is null && dc is not null)
             historico = await CandidatoSapAsync(
                 dc, dc.TarifasLogSap, "historico_sap", linea.clsRuta.OrigenMunicipio, linea.clsRuta.DestinoMunicipio,
@@ -549,27 +564,34 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
     /// ni DANE. "Vigente" aquí es Vigencia &lt;= hoy (fecha desde la que aplica el precio;
     /// convención inversa a las tablas SAP externas, donde Vigencia es la fecha hasta la
     /// que el precio sigue siendo válido — confirmado contra datos reales: los 107 registros
-    /// migrados en S4-HU-10.1 traen Vigencia = fecha de la migración, ya pasada).</summary>
+    /// migrados en S4-HU-10.1 traen Vigencia = fecha de la migración, ya pasada).
+    ///
+    /// S5-HU-18/#262: recibe el <see cref="clsNexoDbContext"/> por parámetro (no usa
+    /// el campo `_db` de la instancia) — este método corre dentro de las tareas en
+    /// paralelo de <see cref="ProponerAsync"/>, y EF Core no es thread-safe. Antes de
+    /// esta issue sí usaba `_db` compartido ahí, causando InvalidOperationException
+    /// intermitentes ("A second operation was started on this context instance before
+    /// a previous operation completed") cuando dos grupos corrían a la vez.</summary>
     private Task<clsCandidatoTarifaDto?> CandidatoPlazaPropiaAsync(
-        int origenMunicipioId, int destinoMunicipioId, string? vehiculo, decimal? peso, CancellationToken ct)
+        clsNexoDbContext db, int origenMunicipioId, int destinoMunicipioId, string? vehiculo, decimal? peso, CancellationToken ct)
     {
         var hoy = DateOnly.FromDateTime(_clock.GetUtcNow().Date);
-        var query = _db.TarifasPlaza.AsNoTracking()
+        var query = db.TarifasPlaza.AsNoTracking()
             .Where(t => t.OrigenMunicipioId == origenMunicipioId && t.DestinoMunicipioId == destinoMunicipioId && t.Vigencia <= hoy)
             .Select(t => new clsCandidatoPropioRow(t.Valor, t.Vigencia, t.DetallesTarifa, t.PesoId, t.TipoVehiculo));
-        return CandidatoPropioAsync(query, vehiculo, peso, "plaza", "tbl_tarifas_plaza", ct);
+        return CandidatoPropioAsync(db, query, vehiculo, peso, "plaza", "tbl_tarifas_plaza", ct);
     }
 
     /// <summary>Mismo criterio que <see cref="CandidatoPlazaPropiaAsync"/>, contra
     /// tbl_tarifas_plaza_historico (la llena solo el trigger de BD, nunca la app).</summary>
     private Task<clsCandidatoTarifaDto?> CandidatoHistoricoPropioAsync(
-        int origenMunicipioId, int destinoMunicipioId, string? vehiculo, decimal? peso, CancellationToken ct)
+        clsNexoDbContext db, int origenMunicipioId, int destinoMunicipioId, string? vehiculo, decimal? peso, CancellationToken ct)
     {
         var hoy = DateOnly.FromDateTime(_clock.GetUtcNow().Date);
-        var query = _db.TarifasPlazaHistorico.AsNoTracking()
+        var query = db.TarifasPlazaHistorico.AsNoTracking()
             .Where(t => t.OrigenMunicipioId == origenMunicipioId && t.DestinoMunicipioId == destinoMunicipioId && t.Vigencia <= hoy)
             .Select(t => new clsCandidatoPropioRow(t.Valor, t.Vigencia, t.DetallesTarifa, t.PesoId, t.TipoVehiculo));
-        return CandidatoPropioAsync(query, vehiculo, peso, "historico_sap", "tbl_tarifas_plaza_historico", ct);
+        return CandidatoPropioAsync(db, query, vehiculo, peso, "historico_sap", "tbl_tarifas_plaza_historico", ct);
     }
 
     /// <summary>
@@ -582,7 +604,7 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
     /// issue — "could not be translated"), así que el resto se filtra en memoria.
     /// </summary>
     private async Task<clsCandidatoTarifaDto?> CandidatoPropioAsync(
-        IQueryable<clsCandidatoPropioRow> query, string? vehiculo, decimal? peso, string fuente, string tabla, CancellationToken ct)
+        clsNexoDbContext db, IQueryable<clsCandidatoPropioRow> query, string? vehiculo, decimal? peso, string fuente, string tabla, CancellationToken ct)
     {
         var candidatos = await query.ToListAsync(ct);
 
@@ -594,7 +616,7 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
 
         if (peso is not null)
         {
-            var pesoId = await _db.RangosPeso.AsNoTracking()
+            var pesoId = await db.RangosPeso.AsNoTracking()
                 .Where(r => r.PesoMinimo <= peso && (r.PesoMaximo == null || peso <= r.PesoMaximo))
                 .Select(r => (int?)r.Id).FirstOrDefaultAsync(ct);
             if (pesoId is not null)

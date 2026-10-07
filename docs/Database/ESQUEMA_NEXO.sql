@@ -340,6 +340,10 @@ CREATE TABLE [db_NEXO].[tbl_cotizacion_conexos] (
     [ServicioConexoId] uniqueidentifier NULL,
     [Cantidad] decimal(12,2) NOT NULL,
     [ValorAplicado] decimal(18,2) NOT NULL,
+    -- S5-HU-18/#262: 'individual' | 'general' — trazabilidad de si el usuario lo agregó a
+    -- esta línea puntual o pidió agregarlo a todas las líneas de una sola vez (que de
+    -- todas formas crea una fila por línea, cada una CON su CotizacionLineaId).
+    [Origen] nvarchar(20) NOT NULL DEFAULT (N'individual'),
     [CreatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset()),
     [UpdatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset())
     , CONSTRAINT [PK_cotizacion_conexos] PRIMARY KEY ([Id])

@@ -42,6 +42,17 @@ public class clsCrearLineaRequest
 
     [Range(typeof(decimal), "0", "9999999999999.99", ParseLimitsInInvariantCulture = true)]
     public decimal? ValorMercancia { get; set; }
+
+    /// <summary>
+    /// S5-HU-17/#263: horas de cargue/descargue de ESTA línea — mismo campo que ya acepta
+    /// clsCapturaLineaRequest (#251) en el camino normal. Null usa el default de la
+    /// solicitud (clsResolucionHorasLinea.Resolver).
+    /// </summary>
+    [Range(typeof(decimal), "0", "240", ParseLimitsInInvariantCulture = true)]
+    public decimal? HorasCargue { get; set; }
+
+    [Range(typeof(decimal), "0", "240", ParseLimitsInInvariantCulture = true)]
+    public decimal? HorasDescargue { get; set; }
 }
 
 /// <summary>Carga masiva de líneas de un pliego de licitación.</summary>

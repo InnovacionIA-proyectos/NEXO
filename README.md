@@ -88,7 +88,7 @@ Para desplegar en Dokploy, ver [`DOKPLOY.md`](DOKPLOY.md).
 
 ## API
 
-Todos los endpoints requieren `X-Portal-Usuario-Id`; algunos exigen además
+Todos los endpoints requieren `X-Portal-clsUsuario-Id`; algunos exigen además
 uno de los 6 roles de Nexo. Errores con forma consistente:
 
 ```json

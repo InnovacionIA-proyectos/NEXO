@@ -139,4 +139,71 @@ public class clsCargarLineasBulkCommandTests
 
         _publicador.Verify(p => p.PublicarAsync(It.IsAny<clsAutoCosteoSolicitado>(), default), Times.Never);
     }
+
+    // S5-HU-17/#263: antes, clsCrearLineaInput/clsCargarLineasBulkCommand no tenían
+    // HorasCargue/HorasDescargue — se descartaban en silencio y la línea siempre caía al
+    // default duro, sin importar lo que el Comercial hubiera escrito en el formulario.
+    [Fact]
+    public async Task Linea_con_horas_propias_las_conserva()
+    {
+        var solicitudId = Guid.NewGuid();
+        _solicitudes.Setup(r => r.ObtenerBasicoAsync(solicitudId, default))
+            .ReturnsAsync(new clsSolicitud { Id = solicitudId, Estado = EstadoSolicitud.Pendiente });
+
+        List<clsLineaSolicitud>? guardadas = null;
+        _solicitudes.Setup(r => r.AgregarLineas(It.IsAny<IEnumerable<clsLineaSolicitud>>()))
+            .Callback<IEnumerable<clsLineaSolicitud>>(ls => guardadas = ls.ToList());
+
+        var comando = new clsCargarLineasBulkCommand(solicitudId,
+            [new clsCrearLineaInput(Guid.NewGuid(), Guid.NewGuid(), null, 1000m, null, HorasCargue: 6m, HorasDescargue: 2m)]);
+        await Handler().Handle(comando);
+
+        var linea = Assert.Single(guardadas!);
+        Assert.Equal(6m, linea.HorasCargue);
+        Assert.Equal(2m, linea.HorasDescargue);
+    }
+
+    [Fact]
+    public async Task Linea_sin_horas_usa_el_default_4_4_cuando_la_solicitud_no_tiene_condiciones_propias()
+    {
+        var solicitudId = Guid.NewGuid();
+        _solicitudes.Setup(r => r.ObtenerBasicoAsync(solicitudId, default))
+            .ReturnsAsync(new clsSolicitud { Id = solicitudId, Estado = EstadoSolicitud.Pendiente, CondicionesServicio = null });
+
+        List<clsLineaSolicitud>? guardadas = null;
+        _solicitudes.Setup(r => r.AgregarLineas(It.IsAny<IEnumerable<clsLineaSolicitud>>()))
+            .Callback<IEnumerable<clsLineaSolicitud>>(ls => guardadas = ls.ToList());
+
+        var comando = new clsCargarLineasBulkCommand(solicitudId,
+            [new clsCrearLineaInput(Guid.NewGuid(), Guid.NewGuid(), null, 1000m, null)]);
+        await Handler().Handle(comando);
+
+        var linea = Assert.Single(guardadas!);
+        Assert.Equal(4m, linea.HorasCargue);
+        Assert.Equal(4m, linea.HorasDescargue);
+    }
+
+    [Fact]
+    public async Task Linea_sin_horas_usa_las_de_la_solicitud_cuando_esta_si_las_tiene()
+    {
+        var solicitudId = Guid.NewGuid();
+        _solicitudes.Setup(r => r.ObtenerBasicoAsync(solicitudId, default))
+            .ReturnsAsync(new clsSolicitud
+            {
+                Id = solicitudId, Estado = EstadoSolicitud.Pendiente,
+                CondicionesServicio = "{\"tiemposLogisticos\":{\"horasCargue\":8,\"horasDescargue\":3}}",
+            });
+
+        List<clsLineaSolicitud>? guardadas = null;
+        _solicitudes.Setup(r => r.AgregarLineas(It.IsAny<IEnumerable<clsLineaSolicitud>>()))
+            .Callback<IEnumerable<clsLineaSolicitud>>(ls => guardadas = ls.ToList());
+
+        var comando = new clsCargarLineasBulkCommand(solicitudId,
+            [new clsCrearLineaInput(Guid.NewGuid(), Guid.NewGuid(), null, 1000m, null)]);
+        await Handler().Handle(comando);
+
+        var linea = Assert.Single(guardadas!);
+        Assert.Equal(8m, linea.HorasCargue);
+        Assert.Equal(3m, linea.HorasDescargue);
+    }
 }

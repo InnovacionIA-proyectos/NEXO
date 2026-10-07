@@ -1,3 +1,4 @@
+using Nexo.Application.CasosDeUso.ServiciosConexos.DTOs;
 using Nexo.Domain.Catalogos.Entidades;
 using Nexo.Domain.Cotizaciones.Entidades;
 using Nexo.Domain.Enums;
@@ -12,8 +13,17 @@ public record clsCotizacionLineaDto(
     Guid Id, Guid? LineaSolicitudId, decimal ValorFlete, FuenteFlete Fuente,
     decimal? ValorAprovisionamiento = null, decimal? ValorRetornoContenedor = null);
 
+/// <summary>
+/// S5-HU-18/#262: <see cref="Origen"/> ("individual" | "general") distingue si el usuario
+/// agregó este conexo a ESTA línea puntualmente o pidió agregarlo a todas las líneas de
+/// una sola vez (que igual crea una fila por línea — sigue sin existir el conexo "general"
+/// sin línea, decisión de #250). <see cref="Servicio"/> trae el servicio completo (sus
+/// dimensiones de origen/destino/puerto/ruta/tipoMaquina incluidas) para que el frontend no
+/// tenga que bajar el catálogo completo solo para mostrar de qué servicio se trata.
+/// </summary>
 public record clsCotizacionConexoDto(
-    Guid Id, Guid CotizacionLineaId, Guid? ServicioConexoId, string? Nombre, string Categoria, decimal Cantidad, decimal ValorAplicado);
+    Guid Id, Guid CotizacionLineaId, Guid? ServicioConexoId, string? Nombre, string Categoria, decimal Cantidad, decimal ValorAplicado,
+    string Origen = "individual", clsServicioConexoDto? Servicio = null);
 
 public record clsCotizacionDto(
     Guid Id,
