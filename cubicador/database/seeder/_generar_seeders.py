@@ -1,30 +1,49 @@
 # -*- coding: utf-8 -*-
-import csv, uuid
+import csv, os, uuid
 
-def nid():
-    return str(uuid.uuid4())
+# Namespace fijo propio del proyecto, para generar Id DETERMINISTICOS (no
+# aleatorios): el mismo texto de "seed" siempre produce el mismo Id, en
+# cualquier maquina, cualquier dia que se corra este script. Esto es lo que
+# permite que cargar el seeder dos veces contra la misma BD no duplique
+# filas ni pise una correccion hecha a mano por el CRUD -- el script de
+# carga (ejecutar_schema_y_seeders.py) simplemente salta cualquier Id que
+# ya exista en la tabla destino.
+_NAMESPACE_CUBICADOR = uuid.UUID("c9b1b1a0-6f3e-4b1a-9c2d-a1b2c3d40001")
+
+def nid(seed: str) -> str:
+    return str(uuid.uuid5(_NAMESPACE_CUBICADOR, seed))
 
 OUT = "."
+# Copias "legibles" (con columnas de referencia de FK en texto) para
+# compartir y entender -- NUNCA se cargan a la BD, solo para lectura
+# humana. El seeder real (OUT) se queda limpio, 1 a 1 con las tablas.
+LEGIBLE = "legible"
+os.makedirs(LEGIBLE, exist_ok=True)
 
 # ---------- Tabla 1: vehiculos ----------
 # "Tractomula Furgon 3S3" ya NO es una fila aparte -- es el mismo 3S3 (el
 # codigo debe quedar unico para el matching con SICE-TAC/tarifario). La
 # diferencia de capacidad con Furgon (30000 vs 34000 kg) se resuelve en
 # relacionVehiculosCarroceria (ver mas abajo), no duplicando el vehiculo.
+# Medidas en cm (cruzado con el seeder de Brayan -- coinciden exacto con las
+# nuestras convertidas). Codigos C2/C3 tal como estan en el Excel (Brayan
+# confirma lo mismo); el alto ya NO es un default fijo -- es el alto real de
+# cada vehiculo (ambos seeders coinciden en que no cambia segun carroceria,
+# asi que es propiedad del vehiculo, no de la combinacion con carroceria).
 vehiculos = [
-    # codigo, nombre, largo, ancho, alto, capacidad_kg
-    ("2L2", "Turbo 2L2", 4.5, 2.2, 2.3, 4000),
-    ("2", "Sencillo C2", 6.5, 2.4, 2.4, 8500),
-    ("3", "Dobletroque C3", 8.0, 2.4, 2.6, 17000),
-    ("2S2", "Minimula 2S2", 12.2, 2.4, 2.6, 18000),
-    ("3S3", "Tractomula 3S3", 12.2, 2.4, 2.6, 34000),
+    # codigo, nombre, largo_cm, ancho_cm, alto_cm, capacidad_kg
+    ("2L2", "Turbo 2L2", 450, 220, 230, 4000),
+    ("C2", "Sencillo C2", 650, 240, 240, 8500),
+    ("C3", "Dobletroque C3", 800, 240, 260, 17000),
+    ("2S2", "Minimula 2S2", 1220, 240, 260, 18000),
+    ("3S3", "Tractomula 3S3", 1220, 240, 260, 34000),
 ]
 vehiculo_ids = {}
 with open(f"{OUT}/vehiculos.csv", "w", newline="", encoding="utf-8") as f:
     w = csv.writer(f)
-    w.writerow(["Id", "CodigoVehiculo", "NombreVehiculo", "LargoPlancha", "AnchoPlancha", "AltoCarroceria", "CapacidadMaxima", "Activo", "CreadoPor"])
+    w.writerow(["Id", "CodigoVehiculo", "NombreVehiculo", "LargoCm", "AnchoCm", "AltoVehiculoCm", "CapacidadMaxima", "Activo", "CreadoPor"])
     for codigo, nombre, l, a, h, cap in vehiculos:
-        vid = nid()
+        vid = nid(f"vehiculo:{codigo}")
         vehiculo_ids[codigo] = vid
         w.writerow([vid, codigo, nombre, l, a, h, cap, "true", "seeder"])
 
@@ -32,18 +51,44 @@ with open(f"{OUT}/vehiculos.csv", "w", newline="", encoding="utf-8") as f:
 # Catalogo SIN fusionar sinonimos: Plataforma y Planchon quedan separados
 # (la matriz los usa como alternativas entre si, ej. filas "Vigas" y "Bobinas de
 # acero"), y Furgon refrigerado / climatizado / ventilado tambien quedan
-# separados (son necesidades distintas, no el mismo codigo).
-carrocerias = ["FURGON", "FURGON_REFRIGERADO", "FURGON_CLIMATIZADO", "FURGON_VENTILADO",
-               "ESTACAS", "PLATAFORMA", "PLANCHON", "PORTAVIDRIOS",
-               "CONTENEDOR_SECO", "CONTENEDOR_REFRIGERADO"]
+# separados (son necesidades distintas, no el mismo codigo). Estructura
+# Codigo+Nombre cruzada con el seeder de Brayan, pero el catalogo sigue
+# siendo el nuestro (mas granular que el de el).
+carrocerias = [
+    ("FURGON", "Furgon"),
+    ("FURGON_REFRIGERADO", "Furgon refrigerado"),
+    ("FURGON_CLIMATIZADO", "Furgon climatizado"),
+    ("FURGON_VENTILADO", "Furgon ventilado"),
+    ("ESTACAS", "Estacas"),
+    ("PLATAFORMA", "Plataforma"),
+    ("PLANCHON", "Planchon"),
+    ("PORTAVIDRIOS", "Estructura portavidrios"),
+    ("CONTENEDOR_SECO", "Contenedor seco"),
+    ("CONTENEDOR_REFRIGERADO", "Contenedor refrigerado"),
+    # Rescatadas del catalogo viejo de cubicacion rapida (9 arquetipos
+    # hardcodeados): CAMA_BAJA y PORTACONTENEDORES no estaban en los
+    # Excel nuevos, pero si existian antes y se decidio mantenerlas.
+    ("CAMA_BAJA", "Cama baja"),
+    ("PORTACONTENEDORES", "Portacontenedores"),
+    # Cruzadas contra el catalogo real de SAP (tblSAPTiposCarroseria) --
+    # existen en SAP pero no teniamos ninguna fila para ellas. Igual que
+    # CAMA_BAJA/PORTACONTENEDORES: se agregan al catalogo SIN relacion en
+    # relacionVehiculosCarroceria (con que vehiculo(s) empareja cada una lo
+    # decide el Administrador de Fletes desde el CRUD, no se infiere aqui).
+    ("TANQUE", "Tanque"),
+    ("TOLVA", "Tolva"),
+    ("VOLCO", "Volco"),
+    ("GRUA", "Grua"),
+    ("NINERA", "Niñera"),
+]
 carroceria_ids = {}
 with open(f"{OUT}/tiposCarroceria.csv", "w", newline="", encoding="utf-8") as f:
     w = csv.writer(f)
-    w.writerow(["Id", "TipoCarroceria", "Activo", "CreadoPor"])
-    for c in carrocerias:
-        cid = nid()
+    w.writerow(["Id", "CodigoCarroceria", "NombreCarroceria", "Activo", "CreadoPor"])
+    for c, nombre in carrocerias:
+        cid = nid(f"carroceria:{c}")
         carroceria_ids[c] = cid
-        w.writerow([cid, c, "true", "seeder"])
+        w.writerow([cid, c, nombre, "true", "seeder"])
 
 # ---------- Tabla 4: relacionVehiculosCarroceria ----------
 # La hoja "Dimensiones y Peso" solo habla de Estacas/Furgon/Plancha en
@@ -55,127 +100,243 @@ with open(f"{OUT}/tiposCarroceria.csv", "w", newline="", encoding="utf-8") as f:
 # carga 30000 kg en vez de los 34000 normales del 3S3 con Estacas/Plataforma.
 rel = {
     "2L2": [("ESTACAS", True, 0), ("FURGON", True, 0), ("PLATAFORMA", True, 0)],
-    "2": [("ESTACAS", True, 0), ("FURGON", True, 0), ("PLATAFORMA", True, 0)],
-    "3": [("ESTACAS", True, 0), ("PLATAFORMA", True, 0)],
+    "C2": [("ESTACAS", True, 0), ("FURGON", True, 0), ("PLATAFORMA", True, 0)],
+    "C3": [("ESTACAS", True, 0), ("PLATAFORMA", True, 0)],
     "2S2": [("ESTACAS", True, 0), ("FURGON", True, 0), ("PLATAFORMA", True, 0)],
     "3S3": [("ESTACAS", True, 0), ("PLATAFORMA", True, 0), ("FURGON", False, 30000)],
 }
+# Las variantes de Furgon (refrigerado/climatizado/ventilado) aplican a los
+# mismos vehiculos que llevan FURGON liso, con la misma regla de capacidad
+# que ya tenia ese vehiculo con Furgon (mismo chasis, solo cambia el
+# acondicionamiento de la caja) -- C3 no tiene ninguna porque no lleva
+# Furgon en el Excel.
+for vcod, cs in list(rel.items()):
+    for c, usa_cap, cap_especifica in cs:
+        if c == "FURGON":
+            for variante in ("FURGON_REFRIGERADO", "FURGON_CLIMATIZADO", "FURGON_VENTILADO"):
+                rel[vcod].append((variante, usa_cap, cap_especifica))
+            break
+# CAMA_BAJA y PORTACONTENEDORES (arriba, Tabla 2) NO llevan fila en esta
+# relacion -- a proposito. Solo se emparejan aqui las carrocerias que salen
+# del Excel "Dimensiones y Peso por vehiculo". Esas 2 son un rescate del
+# catalogo viejo que todavia no tiene emparejamiento real confirmado con
+# ningun vehiculo de este Excel -- queda pendiente de decidir, no se infiere.
+filas_relacion = []  # se guarda para poder escribir la version legible tambien
 with open(f"{OUT}/relacionVehiculosCarroceria.csv", "w", newline="", encoding="utf-8") as f:
     w = csv.writer(f)
-    w.writerow(["Id", "IdTipoVehiculo", "CodigoVehiculo", "IdCarroceria", "CodigoCarroceria",
+    w.writerow(["Id", "IdTipoVehiculo", "IdCarroceria",
                 "UsaCapacidadMaximaDelVehiculo", "CapacidadMaximaEspecifica", "CreadoPor"])
     for vcod, cs in rel.items():
         for c, usa_cap, cap_especifica in cs:
-            w.writerow([nid(), vehiculo_ids[vcod], vcod, carroceria_ids[c], c,
+            fila_id = nid(f"relacion:{vcod}:{c}")
+            w.writerow([fila_id, vehiculo_ids[vcod], carroceria_ids[c],
                         "true" if usa_cap else "false", cap_especifica, "seeder"])
+            filas_relacion.append((fila_id, vehiculo_ids[vcod], vcod, carroceria_ids[c], c,
+                                   usa_cap, cap_especifica))
+
+with open(f"{LEGIBLE}/relacionVehiculosCarroceria_LEGIBLE.csv", "w", newline="", encoding="utf-8") as f:
+    w = csv.writer(f)
+    w.writerow(["Id", "IdTipoVehiculo", "CodigoVehiculo (solo lectura)", "IdCarroceria",
+                "CodigoCarroceria (solo lectura)", "UsaCapacidadMaximaDelVehiculo",
+                "CapacidadMaximaEspecifica", "CreadoPor"])
+    for fila_id, idv, vcod, idc, c, usa_cap, cap_especifica in filas_relacion:
+        w.writerow([fila_id, idv, vcod, idc, c, "true" if usa_cap else "false", cap_especifica, "seeder"])
 
 # ---------- Tabla 5: categoriaMercancia ----------
-# Solo categorias que agrupan mercancias REALES de la matriz (nada heredado
-# del _INCOMPATIBILIDADES del codigo viejo -- ahi no hay nada oxidante ni
-# corrosivo en estas 31 filas).
+# Catalogo cruzado con el seeder de Brayan (13 categorias, se adoptan las de
+# el -- separa MATERIAL_INFLAMABLE/CARBURANTE donde antes teniamos un solo
+# COMBUSTIBLE, y METALICO/CONSTRUCCION donde antes teniamos un solo
+# METALICO_CONSTRUCCION; agrega QUIMICO_OXIDANTE y QUIMICO_CORROSIVO).
 categorias = ["GENERAL", "ALIMENTOS", "FARMACEUTICO", "PERECEDERO_NO_ALIMENTO", "FERTILIZANTE",
-              "COMBUSTIBLE", "METALICO_CONSTRUCCION", "VIDRIO", "GAS_INDUSTRIAL"]
+              "MATERIAL_INFLAMABLE", "CARBURANTE", "METALICO", "CONSTRUCCION", "VIDRIO",
+              "GAS_INDUSTRIAL", "QUIMICO_OXIDANTE", "QUIMICO_CORROSIVO"]
 categoria_ids = {}
 with open(f"{OUT}/categoriaMercancia.csv", "w", newline="", encoding="utf-8") as f:
     w = csv.writer(f)
     w.writerow(["Id", "NombreCategoria", "CreadoPor"])
     for c in categorias:
-        cid = nid()
+        cid = nid(f"categoria:{c}")
         categoria_ids[c] = cid
         w.writerow([cid, c, "seeder"])
 
 # ---------- Tabla 6: reglasIncompatibilidad ----------
-# La matriz de 31 mercancias NO define ninguna regla de incompatibilidad --
-# eso vive en otra hoja/criterio aparte, que todavia no existe. Se deja
-# vacia (solo encabezado) a proposito: no se inventan reglas sin respaldo
-# en el Excel. Hay que construirla con operaciones (ver brecha #4 de
+# Reglas cruzadas con el seeder de Brayan -- se adoptan las 3 de el (la
+# propia, Combustible x Alimentos, ya no aplica tal cual porque esa
+# categoria se partio en MATERIAL_INFLAMABLE/CARBURANTE, ver Tabla 5).
+# Pendiente de completar con operaciones (ver brecha #4 de
 # propuesta-seleccion-vehiculos.md, seccion 3.3).
+reglas_incompatibilidad = [
+    ("FERTILIZANTE", "ALIMENTOS", "Riesgo de contaminacion de alimentos por fertilizante ensacado."),
+    ("QUIMICO_OXIDANTE", "MATERIAL_INFLAMABLE", "Riesgo de reaccion / incendio sin separacion certificada."),
+    ("QUIMICO_CORROSIVO", "ALIMENTOS", "Riesgo de contaminacion de alimentos."),
+]
+filas_reglas = []
 with open(f"{OUT}/reglasIncompatibilidad.csv", "w", newline="", encoding="utf-8") as f:
     w = csv.writer(f)
-    w.writerow(["Id", "IdCategoria1", "Categoria1", "IdCategoria2", "Categoria2", "Motivo", "CreadoPor"])
+    w.writerow(["Id", "IdCategoria1", "IdCategoria2", "Motivo", "CreadoPor"])
+    for c1, c2, motivo in reglas_incompatibilidad:
+        fila_id = nid(f"regla:{c1}:{c2}")
+        w.writerow([fila_id, categoria_ids[c1], categoria_ids[c2], motivo, "seeder"])
+        filas_reglas.append((fila_id, categoria_ids[c1], c1, categoria_ids[c2], c2, motivo))
+
+with open(f"{LEGIBLE}/reglasIncompatibilidad_LEGIBLE.csv", "w", newline="", encoding="utf-8") as f:
+    w = csv.writer(f)
+    w.writerow(["Id", "IdCategoria1", "Categoria1 (solo lectura)", "IdCategoria2",
+                "Categoria2 (solo lectura)", "Motivo", "CreadoPor"])
+    for fila_id, idc1, c1, idc2, c2, motivo in filas_reglas:
+        w.writerow([fila_id, idc1, c1, idc2, c2, motivo, "seeder"])
 
 # ---------- Tabla 3: tiposMercancia ----------
-# cond: 'N' = Si (no condicionado), 'Y' = requiere validacion obligatoria AdminTarifas
+# Contenido cruzado con el seeder de Brayan (41 filas: nuestras 31
+# originales + 10 "no cubicables" que el agrega -- granel, cemento,
+# concreto, combustibles, asfalto, vehiculos en unidad, ingenieria
+# especial). Carrocerias principal/secundaria siguen siendo las NUESTRAS
+# (mas granulares); se resolvieron cruzando el generico de Brayan
+# (FURGON/CONTENEDOR) con su propio campo ControlAmbientalRequerido --
+# ej. FURGON + REFRIGERADO (sin condicional) -> FURGON_REFRIGERADO. Cuando
+# el control es "_CONDICIONAL" o alternativo ("_O_"), se dejo la misma
+# resolucion ya usada en la version anterior de esta tabla.
+# campos: codigo, nombre, categoria, cubicable, condicionada,
+#         carroceria_principal, carroceria_secundaria, secundaria_condicionada,
+#         control_ambiental, apilable, fragil, rotacion_libre, comentario
 filas = [
-    ("Cajas de carton / mercancia empacada", "GENERAL", "FURGON", "ESTACAS", "N",
+    ("CAJAS_CARTON", "Cajas de carton / mercancia empacada", "GENERAL", True, False,
+     "FURGON", "ESTACAS", True, "NINGUNO", None, None, None,
      "Validar dimensiones, apilabilidad y resistencia del empaque."),
-    ("Alimentos secos empacados", "ALIMENTOS", "FURGON", "ESTACAS", "N",
+    ("ALIMENTOS_SECOS", "Alimentos secos empacados", "ALIMENTOS", True, False,
+     "FURGON", "ESTACAS", True, "NINGUNO", None, None, None,
      "Producto empacado; verificar requisitos sanitarios."),
-    ("Electrodomesticos embalados", "GENERAL", "FURGON", "ESTACAS", "N",
+    ("ELECTRODOMESTICOS", "Electrodomesticos embalados", "GENERAL", True, False,
+     "FURGON", "ESTACAS", True, "NINGUNO", None, True, None,
      "Proteger de lluvia, golpes y vibracion."),
-    ("Muebles y enseres embalados", "GENERAL", "FURGON", "ESTACAS", "N",
+    ("MUEBLES_ENSERES", "Muebles y enseres embalados", "MATERIAL_INFLAMABLE", True, False,
+     "FURGON", "ESTACAS", True, "NINGUNO", None, None, None,
      "Validar piezas voluminosas y posibilidad de apilamiento."),
-    ("Productos farmaceuticos a temperatura ambiente", "FARMACEUTICO", "FURGON", "FURGON_CLIMATIZADO", "N",
+    ("FARMA_AMBIENTE", "Productos farmaceuticos a temperatura ambiente", "FARMACEUTICO", True, False,
+     "FURGON_CLIMATIZADO", None, False, "CLIMATIZADO_CONDICIONAL", None, None, None,
      "Respetar condiciones declaradas por fabricante."),
-    ("Productos farmaceuticos refrigerados", "FARMACEUTICO", "FURGON_REFRIGERADO", "CONTENEDOR_REFRIGERADO", "N",
+    ("FARMA_REFRIGERADO", "Productos farmaceuticos refrigerados", "FARMACEUTICO", True, False,
+     "FURGON_REFRIGERADO", "CONTENEDOR_REFRIGERADO", True, "REFRIGERADO", None, None, None,
      "Definir rango de temperatura y monitoreo requerido."),
-    ("Alimentos congelados empacados", "ALIMENTOS", "FURGON_REFRIGERADO", "CONTENEDOR_REFRIGERADO", "N",
+    ("ALIMENTOS_CONGELADOS", "Alimentos congelados empacados", "ALIMENTOS", True, False,
+     "FURGON_REFRIGERADO", "CONTENEDOR_REFRIGERADO", True, "REFRIGERADO", None, None, None,
      "Validar temperatura, ventilacion y estiba."),
-    ("Carnes y productos carnicos empacados", "ALIMENTOS", "FURGON_REFRIGERADO", "CONTENEDOR_REFRIGERADO", "N",
+    ("CARNICOS", "Carnes y productos carnicos empacados", "ALIMENTOS", True, False,
+     "FURGON_REFRIGERADO", "CONTENEDOR_REFRIGERADO", True, "REFRIGERADO", None, None, None,
      "Solo carga debidamente empacada; cumplir cadena de frio."),
-    ("Frutas y verduras empacadas", "ALIMENTOS", "FURGON_VENTILADO", "CONTENEDOR_REFRIGERADO", "N",
-     "La temperatura y ventilacion dependen del producto (principal puede ser ventilado o refrigerado)."),
-    ("Flores y perecederos empacados", "PERECEDERO_NO_ALIMENTO", "FURGON_REFRIGERADO", "CONTENEDOR_REFRIGERADO", "N",
-     "Definir temperatura y ventilacion segun especificacion (principal puede ser refrigerado o climatizado)."),
-    ("Productos lacteos empacados", "ALIMENTOS", "FURGON_REFRIGERADO", "CONTENEDOR_REFRIGERADO", "N",
+    ("FRUTAS_VERDURAS", "Frutas y verduras empacadas", "ALIMENTOS", True, False,
+     "FURGON_VENTILADO", "CONTENEDOR_REFRIGERADO", True, "VENTILADO_O_REFRIGERADO", None, None, None,
+     "La temperatura y ventilacion dependen del producto."),
+    ("FLORES_PERECEDEROS", "Flores y perecederos empacados", "PERECEDERO_NO_ALIMENTO", True, False,
+     "FURGON_REFRIGERADO", "CONTENEDOR_REFRIGERADO", True, "REFRIGERADO_O_CLIMATIZADO", None, None, None,
+     "Definir temperatura y ventilacion segun especificacion."),
+    ("LACTEOS", "Productos lacteos empacados", "ALIMENTOS", True, False,
+     "FURGON_REFRIGERADO", "CONTENEDOR_REFRIGERADO", True, "REFRIGERADO", None, None, None,
      "Mantener cadena de frio."),
-    ("Bebidas embotelladas o enlatadas", "ALIMENTOS", "FURGON", "ESTACAS", "N",
+    ("BEBIDAS", "Bebidas embotelladas o enlatadas", "ALIMENTOS", True, False,
+     "FURGON", "ESTACAS", True, "NINGUNO", None, None, None,
      "Considerar peso por pallet y resistencia del embalaje."),
-    ("Fertilizantes ensacados", "FERTILIZANTE", "FURGON", "ESTACAS", "N",
+    ("FERTILIZANTES_ENSACADOS", "Fertilizantes ensacados", "FERTILIZANTE", True, False,
+     "FURGON", "ESTACAS", True, "NINGUNO", None, None, None,
      "Evitar humedad y contaminacion."),
-    ("Pallets de mercancia general", "GENERAL", "FURGON", "ESTACAS", "N",
+    ("PALLETS_GENERAL", "Pallets de mercancia general", "GENERAL", True, False,
+     "FURGON", "ESTACAS", True, "NINGUNO", None, None, None,
      "Cubicacion por pallet o unidad logistica; revisar espacios no aprovechables."),
-    ("Estibas de madera (mercancia)", "COMBUSTIBLE", "PLATAFORMA", "ESTACAS", "N",
+    ("ESTIBAS_MADERA", "Estibas de madera (mercancia)", "MATERIAL_INFLAMABLE", True, False,
+     "PLATAFORMA", "ESTACAS", False, "NINGUNO", None, None, None,
      "Cubicacion por dimensiones exteriores y forma de estiba."),
-    ("Materiales de construccion empacados", "METALICO_CONSTRUCCION", "ESTACAS", "FURGON", "N",
+    ("MATERIALES_CONSTRUCCION", "Materiales de construccion empacados", "CONSTRUCCION", True, False,
+     "ESTACAS", "FURGON", True, "NINGUNO", None, None, None,
      "Ej.: cajas o paquetes; excluir material suelto a granel."),
-    ("Ladrillos y bloques paletizados", "METALICO_CONSTRUCCION", "ESTACAS", "PLATAFORMA", "N",
+    ("LADRILLOS_BLOQUES", "Ladrillos y bloques paletizados", "CONSTRUCCION", True, False,
+     "ESTACAS", "PLATAFORMA", False, "NINGUNO", None, None, None,
      "Validar peso por pallet y resistencia."),
-    ("Varillas y perfiles metalicos en paquetes", "METALICO_CONSTRUCCION", "PLATAFORMA", "ESTACAS", "N",
+    ("VARILLAS_PERFILES", "Varillas y perfiles metalicos en paquetes", "METALICO", True, False,
+     "PLATAFORMA", "ESTACAS", False, "NINGUNO", None, None, False,
      "Cargas largas; validar longitud, amarres y salientes."),
-    ("Tuberias en paquetes", "METALICO_CONSTRUCCION", "PLATAFORMA", "ESTACAS", "N",
+    ("TUBERIAS", "Tuberias en paquetes", "METALICO", True, False,
+     "PLATAFORMA", "ESTACAS", False, "NINGUNO", None, None, False,
      "Validar longitud, diametro y soportes."),
-    ("Vigas y estructuras metalicas en piezas", "METALICO_CONSTRUCCION", "PLATAFORMA", "PLANCHON", "Y",
+    ("VIGAS_ESTRUCTURAS", "Vigas y estructuras metalicas en piezas", "METALICO", True, True,
+     "PLATAFORMA", None, False, "NINGUNO", None, None, None,
      "Si excede dimensiones ordinarias, tratar como carga especial."),
-    ("Laminas de acero en paquetes", "METALICO_CONSTRUCCION", "PLATAFORMA", "ESTACAS", "N",
-     "Verificar apoyos, proteccion de bordes y peso (principal puede ser plataforma o planchon)."),
-    ("Bobinas de acero", "METALICO_CONSTRUCCION", "PLATAFORMA", "PLANCHON", "Y",
-     "Cubicacion requiere orientacion, diametro, ancho y cunas portabobinas; validar estabilidad."),
-    ("Madera aserrada en paquetes", "COMBUSTIBLE", "PLATAFORMA", "ESTACAS", "N",
+    ("LAMINAS_ACERO", "Laminas de acero en paquetes", "METALICO", True, False,
+     "PLATAFORMA", "ESTACAS", True, "NINGUNO", None, None, None,
+     "Verificar apoyos, proteccion de bordes y peso."),
+    ("BOBINAS_ACERO", "Bobinas de acero", "METALICO", True, True,
+     "PLATAFORMA", None, False, "NINGUNO", None, None, False,
+     "Requiere plataforma con cunas portabobinas. La cubicacion exige orientacion, diametro, ancho y cunas."),
+    ("MADERA_ASERRADA", "Madera aserrada en paquetes", "MATERIAL_INFLAMABLE", True, False,
+     "PLATAFORMA", "ESTACAS", False, "NINGUNO", None, None, None,
      "Validar longitud, paquete y sujecion."),
-    ("Postes de concreto en unidades", "METALICO_CONSTRUCCION", "PLATAFORMA", "ESTACAS", "Y",
+    ("POSTES_CONCRETO", "Postes de concreto en unidades", "CONSTRUCCION", True, True,
+     "PLATAFORMA", "ESTACAS", False, "NINGUNO", None, None, False,
      "Carga larga; validar apoyos y puntos de amarre."),
-    ("Papel y carton en cajas o pacas", "COMBUSTIBLE", "FURGON", "ESTACAS", "N",
+    ("PAPEL_CARTON", "Papel y carton en cajas o pacas", "MATERIAL_INFLAMABLE", True, False,
+     "FURGON", "ESTACAS", True, "NINGUNO", None, None, None,
      "Proteger de humedad."),
-    ("Papel en rollos", "COMBUSTIBLE", "FURGON", "PLATAFORMA", "Y",
-     "Definir diametro, ancho, orientacion y metodo de sujecion (principal puede ser furgon o plataforma con cunas)."),
-    ("Vidrio plano / laminas", "VIDRIO", "PORTAVIDRIOS", "PLATAFORMA", "Y",
+    ("PAPEL_ROLLOS", "Papel en rollos", "MATERIAL_INFLAMABLE", True, True,
+     "FURGON", "PLATAFORMA", False, "NINGUNO", None, None, False,
+     "Definir diametro, ancho, orientacion y metodo de sujecion."),
+    ("VIDRIO_PLANO", "Vidrio plano / laminas", "VIDRIO", True, True,
+     "PORTAVIDRIOS", "PLATAFORMA", False, "NINGUNO", None, True, False,
      "Requiere bastidor, orientacion y proteccion especifica."),
-    ("Ventanas y fachadas embaladas", "GENERAL", "FURGON", "PLATAFORMA", "Y",
+    ("VENTANAS_FACHADAS", "Ventanas y fachadas embaladas", "VIDRIO", True, True,
+     "FURGON", "PLATAFORMA", False, "NINGUNO", True, None, False,
      "Cubicacion por embalaje; controlar fragilidad y orientacion."),
-    ("Cilindros de gases industriales", "GAS_INDUSTRIAL", "PLATAFORMA", "FURGON_VENTILADO", "Y",
+    ("CILINDROS_GAS", "Cilindros de gases industriales", "GAS_INDUSTRIAL", True, True,
+     "PLATAFORMA", "FURGON_VENTILADO", True, "VENTILADO_CONDICIONAL", None, None, False,
      "No cubicar como cajas comunes; validar clasificacion, segregacion y sujecion."),
-    ("Mercancia general de exportacion paletizada", "GENERAL", "FURGON", "ESTACAS", "N",
-     "Cubicacion por pallet/embalaje y patron de estiba (principal puede ser furgon o contenedor seco)."),
-    ("Carga contenerizada en cajas o pallets", "GENERAL", "CONTENEDOR_SECO", "FURGON", "N",
-     "El contenedor es unidad de transporte; cubicacion interna depende de medidas utiles y limites de carga."),
+    ("EXPORTACION_PALETIZADA", "Mercancia general de exportacion paletizada", "GENERAL", True, False,
+     "FURGON", "ESTACAS", True, "NINGUNO", None, None, None,
+     "Cubicacion por pallet/embalaje y patron de estiba. Tambien aplica contenedor seco."),
+    ("CARGA_CONTENERIZADA", "Carga contenerizada en cajas o pallets", "GENERAL", True, False,
+     "CONTENEDOR_SECO", "FURGON", True, "NINGUNO", None, None, None,
+     "El contenedor es unidad de transporte; la cubicacion interna depende de medidas utiles y limites de carga."),
+    # Nota: el seeder de Brayan trae 10 filas adicionales de carga NO
+    # cubicable (granel, cemento, concreto, combustibles, asfalto, etc.) --
+    # a proposito no se agregaron aqui, se dejaron fuera por decision
+    # explicita (quedan solo las 31 de la Matriz/Excel).
 ]
 
+def _b(valor):
+    """None -> '' (NULL); True/False -> 'true'/'false'."""
+    if valor is None:
+        return ""
+    return "true" if valor else "false"
+
+filas_mercancia = []
 with open(f"{OUT}/tiposMercancia.csv", "w", newline="", encoding="utf-8") as f:
     w = csv.writer(f)
-    w.writerow(["Id", "NombreMercancia", "IdCategoria", "Categoria_ref", "Cubicable", "CondicionadaCubicacion",
-                "ComentarioCondicion", "IdCarroceriaPrincipal", "CarroceriaPrincipal_ref",
-                "IdCarroceriaSecundaria", "CarroceriaSecundaria_ref", "CarroceriaSecundariaCondicionada",
+    w.writerow(["Id", "CodigoMercancia", "NombreMercancia", "IdCategoria", "Cubicable",
+                "CondicionadaCubicacion", "ComentarioCondicion", "IdCarroceriaPrincipal",
+                "IdCarroceriaSecundaria", "CarroceriaSecundariaCondicionada",
+                "ControlAmbientalRequerido", "Apilable", "Fragil", "RotacionLibre",
                 "Activo", "CreadoPor"])
-    for nombre, cat, princ, sec, cond, com in filas:
+    for codigo, nombre, cat, cubicable, cond, princ, sec, sec_cond, ctrl_amb, apil, frag, rot, com in filas:
+        princ_id = carroceria_ids[princ] if princ else ""
         sec_id = carroceria_ids[sec] if sec else ""
-        sec_cond = "true" if sec else "false"
-        w.writerow([nid(), nombre, categoria_ids[cat], cat, "true", "true" if cond == "Y" else "false",
-                    com, carroceria_ids[princ], princ, sec_id, sec, sec_cond, "true", "seeder"])
+        fila_id = nid(f"mercancia:{codigo}")
+        w.writerow([fila_id, codigo, nombre, categoria_ids[cat], _b(cubicable), _b(cond),
+                    com, princ_id, sec_id, _b(sec_cond), ctrl_amb, _b(apil), _b(frag), _b(rot),
+                    "true", "seeder"])
+        filas_mercancia.append((fila_id, codigo, nombre, categoria_ids[cat], cat, cond, com,
+                                princ_id, princ, sec_id, sec, sec_cond))
+
+with open(f"{LEGIBLE}/tiposMercancia_LEGIBLE.csv", "w", newline="", encoding="utf-8") as f:
+    w = csv.writer(f)
+    w.writerow(["Id", "CodigoMercancia", "NombreMercancia", "IdCategoria", "Categoria (solo lectura)",
+                "CondicionadaCubicacion", "ComentarioCondicion", "IdCarroceriaPrincipal",
+                "CarroceriaPrincipal (solo lectura)", "IdCarroceriaSecundaria",
+                "CarroceriaSecundaria (solo lectura)", "CarroceriaSecundariaCondicionada",
+                "Activo", "CreadoPor"])
+    for fila_id, codigo, nombre, idcat, cat, cond, com, idprinc, princ, sec_id, sec, sec_cond in filas_mercancia:
+        w.writerow([fila_id, codigo, nombre, idcat, cat, _b(cond),
+                    com, idprinc, princ or "", sec_id, sec or "", _b(sec_cond), "true", "seeder"])
 
 # ---------- Tabla 9: parametrosMotor ----------
 params = [
-    ("k_max", "4", "Tope de vehiculos por grupo antes de sin seleccion automatica"),
+    ("k_max", "10", "Tope de vehiculos por grupo antes de sin seleccion automatica"),
     ("factor_vol_util", "0.90", "Fraccion del volumen util aprovechable en la practica"),
     ("usar_alternativa", "solo_respaldo", "Si la carroceria alternativa entra siempre o solo como respaldo"),
     ("umbral_alerta_llenado", "0.75", "Por debajo de este porcentaje de llenado se marca alerta"),
@@ -185,6 +346,6 @@ with open(f"{OUT}/parametrosMotor.csv", "w", newline="", encoding="utf-8") as f:
     w = csv.writer(f)
     w.writerow(["Id", "Clave", "Valor", "Descripcion", "CreadoPor"])
     for clave, valor, desc in params:
-        w.writerow([nid(), clave, valor, desc, "seeder"])
+        w.writerow([nid(f"parametro:{clave}"), clave, valor, desc, "seeder"])
 
 print("listo")

@@ -1,6 +1,6 @@
-Id,CodigoVehiculo,NombreVehiculo,LargoPlancha,AnchoPlancha,AltoCarroceria,CapacidadMaxima,Activo,CreadoPor
-9091f229-2fd7-4732-9af5-388f41091b3b,2L2,Turbo 2L2,4.5,2.2,2.3,4000,true,seeder
-58fc1465-800a-4705-8b17-8873e6bc9cdb,2,Sencillo C2,6.5,2.4,2.4,8500,true,seeder
-b649beb7-4529-471d-9a25-bda5aaa4e9ca,3,Dobletroque C3,8.0,2.4,2.6,17000,true,seeder
-cda966c1-be93-4cd5-b8d4-0624b4c6db91,2S2,Minimula 2S2,12.2,2.4,2.6,18000,true,seeder
-78bd254f-a0bf-43d6-b78c-714c51c04240,3S3,Tractomula 3S3,12.2,2.4,2.6,34000,true,seeder
+Id,CodigoVehiculo,NombreVehiculo,LargoCm,AnchoCm,AltoVehiculoCm,CapacidadMaxima,Activo,CreadoPor
+14456c83-1b5d-5813-a075-6c88d367760f,2L2,Turbo 2L2,450,220,230,4000,true,seeder
+04342939-06c6-5058-8650-0e9980db59e2,C2,Sencillo C2,650,240,240,8500,true,seeder
+83323d34-0f30-5e98-8136-e9bcaf00d52c,C3,Dobletroque C3,800,240,260,17000,true,seeder
+bc192d24-28a0-55ce-bd29-d637bd0dfe9b,2S2,Minimula 2S2,1220,240,260,18000,true,seeder
+6fb6d96b-00e1-5682-9fec-e47edbdef9eb,3S3,Tractomula 3S3,1220,240,260,34000,true,seeder

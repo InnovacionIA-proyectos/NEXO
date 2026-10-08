@@ -1,11 +1,18 @@
-Id,TipoCarroceria,Activo,CreadoPor
-ba14e015-4f07-458e-a59b-c5600afb2b82,FURGON,true,seeder
-d0a2af01-eafd-49a7-b4fa-4d908b327801,FURGON_REFRIGERADO,true,seeder
-5d7ed30c-20ad-4e97-8836-d246fbd935eb,FURGON_CLIMATIZADO,true,seeder
-75d2d2ae-d1c0-4390-a376-4c2e3e654e6a,FURGON_VENTILADO,true,seeder
-0f9f4eb2-e3fb-4dfe-b5d1-5299772b4cf3,ESTACAS,true,seeder
-b397ea66-f312-42ae-b087-4956af1c910b,PLATAFORMA,true,seeder
-a2fbf957-f3b2-4d52-b502-6823a21d4835,PLANCHON,true,seeder
-655cc196-2913-4034-89ec-645141d0ba45,PORTAVIDRIOS,true,seeder
-a4eb4859-75b8-42b3-af6a-4e7bed352ba0,CONTENEDOR_SECO,true,seeder
-8f9216cd-2c55-4da7-8f21-07de07b1bcb5,CONTENEDOR_REFRIGERADO,true,seeder
+Id,CodigoCarroceria,NombreCarroceria,Activo,CreadoPor
+08f930ce-22e6-5e07-93ec-52d207f6cd64,FURGON,Furgon,true,seeder
+abd73a78-50d2-55ca-b5c9-9af2a7e56b8a,FURGON_REFRIGERADO,Furgon refrigerado,true,seeder
+dcb284aa-6f9d-54bf-8d26-189320bd1b58,FURGON_CLIMATIZADO,Furgon climatizado,true,seeder
+327dff6f-3409-5449-b985-56c5c163c337,FURGON_VENTILADO,Furgon ventilado,true,seeder
+0c18c006-d17b-5e00-9245-299749a2bd0c,ESTACAS,Estacas,true,seeder
+943600ae-2a9b-5087-a3b2-f30b00a4f710,PLATAFORMA,Plataforma,true,seeder
+edc11947-0632-520b-84e4-16bacd35a0f6,PLANCHON,Planchon,true,seeder
+1c339ea2-b645-5f79-b283-d38710533777,PORTAVIDRIOS,Estructura portavidrios,true,seeder
+b6936558-042e-542e-bd1f-4d1841c46a4c,CONTENEDOR_SECO,Contenedor seco,true,seeder
+3e9cc885-3794-52a1-b1b6-185cfbaf1d3c,CONTENEDOR_REFRIGERADO,Contenedor refrigerado,true,seeder
+c3a723b2-7021-5b1f-8b1e-98f7f4aa36b3,CAMA_BAJA,Cama baja,true,seeder
+f68e16a7-4142-5cb6-8554-5ca3aea32f56,PORTACONTENEDORES,Portacontenedores,true,seeder
+45207e91-aebb-59cf-963f-f0ec3dd81803,TANQUE,Tanque,true,seeder
+84dd5541-9c2a-539c-bfd9-72f61e1d369c,TOLVA,Tolva,true,seeder
+1c0e4380-b9ec-5116-8ac8-b45da1598dc3,VOLCO,Volco,true,seeder
+80970236-9e34-5bd4-bf69-d712f7165dcc,GRUA,Grua,true,seeder
+a7ddf59b-808d-5166-aa4a-067df57ab50b,NINERA,Niñera,true,seeder
