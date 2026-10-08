@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text;
 using Nexo.Application.CasosDeUso.Cotizaciones.Interfaces;
 using Nexo.Application.CasosDeUso.ServiciosConexos;
 using Nexo.Application.CasosDeUso.ServiciosConexos.DTOs;
@@ -45,8 +46,14 @@ public sealed class clsEfServiciosConexosRepository(clsNexoDbContext db) : IServ
         }
         if (!string.IsNullOrWhiteSpace(q))
         {
+            // S5-HU-18/#262 (opcional): además de tipo/código, busca por las dimensiones del
+            // servicio — así se puede encontrar "el ITR de Cartagena" sin bajar el catálogo
+            // completo al frontend.
             var t = q.Trim();
-            query = query.Where(s => EF.Functions.Like(s.TipoServicio, $"%{t}%") || EF.Functions.Like(s.CodigoServicio, $"%{t}%"));
+            query = query.Where(s =>
+                EF.Functions.Like(s.TipoServicio, $"%{t}%") || EF.Functions.Like(s.CodigoServicio, $"%{t}%") ||
+                EF.Functions.Like(s.Origen, $"%{t}%") || EF.Functions.Like(s.Destino, $"%{t}%") ||
+                EF.Functions.Like(s.Puerto, $"%{t}%") || EF.Functions.Like(s.Ruta, $"%{t}%"));
         }
 
         var total = await query.CountAsync(ct);
@@ -131,8 +138,16 @@ public sealed class clsEfServiciosConexosRepository(clsNexoDbContext db) : IServ
             // reimportarlo para actualizar (en vez de que cada fila ya existente cuente como
             // "duplicada" y se descarte). Tracked a propósito (sin AsNoTracking) para poder
             // modificar las filas existentes in-place.
+            //
+            // S5-HU-19/#261: la llave se compara sin distinguir mayúsculas y con
+            // normalización Unicode (ClaveNormalizada) — la colación real de
+            // UQ_servicios_conexos_dimensiones es insensible a mayúsculas (CI) y trata como
+            // iguales dos formas Unicode distintas de la misma tilde (NFC/NFD); el
+            // Dictionary<string,...> de C# compara por igualdad ordinal estricta y las veía
+            // como filas distintas. Reproducido con datos reales: "prueba249_precinto" vs.
+            // "PRUEBA249_PRECINTO" ya NO se cuentan como servicios distintos.
             var existentesPorClave = (await db.ServiciosConexos.ToListAsync(ct))
-                .ToDictionary(s => $"{s.CodigoServicio}|{s.Origen}|{s.Destino}|{s.Puerto}|{s.Ruta}|{s.TipoMaquina}");
+                .ToDictionary(s => ClaveNormalizada(s.CodigoServicio, s.Origen, s.Destino, s.Puerto, s.Ruta, s.TipoMaquina));
 
             // "Duplicada" ahora solo significa que la MISMA llave aparece más de una vez
             // DENTRO del archivo (la primera gana, el resto se cuenta y se descarta).
@@ -140,27 +155,50 @@ public sealed class clsEfServiciosConexosRepository(clsNexoDbContext db) : IServ
 
             int leidas = 0, creadas = 0, actualizadas = 0, duplicadas = 0, invalidas = 0;
             var nuevos = new List<clsServicioConexo>();
+            var errores = new List<string>();
+            var fila0 = primeraDataIdx; // la fila de Excel real (1-based + encabezado) para el mensaje
 
             foreach (var fila in filas.Skip(primeraDataIdx))
             {
+                fila0++;
                 var codigo = Txt(fila, cCodigo);
                 var tipo = Txt(fila, cTipo);
                 var costoTxt = Txt(fila, cCosto);
                 if (codigo.Length == 0 && tipo.Length == 0 && costoTxt.Length == 0) continue; // fila vacía
                 leidas++;
 
+                // S5-HU-19/#261: validación de longitud/rango ANTES de guardar, con detalle
+                // por fila — antes una fila que no cabía en la columna de la base (texto
+                // largo, monto de más de decimal(18,2)) tumbaba TODO el archivo con un 500
+                // genérico. Una fila inválida nunca descarta las demás: se cuenta y se sigue.
                 var costo = LeerDecimal(fila.Cell(cCosto));
                 var unidad = cUnidad > 0 ? Txt(fila, cUnidad) : "";
-                if (codigo.Length == 0 || tipo.Length == 0 || costo is null || unidad.Length == 0)
-                { invalidas++; continue; }
+                string? motivoInvalido =
+                    codigo.Length == 0 ? "CODIGO vacío"
+                    : tipo.Length == 0 ? "TIPO SERVICIO vacío"
+                    : costo is null ? "COSTO/VALOR vacío o ilegible"
+                    : unidad.Length == 0 ? "UNIDAD vacía"
+                    : codigo.Length > 30 ? $"CODIGO de {codigo.Length} caracteres (máx. 30)"
+                    : tipo.Length > 120 ? $"TIPO SERVICIO de {tipo.Length} caracteres (máx. 120)"
+                    : unidad.Length > 30 ? $"UNIDAD de {unidad.Length} caracteres (máx. 30)"
+                    : costo < 0 ? "COSTO/VALOR negativo"
+                    : costo >= 10_000_000_000_000_000m ? "COSTO/VALOR excede el máximo permitido (16 dígitos enteros)"
+                    : null;
+                if (motivoInvalido is not null)
+                {
+                    invalidas++;
+                    if (errores.Count < 20) errores.Add($"Fila {fila0}: {motivoInvalido}.");
+                    continue;
+                }
 
-                var origen = NoVacio(cOrigen > 0 ? Txt(fila, cOrigen) : null);
-                var destino = NoVacio(cDestino > 0 ? Txt(fila, cDestino) : null);
-                var puerto = NoVacio(cPuerto > 0 ? Txt(fila, cPuerto) : null);
-                var ruta = NoVacio(cRuta > 0 ? Txt(fila, cRuta) : null);
-                var maquina = NoVacio(cMaquina > 0 ? Txt(fila, cMaquina) : null);
+                var origen = NoVacio(cOrigen > 0 ? Txt(fila, cOrigen) : null, "ORIGEN", 150, fila0, errores, ref invalidas);
+                var destino = NoVacio(cDestino > 0 ? Txt(fila, cDestino) : null, "DESTINO", 150, fila0, errores, ref invalidas);
+                var puerto = NoVacio(cPuerto > 0 ? Txt(fila, cPuerto) : null, "PUERTO", 50, fila0, errores, ref invalidas);
+                var ruta = NoVacio(cRuta > 0 ? Txt(fila, cRuta) : null, "RUTA", 50, fila0, errores, ref invalidas);
+                var maquina = NoVacio(cMaquina > 0 ? Txt(fila, cMaquina) : null, "TIPO MAQUINA", 60, fila0, errores, ref invalidas);
+                if (origen is null || destino is null || puerto is null || ruta is null || maquina is null) continue; // ya contada arriba
 
-                var clave = $"{codigo}|{origen}|{destino}|{puerto}|{ruta}|{maquina}";
+                var clave = ClaveNormalizada(codigo, origen, destino, puerto, ruta, maquina);
                 if (!vistosEnArchivo.Add(clave)) { duplicadas++; continue; }
 
                 var categoria = cCategoria > 0 ? Txt(fila, cCategoria) : "";
@@ -171,11 +209,16 @@ public sealed class clsEfServiciosConexosRepository(clsNexoDbContext db) : IServ
                 if (existentesPorClave.TryGetValue(clave, out var existente))
                 {
                     existente.TipoServicio = tipo;
-                    existente.CostoUnitario = costo.Value;
+                    existente.CostoUnitario = costo!.Value;
                     existente.Unidad = unidad;
                     if (vigencia is { } v) existente.Vigencia = v;
                     if (categoria.Length > 0) existente.Categoria = clsServicioConexoCategoria.Normalizada(categoria);
-                    if (cActivo > 0) existente.Activo = activo;
+                    // S5-HU-19/#261: antes, una columna ACTIVO presente pero VACÍA en esta
+                    // fila reactivaba en silencio un servicio inactivo (texto vacío no
+                    // coincide con NO/INACTIVO/FALSE/0, así que "activo" daba true). Ahora
+                    // una celda vacía no toca el estado existente — solo un valor explícito
+                    // (SI/NO/etc.) lo cambia.
+                    if (cActivo > 0 && activoTxt.Length > 0) existente.Activo = activo;
                     existente.ActualizadoPor = usuarioId;
                     actualizadas++;
                     continue;
@@ -190,7 +233,7 @@ public sealed class clsEfServiciosConexosRepository(clsNexoDbContext db) : IServ
                     Puerto = puerto,
                     Ruta = ruta,
                     TipoMaquina = maquina,
-                    CostoUnitario = costo.Value,
+                    CostoUnitario = costo!.Value,
                     Unidad = unidad,
                     Vigencia = vigencia ?? DateOnly.FromDateTime(DateTime.UtcNow),
                     Categoria = clsServicioConexoCategoria.Normalizada(categoria),
@@ -208,14 +251,47 @@ public sealed class clsEfServiciosConexosRepository(clsNexoDbContext db) : IServ
                     UsuarioId = usuarioId, Entidad = "servicios_conexos", EntidadId = Guid.Empty,
                     Accion = "importar_excel", Diff = $"{{\"creadas\":{creadas},\"actualizadas\":{actualizadas}}}",
                 });
-                await db.SaveChangesAsync(ct);
+                try
+                {
+                    await db.SaveChangesAsync(ct);
+                }
+                catch (DbUpdateException)
+                {
+                    // S5-HU-19/#261: red de seguridad final — la normalización de llave de
+                    // arriba ya evita casi cualquier choque real contra
+                    // UQ_servicios_conexos_dimensiones; si de todas formas la base rechaza el
+                    // lote (ej. una carga concurrente de la misma fila nueva en ese instante),
+                    // se responde con un mensaje de negocio, nunca el texto crudo de la
+                    // excepción (antes: 500 INTERNAL_ERROR con el mensaje de EF expuesto).
+                    throw new Application.Common.Exceptions.clsValidationFailedException(
+                        "SERVICIO_DUPLICADO", "Una o más filas del archivo ya existen con esas mismas dimensiones (código, origen, destino, puerto, ruta, tipo de máquina).");
+                }
             }
-            return new clsImportarServiciosResultDto(leidas, creadas, actualizadas, duplicadas, invalidas);
+            return new clsImportarServiciosResultDto(leidas, creadas, actualizadas, duplicadas, invalidas, errores);
         }
     }
 
-    private static string NoVacio(string? dimension) =>
-        string.IsNullOrWhiteSpace(dimension) ? clsServicioConexo.NoAplica : dimension.Trim();
+    /// <summary>Limpia y, si excede el máximo de la columna, cuenta la fila como inválida
+    /// (con detalle) y devuelve null para que el llamador la salte.</summary>
+    private static string? NoVacio(string? dimension, string columna, int maxLength, int fila, List<string> errores, ref int invalidas)
+    {
+        var limpio = string.IsNullOrWhiteSpace(dimension) ? clsServicioConexo.NoAplica : dimension.Trim();
+        if (limpio.Length <= maxLength) return limpio;
+        invalidas++;
+        if (errores.Count < 20) errores.Add($"Fila {fila}: {columna} de {limpio.Length} caracteres (máx. {maxLength}).");
+        return null;
+    }
+
+    /// <summary>
+    /// Llave de las 6 dimensiones para detectar duplicados/match de upsert, normalizada
+    /// para que la comparación en memoria (Dictionary/HashSet, igualdad ordinal estricta)
+    /// coincida con la colación real de UQ_servicios_conexos_dimensiones: insensible a
+    /// mayúsculas y a la forma Unicode de composición (NFC vs. NFD de la misma tilde). NO
+    /// quita tildes — la colación de la base SÍ distingue acentos (AS), solo mayúsculas no.
+    /// </summary>
+    private static string ClaveNormalizada(string codigo, string origen, string destino, string puerto, string ruta, string maquina) =>
+        string.Join('|', new[] { codigo, origen, destino, puerto, ruta, maquina }
+            .Select(v => v.Trim().Normalize(NormalizationForm.FormC).ToUpperInvariant()));
 
     /// <summary>Lee un valor decimal de una celda: numérica nativa (valor exacto) o texto
     /// ("$ 780.077", "1.250.000,50", "1500.50"), vía <see cref="clsImporteParser"/>.</summary>

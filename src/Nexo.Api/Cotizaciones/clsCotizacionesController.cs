@@ -26,6 +26,8 @@ public class clsCotizacionesController(
     ICommandHandler<clsCrearCotizacionCommand, clsCotizacionDto> crear,
     ICommandHandler<clsAgregarLineaCotizacionCommand, clsCotizacionDto> agregarLinea,
     ICommandHandler<clsAgregarConexosCotizacionCommand, clsCotizacionDto> agregarConexos,
+    ICommandHandler<clsEditarConexoCotizacionCommand, clsCotizacionDto> editarConexo,
+    ICommandHandler<clsEliminarConexoCotizacionCommand, clsCotizacionDto> eliminarConexo,
     ICommandHandler<clsAplicarPropuestasCommand, clsAplicarPropuestasResultDto> aplicarPropuestas,
     ICommandHandler<clsEntregarCotizacionCommand, clsEntregarCotizacionResultDto> entregar,
     ICommandHandler<clsMarcarResultadoCommand, clsCotizacionDto> marcarResultado,
@@ -80,7 +82,28 @@ public class clsCotizacionesController(
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<clsCotizacionDto>> AgregarConexos(Guid id, [FromBody] clsAgregarConexosRequest req, CancellationToken ct = default)
         => Ok(await agregarConexos.Handle(new clsAgregarConexosCotizacionCommand(
-            id, req.Items.Select(i => new clsConexoItem(i.LineaId, i.ServicioConexoId, i.Cantidad, i.ValorAplicado)).ToList()), ct));
+            id, req.Items.Select(i => new clsConexoItem(i.LineaId, i.ServicioConexoId, i.Cantidad, i.ValorAplicado, i.Origen)).ToList()), ct));
+
+    /// <summary>Corregir la cantidad (y opcionalmente el valor) de un conexo ya agregado —
+    /// solo en cotización Borrador (S5-HU-18/#262).</summary>
+    [HttpPatch("{id:guid}/conexos/{conexoId:guid}")]
+    [Authorize(Roles = "Comercial,CoordinadorFletes,Admin")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<clsCotizacionDto>> EditarConexo(Guid id, Guid conexoId, [FromBody] clsEditarConexoRequest req, CancellationToken ct = default)
+        => Ok(await editarConexo.Handle(new clsEditarConexoCotizacionCommand(id, conexoId, req.Cantidad, req.ValorAplicado), ct));
+
+    /// <summary>Quitar un conexo agregado por error — solo en cotización Borrador
+    /// (S5-HU-18/#262).</summary>
+    [HttpDelete("{id:guid}/conexos/{conexoId:guid}")]
+    [Authorize(Roles = "Comercial,CoordinadorFletes,Admin")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<clsCotizacionDto>> EliminarConexo(Guid id, Guid conexoId, CancellationToken ct = default)
+        => Ok(await eliminarConexo.Handle(new clsEliminarConexoCotizacionCommand(id, conexoId), ct));
 
     /// <summary>
     /// Entregar la cotización a Comercial: marca la entrega y envía la cotización

@@ -1,23 +1,27 @@
 using Nexo.Application.CasosDeUso.Solicitudes;
 using Nexo.Application.CasosDeUso.Solicitudes.Interfaces;
+using Nexo.Domain.Catalogos.Entidades;
 using Moq;
 
 namespace Nexo.Application.Tests.Solicitudes;
 
-/// <summary>Filtro por texto y/o departamento sobre el catálogo cacheado de ciudades.</summary>
+/// <summary>Filtro por texto y/o departamento sobre el catálogo de tbl_municipios (S5-HU-16.1/#254).</summary>
 public class clsBuscarCiudadesQueryTests
 {
-    private readonly Mock<ICiudadesDwPort> _ciudades = new();
+    private readonly Mock<IMunicipiosRepository> _municipios = new();
 
-    private clsBuscarCiudadesQueryHandler Handler() => new(_ciudades.Object);
+    private clsBuscarCiudadesQueryHandler Handler() => new(_municipios.Object);
 
-    private void ConCatalogo(params clsCiudadDwDto[] ciudades) =>
-        _ciudades.Setup(p => p.ListarAsync(It.IsAny<CancellationToken>())).ReturnsAsync(ciudades);
+    private static clsMunicipio Municipio(string municipio, string departamento, string pais = "CO", string codigoDane = "00000000") =>
+        new() { Id = municipio.GetHashCode(), CodigoDane = codigoDane, Municipio = municipio, Departamento = departamento, Pais = pais };
+
+    private void ConCatalogo(params clsMunicipio[] municipios) =>
+        _municipios.Setup(p => p.ListarAsync(It.IsAny<CancellationToken>())).ReturnsAsync(municipios);
 
     [Fact]
     public async Task Filtra_por_texto_sin_importar_mayusculas_ni_tildes_de_la_busqueda()
     {
-        ConCatalogo(new clsCiudadDwDto("Medellín", "Antioquia"), new clsCiudadDwDto("Cali", "Valle del Cauca"));
+        ConCatalogo(Municipio("Medellín", "Antioquia"), Municipio("Cali", "Valle del Cauca"));
 
         var resultado = await Handler().Handle(new clsBuscarCiudadesQuery(null, "medellin"));
 
@@ -29,9 +33,9 @@ public class clsBuscarCiudadesQueryTests
     public async Task Filtra_por_departamento_cuando_hay_nombres_de_municipio_repetidos()
     {
         ConCatalogo(
-            new clsCiudadDwDto("Sucre", "Sucre"),
-            new clsCiudadDwDto("Sucre", "Santander"),
-            new clsCiudadDwDto("Sucre", "Cauca"));
+            Municipio("Sucre", "Sucre"),
+            Municipio("Sucre", "Santander"),
+            Municipio("Sucre", "Cauca"));
 
         var resultado = await Handler().Handle(new clsBuscarCiudadesQuery("Santander", null));
 
@@ -43,9 +47,9 @@ public class clsBuscarCiudadesQueryTests
     public async Task Combina_departamento_y_texto_a_la_vez()
     {
         ConCatalogo(
-            new clsCiudadDwDto("Sucre", "Sucre"),
-            new clsCiudadDwDto("Sincelejo", "Sucre"),
-            new clsCiudadDwDto("Sucre", "Santander"));
+            Municipio("Sucre", "Sucre"),
+            Municipio("Sincelejo", "Sucre"),
+            Municipio("Sucre", "Santander"));
 
         var resultado = await Handler().Handle(new clsBuscarCiudadesQuery("Sucre", "sin"));
 
@@ -56,7 +60,7 @@ public class clsBuscarCiudadesQueryTests
     [Fact]
     public async Task Sin_filtros_devuelve_todo_el_catalogo_ordenado()
     {
-        ConCatalogo(new clsCiudadDwDto("Zipaquirá", "Cundinamarca"), new clsCiudadDwDto("Armenia", "Quindío"));
+        ConCatalogo(Municipio("Zipaquirá", "Cundinamarca"), Municipio("Armenia", "Quindío"));
 
         var resultado = await Handler().Handle(new clsBuscarCiudadesQuery(null, null));
 
@@ -64,15 +68,45 @@ public class clsBuscarCiudadesQueryTests
         Assert.Equal("Armenia", resultado[0].Municipio);
     }
 
+    [Fact] // S5-HU-16.1/#254: Venezuela/Ecuador no se ofrecen para Origen/Destino.
+    public async Task Excluye_municipios_que_no_son_de_Colombia()
+    {
+        ConCatalogo(Municipio("Caracas", "Distrito Capital", pais: "VE"), Municipio("Bogotá", "Cundinamarca"));
+
+        var resultado = await Handler().Handle(new clsBuscarCiudadesQuery(null, null));
+
+        var ciudad = Assert.Single(resultado);
+        Assert.Equal("Bogotá", ciudad.Municipio);
+    }
+
+    [Fact] // S5-HU-16.1/#254: la base del match por DANE/ZC/ZTC de #255/#256.
+    public async Task Expone_Id_CodigoDane_y_zonas_de_tarifa()
+    {
+        ConCatalogo(new clsMunicipio
+        {
+            Id = 42, CodigoDane = "05001000", Municipio = "Medellín", Departamento = "Antioquia",
+            Pais = "CO", NombreTarifasPlaza = "ZC_MEDELLIN", ZonaTarificacion = "ZTC_VABURRA",
+        });
+
+        var resultado = await Handler().Handle(new clsBuscarCiudadesQuery(null, null));
+
+        var ciudad = Assert.Single(resultado);
+        Assert.Equal(42, ciudad.Id);
+        Assert.Equal("05001000", ciudad.CodigoDane);
+        Assert.Equal("ZC_MEDELLIN", ciudad.NombreTarifasPlaza);
+        Assert.Equal("ZTC_VABURRA", ciudad.ZonaTarificacion);
+    }
+
     [Fact]
-    public async Task ListarDepartamentos_devuelve_distintos_y_ordenados()
+    public async Task ListarDepartamentos_devuelve_distintos_ordenados_y_solo_Colombia()
     {
         ConCatalogo(
-            new clsCiudadDwDto("Sucre", "Sucre"),
-            new clsCiudadDwDto("Sincelejo", "Sucre"),
-            new clsCiudadDwDto("Medellín", "Antioquia"));
+            Municipio("Sucre", "Sucre"),
+            Municipio("Sincelejo", "Sucre"),
+            Municipio("Medellín", "Antioquia"),
+            Municipio("Caracas", "Distrito Capital", pais: "VE"));
 
-        var resultado = await new clsListarDepartamentosQueryHandler(_ciudades.Object)
+        var resultado = await new clsListarDepartamentosQueryHandler(_municipios.Object)
             .Handle(new clsListarDepartamentosQuery());
 
         Assert.Equal(["Antioquia", "Sucre"], resultado);

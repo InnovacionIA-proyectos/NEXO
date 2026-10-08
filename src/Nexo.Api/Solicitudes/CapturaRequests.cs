@@ -95,6 +95,11 @@ public class clsCapturaLineaRequest
     [Range(typeof(decimal), "0", "240", ParseLimitsInInvariantCulture = true)]
     public decimal? HorasDescargue { get; set; }
 
+    /// <summary>S5-HU-16.1/#254: Id de tbl_municipios elegido en el buscador de ciudades —
+    /// null si Origen/Destino viene de texto libre (formulario viejo, Excel sin ese dato).</summary>
+    public int? OrigenMunicipioId { get; set; }
+    public int? DestinoMunicipioId { get; set; }
+
     [Range(typeof(decimal), "0", "999999.99", ParseLimitsInInvariantCulture = true)]
     public decimal? Peso { get; set; }
 

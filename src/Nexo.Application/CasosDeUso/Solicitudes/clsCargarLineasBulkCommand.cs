@@ -2,8 +2,10 @@ using Nexo.Application.CasosDeUso.Solicitudes.Interfaces;
 using Nexo.Application.CasosDeUso.Trabajos.Interfaces;
 using Nexo.Application.Common;
 using Nexo.Application.Common.Abstractions;
+using Nexo.Application.Common.Dtos;
 using Nexo.Application.Common.Exceptions;
 using Nexo.Application.Common.Ports;
+using Nexo.Domain.Costeo.Reglas;
 using Nexo.Domain.Enums;
 using Nexo.Domain.Solicitudes.Entidades;
 using Nexo.Mensajes.Solicitudes;
@@ -38,14 +40,27 @@ public sealed class clsCargarLineasBulkCommandHandler(
         if (s.Estado is EstadoSolicitud.Entregada or EstadoSolicitud.Descartada)
             throw new clsConflictException("SOLICITUD_NO_EDITABLE", $"No se pueden agregar líneas a una solicitud {s.Estado}.");
 
-        var nuevas = command.Lineas.Select(lr => new clsLineaSolicitud
+        // S5-HU-17/#263: horas por línea, mismo criterio que clsCapturarSolicitudCommand
+        // (#251) — si la línea no trae las suyas, cae al default de ESTA solicitud (la
+        // que ya tenga en CondicionesServicio, o 4h+4h si nunca se serializó — ver
+        // clsCrearSolicitudCommand, que no guarda condiciones propias).
+        var tiemposSolicitud = clsCondicionesServicioDto.Desde(s.CondicionesServicio).TiemposLogisticos!;
+        var nuevas = command.Lineas.Select(lr =>
         {
-            SolicitudId = s.Id,
-            RutaId = lr.RutaId,
-            ConfigVehiculoId = lr.ConfigVehiculoId,
-            Tipologia = lr.Tipologia is null ? null : Enum.Parse<TipologiaCarga>(lr.Tipologia, ignoreCase: true),
-            Peso = lr.Peso,
-            ValorMercancia = lr.ValorMercancia,
+            var (horasCargue, horasDescargue) = clsResolucionHorasLinea.Resolver(
+                lr.HorasCargue, lr.HorasDescargue, retornaContenedor: false,
+                tiemposSolicitud.HorasCargue, tiemposSolicitud.HorasDescargue);
+            return new clsLineaSolicitud
+            {
+                SolicitudId = s.Id,
+                RutaId = lr.RutaId,
+                ConfigVehiculoId = lr.ConfigVehiculoId,
+                Tipologia = lr.Tipologia is null ? null : Enum.Parse<TipologiaCarga>(lr.Tipologia, ignoreCase: true),
+                Peso = lr.Peso,
+                ValorMercancia = lr.ValorMercancia,
+                HorasCargue = horasCargue,
+                HorasDescargue = horasDescargue,
+            };
         }).ToList();
 
         solicitudes.AgregarLineas(nuevas);

@@ -11,6 +11,8 @@ public static class clsDependencyInjection
         .AddScoped<ICommandHandler<clsCrearCotizacionCommand, clsCotizacionDto>, clsCrearCotizacionCommandHandler>()
         .AddScoped<ICommandHandler<clsAgregarLineaCotizacionCommand, clsCotizacionDto>, clsAgregarLineaCotizacionCommandHandler>()
         .AddScoped<ICommandHandler<clsAgregarConexosCotizacionCommand, clsCotizacionDto>, clsAgregarConexosCotizacionCommandHandler>()
+        .AddScoped<ICommandHandler<clsEditarConexoCotizacionCommand, clsCotizacionDto>, clsEditarConexoCotizacionCommandHandler>()
+        .AddScoped<ICommandHandler<clsEliminarConexoCotizacionCommand, clsCotizacionDto>, clsEliminarConexoCotizacionCommandHandler>()
         .AddScoped<ICommandHandler<clsAplicarPropuestasCommand, clsAplicarPropuestasResultDto>, clsAplicarPropuestasCommandHandler>()
         .AddScoped<ICommandHandler<clsEntregarCotizacionCommand, clsEntregarCotizacionResultDto>, clsEntregarCotizacionCommandHandler>()
         .AddScoped<ICommandHandler<clsMarcarResultadoCommand, clsCotizacionDto>, clsMarcarResultadoCommandHandler>()

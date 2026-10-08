@@ -1,9 +1,11 @@
 using Nexo.Application.CasosDeUso.Solicitudes.Interfaces;
 using Nexo.Application.Common;
 using Nexo.Application.Common.Abstractions;
+using Nexo.Application.Common.Dtos;
 using Nexo.Application.Common.Exceptions;
 using Nexo.Application.Common.Ports;
 using Nexo.Mensajes.Bandeja;
+using Nexo.Domain.Costeo.Reglas;
 using Nexo.Domain.Enums;
 using Nexo.Domain.Priorizacion.Reglas;
 using Nexo.Domain.Solicitudes.Entidades;
@@ -15,7 +17,10 @@ public sealed record clsCrearSolicitudCommand(
     Guid? ClienteId, string? ClienteBp, string Tipo, string? Modalidad, DateTimeOffset? Deadline,
     decimal? ValorEstimado, decimal? ProbabilidadCierre, clsCrearLineaInput? Linea) : ICommand<Guid>;
 
-public sealed record clsCrearLineaInput(Guid? RutaId, Guid? ConfigVehiculoId, string? Tipologia, decimal? Peso, decimal? ValorMercancia);
+public sealed record clsCrearLineaInput(
+    Guid? RutaId, Guid? ConfigVehiculoId, string? Tipologia, decimal? Peso, decimal? ValorMercancia,
+    /// <summary>S5-HU-17/#263: horas de ESTA línea — null usa el default de la solicitud.</summary>
+    decimal? HorasCargue = null, decimal? HorasDescargue = null);
 
 public sealed class clsCrearSolicitudCommandHandler(
     ISolicitudesRepository solicitudes, IClientesPort clientes, IClientesDwPort clientesDw, IAuditoriaPort auditoria,
@@ -42,6 +47,13 @@ public sealed class clsCrearSolicitudCommandHandler(
         };
 
         if (command.Linea is { } lr)
+        {
+            // S5-HU-17/#263: esta solicitud no serializa CondicionesServicio (no tiene
+            // notas/horas propias), así que el default de horas es siempre 4h+4h.
+            var tiempos = clsCondicionesServicioDto.Desde(null).TiemposLogisticos!;
+            var (horasCargue, horasDescargue) = clsResolucionHorasLinea.Resolver(
+                lr.HorasCargue, lr.HorasDescargue, retornaContenedor: false, tiempos.HorasCargue, tiempos.HorasDescargue);
+
             solicitud.Lineas.Add(new clsLineaSolicitud
             {
                 SolicitudId = solicitud.Id,
@@ -50,7 +62,10 @@ public sealed class clsCrearSolicitudCommandHandler(
                 Tipologia = lr.Tipologia is null ? null : ParseEnum<TipologiaCarga>(lr.Tipologia, "tipologia"),
                 Peso = lr.Peso,
                 ValorMercancia = lr.ValorMercancia,
+                HorasCargue = horasCargue,
+                HorasDescargue = horasDescargue,
             });
+        }
 
         var parametros = await solicitudes.ParametrosScoreAsync(ct);
         solicitud.ScorePrioridad = (decimal)clsScorePrioridadCalculator.Calcular(solicitud, parametros, clock.GetUtcNow()).Total;

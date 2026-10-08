@@ -228,5 +228,162 @@ public class clsServiciosConexosTests
         Assert.Equal(1, dto.GetProperty("creadas").GetInt32());
         Assert.Equal(1, dto.GetProperty("duplicadas").GetInt32());
     }
+
+    // S5-HU-19/#261: casos reales reportados por QA contra el ambiente de deploy.
+
+    [Fact] // antes: 500 crudo. "prueba249_precinto" y "PRUEBA249_PRECINTO" son el MISMO
+           // servicio para la colación real de la base (insensible a mayúsculas) — ahora
+           // también lo son para el importador: la segunda fila actualiza, no choca.
+    public async Task ImportarExcel_mismo_codigo_con_distintas_mayusculas_actualiza_no_falla()
+    {
+        var admin = _fx.Client("Admin");
+        var codigo = $"MAY_{Guid.NewGuid():N}"[..15];
+        var crear = await admin.PostJson("/api/servicios-conexos", PayloadValido(codigo.ToUpperInvariant(), costo: 1000));
+        Assert.Equal(HttpStatusCode.Created, crear.StatusCode);
+
+        var encabezados = new[] { "CODIGO", "TIPO SERVICIO", "COSTO UNITARIO", "UNIDAD" };
+        var archivo = ArchivoExcel(encabezados, [[codigo.ToLowerInvariant(), "Precinto", "2500", "Por unidad"]]);
+
+        var resp = await admin.PostAsync("/api/servicios-conexos/importar-excel", archivo);
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        var dto = await resp.Json();
+        Assert.Equal(1, dto.GetProperty("actualizadas").GetInt32());
+        Assert.Equal(0, dto.GetProperty("creadas").GetInt32());
+    }
+
+    [Fact] // antes: 500 crudo (TIPO SERVICIO es nvarchar(120)). Ahora: fila inválida con
+           // detalle, el resto del archivo se sigue procesando.
+    public async Task ImportarExcel_texto_largo_queda_invalida_con_detalle_no_500()
+    {
+        var textoLargo = new string('A', 121);
+        var codigoValido = $"OK_{Guid.NewGuid():N}"[..15];
+        var encabezados = new[] { "CODIGO", "TIPO SERVICIO", "COSTO UNITARIO", "UNIDAD" };
+        var archivo = ArchivoExcel(encabezados,
+        [
+            [$"LARGO_{Guid.NewGuid():N}"[..15], textoLargo, "1000", "Por unidad"],
+            [codigoValido, "Precinto", "1000", "Por unidad"],
+        ]);
+
+        var resp = await _fx.Client("Admin").PostAsync("/api/servicios-conexos/importar-excel", archivo);
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        var dto = await resp.Json();
+        Assert.Equal(1, dto.GetProperty("invalidas").GetInt32());
+        Assert.Equal(1, dto.GetProperty("creadas").GetInt32()); // la fila válida sí se creó
+        var errores = dto.GetProperty("errores");
+        Assert.True(errores.GetArrayLength() > 0);
+        Assert.Contains("TIPO SERVICIO", errores[0].GetString());
+    }
+
+    [Fact] // antes: 500 crudo (decimal(18,2), 16 enteros + 2 decimales).
+    public async Task ImportarExcel_monto_con_17_digitos_queda_invalida_no_500()
+    {
+        var encabezados = new[] { "CODIGO", "TIPO SERVICIO", "COSTO UNITARIO", "UNIDAD" };
+        var archivo = ArchivoExcel(encabezados,
+            [[$"MONTO_{Guid.NewGuid():N}"[..15], "Precinto", "99999999999999999", "Por unidad"]]);
+
+        var resp = await _fx.Client("Admin").PostAsync("/api/servicios-conexos/importar-excel", archivo);
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        Assert.Equal(1, (await resp.Json()).GetProperty("invalidas").GetInt32());
+    }
+
+    [Fact]
+    public async Task ImportarExcel_costo_negativo_queda_invalida()
+    {
+        var encabezados = new[] { "CODIGO", "TIPO SERVICIO", "COSTO UNITARIO", "UNIDAD" };
+        var archivo = ArchivoExcel(encabezados, [[$"NEG_{Guid.NewGuid():N}"[..15], "Precinto", "-500", "Por unidad"]]);
+
+        var resp = await _fx.Client("Admin").PostAsync("/api/servicios-conexos/importar-excel", archivo);
+        Assert.Equal(1, (await resp.Json()).GetProperty("invalidas").GetInt32());
+    }
+
+    [Fact] // antes: una columna ACTIVO presente pero vacía en una fila de actualización
+           // reactivaba en silencio un servicio que se había desactivado a propósito.
+    public async Task ImportarExcel_activo_vacio_en_actualizacion_no_toca_el_estado_existente()
+    {
+        var admin = _fx.Client("Admin");
+        var codigo = $"ACT_{Guid.NewGuid():N}"[..15];
+        var crear = await admin.PostJson("/api/servicios-conexos", PayloadValido(codigo));
+        var id = (await crear.Json()).GetProperty("id").GetGuid();
+        await admin.PatchJson($"/api/servicios-conexos/{id}", new { activo = false });
+
+        var encabezados = new[] { "CODIGO", "TIPO SERVICIO", "COSTO UNITARIO", "UNIDAD", "ACTIVO" };
+        var archivo = ArchivoExcel(encabezados, [[codigo, "Precinto", "5000", "Por unidad", ""]]); // ACTIVO presente pero vacío
+
+        var resp = await admin.PostAsync("/api/servicios-conexos/importar-excel", archivo);
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        Assert.Equal(1, (await resp.Json()).GetProperty("actualizadas").GetInt32());
+
+        var activo = _fx.WithDb(db => db.ServiciosConexos.Single(s => s.CodigoServicio == codigo).Activo);
+        Assert.False(activo, "ACTIVO vacío en el archivo no debe reactivar el servicio.");
+    }
+
+    [Theory] // S5-HU-19/#261: cada plantilla trae SOLO sus columnas, no las 12 de siempre.
+    [InlineData("almacenamiento", new[] { "CODIGO", "TIPO SERVICIO", "ORIGEN", "COSTO UNITARIO", "VIGENCIA", "UNIDAD", "CATEGORIA", "ACTIVO" })]
+    [InlineData("itr", new[] { "CODIGO", "TIPO SERVICIO", "ORIGEN", "PUERTO", "TIPO MAQUINA", "COSTO UNITARIO", "VIGENCIA", "UNIDAD", "CATEGORIA", "ACTIVO" })]
+    [InlineData("precinto", new[] { "CODIGO", "TIPO SERVICIO", "RUTA", "COSTO UNITARIO", "VIGENCIA", "UNIDAD", "CATEGORIA", "ACTIVO" })]
+    [InlineData("acompanamiento", new[] { "CODIGO", "TIPO SERVICIO", "ORIGEN", "DESTINO", "COSTO UNITARIO", "VIGENCIA", "UNIDAD", "CATEGORIA", "ACTIVO" })]
+    public async Task PlantillaExcel_trae_solo_las_columnas_de_su_tipo(string tipo, string[] columnasEsperadas)
+    {
+        var resp = await _fx.Client().GetAsync($"/api/servicios-conexos/plantilla-excel/{tipo}");
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+
+        using var wb = new XLWorkbook(new MemoryStream(await resp.Content.ReadAsByteArrayAsync()));
+        var ws = wb.Worksheets.First();
+        var columnas = ws.Row(1).CellsUsed().Select(c => c.GetString()).ToList();
+        Assert.Equal(columnasEsperadas, columnas);
+    }
+
+    [Fact] // la fila 2 (valores fijos) nunca trae datos de apariencia real que se
+           // cargarían como un registro si se sube la plantilla sin editar.
+    public async Task PlantillaExcel_sin_editar_no_crea_ningun_registro_si_se_reimporta()
+    {
+        var antes = _fx.WithDb(db => db.ServiciosConexos.Count());
+
+        var plantilla = await _fx.Client().GetAsync("/api/servicios-conexos/plantilla-excel/almacenamiento");
+        var contenido = new MultipartFormDataContent();
+        var parte = new ByteArrayContent(await plantilla.Content.ReadAsByteArrayAsync());
+        parte.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        contenido.Add(parte, "archivo", "plantilla.xlsx");
+
+        var resp = await _fx.Client("Admin").PostAsync("/api/servicios-conexos/importar-excel", contenido);
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        Assert.Equal(0, (await resp.Json()).GetProperty("creadas").GetInt32());
+
+        var despues = _fx.WithDb(db => db.ServiciosConexos.Count());
+        Assert.Equal(antes, despues);
+    }
+
+    [Fact] // S5-HU-18/#262 (opcional): q también busca por dimensiones del servicio.
+    public async Task Listar_busca_por_dimensiones_del_servicio()
+    {
+        var admin = _fx.Client("Admin");
+        var codigo = $"QDIM_{Guid.NewGuid():N}"[..15];
+        var ruta = $"RutaUnica-{Guid.NewGuid():N}"[..20];
+        var crear = await admin.PostJson("/api/servicios-conexos", new
+        {
+            codigoServicio = codigo, tipoServicio = "Precinto", ruta,
+            costoUnitario = 1000, unidad = "Por unidad", vigencia = "2026-12-31",
+        });
+        Assert.Equal(HttpStatusCode.Created, crear.StatusCode);
+
+        var pagina = await _fx.Client().GetFromJsonAsync<JsonElement>($"/api/servicios-conexos?q={ruta}");
+        var items = pagina.GetProperty("items");
+        Assert.True(items.GetArrayLength() >= 1);
+        Assert.Contains(items.EnumerateArray(), i => i.GetProperty("codigoServicio").GetString() == codigo);
+    }
+
+    [Fact] // S5-HU-19/#261: exportar-excel ahora admite filtrar por categoría.
+    public async Task ExportarExcel_filtra_por_categoria()
+    {
+        var resp = await _fx.Client().GetAsync("/api/servicios-conexos/exportar-excel?categoria=adicional");
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+
+        using var wb = new XLWorkbook(new MemoryStream(await resp.Content.ReadAsByteArrayAsync()));
+        var ws = wb.Worksheets.First();
+        var colCategoria = ws.Row(1).CellsUsed().Single(c => c.GetString() == "CATEGORIA").Address.ColumnNumber;
+        foreach (var fila in ws.RowsUsed().Skip(1))
+            Assert.Equal("adicional", fila.Cell(colCategoria).GetString());
+    }
 }
 

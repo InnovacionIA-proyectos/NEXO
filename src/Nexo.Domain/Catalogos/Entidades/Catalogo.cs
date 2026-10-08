@@ -15,6 +15,18 @@ public class clsRuta : IAuditable
     [Required, MaxLength(150)]
     public string Destino { get; set; } = null!;
 
+    /// <summary>S5-HU-16.1/#254: código DANE real del Origen/Destino, vía tbl_municipios —
+    /// nulo en rutas creadas antes de esta issue o con texto que no resolvió contra el
+    /// catálogo (ej. ciudad fuera de Colombia, typo). Base para que SICE-TAC (#255) y
+    /// plaza/histórico (#256) dejen de comparar por texto.</summary>
+    public int? OrigenMunicipioId { get; set; }
+    [JsonIgnore]
+    public clsMunicipio? OrigenMunicipio { get; set; }
+
+    public int? DestinoMunicipioId { get; set; }
+    [JsonIgnore]
+    public clsMunicipio? DestinoMunicipio { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 }

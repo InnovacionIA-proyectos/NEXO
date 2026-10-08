@@ -1,6 +1,7 @@
 using Nexo.Application.CasosDeUso.Cotizaciones.DTOs;
 using Nexo.Application.CasosDeUso.Cotizaciones.Interfaces;
 using Nexo.Application.CasosDeUso.Cotizaciones.Mappers;
+using Nexo.Application.CasosDeUso.Cotizaciones.Validadores;
 using Nexo.Application.Common.Abstractions;
 using Nexo.Application.Common.Exceptions;
 using Nexo.Application.Common.Ports;
@@ -11,8 +12,9 @@ using Nexo.Domain.Enums;
 namespace Nexo.Application.CasosDeUso.Cotizaciones;
 
 /// <summary>LineaId (S4-HU-15.4/#250): a qué línea de la cotización aplica — obligatorio,
-/// ya no existe el conexo "general" sin línea.</summary>
-public sealed record clsConexoItem(Guid LineaId, Guid ServicioConexoId, decimal Cantidad, decimal? ValorAplicado);
+/// ya no existe el conexo "general" sin línea. Origen (S5-HU-18/#262): "individual" o
+/// "general" — ver clsCotizacionConexo.Origen.</summary>
+public sealed record clsConexoItem(Guid LineaId, Guid ServicioConexoId, decimal Cantidad, decimal? ValorAplicado, string Origen = "individual");
 
 /// <summary>Agregar servicios conexos (logísticos/adicionales) a la cotización.</summary>
 public sealed record clsAgregarConexosCotizacionCommand(
@@ -38,6 +40,9 @@ public sealed class clsAgregarConexosCotizacionCommandHandler(
             if (c.Lineas.All(l => l.Id != item.LineaId))
                 throw new clsValidationFailedException("LINEA_INVALIDA", $"La línea {item.LineaId} no pertenece a esta cotización.");
 
+            clsConexoCotizacionValidador.ValidarCantidad(item.Cantidad);
+            var origen = clsConexoCotizacionValidador.NormalizarOrigen(item.Origen);
+
             var servicio = await serviciosConexos.ObtenerPorIdAsync(item.ServicioConexoId, ct)
                 ?? throw new clsValidationFailedException("SERVICIO_INVALIDO", $"Servicio logístico {item.ServicioConexoId} no existe.");
             if (!servicio.Activo)
@@ -49,9 +54,10 @@ public sealed class clsAgregarConexosCotizacionCommandHandler(
                 CotizacionId = c.Id,
                 CotizacionLineaId = item.LineaId,
                 ServicioConexoId = servicio.Id,
-                clsServicioConexo = servicio, // nav explícita: el DTO denormaliza nombre/categoría
+                clsServicioConexo = servicio, // nav explícita: el DTO denormaliza nombre/categoría/dimensiones
                 Cantidad = item.Cantidad,
-                ValorAplicado = valor
+                ValorAplicado = valor,
+                Origen = origen,
             };
             c.Conexos.Add(conexo);
         }
