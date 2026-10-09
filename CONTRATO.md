@@ -349,7 +349,12 @@ interface CotizacionLineaDto {
   id: UUID; lineaSolicitudId: UUID | null; valorFlete: Decimal; fuente: FuenteFlete
   valorAprovisionamiento: Decimal | null; valorRetornoContenedor: Decimal | null
 }
-interface CotizacionConexoDto { id: UUID; servicioConexoId: UUID | null; nombre: string | null; categoria: string; cantidad: Decimal; valorAplicado: Decimal }
+interface CotizacionConexoDto {
+  id: UUID; cotizacionLineaId: UUID; servicioConexoId: UUID | null; nombre: string | null; categoria: string
+  cantidad: Decimal; valorAplicado: Decimal
+  origen: "individual" | "general" // S5-HU-18/#262: cómo se agregó — "general" = el usuario pidió agregarlo a todas las líneas de una vez (igual crea una fila por línea)
+  servicio: ServicioConexoDto | null // S5-HU-18/#262: el servicio completo (dimensiones incluidas), para no tener que bajar el catálogo completo
+}
 interface CotizacionDto {
   id: UUID; solicitudId: UUID; estado: "Borrador" | "Entregada"
   resultado: "SinDefinir" | "Ganada" | "Perdida"; total: Decimal; entregadaAt: FechaISO | null
@@ -401,8 +406,15 @@ interface ReglaSoloSicetacDto {
 }
 interface ImportarReglasResultDto { filas: number; creadas: number; duplicadas: number; invalidas: number }
 
-interface ServicioConexoDto { id: UUID; nombre: string; categoria: string; reglaCobro: string | null; valorBase: Decimal | null; vigenteHasta: Fecha | null; activo: boolean }
-interface ImportarServiciosResultDto { filas: number; creadas: number; duplicadas: number; invalidas: number }
+interface ServicioConexoDto {
+  id: UUID; codigoServicio: string; tipoServicio: string
+  origen: string; destino: string; puerto: string; ruta: string; tipoMaquina: string // "NO APLICA" si no aplica a este servicio
+  costoUnitario: Decimal; unidad: string; vigencia: Fecha; categoria: string; activo: boolean
+}
+interface ImportarServiciosResultDto {
+  filas: number; creadas: number; actualizadas: number; duplicadas: number; invalidas: number
+  errores: string[] // S5-HU-19/#261: detalle "Fila N: motivo" de cada fila inválida, máx. 20
+}
 
 interface TarifaSicetacDto {
   id: UUID; periodo: number; origenDane: string; destinoDane: string; nombreRuta: string | null
@@ -556,6 +568,12 @@ Formato de cada endpoint:
 | `tipologia` | *opcional* | string | `TipologiaCarga` |
 | `peso` | *opcional* | decimal | 0–999999.99 kg |
 | `valorMercancia` | *opcional* | decimal | monetario |
+| `horasCargue` | *opcional* | decimal | S5-HU-17/#263. 0–240. Antes se descartaba en silencio |
+| `horasDescargue` | *opcional* | decimal | S5-HU-17/#263. 0–240. Antes se descartaba en silencio |
+
+Sin horas propias, la línea usa las de la solicitud (`CondicionesServicio`, 4h+4h
+si nunca se guardaron condiciones) — mismo criterio que `clsCapturaLineaRequest`
+(§3.3, S4-HU-15.5/#251).
 
 #### `POST /api/solicitudes/resolver-catalogos`
 Resuelve texto libre a `rutaId`/`configVehiculoId`, creando lo que falte en el
@@ -636,6 +654,8 @@ Resuelve o crea rutas y vehículos a partir del texto libre de las líneas.
 |---|---|---|---|
 | `origen` | **requerido** | string | máx. 150 |
 | `destino` | **requerido** | string | máx. 150 |
+| `origenMunicipioId` | *opcional* | int | S5-HU-16.1/#254. `id` elegido en `GET /ciudades` para `origen` — sin esto la línea no resuelve municipio y el motor de costeo (#255/#256) no aplica para ella |
+| `destinoMunicipioId` | *opcional* | int | ídem, para `destino` |
 | `peso` | **condicional** | decimal | 0–999999.99 kg. **Requerido (> 0) si las posiciones no traen peso** |
 | `tipoVehiculo` | *opcional* | string | máx. 100 |
 | `carroceria` | *opcional* | string | máx. 100 |
@@ -681,6 +701,41 @@ Piso SICE-TAC del viaje vacío (levante → origen del cargue).
 - **Query**: `q` *opcional* (nombre, NIT o BP).
 - **→** `200 ClienteBusquedaDto[]`. Con el DW configurado busca en clientes
   reales; sin él, en la tabla local.
+
+#### `GET /api/captura-solicitudes/departamentos`
+Departamentos de Colombia con municipio en el catálogo propio
+(`tbl_municipios`, S5-HU-16.1). **Cambio de fuente**: hasta esta issue
+resolvía contra `tblSAPDANE` en vivo, filtrado a ciudades "costeables" en el
+tarifario SAP; ahora es `tbl_municipios` (más amplio — incluye municipios sin
+tarifa SAP cargada, que de todas formas pueden costear por SICE-TAC).
+- **→** `200 string[]`, ordenados.
+
+#### `GET /api/captura-solicitudes/ciudades`
+Búsqueda de ciudades para Origen/Destino, filtrable por `departamento` y/o
+`q` (texto, sin tildes ni mayúsculas). **Cambio de forma (S5-HU-16.1/#254),
+ruptura**: antes devolvía `{ municipio, departamento }`; ahora devuelve la
+fila completa de `tbl_municipios`, con los datos que #255/#256 necesitan
+para dejar de comparar por texto en el motor de costeo. El frontend debe
+capturar `id` y enviarlo como `origenMunicipioId`/`destinoMunicipioId` al
+crear la solicitud (ver tabla de línea en `POST /api/captura-solicitudes`
+arriba) — sin eso, la línea queda sin municipio resuelto y #255/#256 no
+aplican para ella (cae al comportamiento de siempre, sin error).
+
+| Query | | Tipo | Restricción |
+|---|---|---|---|
+| `departamento` | *opcional* | string | nombre exacto (normalizado sin tildes/mayúsculas) |
+| `q` | *opcional* | string | texto libre sobre el nombre del municipio |
+
+- **→** `200 CiudadBusquedaDto[]`, máx. 50, ordenadas por nombre:
+  `{ id: int, codigoDane: string, municipio: string, departamento: string, nombreTarifasPlaza: string|null, zonaTarificacion: string|null }`
+- `nombreTarifasPlaza`/`zonaTarificacion` (códigos `ZC_`/`ZTC_` del
+  Tarifario SAP) vienen `null` cuando el municipio no tiene movimiento
+  comercial conocido — no es un error, el municipio sigue siendo válido
+  para SICE-TAC.
+- 8 ciudades que existían en el catálogo anterior ya no aparecen: eran
+  zonas agregadas sin código DANE propio (Valle de Aburrá, Urabá, Oriente
+  antioqueño) o localidades sub-municipales sin fila propia en
+  `tbl_municipios` (Don Matías, Catambuco, Doradal, Bolombolo, Chibolo).
 
 #### `GET /api/captura-solicitudes/municipios`
 Catálogo completo de municipios (S4-HU-09.1), todas las columnas — para
@@ -732,12 +787,35 @@ líneas pendientes. Sin body.
 
 | Cada item | | Tipo | Restricción |
 |---|---|---|---|
+| `lineaId` | **requerido** | UUID | id de la línea DE LA COTIZACIÓN (no de la solicitud) a la que aplica — S4-HU-15.4/#250, ya no existe el conexo "general" sin línea |
 | `servicioConexoId` | **requerido** | UUID | servicio existente y activo |
-| `cantidad` | *opcional* | decimal | 0.01–999999.99, def. 1 |
-| `valorAplicado` | *opcional* | decimal | monetario. Si falta: `valorBase × cantidad` |
+| `cantidad` | *opcional* | decimal | 0.01–999999.99, máx. 2 decimales, def. 1 |
+| `valorAplicado` | *opcional* | decimal | monetario. Si falta: `costoUnitario × cantidad` |
+| `origen` | *opcional* | string | S5-HU-18/#262. `individual` (def.) \| `general` — si el usuario pidió agregarlo a TODAS las líneas de una vez (igual manda un item por línea) |
 
 - **→** `200 CotizacionDto`
-- **Errores**: `400 SERVICIO_INVALIDO` · `400 SERVICIO_INACTIVO` · `404 COTIZACION_NO_ENCONTRADA` · `409 COTIZACION_NO_EDITABLE`
+- **Errores**: `400 SERVICIO_INVALIDO` · `400 SERVICIO_INACTIVO` · `400 LINEA_INVALIDA` · `400 CANTIDAD_INVALIDA` · `400 ORIGEN_INVALIDO` · `404 COTIZACION_NO_ENCONTRADA` · `409 COTIZACION_NO_EDITABLE`
+
+#### `PATCH /api/cotizaciones/{id}/conexos/{conexoId}` — corregir un conexo
+S5-HU-18/#262: antes solo existía el POST (siempre crea una fila nueva); un error
+de cantidad no se podía deshacer, solo compensar agregando otra fila.
+
+- **Roles**: `Comercial`, `CoordinadorFletes`, `Admin`. Solo en cotización `Borrador`.
+
+| Body | | Tipo | Restricción |
+|---|---|---|---|
+| `cantidad` | **requerido** | decimal | 0.01–999999.99, máx. 2 decimales |
+| `valorAplicado` | *opcional* | decimal | monetario. Si falta: `costoUnitario × cantidad` |
+
+- **→** `200 CotizacionDto`
+- **Errores**: `400 CANTIDAD_INVALIDA` · `400 VALOR_REQUERIDO` (sin servicio para recalcular y sin `valorAplicado`) · `404 COTIZACION_NO_ENCONTRADA` · `404 CONEXO_NO_ENCONTRADO` · `409 COTIZACION_NO_EDITABLE`
+
+#### `DELETE /api/cotizaciones/{id}/conexos/{conexoId}` — quitar un conexo
+S5-HU-18/#262. Solo en cotización `Borrador`.
+
+- **Roles**: `Comercial`, `CoordinadorFletes`, `Admin`.
+- **→** `200 CotizacionDto` (el conexo ya no aparece en `conexos`)
+- **Errores**: `404 COTIZACION_NO_ENCONTRADA` · `404 CONEXO_NO_ENCONTRADO` · `409 COTIZACION_NO_EDITABLE`
 
 #### `POST /api/cotizaciones/{id}/entregar`
 Marca la entrega y envía la cotización por correo al comercial responsable
@@ -893,13 +971,17 @@ Columnas: Origen, Destino, Tipo de vehículo.
 
 ### 3.9 Servicios conexos — `/api/servicios-conexos`
 
+> Reestructurado en S4-HU-15.1/#223: tarifas variables por ciudad/ruta/puerto en vez de
+> un valor único genérico — reemplaza por completo el `nombre`/`reglaCobro`/`valorBase`/
+> `vigenteHasta` que documentaba esta sección antes (esa forma ya no existe en el código).
+
 #### `GET /api/servicios-conexos`
 - **Roles**: Todos.
 
 | Query | | Tipo | Restricción |
 |---|---|---|---|
 | `soloActivos` | *opcional* | boolean | def. `false` |
-| `q` | *opcional* | string | búsqueda por nombre |
+| `q` | *opcional* | string | texto libre sobre `tipoServicio`/`codigoServicio` |
 | `categoria` | *opcional* | string | `logistico` \| `adicional` |
 | `page` | *opcional* | int | ≥ 1, def. 1 |
 | `pageSize` | *opcional* | int | 1–200, def. 50 |
@@ -911,15 +993,17 @@ Columnas: Origen, Destino, Tipo de vehículo.
 
 | Body | | Tipo | Restricción |
 |---|---|---|---|
-| `nombre` | **requerido** | string | máx. 120 |
-| `categoria` | *opcional* | string | `logistico` \| `adicional`, def. `logistico`; máx. 20 |
-| `reglaCobro` | *opcional* | string | JSON serializado como texto, ej. `"{\"tipo\":\"por_hora\",\"valor\":45000}"` |
-| `valorBase` | *opcional* | decimal | monetario |
-| `vigenteHasta` | *opcional* | fecha | solo fecha `"2026-12-31"` |
+| `codigoServicio` | **requerido** | string | máx. 30 |
+| `tipoServicio` | **requerido** | string | máx. 120 |
+| `origen`, `destino`, `puerto`, `ruta`, `tipoMaquina` | *opcional* | string | la dimensión que no aplique a este servicio se guarda como `"NO APLICA"` — máx. 150 (origen/destino), 50 (puerto/ruta), 60 (tipoMaquina) |
+| `costoUnitario` | **requerido** | decimal | ≥ 0 |
+| `unidad` | **requerido** | string | máx. 30 |
+| `vigencia` | **requerido** | fecha | solo fecha `"2026-12-31"` |
+| `categoria` | *opcional* | string | `logistico` \| `adicional`, def. `logistico` |
 | `activo` | *opcional* | boolean | def. `true` |
 
 - **→** `201 ServicioConexoDto`
-- **Errores**: `400 CATEGORIA_INVALIDA` · `409 SERVICIO_DUPLICADO` (ya hay uno activo con el mismo nombre)
+- **Errores**: `400 CATEGORIA_INVALIDA` · `409 SERVICIO_DUPLICADO` (ya existe un servicio con las mismas 6 dimensiones: código, origen, destino, puerto, ruta, tipo de máquina)
 
 #### `PATCH /api/servicios-conexos/{id}`
 Actualización parcial: solo cambian los campos enviados y no nulos.
@@ -930,12 +1014,50 @@ Actualización parcial: solo cambian los campos enviados y no nulos.
 - **Errores**: `400 CATEGORIA_INVALIDA` · `404 SERVICIO_NO_ENCONTRADO`
 
 #### `POST /api/servicios-conexos/importar-excel`
-Columnas: Nombre, Valor base, Vigente hasta, Categoría, Activo.
+Columnas: Codigo, Tipo Servicio, Origen, Destino, Puerto, Ruta, Tipo Maquina, Costo
+Unitario, Unidad, Vigencia, Categoria, Activo — detección de encabezado tolerante (no
+importa el orden ni si falta alguna columna opcional). Hace **upsert** por las 6
+dimensiones (código, origen, destino, puerto, ruta, tipo de máquina): una fila cuya
+combinación ya existe ACTUALIZA ese servicio en vez de crear uno nuevo — así el mismo
+archivo sirve para exportar, editar y recargar. La comparación de esa llave ignora
+mayúsculas y la forma Unicode de composición de tildes (S5-HU-19/#261); sigue
+distinguiendo acentos (`café` ≠ `cafe`).
+
+Una fila inválida (campo obligatorio vacío, texto que excede el máximo de su columna,
+costo negativo o con más de 16 dígitos enteros) **nunca descarta el archivo completo**:
+se cuenta en `invalidas`, su detalle queda en `errores[]` (máx. 20 mensajes), y el resto
+de las filas se sigue procesando.
 
 - **Roles**: `ServiciosLogisticos`, `AdminTarifas`, `Admin`.
 - **Body**: `multipart/form-data`, campo `archivo` **requerido** (§1.9).
 - **→** `200 ImportarServiciosResultDto`
-- **Errores**: `400 ARCHIVO_REQUERIDO` · `400 FORMATO_NO_SOPORTADO` · `400 EXCEL_SIN_DATOS`
+- **Errores**: `400 ARCHIVO_REQUERIDO` · `400 FORMATO_NO_SOPORTADO` · `400 EXCEL_INVALIDO` · `400 EXCEL_SIN_DATOS` · `400 SERVICIO_DUPLICADO` (choque residual contra la base, no detectado en memoria — caso raro, ver nota de #261 abajo)
+
+#### `GET /api/servicios-conexos/exportar-excel`
+Descarga el catálogo a Excel con las mismas 12 columnas que lee el importador — el mismo
+archivo sirve para editar y reimportar como actualización. S5-HU-19/#261: admite los
+mismos filtros que el listado.
+
+- **Roles**: Todos.
+
+| Query | | Tipo | Restricción |
+|---|---|---|---|
+| `q` | *opcional* | string | texto libre sobre `tipoServicio`/`codigoServicio` |
+| `categoria` | *opcional* | string | `logistico` \| `adicional` |
+
+- **→** `200`, archivo `.xlsx` (sin filtros, exporta el catálogo completo)
+
+#### `GET /api/servicios-conexos/plantilla-excel/{tipo}`
+Plantilla de Excel descargable por tipo de servicio — cada una trae SOLO las columnas
+que ese tipo necesita (S5-HU-19/#261, corrige #249: antes las 4 traían las mismas 12).
+Sin fila de datos de ejemplo cargable: la fila 2 solo pre-llena las columnas
+verdaderamente fijas de ese tipo (p. ej. `unidad`/`categoria`); subida sin editar, no
+crea ningún registro.
+
+- **Roles**: Todos.
+- **`tipo`** (ruta): `almacenamiento` \| `itr` \| `precinto` \| `acompanamiento`.
+- **→** `200`, archivo `.xlsx`
+- **Errores**: `400 TIPO_PLANTILLA_INVALIDO`
 
 ### 3.10 Tarifas Ganadas (biblioteca propia) — `/api/tarifas-historicas`
 
@@ -1343,7 +1465,7 @@ abiertos a los 6 roles.
 | `POST /api/cotizaciones` · `aplicar-propuestas` | ✅ | ✅ | ✅ | | | ✅ |
 | `POST /api/cotizaciones/{id}/resultado` | ✅ | | | | | ✅ |
 | `POST /api/cotizaciones/{id}/lineas` · `entregar` | | ✅ | ✅ | | | ✅ |
-| `POST /api/cotizaciones/{id}/conexos` | ✅ | ✅ | | | | ✅ |
+| `POST/PATCH/DELETE /api/cotizaciones/{id}/conexos` | ✅ | ✅ | | | | ✅ |
 | Vigencia plaza SAP (`PATCH`, `POST masivo`, `DELETE`) | | ✅ | ✅ | | | ✅ |
 | `/api/reglas-solo-sicetac` (todo, incluido `GET`) | | | ✅ | | | ✅ |
 | `POST/PATCH /api/servicios-conexos`, `importar-excel` | | | ✅ | ✅ | | ✅ |

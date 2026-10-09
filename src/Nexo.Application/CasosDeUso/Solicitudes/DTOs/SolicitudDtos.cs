@@ -104,8 +104,15 @@ public record clsClienteBusquedaDto(Guid? ClienteId, string? Bp, string Nit, str
     public string NitCliente => Nit;
 }
 
-/// <summary>Municipio costeable para Origen/Destino del formulario de captura.</summary>
-public record clsCiudadBusquedaDto(string Municipio, string Departamento);
+/// <summary>
+/// Municipio para Origen/Destino del formulario de captura (S5-HU-16.1/#254). Antes solo
+/// traía Municipio/Departamento como texto, resuelto en vivo contra tblSAPDANE; ahora sale
+/// de tbl_municipios e incluye Id/CodigoDane/NombreTarifasPlaza(ZC)/ZonaTarificacion(ZTC) —
+/// la base para que SICE-TAC (#255) y plaza/histórico (#256) dejen de comparar por texto.
+/// </summary>
+public record clsCiudadBusquedaDto(
+    int Id, string CodigoDane, string Municipio, string Departamento,
+    string? NombreTarifasPlaza, string? ZonaTarificacion);
 
 /// <summary>Estimación del aprovisionamiento del contenedor (viaje vacío levante → origen).</summary>
 public record clsAprovisionamientoDto(clsCandidatoTarifaDto? Candidato);

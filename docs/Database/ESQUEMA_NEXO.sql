@@ -88,6 +88,10 @@ CREATE TABLE [db_NEXO].[tbl_rutas] (
     [Id] uniqueidentifier NOT NULL,
     [Origen] nvarchar(150) NOT NULL,
     [Destino] nvarchar(150) NOT NULL,
+    -- S5-HU-16.1/#254: código DANE real del Origen/Destino (FK a tbl_municipios), NULL en
+    -- rutas creadas antes de esta issue o cuyo texto no resolvió contra el catálogo.
+    [OrigenMunicipioId] int NULL,
+    [DestinoMunicipioId] int NULL,
     [CreatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset()),
     [UpdatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset())
     , CONSTRAINT [PK_rutas] PRIMARY KEY ([Id])
@@ -336,6 +340,10 @@ CREATE TABLE [db_NEXO].[tbl_cotizacion_conexos] (
     [ServicioConexoId] uniqueidentifier NULL,
     [Cantidad] decimal(12,2) NOT NULL,
     [ValorAplicado] decimal(18,2) NOT NULL,
+    -- S5-HU-18/#262: 'individual' | 'general' — trazabilidad de si el usuario lo agregó a
+    -- esta línea puntual o pidió agregarlo a todas las líneas de una sola vez (que de
+    -- todas formas crea una fila por línea, cada una CON su CotizacionLineaId).
+    [Origen] nvarchar(20) NOT NULL DEFAULT (N'individual'),
     [CreatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset()),
     [UpdatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset())
     , CONSTRAINT [PK_cotizacion_conexos] PRIMARY KEY ([Id])
@@ -693,6 +701,8 @@ ALTER TABLE [db_NEXO].[tbl_cotizaciones] ADD CONSTRAINT [FK_cotizaciones_usuario
 ALTER TABLE [db_NEXO].[tbl_items_plan_cargue] ADD CONSTRAINT [FK_items_plan_cargue_planes_cargue_PlanCargueId] FOREIGN KEY ([PlanCargueId]) REFERENCES [db_NEXO].[tbl_planes_cargue] ([Id]) ON DELETE CASCADE;
 ALTER TABLE [db_NEXO].[tbl_lineas_solicitud] ADD CONSTRAINT [FK_lineas_solicitud_configuraciones_vehiculo_ConfigVehiculoId] FOREIGN KEY ([ConfigVehiculoId]) REFERENCES [db_NEXO].[tbl_configuraciones_vehiculo] ([Id]);
 ALTER TABLE [db_NEXO].[tbl_lineas_solicitud] ADD CONSTRAINT [FK_lineas_solicitud_rutas_RutaId] FOREIGN KEY ([RutaId]) REFERENCES [db_NEXO].[tbl_rutas] ([Id]);
+ALTER TABLE [db_NEXO].[tbl_rutas] ADD CONSTRAINT [FK_rutas_municipios_OrigenMunicipioId] FOREIGN KEY ([OrigenMunicipioId]) REFERENCES [db_NEXO].[tbl_municipios] ([Id]);
+ALTER TABLE [db_NEXO].[tbl_rutas] ADD CONSTRAINT [FK_rutas_municipios_DestinoMunicipioId] FOREIGN KEY ([DestinoMunicipioId]) REFERENCES [db_NEXO].[tbl_municipios] ([Id]);
 ALTER TABLE [db_NEXO].[tbl_lineas_solicitud] ADD CONSTRAINT [FK_lineas_solicitud_solicitudes_SolicitudId] FOREIGN KEY ([SolicitudId]) REFERENCES [db_NEXO].[tbl_solicitudes] ([Id]) ON DELETE CASCADE;
 ALTER TABLE [db_NEXO].[OutboxMessage] ADD CONSTRAINT [FK_OutboxMessage_InboxState_InboxMessageId_InboxConsumerId] FOREIGN KEY ([InboxMessageId], [InboxConsumerId]) REFERENCES [db_NEXO].[InboxState] ([MessageId], [ConsumerId]);
 ALTER TABLE [db_NEXO].[OutboxMessage] ADD CONSTRAINT [FK_OutboxMessage_OutboxState_OutboxId] FOREIGN KEY ([OutboxId]) REFERENCES [db_NEXO].[OutboxState] ([OutboxId]);

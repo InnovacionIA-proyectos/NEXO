@@ -60,7 +60,7 @@ public class clsCapturaSolicitudesController(
             lr.ClaseContenedor, lr.Exclusivo, lr.Consolidado, lr.RetornaContenedor, lr.CiudadDevolucionContenedor,
             lr.LevanteContenedorDiferente, lr.CiudadLevanteContenedor, lr.ValorAprovisionamiento, lr.Peso, lr.ValorMercancia,
             lr.Posiciones?.Select(p => new clsPosicionCargaDto(p.Descripcion, p.Cantidad, p.LargoCm, p.AnchoCm, p.AltoCm, p.PesoKg)).ToList(),
-            lr.HorasCargue, lr.HorasDescargue
+            lr.HorasCargue, lr.HorasDescargue, lr.OrigenMunicipioId, lr.DestinoMunicipioId
         )).ToList();
 
         var command = new clsCapturarSolicitudCommand(
@@ -106,15 +106,17 @@ public class clsCapturaSolicitudesController(
     public async Task<ActionResult<IReadOnlyList<clsClienteBusquedaDto>>> Clientes([FromQuery] string? q, CancellationToken ct = default)
         => Ok(await buscarClientes.Handle(new clsBuscarClientesQuery(q), ct));
 
-    /// <summary>Departamentos del catálogo de ciudades costeables.</summary>
+    /// <summary>Departamentos de Colombia con municipio en tbl_municipios (S5-HU-16.1/#254).</summary>
     [HttpGet("departamentos")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyList<string>>> Departamentos(CancellationToken ct = default)
         => Ok(await listarDepartamentos.Handle(new clsListarDepartamentosQuery(), ct));
 
     /// <summary>
-    /// Búsqueda de ciudades para Origen/Destino, filtrable por departamento y/o texto —
-    /// mismo catálogo "costeable" en ambos casos.
+    /// Búsqueda de ciudades para Origen/Destino, filtrable por departamento y/o texto.
+    /// S5-HU-16.1/#254: el frontend debe capturar el "id" de la ciudad elegida y enviarlo
+    /// como origenMunicipioId/destinoMunicipioId al crear la solicitud (ver
+    /// clsCapturaLineaRequest) — es lo que permite a #255/#256 dejar de comparar por texto.
     /// </summary>
     [HttpGet("ciudades")]
     [ProducesResponseType(StatusCodes.Status200OK)]

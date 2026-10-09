@@ -10,6 +10,7 @@ using Nexo.Application.Common.Exceptions;
 using Nexo.Application.Common.Ports;
 using Nexo.Domain.Catalogos.Entidades;
 using Nexo.Domain.Common;
+using Nexo.Domain.Costeo.Entidades;
 using Nexo.Domain.Costeo.Reglas;
 using Nexo.Domain.Enums;
 using Nexo.Domain.Solicitudes.Entidades;
@@ -79,7 +80,8 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
     public async Task<clsResultadoDeCosteo> ProponerParaLineaAsync(Guid lineaId, CancellationToken ct = default)
     {
         var linea = await _db.LineasSolicitud.AsNoTracking()
-            .Include(l => l.clsRuta)
+            .Include(l => l.clsRuta).ThenInclude(r => r!.OrigenMunicipio)
+            .Include(l => l.clsRuta).ThenInclude(r => r!.DestinoMunicipio)
             .Include(l => l.clsConfiguracionVehiculo)
             .Include(l => l.clsSolicitud)
             .FirstOrDefaultAsync(l => l.Id == lineaId, ct)
@@ -101,7 +103,7 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
         var dc = _dcConfigurado ? scope.ServiceProvider.GetService<clsDbSolucionesTiDbContext>() : null;
         var tarifario = scope.ServiceProvider.GetRequiredService<ITarifarioSapPort>();
 
-        var dto = await ProponerLineaAsync(dw, dc, tarifario, linea, ajustes, soloSice, horasSolicitud, ct);
+        var dto = await ProponerLineaAsync(_db, dw, dc, tarifario, linea, ajustes, soloSice, horasSolicitud, ct);
         await PublicarVencidaSiAplicaAsync(dto, ct);
         return new clsResultadoDeCosteo(dto.ValorPropuesto, dto.FuentePropuesta, dto.Justificacion);
     }
@@ -130,7 +132,8 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
     public async Task<clsPropuestaSolicitudDto> ProponerAsync(Guid solicitudId, CancellationToken ct = default)
     {
         var solicitud = await _db.Solicitudes.AsNoTracking()
-            .Include(s => s.Lineas).ThenInclude(l => l.clsRuta)
+            .Include(s => s.Lineas).ThenInclude(l => l.clsRuta).ThenInclude(r => r!.OrigenMunicipio)
+            .Include(s => s.Lineas).ThenInclude(l => l.clsRuta).ThenInclude(r => r!.DestinoMunicipio)
             .Include(s => s.Lineas).ThenInclude(l => l.clsConfiguracionVehiculo)
             .FirstOrDefaultAsync(s => s.Id == solicitudId, ct)
             ?? throw new clsNotFoundException("SOLICITUD_NO_ENCONTRADA", "clsSolicitud no encontrada.");
@@ -170,11 +173,19 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
             try
             {
                 using var scope = _scopes.CreateScope();
+                // S5-HU-18/#262: DbContext propio por tarea en paralelo — antes
+                // ProponerLineaAsync usaba `_db` (el de la instancia, compartido) para
+                // tbl_tarifas_plaza/histórico/rangos de peso, mientras que dw/dc sí tenían
+                // scope propio. EF Core no es thread-safe: con varios grupos corriendo a
+                // la vez, eso producía InvalidOperationException intermitentes ("A second
+                // operation was started on this context instance before a previous
+                // operation completed").
+                var dbGrupo = scope.ServiceProvider.GetRequiredService<clsNexoDbContext>();
                 var dw = _dwConfigurado ? scope.ServiceProvider.GetService<clsDwSiceDbContext>() : null;
                 var dc = _dcConfigurado ? scope.ServiceProvider.GetService<clsDbSolucionesTiDbContext>() : null;
                 var tarifario = scope.ServiceProvider.GetRequiredService<ITarifarioSapPort>();
                 var horasGrupo = HorasEfectivasDeLinea(grupo.First(), horasSolicitud);
-                var dto = await ProponerLineaAsync(dw, dc, tarifario, grupo.First(), ajustes, soloSice, horasGrupo, ct);
+                var dto = await ProponerLineaAsync(dbGrupo, dw, dc, tarifario, grupo.First(), ajustes, soloSice, horasGrupo, ct);
                 return grupo.Select(l => dto with { LineaId = l.Id }).ToList();
             }
             catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
@@ -183,8 +194,15 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
                 // llevarse los demás. Task.WhenAll falla rápido y descarta hasta los grupos
                 // que ya habían terminado bien si uno solo lanza — por eso el catch va AQUÍ,
                 // por grupo, y no alrededor del WhenAll.
+                //
+                // S5-HU-18/#262: ya NO se interpola ex.Message en la justificación — antes
+                // un fallo técnico (ej. la carrera de DbContext de arriba, o cualquier otra
+                // excepción de infraestructura) se mostraba crudo en la Mesa de Costeo
+                // ("A second operation was started on this context instance..."). Es un
+                // mensaje de negocio fijo; el detalle técnico queda solo para quien revise
+                // logs del servidor, no para el usuario.
                 var primera = grupo.First();
-                var justificacion = $"No se pudo consultar la Biblioteca para esta línea: {ex.Message}";
+                const string justificacion = "No se pudo consultar la Biblioteca para esta línea. Intente de nuevo o revise manualmente.";
                 return grupo.Select(l => new clsPropuestaLineaDto(
                     l.Id, $"{primera.clsRuta?.Origen} → {primera.clsRuta?.Destino}", primera.clsConfiguracionVehiculo?.TipoVehiculo,
                     l.Peso, null, null, null, null, null, justificacion)).ToList();
@@ -207,7 +225,7 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
         linea.HorasCargue is { } hc && linea.HorasDescargue is { } hd ? hc + hd : horasSolicitud;
 
     private async Task<clsPropuestaLineaDto> ProponerLineaAsync(
-        clsDwSiceDbContext? dw, clsDbSolucionesTiDbContext? dc, ITarifarioSapPort tarifario,
+        clsNexoDbContext db, clsDwSiceDbContext? dw, clsDbSolucionesTiDbContext? dc, ITarifarioSapPort tarifario,
         clsLineaSolicitud linea, IReadOnlyDictionary<int, DateTime> ajustesVigencia,
         IReadOnlySet<string> soloSice, decimal horasSolicitud, CancellationToken ct)
     {
@@ -222,16 +240,23 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
         var destino = Normalizar(linea.clsRuta.Destino);
         var vehiculo = linea.clsConfiguracionVehiculo?.TipoVehiculo;
 
-        // Clave canónica de Domain, la MISMA que usan quien guarda la regla y el
-        // repositorio que las lee. Antes se comparaban los valores crudos de la ruta
-        // contra claves ya normalizadas y la regla no se aplicaba en silencio (ver
-        // clsClaveDeRutaTests en Domain.Tests). La clave usa las 3 llaves (ruta + tipo
-        // de vehículo), no solo las 2 de la ruta: antes, marcar un único tipo de
-        // vehículo como "solo SICE-TAC" apagaba la comparación contra plaza para
-        // TODOS los tipos de vehículo de esa ruta.
-        if (soloSice.Contains(clsTexto.ClaveRutaVehiculo(linea.clsRuta.Origen, linea.clsRuta.Destino, vehiculo)))
+        // S5-HU-16.1/#254 + S5-HU-16.2/#255: código DANE real del municipio (tbl_municipios),
+        // cuando la ruta ya resolvió contra el buscador de ciudades — null en rutas viejas
+        // o con texto que no matcheó ningún municipio (ver clsResolucionDeCatalogos).
+        var origenDane = linea.clsRuta.OrigenMunicipio?.CodigoDane;
+        var destinoDane = linea.clsRuta.DestinoMunicipio?.CodigoDane;
+        var origenMunicipioId = linea.clsRuta.OrigenMunicipioId;
+        var destinoMunicipioId = linea.clsRuta.DestinoMunicipioId;
+
+        // Clave por DANE (tbl_reglas_solo_sicetac.Origen/Destino SIEMPRE están en código
+        // DANE — carga masiva S4-HU-09.2): antes comparaba contra el nombre de ciudad en
+        // texto libre de la ruta y nunca coincidía (#255). Sin DANE resuelto para ambos
+        // lados, la ruta no puede marcarse "solo SICE-TAC" por esta vía (igual que hoy,
+        // sin regresión — antes tampoco coincidía nunca).
+        if (origenDane is not null && destinoDane is not null &&
+            soloSice.Contains(clsTexto.ClaveRutaVehiculo(origenDane, destinoDane, vehiculo)))
         {
-            var sice = dw is null ? null : await CandidatoSicetacAsync(dw, origen, destino, vehiculo, linea.Tipologia, linea.clsConfiguracionVehiculo?.Carroceria, horasSolicitud, ct);
+            var sice = dw is null ? null : await CandidatoSicetacAsync(dw, origen, destino, origenDane, destinoDane, vehiculo, linea.Tipologia, linea.clsConfiguracionVehiculo?.Carroceria, horasSolicitud, ct);
             var justif = sice is not null
                 ? $"clsRuta marcada como SOLO SICE-TAC por el Administrador: se propone el piso SICE-TAC ({sice.Valor:C0}) sin comparar con plaza ni tarifario."
                 : "clsRuta marcada como SOLO SICE-TAC, pero no hay piso SICE-TAC para la ruta/periodo: la línea requiere atención manual.";
@@ -260,8 +285,18 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
         // docs/decisiones/matching-sicetac-oficial-vs-solo-sicetac.md.
         clsCandidatoTarifaDto? plaza = oficial?.Tarifa;
         var vencida = oficial?.Vencida == true;
+
+        // S5-HU-16.3/#256: antes de caer a la tabla externa (SAP), se consulta primero
+        // nuestra propia tbl_tarifas_plaza (sembrada en S4-HU-10.1/10.2) — match exacto
+        // por Id de municipio, no por texto ni DANE. Solo corre si la ruta ya resolvió
+        // ambos municipios (#254); si no, se salta directo al fallback externo, igual
+        // que antes de esta issue.
+        if (plaza is null && origenMunicipioId is not null && destinoMunicipioId is not null)
+            plaza = await CandidatoPlazaPropiaAsync(db, origenMunicipioId.Value, destinoMunicipioId.Value, vehiculo, linea.Peso, ct);
         if (plaza is null && dc is not null)
-            plaza = await CandidatoSapAsync(dc, dc.TarifasPlazaSap, "plaza", origen, destino, vehiculo, linea.Peso, soloVigentes: true, ajustesVigencia, ct);
+            plaza = await CandidatoSapAsync(
+                dc, dc.TarifasPlazaSap, "plaza", linea.clsRuta.OrigenMunicipio, linea.clsRuta.DestinoMunicipio,
+                vehiculo, linea.Peso, soloVigentes: true, ajustesVigencia, ct);
 
         // clsTarifarioSapAdapter.SicetacOficialAsync (réplica 1:1 de la lógica SAP
         // legada) exige match exacto de Configuracion/TipoCarga/UnidadTransporte/
@@ -276,9 +311,17 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
         // reglas de negocio).
         var sicetac = oficial?.SicetacOficial;
         if (sicetac is null && dw is not null)
-            sicetac = await CandidatoSicetacAsync(dw, origen, destino, vehiculo, linea.Tipologia, linea.clsConfiguracionVehiculo?.Carroceria, horasSolicitud, ct);
+            sicetac = await CandidatoSicetacAsync(dw, origen, destino, origenDane, destinoDane, vehiculo, linea.Tipologia, linea.clsConfiguracionVehiculo?.Carroceria, horasSolicitud, ct);
 
-        var historico = dc is null ? null : await CandidatoSapAsync(dc, dc.TarifasLogSap, "historico_sap", origen, destino, vehiculo, linea.Peso, soloVigentes: false, ajustesVigencia, ct, ventanaMeses: 3);
+        // S5-HU-16.3/#256: mismo criterio que "plaza" — primero tbl_tarifas_plaza_historico
+        // (propia), si no hay nada ahí, el log externo de SAP.
+        clsCandidatoTarifaDto? historico = null;
+        if (origenMunicipioId is not null && destinoMunicipioId is not null)
+            historico = await CandidatoHistoricoPropioAsync(db, origenMunicipioId.Value, destinoMunicipioId.Value, vehiculo, linea.Peso, ct);
+        if (historico is null && dc is not null)
+            historico = await CandidatoSapAsync(
+                dc, dc.TarifasLogSap, "historico_sap", linea.clsRuta.OrigenMunicipio, linea.clsRuta.DestinoMunicipio,
+                vehiculo, linea.Peso, soloVigentes: false, ajustesVigencia, ct, ventanaMeses: 3);
 
         // Conexión SAP nueva (plaza en vivo), todavía no construida por "el equipo de
         // conexiones". Con SapTarifaFleteEnVivo:Modo en Deshabilitado (default) o
@@ -348,22 +391,23 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
         if (dw is null) return null;
 
         // Sin contexto de solicitud (es una estimación de tramo de posicionamiento, no de
-        // una línea): horasSolicitud null, siempre usa el ValorSiceConHora de DWSice.
+        // una línea, sin clsRuta/municipio resuelto): horasSolicitud null, siempre usa el
+        // ValorSiceConHora de DWSice, y sigue comparando por texto (sin DANE disponible).
         return await CandidatoSicetacAsync(
-            dw, Normalizar(ciudadLevante), Normalizar(origen), configuracion,
+            dw, Normalizar(ciudadLevante), Normalizar(origen), origenDane: null, destinoDane: null, configuracion,
             "VACIO", tipologia: null, carroceria: null, horasSolicitud: null, ct);
     }
 
     private Task<clsCandidatoTarifaDto?> CandidatoSicetacAsync(
-        clsDwSiceDbContext dw, string origen, string destino, string? vehiculo,
+        clsDwSiceDbContext dw, string origen, string destino, string? origenDane, string? destinoDane, string? vehiculo,
         TipologiaCarga? tipologia, string? carroceria, decimal? horasSolicitud, CancellationToken ct)
-        => CandidatoSicetacAsync(dw, origen, destino, vehiculo, "CARGADO", tipologia, carroceria, horasSolicitud, ct);
+        => CandidatoSicetacAsync(dw, origen, destino, origenDane, destinoDane, vehiculo, "CARGADO", tipologia, carroceria, horasSolicitud, ct);
 
     private async Task<clsCandidatoTarifaDto?> CandidatoSicetacAsync(
-        clsDwSiceDbContext dw, string origen, string destino, string? vehiculo, string condicionCarga,
-        TipologiaCarga? tipologia, string? carroceria, decimal? horasSolicitud, CancellationToken ct)
+        clsDwSiceDbContext dw, string origen, string destino, string? origenDane, string? destinoDane, string? vehiculo,
+        string condicionCarga, TipologiaCarga? tipologia, string? carroceria, decimal? horasSolicitud, CancellationToken ct)
     {
-        var (fila, criterio) = await ResolverFilaSiceAsync(dw, origen, destino, vehiculo, condicionCarga, tipologia, carroceria, ct);
+        var (fila, criterio) = await ResolverFilaSiceAsync(dw, origen, destino, origenDane, destinoDane, vehiculo, condicionCarga, tipologia, carroceria, ct);
         if (fila is null) return null;
 
         // S4-HU-14.1/#221: piso recalculado con las horas reales de la solicitud en vez
@@ -390,7 +434,7 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
         if (dw is null) return null;
 
         var (fila, _) = await ResolverFilaSiceAsync(
-            dw, Normalizar(origen), Normalizar(destino), vehiculo, "CARGADO", tipologia, carroceria, ct);
+            dw, Normalizar(origen), Normalizar(destino), origenDane: null, destinoDane: null, vehiculo, "CARGADO", tipologia, carroceria, ct);
         if (fila is null) return null;
 
         return new clsPisoSicetacVigenteDto(
@@ -399,24 +443,50 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
             fila.CondicionCarga ?? "CARGADO");
     }
 
-    /// <summary>Resuelve la fila de DWSice: mismo camino para la propuesta automática
-    /// (<see cref="CandidatoSicetacAsync(clsDwSiceDbContext, string, string, string?, string, TipologiaCarga?, string?, CancellationToken)"/>)
-    /// y para Mesa de Costeo (<see cref="PisoSicetacVigenteAsync"/>) — una sola consulta
-    /// a mantener, dos formas distintas de exponer el resultado.</summary>
+    /// <summary>
+    /// Resuelve la fila de DWSice: mismo camino para la propuesta automática y para
+    /// Mesa de Costeo (<see cref="PisoSicetacVigenteAsync"/>) — una sola consulta a
+    /// mantener, dos formas distintas de exponer el resultado.
+    /// S5-HU-16.2/#255: con <paramref name="origenDane"/>/<paramref name="destinoDane"/>
+    /// (tbl_municipios.CodigoDane) compara EXACTO contra
+    /// tblRutasSicetac.ORIGEN/DESTINO — confirmado con datos reales que esa tabla
+    /// guarda el mismo código DANE pero SIN el cero a la izquierda del departamento
+    /// (tbl_municipios "05001000" ~ DWSice "5001000"), de ahí el TrimStart('0'). Sin
+    /// DANE (ruta vieja sin backfill, o texto que no resolvió ningún municipio — ver
+    /// #254) cae al LIKE de texto contra NOMBRERUTA, igual que antes de esta issue.
+    /// La tabla tiene ~2.1 millones de filas por periodo: el filtro exacto por DANE,
+    /// además de corregir el match, es muchísimo más barato que el LIKE.
+    /// </summary>
     private async Task<(clsRutaSicetacDw? Fila, string Criterio)> ResolverFilaSiceAsync(
-        clsDwSiceDbContext dw, string origen, string destino, string? vehiculo, string condicionCarga,
-        TipologiaCarga? tipologia, string? carroceria, CancellationToken ct)
+        clsDwSiceDbContext dw, string origen, string destino, string? origenDane, string? destinoDane,
+        string? vehiculo, string condicionCarga, TipologiaCarga? tipologia, string? carroceria, CancellationToken ct)
     {
         var periodo = await PeriodoSiceAsync(dw, ct);
         if (periodo == 0) return (null, string.Empty);
 
-        var baseQ = dw.RutasSicetac.AsNoTracking().Where(r =>
-            r.Periodo == periodo &&
-            r.CondicionCarga == condicionCarga &&
-            EF.Functions.Like(r.NombreRuta, $"%{origen}%-%{destino}%"));
-
-        var criterio = $"periodo {periodo} · {condicionCarga} · ruta ~ '{origen} - {destino}'";
-        var claveBase = $"sice-filas:{periodo}:{condicionCarga}:{origen}:{destino}";
+        IQueryable<clsRutaSicetacDw> baseQ;
+        string criterio;
+        string claveRuta;
+        if (origenDane is not null && destinoDane is not null)
+        {
+            var origenSinCeros = origenDane.TrimStart('0');
+            var destinoSinCeros = destinoDane.TrimStart('0');
+            baseQ = dw.RutasSicetac.AsNoTracking().Where(r =>
+                r.Periodo == periodo && r.CondicionCarga == condicionCarga &&
+                r.Origen == origenSinCeros && r.Destino == destinoSinCeros);
+            criterio = $"periodo {periodo} · {condicionCarga} · ruta DANE {origenDane}-{destinoDane}";
+            claveRuta = $"dane:{origenSinCeros}:{destinoSinCeros}";
+        }
+        else
+        {
+            baseQ = dw.RutasSicetac.AsNoTracking().Where(r =>
+                r.Periodo == periodo &&
+                r.CondicionCarga == condicionCarga &&
+                EF.Functions.Like(r.NombreRuta, $"%{origen}%-%{destino}%"));
+            criterio = $"periodo {periodo} · {condicionCarga} · ruta ~ '{origen} - {destino}'";
+            claveRuta = $"txt:{origen}:{destino}";
+        }
+        var claveBase = $"sice-filas:{periodo}:{condicionCarga}:{claveRuta}";
 
         clsRutaSicetacDw? fila = null;
         if (!string.IsNullOrWhiteSpace(vehiculo))
@@ -485,25 +555,122 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
         return periodo;
     }
 
+    // --------------------------------------------- tbl_tarifas_plaza / histórico (propias)
+
+    private sealed record clsCandidatoPropioRow(decimal Valor, DateOnly Vigencia, string DetallesTarifa, int? PesoId, string? TipoVehiculo);
+
+    /// <summary>S5-HU-16.3/#256: candidato "plaza" contra nuestra propia tbl_tarifas_plaza
+    /// (sembrada en S4-HU-10.1/10.2) — match EXACTO por Id de municipio, nunca por texto
+    /// ni DANE. "Vigente" aquí es Vigencia &lt;= hoy (fecha desde la que aplica el precio;
+    /// convención inversa a las tablas SAP externas, donde Vigencia es la fecha hasta la
+    /// que el precio sigue siendo válido — confirmado contra datos reales: los 107 registros
+    /// migrados en S4-HU-10.1 traen Vigencia = fecha de la migración, ya pasada).
+    ///
+    /// S5-HU-18/#262: recibe el <see cref="clsNexoDbContext"/> por parámetro (no usa
+    /// el campo `_db` de la instancia) — este método corre dentro de las tareas en
+    /// paralelo de <see cref="ProponerAsync"/>, y EF Core no es thread-safe. Antes de
+    /// esta issue sí usaba `_db` compartido ahí, causando InvalidOperationException
+    /// intermitentes ("A second operation was started on this context instance before
+    /// a previous operation completed") cuando dos grupos corrían a la vez.</summary>
+    private Task<clsCandidatoTarifaDto?> CandidatoPlazaPropiaAsync(
+        clsNexoDbContext db, int origenMunicipioId, int destinoMunicipioId, string? vehiculo, decimal? peso, CancellationToken ct)
+    {
+        var hoy = DateOnly.FromDateTime(_clock.GetUtcNow().Date);
+        var query = db.TarifasPlaza.AsNoTracking()
+            .Where(t => t.OrigenMunicipioId == origenMunicipioId && t.DestinoMunicipioId == destinoMunicipioId && t.Vigencia <= hoy)
+            .Select(t => new clsCandidatoPropioRow(t.Valor, t.Vigencia, t.DetallesTarifa, t.PesoId, t.TipoVehiculo));
+        return CandidatoPropioAsync(db, query, vehiculo, peso, "plaza", "tbl_tarifas_plaza", ct);
+    }
+
+    /// <summary>Mismo criterio que <see cref="CandidatoPlazaPropiaAsync"/>, contra
+    /// tbl_tarifas_plaza_historico (la llena solo el trigger de BD, nunca la app).</summary>
+    private Task<clsCandidatoTarifaDto?> CandidatoHistoricoPropioAsync(
+        clsNexoDbContext db, int origenMunicipioId, int destinoMunicipioId, string? vehiculo, decimal? peso, CancellationToken ct)
+    {
+        var hoy = DateOnly.FromDateTime(_clock.GetUtcNow().Date);
+        var query = db.TarifasPlazaHistorico.AsNoTracking()
+            .Where(t => t.OrigenMunicipioId == origenMunicipioId && t.DestinoMunicipioId == destinoMunicipioId && t.Vigencia <= hoy)
+            .Select(t => new clsCandidatoPropioRow(t.Valor, t.Vigencia, t.DetallesTarifa, t.PesoId, t.TipoVehiculo));
+        return CandidatoPropioAsync(db, query, vehiculo, peso, "historico_sap", "tbl_tarifas_plaza_historico", ct);
+    }
+
+    /// <summary>
+    /// Vehículo/peso son filtros TOLERANTES (igual que el fallback externo de siempre):
+    /// solo se aplican si dejan al menos una fila — si no, se ignoran y se toma la de
+    /// mayor valor entre todas las que ya cumplen municipio+vigencia. Materializa después
+    /// del filtro por municipio+vigencia (tbl_tarifas_plaza/histórico son tablas chicas,
+    /// ~100-300 filas): EF Core no traduce un Where posterior sobre una propiedad de
+    /// <see cref="clsCandidatoPropioRow"/> ya proyectado (confirmado al verificar esta
+    /// issue — "could not be translated"), así que el resto se filtra en memoria.
+    /// </summary>
+    private async Task<clsCandidatoTarifaDto?> CandidatoPropioAsync(
+        clsNexoDbContext db, IQueryable<clsCandidatoPropioRow> query, string? vehiculo, decimal? peso, string fuente, string tabla, CancellationToken ct)
+    {
+        var candidatos = await query.ToListAsync(ct);
+
+        if (!string.IsNullOrWhiteSpace(vehiculo))
+        {
+            var conVehiculo = candidatos.Where(t => t.TipoVehiculo == vehiculo).ToList();
+            if (conVehiculo.Count > 0) candidatos = conVehiculo;
+        }
+
+        if (peso is not null)
+        {
+            var pesoId = await db.RangosPeso.AsNoTracking()
+                .Where(r => r.PesoMinimo <= peso && (r.PesoMaximo == null || peso <= r.PesoMaximo))
+                .Select(r => (int?)r.Id).FirstOrDefaultAsync(ct);
+            if (pesoId is not null)
+            {
+                var conPeso = candidatos.Where(t => t.PesoId == pesoId).ToList();
+                if (conPeso.Count > 0) candidatos = conPeso;
+            }
+        }
+
+        var top = candidatos.OrderByDescending(t => t.Valor).FirstOrDefault();
+        if (top is null || top.Valor <= 0) return null;
+
+        return new clsCandidatoTarifaDto(
+            fuente, top.Valor,
+            $"vigencia {top.Vigencia:yyyy-MM-dd}" + (top.DetallesTarifa is { Length: > 0 } ? $" · {top.DetallesTarifa}" : ""),
+            $"{tabla} (propia) · municipios", 1);
+    }
+
     // ------------------------------------------------------------- SAP (plaza e histórico)
 
+    /// <summary>Códigos de zona SAP (ZC_/ZTC_) de un municipio ya resuelto — ver
+    /// clsMunicipio.NombreTarifasPlaza/ZonaTarificacion. Vacío (nunca matchea nada) si el
+    /// municipio es null o no tiene ninguno de los dos códigos poblados.</summary>
+    private static IReadOnlyList<string> CodigosZonaSap(clsMunicipio? municipio) =>
+        new[] { municipio?.NombreTarifasPlaza, municipio?.ZonaTarificacion }
+            .Where(c => !string.IsNullOrWhiteSpace(c)).Select(c => c!).ToList();
+
+    /// <summary>
+    /// S5-HU-16.3/#256: Origen/Destino de tblSAPTarifas/tblSAPTarifasLog guardan código
+    /// DIVIPOLA o zona SAP (ZC_/ZTC_) — <see cref="Nexo.Infrastructure.External.clsSapTarifaBase"/>.
+    /// Antes se resolvía un código DANE (tblSAPDANE) y, si no servía, cualquier fila cuyo
+    /// Origen/Destino *contuviera* ese texto como substring (LIKE) — ninguno de los dos es
+    /// el criterio real. Ahora compara EXACTO contra los códigos ZC_/ZTC_ ya cruzados en
+    /// tbl_municipios (seeder S4-HU-09.1). Sin municipio resuelto para alguno de los dos
+    /// lados (#254), o sin ningún código de zona poblado, no hay match posible — se
+    /// devuelve null (la fuente no aplica), nunca se adivina.
+    /// </summary>
     private async Task<clsCandidatoTarifaDto?> CandidatoSapAsync<T>(
-        clsDbSolucionesTiDbContext dc, IQueryable<T> tabla, string fuente, string origen, string destino,
+        clsDbSolucionesTiDbContext dc, IQueryable<T> tabla, string fuente,
+        clsMunicipio? origenMunicipio, clsMunicipio? destinoMunicipio,
         string? vehiculo, decimal? peso, bool soloVigentes,
         IReadOnlyDictionary<int, DateTime> ajustesVigencia, CancellationToken ct,
         int? ventanaMeses = null) where T : clsSapTarifaBase
     {
-        var codigosOrigen = await CodigosDaneAsync(dc, origen, ct);
-        var codigosDestino = await CodigosDaneAsync(dc, destino, ct);
+        var codigosOrigen = CodigosZonaSap(origenMunicipio);
+        var codigosDestino = CodigosZonaSap(destinoMunicipio);
+        if (codigosOrigen.Count == 0 || codigosDestino.Count == 0) return null;
 
-        var query = tabla.Where(t =>
-            (codigosOrigen.Contains(t.Origen) || EF.Functions.Like(t.Origen, $"%{origen}%")) &&
-            (codigosDestino.Contains(t.Destino) || EF.Functions.Like(t.Destino, $"%{destino}%")));
+        var query = tabla.Where(t => codigosOrigen.Contains(t.Origen) && codigosDestino.Contains(t.Destino));
 
         DateTime Efectiva(T t) => ajustesVigencia.TryGetValue(t.Id, out var v) ? v : t.Vigencia;
 
         var hoy = _clock.GetUtcNow().Date;
-        var criterio = $"origen ~ '{origen}' · destino ~ '{destino}'";
+        var criterio = $"origen zona ({string.Join(",", codigosOrigen)}) · destino zona ({string.Join(",", codigosDestino)})";
         if (soloVigentes)
         {
             var idsAjustados = ajustesVigencia.Keys.ToList();
@@ -533,7 +700,8 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
         }
 
         var ajustesClave = ajustesVigencia.Count == 0 ? "" : string.Join('-', ajustesVigencia.Keys.OrderBy(k => k));
-        var claveFetch = $"sap-filas:{fuente}:{origen}:{destino}:{vehiculo}:{soloVigentes}:{hoy:yyyyMMdd}:{ajustesClave}:{ventanaMeses}";
+        var zonaClave = $"{string.Join(',', codigosOrigen)}>{string.Join(',', codigosDestino)}";
+        var claveFetch = $"sap-filas:{fuente}:{zonaClave}:{vehiculo}:{soloVigentes}:{hoy:yyyyMMdd}:{ajustesClave}:{ventanaMeses}";
         var filas = (await _cache.GetOrCreateAsync(claveFetch, async e =>
         {
             e.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(3);
@@ -583,24 +751,6 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
             $"{top.Fila.Origen} → {top.Fila.Destino} · vigencia {vigenciaEfectiva:yyyy-MM-dd}{ajustada}" +
                 (top.Fila is clsSapTarifaPlaza { DetallesTarifa: { Length: > 0 } det } ? $" · {det}" : ""),
             criterio, candidatas.Count);
-    }
-
-    private async Task<List<string>> CodigosDaneAsync(clsDbSolucionesTiDbContext dc, string ciudad, CancellationToken ct)
-    {
-        var municipios = await _cache.GetOrCreateAsync("prop:dane-municipios", async e =>
-        {
-            e.AbsoluteExpirationRelativeToNow = CacheTtl;
-            var todos = await dc.CentrosPobladosDane
-                .Select(d => new { d.CodigoCentroPoblado, d.NombreMunicipio })
-                .ToListAsync(ct);
-            return todos.Select(d => (Codigo: d.CodigoCentroPoblado.Trim(), Nombre: Normalizar(d.NombreMunicipio))).ToList();
-        });
-
-        return municipios!
-            .Where(m => m.Nombre.Contains(ciudad) || ciudad.Contains(m.Nombre))
-            .Select(m => m.Codigo)
-            .Take(200)
-            .ToList();
     }
 
     private async Task<string?> IdVehiculoSapAsync(clsDbSolucionesTiDbContext dc, string codigoVehiculo, CancellationToken ct)

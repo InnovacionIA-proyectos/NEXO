@@ -1,4 +1,5 @@
 using Nexo.Application.CasosDeUso.Cotizaciones.DTOs;
+using Nexo.Application.CasosDeUso.ServiciosConexos.Mappers;
 using Nexo.Domain.Catalogos.Entidades;
 using Nexo.Domain.Cotizaciones.Entidades;
 using Nexo.Domain.Enums;
@@ -21,6 +22,7 @@ public static class clsCotizacionDtoMappers
                 l.ValorAprovisionamiento, l.ValorRetornoContenedor)).ToList(),
             c.Conexos.Select(x => new clsCotizacionConexoDto(
                 x.Id, x.CotizacionLineaId, x.ServicioConexoId, x.clsServicioConexo?.TipoServicio,
-                x.clsServicioConexo?.Categoria ?? "logistico", x.Cantidad, x.ValorAplicado)).ToList(),
+                x.clsServicioConexo?.Categoria ?? "logistico", x.Cantidad, x.ValorAplicado,
+                x.Origen, x.clsServicioConexo?.ToDto())).ToList(),
             c.EsAutoCosteo);
 }

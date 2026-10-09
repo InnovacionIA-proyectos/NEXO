@@ -164,4 +164,123 @@ public class clsCotizacionesTests
         var resp = await _fx.Client("Comercial").PostJson($"/api/cotizaciones/{cid}/resultado", new { resultado = "ganada" });
         Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
     }
+
+    // 7) S5-HU-18/#262 — origen (individual/general), dimensiones del servicio, PATCH/DELETE de conexos.
+
+    private async Task<(Guid cotizacion, Guid cotizacionLineaId)> NuevaCotizacionConLinea()
+    {
+        var cli = _fx.Client();
+        var (sid, lid) = await NuevaSolicitudConLinea();
+        var cid = (await (await cli.PostJson("/api/cotizaciones", new { solicitudId = sid })).Json()).GetProperty("id").GetGuid();
+        var lineaResp = await cli.PostJson($"/api/cotizaciones/{cid}/lineas", new { lineaSolicitudId = lid, valorFlete = 1_000_000, fuente = "manual" });
+        var cotizacionLineaId = (await lineaResp.Json()).GetProperty("lineas")[0].GetProperty("id").GetGuid();
+        return (cid, cotizacionLineaId);
+    }
+
+    [Fact]
+    public async Task Conexo_sin_origen_explicito_queda_individual_y_trae_las_dimensiones_del_servicio()
+    {
+        var cli = _fx.Client();
+        var (cid, lineaId) = await NuevaCotizacionConLinea();
+
+        var resp = await cli.PostJson($"/api/cotizaciones/{cid}/conexos",
+            new { items = new[] { new { lineaId, servicioConexoId = _fx.AnyServicioActivoId(), cantidad = 2 } } });
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+
+        var conexo = (await resp.Json()).GetProperty("conexos")[0];
+        Assert.Equal("individual", conexo.GetProperty("origen").GetString());
+        Assert.True(conexo.GetProperty("servicio").TryGetProperty("origen", out _), "debe traer las dimensiones del servicio");
+    }
+
+    [Fact]
+    public async Task Conexo_con_origen_general_queda_guardado()
+    {
+        var cli = _fx.Client();
+        var (cid, lineaId) = await NuevaCotizacionConLinea();
+
+        var resp = await cli.PostJson($"/api/cotizaciones/{cid}/conexos",
+            new { items = new[] { new { lineaId, servicioConexoId = _fx.AnyServicioActivoId(), cantidad = 1, origen = "general" } } });
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+
+        Assert.Equal("general", (await resp.Json()).GetProperty("conexos")[0].GetProperty("origen").GetString());
+    }
+
+    [Fact]
+    public async Task Conexo_con_cantidad_cero_devuelve_400()
+    {
+        var cli = _fx.Client();
+        var (cid, lineaId) = await NuevaCotizacionConLinea();
+
+        var resp = await cli.PostJson($"/api/cotizaciones/{cid}/conexos",
+            new { items = new[] { new { lineaId, servicioConexoId = _fx.AnyServicioActivoId(), cantidad = 0 } } });
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task Conexo_con_cantidad_de_mas_de_2_decimales_devuelve_400()
+    {
+        var cli = _fx.Client();
+        var (cid, lineaId) = await NuevaCotizacionConLinea();
+
+        var resp = await cli.PostJson($"/api/cotizaciones/{cid}/conexos",
+            new { items = new[] { new { lineaId, servicioConexoId = _fx.AnyServicioActivoId(), cantidad = 1.234 } } });
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+        Assert.Equal("CANTIDAD_INVALIDA", await resp.ErrorCode());
+    }
+
+    [Fact]
+    public async Task Editar_conexo_actualiza_cantidad_y_recalcula_el_total()
+    {
+        var cli = _fx.Client();
+        var (cid, lineaId) = await NuevaCotizacionConLinea();
+        var agregar = await cli.PostJson($"/api/cotizaciones/{cid}/conexos",
+            new { items = new[] { new { lineaId, servicioConexoId = _fx.AnyServicioActivoId(), cantidad = 1 } } });
+        var conexoId = (await agregar.Json()).GetProperty("conexos")[0].GetProperty("id").GetGuid();
+
+        var resp = await cli.PatchJson($"/api/cotizaciones/{cid}/conexos/{conexoId}", new { cantidad = 3 });
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        var dto = await resp.Json();
+        Assert.Equal(3, dto.GetProperty("conexos")[0].GetProperty("cantidad").GetDecimal());
+    }
+
+    [Fact]
+    public async Task Eliminar_conexo_lo_quita_de_la_cotizacion()
+    {
+        var cli = _fx.Client();
+        var (cid, lineaId) = await NuevaCotizacionConLinea();
+        var agregar = await cli.PostJson($"/api/cotizaciones/{cid}/conexos",
+            new { items = new[] { new { lineaId, servicioConexoId = _fx.AnyServicioActivoId(), cantidad = 1 } } });
+        var conexoId = (await agregar.Json()).GetProperty("conexos")[0].GetProperty("id").GetGuid();
+
+        var resp = await cli.DeleteAsync($"/api/cotizaciones/{cid}/conexos/{conexoId}");
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        Assert.Equal(0, (await resp.Json()).GetProperty("conexos").GetArrayLength());
+    }
+
+    [Fact]
+    public async Task Eliminar_conexo_inexistente_devuelve_404()
+    {
+        var cli = _fx.Client();
+        var (cid, _) = await NuevaCotizacionConLinea();
+
+        var resp = await cli.DeleteAsync($"/api/cotizaciones/{cid}/conexos/{Guid.NewGuid()}");
+        Assert.Equal(HttpStatusCode.NotFound, resp.StatusCode);
+    }
+
+    [Fact] // la cotización ya entregada no admite editar ni quitar conexos.
+    public async Task Editar_o_eliminar_conexo_en_cotizacion_entregada_devuelve_409()
+    {
+        var cli = _fx.Client();
+        var (cid, lineaId) = await NuevaCotizacionConLinea();
+        var agregar = await cli.PostJson($"/api/cotizaciones/{cid}/conexos",
+            new { items = new[] { new { lineaId, servicioConexoId = _fx.AnyServicioActivoId(), cantidad = 1 } } });
+        var conexoId = (await agregar.Json()).GetProperty("conexos")[0].GetProperty("id").GetGuid();
+        await cli.PostAsync($"/api/cotizaciones/{cid}/entregar", null);
+
+        var editar = await cli.PatchJson($"/api/cotizaciones/{cid}/conexos/{conexoId}", new { cantidad = 2 });
+        Assert.Equal(HttpStatusCode.Conflict, editar.StatusCode);
+
+        var eliminar = await cli.DeleteAsync($"/api/cotizaciones/{cid}/conexos/{conexoId}");
+        Assert.Equal(HttpStatusCode.Conflict, eliminar.StatusCode);
+    }
 }

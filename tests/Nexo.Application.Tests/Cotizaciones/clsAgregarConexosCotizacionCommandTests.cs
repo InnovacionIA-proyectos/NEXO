@@ -81,4 +81,93 @@ public class clsAgregarConexosCotizacionCommandTests
 
         _servicios.Verify(s => s.ObtenerPorIdAsync(It.IsAny<Guid>(), default), Times.Never);
     }
+
+    // S5-HU-18/#262: Origen distingue "agregado a esta línea" de "agregado a todas las
+    // líneas de una vez" — antes era una deducción del frontend, ahora es un dato real.
+    [Fact]
+    public async Task Sin_origen_explicito_el_conexo_queda_individual_por_defecto()
+    {
+        var cotizacionId = Guid.NewGuid();
+        var lineaId = Guid.NewGuid();
+        var servicioId = Guid.NewGuid();
+        var cotizacion = new clsCotizacion { Id = cotizacionId, Estado = EstadoCotizacion.Borrador };
+        cotizacion.Lineas.Add(new clsCotizacionLinea { Id = lineaId, CotizacionId = cotizacionId });
+        _cotizaciones.Setup(c => c.ObtenerConLineasYConexosAsync(cotizacionId, default)).ReturnsAsync(cotizacion);
+        _servicios.Setup(s => s.ObtenerPorIdAsync(servicioId, default)).ReturnsAsync(ServicioActivo(servicioId));
+
+        var dto = await Handler().Handle(
+            new clsAgregarConexosCotizacionCommand(cotizacionId, [new clsConexoItem(lineaId, servicioId, 1, null)]));
+
+        Assert.Equal("individual", Assert.Single(dto.Conexos).Origen);
+    }
+
+    [Fact]
+    public async Task Origen_general_queda_guardado_y_devuelto()
+    {
+        var cotizacionId = Guid.NewGuid();
+        var lineaId = Guid.NewGuid();
+        var servicioId = Guid.NewGuid();
+        var cotizacion = new clsCotizacion { Id = cotizacionId, Estado = EstadoCotizacion.Borrador };
+        cotizacion.Lineas.Add(new clsCotizacionLinea { Id = lineaId, CotizacionId = cotizacionId });
+        _cotizaciones.Setup(c => c.ObtenerConLineasYConexosAsync(cotizacionId, default)).ReturnsAsync(cotizacion);
+        _servicios.Setup(s => s.ObtenerPorIdAsync(servicioId, default)).ReturnsAsync(ServicioActivo(servicioId));
+
+        var dto = await Handler().Handle(
+            new clsAgregarConexosCotizacionCommand(cotizacionId, [new clsConexoItem(lineaId, servicioId, 1, null, "general")]));
+
+        Assert.Equal("general", Assert.Single(dto.Conexos).Origen);
+    }
+
+    [Fact]
+    public async Task Origen_invalido_lanza_ValidationFailedException()
+    {
+        var cotizacionId = Guid.NewGuid();
+        var lineaId = Guid.NewGuid();
+        var cotizacion = new clsCotizacion { Id = cotizacionId, Estado = EstadoCotizacion.Borrador };
+        cotizacion.Lineas.Add(new clsCotizacionLinea { Id = lineaId, CotizacionId = cotizacionId });
+        _cotizaciones.Setup(c => c.ObtenerConLineasYConexosAsync(cotizacionId, default)).ReturnsAsync(cotizacion);
+
+        var ex = await Assert.ThrowsAsync<clsValidationFailedException>(() => Handler().Handle(
+            new clsAgregarConexosCotizacionCommand(cotizacionId, [new clsConexoItem(lineaId, Guid.NewGuid(), 1, null, "masivo")])));
+
+        Assert.Equal("ORIGEN_INVALIDO", ex.Code);
+    }
+
+    [Fact]
+    public async Task Cantidad_con_mas_de_2_decimales_lanza_ValidationFailedException()
+    {
+        var cotizacionId = Guid.NewGuid();
+        var lineaId = Guid.NewGuid();
+        var cotizacion = new clsCotizacion { Id = cotizacionId, Estado = EstadoCotizacion.Borrador };
+        cotizacion.Lineas.Add(new clsCotizacionLinea { Id = lineaId, CotizacionId = cotizacionId });
+        _cotizaciones.Setup(c => c.ObtenerConLineasYConexosAsync(cotizacionId, default)).ReturnsAsync(cotizacion);
+
+        var ex = await Assert.ThrowsAsync<clsValidationFailedException>(() => Handler().Handle(
+            new clsAgregarConexosCotizacionCommand(cotizacionId, [new clsConexoItem(lineaId, Guid.NewGuid(), 1.234m, null)])));
+
+        Assert.Equal("CANTIDAD_INVALIDA", ex.Code);
+    }
+
+    [Fact] // el servicio completo (sus dimensiones incluidas) viaja en el DTO del conexo.
+    public async Task El_conexo_devuelve_las_dimensiones_del_servicio()
+    {
+        var cotizacionId = Guid.NewGuid();
+        var lineaId = Guid.NewGuid();
+        var servicioId = Guid.NewGuid();
+        var cotizacion = new clsCotizacion { Id = cotizacionId, Estado = EstadoCotizacion.Borrador };
+        cotizacion.Lineas.Add(new clsCotizacionLinea { Id = lineaId, CotizacionId = cotizacionId });
+        _cotizaciones.Setup(c => c.ObtenerConLineasYConexosAsync(cotizacionId, default)).ReturnsAsync(cotizacion);
+        var servicio = ServicioActivo(servicioId);
+        servicio.Origen = "Bogotá";
+        servicio.Destino = "Cali";
+        _servicios.Setup(s => s.ObtenerPorIdAsync(servicioId, default)).ReturnsAsync(servicio);
+
+        var dto = await Handler().Handle(
+            new clsAgregarConexosCotizacionCommand(cotizacionId, [new clsConexoItem(lineaId, servicioId, 1, null)]));
+
+        var conexo = Assert.Single(dto.Conexos);
+        Assert.NotNull(conexo.Servicio);
+        Assert.Equal("Bogotá", conexo.Servicio!.Origen);
+        Assert.Equal("Cali", conexo.Servicio.Destino);
+    }
 }

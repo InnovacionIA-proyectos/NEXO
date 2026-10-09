@@ -112,11 +112,22 @@ public class clsCotizacionConexo : IAuditable
     [JsonIgnore]
     public clsServicioConexo? clsServicioConexo { get; set; }
 
-    [Range(typeof(decimal), "0", "999999.99", ParseLimitsInInvariantCulture = true)]
+    [Range(typeof(decimal), "0.01", "999999.99", ParseLimitsInInvariantCulture = true)]
     public decimal Cantidad { get; set; }
 
     [Range(typeof(decimal), "0", "9999999999999.99", ParseLimitsInInvariantCulture = true)]
     public decimal ValorAplicado { get; set; }
+
+    /// <summary>
+    /// S5-HU-18/#262: "individual" (el usuario lo agregó a ESTA línea puntual) o
+    /// "general" (el usuario pidió agregarlo a TODAS las líneas de la cotización de una
+    /// sola vez, lo que en la práctica crea un clsCotizacionConexo por línea — sigue
+    /// existiendo una línea por conexo, igual que decidió #250; esto es solo la
+    /// trazabilidad de CÓMO se agregó, no un conexo "general" sin línea). Antes el
+    /// frontend tenía que adivinar esto; ahora es un dato real.
+    /// </summary>
+    [Required, MaxLength(20)]
+    public string Origen { get; set; } = "individual";
 
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
