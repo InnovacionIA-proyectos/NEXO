@@ -262,8 +262,16 @@ otro host" (la razón original para mantenerlos separados) sigue siendo
 igual de fácil compartiendo un broker: es la MISMA operación (cambiar una
 connection string), y ahora solo hay que hacerla una vez, no dos.
 
-**Decisión vigente**: la base de datos (Postgres, `db`) sigue siendo propia
-de este `docker-compose.yml` — eso no cambió. RabbitMQ SÍ se comparte: `api`
+**Actualizado en S5-HU-17.1 (2026-10-09)**: la base dejó de ser Postgres y
+dejó de ser propia. Ahora es **SQL Server**, y en QA y producción el Cubicador
+vive en el esquema `dbo_cubicador` de `dbTarifario_Nexo_Pruebas`, una base
+**compartida con Cotifly** (`dbo_cotifly`) — NEXO no está ahí, usa la suya. El
+servicio `db` del `docker-compose.yml` sigue existiendo pero ya es un SQL
+Server **local**, para desarrollo y para el smoke de CI, que imita esa forma
+(misma base, mismo esquema, otro host) sin tocar la compartida. El esquema lo
+gobierna alembic, no `create_all`.
+
+**Decisión vigente**: RabbitMQ SÍ se comparte: `api`
 y `worker` se conectan al `rabbit` del `docker-compose.yml` raíz de NEXO
 (proyecto Compose separado — no se fusionaron los archivos, siguen siendo dos
 `docker compose up` independientes) enganchándose a su red `internal` por
@@ -389,13 +397,22 @@ Confirmado también en el capturador (`GET /api/Messages`): `rowCount: 6`,
 los 6 destinatarios, asunto `[Cubicador] Mensaje tipo_invalido_ci cayo a la
 cola de error tras 3 intentos`.
 
-**Motor de base de datos**: se eligió **PostgreSQL** para producción
-(`docker-compose.yml`) por ser el más común en stacks Python/FastAPI; el
-desarrollo/tests usan SQLite (`DATABASE_URL` por defecto) — mismo código
-SQLAlchemy sirve para ambos, solo cambia la URL. **Verificado**: el flujo
-completo (crear vehículo → plan → ítem → optimizar → ajustar) corrió contra
-un Postgres 16 real en Docker Compose sin cambios de código. Confirmar con
-el equipo si se prefiere otro motor antes de desplegar a producción.
+**Motor de base de datos** — *reemplazado en S5-HU-17.1 (2026-10-09)*: ahora
+es **SQL Server**, el mismo motor que el resto de NEXO. Se dejó de elegir
+PostgreSQL "por ser el más común en stacks Python/FastAPI" porque mantener dos
+motores en la casa costaba más que la comodidad que daba, y porque el catálogo
+nuevo lo administra gente que ya trabaja contra SQL Server.
+
+Dialecto `mssql+aioodbc`, con el *ODBC Driver 18* instalado en la imagen (ver
+`Dockerfile`, que tiene documentadas tres trampas nada evidentes de esa
+instalación). Desarrollo y tests siguen usando SQLite por defecto: el mismo
+código SQLAlchemy sirve para ambos, solo cambia la URL — con una excepción, el
+esquema, que solo se declara contra SQL Server porque SQLite no los soporta
+(ver `infrastructure/persistence/db.py`).
+
+**Verificado el 2026-10-09**: las 123 pruebas en verde dentro de la imagen, la
+migración inicial de alembic aplicada contra SQL Server 2019 real, y la api
+arrancando y sirviendo el catálogo de vehículos desde ahí.
 
 **Nota operativa encontrada al probar**: `api` y `worker` necesitan esperar a
 que `db` esté realmente lista (`condition: service_healthy` en `depends_on`),

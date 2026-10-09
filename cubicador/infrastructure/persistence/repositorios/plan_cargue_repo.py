@@ -65,9 +65,14 @@ class SqlPlanCargueRepository:
         # y a `items_plan_cargue` pero NO tiene relationship ni cascada, asi que el
         # `delete(fila)` de abajo (que si arrastra los items, por el cascade
         # delete-orphan de PlanCargueModel.items) dejaba las colocaciones apuntando a
-        # dos filas muertas: en Postgres, ForeignKeyViolationError en cualquier plan
-        # ya optimizado; en SQLite -sin PRAGMA foreign_keys- filas huerfanas en
-        # silencio.
+        # dos filas muertas: en SQL Server, IntegrityError (error 547, "conflicted
+        # with the FOREIGN KEY constraint") en cualquier plan ya optimizado; en
+        # SQLite -sin PRAGMA foreign_keys- filas huerfanas en silencio.
+        #
+        # El codigo no distingue el error por tipo de driver: SQLAlchemy ya
+        # normaliza los dos a `sqlalchemy.exc.IntegrityError`, asi que el cambio
+        # de motor (S5-HU-17.1, antes era Postgres y asyncpg) no requirio tocar
+        # nada aqui mas que este comentario.
         #
         # Importa mas de lo que parece: NEXO borra de forma optimista (responde antes
         # de saber si Cubicador lo logro), asi que el fallo dejaba a NEXO creyendo que

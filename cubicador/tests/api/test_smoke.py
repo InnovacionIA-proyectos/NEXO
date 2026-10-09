@@ -16,6 +16,8 @@ from __future__ import annotations
 
 import os
 
+from application.plan_cargue.vehiculos import presets
+
 os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
 os.environ["CUBICADOR_API_KEY"] = "test-key"
 
@@ -45,7 +47,7 @@ class _PublisherFalso:
 
     async def publicar_vehiculo_creado(self, vehiculo_id: str, vehiculo: dict) -> None:
         # Issue #162: listar_con_siembra() publica esto por cada preset nuevo -
-        # el primer GET /vehiculos de la suite siembra los 9 presets.
+        # el primer GET /vehiculos de la suite siembra todos los presets.
         self.vehiculos_publicados.append(vehiculo_id)
 
 
@@ -86,7 +88,7 @@ async def test_flujo_completo_crear_optimizar(client, publisher_falso):
     r = await client.get("/api/planes-cargue/vehiculos", headers=HEADERS)
     assert r.status_code == 200
     vehiculos = r.json()
-    assert len(vehiculos) == 9
+    assert len(vehiculos) == len(presets())
     furgon = next(v for v in vehiculos if "13.6" in v["nombre"])
 
     # Crear plan vacio.

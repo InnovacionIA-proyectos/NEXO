@@ -277,7 +277,7 @@ async def _procesar(mensaje: aio_pika.IncomingMessage, publisher: RabbitMqEvento
             logger.exception("Fallo procesando mensaje (intento %d/%d)", intentos_previos + 1, MAX_INTENTOS)
             try:
                 # La sesion puede haber quedado INUTILIZABLE: si el fallo fue durante
-                # un flush (p.ej. ForeignKeyViolationError al insertar un item contra
+                # un flush (p.ej. IntegrityError por llave foranea al insertar un item contra
                 # un plan que no existe), SQLAlchemy la deja en estado "pending
                 # rollback" y CUALQUIER operacion posterior sobre ella lanza
                 # PendingRollbackError - incluido el `marcar_error` de abajo, que es

@@ -66,7 +66,7 @@ tests/
   domain/                            # 33 pytest - las 31 reglas de testDocumentation/REGLAS_DE_NEGOCIO.md
   api/
     test_smoke.py                    # flujo end-to-end contra SQLite
-docker-compose.yml                    # api + worker + postgres (RabbitMQ es el compartido de NEXO, ver DECISIONES_TECNICAS.md #9)
+docker-compose.yml                    # api + worker + SQL Server local (RabbitMQ es el compartido de NEXO, ver DECISIONES_TECNICAS.md #9)
 ```
 
 ## Por qué `domain/motor` es la pieza más importante
@@ -102,6 +102,6 @@ podría introducir imprecisión — no se pierde nada, y las 31 reglas de
 Dos entrypoints sobre el mismo código de `application/`/`domain/`/`infrastructure/`:
 
 - **`api/main.py`** — FastAPI, atiende las rutas síncronas. **Estado actual**: `optimizar`/`reoptimizar`/`desde-línea` también se resuelven aquí mismo, síncronas (ver README.md "Estado actual") — moverlas a publicar en RabbitMQ y responder 202 de inmediato es el siguiente paso, no un cambio de diseño: el camino async ya está probado de punta a punta por el worker (ver abajo), solo falta que la API lo use.
-- **`worker/main.py`** — consume `cubicacion.solicitada`, ejecuta el caso de uso pesado, y publica el evento de resultado. **Verificado contra RabbitMQ real** en Docker Compose: mensaje publicado → worker lo consume → optimiza contra Postgres → publica `plan-de-cargue.generado` → plan queda persistido como `optimizado`.
+- **`worker/main.py`** — consume `cubicacion.solicitada`, ejecuta el caso de uso pesado, y publica el evento de resultado. **Verificado contra RabbitMQ real** en Docker Compose: mensaje publicado → worker lo consume → optimiza contra la base → publica `plan-de-cargue.generado` → plan queda persistido como `optimizado`.
 
 Ambos se escalan de forma independiente (más réplicas del worker si hay cola acumulada, sin tocar cuántas instancias de la API atienden lecturas).

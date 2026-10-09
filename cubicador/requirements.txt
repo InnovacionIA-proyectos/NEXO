@@ -2,13 +2,28 @@ fastapi>=0.115
 uvicorn[standard]>=0.32
 pydantic>=2.9
 pydantic-settings>=2.6
-sqlalchemy>=2.0
+# El extra [asyncio] arrastra `greenlet`, que SQLAlchemy necesita para su capa
+# async. NO viene como dependencia transitiva en python:3.14-slim, asi que sin
+# esto la imagen arranca y muere en el import con "The SQLAlchemy asyncio
+# module requires that the Python 'greenlet' library is installed".
+# Localmente no se nota: el venv ya suele traer greenlet de arrastre, y el
+# fallo aparece recien dentro del contenedor.
+sqlalchemy[asyncio]>=2.0
 aiosqlite>=0.20
-asyncpg>=0.30
 aio-pika>=9.4
 httpx>=0.27
-psycopg2-binary
-asyncpg
+
+# SQL Server (S5-HU-17.1). aioodbc es el driver async que usa SQLAlchemy con el
+# dialecto mssql+aioodbc; pyodbc es su capa sincrona por debajo y lo necesita
+# alembic, que no es async. Los dos exigen el "ODBC Driver 18 for SQL Server"
+# instalado en el sistema - ver Dockerfile.
+aioodbc>=0.5
+pyodbc>=5.2
+
+# Migraciones. Reemplaza a `Base.metadata.create_all`, que crea tablas nuevas
+# pero NUNCA altera una existente: una columna agregada al modelo despues del
+# primer arranque se ignoraba en silencio.
+alembic>=1.14
 
 # dev
 pytest>=8.3

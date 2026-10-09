@@ -1,0 +1,6 @@
+﻿Id,CodigoVehiculo,NombreVehiculo,LargoCm,AnchoCm,AlturaMaximaLegalCm,CapacidadMaximaKg,Activo,CreadoPor
+99e4a5b1-cd28-41ae-8db2-271dd217bc56,2L2,Turbo 2L2,450,220,440,4000,1,seeder
+dc66150c-0a44-4b85-91c1-5821a7b41811,C2,Sencillo C2,650,240,440,8500,1,seeder
+b554e624-b6c9-4c11-b112-5907654b3f20,C3,Dobletroque C3,800,240,440,17000,1,seeder
+5589bb98-6bee-49d2-8dae-e53291ad0c90,2S2,Minimula 2S2,1220,240,440,18000,1,seeder
+d20eed02-ba9b-46cd-a0a8-d4791f7e16a2,3S3,Tractomula 3S3,1220,240,440,34000,1,seeder
