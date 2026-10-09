@@ -28,18 +28,21 @@ GO
 -- Tractomula...). CodigoVehiculo es la clave estable para matching contra
 -- SICE-TAC/tarifario — debe quedar única (ver Tabla 4 para el caso
 -- Tractomula/Tractomula Furgón, que NO duplica este código).
--- Medidas en centímetros (cruzado con el seeder de Brayan). AltoVehiculoCm
--- es el alto real del vehículo/chasis -- varía por vehículo, no es un
--- default único para todos (dato confirmado de forma independiente por el
--- seeder de Brayan: el mismo alto se repite igual para cualquier
--- carrocería de un mismo vehículo, así que es propiedad del vehículo).
+-- Medidas en centímetros (cruzado con el seeder de Brayan).
+-- AlturaMaximaReglamentariaCm NO es una medida física cualquiera del
+-- fabricante -- es el límite LEGAL de altura para ese tipo de vehículo
+-- según la reglamentación de tránsito (así la nombra el seeder de
+-- Brayan: "AlturaMaximaLegalCm"). Varía por vehículo -- cada uno de los 5
+-- vehículos de hoy trae su propio valor explícito (ninguno usa el
+-- default); el default de 440 cm (4.4 m) es solo un respaldo para cuando
+-- a futuro se cree un vehículo nuevo sin esa dato puntual todavía.
 CREATE TABLE [dbo_cubicador].[vehiculos] (
     [Id] uniqueidentifier NOT NULL DEFAULT (newid()),
     [CodigoVehiculo] nvarchar(30) NOT NULL,
     [NombreVehiculo] nvarchar(120) NOT NULL,
     [LargoCm] decimal(9,2) NOT NULL,
     [AnchoCm] decimal(9,2) NOT NULL,
-    [AltoVehiculoCm] decimal(9,2) NOT NULL,
+    [AlturaMaximaReglamentariaCm] decimal(9,2) NOT NULL DEFAULT (440),
     [CapacidadMaxima] decimal(18,2) NOT NULL,
     [Activo] bit NOT NULL DEFAULT (1),
     [CreadoPor] nvarchar(100) NOT NULL,
@@ -104,9 +107,9 @@ CREATE TABLE [dbo_cubicador].[tiposMercancia] (
     [IdCarroceriaSecundaria] uniqueidentifier NULL,
     [CarroceriaSecundariaCondicionada] bit NOT NULL DEFAULT (0),
     [ControlAmbientalRequerido] nvarchar(40) NOT NULL DEFAULT (N'NINGUNO'),
-    [Apilable] bit NULL,
-    [Fragil] bit NULL,
-    [RotacionLibre] bit NULL,
+    [Apilable] bit NOT NULL DEFAULT (1),
+    [Fragil] bit NOT NULL DEFAULT (0),
+    [RotacionLibre] bit NOT NULL DEFAULT (1),
     [Activo] bit NOT NULL DEFAULT (1),
     [CreadoPor] nvarchar(100) NOT NULL,
     [CreatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset()),

@@ -1,11 +1,16 @@
 # Propuesta de BD — Motor de selección de tipo y cantidad de vehículos
 
 Diseño de tablas para el nuevo motor descrito en `propuesta-seleccion-vehiculos.md`
-(§4 "Modelo de datos"). Vive en la base de datos propia del Cubicador, no en
-`db_NEXO`.
+(§4 "Modelo de datos"). Vive en su propio esquema SQL, `dbo_cubicador`,
+dentro de la base compartida `dbTarifario_Nexo_Pruebas` — no en `db_NEXO`
+(ver `cubicador/database/README.md` para el detalle de dónde y cómo).
 
 Documento vivo — se va ajustando tabla por tabla a medida que se revisa cada
-una.
+una. **Actualizado 2026-10-08** cruzando esta propuesta contra un seeder
+real enviado por un colega (Brayan) y contra el catálogo real de SAP
+(`tblSAPTiposCarroseria`) — ver
+`cubicador/database/seeder/ORIGEN-Y-DECISIONES.md` para el detalle completo
+de qué cambió y por qué en cada tabla.
 
 ---
 
@@ -14,11 +19,11 @@ una.
 | Columna | Tipo | Notas |
 |---|---|---|
 | `Id` | uuid | PK |
-| `CodigoVehiculo` | texto | clave corta, ej. `3S3` |
+| `CodigoVehiculo` | texto | clave corta, ej. `C2`, `C3`, `3S3` |
 | `NombreVehiculo` | texto | ej. "Tractomula 3S3" |
-| `LargoPlancha` | decimal (m) | |
-| `AnchoPlancha` | decimal (m) | |
-| `AltoCarroceria` | decimal (m) | **default 4.4 m** si no se especifica |
+| `LargoCm` | decimal (cm) | |
+| `AnchoCm` | decimal (cm) | |
+| `AlturaMaximaReglamentariaCm` | decimal (cm) | límite **legal** de altura para ese tipo de vehículo, no una medida de fábrica — **varía por vehículo**; `DEFAULT (440)` solo como respaldo para un vehículo nuevo sin este dato todavía |
 | `CapacidadMaxima` | decimal (kg) | |
 | `Activo` | booleano | |
 | `CreadoPor` | texto/FK usuario | |
@@ -28,8 +33,21 @@ una.
 
 **Cambios acordados sobre el borrador original:**
 - Se separó `Codigo` de `Nombre` (antes mezclados en `tipoVehiculo`).
-- `AltoCarroceria` queda como campo normal (no nullable), con **valor
-  default de 4.4 m** cuando el vehículo no trae uno propio especificado.
+- Medidas convertidas a **centímetros** (antes metros) — cruzadas y
+  confirmadas exactas contra un seeder externo.
+- **`AlturaMaximaReglamentariaCm` dejó de ser un default fijo de 4.4 m
+  para todos.** Esa decisión original se revirtió: el seeder externo trae
+  un límite distinto por vehículo (230/240/260 cm) que se repite igual sin
+  importar la carrocería, así que es propiedad del vehículo, no un valor
+  inventado por defecto. Se renombró la columna también — el seeder
+  externo la llama "altura máxima legal", un límite normativo de
+  reglamentación de tránsito, no una medida física arbitraria del
+  fabricante; el nombre anterior (`AltoVehiculoCm`) no dejaba eso claro.
+  Ver `ORIGEN-Y-DECISIONES.md` para el detalle de cómo se confirmó.
+- Se agregó `DEFAULT (440)` a la columna — no cambia ninguno de los 5
+  vehículos actuales (cada uno trae su valor propio explícito), es solo
+  un respaldo para cuando se cree un vehículo nuevo por CRUD sin
+  especificar este dato todavía.
 
 ---
 
@@ -38,17 +56,25 @@ una.
 | Columna | Tipo | Notas |
 |---|---|---|
 | `Id` | uuid | PK |
-| `TipoCarroceria` | texto | furgón, estacas, etc. |
+| `CodigoCarroceria` | texto | código fijo, ej. `FURGON`, `FURGON_REFRIGERADO`, `ESTACAS` |
+| `NombreCarroceria` | texto | nombre legible, ej. "Furgón refrigerado" |
 | `Activo` | booleano | |
 | `CreadoPor` | texto/FK usuario | |
 | `CreatedAt` / `UpdatedAt` | datetime | |
 
-**Llenado:** seeder con Excel "Matriz cubicador".
+**Llenado:** seeder con Excel "Matriz cubicador", cruzado después con el
+catálogo real de SAP (`tblSAPTiposCarroseria`). 17 carrocerías en total.
 
-**Sin cambios sobre el borrador original.** El chequeo de altura ya queda
-cubierto a nivel de vehículo (Tabla 1, `AltoCarroceria` con default 4.4 m,
-siempre presente) — no hace falta que la carrocería decida si ese chequeo
-aplica o no, porque siempre aplica.
+**Cambios acordados sobre el borrador original:**
+- Se separó `Codigo` de `Nombre` (antes un solo `TipoCarroceria`) —
+  cruzado contra la estructura de un seeder externo.
+- El chequeo de altura queda cubierto a nivel de vehículo (Tabla 1,
+  `AlturaMaximaReglamentariaCm`, siempre presente) — no hace falta que la
+  carrocería decida si ese chequeo aplica o no, porque siempre aplica.
+- Se agregaron 5 carrocerías que no estaban en ningún Excel propio pero sí
+  existen en el catálogo real de SAP: `TANQUE`, `TOLVA`, `VOLCO`, `GRUA`,
+  `NINERA` — sin emparejamiento con ningún vehículo todavía (queda para el
+  futuro CRUD).
 
 ---
 
@@ -57,21 +83,28 @@ aplica o no, porque siempre aplica.
 | Columna | Tipo | Notas |
 |---|---|---|
 | `Id` | uuid | PK |
+| `CodigoMercancia` | texto | **agregado** — código corto, ej. `CAJAS_CARTON` |
 | `NombreMercancia` | texto | cajas, alimentos empacados, etc. |
 | `IdCategoria` | FK → `categoríaMercancia` | |
 | `Cubicable` | booleano | ¿es cubicable o queda excluido del todo? |
 | `CondicionadaCubicacion` | booleano | ¿requiere que AdminTarifas la valide obligatoriamente antes de aprobarla? — independiente de `Cubicable`, puede ser `true` aunque sí sea cubicable |
 | `ComentarioCondicion` | texto | |
-| `CarroceriaPrincipal` | FK → `TiposCarroceria` | |
+| `CarroceriaPrincipal` | FK → `TiposCarroceria`, nullable | nullable cuando `Cubicable=false` (sin carrocería aplicable) |
 | `CarroceriaSecundaria` | FK → `TiposCarroceria` | |
 | `CarroceríaSecundariaCondicionada` | booleano | |
+| `ControlAmbientalRequerido` | texto | **agregado** — `NINGUNO`/`REFRIGERADO`/`VENTILADO`/`CLIMATIZADO`, variantes `_CONDICIONAL` y `_O_` |
+| `Apilable` | booleano, nullable | **agregado** — `NULL` cuando no aplica/no se sabe |
+| `Fragil` | booleano, nullable | **agregado** |
+| `RotacionLibre` | booleano, nullable | **agregado** |
 | `Activo` | booleano | |
 | `CreadoPor` | texto/FK usuario | |
 | `CreatedAt` / `UpdatedAt` | datetime | |
 
-**Llenado:** seeder con Excel "Matriz cubicador".
+**Llenado:** seeder con Excel "Matriz cubicador" (31 filas), cruzado
+después fila por fila contra un seeder externo (mismo contenido, 5
+columnas nuevas adoptadas de ahí).
 
-**Sin cambios sobre el borrador original** — `Cubicable` y
+**Sin cambios de fondo sobre el borrador original** — `Cubicable` y
 `CondicionadaCubicacion` se mantienen como dos campos independientes (no un
 solo enum): una mercancía puede ser cubicable automáticamente Y a la vez
 requerir validación obligatoria de AdminTarifas antes de aprobarse — son dos
@@ -108,7 +141,9 @@ vehículo con el mismo código (lo que rompería la unicidad), la diferencia
 de capacidad vive en la relación específica vehículo+carrocería: por
 defecto usa la capacidad del vehículo (`UsaCapacidadMaximaDelVehiculo = true`),
 y solo para la combinación `3S3` + `FURGON` se marca `false` y se pone
-`CapacidadMaximaEspecifica = 30000`.
+`CapacidadMaximaEspecifica = 30000` — esa misma restricción se heredó
+también a las 3 variantes de Furgón (refrigerado/climatizado/ventilado)
+para el `3S3`, no solo al Furgón liso.
 
 ---
 
@@ -117,12 +152,18 @@ y solo para la combinación `3S3` + `FURGON` se marca `false` y se pone
 | Columna | Tipo | Notas |
 |---|---|---|
 | `Id` | uuid | PK |
-| `NombreCategoria` | texto | alimentos, químico, refrigerada, etc. |
+| `NombreCategoria` | texto | 13 categorías (ver más abajo) |
 | `CreadoPor` | texto/FK usuario | |
 | `CreatedAt` / `UpdatedAt` | datetime | |
 
-**Sin cambios sobre el borrador original** — catálogo plano, base de la
-Tabla 3 (`IdCategoria`) y de la Tabla 6 (reglas de incompatibilidad).
+**Sin cambios de estructura sobre el borrador original** — catálogo
+plano, base de la Tabla 3 (`IdCategoria`) y de la Tabla 6 (reglas de
+incompatibilidad). **El contenido sí cambió**: se adoptaron las 13
+categorías de un seeder externo (`GENERAL`, `ALIMENTOS`, `FARMACEUTICO`,
+`PERECEDERO_NO_ALIMENTO`, `FERTILIZANTE`, `MATERIAL_INFLAMABLE`,
+`CARBURANTE`, `METALICO`, `CONSTRUCCION`, `VIDRIO`, `GAS_INDUSTRIAL`,
+`QUIMICO_OXIDANTE`, `QUIMICO_CORROSIVO`), reemplazando las 9 que había
+antes.
 
 ---
 
@@ -137,9 +178,13 @@ Tabla 3 (`IdCategoria`) y de la Tabla 6 (reglas de incompatibilidad).
 | `CreadoPor` | texto/FK usuario | |
 | `CreatedAt` / `UpdatedAt` | datetime | |
 
-**Llenado:** reglas existentes en el código actual
-(`cubicacion_rapida.py::_INCOMPATIBILIDADES`: químico oxidante + combustible,
-químico corrosivo + alimentos) más las que operaciones defina.
+**Llenado:** reemplazadas por las 3 reglas de un seeder externo
+(`FERTILIZANTE`×`ALIMENTOS`, `QUIMICO_OXIDANTE`×`MATERIAL_INFLAMABLE`,
+`QUIMICO_CORROSIVO`×`ALIMENTOS`) — las del código viejo de cubicación
+rápida (`_INCOMPATIBILIDADES`) ya no aplican tal cual porque esas
+categorías se partieron en dos (ver Tabla 5). El resto de la matriz de
+compatibilidad queda pendiente de completar con operaciones vía el futuro
+CRUD.
 
 **Cambios acordados:**
 - Se agregó `Motivo` — explica el rechazo al usuario, no solo marca que son
@@ -232,9 +277,13 @@ difiere de, o resuelve, lo que dice la propuesta madre (`propuesta-seleccion-veh
 misma carpeta). Vale la pena ajustar esos puntos allá para que los dos
 documentos no queden contradictorios:
 
-1. **§9.2 (punto abierto) queda resuelto.** La propuesta preguntaba si el
-   alto en Plataforma es límite duro o no se valida. Se resolvió: **siempre
-   se valida**, con default de 4.4 m, independiente de la carrocería.
+1. **§9.2 (punto abierto) queda resuelto — actualizado 2026-10-08.** La
+   propuesta preguntaba si el alto en Plataforma es límite duro o aplica
+   la altura total normativa. La respuesta correcta era la segunda opción:
+   siempre se valida, pero **no** con un default fijo de 4.4 m — es
+   `AlturaMaximaReglamentariaCm`, el límite legal de altura por
+   reglamentación de tránsito, que **varía por vehículo** (230/240/260
+   cm). Ver `ORIGEN-Y-DECISIONES.md`.
 
 2. **§4.3 queda desactualizado.** Dice *"alto_m decimal, opcional (vacío en
    Plataforma → no se valida alto)"* — ya no aplica, el alto nunca es

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import csv, os, uuid
+import csv, uuid
 
 # Namespace fijo propio del proyecto, para generar Id DETERMINISTICOS (no
 # aleatorios): el mismo texto de "seed" siempre produce el mismo Id, en
@@ -14,11 +14,6 @@ def nid(seed: str) -> str:
     return str(uuid.uuid5(_NAMESPACE_CUBICADOR, seed))
 
 OUT = "."
-# Copias "legibles" (con columnas de referencia de FK en texto) para
-# compartir y entender -- NUNCA se cargan a la BD, solo para lectura
-# humana. El seeder real (OUT) se queda limpio, 1 a 1 con las tablas.
-LEGIBLE = "legible"
-os.makedirs(LEGIBLE, exist_ok=True)
 
 # ---------- Tabla 1: vehiculos ----------
 # "Tractomula Furgon 3S3" ya NO es una fila aparte -- es el mismo 3S3 (el
@@ -27,11 +22,13 @@ os.makedirs(LEGIBLE, exist_ok=True)
 # relacionVehiculosCarroceria (ver mas abajo), no duplicando el vehiculo.
 # Medidas en cm (cruzado con el seeder de Brayan -- coinciden exacto con las
 # nuestras convertidas). Codigos C2/C3 tal como estan en el Excel (Brayan
-# confirma lo mismo); el alto ya NO es un default fijo -- es el alto real de
-# cada vehiculo (ambos seeders coinciden en que no cambia segun carroceria,
-# asi que es propiedad del vehiculo, no de la combinacion con carroceria).
+# confirma lo mismo). La altura NO es un default fijo -- es el limite LEGAL
+# de altura para ese tipo de vehiculo segun la reglamentacion de transito
+# (asi la nombra el seeder de Brayan: "AlturaMaximaLegalCm"), no una medida
+# cualquiera del fabricante. Ambos seeders coinciden en que no cambia segun
+# carroceria, asi que es propiedad del vehiculo, no de la combinacion.
 vehiculos = [
-    # codigo, nombre, largo_cm, ancho_cm, alto_cm, capacidad_kg
+    # codigo, nombre, largo_cm, ancho_cm, altura_maxima_reglamentaria_cm, capacidad_kg
     ("2L2", "Turbo 2L2", 450, 220, 230, 4000),
     ("C2", "Sencillo C2", 650, 240, 240, 8500),
     ("C3", "Dobletroque C3", 800, 240, 260, 17000),
@@ -41,7 +38,7 @@ vehiculos = [
 vehiculo_ids = {}
 with open(f"{OUT}/vehiculos.csv", "w", newline="", encoding="utf-8") as f:
     w = csv.writer(f)
-    w.writerow(["Id", "CodigoVehiculo", "NombreVehiculo", "LargoCm", "AnchoCm", "AltoVehiculoCm", "CapacidadMaxima", "Activo", "CreadoPor"])
+    w.writerow(["Id", "CodigoVehiculo", "NombreVehiculo", "LargoCm", "AnchoCm", "AlturaMaximaReglamentariaCm", "CapacidadMaxima", "Activo", "CreadoPor"])
     for codigo, nombre, l, a, h, cap in vehiculos:
         vid = nid(f"vehiculo:{codigo}")
         vehiculo_ids[codigo] = vid
@@ -121,7 +118,6 @@ for vcod, cs in list(rel.items()):
 # del Excel "Dimensiones y Peso por vehiculo". Esas 2 son un rescate del
 # catalogo viejo que todavia no tiene emparejamiento real confirmado con
 # ningun vehiculo de este Excel -- queda pendiente de decidir, no se infiere.
-filas_relacion = []  # se guarda para poder escribir la version legible tambien
 with open(f"{OUT}/relacionVehiculosCarroceria.csv", "w", newline="", encoding="utf-8") as f:
     w = csv.writer(f)
     w.writerow(["Id", "IdTipoVehiculo", "IdCarroceria",
@@ -131,16 +127,6 @@ with open(f"{OUT}/relacionVehiculosCarroceria.csv", "w", newline="", encoding="u
             fila_id = nid(f"relacion:{vcod}:{c}")
             w.writerow([fila_id, vehiculo_ids[vcod], carroceria_ids[c],
                         "true" if usa_cap else "false", cap_especifica, "seeder"])
-            filas_relacion.append((fila_id, vehiculo_ids[vcod], vcod, carroceria_ids[c], c,
-                                   usa_cap, cap_especifica))
-
-with open(f"{LEGIBLE}/relacionVehiculosCarroceria_LEGIBLE.csv", "w", newline="", encoding="utf-8") as f:
-    w = csv.writer(f)
-    w.writerow(["Id", "IdTipoVehiculo", "CodigoVehiculo (solo lectura)", "IdCarroceria",
-                "CodigoCarroceria (solo lectura)", "UsaCapacidadMaximaDelVehiculo",
-                "CapacidadMaximaEspecifica", "CreadoPor"])
-    for fila_id, idv, vcod, idc, c, usa_cap, cap_especifica in filas_relacion:
-        w.writerow([fila_id, idv, vcod, idc, c, "true" if usa_cap else "false", cap_especifica, "seeder"])
 
 # ---------- Tabla 5: categoriaMercancia ----------
 # Catalogo cruzado con el seeder de Brayan (13 categorias, se adoptan las de
@@ -170,21 +156,12 @@ reglas_incompatibilidad = [
     ("QUIMICO_OXIDANTE", "MATERIAL_INFLAMABLE", "Riesgo de reaccion / incendio sin separacion certificada."),
     ("QUIMICO_CORROSIVO", "ALIMENTOS", "Riesgo de contaminacion de alimentos."),
 ]
-filas_reglas = []
 with open(f"{OUT}/reglasIncompatibilidad.csv", "w", newline="", encoding="utf-8") as f:
     w = csv.writer(f)
     w.writerow(["Id", "IdCategoria1", "IdCategoria2", "Motivo", "CreadoPor"])
     for c1, c2, motivo in reglas_incompatibilidad:
         fila_id = nid(f"regla:{c1}:{c2}")
         w.writerow([fila_id, categoria_ids[c1], categoria_ids[c2], motivo, "seeder"])
-        filas_reglas.append((fila_id, categoria_ids[c1], c1, categoria_ids[c2], c2, motivo))
-
-with open(f"{LEGIBLE}/reglasIncompatibilidad_LEGIBLE.csv", "w", newline="", encoding="utf-8") as f:
-    w = csv.writer(f)
-    w.writerow(["Id", "IdCategoria1", "Categoria1 (solo lectura)", "IdCategoria2",
-                "Categoria2 (solo lectura)", "Motivo", "CreadoPor"])
-    for fila_id, idc1, c1, idc2, c2, motivo in filas_reglas:
-        w.writerow([fila_id, idc1, c1, idc2, c2, motivo, "seeder"])
 
 # ---------- Tabla 3: tiposMercancia ----------
 # Contenido cruzado con el seeder de Brayan (41 filas: nuestras 31
@@ -305,7 +282,14 @@ def _b(valor):
         return ""
     return "true" if valor else "false"
 
-filas_mercancia = []
+def _tri(valor, default):
+    """Para Apilable/Fragil/RotacionLibre: None toma el default de negocio
+    (ya no quedan en NULL); un True/False explicito en la fila se respeta
+    tal cual, el default solo aplica cuando no se dijo nada puntual."""
+    if valor is None:
+        valor = default
+    return "true" if valor else "false"
+
 with open(f"{OUT}/tiposMercancia.csv", "w", newline="", encoding="utf-8") as f:
     w = csv.writer(f)
     w.writerow(["Id", "CodigoMercancia", "NombreMercancia", "IdCategoria", "Cubicable",
@@ -318,21 +302,9 @@ with open(f"{OUT}/tiposMercancia.csv", "w", newline="", encoding="utf-8") as f:
         sec_id = carroceria_ids[sec] if sec else ""
         fila_id = nid(f"mercancia:{codigo}")
         w.writerow([fila_id, codigo, nombre, categoria_ids[cat], _b(cubicable), _b(cond),
-                    com, princ_id, sec_id, _b(sec_cond), ctrl_amb, _b(apil), _b(frag), _b(rot),
+                    com, princ_id, sec_id, _b(sec_cond), ctrl_amb,
+                    _tri(apil, True), _tri(frag, False), _tri(rot, True),
                     "true", "seeder"])
-        filas_mercancia.append((fila_id, codigo, nombre, categoria_ids[cat], cat, cond, com,
-                                princ_id, princ, sec_id, sec, sec_cond))
-
-with open(f"{LEGIBLE}/tiposMercancia_LEGIBLE.csv", "w", newline="", encoding="utf-8") as f:
-    w = csv.writer(f)
-    w.writerow(["Id", "CodigoMercancia", "NombreMercancia", "IdCategoria", "Categoria (solo lectura)",
-                "CondicionadaCubicacion", "ComentarioCondicion", "IdCarroceriaPrincipal",
-                "CarroceriaPrincipal (solo lectura)", "IdCarroceriaSecundaria",
-                "CarroceriaSecundaria (solo lectura)", "CarroceriaSecundariaCondicionada",
-                "Activo", "CreadoPor"])
-    for fila_id, codigo, nombre, idcat, cat, cond, com, idprinc, princ, sec_id, sec, sec_cond in filas_mercancia:
-        w.writerow([fila_id, codigo, nombre, idcat, cat, _b(cond),
-                    com, idprinc, princ or "", sec_id, sec or "", _b(sec_cond), "true", "seeder"])
 
 # ---------- Tabla 9: parametrosMotor ----------
 params = [

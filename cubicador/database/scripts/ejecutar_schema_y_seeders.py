@@ -84,7 +84,7 @@ def aplicar_schema(server):
 # '2' sin comillas en esa posicion fuerza a convertir TODAS las filas de esa
 # columna a int, y revienta con la primera que no es numero (ej. '2L2').
 COLUMNAS_NUMERICAS = {
-    "vehiculos": {"LargoCm", "AnchoCm", "AltoVehiculoCm", "CapacidadMaxima"},
+    "vehiculos": {"LargoCm", "AnchoCm", "AlturaMaximaReglamentariaCm", "CapacidadMaxima"},
     "relacionVehiculosCarroceria": {"CapacidadMaximaEspecifica"},
 }
 

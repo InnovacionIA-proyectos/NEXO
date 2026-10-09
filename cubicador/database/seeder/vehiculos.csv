@@ -1,4 +1,4 @@
-Id,CodigoVehiculo,NombreVehiculo,LargoCm,AnchoCm,AltoVehiculoCm,CapacidadMaxima,Activo,CreadoPor
+Id,CodigoVehiculo,NombreVehiculo,LargoCm,AnchoCm,AlturaMaximaReglamentariaCm,CapacidadMaxima,Activo,CreadoPor
 14456c83-1b5d-5813-a075-6c88d367760f,2L2,Turbo 2L2,450,220,230,4000,true,seeder
 04342939-06c6-5058-8650-0e9980db59e2,C2,Sencillo C2,650,240,240,8500,true,seeder
 83323d34-0f30-5e98-8136-e9bcaf00d52c,C3,Dobletroque C3,800,240,260,17000,true,seeder

@@ -107,9 +107,9 @@ Ejemplo de body:
 {
   "codigo": "3S3",
   "nombre": "Tractomula 3S3",
-  "largoPlancha": 12.2,
-  "anchoPlancha": 2.4,
-  "altoCarroceria": 4.4,
+  "largoCm": 1220,
+  "anchoCm": 240,
+  "alturaMaximaReglamentariaCm": 260,
   "capacidadMaxima": 34000,
   "carrocerias": [
     { "idCarroceria": "<id-estacas>", "usaCapacidadMaximaDelVehiculo": true },

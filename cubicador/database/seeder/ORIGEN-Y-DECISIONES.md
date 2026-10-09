@@ -33,19 +33,27 @@ Cuatro fuentes distintas se cruzaron para llegar al estado actual:
 ### `vehiculos`
 
 - Medidas convertidas a **centímetros** (`LargoCm`, `AnchoCm`,
-  `AltoVehiculoCm`) — antes estaban en metros. Se cruzaron contra el
-  seeder de Brayan y coinciden exacto.
+  `AlturaMaximaReglamentariaCm`) — antes estaban en metros. Se cruzaron
+  contra el seeder de Brayan y coinciden exacto.
 - `CodigoVehiculo` para Sencillo/Dobletroque quedó como **`C2`/`C3`**
   (tal como está en el Excel y en el seeder de Brayan) — antes eran
   bare `"2"`/`"3"`, lo que de hecho causó un bug real de tipos al cargar
   a SQL Server (ver nota en `../scripts/ejecutar_schema_y_seeders.py`,
   función `valor_sql`/`COLUMNAS_NUMERICAS`).
-- `AltoVehiculoCm` ya **no es un default fijo igual para todos** (antes
-  4.4 m universal) — es el alto real de cada vehículo, y varía: 2L2=230,
-  C2=240, C3/2S2/3S3=260. Esto se decidió al confirmar que el seeder de
-  Brayan trae el mismo valor repetido para cualquier carrocería de un
-  mismo vehículo — es decir, es propiedad del vehículo/chasis, no de la
-  combinación vehículo+carrocería.
+- `AlturaMaximaReglamentariaCm` (antes `AltoVehiculoCm`, y antes de eso
+  `AltoCarroceria` con default fijo 4.4 m universal) ya **no es un default
+  igual para todos** — varía por vehículo: 2L2=230, C2=240, C3/2S2/3S3=260.
+  Esto se decidió al confirmar que el seeder de Brayan trae el mismo valor
+  repetido para cualquier carrocería de un mismo vehículo — es decir, es
+  propiedad del vehículo, no de la combinación vehículo+carrocería.
+  **Se renombró la columna** porque el seeder de Brayan la llama
+  "altura máxima legal" — no es una medida física cualquiera del
+  fabricante, es el límite que impone la reglamentación de tránsito para
+  ese tipo de vehículo; el nombre anterior no dejaba eso claro.
+- La columna sí quedó con `DEFAULT (440)` en el esquema — pero es solo un
+  respaldo para cuando a futuro se cree un vehículo nuevo (vía el CRUD)
+  sin especificar este dato todavía. Los 5 vehículos de hoy no lo usan:
+  cada uno trae su propio valor explícito (230/240/260 cm).
 
 ### `TiposCarroceria`
 

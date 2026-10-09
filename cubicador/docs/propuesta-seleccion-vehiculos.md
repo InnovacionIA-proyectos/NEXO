@@ -409,9 +409,16 @@ Antes de desplegar, correr el motor sobre 50–100 despachos ya ejecutados y com
    - **(a) Recomendada.** Para *comparar* opciones usar el aprovechamiento real \= max(% volumen, % peso) de cada vehículo; el % que se *reporta* sigue siendo el de volumen. El peso sigue siendo filtro; solo entra en la comparación.  
    - **(b)** Mantener llenado por volumen y desempatar por flota más pequeña (menor suma de volumen útil) cuando las opciones estén dentro de un margen.  
 2. ~~**Alto en Plataforma.** ¿2.6 m es límite duro o aplica la altura total normativa? Queda como campo opcional por configuración; vacío \= no se valida.~~
-   **Resuelto (2026-10-06):** el alto siempre se valida, para todas las
+   ~~**Resuelto (2026-10-06):** el alto siempre se valida, para todas las
    carrocerías, con un valor default de 4.4 m cuando el vehículo no trae uno
-   propio. Ver `PROPUESTA-BD-MOTOR-SELECCION-VEHICULOS.md`.
+   propio.~~
+   **Actualizado (2026-10-08):** esa resolución se revirtió al cruzar
+   contra un seeder externo. La pregunta original tenía razón: sí es
+   "la altura total normativa" — el campo (`AlturaMaximaReglamentariaCm`)
+   es el límite legal de altura por reglamentación de tránsito para ese
+   tipo de vehículo, no una medida física inventada, y varía por vehículo
+   (no hay un default único de 4.4 m). Ver
+   `cubicador/database/seeder/ORIGEN-Y-DECISIONES.md`.
 3. **Alternativa de carrocería.** `usar_alternativa` arranca en `solo_respaldo` porque la matriz las marca como condicionadas. Confirmar.  
 4. **Carrocerías refrigeradas y contenedores.** Agregar configuraciones o excluir de esta versión.  
 5. **Límite `k_max`.** Propuesto 4\. Confirmar con operaciones cuál es el máximo razonable de vehículos que el sistema debe proponer por sí solo.
