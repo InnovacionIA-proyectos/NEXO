@@ -146,6 +146,10 @@ class DeteccionExtradimension:
 MOTIVO_EXTRADIMENSIONADO = "EXTRADIMENSIONADO"
 MOTIVO_SIN_CANDIDATOS_DIMENSIONALES = "SIN_CANDIDATOS_DIMENSIONALES"
 MOTIVO_SUPERA_K_MAX = "SUPERA_K_MAX"
+# No esta en la seccion 2.4 del contrato: es una condicion del algoritmo, no
+# del negocio. Se reporta aparte para no decir "no cabe en 10 vehiculos" cuando
+# lo que paso es que el buscador se quedo sin intentos de empaque.
+MOTIVO_BUSQUEDA_AGOTADA = "BUSQUEDA_AGOTADA"
 MOTIVO_SIN_CARROCERIA_COMPATIBLE = "SIN_CARROCERIA_COMPATIBLE"
 
 RESULTADO_ASIGNADO = "ASIGNADO"
@@ -171,6 +175,16 @@ class Recomendacion:
 
 class CatalogoInconsistente(Exception):
     """La dominancia por carroceria no se cumple. Ver `validar_dominancia`."""
+
+
+class BusquedaAgotada(Exception):
+    """Se acabaron los intentos de empaque antes de encontrar una flota.
+
+    Es distinto de "no cabe en k_max vehiculos": ahi se agotaron las
+    combinaciones posibles, aca se agoto el presupuesto de corridas de DBLF
+    (`_MAX_INTENTOS_EMPAQUE`). Confundirlos le diria al usuario que su carga no
+    cabe en diez camiones cuando en realidad el buscador se rindio antes.
+    """
 
 
 # ------------------------------------------------------- parte 0: dominancia
@@ -435,7 +449,9 @@ def _flota_minima(
 
         for _, _, combinacion in viables:
             if intentos >= _MAX_INTENTOS_EMPAQUE:
-                return None
+                raise BusquedaAgotada(
+                    f"Se probaron {intentos} combinaciones de flota sin encontrar una que "
+                    "empaque la carga.")
             intentos += 1
             reparto = _repartir(combinacion, mercancias)
             if reparto is not None:
@@ -602,6 +618,7 @@ def recomendar(catalogo: Catalogo, solicitud: SolicitudRecomendacion) -> Recomen
     mejor: tuple[str, list[VehiculoRecomendado]] | None = None
     condicionadas_respaldo: list[str] = []
     hubo_candidatos = False
+    agotados: list[str] = []
     for carrocerias, condicionadas_del_intento in intentos:
         for carroceria in carrocerias:
             if not _candidatos(catalogo, carroceria, mercancias):
@@ -611,7 +628,12 @@ def recomendar(catalogo: Catalogo, solicitud: SolicitudRecomendacion) -> Recomen
             vehiculos: list[VehiculoRecomendado] = []
             completo = True
             for grupo in grupos:
-                resultado = _flota_minima(_candidatos(catalogo, carroceria, grupo), grupo, k_max)
+                try:
+                    resultado = _flota_minima(
+                        _candidatos(catalogo, carroceria, grupo), grupo, k_max)
+                except BusquedaAgotada as agotada:
+                    agotados.append(str(agotada))
+                    resultado = None
                 if resultado is None:
                     completo = False
                     break
@@ -629,12 +651,18 @@ def recomendar(catalogo: Catalogo, solicitud: SolicitudRecomendacion) -> Recomen
             break  # la secundaria es RESPALDO: no compite con la principal
 
     if mejor is None:
-        motivo = MOTIVO_SUPERA_K_MAX if hubo_candidatos else MOTIVO_SIN_CANDIDATOS_DIMENSIONALES
-        advertencias.append(
-            f"Ninguna combinacion de hasta {k_max} vehiculos acomoda la carga."
-            if hubo_candidatos else
-            "Ningun vehiculo del catalogo admite las dimensiones o el peso unitario de la carga."
-        )
+        if agotados:
+            motivo = MOTIVO_BUSQUEDA_AGOTADA
+            advertencias.extend(agotados)
+        elif hubo_candidatos:
+            motivo = MOTIVO_SUPERA_K_MAX
+            advertencias.append(
+                f"Ninguna combinacion de hasta {k_max} vehiculos acomoda la carga.")
+        else:
+            motivo = MOTIVO_SIN_CANDIDATOS_DIMENSIONALES
+            advertencias.append(
+                "Ningun vehiculo del catalogo admite las dimensiones o el peso unitario "
+                "de la carga.")
         return _sin_seleccion(motivo, CLASE_CARGA_SUELTA, advertencias, None, condicionadas_tipo)
 
     carroceria, vehiculos = mejor

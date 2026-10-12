@@ -338,3 +338,15 @@ def test_un_vehiculo_poco_lleno_queda_marcado(catalogo):
 def test_un_vehiculo_bien_aprovechado_no_se_marca(catalogo):
     r = _pedir(catalogo, _linea(BEBIDAS, 400, 50, 40, 40, 20))
     assert any(not v.alerta_bajo_llenado for v in r.vehiculos)
+
+
+def test_quedarse_sin_intentos_no_se_reporta_como_k_max(catalogo, monkeypatch):
+    """Son dos cosas distintas: en `SUPERA_K_MAX` se agotaron las
+    combinaciones posibles, y aca se agoto el presupuesto de corridas de DBLF.
+    Confundirlas le diria al usuario que su carga no cabe en diez camiones
+    cuando el buscador se rindio antes."""
+    monkeypatch.setattr(sf, "_MAX_INTENTOS_EMPAQUE", 0)
+    r = _pedir(catalogo, _linea(BEBIDAS, 100, 50, 40, 40, 20))
+    assert r.resultado == sf.RESULTADO_SIN_SELECCION
+    assert r.motivo_sin_seleccion == sf.MOTIVO_BUSQUEDA_AGOTADA
+    assert any("combinaciones de flota" in a for a in r.advertencias)

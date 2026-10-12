@@ -176,7 +176,10 @@ códigos de error quedan solo para fallos reales: `MERCANCIAS_REQUERIDAS`,
 `NO_AUTORIZADO` (401) y `CUBICADOR_NO_DISPONIBLE` (503).
 
 Valores de `motivoSinSeleccion`: `EXTRADIMENSIONADO`,
-`SIN_CANDIDATOS_DIMENSIONALES`, `SUPERA_K_MAX`, `SIN_CARROCERIA_COMPATIBLE`.
+`SIN_CANDIDATOS_DIMENSIONALES`, `SUPERA_K_MAX`, `SIN_CARROCERIA_COMPATIBLE` y
+`BUSQUEDA_AGOTADA` — esta última es una condición del algoritmo, no del
+negocio: el buscador se quedó sin intentos de empaque antes de encontrar una
+flota, que no es lo mismo que no caber en `k_max` vehículos.
 
 **La reconsulta exige `origenSistema` en la query**, no lo toma de la llave: un
 sistema puede necesitar leer lo que recomendó el otro, y un mismo código de línea

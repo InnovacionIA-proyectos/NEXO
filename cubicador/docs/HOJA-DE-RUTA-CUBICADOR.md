@@ -191,7 +191,12 @@ vez de aceptar un `null` silencioso. Es la misma clase de fallo que describe la 
 ```
 
 Valores de `motivoSinSeleccion`: `EXTRADIMENSIONADO`, `SIN_CANDIDATOS_DIMENSIONALES`,
-`SUPERA_K_MAX`, `SIN_CARROCERIA_COMPATIBLE`.
+`SUPERA_K_MAX`, `SIN_CARROCERIA_COMPATIBLE` y `BUSQUEDA_AGOTADA`.
+
+> `BUSQUEDA_AGOTADA` se agregó al implementar el motor: es una condición del
+> algoritmo, no del negocio. Se reporta aparte de `SUPERA_K_MAX` para no decirle
+> al usuario que su carga no cabe en diez camiones cuando lo que pasó es que el
+> buscador se quedó sin intentos de empaque.
 
 ### 2.5 Respuesta — condicionada
 
