@@ -16,6 +16,12 @@ class PosicionCarga:
     ancho_cm: float
     alto_cm: float
     peso_kg: float | None
+    # Codigo del catalogo de tipos de mercancia (S5-HU-17.6). NEXO lo agrega al
+    # JSON de `Dimensiones` por posicion; las lineas capturadas antes no lo
+    # traen y el puente las rechaza con motivo. **No se les pone un default**:
+    # el tipo de mercancia arrastra la carroceria, asi que asumir uno elegiria
+    # el vehiculo equivocado en silencio.
+    codigo_mercancia: str | None = None
 
 
 @dataclass(frozen=True)

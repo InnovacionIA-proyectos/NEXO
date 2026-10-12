@@ -7,8 +7,9 @@ backend C#. Construido para portar el motor de cubicación a Python como
 servicio contenerizado, con paridad automatizada con los 26 casos dorados
 en CI: trae **completo** el cubicador que
 originalmente vivía en `cabinaFletes` (C#) — el cubicador rápido (evaluador
-SICCE por criterios/veto) y el motor de bin-packing 3D (planes de cargue,
-optimización, ajuste manual) — con su propia persistencia, y una suite que
+SICCE por criterios/veto, **retirado en S5-HU-17.6**) y el motor de
+bin-packing 3D (planes de cargue, optimización, ajuste manual) — con su propia
+persistencia, y una suite que
 prueba en cada build que el port sigue produciendo exactamente lo mismo que
 el motor C# original.
 
@@ -17,8 +18,9 @@ Desde S5-HU-17 hay un **tercer motor**: la selección de flota
 responde qué vehículos hacen falta para una carga, en qué cantidad y con qué
 mercancía en cada uno. Reemplaza al cubicador rápido, que comparaba contra
 nueve arquetipos quemados y decidía por volumen puro; ese módulo y su endpoint
-`POST /api/cubicacion` ya se retiraron (S5-HU-17.4): lo reemplaza
-`POST /recomendaciones`, que además persiste su corrida.
+`POST /api/cubicacion` ya se retiraron (S5-HU-17.4), y el módulo del cubicador
+rápido con ellos (S5-HU-17.6): lo reemplaza `POST /recomendaciones`, que además
+persiste su corrida.
 
 No es un servicio de cómputo sin estado: es dueño de todo el dominio
 Cubicación — vehículos, planes de cargue, ítems, colocaciones y parámetros —
@@ -43,6 +45,7 @@ Ver:
 - [`CONTRATO.md`](./CONTRATO.md) — API REST, eventos de RabbitMQ, DTOs, errores, autenticación: todo lo necesario para conectar backend o frontend contra este servicio.
 - [`docs/ARQUITECTURA.md`](./docs/ARQUITECTURA.md) — capas, estructura de carpetas, cómo se traduce Clean Architecture a Python.
 - [`docs/DECISIONES_TECNICAS.md`](./docs/DECISIONES_TECNICAS.md) — registro de cada decisión tomada y por qué.
+- [`docs/DEUDA_DIFERIDA_3D.md`](./docs/DEUDA_DIFERIDA_3D.md) — qué quedó pendiente por no tocar el motor 3D, con lo que cuesta cada punto.
 - [`docs/testDocumentation/`](./docs/testDocumentation/) — documentación completa de los tests: las 31 reglas de negocio portadas desde cabinaFletes y las pruebas de integración/Docker.
 
 ## Stack
@@ -51,7 +54,7 @@ Ver:
 - **FastAPI** — API síncrona (`/recomendaciones`, los seis CRUD de catálogo, `/api/planes-cargue`)
 - **SQLAlchemy 2.0 (async)** — persistencia propia; `DATABASE_URL` apunta a SQLite en las pruebas o a SQL Server en QA y produccion (mismo codigo, solo cambia la URL). el esquema lo gobiernan los scripts de `docs/Database/`, no `create_all`
 - **aio-pika (RabbitMQ)** — worker consumidor separado, para `optimizar` y `crear-desde-línea`
-- **pytest** — 230 pruebas: 33 de reglas de negocio del motor (28 casos dorados de `MotorCubicacion3DTests.cs` + 5 de apilamiento multi-soporte) + **27 de paridad cross-motor** (los mismos casos, comparados contra la salida real del motor C#, no contra un valor transcrito a mano) + 4 de humo end-to-end de la API + 12 de regresión del worker (los 9 comandos por cola + el puente desde línea) + 4 del vigilante de timeouts + 2 del registro de algoritmos intercambiables + 2 de la alerta al equipo cuando un mensaje cae a `cubicacion.dlq` + **19 guardas de los 3 bugs de QA encontrados** (mensaje malformado que atascaba el worker, ítem sin SKU, borrado de plan optimizado) + **19 de la migración a SQL Server** (8 del esquema y la separación de los dos `MetaData` + 11 de la lectura del catálogo) + **39 del motor de selección de flota** (22 del algoritmo, 8 de DBLF y 9 del circuito completo contra SQLite) + **23 del contrato único** (19 de `POST /recomendaciones`, reconsulta, catálogos y llave por sistema de punta a punta por ASGI + 4 de la forma de los eventos de catálogo que consume NEXO) + **27 de los CRUD de catálogo** (concurrencia optimista, borrados bloqueados por referencias, borrado lógico de una mercancía con recomendaciones, dominancia al guardar un vehículo y el par normalizado de las reglas)
+- **pytest** — 240 pruebas: 33 de reglas de negocio del motor (28 casos dorados de `MotorCubicacion3DTests.cs` + 5 de apilamiento multi-soporte) + **27 de paridad cross-motor** (los mismos casos, comparados contra la salida real del motor C#, no contra un valor transcrito a mano) + 4 de humo end-to-end de la API + 12 de regresión del worker (los 9 comandos por cola + el puente desde línea) + 4 del vigilante de timeouts + 2 del registro de algoritmos intercambiables + 2 de la alerta al equipo cuando un mensaje cae a `cubicacion.dlq` + **19 guardas de los 3 bugs de QA encontrados** (mensaje malformado que atascaba el worker, ítem sin SKU, borrado de plan optimizado) + **19 de la migración a SQL Server** (8 del esquema y la separación de los dos `MetaData` + 11 de la lectura del catálogo) + **39 del motor de selección de flota** (22 del algoritmo, 8 de DBLF y 9 del circuito completo contra SQLite) + **23 del contrato único** (19 de `POST /recomendaciones`, reconsulta, catálogos y llave por sistema de punta a punta por ASGI + 4 de la forma de los eventos de catálogo que consume NEXO) + **11 del puente desde línea** (el fallback silencioso muerto y el diccionario de compatibilidad) + **27 de los CRUD de catálogo** (concurrencia optimista, borrados bloqueados por referencias, borrado lógico de una mercancía con recomendaciones, dominancia al guardar un vehículo y el par normalizado de las reglas)
 
 ## Estado actual (léelo antes de asumir que algo funciona)
 

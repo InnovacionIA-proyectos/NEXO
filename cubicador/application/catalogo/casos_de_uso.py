@@ -89,9 +89,8 @@ async def actualizar_parametro(
 # --- 2 y 3. Categorias y carrocerias ---------------------------------------
 
 
-async def crear_categoria(
-    repo: ICatalogoCrudRepository, nombre: str, usuario_id: str, eventos=None,
-):
+async def crear_categoria(repo: ICatalogoCrudRepository, nombre: str, usuario_id: str):
+    # Sin `eventos`: NEXO no proyecta las categorias (ver CON_EVENTO).
     _exigir(bool(nombre and nombre.strip()), "NOMBRE_REQUERIDO",
             "La categoria necesita un nombre.")
     return await repo.crear("categorias", {"nombre": nombre.strip().upper()}, usuario_id)

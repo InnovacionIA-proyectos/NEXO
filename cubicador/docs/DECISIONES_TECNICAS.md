@@ -769,3 +769,52 @@ afuera que deba bloquear su borrado: se van con él, igual que se reconcilian co
 nombre, porque esa es de otro y es append-only. Sin esta distinción, la relación
 que el propio vehículo creó le impedía borrarse y salía como un
 `CONFLICTO_DE_DATOS` genérico.
+
+## 16. El puente desde línea y el fin del fallback silencioso (S5-HU-17.6)
+
+**Murió el default silencioso.** `crear_plan_desde_linea` asumía un furgón de
+13,6 metros cuando no reconocía el vehículo sugerido
+(`_PRESET_POR_UNIDAD_RAPIDA.get(unidad, "Tractocamion furgon 13.6 m")`). Ponía
+la carga en una caja que podía no existir y el plan salía creíble pero
+equivocado. Ahora cada traducción que falla es un rechazo con motivo:
+`MERCANCIA_NO_DECLARADA`, `MERCANCIA_DESCONOCIDA`, `SIN_FLOTA_RECOMENDADA`,
+`VEHICULO_SIN_PRESET` o `PRESET_VEHICULO_NO_ENCONTRADO`.
+
+**El puente consume la recomendación en vez de adivinar.** Antes llenaba un
+vehículo con el optimizador 3D, miraba qué sobraba, abría otro igual, y así
+hasta veinte veces. Ahora el motor de selección responde **cuántos y de qué
+tipo** —y la flota puede ser mixta—, así que el bucle recorre los vehículos que
+el motor indicó. Si después del último queda carga sin ubicar, los dos motores
+no coincidieron y se rechaza con `FLOTA_INSUFICIENTE`: el 3D valida soporte y
+apilamiento por unidad, el de selección empaca con DBLF, y devolver un plan
+incompleto en silencio sería peor que avisar.
+
+**Las posiciones declaran su tipo de mercancía.** `PosicionCarga` ganó
+`codigo_mercancia`, que NEXO agrega al JSON de `Dimensiones` por posición
+(S5-HU-18). Las líneas capturadas antes no lo traen y **se rechazan**: no se les
+pone un default porque el tipo arrastra la carrocería, y asumirlo elegiría el
+vehículo equivocado sin que nada avise.
+
+**El diccionario de compatibilidad es deuda declarada.** Entre el código
+canónico (`2L2`, `C2`, `C3`, `2S2`, `3S3`) y el nombre del preset del 3D hay dos
+diccionarios en `desde_linea.py`. El `3S3` es el único que depende de la
+carrocería, y no es cosmético: con furgón carga 30.000 kg —el furgón pesa— y con
+plataforma los 34.000 del chasis. Mandarlo siempre al mismo preset regalaría o
+quitaría cuatro toneladas. Hay pruebas que verifican que los presets declarados
+existan y que sus capacidades coincidan con las del catálogo.
+
+Ese diccionario existe solo porque existen **dos catálogos de vehículos**;
+se retira el día que se unifiquen. El detalle, con lo que cuesta cada punto,
+está en [`DEUDA_DIFERIDA_3D.md`](./DEUDA_DIFERIDA_3D.md).
+
+**`domain/motor/cubicacion_rapida.py` se retiró.** Con él se va el catálogo de
+nueve arquetipos quemados, la heurística de estanterías, el clasificador de
+categorías por palabras y el criterio de reparto por eje. Lo único que
+sobrevivía —`detectar_extradimension`— ya vive en `seleccion_flota.py` con la
+forma que pide el contrato.
+
+**`SqlParametrosCubicacionRepository` devuelve la entidad de dominio.** Devolvía
+`MedidasEstandar` de ese módulo mientras el puerto declaraba
+`ParametrosCubicacion`: funcionaba por casualidad, porque los dos tipos tienen
+los mismos cuatro campos. Ahora devuelve lo que el puerto dice, y la
+infraestructura deja de depender del motor viejo.

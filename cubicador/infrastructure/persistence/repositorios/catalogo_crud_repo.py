@@ -83,7 +83,8 @@ class SqlCatalogoCrudRepository:
         self._s = sesion
 
     async def listar(self, catalogo: str) -> list[object]:
-        modelo, orden = CATALOGOS[catalogo] if catalogo in CATALOGOS else (_modelo(catalogo), "id")
+        _modelo(catalogo)  # levanta CatalogoDesconocido si el nombre no esta
+        modelo, orden = CATALOGOS[catalogo]
         filas = (await self._s.execute(
             select(modelo).order_by(getattr(modelo, orden))
         )).scalars().all()

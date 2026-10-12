@@ -21,7 +21,7 @@ memoria, sin necesidad de un servidor corriendo.
 |---|---|
 | `test_health` | `GET /health` responde 200. |
 | `test_flujo_completo_crear_optimizar` | El flujo de negocio completo: listar vehículos (dispara la siembra de los 9 presets) → crear plan → agregar 3 unidades de un ítem que sabemos que cabe → `POST /optimizar` (verifica 202 + `estado: "procesando"` + que quedó publicado en el `_PublisherFalso`) → simula al worker llamando `optimizar_plan` directo contra la misma base → `GET /resultado` (verifica que las 3 unidades quedaron cargadas y el estado pasó a `optimizado`) → ajustar manualmente una colocación (bloquearla, verifica que el estado pase a `ajustado`). |
-| `test_cubicacion_rapida` | `POST /api/cubicacion` evalúa contra las 9 unidades del catálogo y devuelve una sugerencia. |
+| ~~`test_cubicacion_rapida`~~ | `POST /api/cubicacion` se retiró en S5-HU-17.4. Lo reemplaza `POST /recomendaciones`, cubierto por `tests/api/test_contrato_recomendaciones.py` y por `scripts/verificar_contrato.py` contra el servicio real. |
 | `test_sin_api_key_es_rechazado` | Una petición sin `Authorization: Bearer` recibe 401. |
 
 **Detalle técnico que vale la pena recordar** si estos tests empiezan a fallar

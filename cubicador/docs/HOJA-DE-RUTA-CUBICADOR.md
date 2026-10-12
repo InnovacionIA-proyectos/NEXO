@@ -330,14 +330,14 @@ arranquen en paralelo, no en secuencia.
 - ✅ **Presets del 3D corregidos contra el Excel** (hecho). El diccionario del puente resuelve el *nombre*, no el *dato*: traducía `2L2` → "Turbo con estacas", y ese preset seguía diciendo 6,2 m y 6.300 kg cuando el Turbo real es 4,5 m y 4.000 kg — el motor nuevo decía "cabe en un Turbo" y el 3D acomodaba dentro de una caja 38% más larga que no existe. Se corrigieron largo, ancho, alto y capacidad de las 5 configuraciones con contraparte en el Excel, **se agregó la Minimula 2S2** (faltaba por completo) y se dejaron intactas cama baja y los 3 contenedores, que no tienen contraparte. Las 122 pruebas pasan, incluidos los 26 casos dorados.
 - ⚠️ **La corrección NO llega sola a las bases que ya existen.** `listar_con_siembra` siembra **por nombre** y solo agrega los faltantes: nunca actualiza una fila. Así que aplica a bases nuevas, y como los datos **se migran** (no se arranca vacío), las filas viejas y erradas viajan a SQL Server. **La migración tiene que incluir un `UPDATE` puntual de esas 5 filas.** Es la misma consecuencia del seeder idempotente que describe la sección 6: las correcciones no entran por siembra.
 - El nombre "Tractocamion furgon 13.6 m" quedó desfasado — son 12,2 m. No se renombró porque la siembra es por nombre y crearía duplicados; el renombre va por CRUD.
-- ✅ El catálogo quemado de SICCE (`cubicacion_rapida.py::CATALOGO`, 9 arquetipos) **no se corrigió a propósito**: lo reemplaza el motor nuevo leyendo de base, que ya está escrito (S5-HU-17.3). El módulo entero se retira en S5-HU-17.4, junto con `POST /api/cubicacion`.
+- ✅ El catálogo quemado de SICCE (`cubicacion_rapida.py::CATALOGO`, 9 arquetipos) **no se corrigió a propósito**: lo reemplaza el motor nuevo leyendo de base, que ya está escrito (S5-HU-17.3). El módulo entero se retiró en S5-HU-17.6; su endpoint `POST /api/cubicacion` ya se había ido en S5-HU-17.4.
 - **Matar el fallback silencioso.** Hoy `_PRESET_POR_UNIDAD_RAPIDA.get(unidad, "Tractocamion furgon 13.6 m")` asume un furgón de 13,6 m cuando no reconoce el vehículo. Pasa a rechazo explícito.
 - **Reescribir el puente `crear_plan_desde_linea`** y sus pruebas. Se simplifica: hoy adivina cuántos vehículos hacen falta llenando uno y viendo qué sobra, hasta 20 veces. El motor nuevo ya responde cuántos y de qué tipo, así que la cascada a ciegas se reemplaza por "crear N planes con los vehículos indicados y optimizar cada uno". Es menos código del que hay.
 - Documento de deuda diferida del 3D.
 
-> La rápida se llama desde **tres puntos**: `api/routers/cubicacion.py`,
-> `application/cubicacion_rapida/casos_de_uso.py` y `application/plan_cargue/desde_linea.py`.
-> La superficie de cambio es chica y está acotada.
+> ✅ Los tres puntos que llamaban a la rápida ya no existen: el router y el caso
+> de uso se retiraron con el endpoint (S5-HU-17.4), y `desde_linea.py` pasó a
+> consumir el motor de selección (S5-HU-17.6).
 
 ### 4.2 NEXO (.NET)
 

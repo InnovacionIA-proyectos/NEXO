@@ -18,9 +18,6 @@ cubicador/
                               # oraculo de empaque de la seleccion de flota.
       puntuacion.py          # scoring 0..100 por estrategia
       motor.py               # MotorCubicacion3D: orquesta optimizar/validar/metricas
-      cubicacion_rapida.py   # evaluador SICCE (7 criterios + heuristica de estanterias).
-                              # LO REEMPLAZA seleccion_flota.py; se retira junto
-                              # con POST /api/cubicacion en S5-HU-17.4.
       seleccion_flota.py      # motor de seleccion de flota (S5-HU-17.3): filtra
                               # candidatos, empaca con DBLF y elige la flota
                               # minima, que puede ser MIXTA. Decide por
@@ -39,8 +36,6 @@ cubicador/
                                # resuelto en memoria. Dataclasses frozen.
   application/
     excepciones.py            # AppException y subtipos (equivalente a NEXO)
-    cubicacion_rapida/
-      casos_de_uso.py         # evaluar_cubicacion, catalogo_unidades, medidas_estandar
     recomendaciones/
       casos_de_uso.py          # recomendar_flota (S5-HU-17.3): resuelve las mercancias
                                 # contra el catalogo de base y corre el motor. Es la
@@ -48,7 +43,7 @@ cubicador/
                                 # crear_recomendacion agrega la persistencia append-only
                                 # y la reconsulta (S5-HU-17.4).
     parametros/
-      casos_de_uso.py           # medidas estandar (venian de cubicacion_rapida/)
+      casos_de_uso.py           # medidas estandar (topes de extradimension)
     catalogo/
       casos_de_uso.py            # CRUD de los seis catalogos (S5-HU-17.5): las
                                   # validaciones que la base no puede hacer sola, y la
@@ -137,7 +132,7 @@ Mapeo de archivos origen → destino:
 | `Optimizadores.cs` (`IOptimizadorCubicacion`, `FirstFitDecreasing`, `BestFitDecreasing`) | `domain/motor/optimizadores.py` |
 | `Puntuacion.cs` | `domain/motor/puntuacion.py` |
 | `MotorCubicacion3D.cs` | `domain/motor/motor.py` |
-| `CubicacionService.cs` (evaluador SICCE) | `domain/motor/cubicacion_rapida.py` |
+| `CubicacionService.cs` (evaluador SICCE) | **retirado en S5-HU-17.6**. Lo reemplaza `domain/motor/seleccion_flota.py`, que lee el catalogo de base |
 | `PlanCargueService.cs` | se reparte entre `application/plan_cargue/*.py` (orquestación) e `infrastructure/persistence/repositorios/plan_cargue_repo.py` (EF→SQLAlchemy) |
 | `Application/Cubicacion3D/Dtos/*.cs` de NEXO | `api/dtos/*.py` (Pydantic) — ver ../CONTRATO.md |
 | `Application/Cubicacion3D/Ports/*.cs` de NEXO | `application/ports/*.py` (Protocols) |
