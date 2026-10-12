@@ -210,3 +210,57 @@ class CrearReglaDto(_ConUsuario):
 class BorrarDto(_ConVersion):
     """Cuerpo de un `DELETE`. Lleva version por lo mismo que el `PUT`: borrar
     una fila que cambio desde que se leyo es tan destructivo como pisarla."""
+
+
+# --- constructores desde la fila ------------------------------------------
+#
+# Viven aca y no en el router porque los usan DOS lados: el router para la
+# respuesta HTTP y los casos de uso para el payload de los eventos de
+# catalogo. Es el mismo criterio ya documentado en
+# `vehiculo_repo._a_evento_payload`: una sola definicion de la forma del
+# evento, para que no diverja de lo que devuelve el GET.
+#
+# **El evento lleva la fila ENTERA**, no solo el codigo: del otro lado NEXO
+# hace upsert por Id, asi que un payload parcial le dejaria la proyeccion con
+# los demas campos vacios.
+
+
+def carroceria_desde(fila) -> TipoCarroceriaDto:
+    return TipoCarroceriaDto(
+        id=fila.id, codigo_carroceria=fila.codigo, nombre_carroceria=fila.nombre,
+        activo=fila.activo, version=fila.version)
+
+
+def mercancia_desde(fila, categorias: dict[str, str],
+                    carrocerias: dict[str, str]) -> TipoMercanciaDto:
+    return TipoMercanciaDto(
+        id=fila.id, codigo_mercancia=fila.codigo, nombre_mercancia=fila.nombre,
+        categoria=categorias.get(fila.categoria_id, ""),
+        cubicable=fila.cubicable, condicionada_cubicacion=fila.condicionada,
+        carroceria_principal=carrocerias.get(fila.carroceria_principal_id or ""),
+        carroceria_secundaria=carrocerias.get(fila.carroceria_secundaria_id or ""),
+        carroceria_secundaria_condicionada=fila.secundaria_condicionada,
+        control_ambiental_requerido=fila.control_ambiental,
+        apilable=fila.apilable, fragil=fila.fragil, rotacion_libre=fila.rotacion_libre,
+        comentario_condicion=fila.comentario_condicion, activo=fila.activo,
+        version=fila.version)
+
+
+def vehiculo_desde(fila, relaciones, carrocerias: dict[str, str]) -> VehiculoCatalogoDto:
+    return VehiculoCatalogoDto(
+        id=fila.id, codigo_vehiculo=fila.codigo, nombre_vehiculo=fila.nombre,
+        largo_cm=fila.largo_cm, ancho_cm=fila.ancho_cm, alto_util_cm=fila.alto_util_cm,
+        capacidad_maxima_kg=fila.capacidad_kg, activo=fila.activo, version=fila.version,
+        carrocerias=[
+            CarroceriaDeVehiculoDto(
+                id_carroceria=r.carroceria_id,
+                codigo_carroceria=carrocerias.get(r.carroceria_id, ""),
+                usa_capacidad_maxima_del_vehiculo=r.usa_capacidad_del_vehiculo,
+                capacidad_maxima_especifica=r.capacidad_especifica_kg)
+            for r in relaciones
+        ])
+
+
+def como_evento(dto) -> dict:
+    """Lo que viaja en el evento: el DTO completo, en camelCase."""
+    return dto.model_dump(mode="json", by_alias=True)

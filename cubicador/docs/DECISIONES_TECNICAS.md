@@ -818,3 +818,19 @@ forma que pide el contrato.
 `ParametrosCubicacion`: funcionaba por casualidad, porque los dos tipos tienen
 los mismos cuatro campos. Ahora devuelve lo que el puerto dice, y la
 infraestructura deja de depender del motor viejo.
+
+
+**Los eventos de catálogo llevan la fila entera.** NEXO hace upsert por Id, así
+que un payload parcial le dejaría la proyección con los demás campos vacíos y
+sus desplegables mostrarían filas a medias. Se reusa el DTO del `GET` para
+armarlo —mismo criterio ya documentado en `vehiculo_repo._a_evento_payload`—
+para que la forma del evento no diverja de la que devuelve la consulta.
+
+**Hay `republicar-catalogo` por catálogo proyectado**
+(`POST /tipos-carroceria/republicar-catalogo` y sus equivalentes para
+mercancías y vehículos). Reemite el evento de creación para todas las filas, no
+solo las nuevas. Es la misma herramienta que ya existía para los vehículos del
+motor 3D, que hizo falta cuando esa proyección quedó en 13 filas contra 20 de
+este lado. Seguro de correr más de una vez, y no es parte de ningún flujo
+automático. Los tres catálogos que NEXO no proyecta no la tienen: no habría a
+quién reemitirle.

@@ -29,6 +29,9 @@ from api.dependencias import (
     verificar_api_key,
 )
 from api.dtos.catalogo import (
+    carroceria_desde as _carroceria,
+    mercancia_desde as _mercancia,
+    vehiculo_desde as _vehiculo,
     ActualizarCarroceriaDto,
     ActualizarCategoriaDto,
     ActualizarMercanciaDto,
@@ -57,12 +60,12 @@ router = APIRouter(tags=["catalogo"], dependencies=[Depends(verificar_api_key)])
 
 
 # --- traductores ------------------------------------------------------------
-
-
-def _carroceria(fila) -> TipoCarroceriaDto:
-    return TipoCarroceriaDto(
-        id=fila.id, codigo_carroceria=fila.codigo, nombre_carroceria=fila.nombre,
-        activo=fila.activo, version=fila.version)
+#
+# Carroceria, mercancia y vehiculo se construyen con las funciones de
+# `api/dtos/catalogo.py`, porque las comparten el router (para la respuesta) y
+# los casos de uso (para el payload del evento de catalogo). Los tres de abajo
+# solo los usa el router: categorias, parametros y reglas no se proyectan en
+# NEXO, asi que no viajan en ningun evento.
 
 
 def _categoria(fila) -> CategoriaMercanciaDto:
@@ -79,35 +82,6 @@ def _regla(fila) -> ReglaIncompatibilidadDto:
     return ReglaIncompatibilidadDto(
         id=fila.id, id_categoria_1=fila.categoria_1_id, id_categoria_2=fila.categoria_2_id,
         motivo=fila.motivo, version=fila.version)
-
-
-def _mercancia(fila, categorias: dict[str, str], carrocerias: dict[str, str]) -> TipoMercanciaDto:
-    return TipoMercanciaDto(
-        id=fila.id, codigo_mercancia=fila.codigo, nombre_mercancia=fila.nombre,
-        categoria=categorias.get(fila.categoria_id, ""),
-        cubicable=fila.cubicable, condicionada_cubicacion=fila.condicionada,
-        carroceria_principal=carrocerias.get(fila.carroceria_principal_id or ""),
-        carroceria_secundaria=carrocerias.get(fila.carroceria_secundaria_id or ""),
-        carroceria_secundaria_condicionada=fila.secundaria_condicionada,
-        control_ambiental_requerido=fila.control_ambiental,
-        apilable=fila.apilable, fragil=fila.fragil, rotacion_libre=fila.rotacion_libre,
-        comentario_condicion=fila.comentario_condicion, activo=fila.activo,
-        version=fila.version)
-
-
-def _vehiculo(fila, relaciones, carrocerias: dict[str, str]) -> VehiculoCatalogoDto:
-    return VehiculoCatalogoDto(
-        id=fila.id, codigo_vehiculo=fila.codigo, nombre_vehiculo=fila.nombre,
-        largo_cm=fila.largo_cm, ancho_cm=fila.ancho_cm, alto_util_cm=fila.alto_util_cm,
-        capacidad_maxima_kg=fila.capacidad_kg, activo=fila.activo, version=fila.version,
-        carrocerias=[
-            CarroceriaDeVehiculoDto(
-                id_carroceria=r.carroceria_id,
-                codigo_carroceria=carrocerias.get(r.carroceria_id, ""),
-                usa_capacidad_maxima_del_vehiculo=r.usa_capacidad_del_vehiculo,
-                capacidad_maxima_especifica=r.capacidad_especifica_kg)
-            for r in relaciones
-        ])
 
 
 async def _codigos_de_carroceria(repo) -> dict[str, str]:
@@ -152,6 +126,21 @@ async def borrar_carroceria(id: str, peticion: BorrarDto,
                             repo=Depends(obtener_catalogo_crud_repo),
                             eventos=Depends(obtener_eventos_publisher)):
     await cu.eliminar_del_catalogo(repo, "carrocerias", id, peticion.version, eventos)
+
+
+@router.post("/tipos-carroceria/republicar-catalogo", response_model=list[TipoCarroceriaDto])
+async def republicar_carrocerias(repo=Depends(obtener_catalogo_crud_repo),
+                                 eventos=Depends(obtener_eventos_publisher)):
+    """Reparo manual de una desincronizacion con la proyeccion de NEXO.
+
+    Republica el evento de creacion para TODO el catalogo, no solo lo nuevo.
+    Seguro de correr mas de una vez: el consumer de NEXO hace upsert por Id. No
+    es parte de ningun flujo automatico. Es la misma herramienta que ya existia
+    para los vehiculos del motor 3D, que hizo falta cuando esa proyeccion quedo
+    en 13 filas contra 20 de aca.
+    """
+    filas = await cu.republicar_catalogo(repo, "carrocerias", eventos)
+    return [_carroceria(f) for f in filas]
 
 
 # --- categorias de mercancia ------------------------------------------------
@@ -243,6 +232,16 @@ async def borrar_mercancia(id: str, peticion: BorrarDto,
     await cu.eliminar_mercancia(repo, id, peticion.version, peticion.usuario_id, eventos)
 
 
+@router.post("/tipos-mercancia/republicar-catalogo", response_model=list[TipoMercanciaDto])
+async def republicar_mercancias(repo=Depends(obtener_catalogo_crud_repo),
+                                eventos=Depends(obtener_eventos_publisher)):
+    """Ver `republicar_carrocerias`."""
+    filas = await cu.republicar_catalogo(repo, "mercancias", eventos)
+    categorias = {c.id: c.nombre for c in await repo.listar("categorias")}
+    carrocerias = await _codigos_de_carroceria(repo)
+    return [_mercancia(f, categorias, carrocerias) for f in filas]
+
+
 # --- vehiculos del catalogo -------------------------------------------------
 
 
@@ -305,6 +304,16 @@ async def borrar_vehiculo(id: str, peticion: BorrarDto,
                           repo=Depends(obtener_catalogo_crud_repo),
                           eventos=Depends(obtener_eventos_publisher)):
     await cu.eliminar_del_catalogo(repo, "vehiculos", id, peticion.version, eventos)
+
+
+@router.post("/vehiculos-catalogo/republicar-catalogo",
+             response_model=list[VehiculoCatalogoDto])
+async def republicar_vehiculos(repo=Depends(obtener_catalogo_crud_repo),
+                               eventos=Depends(obtener_eventos_publisher)):
+    """Ver `republicar_carrocerias`."""
+    filas = await cu.republicar_catalogo(repo, "vehiculos", eventos)
+    carrocerias = await _codigos_de_carroceria(repo)
+    return [_vehiculo(f, await repo.carrocerias_de(f.id), carrocerias) for f in filas]
 
 
 # --- reglas de incompatibilidad ---------------------------------------------

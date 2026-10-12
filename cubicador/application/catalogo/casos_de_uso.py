@@ -40,6 +40,28 @@ from domain.motor.seleccion_flota import CatalogoInconsistente, validar_dominanc
 CON_EVENTO = {"mercancias", "carrocerias", "vehiculos"}
 
 
+def _evento_carroceria(fila) -> dict:
+    from api.dtos.catalogo import carroceria_desde, como_evento
+
+    return como_evento(carroceria_desde(fila))
+
+
+async def _evento_mercancia(repo: ICatalogoCrudRepository, fila) -> dict:
+    from api.dtos.catalogo import como_evento, mercancia_desde
+
+    categorias = {c.id: c.nombre for c in await repo.listar("categorias")}
+    carrocerias = {c.id: c.codigo for c in await repo.listar("carrocerias")}
+    return como_evento(mercancia_desde(fila, categorias, carrocerias))
+
+
+async def _evento_vehiculo(repo: ICatalogoCrudRepository, fila) -> dict:
+    from api.dtos.catalogo import como_evento, vehiculo_desde
+
+    carrocerias = {c.id: c.codigo for c in await repo.listar("carrocerias")}
+    relaciones = await repo.carrocerias_de(fila.id)
+    return como_evento(vehiculo_desde(fila, relaciones, carrocerias))
+
+
 def _exigir(condicion: bool, codigo: str, mensaje: str) -> None:
     if not condicion:
         raise ValidationFailedException(codigo, mensaje)
@@ -52,6 +74,11 @@ async def _publicar(eventos: IEventosPort | None, catalogo: str, accion: str,
     Si no se publica, `GET /api/mercancias` del lado de NEXO sigue ofreciendo
     una mercancia que aqui ya no existe, y la solicitud que la elija falla
     recien al llegar al Cubicador.
+
+    `datos` es la **fila entera** en forma de DTO, no un resumen: NEXO hace
+    upsert por Id, asi que un payload parcial le dejaria los demas campos
+    vacios. `None` es solo para los eventos de borrado, que no tienen fila que
+    proyectar.
     """
     if eventos is None or catalogo not in CON_EVENTO:
         return
@@ -105,8 +132,7 @@ async def crear_carroceria(
         "carrocerias",
         {"codigo": codigo.strip().upper(), "nombre": nombre.strip(), "activo": True},
         usuario_id)
-    await _publicar(eventos, "carrocerias", "creada", fila.id,
-                    {"codigo": fila.codigo, "nombre": fila.nombre, "activo": fila.activo})
+    await _publicar(eventos, "carrocerias", "creada", fila.id, _evento_carroceria(fila))
     return fila
 
 
@@ -163,7 +189,8 @@ async def crear_mercancia(
 ):
     _validar_mercancia(datos)
     fila = await repo.crear("mercancias", datos, usuario_id)
-    await _publicar(eventos, "mercancias", "creada", fila.id, {"codigo": fila.codigo})
+    await _publicar(eventos, "mercancias", "creada", fila.id,
+                    await _evento_mercancia(repo, fila))
     return fila
 
 
@@ -175,7 +202,8 @@ async def actualizar_mercancia(
     fila = await repo.actualizar("mercancias", id, datos, version, usuario_id)
     if fila is None:
         raise NotFoundException("NO_ENCONTRADO", f"No existe la mercancia '{id}'.")
-    await _publicar(eventos, "mercancias", "actualizada", fila.id, {"codigo": fila.codigo})
+    await _publicar(eventos, "mercancias", "actualizada", fila.id,
+                    await _evento_mercancia(repo, fila))
     return fila
 
 
@@ -194,7 +222,7 @@ async def eliminar_mercancia(
         if fila is None:
             raise NotFoundException("NO_ENCONTRADO", f"No existe la mercancia '{id}'.")
         await _publicar(eventos, "mercancias", "actualizada", fila.id,
-                        {"codigo": fila.codigo, "activo": False})
+                        await _evento_mercancia(repo, fila))
         return fila
 
     if not await repo.eliminar("mercancias", id, version):
@@ -293,7 +321,7 @@ async def guardar_vehiculo(
 
     await repo.reconciliar_carrocerias(fila.id, carrocerias, usuario_id)
     await _publicar(eventos, "vehiculos", accion, fila.id,
-                    {"codigo": fila.codigo, "nombre": fila.nombre})
+                    await _evento_vehiculo(repo, fila))
     return fila
 
 
@@ -348,3 +376,37 @@ async def crear_regla(
         "reglas",
         {"categoria_1_id": primera, "categoria_2_id": segunda, "motivo": motivo.strip()},
         usuario_id)
+
+
+# --- republicar el catalogo entero ------------------------------------------
+
+
+async def republicar_catalogo(
+    repo: ICatalogoCrudRepository, catalogo: str, eventos: IEventosPort,
+) -> list:
+    """Republica el evento de creacion para TODAS las filas de un catalogo.
+
+    Repara una desincronizacion ya existente entre este catalogo y la
+    proyeccion de NEXO: la misma herramienta que ya existe para vehiculos del
+    motor 3D (`republicar_catalogo` de `plan_cargue/vehiculos.py`), que se
+    necesito cuando la proyeccion quedo en 13 filas contra 20 de aca.
+
+    Seguro de correr mas de una vez: el consumer de NEXO hace upsert por Id.
+    No es parte de ningun flujo automatico; se invoca a mano.
+    """
+    if catalogo not in CON_EVENTO:
+        raise ValidationFailedException(
+            "CATALOGO_SIN_EVENTO",
+            f"El catalogo '{catalogo}' no se proyecta en NEXO: no hay nada que republicar.")
+
+    filas = await repo.listar(catalogo)
+    accion = "creado" if catalogo == "vehiculos" else "creada"
+    for fila in filas:
+        if catalogo == "carrocerias":
+            payload = _evento_carroceria(fila)
+        elif catalogo == "mercancias":
+            payload = await _evento_mercancia(repo, fila)
+        else:
+            payload = await _evento_vehiculo(repo, fila)
+        await _publicar(eventos, catalogo, accion, fila.id, payload)
+    return filas

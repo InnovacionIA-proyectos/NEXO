@@ -245,6 +245,21 @@ su evento para que la proyección de NEXO no quede vieja. Categorías, parámetr
 y reglas no los publican: NEXO no los proyecta, y serían mensajes que ninguna
 cola consume.
 
+El evento lleva **la fila entera**, con la misma forma que devuelve el `GET`:
+NEXO hace upsert por Id, así que un payload parcial le dejaría los demás campos
+vacíos.
+
+Para reparar una desincronización hay un endpoint por catálogo proyectado:
+
+| | |
+|---|---|
+| `POST /tipos-carroceria/republicar-catalogo` | Reemite el evento de creación para **todas** las filas |
+| `POST /tipos-mercancia/republicar-catalogo` | ídem |
+| `POST /vehiculos-catalogo/republicar-catalogo` | ídem |
+
+Seguro de correr más de una vez —el consumer hace upsert por Id— y no es parte
+de ningún flujo automático: se invoca a mano.
+
 ### 3.3 `/api/planes-cargue` — motor 3D (con persistencia)
 
 | Método | Ruta | Notas |

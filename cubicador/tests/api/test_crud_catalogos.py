@@ -40,14 +40,14 @@ class _PublisherFalso:
     NEXO no quede vieja: si no salen, nada falla aqui y todo falla alla."""
 
     def __init__(self) -> None:
-        self.eventos: list[tuple[str, str]] = []
+        self.eventos: list[tuple[str, str, dict | None]] = []
 
     def __getattr__(self, nombre):
         if not nombre.startswith("publicar_"):
             raise AttributeError(nombre)
 
         async def _registrar(id_, datos=None):
-            self.eventos.append((nombre, id_))
+            self.eventos.append((nombre, id_, datos))
 
         return _registrar
 
@@ -467,3 +467,45 @@ async def test_borrar_un_vehiculo_se_lleva_sus_carrocerias(client):
     codigos = {v["codigoVehiculo"]
                for v in (await client.get("/vehiculos-catalogo", headers=LLAVE)).json()}
     assert "C3" not in codigos
+
+
+# --- lo que necesita la proyeccion de NEXO ----------------------------------
+
+
+async def test_el_evento_lleva_la_fila_entera_no_solo_el_codigo(client, publisher):
+    """NEXO hace upsert por Id: un payload parcial le dejaria la proyeccion con
+    los demas campos vacios, y sus desplegables mostrarian filas a medias."""
+    creada = (await client.post("/tipos-mercancia", headers=LLAVE, json=_mercancia())).json()
+
+    nombre, _id, payload = publisher.eventos[-1]
+    assert nombre == "publicar_mercancia_creada"
+    assert payload["codigoMercancia"] == "NUEVA"
+    assert payload["nombreMercancia"] == creada["nombreMercancia"]
+    assert payload["categoria"] == creada["categoria"]
+    assert payload["carroceriaPrincipal"] == "FURGON"
+    assert payload["version"] == creada["version"]
+
+
+async def test_republicar_el_catalogo_reemite_todo(client, publisher):
+    """La herramienta de reparacion que pide S5-HU-18.5, equivalente a la que
+    ya existia para los vehiculos del motor 3D."""
+    antes = len(publisher.eventos)
+    r = await client.post("/tipos-carroceria/republicar-catalogo", headers=LLAVE)
+    assert r.status_code == 200, r.text
+
+    publicados = publisher.eventos[antes:]
+    assert len(publicados) == len(r.json()) == 3
+    assert all(nombre == "publicar_carroceria_creada" for nombre, _, _ in publicados)
+    assert all(p["codigoCarroceria"] for _, _, p in publicados)
+
+
+async def test_republicar_es_seguro_de_correr_dos_veces(client, publisher):
+    """El consumer de NEXO hace upsert por Id."""
+    primera = (await client.post("/tipos-carroceria/republicar-catalogo", headers=LLAVE)).json()
+    segunda = (await client.post("/tipos-carroceria/republicar-catalogo", headers=LLAVE)).json()
+    assert [c["id"] for c in primera] == [c["id"] for c in segunda]
+
+
+async def test_no_se_republica_un_catalogo_que_nexo_no_proyecta(client):
+    r = await client.post("/categorias-mercancia/republicar-catalogo", headers=LLAVE)
+    assert r.status_code in (404, 405), "no deberia existir la ruta"

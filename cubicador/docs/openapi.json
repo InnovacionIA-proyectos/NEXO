@@ -4521,6 +4521,37 @@
         ]
       }
     },
+    "/tipos-carroceria/republicar-catalogo": {
+      "post": {
+        "description": "Reparo manual de una desincronizacion con la proyeccion de NEXO.\n\nRepublica el evento de creacion para TODO el catalogo, no solo lo nuevo.\nSeguro de correr mas de una vez: el consumer de NEXO hace upsert por Id. No\nes parte de ningun flujo automatico. Es la misma herramienta que ya existia\npara los vehiculos del motor 3D, que hizo falta cuando esa proyeccion quedo\nen 13 filas contra 20 de aca.",
+        "operationId": "republicar_carrocerias_tipos_carroceria_republicar_catalogo_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TipoCarroceriaDto"
+                  },
+                  "title": "Response Republicar Carrocerias Tipos Carroceria Republicar Catalogo Post",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Republicar Carrocerias",
+        "tags": [
+          "catalogo"
+        ]
+      }
+    },
     "/tipos-carroceria/{id}": {
       "delete": {
         "operationId": "borrar_carroceria_tipos_carroceria__id__delete",
@@ -4700,6 +4731,37 @@
         ]
       }
     },
+    "/tipos-mercancia/republicar-catalogo": {
+      "post": {
+        "description": "Ver `republicar_carrocerias`.",
+        "operationId": "republicar_mercancias_tipos_mercancia_republicar_catalogo_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TipoMercanciaDto"
+                  },
+                  "title": "Response Republicar Mercancias Tipos Mercancia Republicar Catalogo Post",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Republicar Mercancias",
+        "tags": [
+          "catalogo"
+        ]
+      }
+    },
     "/tipos-mercancia/{id}": {
       "delete": {
         "operationId": "borrar_mercancia_tipos_mercancia__id__delete",
@@ -4874,6 +4936,37 @@
           }
         ],
         "summary": "Crear Vehiculo",
+        "tags": [
+          "catalogo"
+        ]
+      }
+    },
+    "/vehiculos-catalogo/republicar-catalogo": {
+      "post": {
+        "description": "Ver `republicar_carrocerias`.",
+        "operationId": "republicar_vehiculos_vehiculos_catalogo_republicar_catalogo_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/VehiculoCatalogoDto"
+                  },
+                  "title": "Response Republicar Vehiculos Vehiculos Catalogo Republicar Catalogo Post",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Republicar Vehiculos",
         "tags": [
           "catalogo"
         ]
