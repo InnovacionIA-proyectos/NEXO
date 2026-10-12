@@ -66,6 +66,8 @@ tests/
   domain/                            # 33 pytest - las 31 reglas de testDocumentation/REGLAS_DE_NEGOCIO.md
   api/
     test_smoke.py                    # flujo end-to-end contra SQLite
+alembic/                              # migraciones de esquema (reemplaza a create_all)
+alembic.ini                           # la URL sale del entorno, no de aqui
 docker-compose.yml                    # api + worker + SQL Server local (RabbitMQ es el compartido de NEXO, ver DECISIONES_TECNICAS.md #9)
 ```
 

@@ -14,7 +14,7 @@ el motor C# original.
 
 No es un servicio de cómputo sin estado: es dueño de todo el dominio
 Cubicación — vehículos, planes de cargue, ítems, colocaciones y parámetros —
-con su propia base de datos (Postgres, contenedor propio). NEXO lo consume
+con su propia persistencia en SQL Server. NEXO lo consume
 vía REST (operaciones simples) y RabbitMQ (operaciones pesadas: optimizar,
 crear plan desde línea).
 
@@ -41,7 +41,7 @@ Ver:
 
 - **Python 3.14**
 - **FastAPI** — API síncrona (`/api/cubicacion`, `/api/planes-cargue`)
-- **SQLAlchemy 2.0 (async)** — persistencia propia; `DATABASE_URL` apunta a SQLite en desarrollo o PostgreSQL en producción (mismo código, solo cambia la URL)
+- **SQLAlchemy 2.0 (async)** — persistencia propia; `DATABASE_URL` apunta a SQLite en las pruebas o a SQL Server en QA y produccion (mismo codigo, solo cambia la URL). El esquema lo gobierna **alembic**, no `create_all`
 - **aio-pika (RabbitMQ)** — worker consumidor separado, para `optimizar` y `crear-desde-línea`
 - **pytest** — 103 pruebas: 33 de reglas de negocio del motor (28 casos dorados de `MotorCubicacion3DTests.cs` + 5 de apilamiento multi-soporte) + **27 de paridad cross-motor** (los mismos casos, comparados contra la salida real del motor C#, no contra un valor transcrito a mano) + 4 de humo end-to-end de la API + 12 de regresión del worker (los 9 comandos por cola + el puente desde línea) + 4 del vigilante de timeouts + 2 del registro de algoritmos intercambiables + 2 de la alerta al equipo cuando un mensaje cae a `cubicacion.dlq` + **19 guardas de los 3 bugs de QA encontrados** (mensaje malformado que atascaba el worker, ítem sin SKU, borrado de plan optimizado)
 
@@ -56,16 +56,16 @@ Ver:
   `tests/api/test_smoke.py`.
 - Autenticación por Bearer estático rechazando llamadas sin la key.
 
-**Verificado con Docker Compose real (Postgres + api + worker propios, conectados al RabbitMQ compartido de NEXO):**
-- El mismo flujo de arriba, pero contra **PostgreSQL real** vía `docker
+**Verificado con Docker Compose real (SQL Server + api + worker propios, conectados al RabbitMQ compartido de NEXO):**
+- El mismo flujo de arriba, pero contra **SQL Server real** via `docker
   compose up -d` (con healthcheck: `api`/`worker` esperan a que `db` esté
-  `healthy` antes de arrancar — sin eso, arrancaban antes de que Postgres
+  `healthy` antes de arrancar - sin eso, arrancaban antes de que la base
   terminara su init y se caían). RabbitMQ ya no es un contenedor de este
   compose — ver `docs/DECISIONES_TECNICAS.md` #9.
 - **El flujo asíncrono end-to-end, vía HTTP real**: `POST /{id}/optimizar`
   responde `202` de inmediato con el plan en `procesando`; el `worker` (otro
   contenedor) consume el mensaje de `cubicador.optimizar`, corre
-  `optimizar_plan` contra Postgres y publica `plan-de-cargue.generado` —
+  `optimizar_plan` contra la base y publica `plan-de-cargue.generado` -
   confirmado con `GET /resultado` que el plan quedó persistido como
   `optimizado` (puntaje `75.1`), no solo que el evento se emitió.
 - **Reintentos + Dead-Letter Queue**: un mensaje que provoca un error
@@ -158,7 +158,7 @@ Ver:
 - Este servicio ya NO trae su propio contenedor RabbitMQ — `api`/`worker` se
   conectan al `rabbit` del `docker-compose.yml` raíz de NEXO enganchándose
   a su red Docker por nombre externo. La base de
-  datos (Postgres) sigue siendo propia. Ver `docs/DECISIONES_TECNICAS.md` #9
+  datos es SQL Server. Ver `docs/DECISIONES_TECNICAS.md` #9
   (documenta por qué se revirtió la decisión original de un broker propio) y
   la sección "Puesta en marcha" más abajo (ahora requiere levantar el
   `rabbit` de NEXO antes que este stack).
@@ -217,7 +217,7 @@ jobs en cada push/PR a `QA`/`main`:
   SQLite en memoria, sin infraestructura externa).
 - **`docker-smoke`** — levanta primero el `rabbit` compartido de NEXO
   (`docker compose -f ../docker-compose.yml up -d --wait rabbit`) y luego el
-  stack propio (`docker compose up -d --build --wait`: Postgres + api +
+  stack propio (`docker compose up -d --build --wait`: SQL Server + api +
   worker), y corre `scripts/ci_docker_smoke.py`, que automatiza el flujo de
   las secciones 2.2-2.4 de `docs/testDocumentation/PRUEBAS_DE_INTEGRACION.md`:
   `POST /optimizar` → 202 → espera a que el worker lo procese → `optimizado`
@@ -250,7 +250,7 @@ uvicorn api.main:app --reload
 curl http://localhost:8000/health
 ```
 
-**Con Docker Compose (api + worker + Postgres propios, RabbitMQ compartido de NEXO):**
+**Con Docker Compose (api + worker + SQL Server propios, RabbitMQ compartido de NEXO):**
 
 Requiere el `rabbit` de NEXO ya corriendo (ver `docs/DECISIONES_TECNICAS.md`
 #9) — desde la raíz del repo:
@@ -265,7 +265,7 @@ cd cubicador
 Y luego el stack propio de Cubicador:
 
 ```bash
-cp .env.example .env   # completar POSTGRES_PASSWORD, RABBITMQ_USER/PASSWORD (= los del .env raíz de NEXO), CUBICADOR_API_KEY, NEXO_CALLBACK_API_KEY, NEXO_BASE_URL
+cp .env.example .env   # completar MSSQL_SA_PASSWORD, RABBITMQ_USER/PASSWORD (= los del .env raíz de NEXO), CUBICADOR_API_KEY, NEXO_CALLBACK_API_KEY, NEXO_BASE_URL
 docker compose up -d --build --wait
 curl http://localhost:8081/health
 ```

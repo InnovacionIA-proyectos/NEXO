@@ -94,7 +94,7 @@ correctamente, no existía.
 La pasada de humo end-to-end (crear plan, optimizar, ajustar) contra el
 entorno real está en `tests/api/test_smoke.py` + verificación manual/CI
 contra Docker real (ver `testDocumentation/PRUEBAS_DE_INTEGRACION.md`) — es
-un nivel distinto (flujo completo vía HTTP/RabbitMQ/Postgres), no paridad
+un nivel distinto (flujo completo vía HTTP/RabbitMQ/base de datos), no paridad
 del motor.
 
 ## 4. Contrato REST: mismas rutas, mismos DTOs, mismos códigos
@@ -416,7 +416,8 @@ arrancando y sirviendo el catálogo de vehículos desde ahí.
 
 **Nota operativa encontrada al probar**: `api` y `worker` necesitan esperar a
 que `db` esté realmente lista (`condition: service_healthy` en `depends_on`),
-no solo a que el contenedor haya arrancado — Postgres tarda ~15s en el ciclo
+no solo a que el contenedor haya arrancado — SQL Server tarda bastante mas que
+Postgres en quedar listo (de ahi el `start_period: 20s` del healthcheck); Postgres tardaba ~15s en el ciclo
 de init/restart interno la primera vez, y sin el healthcheck ambos servicios
 se caían al intentar conectar antes de tiempo. Ya corregido en
 `docker-compose.yml`. (RabbitMQ tenía el mismo problema cuando era un

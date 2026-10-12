@@ -190,7 +190,13 @@ caso (arrancar Cubicador antes que el `rabbit` de NEXO, sin que existiera
 todavía), la conexión se logró en el intento 4 de 30 una vez el broker quedó
 listo.
 
-### 2.2 Flujo REST completo contra Postgres real
+### 2.2 Flujo REST completo contra SQL Server real
+
+> **Actualizado el 2026-10-09 (S5-HU-17.1).** Esta seccion se verifico en su dia
+> contra Postgres. El motor cambio a SQL Server y el recorrido se repitio
+> completo: `scripts/verificar_integracion_mssql.py`, **9 de 9 verificaciones**,
+> incluido el flujo asincrono de punta a punta. Lo de abajo describe el mismo
+> flujo; donde dice Postgres, hoy es SQL Server.
 
 Se ejecutó, contra `http://localhost:8000` con el stack de arriba levantado:
 
