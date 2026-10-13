@@ -6,6 +6,13 @@ namespace Nexo.Application.CasosDeUso.Metricas.DTOs;
 /// % de líneas auto-costeadas, cotizaciones emitidas desde la app y fletes manuales a
 /// vigilar frente al piso. Antes no existía ninguna métrica calculada para esto — el
 /// piloto solo podía evaluarse de forma cualitativa/manual.
+///
+/// S5-HU-21.1/#287: el tiempo de costeo ya no es "cuánto tardó el robot en revisar todo"
+/// (TerminadoEn de la saga se marca cuando todas las líneas tienen desenlace, incluso las que
+/// quedan esperando a una persona) sino el ciclo completo: pliego 100% automático (saga
+/// Completado) = TerminadoEn - SolicitadoEn; pliego con intervención manual (saga Parcial) =
+/// desde que se creó la solicitud hasta Cotizacion.EntregadaAt. Un Parcial todavía sin entregar
+/// no entra (mismo criterio que Cumplimiento SLA).
 /// </summary>
 /// <param name="LineasConFleteManual">
 /// Líneas cuyo flete quedó en Fuente=Manual (fuera de la regla automática MAYOR(plaza,
@@ -26,4 +33,6 @@ public record clsKpisPilotoDto(
     int LineasAutoCosteadas,
     double? PorcentajeLineasAutoCosteadas,
     int CotizacionesEmitidas,
-    int LineasConFleteManual);
+    int LineasConFleteManual,
+    /// <summary>S5-HU-21.1/#287: eco del corte por tamaño aplicado al tiempo de costeo ("1-10", "11-100", "+100"); null = todos.</summary>
+    string? Tamano = null);
