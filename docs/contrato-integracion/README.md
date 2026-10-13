@@ -550,6 +550,41 @@ cola de error, así que la alerta llega al primer intento en vez de noventa segu
 
 ---
 
+## 5.5 Cambiar los servicios conexos de una cotización ya entregada
+
+```http
+POST   /api/cotizaciones/{id}/conexos
+DELETE /api/cotizaciones/{id}/conexos/{conexoId}
+```
+
+S5-HU-20.1/#286 (HU-B23/B24). Un servicio omitido se descubre justo **después** de entregar,
+así que agregar y quitar conexos ya no exige `Borrador`: se admite mientras la cotización no
+tenga resultado (`resultado == "SinDefinir"`), es decir `Borrador` **o** `Entregada`. Con
+`Ganada`/`Perdida` responde `409 COTIZACION_CERRADA` y no cambia nada.
+
+**Qué cambia en la respuesta (`CotizacionDto`):** un campo nuevo, `modificadaTrasEntregaAt`
+(`null` si nunca se tocó tras la entrega). Se llena cuando el cambio se hace sobre una
+cotización `Entregada`, y **no** mueve `estado` ni `entregadaAt`: el SLA y las métricas siguen
+midiendo la entrega original.
+
+**El aviso al comercial.** Si la cotización estaba `Entregada` y quien hace el cambio **no**
+es quien creó la solicitud, esa persona recibe un correo "Cotización actualizada: se agregó /
+se quitó *servicio* x *cantidad*; nuevo total *$X*". No se envía nada si:
+
+- la cotización es `Borrador` (todavía no hay nada entregado que corregir), o
+- quien cambia es el mismo creador de la solicitud (no se le avisa lo que acaba de hacer).
+
+Mismo patrón que la entrega (§5.3): el evento `clsConexosCotizacionCambiados` se publica por
+el Outbox, en la **misma transacción** que el cambio, y el correo sale en segundo plano desde
+un consumidor — el front no espera al correo y la respuesta no dice si salió. Es interno
+(nunca al cliente) y un fallo de la salida de correo **sube al bus** (se reintenta y, si no
+tiene arreglo, va a la cola de error): no se traga.
+
+Una petición = un aviso. "Agregar a todas las líneas" ya llega como **una** petición con N
+ítems y produce **un** correo. Agrupar peticiones sucesivas en un solo correo queda por decidir.
+
+---
+
 ## 6. Errores
 
 Toda respuesta de error del API tiene la misma forma, la produzca quien la

@@ -25,9 +25,21 @@ namespace Nexo.Application.Common.Dtos;
 /// forma de distinguirlo era parseando el texto libre de <see cref="Criterio"/> — esto lo
 /// hace un dato estructurado en vez de un detalle de presentación.
 /// </summary>
+/// <summary>
+/// <paramref name="ValorPisoBase"/> y <paramref name="ValorTiemposLogisticos"/>
+/// (S5-HU-20.1/#286): solo los trae el candidato SICE-TAC. Descomponen <c>Valor</c> en el
+/// piso base de la fila (<c>fila.Valor</c>) y lo que suman las horas logísticas reales de
+/// la línea (<c>Valor - fila.Valor</c>, una diferencia a propósito: sirve igual cuando el
+/// total salió del <c>ValorSiceConHora</c> de respaldo y no de <c>valorHora × horas</c>).
+/// Invariante: <c>ValorPisoBase + ValorTiemposLogisticos == Valor</c>. Plaza e histórico los
+/// dejan en null. El desglose se calcula acá y no en pantalla porque el frontend solo ve el
+/// catálogo crudo (valorHora/horasPactadas por defecto) y reconstruirlo con las horas de la
+/// solicitud —no las de la línea— reviviría el bug que corrigió S4-HU-14.1/#221.
+/// </summary>
 public record clsCandidatoTarifaDto(
     string Fuente, decimal Valor, string Detalle, string Criterio, int Coincidencias,
-    string? Advertencia = null, string TablaOrigen = "SAP");
+    string? Advertencia = null, string TablaOrigen = "SAP",
+    decimal? ValorPisoBase = null, decimal? ValorTiemposLogisticos = null);
 
 /// <summary>
 /// Piso SICE-TAC vigente con el desglose de horas, para Mesa de Costeo

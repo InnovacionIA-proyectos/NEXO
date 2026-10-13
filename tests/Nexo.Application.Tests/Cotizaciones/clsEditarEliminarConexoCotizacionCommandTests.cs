@@ -17,6 +17,8 @@ public class clsEditarEliminarConexoCotizacionCommandTests
 {
     private readonly Mock<ICotizacionRepository> _cotizaciones = new();
     private readonly Mock<IAuditoriaPort> _auditoria = new();
+    private readonly Mock<ISolicitudesPort> _solicitudes = new();
+    private readonly Mock<IPublicadorDeMensajes> _publicador = new();
     private readonly Mock<ICurrentUserPort> _usuarioActual = new();
     private readonly Mock<IUnitOfWork> _uow = new();
 
@@ -24,7 +26,7 @@ public class clsEditarEliminarConexoCotizacionCommandTests
         new(_cotizaciones.Object, _auditoria.Object, _usuarioActual.Object, _uow.Object);
 
     private clsEliminarConexoCotizacionCommandHandler EliminarHandler() =>
-        new(_cotizaciones.Object, _auditoria.Object, _usuarioActual.Object, _uow.Object);
+        new(_cotizaciones.Object, _solicitudes.Object, _auditoria.Object, _publicador.Object, _usuarioActual.Object, TimeProvider.System, _uow.Object);
 
     private static (clsCotizacion Cotizacion, clsCotizacionConexo Conexo) CotizacionConConexo(
         EstadoCotizacion estado = EstadoCotizacion.Borrador, decimal costoUnitario = 50_000m)
@@ -133,14 +135,17 @@ public class clsEditarEliminarConexoCotizacionCommandTests
     }
 
     [Fact]
-    public async Task Eliminar_cotizacion_no_editable_lanza_ConflictException_sin_guardar()
+    public async Task Eliminar_cotizacion_con_resultado_lanza_COTIZACION_CERRADA_sin_guardar()
     {
+        // S5-HU-20.1/#286: Entregada ya se puede modificar; solo Ganada/Perdida cierra.
         var (cotizacion, conexo) = CotizacionConConexo(EstadoCotizacion.Entregada);
+        cotizacion.Resultado = ResultadoCotizacion.Perdida;
         _cotizaciones.Setup(c => c.ObtenerConLineasYConexosAsync(cotizacion.Id, default)).ReturnsAsync(cotizacion);
 
-        await Assert.ThrowsAsync<clsConflictException>(() =>
+        var ex = await Assert.ThrowsAsync<clsConflictException>(() =>
             EliminarHandler().Handle(new clsEliminarConexoCotizacionCommand(cotizacion.Id, conexo.Id)));
 
+        Assert.Equal("COTIZACION_CERRADA", ex.Code);
         _uow.Verify(u => u.SaveChangesAsync(default), Times.Never);
     }
 }

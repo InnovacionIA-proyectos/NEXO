@@ -81,7 +81,10 @@ public record clsLineaCosteoDto(
     /// (línea nacida en NEXO, o capturada antes de este cambio).</summary>
     Guid? GrupoRutaId = null,
     /// <summary>S5-HU-18.2/#274: recomendación del Cubicador usada para esta línea.</summary>
-    string? IdRecomendacionVehiculo = null);
+    string? IdRecomendacionVehiculo = null,
+    /// <summary>S5-HU-20.1/#286: valor de la mercancía capturado para la línea (clsLineaSolicitud.ValorMercancia),
+    /// null si no se capturó. Mismo patrón que LineaNegocio/ClaseViaje/ClaseContenedor.</summary>
+    decimal? ValorMercancia = null);
 
 public record clsSolicitudCosteoDto(clsSolicitudDto Solicitud, clsTiemposLogisticosDto Tiempos, IReadOnlyList<clsLineaCosteoDto> Lineas);
 

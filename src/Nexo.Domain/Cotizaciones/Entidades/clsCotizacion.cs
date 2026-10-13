@@ -42,6 +42,14 @@ public class clsCotizacion : IAuditable
 
     public DateTimeOffset? EntregadaAt { get; set; }
 
+    /// <summary>
+    /// S5-HU-20.1/#286: última vez que se agregó o quitó un servicio conexo DESPUÉS de
+    /// entregar la cotización. Null mientras nunca se haya tocado tras la entrega. A
+    /// propósito es una marca aparte y NO mueve <see cref="Estado"/> ni
+    /// <see cref="EntregadaAt"/>: el SLA y las métricas siguen midiendo la entrega original.
+    /// </summary>
+    public DateTimeOffset? ModificadaTrasEntregaAt { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 

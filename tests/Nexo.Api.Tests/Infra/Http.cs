@@ -10,6 +10,9 @@ public static class Http
     public static Task<HttpResponseMessage> PostJson(this HttpClient c, string url, object body)
         => c.PostAsJsonAsync(url, body, JsonOpts);
 
+    public static Task<HttpResponseMessage> PutJson(this HttpClient c, string url, object body)
+        => c.PutAsJsonAsync(url, body, JsonOpts);
+
     public static Task<HttpResponseMessage> PatchJson(this HttpClient c, string url, object body)
         => c.PatchAsJsonAsync(url, body, JsonOpts);
 

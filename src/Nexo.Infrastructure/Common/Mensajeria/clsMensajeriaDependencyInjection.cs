@@ -141,6 +141,10 @@ public static class clsMensajeriaDependencyInjection
             // notificación perdida no se recupera consultando nada y nadie se enteraría.
             x.AddConsumer<clsNotificarEntregaConsumer>();
 
+            // Avisa a quien creó la solicitud que otra persona cambió los servicios conexos
+            // de su cotización ya entregada (S5-HU-20.1/#286). Misma regla: la excepción sube.
+            x.AddConsumer<clsNotificarConexosCambiadosConsumer>();
+
             // Las 3 alertas de negocio del documento de entendimiento: tarifa vencida,
             // línea sin costear por falla técnica, y cotización ganada. Mismo criterio
             // que arriba: la excepción sube.
@@ -440,6 +444,7 @@ public static class clsMensajeriaDependencyInjection
         services.AddScoped<IValidadorDeMensaje<clsRecalcularScoresSolicitado>, clsRecalcularScoresSolicitadoValidador>();
         services.AddScoped<IValidadorDeMensaje<clsBandejaCambio>, clsBandejaCambioValidador>();
         services.AddScoped<IValidadorDeMensaje<clsCotizacionEntregada>, clsCotizacionEntregadaValidador>();
+        services.AddScoped<IValidadorDeMensaje<clsConexosCotizacionCambiados>, clsConexosCotizacionCambiadosValidador>();
         services.AddScoped<IValidadorDeMensaje<clsTarifaVencidaDetectada>, clsTarifaVencidaDetectadaValidador>();
         services.AddScoped<IValidadorDeMensaje<clsCotizacionMarcadaGanada>, clsCotizacionMarcadaGanadaValidador>();
 
