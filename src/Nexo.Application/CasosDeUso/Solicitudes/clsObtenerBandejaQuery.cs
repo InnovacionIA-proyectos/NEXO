@@ -13,7 +13,8 @@ namespace Nexo.Application.CasosDeUso.Solicitudes;
 /// <summary>
 /// Bandeja Priorizada (anti-FIFO): la cola se sirve por score descendente, no por
 /// orden de llegada. Por defecto (atención 'pendientes') es la COLA DE TRABAJO:
-/// solo solicitudes con líneas SIN flete.
+/// solicitudes con líneas SIN flete o con todas las líneas revisadas pero todavía sin
+/// entregar (S5-HU-23.1/#289).
 ///
 /// Pagina (page 1-based, pageSize) - a diferencia de los listados
 /// paginados en SQL (Skip/Take antes de traer las filas), acá el score se
@@ -34,7 +35,13 @@ public sealed class clsObtenerBandejaQueryHandler(
         var filtro = query.Filtro;
         var parametros = await solicitudes.ParametrosScoreAsync(ct);
         var ahora = clock.GetUtcNow();
-        var atencion = (filtro.Atencion ?? "pendientes").Trim().ToLowerInvariant();
+        var resultado = clsBandejaResultado.Parsear(filtro.Resultado);
+        // S5-HU-23.1/#289: la vista por defecto es la cola de trabajo ("pendientes"), que solo trae
+        // Estado Pendiente/EnCosteo. Con un resultado informado y sin atención explícita eso
+        // ocultaría justo lo que se pide (una cotización Ganada/Perdida/esperando ya es Entregada),
+        // así que la atención vacía se trata como "todas".
+        var atencion = (string.IsNullOrWhiteSpace(filtro.Atencion) ? (resultado is null ? "pendientes" : "todas") : filtro.Atencion)
+            .Trim().ToLowerInvariant();
 
         EstadoSolicitud? estado = null;
         if (!string.IsNullOrWhiteSpace(filtro.Estado) && Enum.TryParse<EstadoSolicitud>(filtro.Estado, ignoreCase: true, out var e) && Enum.IsDefined(e))
@@ -45,12 +52,15 @@ public sealed class clsObtenerBandejaQueryHandler(
         // Admin, etc.) siguen viendo la bandeja completa, sin restricción.
         var creadoPorFiltro = usuarioActual.Rol == RolUsuario.Comercial ? usuarioActual.Id : (Guid?)null;
 
-        var filas = await solicitudes.BandejaFilasAsync(atencion, estado, filtro.Desde, filtro.Hasta, creadoPorFiltro, ct);
+        var filas = await solicitudes.BandejaFilasAsync(atencion, estado, filtro.Desde, filtro.Hasta, creadoPorFiltro, resultado, ct);
 
-        var limiteVigencia = ahora.AddDays(-7);
+        // S5-HU-23.1/#289: la vigencia es la de la FECHA LÍMITE, no la antigüedad de la captura
+        // (antes: "capturada hace menos de 7 días", sin mirar nunca el Deadline). Sin Deadline
+        // cuenta como vigente (regla confirmada); vencida = Deadline anterior a "ahora".
+        bool Vigente(clsBandejaFilaRaw f) => f.Deadline is null || f.Deadline >= ahora;
         var vigenciaFiltro = filtro.Vigencia?.Trim().ToLowerInvariant();
-        if (vigenciaFiltro == "vigente") filas = filas.Where(f => f.CreatedAt >= limiteVigencia).ToList();
-        else if (vigenciaFiltro == "vencida") filas = filas.Where(f => f.CreatedAt < limiteVigencia).ToList();
+        if (vigenciaFiltro == "vigente") filas = filas.Where(Vigente).ToList();
+        else if (vigenciaFiltro == "vencida") filas = filas.Where(f => !Vigente(f)).ToList();
 
         // El score persistido se congela al capturar; la urgencia depende del "ahora",
         // así que se recalcula al servir la bandeja para que el orden anti-FIFO no se
@@ -64,10 +74,10 @@ public sealed class clsObtenerBandejaQueryHandler(
                     : f.Revisadas > 0 ? "administrador"
                     : f.Auto > 0 ? "automatico"
                     : "manual";
-                var vigencia = f.CreatedAt >= limiteVigencia ? "vigente" : "vencida";
+                var vigencia = Vigente(f) ? "vigente" : "vencida";
                 return new clsBandejaItemDto(
                     f.Id, f.clsCliente, f.Tipo.ToString(), f.Estado.ToString(), f.Deadline, f.ValorEstimado,
-                    score, f.Lineas, f.FleteTotal, f.SinFlete, f.CreatedAt, etiqueta, vigencia);
+                    score, f.Lineas, f.FleteTotal, f.SinFlete, f.CreatedAt, etiqueta, vigencia, f.Resultado?.ToString());
             })
             .OrderByDescending(x => x.ScorePrioridad)
             .ThenBy(x => x.Deadline)

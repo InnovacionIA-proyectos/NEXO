@@ -34,7 +34,7 @@ public class clsObtenerBandejaQueryTests
             DateTimeOffset.UtcNow.AddHours(-i), 1, null, 1, 0, 0)).ToList();
 
         _repo.Setup(r => r.BandejaFilasAsync(
-                "todas", null, null, null, creadoPorEsperado, It.IsAny<CancellationToken>()))
+                "todas", null, null, null, creadoPorEsperado, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(filas);
     }
 
@@ -95,7 +95,7 @@ public class clsObtenerBandejaQueryTests
 
         Assert.Equal(3, pagina.Total);
         _repo.Verify(r => r.BandejaFilasAsync(
-            "todas", null, null, null, comercialId, It.IsAny<CancellationToken>()), Times.Once);
+            "todas", null, null, null, comercialId, null, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Theory]
@@ -112,6 +112,6 @@ public class clsObtenerBandejaQueryTests
 
         Assert.Equal(3, pagina.Total);
         _repo.Verify(r => r.BandejaFilasAsync(
-            "todas", null, null, null, null, It.IsAny<CancellationToken>()), Times.Once);
+            "todas", null, null, null, null, null, It.IsAny<CancellationToken>()), Times.Once);
     }
 }
