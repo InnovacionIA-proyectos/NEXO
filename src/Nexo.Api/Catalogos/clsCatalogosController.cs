@@ -26,7 +26,7 @@ public class clsCatalogosController(
     IQueryHandler<clsListarMunicipiosQuery, IReadOnlyList<clsMunicipioDto>> municipios)
     : ControllerBase
 {
-    /// <summary>Catálogo de tipos de vehículo (tblSAPTiposVehiculoTarifario + casos especiales sin código SAP).</summary>
+    /// <summary>Catálogo de tipos de vehículo (tblSAPTiposVehiculoTarifario, tal cual — S5-HU-22.1/#288 retiró los 5 casos especiales).</summary>
     [HttpGet("tipos-vehiculo")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [EnableRateLimiting(clsRateLimitingExtensions.PoliticaListadosEstandar)]

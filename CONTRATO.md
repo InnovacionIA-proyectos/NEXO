@@ -673,7 +673,16 @@ cuál de las dos vino el candidato ganador.
 
 ### 3.3 Captura de solicitudes — `/api/captura-solicitudes`
 
-**Todo el controller**: `Comercial`, `Admin`.
+**Roles (S5-HU-22.1/#288)**: ya **no** están a nivel de controller. Un `[Authorize(Roles)]` de
+método no reemplaza el de la clase —se combinan con AND—, así que con `Comercial,Admin` en la
+clase, `GET .../ciudades` devolvía `403` a `CoordinadorFletes` (que sí gestiona servicios en
+Biblioteca) y el campo se quedaba sin sugerencias. Ahora:
+
+| Endpoint | Roles |
+|---|---|
+| `POST analizar-excel`, `POST /` (capturar) | `Comercial`, `Admin` |
+| `GET aprovisionamiento`, `GET clientes` | `Comercial`, `Admin` (revisado caso por caso: se mantienen) |
+| `GET departamentos`, `GET ciudades`, `GET municipios` | **cualquier rol válido de Nexo** (hay que estar autenticado; sin sesión → `401`) |
 
 #### `POST /api/captura-solicitudes/analizar-excel`
 No persiste; lee el Excel para que el usuario mapee columnas.
@@ -1081,6 +1090,18 @@ Columnas: Origen, Destino, Tipo de vehículo.
 - **Body**: `multipart/form-data`, campo `archivo` **requerido** (§1.9).
 - **→** `200 ImportarReglasResultDto`
 - **Errores**: `400 ARCHIVO_REQUERIDO` · `400 FORMATO_NO_SOPORTADO` · `400 EXCEL_INVALIDO` · `400 EXCEL_SIN_DATOS`
+- S5-HU-22.1/#288: una regla que **ya existe** se cuenta como `duplicadas` aunque su código de
+  vehículo no esté en el catálogo de SAP (hay reglas con `3S2`/`2L3`, que SAP no trae). Antes
+  se contaban como `invalidas`. El catálogo solo se exige a las reglas que se van a crear.
+
+#### `GET /api/reglas-solo-sicetac/exportar-excel`
+S5-HU-22.1/#288. Descarga las reglas ya cargadas, con las **mismas 3 columnas que acepta
+`importar-excel`** (`ORIGEN`, `DESTINO`, `TIPO VEHICULO`) y los valores tal como están
+guardados (código DANE como **texto**, para no perder el cero inicial de `05001000`). El
+archivo se puede editar y reimportar: las reglas que ya existen se reportan como `duplicadas`
+(no se pisan) y solo entran las filas nuevas.
+- **Roles**: `AdminTarifas`, `Admin`.
+- **→** `200`, archivo `.xlsx` (`reglas-solo-sicetac-yyyyMMdd.xlsx`)
 
 ### 3.9 Servicios conexos — `/api/servicios-conexos`
 
@@ -1560,7 +1581,7 @@ de Reglas Solo-SICETAC y Tarifas de Plaza — reemplazan el texto libre.
 
 | Endpoint | Fuente | → |
 |---|---|---|
-| `GET /api/catalogos/tipos-vehiculo` | `tblSAPTiposVehiculoTarifario` + 5 casos especiales sin código SAP | `200 TipoVehiculoDto[]` |
+| `GET /api/catalogos/tipos-vehiculo` | `tblSAPTiposVehiculoTarifario`, tal cual (S5-HU-22.1/#288: se eliminaron los 5 casos especiales; `[]` si dbSolucionesTI no está disponible; faltan 3S2 y 2L3, decisión de negocio) | `200 TipoVehiculoDto[]` |
 | `GET /api/catalogos/lineas-negocio` | `tblSAPLineaNegocio` | `200 LineaNegocioDto[]` |
 | `GET /api/catalogos/clases-viaje` | `tblSAPClaseViaje` | `200 ClaseViajeDto[]` |
 | `GET /api/catalogos/clases-contenedor` | `tblSAPClaseContenedor` | `200 ClaseContenedorDto[]` |
@@ -1649,13 +1670,36 @@ histórico — nada especial que hacer del lado del cliente.
 Upsert por línea de negocio + clase de viaje + origen + destino + clase de
 contenedor + rango de peso + tipo de vehículo (las 7 dimensiones).
 
+Columnas obligatorias: `LINEA DE NEGOCIO`, `CLASE DE VIAJE`, `ORIGEN`, `DESTINO`, `VALOR`,
+`VIGENCIA`, `DETALLES`. Opcionales: `CLASE CONTENEDOR`, `RANGO PESO`, `TIPO VEHICULO` y,
+desde S5-HU-22.1/#288, `DEPARTAMENTO ORIGEN` y `DEPARTAMENTO DESTINO`.
+
+**`VIGENCIA` (S5-HU-22.1/#288).** Se lee sin depender de la cultura del servidor. Se acepta, en
+este orden: fecha nativa de Excel; **serial de Excel** (una fecha en una celda con formato
+*General* es el número de días desde 1899-12-30: `46315` = `2026-10-20`; solo se acepta entre
+1970 y 2099); texto `dd/MM/yyyy`, `d/M/yyyy`, `yyyy-MM-dd`, `MM/dd/yyyy` (ante `05/10/2026`
+gana día/mes: 5 de octubre) y, al final, `es-CO`. El error `'…' no es una fecha de vigencia
+válida` solo sale cuando de verdad no es una fecha reconocible. Regla para todo importador
+nuevo con fecha: usar `clsLectorFechasExcel`.
+
+**`DEPARTAMENTO ORIGEN` / `DEPARTAMENTO DESTINO`.** 68 nombres de municipios colombianos se
+repiten entre departamentos (`ARMENIA` en Antioquia y Quindío). Con la columna llena, el
+municipio se busca por **nombre + departamento** (ambos sin tildes ni mayúsculas); si el par no
+existe, la fila se rechaza con `'Armenia' no existe en el departamento 'X'`. Con la columna
+ausente o la celda vacía, igual que antes: el primero de la lista (Colombia primero, y a
+igualdad el de menor `id`). `exportar-excel` ya las trae para que exportar → reimportar no
+mueva una ciudad repetida al primer departamento.
+
 - **Body**: `multipart/form-data`, campo `archivo` (§1.9), tope 10 MB.
 - **→** `200 ImportarTarifasPlazaResultDto`
-- **Errores**: `400 ARCHIVO_REQUERIDO` · `400 FORMATO_NO_SOPORTADO` (solo `.xlsx`/`.xlsm`)
+- **Errores**: `400 ARCHIVO_REQUERIDO` · `400 FORMATO_NO_SOPORTADO` (solo `.xlsx`/`.xlsm`) ·
+  `400 EXCEL_INVALIDO` · `400 EXCEL_COLUMNAS`. Los errores por fila van en `errores` (máx. 20).
 
 #### `GET /api/tarifas-plaza/exportar-excel`
 Descarga el catálogo completo — el mismo archivo sirve de plantilla para
-`importar-excel`.
+`importar-excel`. Columnas: `LINEA DE NEGOCIO`, `CLASE DE VIAJE`, `ORIGEN`, `DESTINO`,
+`CLASE CONTENEDOR`, `RANGO PESO`, `TIPO VEHICULO`, `VALOR`, `VIGENCIA`, `DETALLES` y, desde
+S5-HU-22.1/#288, `DEPARTAMENTO ORIGEN` y `DEPARTAMENTO DESTINO` (al final).
 - **→** `200`, archivo `.xlsx` (`Content-Type` de Excel)
 
 ---
@@ -1687,7 +1731,8 @@ abiertos a los 6 roles.
 
 | Operación | Com | Coord | AdmTar | ServLog | Líder | Admin |
 |---|:-:|:-:|:-:|:-:|:-:|:-:|
-| `POST /api/captura-solicitudes/*` y sus `GET` (aprovisionamiento, clientes) | ✅ | | | | | ✅ |
+| `POST /api/captura-solicitudes/analizar-excel` · `POST /api/captura-solicitudes` · `GET aprovisionamiento` · `GET clientes` | ✅ | | | | | ✅ |
+| `GET /api/captura-solicitudes/ciudades` · `departamentos` · `municipios` (S5-HU-22.1: cualquier rol válido) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `POST /api/solicitudes` | | ✅ | | | | ✅ |
 | `POST /api/solicitudes/resolver-catalogos` | ✅ | ✅ | | | | ✅ |
 | `POST /api/solicitudes/{id}/lineas:bulk` | | ✅ | | | | ✅ |
@@ -1699,7 +1744,7 @@ abiertos a los 6 roles.
 | `POST/DELETE /api/cotizaciones/{id}/conexos` (S5-HU-20.1: + AdminTarifas) | ✅ | ✅ | ✅ | | | ✅ |
 | `PATCH /api/cotizaciones/{id}/conexos/{conexoId}` | ✅ | ✅ | | | | ✅ |
 | Vigencia plaza SAP (`PATCH`, `POST masivo`, `DELETE`) | | ✅ | ✅ | | | ✅ |
-| `/api/reglas-solo-sicetac` (todo, incluido `GET`) | | | ✅ | | | ✅ |
+| `/api/reglas-solo-sicetac` (todo, incluido `GET` y `exportar-excel`) | | | ✅ | | | ✅ |
 | `POST/PATCH /api/servicios-conexos`, `importar-excel` | | | ✅ | ✅ | | ✅ |
 | `POST /api/tarifas-sicetac/importar` | | ✅ | | | | ✅ |
 | `/api/metricas/*` | | | ✅ | | ✅ | ✅ |

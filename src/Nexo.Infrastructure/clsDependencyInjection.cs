@@ -194,6 +194,7 @@ public static class clsDependencyInjection
         services.AddScoped<IClavesSoloSicetacPort>(sp => sp.GetRequiredService<clsEfReglasSoloSicetacRepository>());
         services.AddScoped<IExcelReglasSoloSicetacPort, clsExcelReglasSoloSicetacAdapter>();
         services.AddScoped<IPlantillaReglasSoloSicetacPort, clsPlantillaReglasSoloSicetacAdapter>();
+        services.AddScoped<IExportadorReglasSoloSicetacExcelPort, clsExportadorReglasSoloSicetacExcelAdapter>();
         services.AddScoped<ITiposVehiculoPort, clsTiposVehiculoAdapter>();
         services.AddScoped<ILineasNegocioPort, clsLineasNegocioAdapter>();
         services.AddScoped<IClasesViajePort, clsClasesViajeAdapter>();

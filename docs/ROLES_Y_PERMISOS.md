@@ -32,7 +32,9 @@ sin rol específico. Lo que diferencia a los roles es quién puede **escribir**
 
 Excepción a "todos consultan": los `GET` de captura de solicitudes (clientes,
 aprovisionamiento), reglas Solo-SICETAC, métricas y priorización también están
-restringidos por rol, igual que sus escrituras.
+restringidos por rol, igual que sus escrituras. Los catálogos de ciudades (`GET /api/captura-solicitudes/ciudades`, `departamentos`, `municipios`) 
+son la excepción a la excepción (S5-HU-22.1/#288): los ve cualquier rol válido, porque los usan formularios de 
+Biblioteca que no son de Comercial. Capturar y analizar un Excel siguen siendo solo de Comercial y Admin.
 
 ### Comercial
 - Analizar y capturar solicitudes desde Excel, buscar clientes y estimar aprovisionamiento (`/api/captura-solicitudes*`)
