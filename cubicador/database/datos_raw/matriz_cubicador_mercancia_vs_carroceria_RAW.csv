@@ -1,0 +1,32 @@
+Mercancía / presentación,Carrocería principal,Alternativa condicionada,¿Cubicable?,Criterio / observación para el cubicador
+Cajas de cartón / mercancía empacada,Furgón,"Estacas con carpa y protección, si la operación lo permite",Sí,"Validar dimensiones, apilabilidad y resistencia del empaque."
+Alimentos secos empacados,Furgón,"Estacas con cubierta impermeable, según empaque y riesgo de contaminación",Sí,Producto empacado; verificar requisitos sanitarios.
+Electrodomésticos embalados,Furgón,"Estacas con protección y sujeción, si el embalaje lo admite",Sí,"Proteger de lluvia, golpes y vibración."
+Muebles y enseres embalados,Furgón,Estacas con protección y sujeción,Sí,Validar piezas voluminosas y posibilidad de apilamiento.
+Productos farmacéuticos a temperatura ambiente,Furgón,"Furgón climatizado, si lo exige la ficha del producto",Sí,Respetar condiciones declaradas por fabricante.
+Productos farmacéuticos refrigerados,Furgón refrigerado,Contenedor refrigerado,Sí,Definir rango de temperatura y monitoreo requerido.
+Alimentos congelados empacados,Furgón refrigerado,Contenedor refrigerado,Sí,"Validar temperatura, ventilación y estiba."
+Carnes y productos cárnicos empacados,Furgón refrigerado,Contenedor refrigerado,Sí,Solo carga debidamente empacada; cumplir cadena de frío.
+Frutas y verduras empacadas,"Furgón ventilado o refrigerado, según producto",Contenedor refrigerado,Sí,La temperatura y ventilación dependen del producto.
+Flores y perecederos empacados,Furgón refrigerado / climatizado,Contenedor refrigerado,Sí,Definir temperatura y ventilación según especificación.
+Productos lácteos empacados,Furgón refrigerado,Contenedor refrigerado,Sí,Mantener cadena de frío.
+Bebidas embotelladas o enlatadas,Furgón,"Estacas con carpa y sujeción, según empaque",Sí,Considerar peso por pallet y resistencia del embalaje.
+Fertilizantes ensacados,Furgón,Estacas con cubierta impermeable,Sí,Evitar humedad y contaminación.
+Pallets de mercancía general,Furgón,Estacas con carpa,Sí,Cubicación por pallet o unidad logística; revisar espacios no aprovechables.
+Estibas de madera (mercancía),Plataforma,Estacas,Sí,Cubicación por dimensiones exteriores y forma de estiba.
+Materiales de construcción empacados,Estacas,"Furgón, si requiere protección",Sí,Ej.: cajas o paquetes; excluir material suelto a granel.
+Ladrillos y bloques paletizados,Estacas,Plataforma,Sí,Validar peso por pallet y resistencia.
+Varillas y perfiles metálicos en paquetes,Plataforma,Estacas,Sí,"Cargas largas; validar longitud, amarres y salientes."
+Tuberías en paquetes,Plataforma,Estacas,Sí,"Validar longitud, diámetro y soportes."
+Vigas y estructuras metálicas en piezas,Plataforma,Planchón,"Sí, con revisión especial","Si excede dimensiones ordinarias, tratar como carga especial."
+Láminas de acero en paquetes,Plataforma / planchón,"Estacas, si la geometría y sujeción lo permiten",Sí,"Verificar apoyos, protección de bordes y peso."
+Bobinas de acero,Plataforma con cunas portabobinas,Planchón con sistema de apoyo compatible,Condicionado,"Cubicación requiere orientación, diámetro, ancho y cunas; validar estabilidad."
+Madera aserrada en paquetes,Plataforma,Estacas,Sí,"Validar longitud, paquete y sujeción."
+Postes de concreto en unidades,Plataforma,Estacas,"Sí, con revisión especial",Carga larga; validar apoyos y puntos de amarre.
+Papel y cartón en cajas o pacas,Furgón,Estacas con cubierta impermeable,Sí,Proteger de humedad.
+Papel en rollos,"Furgón o plataforma con cunas, según dimensiones",Plataforma con soportes,Condicionado,"Definir diámetro, ancho, orientación y método de sujeción."
+Vidrio plano / láminas,Estructura portavidrios,Plataforma con bastidor diseñado para vidrio,Condicionado,"Requiere bastidor, orientación y protección específica."
+Ventanas y fachadas embaladas,Furgón,Plataforma con bastidores adecuados,"Sí, con validación",Cubicación por embalaje; controlar fragilidad y orientación.
+Cilindros de gases industriales,Plataforma con bastidores y sujeción aprobada,Furgón ventilado solo si normativa y producto lo permiten,Condicionado,"No cubicar como cajas comunes; validar clasificación, segregación y sujeción."
+Mercancía general de exportación paletizada,Furgón o contenedor seco,"Estacas con carpa, según requisitos de protección",Sí,Cubicación por pallet/embalaje y patrón de estiba.
+Carga contenerizada en cajas o pallets,Contenedor seco,Furgón para transporte terrestre no contenerizado,Sí,El contenedor es unidad de transporte; cubicación interna depende de medidas útiles y límites de carga.
