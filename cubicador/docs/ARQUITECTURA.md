@@ -12,10 +12,19 @@ cubicador/
     motor/
       dominio.py            # tipos puros: Contenedor, ItemCarga, Orientacion, Colocacion...
       validadores.py         # colision, soporte, apilamiento, puerta, balance de ejes...
-      optimizadores.py       # IOptimizadorCubicacion, FirstFitDecreasing, BestFitDecreasing
+      optimizadores.py       # Optimizador (Protocol) + registro por nombre:
+                              # FirstFitDecreasing, BestFitDecreasing y
+                              # DeepestBottomLeftFill (S5-HU-17.3), que es el
+                              # oraculo de empaque de la seleccion de flota.
       puntuacion.py          # scoring 0..100 por estrategia
       motor.py               # MotorCubicacion3D: orquesta optimizar/validar/metricas
-      cubicacion_rapida.py   # evaluador SICCE (7 criterios + heuristica de estanterias)
+      cubicacion_rapida.py   # evaluador SICCE (7 criterios + heuristica de estanterias).
+                              # LO REEMPLAZA seleccion_flota.py; se retira junto
+                              # con POST /api/cubicacion en S5-HU-17.4.
+      seleccion_flota.py      # motor de seleccion de flota (S5-HU-17.3): filtra
+                              # candidatos, empaca con DBLF y elige la flota
+                              # minima, que puede ser MIXTA. Decide por
+                              # max(%volumen, %peso) y reporta los dos.
       # PURO: sin I/O, sin FastAPI, sin SQLAlchemy, sin aio-pika. Portado tal
       # cual de cabinaFletes (via el paso intermedio en NEXO). Ver
       # testDocumentation/REGLAS_DE_NEGOCIO.md: estas 31 reglas NO se pueden romper al traducir
@@ -32,6 +41,10 @@ cubicador/
     excepciones.py            # AppException y subtipos (equivalente a NEXO)
     cubicacion_rapida/
       casos_de_uso.py         # evaluar_cubicacion, catalogo_unidades, medidas_estandar
+    recomendaciones/
+      casos_de_uso.py          # recomendar_flota (S5-HU-17.3): resuelve los codigos
+                                # contra el catalogo de base y corre el motor. Es la
+                                # unica pieza que toca el puerto y el dominio a la vez.
     plan_cargue/
       mapeos.py                # traduce entidades <-> tipos del motor (clave "id#indice")
       vehiculos.py              # guardar/eliminar/listar vehiculos + presets

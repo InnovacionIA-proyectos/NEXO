@@ -12,6 +12,13 @@ optimización, ajuste manual) — con su propia persistencia, y una suite que
 prueba en cada build que el port sigue produciendo exactamente lo mismo que
 el motor C# original.
 
+Desde S5-HU-17 hay un **tercer motor**: la selección de flota
+(`domain/motor/seleccion_flota.py`), que lee el catálogo de `dbo_cubicador` y
+responde qué vehículos hacen falta para una carga, en qué cantidad y con qué
+mercancía en cada uno. Reemplaza al cubicador rápido, que comparaba contra
+nueve arquetipos quemados y decidía por volumen puro; ese módulo y su endpoint
+`POST /api/cubicacion` se retiran en S5-HU-17.4.
+
 No es un servicio de cómputo sin estado: es dueño de todo el dominio
 Cubicación — vehículos, planes de cargue, ítems, colocaciones y parámetros —
 con su propia persistencia en SQL Server. NEXO lo consume
@@ -43,7 +50,7 @@ Ver:
 - **FastAPI** — API síncrona (`/api/cubicacion`, `/api/planes-cargue`)
 - **SQLAlchemy 2.0 (async)** — persistencia propia; `DATABASE_URL` apunta a SQLite en las pruebas o a SQL Server en QA y produccion (mismo codigo, solo cambia la URL). el esquema lo gobiernan los scripts de `docs/Database/`, no `create_all`
 - **aio-pika (RabbitMQ)** — worker consumidor separado, para `optimizar` y `crear-desde-línea`
-- **pytest** — 142 pruebas: 33 de reglas de negocio del motor (28 casos dorados de `MotorCubicacion3DTests.cs` + 5 de apilamiento multi-soporte) + **27 de paridad cross-motor** (los mismos casos, comparados contra la salida real del motor C#, no contra un valor transcrito a mano) + 4 de humo end-to-end de la API + 12 de regresión del worker (los 9 comandos por cola + el puente desde línea) + 4 del vigilante de timeouts + 2 del registro de algoritmos intercambiables + 2 de la alerta al equipo cuando un mensaje cae a `cubicacion.dlq` + **19 guardas de los 3 bugs de QA encontrados** (mensaje malformado que atascaba el worker, ítem sin SKU, borrado de plan optimizado) + **19 de la migración a SQL Server** (8 del esquema y la separación de los dos `MetaData` + 11 de la lectura del catálogo)
+- **pytest** — 181 pruebas: 33 de reglas de negocio del motor (28 casos dorados de `MotorCubicacion3DTests.cs` + 5 de apilamiento multi-soporte) + **27 de paridad cross-motor** (los mismos casos, comparados contra la salida real del motor C#, no contra un valor transcrito a mano) + 4 de humo end-to-end de la API + 12 de regresión del worker (los 9 comandos por cola + el puente desde línea) + 4 del vigilante de timeouts + 2 del registro de algoritmos intercambiables + 2 de la alerta al equipo cuando un mensaje cae a `cubicacion.dlq` + **19 guardas de los 3 bugs de QA encontrados** (mensaje malformado que atascaba el worker, ítem sin SKU, borrado de plan optimizado) + **19 de la migración a SQL Server** (8 del esquema y la separación de los dos `MetaData` + 11 de la lectura del catálogo) + **39 del motor de selección de flota** (22 del algoritmo, 8 de DBLF y 9 del circuito completo contra SQLite)
 
 ## Estado actual (léelo antes de asumir que algo funciona)
 
@@ -55,6 +62,23 @@ Ver:
   ítem → optimizar → leer resultado → ajustar manualmente una colocación. Ver
   `tests/api/test_smoke.py`.
 - Autenticación por Bearer estático rechazando llamadas sin la key.
+- **El motor de selección de flota** (S5-HU-17.3): el circuito completo
+  adaptador → puerto → caso de uso → motor contra SQLite, más el algoritmo con
+  un catálogo calcado del real. Ver `tests/domain/test_seleccion_flota.py`,
+  `tests/domain/test_dblf.py` y `tests/application/test_recomendar_flota.py`.
+
+**Verificado contra el catálogo REAL de QA (`dbo_cubicador`, no un sustituto):**
+- Las **31 mercancías del catálogo resuelven**, una por una. Las dos cuya
+  carrocería principal no tiene vehículo asignado (`CARGA_CONTENERIZADA` y
+  `VIDRIO_PLANO`) caen a su carrocería de respaldo y vuelven marcadas como
+  condicionadas.
+- Los siete escenarios del contrato: flota mixta, carga heterogénea en un
+  vehículo, reparto por incompatibilidad, condicionada, refrigerada,
+  extradimensionado y `SUPERA_K_MAX`.
+- El mapeo de las 10 tablas del catálogo cuadra columna por columna contra
+  `sys.columns` — `scripts/verificar_mapeo_catalogo.py`.
+- El empaque de DBLF iguala la rejilla óptima en 20 combinaciones de vehículo
+  y bulto — `scripts/medir_empaque_dblf.py`.
 
 **Verificado con Docker Compose real (SQL Server + api + worker propios, conectados al RabbitMQ compartido de NEXO):**
 - El mismo flujo de arriba, pero contra **SQL Server real** via `docker

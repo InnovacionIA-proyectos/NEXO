@@ -306,13 +306,19 @@ arranquen en paralelo, no en secuencia.
 - Seeders desde los CSV de `docs/seeder/`, **idempotentes por código estable** (sección 7).
 - **El Cubicador es el dueño de los códigos canónicos de vehículo** (`2L2`, `C2`, `C3`, `2S2`, `3S3`): son los del Excel, que además son los que entienden SICE-TAC y el tarifario. NEXO no es fuente — converge hacia ellos (sección 4.2).
 
-**Motor**
-- Partes 1, 2 y 3 del flujo de selección, con **DBLF** como constructor.
-- Validación de dominancia **por carrocería**, que falla ruidosamente.
-- Comparación por `max(%volumen, %peso)`; se reportan los dos.
-- `k_max = 10`, con medición del costo para revisarlo después.
-- Clase de viaje **derivada** de la carrocería: `CONTENEDOR` → Contenedor, extradimensión detectada → Extradimensionado, resto → Carga Suelta.
-- Persistencia append-only en las tablas de recomendación.
+**Motor** — ✅ hecho en S5-HU-17.3 (`domain/motor/seleccion_flota.py`)
+- ✅ Partes 1, 2 y 3 del flujo de selección, con **DBLF** como constructor. No es un empacador nuevo: `DeepestBottomLeftFill` se agregó al registro de `domain/motor/optimizadores.py` reusando el mecanismo de puntos extremos de FFD y BFD y sus validadores.
+- ✅ Validación de dominancia **por carrocería**, que falla ruidosamente. Se cumple en las 6 carrocerías con vehículo asignado.
+- ✅ Comparación por `max(%volumen, %peso)`; se reportan los dos.
+- ✅ `k_max = 10`, leído de `parametrosMotor`. Se aplica **por grupo de incompatibilidad**, como dice la descripción de ese parámetro en la tabla.
+- ✅ Clase de viaje **derivada** de la carrocería. Corrección sobre lo escrito acá: en el catálogo no existe un `CONTENEDOR` suelto — son `CONTENEDOR_SECO` y `CONTENEDOR_REFRIGERADO`, así que se compara por **prefijo**.
+- ⬜ Persistencia append-only en las tablas de recomendación → **va en S5-HU-17.4**, con el contrato. El motor devuelve el resultado; no escribe.
+
+**Lo que la implementación agregó sobre lo escrito acá**
+- **Las mercancías incompatibles se reparten en vehículos distintos**, no vetan la carga. El motor viejo la rechazaba entera. La regla es por **pares de categorías concretas**, así que no sirve el `grupo_compatibilidad` del motor 3D, que separa cualquier par de grupos distintos.
+- **La carrocería de respaldo entra también cuando la principal no tiene vehículos asignados**, no solo cuando no hay carrocería común. Sin esto, `CARGA_CONTENERIZADA` (`CONTENEDOR_SECO`) y `VIDRIO_PLANO` (`PORTAVIDRIOS`) se quedaban sin recomendación.
+- **DBLF ordena las orientaciones por cuál embaldosa mejor el vehículo.** Medido: tomando la orientación original primero quedaba 6,0 puntos porcentuales por debajo del óptimo de rejilla en promedio y 28,8 en el peor caso — pedir dos camiones donde alcanza uno. Con la preferencia, la brecha es cero en las 20 combinaciones medidas, y por eso **no hace falta Maximal Empty Spaces** (`scripts/medir_empaque_dblf.py`).
+- **La validación contra 50 a 100 despachos históricos no se pudo hacer**: los datos no existen en `db_NEXO`. De 3.122 líneas, las que traen `Dimensiones` con contenido real son 182 y todas son la misma fila de prueba; con dimensiones y vehículo elegido hay 4; con posiciones capturadas, ninguna ligada a una línea. La captura de dimensiones por mercancía entra con este contrato, así que el histórico anterior no la tiene. Ver `DECISIONES_TECNICAS.md` #13.
 
 **Contrato y catálogos**
 - `POST /recomendaciones`, `GET /tipos-mercancia`, `GET /tipos-carroceria`, `GET /recomendaciones`, `GET /recomendaciones/{id}/mercancias`.
@@ -324,7 +330,7 @@ arranquen en paralelo, no en secuencia.
 - ✅ **Presets del 3D corregidos contra el Excel** (hecho). El diccionario del puente resuelve el *nombre*, no el *dato*: traducía `2L2` → "Turbo con estacas", y ese preset seguía diciendo 6,2 m y 6.300 kg cuando el Turbo real es 4,5 m y 4.000 kg — el motor nuevo decía "cabe en un Turbo" y el 3D acomodaba dentro de una caja 38% más larga que no existe. Se corrigieron largo, ancho, alto y capacidad de las 5 configuraciones con contraparte en el Excel, **se agregó la Minimula 2S2** (faltaba por completo) y se dejaron intactas cama baja y los 3 contenedores, que no tienen contraparte. Las 122 pruebas pasan, incluidos los 26 casos dorados.
 - ⚠️ **La corrección NO llega sola a las bases que ya existen.** `listar_con_siembra` siembra **por nombre** y solo agrega los faltantes: nunca actualiza una fila. Así que aplica a bases nuevas, y como los datos **se migran** (no se arranca vacío), las filas viejas y erradas viajan a SQL Server. **La migración tiene que incluir un `UPDATE` puntual de esas 5 filas.** Es la misma consecuencia del seeder idempotente que describe la sección 6: las correcciones no entran por siembra.
 - El nombre "Tractocamion furgon 13.6 m" quedó desfasado — son 12,2 m. No se renombró porque la siembra es por nombre y crearía duplicados; el renombre va por CRUD.
-- El catálogo quemado de SICCE (`cubicacion_rapida.py::CATALOGO`, 9 arquetipos) **no se corrigió a propósito**: lo reemplaza el motor nuevo leyendo de base en la fase 3, así que arreglarlo sería trabajo tirado.
+- ✅ El catálogo quemado de SICCE (`cubicacion_rapida.py::CATALOGO`, 9 arquetipos) **no se corrigió a propósito**: lo reemplaza el motor nuevo leyendo de base, que ya está escrito (S5-HU-17.3). El módulo entero se retira en S5-HU-17.4, junto con `POST /api/cubicacion`.
 - **Matar el fallback silencioso.** Hoy `_PRESET_POR_UNIDAD_RAPIDA.get(unidad, "Tractocamion furgon 13.6 m")` asume un furgón de 13,6 m cuando no reconoce el vehículo. Pasa a rechazo explícito.
 - **Reescribir el puente `crear_plan_desde_linea`** y sus pruebas. Se simplifica: hoy adivina cuántos vehículos hacen falta llenando uno y viendo qué sobra, hasta 20 veces. El motor nuevo ya responde cuántos y de qué tipo, así que la cascada a ciegas se reemplaza por "crear N planes con los vehículos indicados y optimizar cada uno". Es menos código del que hay.
 - Documento de deuda diferida del 3D.

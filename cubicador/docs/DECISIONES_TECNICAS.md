@@ -411,7 +411,7 @@ código SQLAlchemy sirve para ambos, solo cambia la URL — con una excepción, 
 esquema, que solo se declara contra SQL Server porque SQLite no los soporta
 (ver `infrastructure/persistence/db.py`).
 
-**Verificado el 2026-10-09**: las 142 pruebas en verde dentro de la imagen, el
+**Verificado el 2026-10-09**: la suite entera en verde dentro de la imagen (142 pruebas a esa fecha), el
 esquema del motor 3D aplicado contra SQL Server 2019 real, y la api
 arrancando y sirviendo el catálogo de vehículos desde ahí.
 
@@ -512,3 +512,93 @@ con `KeyError: 'tipo'` (documentado con la traza real en
 `NEXO/docs/mensajeria/CUBICACION.md` #4, incluido un bug que ese mismo
 `KeyError` exponía en el manejo de error de `_mover_a_dlq`, ya corregido de
 paso al aplicar el mismo desenvuelto ahí).
+
+## 13. Motor de selección de flota (S5-HU-17.3)
+
+**Decisión**: reemplazar la heurística de `cubicacion_rapida.py` por
+`domain/motor/seleccion_flota.py`, que lee el catálogo de base y resuelve en
+tres partes: filtrar candidatos, empacar con DBLF y elegir la flota mínima.
+
+**Por qué un módulo nuevo y no reescribir el viejo en sitio.** De las 692
+líneas de `cubicacion_rapida.py` sobreviven unas 35 (`detectar_extradimension`).
+Se van el catálogo de 9 arquetipos quemados, la heurística de estanterías, el
+clasificador de categorías por palabras (`"oxidante"`, `"papel"`, `"madera"`),
+el criterio de reparto por eje —fuera del alcance por falta de datos— y la
+forma de respuesta entera. No es un refactor del mismo algoritmo: es otro
+algoritmo, con otra entrada y otra salida. El viejo sigue en pie solo porque
+`POST /api/cubicacion` y `application/plan_cargue/desde_linea.py` todavía lo
+llaman; **muere en S5-HU-17.4**, que retira ese endpoint.
+
+**DBLF no es un empacador nuevo.** `DeepestBottomLeftFill` se agregó al
+registro de `optimizadores.py` junto a FFD y BFD, reusando el mecanismo de
+puntos extremos y sus validadores de colisión, soporte y apilamiento. Cambia
+una sola cosa: el orden de recorrido de los puntos pasa de `(z, x, y)` a
+`(x, z, y)`, que llena la rebanada del fondo antes de avanzar hacia la puerta.
+Escribir un segundo empacador habría duplicado la lógica que ya sostienen 33
+casos dorados y 27 de paridad con el motor C#.
+
+**Se decide por `max(%volumen, %peso)`.** Una carga de bebidas llena el peso
+mucho antes que el volumen; una de cajas vacías al revés. El motor viejo solo
+tenía `factorUtilizacion`, volumétrico puro, así que en el primer caso pedía
+vehículos de menos. Los dos porcentajes se reportan siempre.
+
+**La capacidad es la de la combinación, no la del chasis.** `3S3 + FURGON` son
+30.000 kg porque el furgón pesa; usar los 34.000 del chasis sería creer que
+caben 4 toneladas de más.
+
+**Las mercancías incompatibles se reparten, no vetan.** El motor viejo
+rechazaba la carga entera al encontrar un par incompatible. Ahora van en
+vehículos distintos, que es lo que haría un planillador. La regla es por
+**pares de categorías concretas**, así que no sirve el `grupo_compatibilidad`
+del motor 3D, que separa cualquier par de grupos distintos: bebidas y cajas de
+cartón son categorías distintas y comparten camión sin problema.
+
+**La carrocería de respaldo entra también cuando la principal no tiene
+vehículos.** No solo cuando no hay carrocería común. Es el caso real de
+`CARGA_CONTENERIZADA` (su principal `CONTENEDOR_SECO` está sembrada sin
+vehículo) y de `VIDRIO_PLANO` (`PORTAVIDRIOS`). Sin esto, 2 de las 31
+mercancías se quedaban sin recomendación.
+
+**Maximal Empty Spaces no hace falta** — *medido, no supuesto*. El último
+criterio de la issue pedía justificar con medición si MES era necesario sobre
+DBLF. `scripts/medir_empaque_dblf.py` compara DBLF contra la rejilla óptima
+(el tope exacto alcanzable con una orientación uniforme) en 20 combinaciones de
+vehículo y bulto.
+
+La primera corrida encontró una brecha real: **6,0 puntos porcentuales por
+debajo en promedio y 28,8 en el peor caso** — una estiba de 120×100×150 en un
+Sencillo daba 48,1% contra 76,9%, que es pedir dos camiones donde alcanza uno.
+La causa **no era fragmentación del espacio vacío**, que es lo que resolvería
+MES, sino la elección de orientación: DBLF tomaba la primera válida, que es la
+original. Ordenar las orientaciones por cuántas unidades entrarían en el
+vehículo vacío cuesta una división entera por orientación y cierra la brecha a
+**0,0 puntos en las 20 combinaciones**.
+
+Esa preferencia es **solo de DBLF**: FFD y BFD conservan el orden histórico de
+`orientaciones_de`, porque los 27 casos dorados de paridad con el motor C#
+dependen de él.
+
+**La validación contra despachos históricos no se pudo hacer: los datos no
+existen.** El criterio pedía comparar el motor contra 50 a 100 solicitudes
+entregadas con posiciones capturadas. Medido sobre `db_NEXO`, que es la fuente
+de despachos del sistema:
+
+| | |
+|---|---|
+| Líneas de solicitud | 3.122 |
+| Con `Dimensiones` no vacío | **182**, y las 182 son la misma fila de prueba repetida: `Pallet, 3 unidades, 120×100×100 cm, 500 kg` |
+| Con dimensiones **y** vehículo elegido | **4** |
+| Con peso y vehículo canónico (2L2/C2/C3/2S2/3S3) | 84, de las cuales **18** pertenecen a una solicitud entregada |
+| Con posiciones capturadas | **ninguna** — las 417 colocaciones que existen son de 12 planes de cargue de prueba, y los 12 tienen `LineaSolicitudId` en NULL |
+
+Lo único reconstruible es `(peso, vehículo elegido)` en 84 líneas: sirve para
+el filtro por peso, no para el volumen ni el empaque, que es lo que el criterio
+quería medir. La captura de dimensiones por mercancía **entra con este
+contrato**, así que el histórico anterior no la tiene ni la va a tener. La
+comparación contra despachos reales se puede hacer después del corte, cuando se
+acumulen recomendaciones con su resultado.
+
+Lo que sí acota el error mientras tanto es la medición de arriba: DBLF contra
+el tope geométrico exacto, con brecha cero. La única fuente restante de
+"vehículos de más" es el catálogo —por ejemplo que `C3` no admita furgón, que
+deja un salto de 8.500 a 18.000 kg sin escalón intermedio—, no el algoritmo.
