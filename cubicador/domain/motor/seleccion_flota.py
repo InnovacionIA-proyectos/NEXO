@@ -127,6 +127,10 @@ class VehiculoRecomendado:
 
 @dataclass(frozen=True)
 class PiezaExcedida:
+    # Los dos identificadores: el id es lo que Cotifly manda en el request y el
+    # codigo lo que usa NEXO. Darlos juntos evita que cada consumidor tenga que
+    # resolver el otro por su cuenta.
+    id_tipo_mercancia: str
     codigo_mercancia: str
     excesos: tuple[str, ...]
 
@@ -465,7 +469,7 @@ def _detectar_extradimension(
         if m.peso_kg > medidas.peso_max_kg:
             excesos.append(f"peso {m.peso_kg:.1f} kg > {medidas.peso_max_kg:.1f} kg")
         if excesos:
-            excedidas.append(PiezaExcedida(m.tipo.codigo, tuple(excesos)))
+            excedidas.append(PiezaExcedida(m.tipo.id, m.tipo.codigo, tuple(excesos)))
     return DeteccionExtradimension(bool(excedidas), medidas, tuple(excedidas))
 
 

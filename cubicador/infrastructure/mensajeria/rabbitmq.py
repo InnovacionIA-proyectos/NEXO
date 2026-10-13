@@ -154,3 +154,37 @@ class RabbitMqEventosPublisher:
     async def publicar_vehiculo_eliminado(self, vehiculo_id: str) -> None:
         payload = {"correlationId": vehiculo_id, "vehiculoId": vehiculo_id}
         await self._publicar("vehiculo.eliminado", _sobre_masstransit("VehiculoEliminado", payload))
+
+    # --- Catalogo del contrato unico (S5-HU-17.4) --------------------------
+    # Mismo patron que el trio de vehiculo: sobre de MassTransit para que del
+    # otro lado lo consuma un IConsumer<T> real, `correlationId` con el id de
+    # la fila, y el evento de borrado lleva SOLO el id porque no hay fila que
+    # proyectar, solo una que quitar.
+    #
+    # Los publican los CRUD de S5-HU-17.5. Quedan escritos aca para que esas
+    # escrituras no tengan que inventar la forma del mensaje y se desvien de
+    # la que NEXO ya sabe consumir.
+
+    async def publicar_mercancia_creada(self, mercancia_id: str, mercancia: dict[str, Any]) -> None:
+        payload = {"correlationId": mercancia_id, "mercancia": mercancia}
+        await self._publicar("mercancia.creada", _sobre_masstransit("MercanciaCreada", payload))
+
+    async def publicar_mercancia_actualizada(self, mercancia_id: str, mercancia: dict[str, Any]) -> None:
+        payload = {"correlationId": mercancia_id, "mercancia": mercancia}
+        await self._publicar("mercancia.actualizada", _sobre_masstransit("MercanciaActualizada", payload))
+
+    async def publicar_mercancia_eliminada(self, mercancia_id: str) -> None:
+        payload = {"correlationId": mercancia_id, "mercanciaId": mercancia_id}
+        await self._publicar("mercancia.eliminada", _sobre_masstransit("MercanciaEliminada", payload))
+
+    async def publicar_carroceria_creada(self, carroceria_id: str, carroceria: dict[str, Any]) -> None:
+        payload = {"correlationId": carroceria_id, "carroceria": carroceria}
+        await self._publicar("carroceria.creada", _sobre_masstransit("CarroceriaCreada", payload))
+
+    async def publicar_carroceria_actualizada(self, carroceria_id: str, carroceria: dict[str, Any]) -> None:
+        payload = {"correlationId": carroceria_id, "carroceria": carroceria}
+        await self._publicar("carroceria.actualizada", _sobre_masstransit("CarroceriaActualizada", payload))
+
+    async def publicar_carroceria_eliminada(self, carroceria_id: str) -> None:
+        payload = {"correlationId": carroceria_id, "carroceriaId": carroceria_id}
+        await self._publicar("carroceria.eliminada", _sobre_masstransit("CarroceriaEliminada", payload))

@@ -602,3 +602,97 @@ Lo que sí acota el error mientras tanto es la medición de arriba: DBLF contra
 el tope geométrico exacto, con brecha cero. La única fuente restante de
 "vehículos de más" es el catálogo —por ejemplo que `C3` no admita furgón, que
 deja un salto de 8.500 a 18.000 kg sin escalón intermedio—, no el algoritmo.
+
+## 14. El contrato único (S5-HU-17.4)
+
+**Decisión**: `POST /recomendaciones` reemplaza a `POST /api/cubicacion`, que se
+retiró en el mismo corte. No queda endpoint de transición.
+
+**Lo que antes era error ahora es resultado.** `SIN_SELECCION_AUTOMATICA`,
+`condicionada` y `extradimension` vuelven con **200**, dentro de `resultado`.
+Los códigos de error quedan solo para fallos reales. Un vehículo que no se pudo
+recomendar no es una falla del servicio: es una respuesta, y el consumidor tiene
+que poder distinguirla de un 500.
+
+**El `origenSistema` sale de la llave, no del cuerpo.** Dos variables,
+`CUBICADOR_API_KEY_NEXO` y `CUBICADOR_API_KEY_COTIFLY`, en vez de un mapa en una
+sola cadena: se leen mejor en Dokploy y rotar una no obliga a tocar la otra. La
+llave genérica `CUBICADOR_API_KEY` sigue sirviendo para `/api/planes-cargue` y
+los catálogos, pero **no** para `/recomendaciones`: identifica al servicio, no a
+un sistema, y una recomendación tiene que saber de quién viene para poder
+reconsultarla. Si el cuerpo declara un `origenSistema` que no corresponde a la
+llave, 401 — declararlo es opcional, mentir no.
+
+**Las mercancías viajan con id y código.** En el request va el id (acordado con
+Cotifly el 2026-10-08, su HU-021.5; la primera versión de la hoja de ruta
+proponía el código). En la respuesta van los dos, igual que
+`GET /tipos-mercancia`: Cotifly persiste el id y NEXO usa el código estable.
+Darlos juntos cuesta una columna más en el JSON y evita que cada consumidor
+tenga que resolver el otro por su cuenta.
+
+**Dos columnas nuevas en `dbo_cubicador`**
+(`docs/Database/S5-HU-17.4_columnas_recomendacion.sql`), las dos `NOT NULL` con
+default según el criterio del equipo de Datos:
+
+- `recomendaciones.MercanciasCondicionadasJson` — no se puede derivar al releer.
+  Una mercancía queda condicionada por su propia marca **o** por haberse usado
+  su carrocería de respaldo, y esa segunda razón se pierde si no se guarda.
+- `recomendacionVehiculo.AlertaBajoLlenado` — no se puede recalcular.
+  `umbral_alerta_llenado` es editable por CRUD y estas tablas son append-only:
+  una fila consultada dentro de dos años tiene que decir lo que dijo el día que
+  se calculó, no lo que diría con el umbral de hoy.
+
+**Los ids se generan en mayúsculas** — *encontrado al probar contra QA real, no
+al diseñar*. SQL Server devuelve las columnas `uniqueidentifier` en mayúsculas y
+no es configurable. Escribiendo `b9c435cf-...`, la reconsulta traía
+`B9C435CF-...`: el `idRecomendacionVehiculo` del POST y el de la reconsulta no
+eran el mismo texto, y guardar ese id es exactamente para lo que existe. SQLite
+no lo muestra, porque devuelve lo que se escribió. Se generan ya en mayúsculas,
+y además las búsquedas por uuid no distinguen caja: un consumidor puede
+guardarlo en minúsculas de su lado y es el mismo uuid.
+
+**La escala decimal se normaliza en el borde HTTP.** La misma cifra llegaba al
+DTO con distinta precisión según el camino: en el POST sale del motor y en la
+reconsulta de la columna, que tiene su propia escala (`VolumenTotalM3` es
+`DECIMAL(18,3)`). Sin normalizar, un consumidor que guarda la respuesta del POST
+y después reconsulta recibe `9.60` y `9.600` para el mismo volumen.
+
+**`docs/openapi.json` se regenera, no se edita.** `scripts/generar_openapi.py`
+lo escribe desde la app, y con `--verificar` falla si quedó desactualizado.
+Hasta ahora se mantenía a mano, que es justo lo que no puede pasar con un
+contrato que programan dos equipos de afuera.
+
+### Las dos bases: QA y la local del compose
+
+Es la confusión más fácil de este servicio y conviene tenerla escrita.
+
+| | **QA corporativo** | **Local del `docker-compose`** |
+|---|---|---|
+| Host | `10.10.40.85:1433` | `127.0.0.1:1434` (servicio `db`) |
+| Base | `dbTarifario_Nexo_Pruebas` | `dbTarifario_Nexo_Pruebas` (mismo nombre, otro servidor) |
+| Esquema | `dbo_cubicador`, **compartido con `dbo_cotifly`** | `dbo_cubicador`, solo |
+| Quién lo administra | el equipo de Datos | este repo |
+| Qué lo llena | `sqlcmd` del equipo de Datos + `docs/Database/*.sql` | `docs/Database/*.sql` + `scripts/preparar_catalogo_local.py` |
+
+El `.env` apunta a **QA** — lo usan pytest contra base real y los scripts de
+verificación. El `docker-compose.yml` arma su propia `DATABASE_URL` apuntando al
+contenedor `db`, así que el servicio levantado con `docker compose up` **no habla
+con QA**.
+
+Por eso el stack local arrancaba con `GET /tipos-carroceria` en 503 aunque QA
+tuviera sus 15 tablas desde el principio: el contenedor local solo había corrido
+`ESQUEMA_CUBICADOR.sql`, que son las 5 tablas del motor 3D. El DDL de las 10 del
+catálogo nunca estuvo en el repo porque el equipo de Datos lo aplicó directo en
+QA. `scripts/preparar_catalogo_local.py` lo resuelve creando y sembrando esas
+tablas **solo en la base local**: se niega a correr contra cualquier host que no
+sea `db`, `localhost`, `127.0.0.1` o `host.docker.internal`, porque crea tablas y
+apuntarlo por error a QA es exactamente lo que no puede pasar.
+
+### Verificación del contrato contra el servicio real
+
+`scripts/verificar_contrato.py` recorre los criterios de aceptación de
+S5-HU-17.4 contra el servicio corriendo, por HTTP. No reemplaza a pytest: lo
+complementa donde pytest no llega, que es el motor de base real y la
+serialización de verdad. Las dos diferencias que encontró —los `uniqueidentifier`
+en mayúsculas y los decimales como texto— eran invisibles contra SQLite y por
+ASGI.

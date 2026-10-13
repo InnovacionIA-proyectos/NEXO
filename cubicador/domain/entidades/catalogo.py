@@ -190,7 +190,12 @@ class Catalogo:
         return next((m for m in self.mercancias if m.codigo == codigo), None)
 
     def mercancia_por_id(self, id_mercancia: str) -> TipoMercancia | None:
-        return next((m for m in self.mercancias if m.id == id_mercancia), None)
+        """Sin distinguir mayusculas: SQL Server devuelve los `uniqueidentifier`
+        en mayusculas y un consumidor puede guardarlos en minusculas de su lado.
+        Es el mismo uuid; rechazarlo por la caja seria un
+        `MERCANCIA_DESCONOCIDA` falso."""
+        buscado = (id_mercancia or "").strip().casefold()
+        return next((m for m in self.mercancias if m.id.casefold() == buscado), None)
 
     def son_incompatibles(self, a: TipoMercancia, b: TipoMercancia) -> str | None:
         """El motivo si no pueden viajar juntas, o None si pueden."""

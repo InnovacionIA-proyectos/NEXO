@@ -91,6 +91,10 @@ services:
       DATABASE_URL: mssql+aioodbc://sa:${MSSQL_SA_PASSWORD}@db:1433/dbTarifario_Nexo_Pruebas?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes
       CUBICADOR_DB_ESQUEMA: ${CUBICADOR_DB_ESQUEMA:-dbo_cubicador}
       CUBICADOR_API_KEY: ${CUBICADOR_API_KEY:?definir en .env}
+      # Llave por sistema: de aca sale el origenSistema verificado de
+      # POST /recomendaciones (ver .env.example).
+      CUBICADOR_API_KEY_NEXO: ${CUBICADOR_API_KEY_NEXO:-}
+      CUBICADOR_API_KEY_COTIFLY: ${CUBICADOR_API_KEY_COTIFLY:-}
       # rabbit compartido de NEXO (mismas credenciales que su .env raiz) - ver
       # comentario de cabecera de este archivo.
       CUBICADOR_RABBITMQ_URL: amqp://${RABBITMQ_USER:?definir en .env}:${RABBITMQ_PASSWORD:?definir en .env}@rabbit:5672/

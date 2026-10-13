@@ -1,14 +1,18 @@
-"""Caso de uso de recomendacion de flota (S5-HU-17.3).
+"""Casos de uso de recomendacion de flota (S5-HU-17.3 y 17.4).
 
-Es la costura entre el motor puro (`domain.motor.seleccion_flota`) y la base:
-trae el catalogo por su puerto, trae las medidas estandar por el suyo, resuelve
-los codigos de mercancia que llegaron contra el catalogo real y llama al motor.
+`recomendar_flota` es la costura entre el motor puro
+(`domain.motor.seleccion_flota`) y la base: trae el catalogo por su puerto,
+trae las medidas estandar por el suyo, resuelve las mercancias que llegaron
+contra el catalogo real y llama al motor. **Ahi es donde deja de haber catalogo
+quemado.**
 
-**Aca es donde deja de haber catalogo quemado.** El motor no conoce
-SQLAlchemy ni sabe de donde salen los vehiculos; este modulo es el unico que
-toca los dos lados.
+`crear_recomendacion` agrega la persistencia append-only y es lo que sirve
+`POST /recomendaciones`; `consultar_recomendacion` y
+`listar_mercancias_de_vehiculo` son la reconsulta.
 
-Lo que NO hace: HTTP, DTOs ni persistir la recomendacion. Eso es S5-HU-17.4.
+Lo que NO hace este modulo: HTTP, DTOs ni autenticacion. El `origen_sistema`
+llega ya **verificado contra la llave** desde la capa `api/` - nunca se toma
+del cuerpo de la peticion.
 """
 
 from __future__ import annotations
@@ -16,28 +20,46 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 
-from application.excepciones import ValidationFailedException
+from application.excepciones import NotFoundException, ValidationFailedException
 from application.ports.repositorios import (
     ICatalogoRepository,
     IParametrosCubicacionRepository,
+    IRecomendacionRepository,
 )
+from domain.entidades.recomendacion import MercanciaRecomendada, RecomendacionGuardada
 from domain.motor import seleccion_flota as motor
 
-# Mismo tope que el cubicador rapido: proteccion anti-DoS, no una regla de
-# negocio. Expandir cantidades a unidades fisicas es lo que cuesta.
+# Mismo tope que tenia el cubicador rapido: proteccion anti-DoS, no una regla
+# de negocio. Expandir cantidades a unidades fisicas es lo que cuesta.
 _MAX_UNIDADES_TOTALES = 10_000
+
+SISTEMAS_VALIDOS = ("NEXO", "COTIFLY")
 
 
 @dataclass(frozen=True)
 class LineaMercancia:
-    """Una linea tal como llega del llamante, con el codigo **sin resolver**."""
+    """Una linea tal como llega del llamante.
 
-    codigo_mercancia: str
+    Viaja el **id** del tipo de mercancia, no el codigo: acordado con Cotifly
+    el 2026-10-08 (su HU-021.5). Es el id que este servicio devolvio en
+    `GET /tipos-mercancia`. El codigo estable se usa del lado de NEXO.
+    """
+
+    id_tipo_mercancia: str
     cantidad: int
     largo_cm: Decimal
     ancho_cm: Decimal
     alto_cm: Decimal
     peso_kg: Decimal
+
+
+@dataclass(frozen=True)
+class SolicitudDeRecomendacion:
+    id_linea_solicitud: str
+    origen_sistema: str
+    mercancias: list[LineaMercancia]
+    clase_viaje_preferida: str | None = None
+    usuario_id: str | None = None
 
 
 async def recomendar_flota(
@@ -46,12 +68,12 @@ async def recomendar_flota(
     lineas: list[LineaMercancia],
     clase_viaje_preferida: str | None = None,
 ) -> motor.Recomendacion:
-    """Resuelve las lineas contra el catalogo y corre el motor.
+    """Resuelve las lineas contra el catalogo y corre el motor, sin persistir.
 
-    Los codigos se resuelven **aca y no en el motor**: un codigo que no existe
-    o una mercancia no cubicable son errores del llamante (400 en el contrato),
+    Las mercancias se resuelven **aca y no en el motor**: un id que no existe o
+    una mercancia no cubicable son errores del llamante (400 en el contrato),
     no un resultado del algoritmo. Nunca se cae a un default silencioso - ese
-    es el fallback que mata S5-HU-17.6.
+    es justamente el fallback que mata S5-HU-17.6.
     """
     if not lineas:
         raise ValidationFailedException(
@@ -70,22 +92,22 @@ async def recomendar_flota(
         if linea.cantidad < 1:
             raise ValidationFailedException(
                 "DIMENSIONES_INVALIDAS",
-                f"La cantidad de '{linea.codigo_mercancia}' debe ser al menos 1.")
+                f"La cantidad de '{linea.id_tipo_mercancia}' debe ser al menos 1.")
         if min(linea.largo_cm, linea.ancho_cm, linea.alto_cm, linea.peso_kg) <= 0:
             raise ValidationFailedException(
                 "DIMENSIONES_INVALIDAS",
-                f"Las medidas y el peso de '{linea.codigo_mercancia}' deben ser mayores que cero.")
+                f"Las medidas y el peso de '{linea.id_tipo_mercancia}' deben ser mayores que cero.")
 
-        tipo = catalogo.mercancia_por_codigo(linea.codigo_mercancia)
+        tipo = catalogo.mercancia_por_id(linea.id_tipo_mercancia)
         if tipo is None:
             raise ValidationFailedException(
                 "MERCANCIA_DESCONOCIDA",
-                f"'{linea.codigo_mercancia}' no esta en el catalogo de tipos de mercancia.")
+                f"'{linea.id_tipo_mercancia}' no esta en el catalogo de tipos de mercancia.")
         if not tipo.cubicable:
             raise ValidationFailedException(
                 "MERCANCIA_NO_CUBICABLE",
-                f"'{linea.codigo_mercancia}' esta marcada como no cubicable: no se le puede "
-                "recomendar un vehiculo.")
+                f"'{tipo.codigo}' esta marcada como no cubicable: no se le puede recomendar "
+                "un vehiculo.")
 
         mercancias.append(motor.MercanciaSolicitada(
             tipo=tipo, cantidad=linea.cantidad, largo_cm=linea.largo_cm,
@@ -104,3 +126,60 @@ async def recomendar_flota(
         mercancias=tuple(mercancias), medidas_estandar=medidas,
         clase_viaje_preferida=clase_viaje_preferida,
     ))
+
+
+async def crear_recomendacion(
+    catalogo_repo: ICatalogoRepository,
+    parametros_repo: IParametrosCubicacionRepository,
+    recomendacion_repo: IRecomendacionRepository,
+    solicitud: SolicitudDeRecomendacion,
+) -> RecomendacionGuardada:
+    """Corre el motor y guarda la corrida. Es lo que sirve `POST /recomendaciones`.
+
+    **Se guarda tambien cuando el resultado es `SIN_SELECCION_AUTOMATICA`.**
+    Esa corrida tambien ocurrio, y sin la fila padre no quedaria rastro de que
+    se consulto ni de por que no hubo vehiculo: es la razon de existir de la
+    tabla `recomendaciones`.
+    """
+    if not solicitud.id_linea_solicitud or not solicitud.id_linea_solicitud.strip():
+        raise ValidationFailedException(
+            "DIMENSIONES_INVALIDAS", "La solicitud no trae idLineaSolicitud.")
+
+    resultado = await recomendar_flota(
+        catalogo_repo, parametros_repo, solicitud.mercancias, solicitud.clase_viaje_preferida)
+
+    return await recomendacion_repo.guardar(
+        resultado, solicitud.id_linea_solicitud, solicitud.origen_sistema, solicitud.usuario_id)
+
+
+async def consultar_recomendacion(
+    recomendacion_repo: IRecomendacionRepository, id_linea_solicitud: str, origen_sistema: str,
+) -> RecomendacionGuardada:
+    """La ultima corrida de una linea. `origen_sistema` es obligatorio.
+
+    Un mismo codigo de linea puede existir en NEXO y en Cotifly y ser rutas
+    distintas: sin el filtro por origen, una consulta podria devolver la
+    recomendacion del otro sistema.
+    """
+    if origen_sistema not in SISTEMAS_VALIDOS:
+        raise ValidationFailedException(
+            "ORIGEN_SISTEMA_INVALIDO",
+            f"origenSistema debe ser uno de {', '.join(SISTEMAS_VALIDOS)}.")
+
+    guardada = await recomendacion_repo.obtener_por_linea(id_linea_solicitud, origen_sistema)
+    if guardada is None:
+        raise NotFoundException(
+            "RECOMENDACION_NO_ENCONTRADA",
+            f"No hay recomendaciones para la linea '{id_linea_solicitud}' en {origen_sistema}.")
+    return guardada
+
+
+async def listar_mercancias_de_vehiculo(
+    recomendacion_repo: IRecomendacionRepository, id_recomendacion_vehiculo: str,
+) -> list[MercanciaRecomendada]:
+    mercancias = await recomendacion_repo.listar_mercancias(id_recomendacion_vehiculo)
+    if mercancias is None:
+        raise NotFoundException(
+            "RECOMENDACION_NO_ENCONTRADA",
+            f"No existe el vehiculo recomendado '{id_recomendacion_vehiculo}'.")
+    return mercancias

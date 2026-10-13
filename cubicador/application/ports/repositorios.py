@@ -7,6 +7,7 @@ from __future__ import annotations
 from typing import Protocol
 
 from domain.entidades.catalogo import Catalogo
+from domain.entidades.recomendacion import MercanciaRecomendada, RecomendacionGuardada
 from domain.entidades.entidades import (
     ItemPlanCargue,
     ParametrosCubicacion,
@@ -141,4 +142,47 @@ class ICatalogoRepository(Protocol):
 
     async def cargar(self) -> Catalogo:
         """Trae vehiculos con sus carrocerias, mercancias, reglas y parametros."""
+        ...
+
+
+class IRecomendacionRepository(Protocol):
+    """Persistencia de las corridas del motor (S5-HU-17.4).
+
+    **Append-only**: no hay `actualizar` ni `eliminar`, a proposito. Recalcular
+    una ruta crea una corrida nueva; la anterior queda intacta porque Cotifly
+    guardo su `idRecomendacionVehiculo` dentro de una cotizacion y esa fila
+    tiene que seguir diciendo lo mismo dentro de dos anos (seccion 2.9 del
+    contrato). Si algun dia aparece la necesidad de corregir una corrida, la
+    respuesta es otra corrida, no un UPDATE.
+    """
+
+    async def guardar(
+        self,
+        resultado: object,
+        id_linea_solicitud: str,
+        origen_sistema: str,
+        usuario_id: str | None,
+    ) -> RecomendacionGuardada:
+        """Guarda la corrida y devuelve la version con ids.
+
+        `resultado` es la `Recomendacion` del motor. Se tipa laxo para no
+        meter `domain.motor` dentro de los puertos de persistencia: el motor es
+        dominio puro y no tiene por que aparecer en esta frontera.
+        """
+        ...
+
+    async def obtener_por_linea(
+        self, id_linea_solicitud: str, origen_sistema: str,
+    ) -> RecomendacionGuardada | None:
+        """La ULTIMA corrida de esa linea en ese sistema.
+
+        `origen_sistema` es obligatorio: un mismo codigo de linea puede existir
+        en NEXO y en Cotifly, y son rutas distintas.
+        """
+        ...
+
+    async def listar_mercancias(
+        self, id_recomendacion_vehiculo: str,
+    ) -> list[MercanciaRecomendada] | None:
+        """Las mercancias de un camion. None si ese id no existe."""
         ...

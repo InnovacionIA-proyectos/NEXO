@@ -43,8 +43,14 @@ class _ParametrosFalsos:
         return parametros
 
 
+# El fixture siembra los ids a mano, asi que el id del tipo es predecible: el
+# contrato manda el ID del catalogo, no el codigo (acuerdo con Cotifly del
+# 2026-10-08). `m-beb` es BEBIDAS, `m-vid` VIDRIO_PLANO, `m-fer` FERTILIZANTES.
+IDS = {"BEBIDAS": "m-beb", "VIDRIO_PLANO": "m-vid", "FERTILIZANTES": "m-fer"}
+
+
 def _linea(codigo, cantidad, largo, ancho, alto, peso):
-    return LineaMercancia(codigo, cantidad, D(largo), D(ancho), D(alto), D(peso))
+    return LineaMercancia(IDS.get(codigo, codigo), cantidad, D(largo), D(ancho), D(alto), D(peso))
 
 
 async def _recomendar(sesion, lineas, clase=None, parametros=None):

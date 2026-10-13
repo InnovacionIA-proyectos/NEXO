@@ -261,6 +261,10 @@ class Recomendacion(BaseCatalogo):
     # tercer estado, mismo criterio que `ControlAmbientalRequerido`.
     motivo_sin_seleccion: Mapped[str] = mapped_column("MotivoSinSeleccion", String(500))
     condicionada: Mapped[bool] = mapped_column("Condicionada", Boolean)
+    # Que mercancias quedaron marcadas. No se puede derivar al releer: una
+    # mercancia queda condicionada por su propia marca O por haberse usado su
+    # carroceria de respaldo, y esa segunda razon se pierde si no se guarda.
+    mercancias_condicionadas_json: Mapped[str] = mapped_column("MercanciasCondicionadasJson", Text)
     advertencias_json: Mapped[str] = mapped_column("AdvertenciasJson", Text)
     extradimension_json: Mapped[str] = mapped_column("ExtradimensionJson", Text)
     creado_por: Mapped[str] = mapped_column("CreadoPor", String(100))
@@ -300,6 +304,10 @@ class RecomendacionVehiculo(BaseCatalogo):
         "PorcentajeLlenadoVolumen", Numeric(5, 2))
     porcentaje_llenado_peso: Mapped[Decimal] = mapped_column(
         "PorcentajeLlenadoPeso", Numeric(5, 2))
+    # Se guarda, no se recalcula: `umbral_alerta_llenado` es editable por CRUD y
+    # esta tabla es append-only. Una fila consultada dentro de dos anos tiene que
+    # decir lo que dijo el dia que se calculo.
+    alerta_bajo_llenado: Mapped[bool] = mapped_column("AlertaBajoLlenado", Boolean)
     peso_total_kg: Mapped[Decimal] = mapped_column("PesoTotalKg", Numeric(18, 2))
     volumen_total_m3: Mapped[Decimal] = mapped_column("VolumenTotalM3", Numeric(18, 3))
     numero_vehiculo: Mapped[int] = mapped_column("NumeroVehiculo", Integer)

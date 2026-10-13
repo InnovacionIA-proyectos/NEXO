@@ -17,7 +17,8 @@ Desde S5-HU-17 hay un **tercer motor**: la selección de flota
 responde qué vehículos hacen falta para una carga, en qué cantidad y con qué
 mercancía en cada uno. Reemplaza al cubicador rápido, que comparaba contra
 nueve arquetipos quemados y decidía por volumen puro; ese módulo y su endpoint
-`POST /api/cubicacion` se retiran en S5-HU-17.4.
+`POST /api/cubicacion` ya se retiraron (S5-HU-17.4): lo reemplaza
+`POST /recomendaciones`, que además persiste su corrida.
 
 No es un servicio de cómputo sin estado: es dueño de todo el dominio
 Cubicación — vehículos, planes de cargue, ítems, colocaciones y parámetros —
@@ -47,10 +48,10 @@ Ver:
 ## Stack
 
 - **Python 3.14**
-- **FastAPI** — API síncrona (`/api/cubicacion`, `/api/planes-cargue`)
+- **FastAPI** — API síncrona (`/recomendaciones`, `/tipos-mercancia`, `/tipos-carroceria`, `/api/planes-cargue`)
 - **SQLAlchemy 2.0 (async)** — persistencia propia; `DATABASE_URL` apunta a SQLite en las pruebas o a SQL Server en QA y produccion (mismo codigo, solo cambia la URL). el esquema lo gobiernan los scripts de `docs/Database/`, no `create_all`
 - **aio-pika (RabbitMQ)** — worker consumidor separado, para `optimizar` y `crear-desde-línea`
-- **pytest** — 181 pruebas: 33 de reglas de negocio del motor (28 casos dorados de `MotorCubicacion3DTests.cs` + 5 de apilamiento multi-soporte) + **27 de paridad cross-motor** (los mismos casos, comparados contra la salida real del motor C#, no contra un valor transcrito a mano) + 4 de humo end-to-end de la API + 12 de regresión del worker (los 9 comandos por cola + el puente desde línea) + 4 del vigilante de timeouts + 2 del registro de algoritmos intercambiables + 2 de la alerta al equipo cuando un mensaje cae a `cubicacion.dlq` + **19 guardas de los 3 bugs de QA encontrados** (mensaje malformado que atascaba el worker, ítem sin SKU, borrado de plan optimizado) + **19 de la migración a SQL Server** (8 del esquema y la separación de los dos `MetaData` + 11 de la lectura del catálogo) + **39 del motor de selección de flota** (22 del algoritmo, 8 de DBLF y 9 del circuito completo contra SQLite)
+- **pytest** — 203 pruebas: 33 de reglas de negocio del motor (28 casos dorados de `MotorCubicacion3DTests.cs` + 5 de apilamiento multi-soporte) + **27 de paridad cross-motor** (los mismos casos, comparados contra la salida real del motor C#, no contra un valor transcrito a mano) + 4 de humo end-to-end de la API + 12 de regresión del worker (los 9 comandos por cola + el puente desde línea) + 4 del vigilante de timeouts + 2 del registro de algoritmos intercambiables + 2 de la alerta al equipo cuando un mensaje cae a `cubicacion.dlq` + **19 guardas de los 3 bugs de QA encontrados** (mensaje malformado que atascaba el worker, ítem sin SKU, borrado de plan optimizado) + **19 de la migración a SQL Server** (8 del esquema y la separación de los dos `MetaData` + 11 de la lectura del catálogo) + **39 del motor de selección de flota** (22 del algoritmo, 8 de DBLF y 9 del circuito completo contra SQLite) + **23 del contrato único** (19 de `POST /recomendaciones`, reconsulta, catálogos y llave por sistema de punta a punta por ASGI + 4 de la forma de los eventos de catálogo que consume NEXO)
 
 ## Estado actual (léelo antes de asumir que algo funciona)
 

@@ -132,17 +132,6 @@ async def test_flujo_completo_crear_optimizar(client, publisher_falso):
     assert r.json()["plan"]["estado"] == "ajustado"
 
 
-async def test_cubicacion_rapida(client):
-    r = await client.post(
-        "/api/cubicacion", headers=HEADERS,
-        json={"items": [{"descripcion": "Caja", "cantidad": 5, "largoCm": 100, "anchoCm": 100, "altoCm": 100, "pesoKg": 50}]},
-    )
-    assert r.status_code == 200, r.text
-    data = r.json()
-    assert len(data["matrices"]) == 9  # todo el catalogo evaluado
-    assert data["sugerencia"] is not None
-
-
 async def test_sin_api_key_es_rechazado(client):
     r = await client.get("/api/planes-cargue/vehiculos")
     assert r.status_code == 401

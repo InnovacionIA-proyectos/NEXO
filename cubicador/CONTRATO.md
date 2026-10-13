@@ -36,7 +36,7 @@ Ver sección 3 más abajo para el mensaje de entrada y los eventos
 de salida.
 
 **Única excepción, acotada a un solo endpoint**:
-`POST /api/cubicacion` (cubicación rápida, sin persistencia — sección 3.1).
+`POST /recomendaciones` (selección de flota — sección 3.1).
 Al no haber plan ni Id que guardar ni proyectar, no hay cola que lo procese
 ni proyección que lo sirva después — NEXO lo llama directo con el mismo
 Bearer de esta sección (`CUBICADOR_API_KEY`), guardado en su configuración
@@ -84,7 +84,9 @@ faltaban para completar esa migración, ya se agregaron 3 (`desde-linea/{id}`,
 servicio ya implementaba de punta a punta — solo faltaba que NEXO lo publicara
 en vez de que lo disparara el navegador. Los 20 de 20 ya tienen equivalente del lado NEXO: `POST /api/cubicacion` se
 resolvió como excepción HTTP declarada (sección 1.1), no como comando de
-cola — es la única de las 20 sin plan ni Id que persistir. Inventario 1 a 1
+cola — era la única de las 20 sin plan ni Id que persistir. **Ese endpoint se
+retiró en S5-HU-17.4**; lo reemplaza `POST /recomendaciones`, que sí persiste
+su corrida (sección 3.1). Inventario 1 a 1
 en `NEXO/docs/mensajeria/CUBICACION.md` §8.
 
 `CUBICADOR_API_KEY` (sección 4/5) sigue existiendo — protege la API para
@@ -115,7 +117,7 @@ público del portal mientras el navegador todavía llamaba directo.
   atributos Python en snake_case, JSON de la red en camelCase).
 - **Unidades**: milímetros y kilogramos en todo lo que toca el motor 3D
   (`/api/planes-cargue`: vehículos, ítems, colocaciones). El cubicador
-  rápido (`/api/cubicacion`) trabaja en **centímetros** — son dos sistemas
+  rápido, hoy `/recomendaciones`, trabaja en **centímetros** — son dos sistemas
   heredados de dos prototipos distintos, no se unifican (cambiaría
   comportamiento, no solo forma). ⚠️ Si tu integración toca ambos endpoints,
   no asumas la misma unidad en los dos.
@@ -129,86 +131,63 @@ público del portal mientras el navegador todavía llamaba directo.
 
 ## 3. API REST
 
-### 3.1 `/api/cubicacion` — cubicador rápido (sin persistencia salvo medidas estándar)
+### 3.1 `/recomendaciones` — selección de flota (S5-HU-17.4)
+
+**Reemplaza a `POST /api/cubicacion`, que se retiró en el mismo corte.** No hay
+endpoint de transición: NEXO y Cotifly apuntan acá desde el release que lo publica.
+
+La especificación completa —request, las tres formas de respuesta, la tabla de
+campos obligatorios y los códigos de error— está en la **sección 2 de
+[`docs/HOJA-DE-RUTA-CUBICADOR.md`](./docs/HOJA-DE-RUTA-CUBICADOR.md)**. Acá va lo
+operativo.
 
 | Método | Ruta | Body | Respuesta |
 |---|---|---|---|
-| POST | `/api/cubicacion` | `CubicacionRequestDto` | `CubicacionResponseDto` |
-| GET | `/api/cubicacion/unidades` | — | `UnidadCubicacionDto[]` |
-| GET | `/api/cubicacion/medidas-estandar` | — | `MedidasEstandarDto` |
-| PUT | `/api/cubicacion/medidas-estandar` | `MedidasEstandarDto` | `MedidasEstandarDto` |
+| POST | `/recomendaciones` | `CrearRecomendacionDto` | `RecomendacionDto` |
+| GET | `/recomendaciones?idLineaSolicitud=&origenSistema=` | — | `RecomendacionDto` |
+| GET | `/recomendaciones/{idRecomendacionVehiculo}/mercancias` | — | `MercanciaDeVehiculoDto[]` |
+| GET | `/tipos-mercancia` | — | `TipoMercanciaDto[]` |
+| GET | `/tipos-carroceria` | — | `TipoCarroceriaDto[]` |
+| GET | `/medidas-estandar` | — | `MedidasEstandarDto` |
+| PUT | `/medidas-estandar` | `MedidasEstandarDto` | `MedidasEstandarDto` |
 
-Límite: **10.000 bultos totales por request** (`application/cubicacion_rapida/casos_de_uso.py:12`) — por encima, `400 CUBICACION_DEMASIADO_GRANDE`.
+`/medidas-estandar` vivía bajo `/api/cubicacion`: se mudó sin cambios de
+comportamiento. Sigue siendo la única forma de editar los topes contra los que se
+detecta extradimensión, que el contrato devuelve en el bloque `extradimension`.
 
-DTOs reales (`api/dtos/cubicacion_rapida.py`):
+Límite: **10.000 unidades totales por request**
+(`application/recomendaciones/casos_de_uso.py`) — por encima,
+`400 CUBICACION_DEMASIADO_GRANDE`.
 
-```python
-class ItemCubicacionDto(ApiModel):
-    descripcion: str | None = None
-    cantidad: int = 1
-    largo_cm: float
-    ancho_cm: float
-    alto_cm: float
-    peso_kg: float | None = None
-    tipo_mercancia: str | None = None
+**Las mercancías viajan con id y código.** En el request va el `idTipoMercancia`
+que devolvió `GET /tipos-mercancia` (acordado con Cotifly el 2026-10-08, su
+HU-021.5). En la respuesta van **los dos**: el id es lo que Cotifly persiste y el
+código estable es lo que usa NEXO. Un uuid se acepta en cualquier caja —
+mayúsculas o minúsculas— porque es el mismo uuid.
 
-class CubicacionRequestDto(ApiModel):
-    items: list[ItemCubicacionDto]
-    unidad_ids: list[str] | None = None
-    clase_viaje: str | None = None
+**Los ids que devuelve este servicio vienen en MAYÚSCULAS.** SQL Server
+devuelve así las columnas `uniqueidentifier` y no es configurable; se generan ya
+en mayúsculas para que el id del POST y el de la reconsulta sean el mismo texto.
 
-class UnidadCubicacionDto(ApiModel):
-    id: str
-    nombre: str
-    geometria: str
-    control_ambiental: str
-    largo_util_m: float
-    ancho_util_m: float
-    alto_util_m: float
-    peso_bruto_permitido_kg: float
-    peso_vacio_kg: float
-    capacidad_por_eje_kg: list[float]
-    config_vehiculo: str | None
-    carroceria: str | None
-    clase_viaje: str | None
-    clase_contenedor: str | None
+**Lo que antes era error ahora es resultado.** `SIN_SELECCION_AUTOMATICA`,
+`condicionada` y `extradimension` vuelven con **200**, dentro de `resultado`. Los
+códigos de error quedan solo para fallos reales: `MERCANCIAS_REQUERIDAS`,
+`MERCANCIA_DESCONOCIDA`, `MERCANCIA_NO_CUBICABLE`, `DIMENSIONES_INVALIDAS` (400),
+`NO_AUTORIZADO` (401) y `CUBICADOR_NO_DISPONIBLE` (503).
 
-class MedidasEstandarDto(ApiModel):
-    largo_max_cm: float
-    ancho_max_cm: float
-    alto_max_cm: float
-    peso_max_kg: float
+Valores de `motivoSinSeleccion`: `EXTRADIMENSIONADO`,
+`SIN_CANDIDATOS_DIMENSIONALES`, `SUPERA_K_MAX`, `SIN_CARROCERIA_COMPATIBLE`.
 
-class CubicacionResponseDto(ApiModel):
-    matrices: list[MatrizCubicacionDto]        # una fila por unidad evaluada
-    sugerencia: SugerenciaVehiculoDto | None    # mejor unidad para UN vehículo
-    advertencias: list[str]
-    sugerencia_flota: SugerenciaFlotaDto | None = None   # si necesita varios vehículos
-    extradimension: DeteccionExtradimensionDto | None = None
+**La reconsulta exige `origenSistema` en la query**, no lo toma de la llave: un
+sistema puede necesitar leer lo que recomendó el otro, y un mismo código de línea
+puede existir en los dos. Devuelve la **última** corrida de esa línea.
 
-class MatrizCubicacionDto(ApiModel):
-    unidad: UnidadCubicacionDto
-    criterios: list[CriterioCubicacionDto]      # {criterio, resultado, detalle, criticidad}
-    banda: str
-    advertencias: list[str]
-    disposicion: DisposicionDto | None          # colocaciones + peso + centro de gravedad
+**Append-only**: recalcular una ruta crea una corrida nueva. La anterior queda
+intacta, y el `idRecomendacionVehiculo` que un consumidor guardó sigue
+devolviendo lo mismo.
 
-class SugerenciaVehiculoDto(ApiModel):
-    unidad_id: str
-    unidad_nombre: str
-    banda: str
-    factor_utilizacion: float
-    config_vehiculo: str | None
-    carroceria: str | None
-    clase_viaje: str | None
-    clase_contenedor: str | None
-
-class DeteccionExtradimensionDto(ApiModel):
-    hay_extradimension: bool
-    medidas_estandar: MedidasEstandarDto
-    piezas: list[PiezaExcedidaDto]              # {descripcion, excesos, largo_cm, ancho_cm, alto_cm, peso_kg}
-    sugerencia: str | None
-```
+DTOs reales en `api/dtos/recomendaciones.py` y `api/dtos/catalogo.py`; el esquema
+completo, en `docs/openapi.json` (lo regenera `scripts/generar_openapi.py`).
 
 ### 3.2 `/api/planes-cargue` — motor 3D (con persistencia)
 
@@ -542,15 +521,24 @@ Header en **todas** las llamadas, en ambas direcciones:
 Authorization: Bearer <secreto correspondiente>
 ```
 
-- Consumidores server-to-server → este servicio: valida contra
-  `CUBICADOR_API_KEY` (`api/dependencias.py:verificar_api_key`). **NEXO SÍ es
-  uno de estos consumidores, pero solo para un endpoint** (`POST
-  /api/cubicacion`, sección 1.1) — todo lo demás sigue siendo solo por
-  colas. NEXO guarda este mismo valor como `Cubicador3D__OutboundApiKey`.
-  Los otros consumidores son CI/scripts de verificación manual;
-  anteriormente también la usaba el navegador vía CORS — ya cerrado, y
-  la clave fue rotada porque ese valor estuvo
-  expuesto en el bundle público del portal.
+- **Una llave POR SISTEMA para `/recomendaciones`** (S5-HU-17.4):
+  `CUBICADOR_API_KEY_NEXO` y `CUBICADOR_API_KEY_COTIFLY`
+  (`api/dependencias.py:verificar_origen_sistema`). De ahí sale el
+  `origenSistema` **verificado**, en vez de creerle al cuerpo de la petición:
+  quien tiene la llave de Cotifly es Cotifly. Si el cuerpo declara un
+  `origenSistema` que no corresponde a la llave, **401**. La de Cotifly la
+  genera Cotifly y solo tiene que ser distinta de la de NEXO.
+- Consumidores server-to-server → el resto del servicio
+  (`/api/planes-cargue`, catálogos, medidas estándar): valida contra
+  `CUBICADOR_API_KEY`, o contra cualquiera de las dos de arriba
+  (`api/dependencias.py:verificar_api_key`). NEXO guarda este valor como
+  `Cubicador3D__OutboundApiKey`. Los otros consumidores son CI/scripts de
+  verificación manual; anteriormente también la usaba el navegador vía CORS —
+  ya cerrado, y la clave fue rotada porque ese valor estuvo expuesto en el
+  bundle público del portal.
+- **La llave genérica NO sirve para `/recomendaciones`**: identifica al
+  servicio, no a un sistema, y una recomendación tiene que saber de quién
+  viene para poder reconsultarla después.
 - Este servicio → NEXO (llamada de `crear_desde_linea`, ver sección 7): NEXO
   valida contra `Cubicador3D__InboundApiKey`
   (`CubicadorApiKeyAuthenticationHandler`, esquema `CubicadorApiKey` aparte

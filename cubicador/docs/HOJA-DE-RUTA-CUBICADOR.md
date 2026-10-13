@@ -73,7 +73,7 @@ release que lo publica.
   "usuarioId": "1042",
   "mercancias": [
     {
-      "codigoMercancia": "BEBIDAS",
+      "idTipoMercancia": "2B213679-A42E-5E30-A6AF-E3A4FB42BD92",
       "cantidad": 1200,
       "largoCm": 50,
       "anchoCm": 40,
@@ -90,16 +90,16 @@ release que lo publica.
 | `origenSistema` | enum `NEXO` / `COTIFLY` | sí | Se valida contra la llave: si no coincide, 401 |
 | `claseViajeSeleccionada` | string | no | **Preferencia, no filtro.** El motor corre completo y da su mejor respuesta; si no coincide con lo que el usuario marcó, lo dice en `advertencias[]`. No hay campo dedicado: se evaluó y ningún consumidor lo necesita — el portal deja de escribir la clase de viaje al formulario, así que no queda quién lo lea |
 | `usuarioId` | string | no | Dato declarado por el llamante, para auditoría. El Cubicador no lo verifica |
-| `mercancias[].codigoMercancia` | string | sí | Código estable del catálogo (`BEBIDAS`), **no el uuid** |
+| `mercancias[].idTipoMercancia` | string | sí | El **id** que devolvió `GET /tipos-mercancia`. Acordado con Cotifly el 2026-10-08 (su HU-021.5); reemplaza al `codigoMercancia` que proponía la primera versión de esta hoja. Se acepta en cualquier caja: es el mismo uuid |
 | `mercancias[].cantidad` | entero ≥ 1 | sí | |
 | `mercancias[].largoCm` / `anchoCm` / `altoCm` | decimal > 0 | sí | |
 | `mercancias[].pesoKg` | decimal > 0 | sí | Por unidad, no total |
 
-> **Punto a confirmar con Cotifly.** Su documento dice *"en `POST /recomendaciones`
-> mandamos el id"*. El contrato lleva el **código**: es estable, sobrevive una resiembra,
-> es legible en un log y es coherente con que `codigoVehiculo` ya sea la identidad en el
-> cable. Cotifly sigue persistiendo el uuid internamente si quiere; solo cambia lo que
-> manda. Para ellos es una línea.
+> **Cerrado el 2026-10-08.** La primera versión de esta hoja proponía mandar el **código**
+> y dejaba el punto por confirmar con Cotifly. Se adoptó lo de ellos: en el request viaja
+> el **id**. A cambio, la **respuesta lleva los dos** —`idTipoMercancia` y
+> `codigoMercancia`, igual que `GET /tipos-mercancia`—, así que nadie tiene que resolver el
+> otro por su cuenta: Cotifly persiste el id y NEXO usa el código estable (S5-HU-18.2).
 
 ### 2.3 Respuesta — caso asignado
 
@@ -126,7 +126,7 @@ release que lo publica.
       "alertaBajoLlenado": false,
       "heterogenea": false,
       "mercancias": [
-        { "codigoMercancia": "BEBIDAS", "cantidad": 421, "pesoKg": 8420.0, "volumenM3": 33.68 }
+        { "idTipoMercancia": "2B213679-...", "codigoMercancia": "BEBIDAS", "cantidad": 421, "pesoKg": 8420.0, "volumenM3": 33.68 }
       ]
     },
     {
@@ -142,7 +142,7 @@ release que lo publica.
       "alertaBajoLlenado": false,
       "heterogenea": false,
       "mercancias": [
-        { "codigoMercancia": "BEBIDAS", "cantidad": 779, "pesoKg": 15580.0, "volumenM3": 62.32 }
+        { "idTipoMercancia": "2B213679-...", "codigoMercancia": "BEBIDAS", "cantidad": 779, "pesoKg": 15580.0, "volumenM3": 62.32 }
       ]
     }
   ],
@@ -184,7 +184,7 @@ vez de aceptar un `null` silencioso. Es la misma clase de fallo que describe la 
     "hayExtradimension": true,
     "medidasEstandar": { "largoMaxCm": 1220, "anchoMaxCm": 260, "altoMaxCm": 300, "pesoMaxKg": 34000 },
     "piezas": [
-      { "codigoMercancia": "VIGAS_ESTRUCTURAS", "excesos": ["largo 1400.0 cm > 1220.0 cm"] }
+      { "idTipoMercancia": "9F2C...", "codigoMercancia": "VIGAS_ESTRUCTURAS", "excesos": ["largo 1400.0 cm > 1220.0 cm"] }
     ]
   }
 }

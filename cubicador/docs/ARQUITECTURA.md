@@ -42,9 +42,13 @@ cubicador/
     cubicacion_rapida/
       casos_de_uso.py         # evaluar_cubicacion, catalogo_unidades, medidas_estandar
     recomendaciones/
-      casos_de_uso.py          # recomendar_flota (S5-HU-17.3): resuelve los codigos
+      casos_de_uso.py          # recomendar_flota (S5-HU-17.3): resuelve las mercancias
                                 # contra el catalogo de base y corre el motor. Es la
                                 # unica pieza que toca el puerto y el dominio a la vez.
+                                # crear_recomendacion agrega la persistencia append-only
+                                # y la reconsulta (S5-HU-17.4).
+    parametros/
+      casos_de_uso.py           # medidas estandar (venian de cubicacion_rapida/)
     plan_cargue/
       mapeos.py                # traduce entidades <-> tipos del motor (clave "id#indice")
       vehiculos.py              # guardar/eliminar/listar vehiculos + presets
@@ -68,6 +72,7 @@ cubicador/
                                    # Cubicador no las crea ni las altera.
       repositorios/               # implementan los Ports de persistencia
         catalogo_repo.py           # SqlCatalogoRepository: lee el catalogo entero
+        recomendacion_repo.py       # append-only: solo INSERT y SELECT, ni un UPDATE
     mensajeria/
       rabbitmq.py                 # implementa IEventosPort con aio-pika
     clientes/
@@ -76,11 +81,13 @@ cubicador/
     dependencias.py               # inyeccion de dependencias FastAPI (equivalente a Program.cs)
     dtos/
       comun.py                     # ApiModel base (camelCase)
-      cubicacion_rapida.py          # DTOs de /api/cubicacion
-      plan_cargue.py                 # DTOs de /api/planes-cargue
+      recomendaciones.py            # DTOs del contrato unico (S5-HU-17.4)
+      catalogo.py                    # DTOs de /tipos-mercancia y /tipos-carroceria
+      plan_cargue.py                  # DTOs de /api/planes-cargue
     routers/
-      cubicacion.py                  # FastAPI router: /api/cubicacion
-      planes_cargue.py                # FastAPI router: /api/planes-cargue
+      recomendaciones.py             # POST /recomendaciones + reconsulta
+      catalogo.py                     # catalogos publicos y /medidas-estandar
+      planes_cargue.py                 # FastAPI router: /api/planes-cargue
     main.py                          # app FastAPI, manejo de excepciones, healthcheck
   worker/
     main.py                          # consumidor RabbitMQ (optimizar/crear_desde_linea)
@@ -93,6 +100,12 @@ scripts/
   verificar_mapeo_catalogo.py          # compara modelos_catalogo.py contra sys.columns
                                         # del esquema REAL. Las pruebas corren contra
                                         # SQLite y no pueden ver esa divergencia.
+  generar_openapi.py                    # regenera docs/openapi.json (--verificar para CI)
+  verificar_contrato.py                  # los criterios del contrato contra el servicio
+                                          # corriendo, por HTTP: campos obligatorios,
+                                          # origen verificado, append-only, 200 vs error
+  preparar_catalogo_local.py              # crea y siembra el catalogo en la base LOCAL
+                                          # (se niega a correr contra un host remoto)
   verificar_integracion_mssql.py        # humo end-to-end contra SQL Server real
   verificar_aislamiento.sql              # confirma que no tocamos dbo ni dbo_cotifly
 docs/Database/ESQUEMA_CUBICADOR.sql   # DDL del motor 3D, fuente de verdad, se aplica a mano
