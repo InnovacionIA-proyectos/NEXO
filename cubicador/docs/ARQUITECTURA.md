@@ -24,6 +24,10 @@ cubicador/
       entidades.py            # VehiculoCubicacion, PlanCargue, ItemPlanCargue,
                                # ColocacionCargue, ParametrosCubicacion - dataclasses
                                # puras, sin ORM.
+      catalogo.py              # Catalogo, Vehiculo, Carroceria, TipoMercancia,
+                               # ReglaIncompatibilidad, ParametrosMotor (S5-HU-17.2):
+                               # el catalogo que administra el equipo de Datos, ya
+                               # resuelto en memoria. Dataclasses frozen.
   application/
     excepciones.py            # AppException y subtipos (equivalente a NEXO)
     cubicacion_rapida/
@@ -39,13 +43,18 @@ cubicador/
       desde_linea.py              # crear_plan_desde_linea (cascada de flota, llama a NEXO)
       resultado.py                 # obtener_resultado (arma plan+vehiculo+colocaciones+metricas)
     ports/
-      repositorios.py           # Protocols: IVehiculoCubicacionRepository, IPlanCargueRepository...
+      repositorios.py           # Protocols: IVehiculoCubicacionRepository, IPlanCargueRepository,
+                                 # ICatalogoRepository (solo lectura, un metodo: cargar())...
       externos.py                # Protocols: ILineaSolicitudPort (NEXO), IEventosPort (RabbitMQ)
   infrastructure/
     persistence/
-      db.py                     # engine/sesion SQLAlchemy async
-      modelos.py                 # tablas SQLAlchemy (mismos nombres que NEXO/cabinaFletes)
+      db.py                     # engine/sesion SQLAlchemy async (esquema dbo_cubicador)
+      modelos.py                 # las 5 tablas del motor 3D - DDL en docs/Database/
+      modelos_catalogo.py         # las 10 tablas del catalogo (S5-HU-17.2). MetaData
+                                   # PROPIO: las administra el equipo de Datos, el
+                                   # Cubicador no las crea ni las altera.
       repositorios/               # implementan los Ports de persistencia
+        catalogo_repo.py           # SqlCatalogoRepository: lee el catalogo entero
     mensajeria/
       rabbitmq.py                 # implementa IEventosPort con aio-pika
     clientes/
@@ -66,8 +75,14 @@ tests/
   domain/                            # 33 pytest - las 31 reglas de testDocumentation/REGLAS_DE_NEGOCIO.md
   api/
     test_smoke.py                    # flujo end-to-end contra SQLite
-alembic/                              # migraciones de esquema (reemplaza a create_all)
-alembic.ini                           # la URL sale del entorno, no de aqui
+scripts/
+  aplicar_sql.py                      # aplica los .sql de docs/Database/ (corta por GO)
+  verificar_mapeo_catalogo.py          # compara modelos_catalogo.py contra sys.columns
+                                        # del esquema REAL. Las pruebas corren contra
+                                        # SQLite y no pueden ver esa divergencia.
+  verificar_integracion_mssql.py        # humo end-to-end contra SQL Server real
+  verificar_aislamiento.sql              # confirma que no tocamos dbo ni dbo_cotifly
+docs/Database/ESQUEMA_CUBICADOR.sql   # DDL del motor 3D, fuente de verdad, se aplica a mano
 docker-compose.yml                    # api + worker + SQL Server local (RabbitMQ es el compartido de NEXO, ver DECISIONES_TECNICAS.md #9)
 ```
 

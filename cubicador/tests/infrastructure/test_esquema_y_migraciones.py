@@ -1,15 +1,13 @@
-"""S5-HU-17.1: las dos piezas de la migracion a SQL Server que, si se rompen,
-no fallan — hacen algo peor en silencio.
+"""S5-HU-17.1/17.2: el esquema del `MetaData`, que si se rompe no falla —
+hace algo peor en silencio.
 
-1. El esquema del `MetaData`. Tiene que estar puesto contra SQL Server (si no,
-   las tablas caen en `dbo`, compartido con Cotifly) y tiene que estar en None
-   contra SQLite (que no soporta esquemas: declararlo rompe toda la suite).
+Tiene que estar puesto contra SQL Server (si no, las tablas caen en `dbo`,
+compartido con Cotifly) y tiene que estar en None contra SQLite, que no
+soporta esquemas: declararlo ahi rompe toda la suite.
 
-2. El `include_object` de alembic. Las 9 tablas que el equipo creo y sembro a
-   mano viven en el mismo esquema pero alembic no las conoce. Sin el filtro, un
-   `--autogenerate` propone `op.drop_table` para las 9 — con datos reales
-   adentro. Esta prueba existe para que sacar una de la lista, o romper el
-   filtro, se note aca y no en produccion.
+Y los modelos del catalogo tienen que mantener su `MetaData` propio, separado
+del de `modelos.py`: son dos juegos de tablas con dueños distintos, y
+compartirlo haria que un `create_all` las tratara igual.
 """
 
 from __future__ import annotations
@@ -69,8 +67,9 @@ def test_sqlserver_cae_a_dbo_cubicador_por_defecto(monkeypatch):
 
 
 def test_crear_tablas_no_hace_nada_contra_sqlserver(monkeypatch):
-    """`create_all` contra SQL Server dejaria tablas sin sello de alembic, y el
-    `upgrade head` siguiente fallaria al crear lo que ya existe."""
+    """El esquema de SQL Server lo gobiernan los scripts de `docs/Database/`:
+    `create_all` ahi crearia tablas fuera de esa fuente de verdad, en un
+    esquema que ademas se comparte con Cotifly."""
     import asyncio
 
     db = _recargar_db(
@@ -81,65 +80,38 @@ def test_crear_tablas_no_hace_nada_contra_sqlserver(monkeypatch):
     asyncio.run(db.crear_tablas())
 
 
-# --- 2. El filtro que protege las tablas del equipo ------------------------
+# --- 2. Los modelos del catalogo (S5-HU-17.2) ------------------------------
 
-# Creadas y sembradas a mano por el equipo en dbo_cubicador (ver comentario de
-# la issue #266). Alembic no las gobierna y no debe tocarlas.
-TABLAS_DEL_EQUIPO = [
-    "categoriaMercancia",
-    "parametrosMotor",
-    "recomendacionVehiculo",
-    "recomendacionVehiculoMercancia",
-    "reglasIncompatibilidad",
-    "relacionVehiculosCarroceria",
-    "TiposCarroceria",
-    "tiposMercancia",
-    "vehiculos",
-]
+def test_los_modelos_del_catalogo_tienen_metadata_propio():
+    """Si compartieran el `MetaData` de `modelos.py`, un `create_all` trataria
+    igual a las 5 tablas del motor 3D y a las 10 del catalogo, que tienen
+    dueños distintos: las del catalogo las administra el equipo de Datos."""
+    from infrastructure.persistence import modelos_catalogo as mc
+    from infrastructure.persistence.db import Base
 
-# Las 5 del motor 3D, que alembic SI gobierna.
-TABLAS_PROPIAS = [
-    "vehiculos_cubicacion",
-    "planes_cargue",
-    "items_plan_cargue",
-    "colocaciones_cargue",
-    "parametros_cubicacion",
-]
+    assert mc.BaseCatalogo.metadata is not Base.metadata
+    assert len(mc.BaseCatalogo.metadata.tables) == 10
 
 
-def _include_object():
-    sys.path.insert(0, os.path.join(RAIZ, "alembic"))
-    try:
-        from alembic import context  # noqa: F401
-    except ImportError:  # pragma: no cover
-        pytest.skip("alembic no instalado")
-    # env.py corre migraciones al importarse, asi que se lee el filtro del
-    # fuente en vez de importarlo.
-    ruta = os.path.join(RAIZ, "alembic", "env.py")
-    espacio: dict = {}
-    with open(ruta, encoding="utf-8") as f:
-        fuente = f.read()
-    ini = fuente.index("TABLAS_EXTERNAS")
-    fin = fuente.index("def _opciones_comunes")
-    exec(compile(fuente[ini:fin], ruta, "exec"), espacio)  # noqa: S102
-    return espacio["include_object"], espacio["TABLAS_EXTERNAS"]
+def test_el_catalogo_mapea_las_diez_tablas_con_sus_nombres_reales():
+    """El esquema usa camelCase para las tablas, con `TiposCarroceria` como
+    unica PascalCase. Renombrarlas en el modelo las desconectaria de la base."""
+    from infrastructure.persistence import modelos_catalogo as mc
+
+    nombres = {t.split(".")[-1] for t in mc.BaseCatalogo.metadata.tables}
+    assert nombres == {
+        "vehiculos", "TiposCarroceria", "relacionVehiculosCarroceria",
+        "categoriaMercancia", "tiposMercancia", "reglasIncompatibilidad",
+        "parametrosMotor", "recomendaciones", "recomendacionVehiculo",
+        "recomendacionVehiculoMercancia",
+    }
 
 
-@pytest.mark.parametrize("tabla", TABLAS_DEL_EQUIPO)
-def test_el_autogenerado_no_toca_las_tablas_del_equipo(tabla):
-    include_object, externas = _include_object()
-    assert tabla in externas, f"{tabla} salio de TABLAS_EXTERNAS: alembic la borraria"
-    assert include_object(None, tabla, "table", True, None) is False
+def test_el_alto_util_apunta_a_la_columna_con_nombre_enganoso():
+    """`AlturaMaximaReglamentariaCm` dice "maxima reglamentaria" y su default es
+    440 (el tope legal), pero guarda el alto UTIL: 230 para el Turbo, 260 para
+    la tractomula. El atributo de Python se llama como lo que contiene."""
+    from infrastructure.persistence import modelos_catalogo as mc
 
-
-@pytest.mark.parametrize("tabla", TABLAS_PROPIAS)
-def test_el_autogenerado_si_gobierna_las_tablas_del_motor_3d(tabla):
-    include_object, _ = _include_object()
-    assert include_object(None, tabla, "table", True, None) is True
-
-
-def test_la_lista_de_externas_son_exactamente_nueve():
-    """Si aparece una decima tabla sembrada a mano, hay que agregarla aqui a
-    conciencia, no que se cuele sin que nadie lo note."""
-    _, externas = _include_object()
-    assert externas == set(TABLAS_DEL_EQUIPO)
+    col = mc.Vehiculo.__table__.columns["AlturaMaximaReglamentariaCm"]
+    assert mc.Vehiculo.alto_util_cm.property.columns[0] is col

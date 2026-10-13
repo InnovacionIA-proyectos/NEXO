@@ -46,8 +46,8 @@ GROUP BY s.name
 ORDER BY s.name;
 
 -- 4 ------------------------------------------------------------------------
--- Permisos efectivos sobre la base actual. Hacen falta los de DDL para que
--- Alembic pueda crear y alterar tablas.
+-- Permisos efectivos sobre la base actual. Hacen falta los de DDL para
+-- aplicar los scripts de docs/Database/ (crean y alteran tablas).
 SELECT
     permission_name          AS permiso,
     'presente'               AS estado
@@ -57,7 +57,7 @@ ORDER BY permission_name;
 
 -- 5 ------------------------------------------------------------------------
 -- Si `dbo_cubicador` ya tiene tablas, cuáles son. En una base limpia esto
--- devuelve cero filas: es lo esperado antes de correr la primera migración.
+-- devuelve cero filas: es lo esperado antes de aplicar ESQUEMA_CUBICADOR.sql.
 SELECT
     t.name                   AS tabla,
     (SELECT COUNT(*) FROM sys.columns c WHERE c.object_id = t.object_id) AS columnas

@@ -14,6 +14,7 @@ from application.ports.externos import ILineaSolicitudPort
 from infrastructure.clientes.nexo_client import NexoLineaSolicitudClient
 from infrastructure.mensajeria.rabbitmq import RabbitMqEventosPublisher
 from infrastructure.persistence.db import obtener_sesion
+from infrastructure.persistence.repositorios.catalogo_repo import SqlCatalogoRepository
 from infrastructure.persistence.repositorios.parametros_repo import SqlParametrosCubicacionRepository
 from infrastructure.persistence.repositorios.plan_cargue_repo import SqlPlanCargueRepository
 from infrastructure.persistence.repositorios.vehiculo_repo import SqlVehiculoCubicacionRepository
@@ -86,6 +87,11 @@ def obtener_plan_repo(sesion: AsyncSession = Depends(obtener_db)) -> SqlPlanCarg
 
 def obtener_parametros_repo(sesion: AsyncSession = Depends(obtener_db)) -> SqlParametrosCubicacionRepository:
     return SqlParametrosCubicacionRepository(sesion)
+
+
+def obtener_catalogo_repo(sesion: AsyncSession = Depends(obtener_db)) -> SqlCatalogoRepository:
+    # Solo lectura: el catalogo lo administra el equipo de Datos (S5-HU-17.2).
+    return SqlCatalogoRepository(sesion)
 
 
 def obtener_linea_solicitud_port() -> ILineaSolicitudPort:

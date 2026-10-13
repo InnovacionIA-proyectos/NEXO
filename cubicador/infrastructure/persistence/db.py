@@ -31,8 +31,8 @@ DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite+aiosqlite:///./cubicador.d
 _es_sqlite = DATABASE_URL.startswith("sqlite")
 _es_mssql = DATABASE_URL.startswith("mssql")
 
-# Esquema de TODAS las tablas del Cubicador, incluida la `alembic_version` (ver
-# alembic/env.py). Sin esto caerian en `dbo`, que esta compartido con Cotifly.
+# Esquema de TODAS las tablas del Cubicador. Sin esto caerian en `dbo`, que
+# esta compartido con Cotifly.
 #
 # Queda en None fuera de SQL Server: SQLite no soporta esquemas y un
 # `MetaData(schema=...)` ahi hace fallar cualquier consulta de la suite.
@@ -58,18 +58,19 @@ class Base(DeclarativeBase):
 async def crear_tablas() -> None:
     """Crea las tablas que falten. SOLO para SQLite (pruebas y arranque local).
 
-    Contra SQL Server no hace nada a proposito: el esquema lo gobierna alembic
-    (`alembic upgrade head`). Dejar que `create_all` corra ahi al arrancar es
-    activamente danino, no solo inutil:
+    Contra SQL Server no hace nada a proposito: el esquema lo gobiernan los
+    scripts de `docs/Database/` (ver ESQUEMA_CUBICADOR.sql), que son la fuente
+    de verdad y se aplican con `scripts/aplicar_sql.py`. Dejar que `create_all`
+    corra ahi al arrancar seria danino, no solo inutil:
 
     - `create_all` crea tablas nuevas pero NUNCA altera una existente, asi que
       una columna agregada al modelo despues del primer arranque se ignora en
       silencio.
-    - Peor: contra una base vacia crearia las 5 tablas SIN dejar sello en
-      `alembic_version`, y el `alembic upgrade head` siguiente fallaria al
-      intentar crear lo que ya existe. Las dos herramientas se pisan.
+    - El esquema `dbo_cubicador` se comparte con Cotifly dentro de la misma
+      base: lo que toca la estructura se revisa y se aplica a mano, no en el
+      arranque de un contenedor.
 
-    Las pruebas corren contra SQLite en memoria y no tienen alembic de por
+    Las pruebas corren contra SQLite en memoria, donde no hay scripts de por
     medio, asi que ahi sigue siendo la forma correcta de armar el esquema.
     """
     if _es_mssql:

@@ -33,17 +33,22 @@ BEGIN
         -- ASIGNADO | SIN_SELECCION_AUTOMATICA
         Resultado           NVARCHAR(30)   COLLATE Modern_Spanish_CI_AS NOT NULL,
         -- EXTRADIMENSIONADO | SIN_CANDIDATOS_DIMENSIONALES | SUPERA_K_MAX |
-        -- SIN_CARROCERIA_COMPATIBLE. Null cuando Resultado = ASIGNADO.
-        MotivoSinSeleccion  NVARCHAR(500)  COLLATE Modern_Spanish_CI_AS NULL,
+        -- SIN_CARROCERIA_COMPATIBLE. 'NINGUNO' cuando Resultado = ASIGNADO:
+        -- se evita NULL para no manejar un tercer estado, mismo criterio que
+        -- `ControlAmbientalRequerido` en el resto del esquema.
+        MotivoSinSeleccion  NVARCHAR(500)  COLLATE Modern_Spanish_CI_AS NOT NULL
+                            CONSTRAINT DF_recomendaciones_MotivoSinSeleccion DEFAULT (N'NINGUNO'),
         -- Marca, no flujo de aprobación: la solicitud viaja completa igual.
         Condicionada        BIT NOT NULL
                             CONSTRAINT DF_recomendaciones_Condicionada DEFAULT ((0)),
         -- JSON. `advertencias[]` del contrato, incluida la de clase de viaje
         -- que no coincide con la que marcó el usuario.
-        AdvertenciasJson    NVARCHAR(MAX)  COLLATE Modern_Spanish_CI_AS NULL,
+        AdvertenciasJson    NVARCHAR(MAX)  COLLATE Modern_Spanish_CI_AS NOT NULL
+                            CONSTRAINT DF_recomendaciones_AdvertenciasJson DEFAULT (N'[]'),
         -- JSON. El objeto `extradimension` del contrato: medidas estándar y
         -- las piezas que las exceden, con su motivo.
-        ExtradimensionJson  NVARCHAR(MAX)  COLLATE Modern_Spanish_CI_AS NULL,
+        ExtradimensionJson  NVARCHAR(MAX)  COLLATE Modern_Spanish_CI_AS NOT NULL
+                            CONSTRAINT DF_recomendaciones_ExtradimensionJson DEFAULT (N'{}'),
         CreadoPor           NVARCHAR(100)  COLLATE Modern_Spanish_CI_AS NOT NULL,
         CreatedAt           DATETIMEOFFSET NOT NULL
                             CONSTRAINT DF_recomendaciones_CreatedAt DEFAULT (sysdatetimeoffset()),
@@ -76,7 +81,7 @@ GO
 IF COL_LENGTH('dbo_cubicador.recomendacionVehiculo', 'IdRecomendacion') IS NULL
 BEGIN
     ALTER TABLE dbo_cubicador.recomendacionVehiculo
-        ADD IdRecomendacion UNIQUEIDENTIFIER NULL;
+        ADD IdRecomendacion UNIQUEIDENTIFIER NOT NULL;
 END;
 GO
 
@@ -99,8 +104,8 @@ GO
 IF COL_LENGTH('dbo_cubicador.recomendacionVehiculo', 'PorcentajeLlenadoVolumen') IS NULL
 BEGIN
     ALTER TABLE dbo_cubicador.recomendacionVehiculo
-        ADD PorcentajeLlenadoVolumen DECIMAL(5,2) NULL,
-            PorcentajeLlenadoPeso    DECIMAL(5,2) NULL;
+        ADD PorcentajeLlenadoVolumen DECIMAL(5,2) NOT NULL,
+            PorcentajeLlenadoPeso    DECIMAL(5,2) NOT NULL;
 END;
 GO
 
@@ -110,9 +115,9 @@ GO
 IF COL_LENGTH('dbo_cubicador.recomendacionVehiculo', 'PesoTotalKg') IS NULL
 BEGIN
     ALTER TABLE dbo_cubicador.recomendacionVehiculo
-        ADD PesoTotalKg    DECIMAL(18,2) NULL,
-            VolumenTotalM3 DECIMAL(18,3) NULL,
-            NumeroVehiculo INT           NULL;
+        ADD PesoTotalKg    DECIMAL(18,2) NOT NULL,
+            VolumenTotalM3 DECIMAL(18,3) NOT NULL,
+            NumeroVehiculo INT           NOT NULL;
 END;
 GO
 
@@ -128,39 +133,16 @@ GO
 
 
 -- -----------------------------------------------------------------------------
--- PUNTO 5 — Los 10 tipos de mercancía excluidos (`Cubicable = 0`)
+-- PUNTO 5 — Los 10 tipos excluidos: NO se siembran
 -- -----------------------------------------------------------------------------
--- Hoy las 31 filas tienen Cubicable = 1, porque el default de esa columna es
--- ((1)) y se insertaron sin especificarla. Sin estos 10, el motor no puede
--- distinguir "no conozco este tipo" de "este tipo no se cubica", y quien
--- capture "cemento a granel" recibe una recomendación inventada en vez de un
--- rechazo con motivo.
+-- Decision del equipo de Datos (issue #267): `tiposMercancia` se queda con las
+-- 31 filas reales de la matriz. Si alguna vez hace falta rechazar graneles,
+-- cemento o combustibles con motivo, entran por CRUD cuando se necesiten, no
+-- desde el seeder inicial.
 --
--- Salen de la hoja "Alcance y exclusiones" del Excel de Operaciones.
--- Van a GENERAL: la categoría no importa para algo que no se cubica.
-INSERT INTO dbo_cubicador.tiposMercancia
-    (CodigoMercancia, NombreMercancia, IdCategoria, Cubicable,
-     CondicionadaCubicacion, ComentarioCondicion, CarroceriaSecundariaCondicionada,
-     ControlAmbientalRequerido, Apilable, Fragil, RotacionLibre, Activo, CreadoPor)
-SELECT v.Codigo, v.Nombre,
-       (SELECT TOP 1 Id FROM dbo_cubicador.categoriaMercancia WHERE NombreCategoria = 'GENERAL'),
-       0, 0, v.Motivo, 0, 'NINGUNO', 0, 0, 0, 1, 'S5-HU-17.2'
-FROM (VALUES
-    ('GRANEL_SOLIDO',        'Granel sólido',                'No se cubica: carga a granel, sin unidades discretas'),
-    ('GRANEL_LIQUIDO',       'Granel líquido',               'No se cubica: requiere tanque, se mide por volumen del vehículo'),
-    ('COMBUSTIBLES',         'Combustibles',                 'Fuera de alcance: transporte especializado'),
-    ('QUIMICOS_GRANEL',      'Químicos a granel',            'Fuera de alcance: transporte especializado'),
-    ('CEMENTO_GRANEL',       'Cemento a granel',             'No se cubica: granel, requiere tolva'),
-    ('CONCRETO',             'Concreto',                     'No se cubica: requiere mixer'),
-    ('RESIDUOS',             'Residuos',                     'Fuera de alcance'),
-    ('ASFALTO',              'Asfalto',                      'No se cubica: requiere equipo especializado'),
-    ('VEHICULOS_UNIDAD',     'Vehículos como unidad',        'No se cubica: requiere niñera, se cuenta por unidad'),
-    ('INGENIERIA_ESPECIAL',  'Carga de ingeniería especial', 'Fuera de alcance: estudio caso por caso')
-) AS v(Codigo, Nombre, Motivo)
-WHERE NOT EXISTS (
-    SELECT 1 FROM dbo_cubicador.tiposMercancia m WHERE m.CodigoMercancia = v.Codigo
-);
-GO
+-- Consecuencia a tener presente al escribir el motor: sin esas filas, un codigo
+-- de mercancia desconocido y uno no cubicable son el mismo caso. "Cemento a
+-- granel" no existe en el catalogo, asi que se rechaza por desconocido.
 
 
 -- -----------------------------------------------------------------------------
@@ -176,6 +158,5 @@ SELECT 'columnas nuevas en recomendacionVehiculo',
            AND name IN ('IdRecomendacion','PorcentajeLlenadoVolumen','PorcentajeLlenadoPeso',
                         'PesoTotalKg','VolumenTotalM3','NumeroVehiculo'))
 UNION ALL
-SELECT 'mercancias no cubicables',
-       (SELECT COUNT(*) FROM dbo_cubicador.tiposMercancia WHERE Cubicable = 0);
--- Esperado: 10 tablas, 6 columnas nuevas, 10 mercancías no cubicables.
+SELECT 'tipos de mercancia', (SELECT COUNT(*) FROM dbo_cubicador.tiposMercancia);
+-- Esperado: 10 tablas, 6 columnas nuevas, 31 tipos de mercancia.

@@ -2,6 +2,13 @@
 
 **Fecha de redacción:** 2026-10-08. Borrador listo para copiar y pegar en GitHub.
 
+> **Este documento es el texto tal como se creó en GitHub**, no el estado actual. Donde la
+> implementación revisó una decisión, lo vigente está en los comentarios de la issue y en
+> [`HOJA-DE-RUTA-CUBICADOR.md`](./HOJA-DE-RUTA-CUBICADOR.md). Revisado hasta hoy: **Alembic
+> se retiró** (S5-HU-17.2) — el esquema lo gobiernan scripts `.sql` versionados en
+> `docs/Database/`, porque el `--autogenerate` de Alembic lee la base entera y proponía
+> borrar las tablas de Cotifly, que comparten base con nosotros.
+
 Fuente: [`HOJA-DE-RUTA-CUBICADOR.md`](./HOJA-DE-RUTA-CUBICADOR.md), que contiene el
 contrato completo, las decisiones cerradas y el detalle técnico que estas issues citan.
 

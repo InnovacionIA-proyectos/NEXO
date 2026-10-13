@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
+from domain.entidades.catalogo import Catalogo
 from domain.entidades.entidades import (
     ItemPlanCargue,
     ParametrosCubicacion,
@@ -122,3 +123,22 @@ class IParametrosCubicacionRepository(Protocol):
     async def obtener(self) -> ParametrosCubicacion: ...
 
     async def guardar(self, parametros: ParametrosCubicacion) -> ParametrosCubicacion: ...
+
+
+class ICatalogoRepository(Protocol):
+    """Lectura del catalogo que administra el equipo de Datos (S5-HU-17.2).
+
+    **Solo lee.** Las 10 tablas de `dbo_cubicador` las crea y mantiene el equipo
+    de Datos con sus propios scripts; el Cubicador las consume. Las escrituras
+    que si le corresponden son las de los CRUD (S5-HU-17.5) y las de
+    recomendaciones, que son append-only y tienen su propio puerto.
+
+    Un solo metodo a proposito: el motor necesita todo el catalogo para evaluar
+    candidatos y lo recorre varias veces en una corrida. Son menos de cien filas
+    entre las cinco tablas, asi que traerlo entero sale mas barato que ir y
+    volver por partes.
+    """
+
+    async def cargar(self) -> Catalogo:
+        """Trae vehiculos con sus carrocerias, mercancias, reglas y parametros."""
+        ...

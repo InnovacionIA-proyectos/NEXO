@@ -269,7 +269,8 @@ vive en el esquema `dbo_cubicador` de `dbTarifario_Nexo_Pruebas`, una base
 servicio `db` del `docker-compose.yml` sigue existiendo pero ya es un SQL
 Server **local**, para desarrollo y para el smoke de CI, que imita esa forma
 (misma base, mismo esquema, otro host) sin tocar la compartida. El esquema lo
-gobierna alembic, no `create_all`.
+lo gobierna `docs/Database/ESQUEMA_CUBICADOR.sql`, que se aplica a mano, no
+`create_all` ni migraciones automaticas.
 
 **Decisión vigente**: RabbitMQ SÍ se comparte: `api`
 y `worker` se conectan al `rabbit` del `docker-compose.yml` raíz de NEXO
@@ -410,9 +411,36 @@ código SQLAlchemy sirve para ambos, solo cambia la URL — con una excepción, 
 esquema, que solo se declara contra SQL Server porque SQLite no los soporta
 (ver `infrastructure/persistence/db.py`).
 
-**Verificado el 2026-10-09**: las 123 pruebas en verde dentro de la imagen, la
-migración inicial de alembic aplicada contra SQL Server 2019 real, y la api
+**Verificado el 2026-10-09**: las 142 pruebas en verde dentro de la imagen, el
+esquema del motor 3D aplicado contra SQL Server 2019 real, y la api
 arrancando y sirviendo el catálogo de vehículos desde ahí.
+
+**Cómo se gobierna el esquema** — *decidido en S5-HU-17.2 (2026-10-09),
+reemplaza a Alembic*: con **scripts `.sql` versionados** en `docs/Database/`,
+aplicados con `scripts/aplicar_sql.py`. La propuesta original era Alembic con
+`--autogenerate` desde los modelos, y se retiró al probarla: su autogenerado
+lee la base **entera**, no solo nuestro esquema, y como `dbo_cubicador` vive en
+la misma base que `dbo_cotifly`, la primera corrida propuso **36 `op.drop_table`
+contra tablas de Cotifly**. `include_object` no alcanzaba — filtra por nombre de
+tabla, no por esquema — y localmente el problema era invisible, porque el SQL
+Server de desarrollo no tiene `dbo_cotifly`. Un `upgrade head` en QA habría
+borrado datos de otro equipo. DDL explícito es además el formato que ya usan
+NEXO y Cotifly, así que el equipo de Datos revisa uno solo.
+
+El costo que se acepta: el modelo de SQLAlchemy y el DDL son dos
+descripciones del mismo esquema y pueden separarse en silencio.
+`scripts/verificar_mapeo_catalogo.py` es lo que lo detecta — compara cada
+columna de los modelos contra `sys.columns` de la base real (tipo, largo,
+precisión y nulabilidad). Las pruebas de pytest corren contra SQLite y por
+definición no pueden ver esa divergencia. En su primera corrida encontró una
+real: `recomendacionVehiculoMercancia.VolumenMercanciaM3` es `DECIMAL(18,4)` en
+la base y el modelo la declaraba `(18,3)`.
+
+**Dos `MetaData` separados** (S5-HU-17.2): `modelos.py` tiene las 5 tablas del
+motor 3D, que gobierna este repo; `modelos_catalogo.py` tiene las 10 del
+catálogo, que administra el equipo de Datos. Tienen `MetaData` propio cada uno
+porque compartirlo haría que un `create_all` las tratara igual, y el Cubicador
+nunca debe crear ni alterar las del catálogo: solo leerlas.
 
 **Nota operativa encontrada al probar**: `api` y `worker` necesitan esperar a
 que `db` esté realmente lista (`condition: service_healthy` en `depends_on`),

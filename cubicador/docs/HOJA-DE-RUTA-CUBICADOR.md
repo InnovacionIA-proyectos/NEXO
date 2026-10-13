@@ -267,7 +267,7 @@ empezar pruebas**, no que los cinco repositorios estén en producción.
 
 | Fase | Qué entrega | Compuerta |
 |---|---|---|
-| 1 · SQL Server | Migración del motor de base con las tablas que ya existen, sin cambio funcional. **Alembic** para las migraciones | La batería de integración actual pasa contra SQL Server 2019 |
+| 1 · SQL Server | Migración del motor de base con las tablas que ya existen, sin cambio funcional. El esquema lo gobiernan **scripts `.sql` versionados** | La batería de integración actual pasa contra SQL Server 2019 |
 | 2 · Modelo de datos | Las 10 tablas y los seeders desde los 7 CSV | Catálogo sembrado y revisado por operaciones |
 | 3 · Motor y CRUD | Partes 1, 2 y 3 del flujo con DBLF, los 6 CRUD y la persistencia append-only | 50 a 100 despachos históricos comparados |
 | 4 · Contrato y consumidores | El contrato expuesto, y NEXO, el portal, Cotifly y su front adaptándose | Corrida de punta a punta desde Cotifly, con flota mixta entre los casos |
@@ -294,7 +294,7 @@ arranquen en paralelo, no en secuencia.
 - Tipos neutrales en vez de UUID nativo de Postgres (`sqlalchemy.Uuid`).
 - Manejo de excepciones del driver nuevo — hoy hay código que distingue `ForeignKeyViolationError` de Postgres explícitamente en `plan_cargue_repo.py`.
 - `docker-compose.yml`: servicio `db` a `mcr.microsoft.com/mssql/server:2019-latest`, con healthcheck propio (el actual usa `pg_isready`).
-- **Alembic** reemplaza a `Base.metadata.create_all`, que nunca hace `ALTER`.
+- Los **scripts `.sql` de `docs/Database/`** reemplazan a `Base.metadata.create_all`, que nunca hace `ALTER`. Se aplican con `scripts/aplicar_sql.py`.
 - Correr la batería de `testDocumentation/PRUEBAS_DE_INTEGRACION.md` contra SQL Server real.
 
 **Modelo**
@@ -553,7 +553,7 @@ Es una sesión de una o dos horas, y es el **camino crítico** de todo lo demás
 - Todo en **centímetros**: los valores del Excel quedan enteros exactos, y `parametros_cubicacion` ya estaba en cm con 1220, que es el largo de la tractomula.
 
 **Arquitectura**
-- Base propia en **SQL Server 2019**, con **Alembic** para migraciones.
+- **SQL Server 2019**, en el esquema `dbo_cubicador` de `dbTarifario_Nexo_Pruebas` (compartido con Cotifly), con **scripts `.sql` versionados** para el esquema.
 - El 3D se migra tal cual, para no tener dos motores de base adentro del Cubicador.
 - El puente usa un diccionario de compatibilidad `CodigoVehiculo` → preset viejo.
 - Un solo contrato, **corte coordinado**, sin endpoint de transición.
@@ -564,7 +564,7 @@ Es una sesión de una o dos horas, y es el **camino crítico** de todo lo demás
 - Vehículos no reconocidos en NEXO se crean **en cuarentena**, fuera de los desplegables.
 - Las recomendaciones de **los dos** orígenes se persisten; NEXO también guarda el id.
 - `fragil` y `rotacion_libre` entran como columnas nullable ahora; los datos llegan después.
-- **Alembic** para las migraciones, con `--autogenerate` desde los modelos. Los modelos siguen siendo la única fuente de verdad: Alembic no agrega una segunda descripción del esquema, solo registra los deltas para que las bases existentes se pongan al día. `create_all` no sirve porque **nunca hace `ALTER`**, y el esquema va a cambiar varias veces durante la implementación.
+- **Scripts `.sql` versionados** en `docs/Database/` como fuente de verdad del esquema, aplicados con `scripts/aplicar_sql.py`. Decisión revisada en S5-HU-17.2 a pedido del equipo de Datos: la propuesta original era Alembic con `--autogenerate`, pero su autogenerado lee la base **entera**, y como `dbo_cubicador` vive en la misma base que `dbo_cotifly`, la primera corrida propuso 36 `drop_table` contra tablas de Cotifly. `create_all` tampoco sirve porque **nunca hace `ALTER`**. El DDL explícito es además lo que ya usan NEXO y Cotifly, así que el equipo de Datos revisa un solo formato.
 - Los CRUD viven en el **backend del Cubicador**; el portal de NEXO los consume por **passthrough**, que es donde están los usuarios y los roles. El navegador nunca llama al Cubicador.
 - Los **códigos canónicos de vehículo son del Cubicador**; NEXO converge hacia ellos vía la cuarentena. No se heredan los duplicados de `tbl_configuraciones_vehiculo`.
 - **`GrupoRutaId`** como columna nueva en `tbl_lineas_solicitud`, puesta por Cotifly y solo guardada por NEXO. No se parte la tabla.
@@ -601,13 +601,14 @@ Siguen su curso en paralelo y se cierran antes de que el motor los necesite.
 
 No son decisiones: son cosas que tienen que estar cuando se implemente, no antes.
 
-- **Credenciales del SQL Server 2019 de QA.** Pedir la cadena de conexión **y un usuario con permisos DDL** — Alembic crea y altera tablas, un usuario de solo datos no alcanza. Confirmar también que la instancia es alcanzable desde las máquinas de desarrollo y desde CI.
+- **Credenciales del SQL Server 2019 de QA.** ✅ Entregadas. `userTarifarioNexo` con DDL **acotado a `dbo_cubicador`** (`CREATE TABLE`, `ALTER`, `REFERENCES`, `VIEW DEFINITION`); sin acceso a `dbo_cotifly` ni a `dbo`. Alcanzable desde desarrollo; CI usa su propio SQL Server en contenedor.
 - **La llave de Cotifly.** La genera Cotifly. Solo tiene que ser **distinta de la de NEXO**: de ahí sale el `origenSistema` verificado.
 - **El `UPDATE` de las filas de vehículos existentes.** Ya escrito en `docs/seeder/corregir_vehiculos_existentes.sql`. Corre como paso de datos de la migración, después de crear el esquema y antes del primer arranque.
 
 **Cerrados desde la primera versión:** el espacio del furgón refrigerado (se usa la medida
 por defecto), cama baja y portacontenedores (entran como carrocerías sin vehículo), las
-categorías (9, las que respaldan mercancías reales), el mecanismo de migraciones (Alembic),
+categorías (9, las que respaldan mercancías reales), el mecanismo de migraciones (revisado
+en S5-HU-17.2: scripts `.sql` versionados en vez de Alembic),
 dónde viven los CRUD (Cubicador, con passthrough) y los códigos de vehículo (del Cubicador,
 NEXO converge).
 
