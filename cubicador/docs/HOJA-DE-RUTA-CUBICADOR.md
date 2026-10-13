@@ -50,6 +50,17 @@ Y una tercera, para la administración de catálogos:
 Esta sección es contra lo que programan los dos equipos. Unidades: **centímetros y
 kilogramos**. Porcentajes en **0–100**. JSON en camelCase.
 
+> **Desde que S5-HU-17.4 está construido, hay dos fuentes más precisas que esta
+> prosa**, y ante cualquier duda mandan ellas:
+>
+> - [`cubicador/docs/openapi.json`](./openapi.json) — el esquema exacto, regenerado
+>   desde la aplicación con `scripts/generar_openapi.py`.
+> - [`cubicador/CONTRATO.md`](../CONTRATO.md) §3.1 (recomendaciones) y §3.2 (los seis
+>   CRUD) — las rutas, los códigos de error y las decisiones de integración.
+>
+> Esta sección se mantiene al día con ellas y sigue siendo el lugar donde se
+> explica **por qué** el contrato es así.
+
 ### 2.1 Autenticación
 
 ```
@@ -246,6 +257,20 @@ Devuelve **id y código**: Cotifly decide cuál persiste, pero en el cable viaja
 
 `tipos-carroceria` devuelve `id`, `codigoCarroceria`, `nombreCarroceria`, `activo`.
 
+**Los dos devuelven también las filas inactivas**, con su bandera. Es a propósito:
+la pantalla de administración tiene que poder verlas y reactivarlas. Quien pinta
+un desplegable de captura filtra por `activo`.
+
+**Los dos traen `version`**, el token de concurrencia optimista que los `PUT` y
+`DELETE` de los CRUD exigen (sección 6).
+
+Para reparar una desincronización de la proyección de NEXO hay un endpoint por
+catálogo proyectado: `POST /tipos-carroceria/republicar-catalogo`,
+`POST /tipos-mercancia/republicar-catalogo` y
+`POST /vehiculos-catalogo/republicar-catalogo`. Reemiten el evento de creación
+para todas las filas; seguros de correr más de una vez, porque el consumer hace
+upsert por Id.
+
 ### 2.8 Reconsulta
 
 ```
@@ -294,21 +319,21 @@ arranquen en paralelo, no en secuencia.
 
 ### 4.1 Cubicador (Python)
 
-**Base de datos**
-- Dialecto `mssql+aioodbc`, driver ODBC en la imagen Docker.
-- Tipos neutrales en vez de UUID nativo de Postgres (`sqlalchemy.Uuid`).
-- Manejo de excepciones del driver nuevo — hoy hay código que distingue `ForeignKeyViolationError` de Postgres explícitamente en `plan_cargue_repo.py`.
-- `docker-compose.yml`: servicio `db` a `mcr.microsoft.com/mssql/server:2019-latest`, con healthcheck propio (el actual usa `pg_isready`).
-- Los **scripts `.sql` de `docs/Database/`** reemplazan a `Base.metadata.create_all`, que nunca hace `ALTER`. Se aplican con `scripts/aplicar_sql.py`.
-- Correr la batería de `testDocumentation/PRUEBAS_DE_INTEGRACION.md` contra SQL Server real.
+**Base de datos** — ✅ hecho en S5-HU-17.1
+- ✅ Dialecto `mssql+aioodbc`, driver ODBC en las dos imágenes Docker.
+- ✅ Tipos neutrales: `modelos.py` ya no usaba ninguno específico de Postgres, así que no hubo nada que cambiar.
+- ✅ Manejo de excepciones: las menciones a `ForeignKeyViolationError` eran comentarios, no código. Hoy no queda ninguna referencia a `asyncpg` ni `psycopg` en el repo.
+- ✅ `docker-compose.yml`: servicio `db` en `mcr.microsoft.com/mssql/server:2019-latest`, con healthcheck propio y volumen separado (`db_data` conserva los datos de PostgreSQL hasta migrarlos).
+- ✅ Los **scripts `.sql` de `docs/Database/`** reemplazan a `Base.metadata.create_all`, que nunca hace `ALTER`. Se aplican con `scripts/aplicar_sql.py`.
+- ✅ La batería de `testDocumentation/PRUEBAS_DE_INTEGRACION.md` corrió contra SQL Server 2019 real: 9 de 9.
 
-**Modelo**
-- 10 tablas: las 9 de la propuesta más la tabla padre `recomendaciones` (una fila por corrida).
-- Todo en **centímetros**. `DECIMAL(18,3)` para medidas, `DECIMAL(18,2)` para kg.
-- `UNIQUEIDENTIFIER` con `NEWSEQUENTIALID()`, PK no clustered.
-- Nombres `snake_case` sin tildes. Collation `Modern_Spanish_CI_AI` en columnas de texto.
-- `version_id_col` de SQLAlchemy en los seis catálogos (concurrencia optimista).
-- Seeders desde los CSV de `docs/seeder/`, **idempotentes por código estable** (sección 7).
+**Modelo** — ✅ hecho en S5-HU-17.2, con tres convenciones revisadas
+- ✅ 10 tablas: las 9 del equipo de Datos más la tabla padre `recomendaciones` (una fila por corrida), que se agregó con `docs/seeder/S5-HU-17.2_ajustes_esquema.sql`.
+- ✅ Todo en **centímetros**.
+- ⚠️ `UNIQUEIDENTIFIER` con **`newid()`**, no `NEWSEQUENTIALID()`: así las creó el equipo de Datos. Los ids los genera el código, en mayúsculas, porque SQL Server devuelve ese tipo en mayúsculas y si no el id del POST y el de la reconsulta no serían el mismo texto.
+- ⚠️ Nombres en **camelCase y PascalCase**, no `snake_case`, y collation `Modern_Spanish_CI_AS`: también del equipo de Datos. Los atributos de Python quedan idiomáticos con `mapped_column("NombreReal", ...)`; no se renombró nada en la base.
+- ✅ `version_id_col` en los seis catálogos — `Version INT NOT NULL DEFAULT 1`, agregada en S5-HU-17.5.
+- ⚠️ **No hay seeder de Python.** El catálogo lo creó y lo sembró el equipo de Datos con sus propios scripts, y siete de las diez tablas tienen `UNIQUE` sobre la clave de negocio, así que la idempotencia la garantiza la base. Los CSV de `docs/seeder/` quedan como referencia.
 - **El Cubicador es el dueño de los códigos canónicos de vehículo** (`2L2`, `C2`, `C3`, `2S2`, `3S3`): son los del Excel, que además son los que entienden SICE-TAC y el tarifario. NEXO no es fuente — converge hacia ellos (sección 4.2).
 
 **Motor** — ✅ hecho en S5-HU-17.3 (`domain/motor/seleccion_flota.py`)
@@ -325,14 +350,14 @@ arranquen en paralelo, no en secuencia.
 - **DBLF ordena las orientaciones por cuál embaldosa mejor el vehículo.** Medido: tomando la orientación original primero quedaba 6,0 puntos porcentuales por debajo del óptimo de rejilla en promedio y 28,8 en el peor caso — pedir dos camiones donde alcanza uno. Con la preferencia, la brecha es cero en las 20 combinaciones medidas, y por eso **no hace falta Maximal Empty Spaces** (`scripts/medir_empaque_dblf.py`).
 - **La validación contra 50 a 100 despachos históricos no se pudo hacer**: los datos no existen en `db_NEXO`. De 3.122 líneas, las que traen `Dimensiones` con contenido real son 182 y todas son la misma fila de prueba; con dimensiones y vehículo elegido hay 4; con posiciones capturadas, ninguna ligada a una línea. La captura de dimensiones por mercancía entra con este contrato, así que el histórico anterior no la tiene. Ver `DECISIONES_TECNICAS.md` #13.
 
-**Contrato y catálogos**
-- `POST /recomendaciones`, `GET /tipos-mercancia`, `GET /tipos-carroceria`, `GET /recomendaciones`, `GET /recomendaciones/{id}/mercancias`.
-- Los 6 CRUD de catálogo (sección 6).
-- Eventos de catálogo para que NEXO proyecte mercancías y carrocerías. **Cada escritura de CRUD publica su evento**, o la proyección de NEXO queda vieja sin avisar.
-- `verificar_api_key` pasa a un mapa `llave → sistema`.
+**Contrato y catálogos** — ✅ hecho en S5-HU-17.4 y S5-HU-17.5
+- ✅ `POST /recomendaciones`, `GET /tipos-mercancia`, `GET /tipos-carroceria`, `GET /recomendaciones`, `GET /recomendaciones/{id}/mercancias`. `POST /api/cubicacion` se retiró en el mismo corte.
+- ✅ Los 6 CRUD de catálogo (sección 6), con concurrencia optimista.
+- ✅ Eventos de catálogo. Cada escritura publica el suyo **con la fila entera**, porque NEXO hace upsert por Id. Solo los tres catálogos que NEXO proyecta —mercancías, carrocerías y vehículos— los publican; los otros tres irían a colas que nadie consume. Hay `POST /{catálogo}/republicar-catalogo` para reparar una desincronización.
+- ✅ `verificar_api_key` pasa a un mapa `llave → sistema`: `CUBICADOR_API_KEY_NEXO` y `CUBICADOR_API_KEY_COTIFLY`.
 
 **Limpieza obligatoria**
-- ✅ **Presets del 3D corregidos contra el Excel** (hecho). El diccionario del puente resuelve el *nombre*, no el *dato*: traducía `2L2` → "Turbo con estacas", y ese preset seguía diciendo 6,2 m y 6.300 kg cuando el Turbo real es 4,5 m y 4.000 kg — el motor nuevo decía "cabe en un Turbo" y el 3D acomodaba dentro de una caja 38% más larga que no existe. Se corrigieron largo, ancho, alto y capacidad de las 5 configuraciones con contraparte en el Excel, **se agregó la Minimula 2S2** (faltaba por completo) y se dejaron intactas cama baja y los 3 contenedores, que no tienen contraparte. Las 122 pruebas pasan, incluidos los 26 casos dorados.
+- ✅ **Presets del 3D corregidos contra el Excel** (hecho). El diccionario del puente resuelve el *nombre*, no el *dato*: traducía `2L2` → "Turbo con estacas", y ese preset seguía diciendo 6,2 m y 6.300 kg cuando el Turbo real es 4,5 m y 4.000 kg — el motor nuevo decía "cabe en un Turbo" y el 3D acomodaba dentro de una caja 38% más larga que no existe. Se corrigieron largo, ancho, alto y capacidad de las 5 configuraciones con contraparte en el Excel, **se agregó la Minimula 2S2** (faltaba por completo) y se dejaron intactas cama baja y los 3 contenedores, que no tienen contraparte. Las pruebas pasaron al aplicarlo, incluidos los 26 casos dorados.
 - ⚠️ **La corrección NO llega sola a las bases que ya existen.** `listar_con_siembra` siembra **por nombre** y solo agrega los faltantes: nunca actualiza una fila. Así que aplica a bases nuevas, y como los datos **se migran** (no se arranca vacío), las filas viejas y erradas viajan a SQL Server. **La migración tiene que incluir un `UPDATE` puntual de esas 5 filas.** Es la misma consecuencia del seeder idempotente que describe la sección 6: las correcciones no entran por siembra.
 - El nombre "Tractocamion furgon 13.6 m" quedó desfasado — son 12,2 m. No se renombró porque la siembra es por nombre y crearía duplicados; el renombre va por CRUD.
 - ✅ El catálogo quemado de SICCE (`cubicacion_rapida.py::CATALOGO`, 9 arquetipos) **no se corrigió a propósito**: lo reemplaza el motor nuevo leyendo de base, que ya está escrito (S5-HU-17.3). El módulo entero se retiró en S5-HU-17.6; su endpoint `POST /api/cubicacion` ya se había ido en S5-HU-17.4.
@@ -594,15 +619,15 @@ Es una sesión de una o dos horas, y es el **camino crítico** de todo lo demás
 
 | Pendiente | Dueño | Qué bloquea |
 |---|---|---|
-| Qué significa `COMBUSTIBLE`, y renombrarla a `CARBURANTE` con `Cubicable = false` | Operaciones | Una mercancía mal clasificada. Es un renombre |
-| Agregar los 10 tipos excluidos al seeder | Operaciones | Que "cemento a granel" reciba un rechazo con motivo y no una recomendación inventada |
-| Llenar `apilable`, `fragil` y `rotacion_libre` en los 31 tipos | Operaciones | Vacío significa "no declarado" y el motor se comporta como hoy. No bloquea, pero deja el dato sin dueño |
-| Confirmar que el código de mercancía viaja en el cable, no el uuid | Cotifly | Su adaptador. Es una línea de su lado |
+| ~~Qué significa `COMBUSTIBLE`~~ ✅ **Cerrado.** El equipo de Datos dejó `CARBURANTE` y `MATERIAL_INFLAMABLE` como **dos categorías separadas**, con papel, cartón y madera bajo la segunda — no una sola como proponía esta hoja | — | — |
+| ~~Agregar los 10 tipos excluidos al seeder~~ ✅ **Cerrado: no se agregan.** `tiposMercancia` se queda con las 31 filas reales de la matriz. Si hace falta rechazar graneles o cemento con motivo, entran por CRUD cuando se necesiten | — | — |
+| Revisar `Apilable`, que está en `1` en las **31** mercancías | Operaciones | Las otras dos banderas sí tienen datos variados, así que esa uniformidad parece el default y no una declaración. Las tres son `NOT NULL` con default: no hay "no declarado" |
+| ~~Confirmar qué viaja en el cable~~ ✅ **Cerrado el 2026-10-08: viaja el `idTipoMercancia`.** Se adoptó lo de Cotifly; a cambio la respuesta lleva id **y** código. Ver sección 2.2 | — | — |
 | Dimensiones y capacidad de los contenedores 40HC y 20STD | Negocio | "Carga contenerizada" cae en sin selección hasta que se resuelva. Entra por CRUD |
 | Con qué vehículos emparejan `CAMA_BAJA` y `PORTACONTENEDORES` | Administrador de Fletes | Nada: se decide desde el CRUD cuando se use |
 | Matriz de compatibilidad más allá de la regla sembrada | Operaciones | Nada: el resto entra por CRUD |
 | Nombres finales de campos y fechas del contrato | Cotifly (HU de Duban) | La firma final. La forma está en la sección 2 |
-| De dónde salen los 50-100 despachos históricos | NEXO | La compuerta de la fase 3. Salen de solicitudes entregadas con posiciones capturadas |
+| ~~De dónde salen los 50-100 despachos históricos~~ ✅ **Cerrado: no existen.** De 3.122 líneas, las que traen `Dimensiones` con contenido real son 182 y todas son la misma fila de prueba; con dimensiones **y** vehículo elegido hay 4; con posiciones capturadas, ninguna ligada a una línea. La captura por mercancía entra con este contrato, así que el histórico anterior no la tiene. Lo reemplaza la medición de DBLF contra la rejilla óptima — `DECISIONES_TECNICAS.md` #13 | — | — |
 | Si `numeroLinea` alcanza para ordenar las líneas de un `GrupoRutaId` | NEXO | Si no alcanza, hace falta una columna de orden |
 
 **Ninguno de esos bloquea la revisión de este documento ni la escritura de las issues.**
@@ -614,11 +639,12 @@ No son decisiones: son cosas que tienen que estar cuando se implemente, no antes
 
 - **Credenciales del SQL Server 2019 de QA.** ✅ Entregadas. `userTarifarioNexo` con DDL **acotado a `dbo_cubicador`** (`CREATE TABLE`, `ALTER`, `REFERENCES`, `VIEW DEFINITION`); sin acceso a `dbo_cotifly` ni a `dbo`. Alcanzable desde desarrollo; CI usa su propio SQL Server en contenedor.
 - **La llave de Cotifly.** La genera Cotifly. Solo tiene que ser **distinta de la de NEXO**: de ahí sale el `origenSistema` verificado.
-- **El `UPDATE` de las filas de vehículos existentes.** Ya escrito en `docs/seeder/corregir_vehiculos_existentes.sql`. Corre como paso de datos de la migración, después de crear el esquema y antes del primer arranque.
+- **El `UPDATE` de las filas de vehículos existentes.** ✅ Aplicado en S5-HU-17.1, con `docs/seeder/corregir_vehiculos_existentes.sql`.
 
 **Cerrados desde la primera versión:** el espacio del furgón refrigerado (se usa la medida
 por defecto), cama baja y portacontenedores (entran como carrocerías sin vehículo), las
-categorías (9, las que respaldan mercancías reales), el mecanismo de migraciones (revisado
+categorías (revisado al sembrar: quedaron **13**, no 9, porque el equipo de Datos adoptó
+las del seeder cruzado contra SAP), el mecanismo de migraciones (revisado
 en S5-HU-17.2: scripts `.sql` versionados en vez de Alembic),
 dónde viven los CRUD (Cubicador, con passthrough) y los códigos de vehículo (del Cubicador,
 NEXO converge).

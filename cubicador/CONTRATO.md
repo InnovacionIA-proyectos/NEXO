@@ -228,6 +228,13 @@ el cambio solo toque las relaciones.
 usuarios: NEXO manda el id y acá queda en `CreadoPor` como dato declarado, no
 como identidad comprobada.
 
+**Los `GET` devuelven también las filas inactivas**, con su bandera `activo`.
+Es a propósito: la pantalla de administración tiene que poder verlas y
+reactivarlas. **Quien pinta un desplegable de captura debe filtrar por
+`activo`** — si no, una mercancía borrada lógicamente seguiría ofreciéndose, que
+es justamente lo que el borrado lógico evita. Lo mismo aplica a la proyección de
+NEXO: proyecta la fila completa, incluido `activo`, y el desplegable filtra.
+
 **Errores.** Mismo formato `{ "codigo": "...", "mensaje": "..." }` de la sección
 4:
 
