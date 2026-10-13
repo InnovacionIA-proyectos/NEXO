@@ -63,6 +63,25 @@ public class clsImportarReglasSoloSicetacExcelCommandTests
         _reglas.Verify(r => r.AgregarRango(It.IsAny<IEnumerable<clsReglaSoloSicetac>>()), Times.Never);
     }
 
+    // S5-HU-22.1/#288: reimportar un export con reglas cuyo código SAP no trae (3S2, 2L3) las
+    // contaba como "inválidas"; ya existen, así que son duplicadas. El catálogo solo se exige
+    // para las reglas que de verdad se van a crear.
+    [Fact]
+    public async Task Regla_ya_existente_con_codigo_fuera_del_catalogo_es_duplicada_no_invalida()
+    {
+        _reglas.Setup(r => r.ClavesOrigenDestinoTipoVehiculoAsync(default))
+            .ReturnsAsync((IReadOnlySet<string>)new HashSet<string> { "MEDELLIN|BOGOTA|2L3" });
+        ConCatalogo("3S3");
+        _excel.Setup(e => e.Leer(It.IsAny<Stream>()))
+            .Returns([new clsFilaReglaSoloSicetacDto("Medellín", "Bogotá", "2L3"), new clsFilaReglaSoloSicetacDto("Cali", "Bogotá", "2L3")]);
+
+        var result = await Handler().Handle(new clsImportarReglasSoloSicetacExcelCommand(Stream.Null));
+
+        Assert.Equal(1, result.Duplicadas);   // la que ya está
+        Assert.Equal(1, result.Invalidas);    // la nueva con un código que el catálogo no tiene
+        Assert.Equal(0, result.Creadas);
+    }
+
     [Fact]
     public async Task Fila_con_campo_vacio_se_rechaza_con_motivo_por_fila()
     {

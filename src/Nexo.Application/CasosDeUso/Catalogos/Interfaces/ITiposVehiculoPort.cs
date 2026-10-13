@@ -1,16 +1,16 @@
 namespace Nexo.Application.CasosDeUso.Catalogos.Interfaces;
 
 /// <summary>Un tipo de vehículo para los desplegables de Reglas Solo-SICETAC (S4-HU-09.2)
-/// y Tarifas de Plaza (S4-HU-10.x). <see cref="EsCatalogoOficial"/> distingue los códigos
-/// que sí vienen de tblSAPTiposVehiculoTarifario de los casos reales de negocio que
-/// todavía no tienen código en ningún catálogo (ver <see cref="ITiposVehiculoPort"/>).</summary>
+/// y Tarifas de Plaza (S4-HU-10.x). S5-HU-22.1/#288: <see cref="EsCatalogoOficial"/> se conserva
+/// por compatibilidad con el frontend, pero ya siempre es <c>true</c>: el catálogo es solo el de
+/// tblSAPTiposVehiculoTarifario (se eliminaron los 5 casos especiales escritos a mano).</summary>
 public sealed record clsTipoVehiculoDto(string Codigo, string Descripcion, bool EsCatalogoOficial);
 
 /// <summary>
-/// Catálogo de tipos de vehículo (tblSAPTiposVehiculoTarifario, dbSolucionesTI) más los
-/// casos reales de negocio que ese catálogo todavía no cubre (confirmados con datos
-/// reales del seeder de S4-HU-10.1: 4 valores de devolución de contenedor +
-/// "PBV 7500-8000") — la implementación de Infrastructure documenta cada caso especial.
+/// Catálogo de tipos de vehículo: tblSAPTiposVehiculoTarifario (dbSolucionesTI), tal cual.
+/// S5-HU-22.1/#288: ya no se le suman códigos inventados; si dbSolucionesTI no está disponible
+/// devuelve una lista vacía. Los códigos 3S2 y 2L3 faltan en SAP — decisión de negocio, no se
+/// hardcodean.
 /// </summary>
 public interface ITiposVehiculoPort
 {

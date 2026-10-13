@@ -45,18 +45,24 @@ public sealed class clsImportarReglasSoloSicetacExcelCommandHandler(
                 if (errores.Count < TopeErrores) errores.Add($"Fila {fila}: origen, destino y tipo de vehículo son obligatorios.");
                 continue;
             }
+            // S5-HU-22.1/#288: el duplicado se mira ANTES que el catálogo. Una regla que ya está
+            // guardada no puede ser "inválida": hay reglas con un código que SAP no trae (3S2, 2L3)
+            // y al reimportar un export de reglas esas filas saltaban como inválidas en vez de como
+            // duplicadas. El catálogo solo se exige para las reglas que de verdad se van a crear.
+            var clave = $"{o}|{d}|{v}";
+            if (yaVistas.Contains(clave))
+            {
+                duplicadas++;
+                if (errores.Count < TopeErrores) errores.Add($"Fila {fila}: ya existe una regla para {o} → {d} ({v}).");
+                continue;
+            }
             if (!codigosVehiculo.Contains(v))
             {
                 invalidas++;
                 if (errores.Count < TopeErrores) errores.Add($"Fila {fila}: '{f.TipoVehiculo}' no es un tipo de vehículo del catálogo.");
                 continue;
             }
-            if (!yaVistas.Add($"{o}|{d}|{v}"))
-            {
-                duplicadas++;
-                if (errores.Count < TopeErrores) errores.Add($"Fila {fila}: ya existe una regla para {o} → {d} ({v}).");
-                continue;
-            }
+            yaVistas.Add(clave);
             nuevas.Add(new clsReglaSoloSicetac { Origen = o, Destino = d, TipoVehiculo = v });
             creadas++;
         }
