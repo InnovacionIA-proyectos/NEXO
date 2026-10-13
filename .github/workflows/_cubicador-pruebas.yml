@@ -53,6 +53,10 @@ jobs:
         run: pip install -r requirements.txt
 
       # Valores dummy validos solo para este runner efimero - nunca secretos reales.
+      # MSSQL_SA_PASSWORD tiene que cumplir la politica de SQL Server (8+ caracteres
+      # con mayuscula, minuscula, numero y simbolo) o el contenedor `db` no arranca.
+      # El smoke test usa el SQL Server LOCAL del compose, nunca la base compartida
+      # de QA: corre en cada push y dos ejecuciones simultaneas se pisarian.
       # NEXO_BASE_URL/NEXO_CALLBACK_API_KEY quedan sin usar en este smoke test (no
       # se ejercita crear-desde-linea, que depende de un NEXO real corriendo aparte
       # - ver cubicador/docs/testDocumentation/PRUEBAS_DE_INTEGRACION.md seccion 2.6).
@@ -60,10 +64,13 @@ jobs:
         working-directory: cubicador
         run: |
           cat > .env <<'EOF'
-          POSTGRES_PASSWORD=ci_password
+          MSSQL_SA_PASSWORD=Ci_Password_123
+          CUBICADOR_DB_ESQUEMA=dbo_cubicador
           RABBITMQ_USER=ci_user
           RABBITMQ_PASSWORD=ci_password
           CUBICADOR_API_KEY=ci-api-key
+          CUBICADOR_API_KEY_NEXO=ci-api-key-nexo
+          CUBICADOR_API_KEY_COTIFLY=ci-api-key-cotifly
           NEXO_CALLBACK_API_KEY=ci-nexo-key
           NEXO_BASE_URL=http://localhost:5080
           EOF
@@ -86,6 +93,8 @@ jobs:
         working-directory: cubicador
         env:
           CUBICADOR_API_KEY: ci-api-key
+          CUBICADOR_API_KEY_NEXO: ci-api-key-nexo
+          CUBICADOR_API_KEY_COTIFLY: ci-api-key-cotifly
           RABBITMQ_USER: ci_user
           RABBITMQ_PASSWORD: ci_password
         run: python scripts/ci_docker_smoke.py

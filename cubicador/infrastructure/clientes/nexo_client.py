@@ -29,7 +29,8 @@ class NexoLineaSolicitudClient:
             posiciones=[
                 PosicionCarga(
                     descripcion=p.get("descripcion"), cantidad=p["cantidad"],
-                    largo_cm=p["largoCm"], ancho_cm=p["anchoCm"], alto_cm=p["altoCm"], peso_kg=p.get("pesoKg"),
+                    largo_cm=p["largoCm"], ancho_cm=p["anchoCm"], alto_cm=p["altoCm"],
+                    peso_kg=p.get("pesoKg"), codigo_mercancia=p.get("codigoMercancia"),
                 )
                 for p in data.get("posiciones", [])
             ],

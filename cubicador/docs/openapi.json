@@ -1,1255 +1,306 @@
 {
-  "openapi": "3.1.0",
-  "info": {
-    "title": "Cubicador",
-    "description": "Microservicio de cubicacion: cubicador rapido (SICCE) y motor de bin-packing 3D (Plan de Cargue). Autenticacion: Bearer estatico servicio-a-servicio (boton Authorize en Swagger). Contrato e integracion completos en CONTRATO.md.",
-    "version": "0.1.0"
-  },
-  "servers": [
-    {
-      "url": "http://localhost:8081",
-      "description": "Docker Compose local (host)"
-    },
-    {
-      "url": "http://localhost:8000",
-      "description": "Fuera de Docker (uvicorn --reload)"
-    }
-  ],
-  "paths": {
-    "/api/cubicacion": {
-      "post": {
-        "tags": [
-          "cubicacion-rapida"
-        ],
-        "summary": "Cubicar",
-        "operationId": "cubicar_api_cubicacion_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CubicacionRequestDto"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CubicacionResponseDto"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
-      }
-    },
-    "/api/cubicacion/unidades": {
-      "get": {
-        "tags": [
-          "cubicacion-rapida"
-        ],
-        "summary": "Unidades",
-        "operationId": "unidades_api_cubicacion_unidades_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/UnidadCubicacionDto"
-                  },
-                  "type": "array",
-                  "title": "Response Unidades Api Cubicacion Unidades Get"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
-      }
-    },
-    "/api/cubicacion/medidas-estandar": {
-      "get": {
-        "tags": [
-          "cubicacion-rapida"
-        ],
-        "summary": "Medidas Estandar",
-        "operationId": "medidas_estandar_api_cubicacion_medidas_estandar_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MedidasEstandarDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
-      },
-      "put": {
-        "tags": [
-          "cubicacion-rapida"
-        ],
-        "summary": "Actualizar Medidas",
-        "operationId": "actualizar_medidas_api_cubicacion_medidas_estandar_put",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/MedidasEstandarDto"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MedidasEstandarDto"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
-      }
-    },
-    "/api/planes-cargue/vehiculos": {
-      "get": {
-        "tags": [
-          "plan-cargue"
-        ],
-        "summary": "Vehiculos",
-        "operationId": "vehiculos_api_planes_cargue_vehiculos_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/VehiculoCubicacionDto"
-                  },
-                  "type": "array",
-                  "title": "Response Vehiculos Api Planes Cargue Vehiculos Get"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
-      },
-      "post": {
-        "tags": [
-          "plan-cargue"
-        ],
-        "summary": "Guardar Vehiculo",
-        "operationId": "guardar_vehiculo_api_planes_cargue_vehiculos_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/GuardarVehiculoInput"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/VehiculoCubicacionDto"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
-      }
-    },
-    "/api/planes-cargue/vehiculos/{id}": {
-      "delete": {
-        "tags": [
-          "plan-cargue"
-        ],
-        "summary": "Eliminar Vehiculo",
-        "operationId": "eliminar_vehiculo_api_planes_cargue_vehiculos__id__delete",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Id"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Successful Response"
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/planes-cargue": {
-      "get": {
-        "tags": [
-          "plan-cargue"
-        ],
-        "summary": "Planes",
-        "operationId": "planes_api_planes_cargue_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/PlanCargueDto"
-                  },
-                  "type": "array",
-                  "title": "Response Planes Api Planes Cargue Get"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
-      },
-      "post": {
-        "tags": [
-          "plan-cargue"
-        ],
-        "summary": "Crear Plan",
-        "operationId": "crear_plan_api_planes_cargue_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CrearPlanRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PlanCargueDto"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
-      }
-    },
-    "/api/planes-cargue/{id}": {
-      "get": {
-        "tags": [
-          "plan-cargue"
-        ],
-        "summary": "Obtener Plan",
-        "operationId": "obtener_plan_api_planes_cargue__id__get",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PlanCargueDto"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      },
-      "delete": {
-        "tags": [
-          "plan-cargue"
-        ],
-        "summary": "Eliminar Plan",
-        "operationId": "eliminar_plan_api_planes_cargue__id__delete",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Id"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Successful Response"
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/planes-cargue/{id}/flota": {
-      "get": {
-        "tags": [
-          "plan-cargue"
-        ],
-        "summary": "Flota",
-        "operationId": "flota_api_planes_cargue__id__flota_get",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/PlanFlotaItemDto"
-                  },
-                  "title": "Response Flota Api Planes Cargue  Id  Flota Get"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/planes-cargue/demo": {
-      "post": {
-        "tags": [
-          "plan-cargue"
-        ],
-        "summary": "Crear Demo",
-        "operationId": "crear_demo_api_planes_cargue_demo_post",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PlanCargueDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
-      }
-    },
-    "/api/planes-cargue/desde-linea/{linea_solicitud_id}": {
-      "post": {
-        "tags": [
-          "plan-cargue"
-        ],
-        "summary": "Crear Desde Linea",
-        "operationId": "crear_desde_linea_api_planes_cargue_desde_linea__linea_solicitud_id__post",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "linea_solicitud_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Linea Solicitud Id"
-            }
-          }
-        ],
-        "responses": {
-          "202": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SolicitudEncoladaDto"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/planes-cargue/por-linea/{linea_solicitud_id}": {
-      "get": {
-        "tags": [
-          "plan-cargue"
-        ],
-        "summary": "Por Linea",
-        "description": "Lista vacia mientras `crear_desde_linea` sigue en proceso (ver POST de arriba).",
-        "operationId": "por_linea_api_planes_cargue_por_linea__linea_solicitud_id__get",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "linea_solicitud_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Linea Solicitud Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/PlanFlotaItemDto"
-                  },
-                  "title": "Response Por Linea Api Planes Cargue Por Linea  Linea Solicitud Id  Get"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/planes-cargue/{id}/items": {
-      "post": {
-        "tags": [
-          "plan-cargue"
-        ],
-        "summary": "Guardar Item",
-        "operationId": "guardar_item_api_planes_cargue__id__items_post",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Id"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/GuardarItemPlanCargueInput"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ItemPlanCargueDto"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/planes-cargue/{id}/items/importar": {
-      "post": {
-        "tags": [
-          "plan-cargue"
-        ],
-        "summary": "Importar Items",
-        "operationId": "importar_items_api_planes_cargue__id__items_importar_post",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Id"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "array",
-                "items": {
-                  "$ref": "#/components/schemas/GuardarItemPlanCargueInput"
-                },
-                "title": "Items"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/ItemPlanCargueDto"
-                  },
-                  "title": "Response Importar Items Api Planes Cargue  Id  Items Importar Post"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/planes-cargue/{id}/items/{item_id}": {
-      "delete": {
-        "tags": [
-          "plan-cargue"
-        ],
-        "summary": "Eliminar Item",
-        "operationId": "eliminar_item_api_planes_cargue__id__items__item_id__delete",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Id"
-            }
-          },
-          {
-            "name": "item_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Item Id"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Successful Response"
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/planes-cargue/{id}/optimizar": {
-      "post": {
-        "tags": [
-          "plan-cargue"
-        ],
-        "summary": "Optimizar",
-        "operationId": "optimizar_api_planes_cargue__id__optimizar_post",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Id"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/OptimizarRequestDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "202": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PlanCargueDto"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/planes-cargue/{id}/reoptimizar": {
-      "post": {
-        "tags": [
-          "plan-cargue"
-        ],
-        "summary": "Reoptimizar",
-        "operationId": "reoptimizar_api_planes_cargue__id__reoptimizar_post",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Id"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/OptimizarRequestDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "202": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PlanCargueDto"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/planes-cargue/{id}/resultado": {
-      "get": {
-        "tags": [
-          "plan-cargue"
-        ],
-        "summary": "Resultado",
-        "operationId": "resultado_api_planes_cargue__id__resultado_get",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultadoPlanDto"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/planes-cargue/{id}/colocaciones": {
-      "get": {
-        "tags": [
-          "plan-cargue"
-        ],
-        "summary": "Colocaciones",
-        "operationId": "colocaciones_api_planes_cargue__id__colocaciones_get",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/planes-cargue/{id}/metricas": {
-      "get": {
-        "tags": [
-          "plan-cargue"
-        ],
-        "summary": "Metricas",
-        "operationId": "metricas_api_planes_cargue__id__metricas_get",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/planes-cargue/{id}/no-cargadas": {
-      "get": {
-        "tags": [
-          "plan-cargue"
-        ],
-        "summary": "No Cargadas",
-        "operationId": "no_cargadas_api_planes_cargue__id__no_cargadas_get",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/planes-cargue/{id}/colocaciones/{colocacion_id}": {
-      "patch": {
-        "tags": [
-          "plan-cargue"
-        ],
-        "summary": "Ajustar",
-        "operationId": "ajustar_api_planes_cargue__id__colocaciones__colocacion_id__patch",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Id"
-            }
-          },
-          {
-            "name": "colocacion_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Colocacion Id"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AjusteColocacionInput"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultadoPlanDto"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/planes-cargue/{id}/exportar": {
-      "get": {
-        "tags": [
-          "plan-cargue"
-        ],
-        "summary": "Exportar",
-        "operationId": "exportar_api_planes_cargue__id__exportar_get",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ResultadoPlanDto"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/health": {
-      "get": {
-        "summary": "Health",
-        "operationId": "health_health_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": {
-                    "type": "string"
-                  },
-                  "type": "object",
-                  "title": "Response Health Health Get"
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  },
   "components": {
     "schemas": {
+      "ActualizarCarroceriaDto": {
+        "properties": {
+          "activo": {
+            "default": true,
+            "title": "Activo",
+            "type": "boolean"
+          },
+          "nombreCarroceria": {
+            "minLength": 1,
+            "title": "Nombrecarroceria",
+            "type": "string"
+          },
+          "usuarioId": {
+            "minLength": 1,
+            "title": "Usuarioid",
+            "type": "string"
+          },
+          "version": {
+            "minimum": 1.0,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "usuarioId",
+          "version",
+          "nombreCarroceria"
+        ],
+        "title": "ActualizarCarroceriaDto",
+        "type": "object"
+      },
+      "ActualizarCategoriaDto": {
+        "properties": {
+          "nombreCategoria": {
+            "minLength": 1,
+            "title": "Nombrecategoria",
+            "type": "string"
+          },
+          "usuarioId": {
+            "minLength": 1,
+            "title": "Usuarioid",
+            "type": "string"
+          },
+          "version": {
+            "minimum": 1.0,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "usuarioId",
+          "version",
+          "nombreCategoria"
+        ],
+        "title": "ActualizarCategoriaDto",
+        "type": "object"
+      },
+      "ActualizarMercanciaDto": {
+        "properties": {
+          "activo": {
+            "default": true,
+            "title": "Activo",
+            "type": "boolean"
+          },
+          "apilable": {
+            "default": true,
+            "title": "Apilable",
+            "type": "boolean"
+          },
+          "carroceriaSecundariaCondicionada": {
+            "default": false,
+            "title": "Carroceriasecundariacondicionada",
+            "type": "boolean"
+          },
+          "codigoMercancia": {
+            "minLength": 1,
+            "title": "Codigomercancia",
+            "type": "string"
+          },
+          "comentarioCondicion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comentariocondicion"
+          },
+          "condicionadaCubicacion": {
+            "default": false,
+            "title": "Condicionadacubicacion",
+            "type": "boolean"
+          },
+          "controlAmbientalRequerido": {
+            "default": "NINGUNO",
+            "title": "Controlambientalrequerido",
+            "type": "string"
+          },
+          "cubicable": {
+            "default": true,
+            "title": "Cubicable",
+            "type": "boolean"
+          },
+          "fragil": {
+            "default": false,
+            "title": "Fragil",
+            "type": "boolean"
+          },
+          "idCarroceriaPrincipal": {
+            "title": "Idcarroceriaprincipal",
+            "type": "string"
+          },
+          "idCarroceriaSecundaria": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Idcarroceriasecundaria"
+          },
+          "idCategoria": {
+            "title": "Idcategoria",
+            "type": "string"
+          },
+          "nombreMercancia": {
+            "minLength": 1,
+            "title": "Nombremercancia",
+            "type": "string"
+          },
+          "rotacionLibre": {
+            "default": true,
+            "title": "Rotacionlibre",
+            "type": "boolean"
+          },
+          "usuarioId": {
+            "minLength": 1,
+            "title": "Usuarioid",
+            "type": "string"
+          },
+          "version": {
+            "minimum": 1.0,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "usuarioId",
+          "version",
+          "codigoMercancia",
+          "nombreMercancia",
+          "idCategoria",
+          "idCarroceriaPrincipal"
+        ],
+        "title": "ActualizarMercanciaDto",
+        "type": "object"
+      },
+      "ActualizarParametroDto": {
+        "properties": {
+          "usuarioId": {
+            "minLength": 1,
+            "title": "Usuarioid",
+            "type": "string"
+          },
+          "valor": {
+            "minLength": 1,
+            "title": "Valor",
+            "type": "string"
+          },
+          "version": {
+            "minimum": 1.0,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "usuarioId",
+          "version",
+          "valor"
+        ],
+        "title": "ActualizarParametroDto",
+        "type": "object"
+      },
+      "ActualizarVehiculoDto": {
+        "properties": {
+          "activo": {
+            "default": true,
+            "title": "Activo",
+            "type": "boolean"
+          },
+          "altoUtilCm": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Altoutilcm"
+          },
+          "anchoCm": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Anchocm"
+          },
+          "capacidadMaximaKg": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Capacidadmaximakg"
+          },
+          "carrocerias": {
+            "items": {
+              "$ref": "#/components/schemas/CarroceriaDeVehiculoEntradaDto"
+            },
+            "title": "Carrocerias",
+            "type": "array"
+          },
+          "codigoVehiculo": {
+            "minLength": 1,
+            "title": "Codigovehiculo",
+            "type": "string"
+          },
+          "largoCm": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Largocm"
+          },
+          "nombreVehiculo": {
+            "minLength": 1,
+            "title": "Nombrevehiculo",
+            "type": "string"
+          },
+          "usuarioId": {
+            "minLength": 1,
+            "title": "Usuarioid",
+            "type": "string"
+          },
+          "version": {
+            "minimum": 1.0,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "usuarioId",
+          "version",
+          "codigoVehiculo",
+          "nombreVehiculo",
+          "largoCm",
+          "anchoCm",
+          "altoUtilCm",
+          "capacidadMaximaKg",
+          "carrocerias"
+        ],
+        "title": "ActualizarVehiculoDto",
+        "type": "object"
+      },
       "AjusteColocacionInput": {
         "properties": {
-          "x": {
+          "bloqueada": {
             "anyOf": [
               {
-                "type": "number"
+                "type": "boolean"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "X"
-          },
-          "y": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Y"
-          },
-          "z": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Z"
+            "title": "Bloqueada"
           },
           "orientacionIndice": {
             "anyOf": [
@@ -1262,7 +313,7 @@
             ],
             "title": "Orientacionindice"
           },
-          "bloqueada": {
+          "reinsertar": {
             "anyOf": [
               {
                 "type": "boolean"
@@ -1271,7 +322,7 @@
                 "type": "null"
               }
             ],
-            "title": "Bloqueada"
+            "title": "Reinsertar"
           },
           "retirar": {
             "anyOf": [
@@ -1284,109 +335,172 @@
             ],
             "title": "Retirar"
           },
-          "reinsertar": {
+          "x": {
             "anyOf": [
               {
-                "type": "boolean"
+                "type": "number"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Reinsertar"
-          }
-        },
-        "type": "object",
-        "title": "AjusteColocacionInput"
-      },
-      "ColocacionCargueDto": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "title": "Id"
-          },
-          "planCargueId": {
-            "type": "string",
-            "title": "Plancargueid"
-          },
-          "itemPlanCargueId": {
-            "type": "string",
-            "title": "Itemplancargueid"
-          },
-          "indiceUnidad": {
-            "type": "integer",
-            "title": "Indiceunidad"
-          },
-          "cargada": {
-            "type": "boolean",
-            "title": "Cargada"
-          },
-          "x": {
-            "type": "number",
             "title": "X"
           },
           "y": {
-            "type": "number",
-            "title": "Y"
-          },
-          "z": {
-            "type": "number",
-            "title": "Z"
-          },
-          "largoColocadoMm": {
-            "type": "number",
-            "title": "Largocolocadomm"
-          },
-          "anchoColocadoMm": {
-            "type": "number",
-            "title": "Anchocolocadomm"
-          },
-          "altoColocadoMm": {
-            "type": "number",
-            "title": "Altocolocadomm"
-          },
-          "orientacionIndice": {
-            "type": "integer",
-            "title": "Orientacionindice"
-          },
-          "secuenciaCargue": {
-            "type": "integer",
-            "title": "Secuenciacargue"
-          },
-          "soporteColocacionId": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "number"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Soportecolocacionid"
+            "title": "Y"
           },
-          "porcentajeSoporte": {
-            "type": "number",
-            "title": "Porcentajesoporte"
+          "z": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Z"
+          }
+        },
+        "title": "AjusteColocacionInput",
+        "type": "object"
+      },
+      "BorrarDto": {
+        "description": "Cuerpo de un `DELETE`. Lleva version por lo mismo que el `PUT`: borrar\nuna fila que cambio desde que se leyo es tan destructivo como pisarla.",
+        "properties": {
+          "usuarioId": {
+            "minLength": 1,
+            "title": "Usuarioid",
+            "type": "string"
           },
-          "pesoEncimaKg": {
-            "type": "number",
-            "title": "Pesoencimakg"
+          "version": {
+            "minimum": 1.0,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "usuarioId",
+          "version"
+        ],
+        "title": "BorrarDto",
+        "type": "object"
+      },
+      "CarroceriaDeVehiculoDto": {
+        "properties": {
+          "capacidadMaximaEspecifica": {
+            "title": "Capacidadmaximaespecifica",
+            "type": "number"
           },
-          "estadoEstabilidad": {
-            "type": "string",
-            "title": "Estadoestabilidad"
+          "codigoCarroceria": {
+            "title": "Codigocarroceria",
+            "type": "string"
           },
+          "idCarroceria": {
+            "title": "Idcarroceria",
+            "type": "string"
+          },
+          "usaCapacidadMaximaDelVehiculo": {
+            "title": "Usacapacidadmaximadelvehiculo",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "idCarroceria",
+          "codigoCarroceria",
+          "usaCapacidadMaximaDelVehiculo",
+          "capacidadMaximaEspecifica"
+        ],
+        "title": "CarroceriaDeVehiculoDto",
+        "type": "object"
+      },
+      "CarroceriaDeVehiculoEntradaDto": {
+        "properties": {
+          "capacidadMaximaEspecifica": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "default": 0,
+            "title": "Capacidadmaximaespecifica"
+          },
+          "idCarroceria": {
+            "title": "Idcarroceria",
+            "type": "string"
+          },
+          "usaCapacidadMaximaDelVehiculo": {
+            "default": true,
+            "title": "Usacapacidadmaximadelvehiculo",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "idCarroceria"
+        ],
+        "title": "CarroceriaDeVehiculoEntradaDto",
+        "type": "object"
+      },
+      "CategoriaMercanciaDto": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "nombreCategoria": {
+            "title": "Nombrecategoria",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "nombreCategoria",
+          "version"
+        ],
+        "title": "CategoriaMercanciaDto",
+        "type": "object"
+      },
+      "ColocacionCargueDto": {
+        "properties": {
           "accesibilidad": {
-            "type": "string",
-            "title": "Accesibilidad"
-          },
-          "bloqueada": {
-            "type": "boolean",
-            "title": "Bloqueada"
+            "title": "Accesibilidad",
+            "type": "string"
           },
           "ajusteManual": {
-            "type": "boolean",
-            "title": "Ajustemanual"
+            "title": "Ajustemanual",
+            "type": "boolean"
+          },
+          "altoColocadoMm": {
+            "title": "Altocolocadomm",
+            "type": "number"
+          },
+          "anchoColocadoMm": {
+            "title": "Anchocolocadomm",
+            "type": "number"
+          },
+          "bloqueada": {
+            "title": "Bloqueada",
+            "type": "boolean"
+          },
+          "cargada": {
+            "title": "Cargada",
+            "type": "boolean"
           },
           "codigoRechazo": {
             "anyOf": [
@@ -1399,6 +513,42 @@
             ],
             "title": "Codigorechazo"
           },
+          "estadoEstabilidad": {
+            "title": "Estadoestabilidad",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "indiceUnidad": {
+            "title": "Indiceunidad",
+            "type": "integer"
+          },
+          "itemPlanCargueId": {
+            "title": "Itemplancargueid",
+            "type": "string"
+          },
+          "largoColocadoMm": {
+            "title": "Largocolocadomm",
+            "type": "number"
+          },
+          "orientacionIndice": {
+            "title": "Orientacionindice",
+            "type": "integer"
+          },
+          "pesoEncimaKg": {
+            "title": "Pesoencimakg",
+            "type": "number"
+          },
+          "planCargueId": {
+            "title": "Plancargueid",
+            "type": "string"
+          },
+          "porcentajeSoporte": {
+            "title": "Porcentajesoporte",
+            "type": "number"
+          },
           "razonRechazo": {
             "anyOf": [
               {
@@ -1409,9 +559,35 @@
               }
             ],
             "title": "Razonrechazo"
+          },
+          "secuenciaCargue": {
+            "title": "Secuenciacargue",
+            "type": "integer"
+          },
+          "soporteColocacionId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Soportecolocacionid"
+          },
+          "x": {
+            "title": "X",
+            "type": "number"
+          },
+          "y": {
+            "title": "Y",
+            "type": "number"
+          },
+          "z": {
+            "title": "Z",
+            "type": "number"
           }
         },
-        "type": "object",
         "required": [
           "id",
           "planCargueId",
@@ -1436,126 +612,174 @@
           "codigoRechazo",
           "razonRechazo"
         ],
-        "title": "ColocacionCargueDto"
+        "title": "ColocacionCargueDto",
+        "type": "object"
       },
-      "ColocacionDisposicionDto": {
+      "CrearCarroceriaDto": {
         "properties": {
-          "descripcion": {
-            "type": "string",
-            "title": "Descripcion"
+          "codigoCarroceria": {
+            "minLength": 1,
+            "title": "Codigocarroceria",
+            "type": "string"
           },
-          "x": {
-            "type": "number",
-            "title": "X"
+          "nombreCarroceria": {
+            "minLength": 1,
+            "title": "Nombrecarroceria",
+            "type": "string"
           },
-          "y": {
-            "type": "number",
-            "title": "Y"
-          },
-          "z": {
-            "type": "number",
-            "title": "Z"
-          },
-          "largoM": {
-            "type": "number",
-            "title": "Largom"
-          },
-          "anchoM": {
-            "type": "number",
-            "title": "Anchom"
-          },
-          "altoM": {
-            "type": "number",
-            "title": "Altom"
-          },
-          "pesoKg": {
-            "type": "number",
-            "title": "Pesokg"
+          "usuarioId": {
+            "minLength": 1,
+            "title": "Usuarioid",
+            "type": "string"
           }
         },
-        "type": "object",
         "required": [
-          "descripcion",
-          "x",
-          "y",
-          "z",
-          "largoM",
-          "anchoM",
-          "altoM",
-          "pesoKg"
+          "usuarioId",
+          "codigoCarroceria",
+          "nombreCarroceria"
         ],
-        "title": "ColocacionDisposicionDto"
+        "title": "CrearCarroceriaDto",
+        "type": "object"
+      },
+      "CrearCategoriaDto": {
+        "properties": {
+          "nombreCategoria": {
+            "minLength": 1,
+            "title": "Nombrecategoria",
+            "type": "string"
+          },
+          "usuarioId": {
+            "minLength": 1,
+            "title": "Usuarioid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "usuarioId",
+          "nombreCategoria"
+        ],
+        "title": "CrearCategoriaDto",
+        "type": "object"
+      },
+      "CrearMercanciaDto": {
+        "properties": {
+          "activo": {
+            "default": true,
+            "title": "Activo",
+            "type": "boolean"
+          },
+          "apilable": {
+            "default": true,
+            "title": "Apilable",
+            "type": "boolean"
+          },
+          "carroceriaSecundariaCondicionada": {
+            "default": false,
+            "title": "Carroceriasecundariacondicionada",
+            "type": "boolean"
+          },
+          "codigoMercancia": {
+            "minLength": 1,
+            "title": "Codigomercancia",
+            "type": "string"
+          },
+          "comentarioCondicion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comentariocondicion"
+          },
+          "condicionadaCubicacion": {
+            "default": false,
+            "title": "Condicionadacubicacion",
+            "type": "boolean"
+          },
+          "controlAmbientalRequerido": {
+            "default": "NINGUNO",
+            "title": "Controlambientalrequerido",
+            "type": "string"
+          },
+          "cubicable": {
+            "default": true,
+            "title": "Cubicable",
+            "type": "boolean"
+          },
+          "fragil": {
+            "default": false,
+            "title": "Fragil",
+            "type": "boolean"
+          },
+          "idCarroceriaPrincipal": {
+            "title": "Idcarroceriaprincipal",
+            "type": "string"
+          },
+          "idCarroceriaSecundaria": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Idcarroceriasecundaria"
+          },
+          "idCategoria": {
+            "title": "Idcategoria",
+            "type": "string"
+          },
+          "nombreMercancia": {
+            "minLength": 1,
+            "title": "Nombremercancia",
+            "type": "string"
+          },
+          "rotacionLibre": {
+            "default": true,
+            "title": "Rotacionlibre",
+            "type": "boolean"
+          },
+          "usuarioId": {
+            "minLength": 1,
+            "title": "Usuarioid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "usuarioId",
+          "codigoMercancia",
+          "nombreMercancia",
+          "idCategoria",
+          "idCarroceriaPrincipal"
+        ],
+        "title": "CrearMercanciaDto",
+        "type": "object"
       },
       "CrearPlanRequest": {
         "properties": {
           "nombre": {
-            "type": "string",
-            "title": "Nombre"
+            "title": "Nombre",
+            "type": "string"
           },
           "vehiculoId": {
-            "type": "string",
-            "title": "Vehiculoid"
+            "title": "Vehiculoid",
+            "type": "string"
           }
         },
-        "type": "object",
         "required": [
           "nombre",
           "vehiculoId"
         ],
-        "title": "CrearPlanRequest"
+        "title": "CrearPlanRequest",
+        "type": "object"
       },
-      "CriterioCubicacionDto": {
+      "CrearRecomendacionDto": {
         "properties": {
-          "criterio": {
-            "type": "string",
-            "title": "Criterio"
-          },
-          "resultado": {
-            "type": "string",
-            "title": "Resultado"
-          },
-          "detalle": {
-            "type": "string",
-            "title": "Detalle"
-          },
-          "criticidad": {
-            "type": "string",
-            "title": "Criticidad"
-          }
-        },
-        "type": "object",
-        "required": [
-          "criterio",
-          "resultado",
-          "detalle",
-          "criticidad"
-        ],
-        "title": "CriterioCubicacionDto"
-      },
-      "CubicacionRequestDto": {
-        "properties": {
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/ItemCubicacionDto"
-            },
-            "type": "array",
-            "title": "Items"
-          },
-          "unidadIds": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Unidadids"
-          },
-          "claseViaje": {
+          "claseViajeSeleccionada": {
             "anyOf": [
               {
                 "type": "string"
@@ -1564,87 +788,20 @@
                 "type": "null"
               }
             ],
-            "title": "Claseviaje"
-          }
-        },
-        "type": "object",
-        "required": [
-          "items"
-        ],
-        "title": "CubicacionRequestDto"
-      },
-      "CubicacionResponseDto": {
-        "properties": {
-          "matrices": {
+            "title": "Claseviajeseleccionada"
+          },
+          "idLineaSolicitud": {
+            "title": "Idlineasolicitud",
+            "type": "string"
+          },
+          "mercancias": {
             "items": {
-              "$ref": "#/components/schemas/MatrizCubicacionDto"
+              "$ref": "#/components/schemas/MercanciaSolicitadaDto"
             },
-            "type": "array",
-            "title": "Matrices"
+            "title": "Mercancias",
+            "type": "array"
           },
-          "sugerencia": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/SugerenciaVehiculoDto"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "advertencias": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Advertencias"
-          },
-          "sugerenciaFlota": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/SugerenciaFlotaDto"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "extradimension": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/DeteccionExtradimensionDto"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          }
-        },
-        "type": "object",
-        "required": [
-          "matrices",
-          "sugerencia",
-          "advertencias"
-        ],
-        "title": "CubicacionResponseDto"
-      },
-      "DeteccionExtradimensionDto": {
-        "properties": {
-          "hayExtradimension": {
-            "type": "boolean",
-            "title": "Hayextradimension"
-          },
-          "medidasEstandar": {
-            "$ref": "#/components/schemas/MedidasEstandarDto"
-          },
-          "piezas": {
-            "items": {
-              "$ref": "#/components/schemas/PiezaExcedidaDto"
-            },
-            "type": "array",
-            "title": "Piezas"
-          },
-          "sugerencia": {
+          "origenSistema": {
             "anyOf": [
               {
                 "type": "string"
@@ -1653,115 +810,215 @@
                 "type": "null"
               }
             ],
-            "title": "Sugerencia"
+            "title": "Origensistema"
+          },
+          "usuarioId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usuarioid"
           }
         },
-        "type": "object",
         "required": [
-          "hayExtradimension",
-          "medidasEstandar",
-          "piezas",
-          "sugerencia"
+          "idLineaSolicitud",
+          "mercancias"
         ],
-        "title": "DeteccionExtradimensionDto"
+        "title": "CrearRecomendacionDto",
+        "type": "object"
       },
-      "DisposicionDto": {
+      "CrearReglaDto": {
+        "description": "Sin `PUT`: una regla se borra y se crea. Cambiarle el par a una regla\nexistente es, en los hechos, otra regla.",
         "properties": {
-          "pesoTotalKg": {
-            "type": "number",
-            "title": "Pesototalkg"
+          "idCategoria1": {
+            "title": "Idcategoria1",
+            "type": "string"
           },
-          "centroGravedadM": {
-            "items": {
-              "type": "number"
-            },
-            "type": "array",
-            "title": "Centrogravedadm"
+          "idCategoria2": {
+            "title": "Idcategoria2",
+            "type": "string"
           },
-          "margenEstabilidadOk": {
-            "type": "boolean",
-            "title": "Margenestabilidadok"
+          "motivo": {
+            "minLength": 1,
+            "title": "Motivo",
+            "type": "string"
           },
-          "factorUtilizacionVolumen": {
-            "type": "number",
-            "title": "Factorutilizacionvolumen"
-          },
-          "itemsSinUbicar": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Itemssinubicar"
-          },
-          "colocaciones": {
-            "items": {
-              "$ref": "#/components/schemas/ColocacionDisposicionDto"
-            },
-            "type": "array",
-            "title": "Colocaciones"
+          "usuarioId": {
+            "minLength": 1,
+            "title": "Usuarioid",
+            "type": "string"
           }
         },
-        "type": "object",
         "required": [
-          "pesoTotalKg",
-          "centroGravedadM",
-          "margenEstabilidadOk",
-          "factorUtilizacionVolumen",
-          "itemsSinUbicar",
-          "colocaciones"
+          "usuarioId",
+          "idCategoria1",
+          "idCategoria2",
+          "motivo"
         ],
-        "title": "DisposicionDto"
+        "title": "CrearReglaDto",
+        "type": "object"
+      },
+      "CrearVehiculoDto": {
+        "properties": {
+          "activo": {
+            "default": true,
+            "title": "Activo",
+            "type": "boolean"
+          },
+          "altoUtilCm": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Altoutilcm"
+          },
+          "anchoCm": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Anchocm"
+          },
+          "capacidadMaximaKg": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Capacidadmaximakg"
+          },
+          "carrocerias": {
+            "items": {
+              "$ref": "#/components/schemas/CarroceriaDeVehiculoEntradaDto"
+            },
+            "title": "Carrocerias",
+            "type": "array"
+          },
+          "codigoVehiculo": {
+            "minLength": 1,
+            "title": "Codigovehiculo",
+            "type": "string"
+          },
+          "largoCm": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Largocm"
+          },
+          "nombreVehiculo": {
+            "minLength": 1,
+            "title": "Nombrevehiculo",
+            "type": "string"
+          },
+          "usuarioId": {
+            "minLength": 1,
+            "title": "Usuarioid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "usuarioId",
+          "codigoVehiculo",
+          "nombreVehiculo",
+          "largoCm",
+          "anchoCm",
+          "altoUtilCm",
+          "capacidadMaximaKg",
+          "carrocerias"
+        ],
+        "title": "CrearVehiculoDto",
+        "type": "object"
       },
       "EjeVehiculoDto": {
         "properties": {
-          "posicionMm": {
-            "type": "number",
-            "title": "Posicionmm"
-          },
           "capacidadKg": {
-            "type": "number",
-            "title": "Capacidadkg"
+            "title": "Capacidadkg",
+            "type": "number"
+          },
+          "posicionMm": {
+            "title": "Posicionmm",
+            "type": "number"
           }
         },
-        "type": "object",
         "required": [
           "posicionMm",
           "capacidadKg"
         ],
-        "title": "EjeVehiculoDto"
+        "title": "EjeVehiculoDto",
+        "type": "object"
+      },
+      "ExtradimensionDto": {
+        "properties": {
+          "hayExtradimension": {
+            "title": "Hayextradimension",
+            "type": "boolean"
+          },
+          "medidasEstandar": {
+            "$ref": "#/components/schemas/MedidasEstandarDto-Output"
+          },
+          "piezas": {
+            "items": {
+              "$ref": "#/components/schemas/PiezaFueraDeMedidaDto"
+            },
+            "title": "Piezas",
+            "type": "array"
+          }
+        },
+        "required": [
+          "hayExtradimension",
+          "medidasEstandar",
+          "piezas"
+        ],
+        "title": "ExtradimensionDto",
+        "type": "object"
       },
       "GuardarItemPlanCargueInput": {
         "properties": {
-          "id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Id"
+          "altoMm": {
+            "title": "Altomm",
+            "type": "number"
           },
-          "sku": {
-            "type": "string",
-            "title": "Sku",
-            "default": ""
+          "anchoMm": {
+            "title": "Anchomm",
+            "type": "number"
           },
-          "descripcion": {
-            "type": "string",
-            "title": "Descripcion"
+          "apilable": {
+            "default": true,
+            "title": "Apilable",
+            "type": "boolean"
           },
-          "pedido": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Pedido"
+          "cantidad": {
+            "default": 1,
+            "title": "Cantidad",
+            "type": "integer"
           },
           "cliente": {
             "anyOf": [
@@ -1774,43 +1031,6 @@
             ],
             "title": "Cliente"
           },
-          "destino": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Destino"
-          },
-          "secuenciaEntrega": {
-            "type": "integer",
-            "title": "Secuenciaentrega",
-            "default": 1
-          },
-          "largoMm": {
-            "type": "number",
-            "title": "Largomm"
-          },
-          "anchoMm": {
-            "type": "number",
-            "title": "Anchomm"
-          },
-          "altoMm": {
-            "type": "number",
-            "title": "Altomm"
-          },
-          "pesoKg": {
-            "type": "number",
-            "title": "Pesokg"
-          },
-          "cantidad": {
-            "type": "integer",
-            "title": "Cantidad",
-            "default": 1
-          },
           "color": {
             "anyOf": [
               {
@@ -1822,12 +1042,11 @@
             ],
             "title": "Color"
           },
-          "prioridad": {
-            "type": "integer",
-            "title": "Prioridad",
-            "default": 3
+          "descripcion": {
+            "title": "Descripcion",
+            "type": "string"
           },
-          "tipoEmbalaje": {
+          "destino": {
             "anyOf": [
               {
                 "type": "string"
@@ -1836,47 +1055,12 @@
                 "type": "null"
               }
             ],
-            "title": "Tipoembalaje"
-          },
-          "apilable": {
-            "type": "boolean",
-            "title": "Apilable",
-            "default": true
-          },
-          "maxNiveles": {
-            "type": "integer",
-            "title": "Maxniveles",
-            "default": 0
-          },
-          "maxPesoEncimaKg": {
-            "type": "number",
-            "title": "Maxpesoencimakg",
-            "default": -1.0
-          },
-          "rotable": {
-            "type": "boolean",
-            "title": "Rotable",
-            "default": true
-          },
-          "mantenerVertical": {
-            "type": "boolean",
-            "title": "Mantenervertical",
-            "default": false
+            "title": "Destino"
           },
           "fragil": {
-            "type": "boolean",
+            "default": false,
             "title": "Fragil",
-            "default": false
-          },
-          "peligroso": {
-            "type": "boolean",
-            "title": "Peligroso",
-            "default": false
-          },
-          "refrigerado": {
-            "type": "boolean",
-            "title": "Refrigerado",
-            "default": false
+            "type": "boolean"
           },
           "grupoCompatibilidad": {
             "anyOf": [
@@ -1889,30 +1073,6 @@
             ],
             "title": "Grupocompatibilidad"
           },
-          "observaciones": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Observaciones"
-          }
-        },
-        "type": "object",
-        "required": [
-          "descripcion",
-          "largoMm",
-          "anchoMm",
-          "altoMm",
-          "pesoKg"
-        ],
-        "title": "GuardarItemPlanCargueInput"
-      },
-      "GuardarVehiculoInput": {
-        "properties": {
           "id": {
             "anyOf": [
               {
@@ -1924,9 +1084,116 @@
             ],
             "title": "Id"
           },
-          "nombre": {
-            "type": "string",
-            "title": "Nombre"
+          "largoMm": {
+            "title": "Largomm",
+            "type": "number"
+          },
+          "mantenerVertical": {
+            "default": false,
+            "title": "Mantenervertical",
+            "type": "boolean"
+          },
+          "maxNiveles": {
+            "default": 0,
+            "title": "Maxniveles",
+            "type": "integer"
+          },
+          "maxPesoEncimaKg": {
+            "default": -1.0,
+            "title": "Maxpesoencimakg",
+            "type": "number"
+          },
+          "observaciones": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observaciones"
+          },
+          "pedido": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pedido"
+          },
+          "peligroso": {
+            "default": false,
+            "title": "Peligroso",
+            "type": "boolean"
+          },
+          "pesoKg": {
+            "title": "Pesokg",
+            "type": "number"
+          },
+          "prioridad": {
+            "default": 3,
+            "title": "Prioridad",
+            "type": "integer"
+          },
+          "refrigerado": {
+            "default": false,
+            "title": "Refrigerado",
+            "type": "boolean"
+          },
+          "rotable": {
+            "default": true,
+            "title": "Rotable",
+            "type": "boolean"
+          },
+          "secuenciaEntrega": {
+            "default": 1,
+            "title": "Secuenciaentrega",
+            "type": "integer"
+          },
+          "sku": {
+            "default": "",
+            "title": "Sku",
+            "type": "string"
+          },
+          "tipoEmbalaje": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tipoembalaje"
+          }
+        },
+        "required": [
+          "descripcion",
+          "largoMm",
+          "anchoMm",
+          "altoMm",
+          "pesoKg"
+        ],
+        "title": "GuardarItemPlanCargueInput",
+        "type": "object"
+      },
+      "GuardarVehiculoInput": {
+        "properties": {
+          "altoInternoMm": {
+            "title": "Altointernomm",
+            "type": "number"
+          },
+          "anchoInternoMm": {
+            "title": "Anchointernomm",
+            "type": "number"
+          },
+          "capacidadKg": {
+            "title": "Capacidadkg",
+            "type": "number"
           },
           "descripcion": {
             "anyOf": [
@@ -1939,57 +1206,59 @@
             ],
             "title": "Descripcion"
           },
-          "largoInternoMm": {
-            "type": "number",
-            "title": "Largointernomm"
-          },
-          "anchoInternoMm": {
-            "type": "number",
-            "title": "Anchointernomm"
-          },
-          "altoInternoMm": {
-            "type": "number",
-            "title": "Altointernomm"
-          },
-          "capacidadKg": {
-            "type": "number",
-            "title": "Capacidadkg"
-          },
-          "taraKg": {
-            "type": "number",
-            "title": "Tarakg"
-          },
-          "puertaAnchoMm": {
-            "type": "number",
-            "title": "Puertaanchomm"
-          },
-          "puertaAltoMm": {
-            "type": "number",
-            "title": "Puertaaltomm"
-          },
-          "puertaPosicion": {
-            "type": "string",
-            "title": "Puertaposicion"
-          },
           "ejes": {
             "items": {
               "$ref": "#/components/schemas/EjeVehiculoDto"
             },
-            "type": "array",
-            "title": "Ejes"
+            "title": "Ejes",
+            "type": "array"
           },
-          "toleranciaParedesMm": {
-            "type": "number",
-            "title": "Toleranciaparedesmm",
-            "default": 0.0
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "largoInternoMm": {
+            "title": "Largointernomm",
+            "type": "number"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "puertaAltoMm": {
+            "title": "Puertaaltomm",
+            "type": "number"
+          },
+          "puertaAnchoMm": {
+            "title": "Puertaanchomm",
+            "type": "number"
+          },
+          "puertaPosicion": {
+            "title": "Puertaposicion",
+            "type": "string"
+          },
+          "taraKg": {
+            "title": "Tarakg",
+            "type": "number"
           },
           "toleranciaEntreUnidadesMm": {
-            "type": "number",
+            "default": 0.0,
             "title": "Toleranciaentreunidadesmm",
-            "default": 0.0
+            "type": "number"
+          },
+          "toleranciaParedesMm": {
+            "default": 0.0,
+            "title": "Toleranciaparedesmm",
+            "type": "number"
           }
         },
-        "type": "object",
         "required": [
           "nombre",
           "largoInternoMm",
@@ -2002,7 +1271,8 @@
           "puertaPosicion",
           "ejes"
         ],
-        "title": "GuardarVehiculoInput"
+        "title": "GuardarVehiculoInput",
+        "type": "object"
       },
       "HTTPValidationError": {
         "properties": {
@@ -2010,31 +1280,15 @@
             "items": {
               "$ref": "#/components/schemas/ValidationError"
             },
-            "type": "array",
-            "title": "Detail"
+            "title": "Detail",
+            "type": "array"
           }
         },
-        "type": "object",
-        "title": "HTTPValidationError"
+        "title": "HTTPValidationError",
+        "type": "object"
       },
       "IncidenciaValidacionDto": {
         "properties": {
-          "severidad": {
-            "type": "string",
-            "title": "Severidad"
-          },
-          "codigoRegla": {
-            "type": "string",
-            "title": "Codigoregla"
-          },
-          "titulo": {
-            "type": "string",
-            "title": "Titulo"
-          },
-          "descripcion": {
-            "type": "string",
-            "title": "Descripcion"
-          },
           "accionSugerida": {
             "anyOf": [
               {
@@ -2046,6 +1300,10 @@
             ],
             "title": "Accionsugerida"
           },
+          "codigoRegla": {
+            "title": "Codigoregla",
+            "type": "string"
+          },
           "colocacionItemId": {
             "anyOf": [
               {
@@ -2056,9 +1314,20 @@
               }
             ],
             "title": "Colocacionitemid"
+          },
+          "descripcion": {
+            "title": "Descripcion",
+            "type": "string"
+          },
+          "severidad": {
+            "title": "Severidad",
+            "type": "string"
+          },
+          "titulo": {
+            "title": "Titulo",
+            "type": "string"
           }
         },
-        "type": "object",
         "required": [
           "severidad",
           "codigoRegla",
@@ -2067,97 +1336,26 @@
           "accionSugerida",
           "colocacionItemId"
         ],
-        "title": "IncidenciaValidacionDto"
-      },
-      "ItemCubicacionDto": {
-        "properties": {
-          "descripcion": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Descripcion"
-          },
-          "cantidad": {
-            "type": "integer",
-            "title": "Cantidad",
-            "default": 1
-          },
-          "largoCm": {
-            "type": "number",
-            "title": "Largocm"
-          },
-          "anchoCm": {
-            "type": "number",
-            "title": "Anchocm"
-          },
-          "altoCm": {
-            "type": "number",
-            "title": "Altocm"
-          },
-          "pesoKg": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Pesokg"
-          },
-          "tipoMercancia": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Tipomercancia"
-          }
-        },
-        "type": "object",
-        "required": [
-          "largoCm",
-          "anchoCm",
-          "altoCm"
-        ],
-        "title": "ItemCubicacionDto"
+        "title": "IncidenciaValidacionDto",
+        "type": "object"
       },
       "ItemPlanCargueDto": {
         "properties": {
-          "id": {
-            "type": "string",
-            "title": "Id"
+          "altoMm": {
+            "title": "Altomm",
+            "type": "number"
           },
-          "planCargueId": {
-            "type": "string",
-            "title": "Plancargueid"
+          "anchoMm": {
+            "title": "Anchomm",
+            "type": "number"
           },
-          "sku": {
-            "type": "string",
-            "title": "Sku"
+          "apilable": {
+            "title": "Apilable",
+            "type": "boolean"
           },
-          "descripcion": {
-            "type": "string",
-            "title": "Descripcion"
-          },
-          "pedido": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Pedido"
+          "cantidad": {
+            "title": "Cantidad",
+            "type": "integer"
           },
           "cliente": {
             "anyOf": [
@@ -2170,41 +1368,6 @@
             ],
             "title": "Cliente"
           },
-          "destino": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Destino"
-          },
-          "secuenciaEntrega": {
-            "type": "integer",
-            "title": "Secuenciaentrega"
-          },
-          "largoMm": {
-            "type": "number",
-            "title": "Largomm"
-          },
-          "anchoMm": {
-            "type": "number",
-            "title": "Anchomm"
-          },
-          "altoMm": {
-            "type": "number",
-            "title": "Altomm"
-          },
-          "pesoKg": {
-            "type": "number",
-            "title": "Pesokg"
-          },
-          "cantidad": {
-            "type": "integer",
-            "title": "Cantidad"
-          },
           "color": {
             "anyOf": [
               {
@@ -2216,11 +1379,11 @@
             ],
             "title": "Color"
           },
-          "prioridad": {
-            "type": "integer",
-            "title": "Prioridad"
+          "descripcion": {
+            "title": "Descripcion",
+            "type": "string"
           },
-          "tipoEmbalaje": {
+          "destino": {
             "anyOf": [
               {
                 "type": "string"
@@ -2229,39 +1392,11 @@
                 "type": "null"
               }
             ],
-            "title": "Tipoembalaje"
-          },
-          "apilable": {
-            "type": "boolean",
-            "title": "Apilable"
-          },
-          "maxNiveles": {
-            "type": "integer",
-            "title": "Maxniveles"
-          },
-          "maxPesoEncimaKg": {
-            "type": "number",
-            "title": "Maxpesoencimakg"
-          },
-          "rotable": {
-            "type": "boolean",
-            "title": "Rotable"
-          },
-          "mantenerVertical": {
-            "type": "boolean",
-            "title": "Mantenervertical"
+            "title": "Destino"
           },
           "fragil": {
-            "type": "boolean",
-            "title": "Fragil"
-          },
-          "peligroso": {
-            "type": "boolean",
-            "title": "Peligroso"
-          },
-          "refrigerado": {
-            "type": "boolean",
-            "title": "Refrigerado"
+            "title": "Fragil",
+            "type": "boolean"
           },
           "grupoCompatibilidad": {
             "anyOf": [
@@ -2274,6 +1409,26 @@
             ],
             "title": "Grupocompatibilidad"
           },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "largoMm": {
+            "title": "Largomm",
+            "type": "number"
+          },
+          "mantenerVertical": {
+            "title": "Mantenervertical",
+            "type": "boolean"
+          },
+          "maxNiveles": {
+            "title": "Maxniveles",
+            "type": "integer"
+          },
+          "maxPesoEncimaKg": {
+            "title": "Maxpesoencimakg",
+            "type": "number"
+          },
           "observaciones": {
             "anyOf": [
               {
@@ -2284,9 +1439,62 @@
               }
             ],
             "title": "Observaciones"
+          },
+          "pedido": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pedido"
+          },
+          "peligroso": {
+            "title": "Peligroso",
+            "type": "boolean"
+          },
+          "pesoKg": {
+            "title": "Pesokg",
+            "type": "number"
+          },
+          "planCargueId": {
+            "title": "Plancargueid",
+            "type": "string"
+          },
+          "prioridad": {
+            "title": "Prioridad",
+            "type": "integer"
+          },
+          "refrigerado": {
+            "title": "Refrigerado",
+            "type": "boolean"
+          },
+          "rotable": {
+            "title": "Rotable",
+            "type": "boolean"
+          },
+          "secuenciaEntrega": {
+            "title": "Secuenciaentrega",
+            "type": "integer"
+          },
+          "sku": {
+            "title": "Sku",
+            "type": "string"
+          },
+          "tipoEmbalaje": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tipoembalaje"
           }
         },
-        "type": "object",
         "required": [
           "id",
           "planCargueId",
@@ -2315,193 +1523,317 @@
           "grupoCompatibilidad",
           "observaciones"
         ],
-        "title": "ItemPlanCargueDto"
+        "title": "ItemPlanCargueDto",
+        "type": "object"
       },
-      "MatrizCubicacionDto": {
+      "MedidasEstandarDto-Input": {
         "properties": {
-          "unidad": {
-            "$ref": "#/components/schemas/UnidadCubicacionDto"
-          },
-          "criterios": {
-            "items": {
-              "$ref": "#/components/schemas/CriterioCubicacionDto"
-            },
-            "type": "array",
-            "title": "Criterios"
-          },
-          "banda": {
-            "type": "string",
-            "title": "Banda"
-          },
-          "advertencias": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Advertencias"
-          },
-          "disposicion": {
+          "altoMaxCm": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/DisposicionDto"
+                "type": "number"
               },
               {
-                "type": "null"
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
               }
-            ]
-          }
-        },
-        "type": "object",
-        "required": [
-          "unidad",
-          "criterios",
-          "banda",
-          "advertencias",
-          "disposicion"
-        ],
-        "title": "MatrizCubicacionDto"
-      },
-      "MedidasEstandarDto": {
-        "properties": {
-          "largoMaxCm": {
-            "type": "number",
-            "title": "Largomaxcm"
-          },
-          "anchoMaxCm": {
-            "type": "number",
-            "title": "Anchomaxcm"
-          },
-          "altoMaxCm": {
-            "type": "number",
+            ],
             "title": "Altomaxcm"
           },
+          "anchoMaxCm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Anchomaxcm"
+          },
+          "largoMaxCm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Largomaxcm"
+          },
           "pesoMaxKg": {
-            "type": "number",
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
             "title": "Pesomaxkg"
           }
         },
-        "type": "object",
         "required": [
           "largoMaxCm",
           "anchoMaxCm",
           "altoMaxCm",
           "pesoMaxKg"
         ],
-        "title": "MedidasEstandarDto"
+        "title": "MedidasEstandarDto",
+        "type": "object"
+      },
+      "MedidasEstandarDto-Output": {
+        "properties": {
+          "altoMaxCm": {
+            "title": "Altomaxcm",
+            "type": "number"
+          },
+          "anchoMaxCm": {
+            "title": "Anchomaxcm",
+            "type": "number"
+          },
+          "largoMaxCm": {
+            "title": "Largomaxcm",
+            "type": "number"
+          },
+          "pesoMaxKg": {
+            "title": "Pesomaxkg",
+            "type": "number"
+          }
+        },
+        "required": [
+          "largoMaxCm",
+          "anchoMaxCm",
+          "altoMaxCm",
+          "pesoMaxKg"
+        ],
+        "title": "MedidasEstandarDto",
+        "type": "object"
+      },
+      "MercanciaDeVehiculoDto": {
+        "properties": {
+          "cantidad": {
+            "title": "Cantidad",
+            "type": "integer"
+          },
+          "codigoMercancia": {
+            "title": "Codigomercancia",
+            "type": "string"
+          },
+          "idTipoMercancia": {
+            "title": "Idtipomercancia",
+            "type": "string"
+          },
+          "pesoKg": {
+            "title": "Pesokg",
+            "type": "number"
+          },
+          "volumenM3": {
+            "title": "Volumenm3",
+            "type": "number"
+          }
+        },
+        "required": [
+          "idTipoMercancia",
+          "codigoMercancia",
+          "cantidad",
+          "pesoKg",
+          "volumenM3"
+        ],
+        "title": "MercanciaDeVehiculoDto",
+        "type": "object"
+      },
+      "MercanciaSolicitadaDto": {
+        "properties": {
+          "altoCm": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Altocm"
+          },
+          "anchoCm": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Anchocm"
+          },
+          "cantidad": {
+            "minimum": 1.0,
+            "title": "Cantidad",
+            "type": "integer"
+          },
+          "idTipoMercancia": {
+            "title": "Idtipomercancia",
+            "type": "string"
+          },
+          "largoCm": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Largocm"
+          },
+          "pesoKg": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Pesokg"
+          }
+        },
+        "required": [
+          "idTipoMercancia",
+          "cantidad",
+          "largoCm",
+          "anchoCm",
+          "altoCm",
+          "pesoKg"
+        ],
+        "title": "MercanciaSolicitadaDto",
+        "type": "object"
       },
       "MetricasCubicacionDto": {
         "properties": {
-          "volumenInternoM3": {
-            "type": "number",
-            "title": "Volumeninternom3"
-          },
-          "volumenUtilizadoM3": {
-            "type": "number",
-            "title": "Volumenutilizadom3"
-          },
-          "porcentajeVolumen": {
-            "type": "number",
-            "title": "Porcentajevolumen"
-          },
-          "areaPisoM2": {
-            "type": "number",
-            "title": "Areapisom2"
-          },
-          "areaPisoUtilizadaM2": {
-            "type": "number",
-            "title": "Areapisoutilizadam2"
-          },
-          "porcentajePiso": {
-            "type": "number",
-            "title": "Porcentajepiso"
-          },
-          "pesoMaximoKg": {
-            "type": "number",
-            "title": "Pesomaximokg"
-          },
-          "pesoCargadoKg": {
-            "type": "number",
-            "title": "Pesocargadokg"
-          },
-          "porcentajePeso": {
-            "type": "number",
-            "title": "Porcentajepeso"
-          },
-          "unidadesTotales": {
-            "type": "integer",
-            "title": "Unidadestotales"
-          },
-          "unidadesCargadas": {
-            "type": "integer",
-            "title": "Unidadescargadas"
-          },
-          "unidadesNoCargadas": {
-            "type": "integer",
-            "title": "Unidadesnocargadas"
-          },
-          "pedidosCompletos": {
-            "type": "integer",
-            "title": "Pedidoscompletos"
-          },
-          "pedidosParciales": {
-            "type": "integer",
-            "title": "Pedidosparciales"
-          },
-          "destinos": {
-            "type": "integer",
-            "title": "Destinos"
+          "advertencias": {
+            "title": "Advertencias",
+            "type": "integer"
           },
           "alturaMaximaMm": {
-            "type": "number",
-            "title": "Alturamaximamm"
+            "title": "Alturamaximamm",
+            "type": "number"
+          },
+          "areaPisoM2": {
+            "title": "Areapisom2",
+            "type": "number"
+          },
+          "areaPisoUtilizadaM2": {
+            "title": "Areapisoutilizadam2",
+            "type": "number"
           },
           "centroGravedadMm": {
             "items": {
               "type": "number"
             },
-            "type": "array",
-            "title": "Centrogravedadmm"
+            "title": "Centrogravedadmm",
+            "type": "array"
+          },
+          "destinos": {
+            "title": "Destinos",
+            "type": "integer"
+          },
+          "diferenciaLadosKg": {
+            "title": "Diferencialadoskg",
+            "type": "number"
+          },
+          "espacioFragmentadoM3": {
+            "title": "Espaciofragmentadom3",
+            "type": "number"
+          },
+          "espacioVacioUtilM3": {
+            "title": "Espaciovacioutilm3",
+            "type": "number"
+          },
+          "pedidosCompletos": {
+            "title": "Pedidoscompletos",
+            "type": "integer"
+          },
+          "pedidosParciales": {
+            "title": "Pedidosparciales",
+            "type": "integer"
+          },
+          "pesoCargadoKg": {
+            "title": "Pesocargadokg",
+            "type": "number"
+          },
+          "pesoMaximoKg": {
+            "title": "Pesomaximokg",
+            "type": "number"
           },
           "pesoPorEjeKg": {
             "items": {
               "type": "number"
             },
-            "type": "array",
-            "title": "Pesoporejekg"
+            "title": "Pesoporejekg",
+            "type": "array"
           },
-          "diferenciaLadosKg": {
-            "type": "number",
-            "title": "Diferencialadoskg"
+          "porcentajePeso": {
+            "title": "Porcentajepeso",
+            "type": "number"
           },
-          "advertencias": {
-            "type": "integer",
-            "title": "Advertencias"
+          "porcentajePiso": {
+            "title": "Porcentajepiso",
+            "type": "number"
           },
-          "violacionesCriticas": {
-            "type": "integer",
-            "title": "Violacionescriticas"
+          "porcentajeVolumen": {
+            "title": "Porcentajevolumen",
+            "type": "number"
           },
           "puntaje": {
-            "type": "number",
-            "title": "Puntaje"
+            "title": "Puntaje",
+            "type": "number"
           },
           "puntajesParciales": {
             "additionalProperties": {
               "type": "number"
             },
-            "type": "object",
-            "title": "Puntajesparciales"
+            "title": "Puntajesparciales",
+            "type": "object"
           },
-          "espacioVacioUtilM3": {
-            "type": "number",
-            "title": "Espaciovacioutilm3"
+          "unidadesCargadas": {
+            "title": "Unidadescargadas",
+            "type": "integer"
           },
-          "espacioFragmentadoM3": {
-            "type": "number",
-            "title": "Espaciofragmentadom3"
+          "unidadesNoCargadas": {
+            "title": "Unidadesnocargadas",
+            "type": "integer"
+          },
+          "unidadesTotales": {
+            "title": "Unidadestotales",
+            "type": "integer"
+          },
+          "violacionesCriticas": {
+            "title": "Violacionescriticas",
+            "type": "integer"
+          },
+          "volumenInternoM3": {
+            "title": "Volumeninternom3",
+            "type": "number"
+          },
+          "volumenUtilizadoM3": {
+            "title": "Volumenutilizadom3",
+            "type": "number"
           }
         },
-        "type": "object",
         "required": [
           "volumenInternoM3",
           "volumenUtilizadoM3",
@@ -2529,30 +1861,20 @@
           "espacioVacioUtilM3",
           "espacioFragmentadoM3"
         ],
-        "title": "MetricasCubicacionDto"
+        "title": "MetricasCubicacionDto",
+        "type": "object"
       },
       "OptimizarRequestDto": {
         "properties": {
-          "estrategia": {
-            "type": "string",
-            "title": "Estrategia",
-            "default": "Combinada"
-          },
           "algoritmo": {
-            "type": "string",
+            "default": "bfd",
             "title": "Algoritmo",
-            "default": "bfd"
+            "type": "string"
           },
-          "semilla": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Semilla"
+          "estrategia": {
+            "default": "Combinada",
+            "title": "Estrategia",
+            "type": "string"
           },
           "ponderaciones": {
             "anyOf": [
@@ -2565,75 +1887,120 @@
             ]
           },
           "respetarBloqueadas": {
-            "type": "boolean",
+            "default": false,
             "title": "Respetarbloqueadas",
-            "default": false
-          }
-        },
-        "type": "object",
-        "title": "OptimizarRequestDto"
-      },
-      "PiezaExcedidaDto": {
-        "properties": {
-          "descripcion": {
-            "type": "string",
-            "title": "Descripcion"
+            "type": "boolean"
           },
-          "excesos": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Excesos"
-          },
-          "largoCm": {
-            "type": "number",
-            "title": "Largocm"
-          },
-          "anchoCm": {
-            "type": "number",
-            "title": "Anchocm"
-          },
-          "altoCm": {
-            "type": "number",
-            "title": "Altocm"
-          },
-          "pesoKg": {
+          "semilla": {
             "anyOf": [
               {
-                "type": "number"
+                "type": "integer"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Pesokg"
+            "title": "Semilla"
           }
         },
-        "type": "object",
+        "title": "OptimizarRequestDto",
+        "type": "object"
+      },
+      "ParametroMotorDto": {
+        "properties": {
+          "clave": {
+            "title": "Clave",
+            "type": "string"
+          },
+          "descripcion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descripcion"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "valor": {
+            "title": "Valor",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
         "required": [
+          "id",
+          "clave",
+          "valor",
           "descripcion",
-          "excesos",
-          "largoCm",
-          "anchoCm",
-          "altoCm",
-          "pesoKg"
+          "version"
         ],
-        "title": "PiezaExcedidaDto"
+        "title": "ParametroMotorDto",
+        "type": "object"
+      },
+      "PiezaFueraDeMedidaDto": {
+        "properties": {
+          "codigoMercancia": {
+            "title": "Codigomercancia",
+            "type": "string"
+          },
+          "excesos": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Excesos",
+            "type": "array"
+          },
+          "idTipoMercancia": {
+            "title": "Idtipomercancia",
+            "type": "string"
+          }
+        },
+        "required": [
+          "idTipoMercancia",
+          "codigoMercancia",
+          "excesos"
+        ],
+        "title": "PiezaFueraDeMedidaDto",
+        "type": "object"
       },
       "PlanCargueDto": {
         "properties": {
+          "algoritmo": {
+            "title": "Algoritmo",
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "title": "Createdat",
+            "type": "string"
+          },
+          "estado": {
+            "title": "Estado",
+            "type": "string"
+          },
+          "estrategia": {
+            "title": "Estrategia",
+            "type": "string"
+          },
           "id": {
-            "type": "string",
-            "title": "Id"
+            "title": "Id",
+            "type": "string"
           },
-          "nombre": {
-            "type": "string",
-            "title": "Nombre"
-          },
-          "vehiculoId": {
-            "type": "string",
-            "title": "Vehiculoid"
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ItemPlanCargueDto"
+            },
+            "title": "Items",
+            "type": "array"
           },
           "lineaSolicitudId": {
             "anyOf": [
@@ -2646,21 +2013,21 @@
             ],
             "title": "Lineasolicitudid"
           },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
           "numeroVehiculo": {
-            "type": "integer",
-            "title": "Numerovehiculo"
+            "title": "Numerovehiculo",
+            "type": "integer"
           },
-          "estado": {
-            "type": "string",
-            "title": "Estado"
+          "pesoTotalKg": {
+            "title": "Pesototalkg",
+            "type": "number"
           },
-          "estrategia": {
-            "type": "string",
-            "title": "Estrategia"
-          },
-          "algoritmo": {
-            "type": "string",
-            "title": "Algoritmo"
+          "puntaje": {
+            "title": "Puntaje",
+            "type": "number"
           },
           "semilla": {
             "anyOf": [
@@ -2673,45 +2040,28 @@
             ],
             "title": "Semilla"
           },
-          "pesoTotalKg": {
-            "type": "number",
-            "title": "Pesototalkg"
-          },
-          "volumenUtilizadoM3": {
-            "type": "number",
-            "title": "Volumenutilizadom3"
-          },
-          "utilizacionVolumen": {
-            "type": "number",
-            "title": "Utilizacionvolumen"
+          "updatedAt": {
+            "format": "date-time",
+            "title": "Updatedat",
+            "type": "string"
           },
           "utilizacionPiso": {
-            "type": "number",
-            "title": "Utilizacionpiso"
+            "title": "Utilizacionpiso",
+            "type": "number"
           },
-          "puntaje": {
-            "type": "number",
-            "title": "Puntaje"
+          "utilizacionVolumen": {
+            "title": "Utilizacionvolumen",
+            "type": "number"
           },
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/ItemPlanCargueDto"
-            },
-            "type": "array",
-            "title": "Items"
+          "vehiculoId": {
+            "title": "Vehiculoid",
+            "type": "string"
           },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Createdat"
-          },
-          "updatedAt": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Updatedat"
+          "volumenUtilizadoM3": {
+            "title": "Volumenutilizadom3",
+            "type": "number"
           }
         },
-        "type": "object",
         "required": [
           "id",
           "nombre",
@@ -2731,32 +2081,32 @@
           "createdAt",
           "updatedAt"
         ],
-        "title": "PlanCargueDto"
+        "title": "PlanCargueDto",
+        "type": "object"
       },
       "PlanFlotaItemDto": {
         "properties": {
           "id": {
-            "type": "string",
-            "title": "Id"
+            "title": "Id",
+            "type": "string"
           },
           "numeroVehiculo": {
-            "type": "integer",
-            "title": "Numerovehiculo"
+            "title": "Numerovehiculo",
+            "type": "integer"
           },
           "totalVehiculos": {
-            "type": "integer",
-            "title": "Totalvehiculos"
+            "title": "Totalvehiculos",
+            "type": "integer"
           },
           "unidadesCargadas": {
-            "type": "integer",
-            "title": "Unidadescargadas"
+            "title": "Unidadescargadas",
+            "type": "integer"
           },
           "unidadesTotales": {
-            "type": "integer",
-            "title": "Unidadestotales"
+            "title": "Unidadestotales",
+            "type": "integer"
           }
         },
-        "type": "object",
         "required": [
           "id",
           "numeroVehiculo",
@@ -2764,58 +2114,174 @@
           "unidadesCargadas",
           "unidadesTotales"
         ],
-        "title": "PlanFlotaItemDto"
+        "title": "PlanFlotaItemDto",
+        "type": "object"
       },
       "PonderacionesCombinadaDto": {
         "properties": {
-          "volumen": {
-            "type": "number",
-            "title": "Volumen",
-            "default": 0.25
-          },
           "balanceEjes": {
-            "type": "number",
+            "default": 0.25,
             "title": "Balanceejes",
-            "default": 0.25
+            "type": "number"
           },
           "estabilidad": {
-            "type": "number",
+            "default": 0.2,
             "title": "Estabilidad",
-            "default": 0.2
-          },
-          "secuencia": {
-            "type": "number",
-            "title": "Secuencia",
-            "default": 0.15
+            "type": "number"
           },
           "prioridad": {
-            "type": "number",
+            "default": 0.1,
             "title": "Prioridad",
-            "default": 0.1
+            "type": "number"
+          },
+          "secuencia": {
+            "default": 0.15,
+            "title": "Secuencia",
+            "type": "number"
           },
           "unidades": {
-            "type": "number",
+            "default": 0.05,
             "title": "Unidades",
-            "default": 0.05
+            "type": "number"
+          },
+          "volumen": {
+            "default": 0.25,
+            "title": "Volumen",
+            "type": "number"
           }
         },
-        "type": "object",
-        "title": "PonderacionesCombinadaDto"
+        "title": "PonderacionesCombinadaDto",
+        "type": "object"
+      },
+      "RecomendacionDto": {
+        "description": "`SIN_SELECCION_AUTOMATICA`, `condicionada` y `extradimension` vuelven con\n**200**, dentro de `resultado`: lo que antes era error ahora es resultado\n(seccion 2.6). Los codigos de error quedan solo para fallos reales.",
+        "properties": {
+          "advertencias": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Advertencias",
+            "type": "array"
+          },
+          "condicionada": {
+            "title": "Condicionada",
+            "type": "boolean"
+          },
+          "extradimension": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExtradimensionDto"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "idLineaSolicitud": {
+            "title": "Idlineasolicitud",
+            "type": "string"
+          },
+          "idRecomendacion": {
+            "title": "Idrecomendacion",
+            "type": "string"
+          },
+          "mercanciasCondicionadas": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Mercanciascondicionadas",
+            "type": "array"
+          },
+          "motivoSinSeleccion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Motivosinseleccion"
+          },
+          "origenSistema": {
+            "title": "Origensistema",
+            "type": "string"
+          },
+          "resultado": {
+            "title": "Resultado",
+            "type": "string"
+          },
+          "vehiculos": {
+            "items": {
+              "$ref": "#/components/schemas/VehiculoRecomendadoDto"
+            },
+            "title": "Vehiculos",
+            "type": "array"
+          }
+        },
+        "required": [
+          "idRecomendacion",
+          "idLineaSolicitud",
+          "origenSistema",
+          "resultado",
+          "motivoSinSeleccion",
+          "condicionada",
+          "mercanciasCondicionadas",
+          "vehiculos",
+          "advertencias",
+          "extradimension"
+        ],
+        "title": "RecomendacionDto",
+        "type": "object"
+      },
+      "ReglaIncompatibilidadDto": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "idCategoria1": {
+            "title": "Idcategoria1",
+            "type": "string"
+          },
+          "idCategoria2": {
+            "title": "Idcategoria2",
+            "type": "string"
+          },
+          "motivo": {
+            "title": "Motivo",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "idCategoria1",
+          "idCategoria2",
+          "motivo",
+          "version"
+        ],
+        "title": "ReglaIncompatibilidadDto",
+        "type": "object"
       },
       "ResultadoPlanDto": {
         "properties": {
-          "plan": {
-            "$ref": "#/components/schemas/PlanCargueDto"
-          },
-          "vehiculo": {
-            "$ref": "#/components/schemas/VehiculoCubicacionDto"
-          },
           "colocaciones": {
             "items": {
               "$ref": "#/components/schemas/ColocacionCargueDto"
             },
-            "type": "array",
-            "title": "Colocaciones"
+            "title": "Colocaciones",
+            "type": "array"
+          },
+          "incidencias": {
+            "items": {
+              "$ref": "#/components/schemas/IncidenciaValidacionDto"
+            },
+            "title": "Incidencias",
+            "type": "array"
           },
           "metricas": {
             "anyOf": [
@@ -2827,15 +2293,13 @@
               }
             ]
           },
-          "incidencias": {
-            "items": {
-              "$ref": "#/components/schemas/IncidenciaValidacionDto"
-            },
-            "type": "array",
-            "title": "Incidencias"
+          "plan": {
+            "$ref": "#/components/schemas/PlanCargueDto"
+          },
+          "vehiculo": {
+            "$ref": "#/components/schemas/VehiculoCubicacionDto"
           }
         },
-        "type": "object",
         "required": [
           "plan",
           "vehiculo",
@@ -2843,298 +2307,179 @@
           "metricas",
           "incidencias"
         ],
-        "title": "ResultadoPlanDto"
+        "title": "ResultadoPlanDto",
+        "type": "object"
       },
       "SolicitudEncoladaDto": {
+        "description": "Respuesta 202 de una operacion que se resuelve async (ver CONTRATO.md seccion 6).",
         "properties": {
           "correlationId": {
-            "type": "string",
-            "title": "Correlationid"
+            "title": "Correlationid",
+            "type": "string"
           },
           "estado": {
-            "type": "string",
+            "default": "procesando",
             "title": "Estado",
-            "default": "procesando"
+            "type": "string"
           }
         },
-        "type": "object",
         "required": [
           "correlationId"
         ],
         "title": "SolicitudEncoladaDto",
-        "description": "Respuesta 202 de una operacion que se resuelve async (ver CONTRATO.md seccion 6)."
+        "type": "object"
       },
-      "SugerenciaFlotaDto": {
+      "TipoCarroceriaDto": {
         "properties": {
-          "unidadId": {
-            "type": "string",
-            "title": "Unidadid"
+          "activo": {
+            "title": "Activo",
+            "type": "boolean"
           },
-          "unidadNombre": {
-            "type": "string",
-            "title": "Unidadnombre"
+          "codigoCarroceria": {
+            "title": "Codigocarroceria",
+            "type": "string"
           },
-          "cantidadVehiculos": {
-            "type": "integer",
-            "title": "Cantidadvehiculos"
-          },
-          "utilizacionPromedio": {
-            "type": "number",
-            "title": "Utilizacionpromedio"
-          },
-          "configVehiculo": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Configvehiculo"
-          },
-          "carroceria": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Carroceria"
-          },
-          "claseViaje": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Claseviaje"
-          },
-          "claseContenedor": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Clasecontenedor"
-          },
-          "disposiciones": {
-            "items": {
-              "$ref": "#/components/schemas/DisposicionDto"
-            },
-            "type": "array",
-            "title": "Disposiciones"
-          }
-        },
-        "type": "object",
-        "required": [
-          "unidadId",
-          "unidadNombre",
-          "cantidadVehiculos",
-          "utilizacionPromedio",
-          "configVehiculo",
-          "carroceria",
-          "claseViaje",
-          "claseContenedor",
-          "disposiciones"
-        ],
-        "title": "SugerenciaFlotaDto"
-      },
-      "SugerenciaVehiculoDto": {
-        "properties": {
-          "unidadId": {
-            "type": "string",
-            "title": "Unidadid"
-          },
-          "unidadNombre": {
-            "type": "string",
-            "title": "Unidadnombre"
-          },
-          "banda": {
-            "type": "string",
-            "title": "Banda"
-          },
-          "factorUtilizacion": {
-            "type": "number",
-            "title": "Factorutilizacion"
-          },
-          "configVehiculo": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Configvehiculo"
-          },
-          "carroceria": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Carroceria"
-          },
-          "claseViaje": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Claseviaje"
-          },
-          "claseContenedor": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Clasecontenedor"
-          }
-        },
-        "type": "object",
-        "required": [
-          "unidadId",
-          "unidadNombre",
-          "banda",
-          "factorUtilizacion",
-          "configVehiculo",
-          "carroceria",
-          "claseViaje",
-          "claseContenedor"
-        ],
-        "title": "SugerenciaVehiculoDto"
-      },
-      "UnidadCubicacionDto": {
-        "properties": {
           "id": {
-            "type": "string",
-            "title": "Id"
+            "title": "Id",
+            "type": "string"
           },
-          "nombre": {
-            "type": "string",
-            "title": "Nombre"
+          "nombreCarroceria": {
+            "title": "Nombrecarroceria",
+            "type": "string"
           },
-          "geometria": {
-            "type": "string",
-            "title": "Geometria"
-          },
-          "controlAmbiental": {
-            "type": "string",
-            "title": "Controlambiental"
-          },
-          "largoUtilM": {
-            "type": "number",
-            "title": "Largoutilm"
-          },
-          "anchoUtilM": {
-            "type": "number",
-            "title": "Anchoutilm"
-          },
-          "altoUtilM": {
-            "type": "number",
-            "title": "Altoutilm"
-          },
-          "pesoBrutoPermitidoKg": {
-            "type": "number",
-            "title": "Pesobrutopermitidokg"
-          },
-          "pesoVacioKg": {
-            "type": "number",
-            "title": "Pesovaciokg"
-          },
-          "capacidadPorEjeKg": {
-            "items": {
-              "type": "number"
-            },
-            "type": "array",
-            "title": "Capacidadporejekg"
-          },
-          "configVehiculo": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Configvehiculo"
-          },
-          "carroceria": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Carroceria"
-          },
-          "claseViaje": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Claseviaje"
-          },
-          "claseContenedor": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Clasecontenedor"
+          "version": {
+            "title": "Version",
+            "type": "integer"
           }
         },
-        "type": "object",
         "required": [
           "id",
-          "nombre",
-          "geometria",
-          "controlAmbiental",
-          "largoUtilM",
-          "anchoUtilM",
-          "altoUtilM",
-          "pesoBrutoPermitidoKg",
-          "pesoVacioKg",
-          "capacidadPorEjeKg",
-          "configVehiculo",
-          "carroceria",
-          "claseViaje",
-          "claseContenedor"
+          "codigoCarroceria",
+          "nombreCarroceria",
+          "activo",
+          "version"
         ],
-        "title": "UnidadCubicacionDto"
+        "title": "TipoCarroceriaDto",
+        "type": "object"
+      },
+      "TipoMercanciaDto": {
+        "properties": {
+          "activo": {
+            "title": "Activo",
+            "type": "boolean"
+          },
+          "apilable": {
+            "title": "Apilable",
+            "type": "boolean"
+          },
+          "carroceriaPrincipal": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Carroceriaprincipal"
+          },
+          "carroceriaSecundaria": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Carroceriasecundaria"
+          },
+          "carroceriaSecundariaCondicionada": {
+            "title": "Carroceriasecundariacondicionada",
+            "type": "boolean"
+          },
+          "categoria": {
+            "title": "Categoria",
+            "type": "string"
+          },
+          "codigoMercancia": {
+            "title": "Codigomercancia",
+            "type": "string"
+          },
+          "comentarioCondicion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comentariocondicion"
+          },
+          "condicionadaCubicacion": {
+            "title": "Condicionadacubicacion",
+            "type": "boolean"
+          },
+          "controlAmbientalRequerido": {
+            "title": "Controlambientalrequerido",
+            "type": "string"
+          },
+          "cubicable": {
+            "title": "Cubicable",
+            "type": "boolean"
+          },
+          "fragil": {
+            "title": "Fragil",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "nombreMercancia": {
+            "title": "Nombremercancia",
+            "type": "string"
+          },
+          "rotacionLibre": {
+            "title": "Rotacionlibre",
+            "type": "boolean"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "codigoMercancia",
+          "nombreMercancia",
+          "categoria",
+          "cubicable",
+          "condicionadaCubicacion",
+          "carroceriaPrincipal",
+          "carroceriaSecundaria",
+          "carroceriaSecundariaCondicionada",
+          "controlAmbientalRequerido",
+          "apilable",
+          "fragil",
+          "rotacionLibre",
+          "comentarioCondicion",
+          "activo",
+          "version"
+        ],
+        "title": "TipoMercanciaDto",
+        "type": "object"
       },
       "ValidationError": {
         "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
           "loc": {
             "items": {
               "anyOf": [
@@ -3146,42 +2491,101 @@
                 }
               ]
             },
-            "type": "array",
-            "title": "Location"
+            "title": "Location",
+            "type": "array"
           },
           "msg": {
-            "type": "string",
-            "title": "Message"
+            "title": "Message",
+            "type": "string"
           },
           "type": {
-            "type": "string",
-            "title": "Error Type"
-          },
-          "input": {
-            "title": "Input"
-          },
-          "ctx": {
-            "type": "object",
-            "title": "Context"
+            "title": "Error Type",
+            "type": "string"
           }
         },
-        "type": "object",
         "required": [
           "loc",
           "msg",
           "type"
         ],
-        "title": "ValidationError"
+        "title": "ValidationError",
+        "type": "object"
+      },
+      "VehiculoCatalogoDto": {
+        "description": "El vehiculo del catalogo que alimenta al motor.\n\n**No confundir con `/api/planes-cargue/vehiculos`**, que es el catalogo\npropio del motor 3D (`vehiculos_cubicacion`): otra tabla, otro proposito.",
+        "properties": {
+          "activo": {
+            "title": "Activo",
+            "type": "boolean"
+          },
+          "altoUtilCm": {
+            "title": "Altoutilcm",
+            "type": "number"
+          },
+          "anchoCm": {
+            "title": "Anchocm",
+            "type": "number"
+          },
+          "capacidadMaximaKg": {
+            "title": "Capacidadmaximakg",
+            "type": "number"
+          },
+          "carrocerias": {
+            "items": {
+              "$ref": "#/components/schemas/CarroceriaDeVehiculoDto"
+            },
+            "title": "Carrocerias",
+            "type": "array"
+          },
+          "codigoVehiculo": {
+            "title": "Codigovehiculo",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "largoCm": {
+            "title": "Largocm",
+            "type": "number"
+          },
+          "nombreVehiculo": {
+            "title": "Nombrevehiculo",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "codigoVehiculo",
+          "nombreVehiculo",
+          "largoCm",
+          "anchoCm",
+          "altoUtilCm",
+          "capacidadMaximaKg",
+          "activo",
+          "version",
+          "carrocerias"
+        ],
+        "title": "VehiculoCatalogoDto",
+        "type": "object"
       },
       "VehiculoCubicacionDto": {
         "properties": {
-          "id": {
-            "type": "string",
-            "title": "Id"
+          "altoInternoMm": {
+            "title": "Altointernomm",
+            "type": "number"
           },
-          "nombre": {
-            "type": "string",
-            "title": "Nombre"
+          "anchoInternoMm": {
+            "title": "Anchointernomm",
+            "type": "number"
+          },
+          "capacidadKg": {
+            "title": "Capacidadkg",
+            "type": "number"
           },
           "descripcion": {
             "anyOf": [
@@ -3194,59 +2598,54 @@
             ],
             "title": "Descripcion"
           },
-          "largoInternoMm": {
-            "type": "number",
-            "title": "Largointernomm"
-          },
-          "anchoInternoMm": {
-            "type": "number",
-            "title": "Anchointernomm"
-          },
-          "altoInternoMm": {
-            "type": "number",
-            "title": "Altointernomm"
-          },
-          "capacidadKg": {
-            "type": "number",
-            "title": "Capacidadkg"
-          },
-          "taraKg": {
-            "type": "number",
-            "title": "Tarakg"
-          },
-          "puertaAnchoMm": {
-            "type": "number",
-            "title": "Puertaanchomm"
-          },
-          "puertaAltoMm": {
-            "type": "number",
-            "title": "Puertaaltomm"
-          },
-          "puertaPosicion": {
-            "type": "string",
-            "title": "Puertaposicion"
-          },
           "ejes": {
             "items": {
               "$ref": "#/components/schemas/EjeVehiculoDto"
             },
-            "type": "array",
-            "title": "Ejes"
-          },
-          "toleranciaParedesMm": {
-            "type": "number",
-            "title": "Toleranciaparedesmm"
-          },
-          "toleranciaEntreUnidadesMm": {
-            "type": "number",
-            "title": "Toleranciaentreunidadesmm"
+            "title": "Ejes",
+            "type": "array"
           },
           "esPreset": {
-            "type": "boolean",
-            "title": "Espreset"
+            "title": "Espreset",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "largoInternoMm": {
+            "title": "Largointernomm",
+            "type": "number"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "puertaAltoMm": {
+            "title": "Puertaaltomm",
+            "type": "number"
+          },
+          "puertaAnchoMm": {
+            "title": "Puertaanchomm",
+            "type": "number"
+          },
+          "puertaPosicion": {
+            "title": "Puertaposicion",
+            "type": "string"
+          },
+          "taraKg": {
+            "title": "Tarakg",
+            "type": "number"
+          },
+          "toleranciaEntreUnidadesMm": {
+            "title": "Toleranciaentreunidadesmm",
+            "type": "number"
+          },
+          "toleranciaParedesMm": {
+            "title": "Toleranciaparedesmm",
+            "type": "number"
           }
         },
-        "type": "object",
         "required": [
           "id",
           "nombre",
@@ -3264,13 +2663,2418 @@
           "toleranciaEntreUnidadesMm",
           "esPreset"
         ],
-        "title": "VehiculoCubicacionDto"
+        "title": "VehiculoCubicacionDto",
+        "type": "object"
+      },
+      "VehiculoRecomendadoDto": {
+        "description": "Cada campo es obligatorio y nunca viaja en null cuando el resultado es\nASIGNADO - ver la tabla de la seccion 2.3. `pesoTotalKg` especialmente: es\nel peso que Cotifly le manda a NEXO al crear la solicitud, y el porcentaje\nno sirve para costear.",
+        "properties": {
+          "alertaBajoLlenado": {
+            "title": "Alertabajollenado",
+            "type": "boolean"
+          },
+          "codigoCarroceria": {
+            "title": "Codigocarroceria",
+            "type": "string"
+          },
+          "codigoVehiculo": {
+            "title": "Codigovehiculo",
+            "type": "string"
+          },
+          "heterogenea": {
+            "title": "Heterogenea",
+            "type": "boolean"
+          },
+          "idRecomendacionVehiculo": {
+            "title": "Idrecomendacionvehiculo",
+            "type": "string"
+          },
+          "mercancias": {
+            "items": {
+              "$ref": "#/components/schemas/MercanciaDeVehiculoDto"
+            },
+            "title": "Mercancias",
+            "type": "array"
+          },
+          "nombreVehiculo": {
+            "title": "Nombrevehiculo",
+            "type": "string"
+          },
+          "numeroVehiculo": {
+            "title": "Numerovehiculo",
+            "type": "integer"
+          },
+          "pesoTotalKg": {
+            "title": "Pesototalkg",
+            "type": "number"
+          },
+          "porcentajeLlenadoPeso": {
+            "title": "Porcentajellenadopeso",
+            "type": "number"
+          },
+          "porcentajeLlenadoVolumen": {
+            "title": "Porcentajellenadovolumen",
+            "type": "number"
+          },
+          "volumenTotalM3": {
+            "title": "Volumentotalm3",
+            "type": "number"
+          }
+        },
+        "required": [
+          "idRecomendacionVehiculo",
+          "numeroVehiculo",
+          "codigoVehiculo",
+          "nombreVehiculo",
+          "codigoCarroceria",
+          "pesoTotalKg",
+          "volumenTotalM3",
+          "porcentajeLlenadoVolumen",
+          "porcentajeLlenadoPeso",
+          "alertaBajoLlenado",
+          "heterogenea",
+          "mercancias"
+        ],
+        "title": "VehiculoRecomendadoDto",
+        "type": "object"
       }
     },
     "securitySchemes": {
       "HTTPBearer": {
-        "type": "http",
-        "scheme": "bearer"
+        "scheme": "bearer",
+        "type": "http"
+      }
+    }
+  },
+  "info": {
+    "description": "Microservicio de cubicacion: seleccion de flota (POST /recomendaciones) y motor de bin-packing 3D (Plan de Cargue). Autenticacion: Bearer estatico servicio-a-servicio, una llave POR SISTEMA para el contrato de recomendaciones (boton Authorize en Swagger). Contrato e integracion completos en CONTRATO.md.",
+    "title": "Cubicador",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/planes-cargue": {
+      "get": {
+        "operationId": "planes_api_planes_cargue_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PlanCargueDto"
+                  },
+                  "title": "Response Planes Api Planes Cargue Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Planes",
+        "tags": [
+          "plan-cargue"
+        ]
+      },
+      "post": {
+        "operationId": "crear_plan_api_planes_cargue_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CrearPlanRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanCargueDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Crear Plan",
+        "tags": [
+          "plan-cargue"
+        ]
+      }
+    },
+    "/api/planes-cargue/demo": {
+      "post": {
+        "operationId": "crear_demo_api_planes_cargue_demo_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanCargueDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Crear Demo",
+        "tags": [
+          "plan-cargue"
+        ]
+      }
+    },
+    "/api/planes-cargue/desde-linea/{linea_solicitud_id}": {
+      "post": {
+        "operationId": "crear_desde_linea_api_planes_cargue_desde_linea__linea_solicitud_id__post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "linea_solicitud_id",
+            "required": true,
+            "schema": {
+              "title": "Linea Solicitud Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SolicitudEncoladaDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Crear Desde Linea",
+        "tags": [
+          "plan-cargue"
+        ]
+      }
+    },
+    "/api/planes-cargue/por-linea/{linea_solicitud_id}": {
+      "get": {
+        "description": "Lista vacia mientras `crear_desde_linea` sigue en proceso (ver POST de arriba).",
+        "operationId": "por_linea_api_planes_cargue_por_linea__linea_solicitud_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "linea_solicitud_id",
+            "required": true,
+            "schema": {
+              "title": "Linea Solicitud Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PlanFlotaItemDto"
+                  },
+                  "title": "Response Por Linea Api Planes Cargue Por Linea  Linea Solicitud Id  Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Por Linea",
+        "tags": [
+          "plan-cargue"
+        ]
+      }
+    },
+    "/api/planes-cargue/vehiculos": {
+      "get": {
+        "operationId": "vehiculos_api_planes_cargue_vehiculos_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/VehiculoCubicacionDto"
+                  },
+                  "title": "Response Vehiculos Api Planes Cargue Vehiculos Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Vehiculos",
+        "tags": [
+          "plan-cargue"
+        ]
+      },
+      "post": {
+        "operationId": "guardar_vehiculo_api_planes_cargue_vehiculos_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GuardarVehiculoInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VehiculoCubicacionDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Guardar Vehiculo",
+        "tags": [
+          "plan-cargue"
+        ]
+      }
+    },
+    "/api/planes-cargue/vehiculos/republicar-catalogo": {
+      "post": {
+        "description": "Reparo manual, una sola vez, de la desincronizacion entre\nel catalogo de Cubicador y la proyeccion de NEXO (20 vehiculos en\nCubicador contra 13 en NEXO al momento de reportarse). Republica\nvehiculo.creado para TODO el catalogo actual - seguro de correr mas de\nuna vez, el consumer de NEXO hace upsert por Id. No es parte de ningun\nflujo automatico; se invoca a mano cuando haga falta re-sincronizar.",
+        "operationId": "republicar_catalogo_vehiculos_api_planes_cargue_vehiculos_republicar_catalogo_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/VehiculoCubicacionDto"
+                  },
+                  "title": "Response Republicar Catalogo Vehiculos Api Planes Cargue Vehiculos Republicar Catalogo Post",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Republicar Catalogo Vehiculos",
+        "tags": [
+          "plan-cargue"
+        ]
+      }
+    },
+    "/api/planes-cargue/vehiculos/{id}": {
+      "delete": {
+        "operationId": "eliminar_vehiculo_api_planes_cargue_vehiculos__id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Eliminar Vehiculo",
+        "tags": [
+          "plan-cargue"
+        ]
+      }
+    },
+    "/api/planes-cargue/{id}": {
+      "delete": {
+        "operationId": "eliminar_plan_api_planes_cargue__id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Eliminar Plan",
+        "tags": [
+          "plan-cargue"
+        ]
+      },
+      "get": {
+        "operationId": "obtener_plan_api_planes_cargue__id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanCargueDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Obtener Plan",
+        "tags": [
+          "plan-cargue"
+        ]
+      }
+    },
+    "/api/planes-cargue/{id}/colocaciones": {
+      "get": {
+        "operationId": "colocaciones_api_planes_cargue__id__colocaciones_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Colocaciones",
+        "tags": [
+          "plan-cargue"
+        ]
+      }
+    },
+    "/api/planes-cargue/{id}/colocaciones/{colocacion_id}": {
+      "patch": {
+        "operationId": "ajustar_api_planes_cargue__id__colocaciones__colocacion_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "colocacion_id",
+            "required": true,
+            "schema": {
+              "title": "Colocacion Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AjusteColocacionInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultadoPlanDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Ajustar",
+        "tags": [
+          "plan-cargue"
+        ]
+      }
+    },
+    "/api/planes-cargue/{id}/exportar": {
+      "get": {
+        "operationId": "exportar_api_planes_cargue__id__exportar_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultadoPlanDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Exportar",
+        "tags": [
+          "plan-cargue"
+        ]
+      }
+    },
+    "/api/planes-cargue/{id}/flota": {
+      "get": {
+        "operationId": "flota_api_planes_cargue__id__flota_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PlanFlotaItemDto"
+                  },
+                  "title": "Response Flota Api Planes Cargue  Id  Flota Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Flota",
+        "tags": [
+          "plan-cargue"
+        ]
+      }
+    },
+    "/api/planes-cargue/{id}/items": {
+      "post": {
+        "operationId": "guardar_item_api_planes_cargue__id__items_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GuardarItemPlanCargueInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItemPlanCargueDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Guardar Item",
+        "tags": [
+          "plan-cargue"
+        ]
+      }
+    },
+    "/api/planes-cargue/{id}/items/importar": {
+      "post": {
+        "operationId": "importar_items_api_planes_cargue__id__items_importar_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "items": {
+                  "$ref": "#/components/schemas/GuardarItemPlanCargueInput"
+                },
+                "title": "Items",
+                "type": "array"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ItemPlanCargueDto"
+                  },
+                  "title": "Response Importar Items Api Planes Cargue  Id  Items Importar Post",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Importar Items",
+        "tags": [
+          "plan-cargue"
+        ]
+      }
+    },
+    "/api/planes-cargue/{id}/items/{item_id}": {
+      "delete": {
+        "operationId": "eliminar_item_api_planes_cargue__id__items__item_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "title": "Item Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Eliminar Item",
+        "tags": [
+          "plan-cargue"
+        ]
+      }
+    },
+    "/api/planes-cargue/{id}/metricas": {
+      "get": {
+        "operationId": "metricas_api_planes_cargue__id__metricas_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Metricas",
+        "tags": [
+          "plan-cargue"
+        ]
+      }
+    },
+    "/api/planes-cargue/{id}/no-cargadas": {
+      "get": {
+        "operationId": "no_cargadas_api_planes_cargue__id__no_cargadas_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "No Cargadas",
+        "tags": [
+          "plan-cargue"
+        ]
+      }
+    },
+    "/api/planes-cargue/{id}/optimizar": {
+      "post": {
+        "operationId": "optimizar_api_planes_cargue__id__optimizar_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OptimizarRequestDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanCargueDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Optimizar",
+        "tags": [
+          "plan-cargue"
+        ]
+      }
+    },
+    "/api/planes-cargue/{id}/reoptimizar": {
+      "post": {
+        "operationId": "reoptimizar_api_planes_cargue__id__reoptimizar_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OptimizarRequestDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanCargueDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Reoptimizar",
+        "tags": [
+          "plan-cargue"
+        ]
+      }
+    },
+    "/api/planes-cargue/{id}/resultado": {
+      "get": {
+        "operationId": "resultado_api_planes_cargue__id__resultado_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultadoPlanDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Resultado",
+        "tags": [
+          "plan-cargue"
+        ]
+      }
+    },
+    "/categorias-mercancia": {
+      "get": {
+        "operationId": "listar_categorias_categorias_mercancia_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CategoriaMercanciaDto"
+                  },
+                  "title": "Response Listar Categorias Categorias Mercancia Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Categorias",
+        "tags": [
+          "catalogo"
+        ]
+      },
+      "post": {
+        "operationId": "crear_categoria_categorias_mercancia_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CrearCategoriaDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CategoriaMercanciaDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Crear Categoria",
+        "tags": [
+          "catalogo"
+        ]
+      }
+    },
+    "/categorias-mercancia/{id}": {
+      "delete": {
+        "operationId": "borrar_categoria_categorias_mercancia__id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BorrarDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Borrar Categoria",
+        "tags": [
+          "catalogo"
+        ]
+      },
+      "put": {
+        "operationId": "actualizar_categoria_categorias_mercancia__id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActualizarCategoriaDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CategoriaMercanciaDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Actualizar Categoria",
+        "tags": [
+          "catalogo"
+        ]
+      }
+    },
+    "/health": {
+      "get": {
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Health Health Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Health"
+      }
+    },
+    "/medidas-estandar": {
+      "get": {
+        "operationId": "medidas_estandar_medidas_estandar_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MedidasEstandarDto-Output"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Medidas Estandar",
+        "tags": [
+          "catalogo"
+        ]
+      },
+      "put": {
+        "operationId": "actualizar_medidas_medidas_estandar_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MedidasEstandarDto-Input"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MedidasEstandarDto-Output"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Actualizar Medidas",
+        "tags": [
+          "catalogo"
+        ]
+      }
+    },
+    "/parametros-motor": {
+      "get": {
+        "operationId": "listar_parametros_parametros_motor_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ParametroMotorDto"
+                  },
+                  "title": "Response Listar Parametros Parametros Motor Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Parametros",
+        "tags": [
+          "catalogo"
+        ]
+      }
+    },
+    "/parametros-motor/{clave}": {
+      "put": {
+        "operationId": "actualizar_parametro_parametros_motor__clave__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "clave",
+            "required": true,
+            "schema": {
+              "title": "Clave",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActualizarParametroDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ParametroMotorDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Actualizar Parametro",
+        "tags": [
+          "catalogo"
+        ]
+      }
+    },
+    "/recomendaciones": {
+      "get": {
+        "description": "La ultima corrida de una linea.\n\n`origenSistema` es **obligatorio en la query**, no se toma de la llave: un\nsistema puede necesitar leer lo que recomendo el otro (NEXO consulta lo de\nCotifly al recibir la solicitud), y un mismo codigo de linea puede existir\nen los dos.",
+        "operationId": "consultar_recomendaciones_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "idLineaSolicitud",
+            "required": true,
+            "schema": {
+              "title": "Idlineasolicitud",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "origenSistema",
+            "required": true,
+            "schema": {
+              "title": "Origensistema",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecomendacionDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Consultar",
+        "tags": [
+          "recomendaciones"
+        ]
+      },
+      "post": {
+        "operationId": "crear_recomendaciones_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CrearRecomendacionDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecomendacionDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Crear",
+        "tags": [
+          "recomendaciones"
+        ]
+      }
+    },
+    "/recomendaciones/{id_recomendacion_vehiculo}/mercancias": {
+      "get": {
+        "operationId": "mercancias_de_vehiculo_recomendaciones__id_recomendacion_vehiculo__mercancias_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id_recomendacion_vehiculo",
+            "required": true,
+            "schema": {
+              "title": "Id Recomendacion Vehiculo",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MercanciaDeVehiculoDto"
+                  },
+                  "title": "Response Mercancias De Vehiculo Recomendaciones  Id Recomendacion Vehiculo  Mercancias Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Mercancias De Vehiculo",
+        "tags": [
+          "recomendaciones"
+        ]
+      }
+    },
+    "/reglas-incompatibilidad": {
+      "get": {
+        "operationId": "listar_reglas_reglas_incompatibilidad_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ReglaIncompatibilidadDto"
+                  },
+                  "title": "Response Listar Reglas Reglas Incompatibilidad Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Reglas",
+        "tags": [
+          "catalogo"
+        ]
+      },
+      "post": {
+        "operationId": "crear_regla_reglas_incompatibilidad_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CrearReglaDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReglaIncompatibilidadDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Crear Regla",
+        "tags": [
+          "catalogo"
+        ]
+      }
+    },
+    "/reglas-incompatibilidad/{id}": {
+      "delete": {
+        "operationId": "borrar_regla_reglas_incompatibilidad__id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BorrarDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Borrar Regla",
+        "tags": [
+          "catalogo"
+        ]
+      }
+    },
+    "/tipos-carroceria": {
+      "get": {
+        "operationId": "listar_carrocerias_tipos_carroceria_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TipoCarroceriaDto"
+                  },
+                  "title": "Response Listar Carrocerias Tipos Carroceria Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Carrocerias",
+        "tags": [
+          "catalogo"
+        ]
+      },
+      "post": {
+        "operationId": "crear_carroceria_tipos_carroceria_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CrearCarroceriaDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TipoCarroceriaDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Crear Carroceria",
+        "tags": [
+          "catalogo"
+        ]
+      }
+    },
+    "/tipos-carroceria/republicar-catalogo": {
+      "post": {
+        "description": "Reparo manual de una desincronizacion con la proyeccion de NEXO.\n\nRepublica el evento de creacion para TODO el catalogo, no solo lo nuevo.\nSeguro de correr mas de una vez: el consumer de NEXO hace upsert por Id. No\nes parte de ningun flujo automatico. Es la misma herramienta que ya existia\npara los vehiculos del motor 3D, que hizo falta cuando esa proyeccion quedo\nen 13 filas contra 20 de aca.",
+        "operationId": "republicar_carrocerias_tipos_carroceria_republicar_catalogo_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TipoCarroceriaDto"
+                  },
+                  "title": "Response Republicar Carrocerias Tipos Carroceria Republicar Catalogo Post",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Republicar Carrocerias",
+        "tags": [
+          "catalogo"
+        ]
+      }
+    },
+    "/tipos-carroceria/{id}": {
+      "delete": {
+        "operationId": "borrar_carroceria_tipos_carroceria__id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BorrarDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Borrar Carroceria",
+        "tags": [
+          "catalogo"
+        ]
+      },
+      "put": {
+        "operationId": "actualizar_carroceria_tipos_carroceria__id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActualizarCarroceriaDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TipoCarroceriaDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Actualizar Carroceria",
+        "tags": [
+          "catalogo"
+        ]
+      }
+    },
+    "/tipos-mercancia": {
+      "get": {
+        "operationId": "listar_mercancias_tipos_mercancia_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TipoMercanciaDto"
+                  },
+                  "title": "Response Listar Mercancias Tipos Mercancia Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Mercancias",
+        "tags": [
+          "catalogo"
+        ]
+      },
+      "post": {
+        "operationId": "crear_mercancia_tipos_mercancia_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CrearMercanciaDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TipoMercanciaDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Crear Mercancia",
+        "tags": [
+          "catalogo"
+        ]
+      }
+    },
+    "/tipos-mercancia/republicar-catalogo": {
+      "post": {
+        "description": "Ver `republicar_carrocerias`.",
+        "operationId": "republicar_mercancias_tipos_mercancia_republicar_catalogo_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TipoMercanciaDto"
+                  },
+                  "title": "Response Republicar Mercancias Tipos Mercancia Republicar Catalogo Post",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Republicar Mercancias",
+        "tags": [
+          "catalogo"
+        ]
+      }
+    },
+    "/tipos-mercancia/{id}": {
+      "delete": {
+        "operationId": "borrar_mercancia_tipos_mercancia__id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BorrarDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Borrar Mercancia",
+        "tags": [
+          "catalogo"
+        ]
+      },
+      "put": {
+        "operationId": "actualizar_mercancia_tipos_mercancia__id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActualizarMercanciaDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TipoMercanciaDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Actualizar Mercancia",
+        "tags": [
+          "catalogo"
+        ]
+      }
+    },
+    "/vehiculos-catalogo": {
+      "get": {
+        "operationId": "listar_vehiculos_vehiculos_catalogo_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/VehiculoCatalogoDto"
+                  },
+                  "title": "Response Listar Vehiculos Vehiculos Catalogo Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Vehiculos",
+        "tags": [
+          "catalogo"
+        ]
+      },
+      "post": {
+        "operationId": "crear_vehiculo_vehiculos_catalogo_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CrearVehiculoDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VehiculoCatalogoDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Crear Vehiculo",
+        "tags": [
+          "catalogo"
+        ]
+      }
+    },
+    "/vehiculos-catalogo/republicar-catalogo": {
+      "post": {
+        "description": "Ver `republicar_carrocerias`.",
+        "operationId": "republicar_vehiculos_vehiculos_catalogo_republicar_catalogo_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/VehiculoCatalogoDto"
+                  },
+                  "title": "Response Republicar Vehiculos Vehiculos Catalogo Republicar Catalogo Post",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Republicar Vehiculos",
+        "tags": [
+          "catalogo"
+        ]
+      }
+    },
+    "/vehiculos-catalogo/{id}": {
+      "delete": {
+        "operationId": "borrar_vehiculo_vehiculos_catalogo__id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BorrarDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Borrar Vehiculo",
+        "tags": [
+          "catalogo"
+        ]
+      },
+      "put": {
+        "operationId": "actualizar_vehiculo_vehiculos_catalogo__id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActualizarVehiculoDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VehiculoCatalogoDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Actualizar Vehiculo",
+        "tags": [
+          "catalogo"
+        ]
       }
     }
   }

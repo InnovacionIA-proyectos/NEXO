@@ -111,3 +111,30 @@ Si alguna vez alguna de estas 33 pruebas falla tras un cambio: es un bug del
 port — no una "rareza a documentar" (ver DECISIONES_TECNICAS.md #2). Estas 31
 reglas son parte del contrato de comportamiento, no candidatas a
 reinterpretación.
+
+---
+
+## Lo que estas 31 reglas NO cubren
+
+Son las reglas **portadas desde cabinaFletes**: la geometría del motor 3D.
+Desde S5-HU-17.3 hay un segundo juego de reglas, las del **motor de selección
+de flota** (`domain/motor/seleccion_flota.py`), que no vienen de ningún motor
+C# y por eso no están en esta tabla ni tienen origen que citar.
+
+Esas viven en `tests/domain/test_seleccion_flota.py` (22 pruebas) y fijan,
+entre otras: que la decisión usa `max(%volumen, %peso)` y no solo el volumen;
+que la capacidad es la de la combinación vehículo-carrocería y no la del
+chasis; que la flota puede ser mixta; que las mercancías incompatibles se
+reparten en vehículos distintos en vez de vetar la carga; que una mercancía
+condicionada sale con recomendación y además marcada; que la carrocería de
+respaldo entra cuando la principal no tiene vehículos; y que la dominancia por
+carrocería falla con error explícito en vez de devolver un mínimo equivocado.
+
+`tests/domain/test_dblf.py` (8 pruebas) cubre el empacador: que DBLF llena
+desde el fondo hacia la puerta, que respeta capacidad y apilamiento, y que
+elige la orientación que mejor embaldosa el vehículo — **y que esa preferencia
+es solo suya**, porque FFD y BFD conservan el orden histórico de
+`orientaciones_de`, del que dependen los 27 casos dorados de paridad.
+
+`tests/application/test_recomendar_flota.py` (9 pruebas) cierra el circuito
+contra SQLite: adaptador, puerto, caso de uso y motor.

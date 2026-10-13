@@ -2,13 +2,29 @@ fastapi>=0.115
 uvicorn[standard]>=0.32
 pydantic>=2.9
 pydantic-settings>=2.6
-sqlalchemy>=2.0
+# El extra [asyncio] arrastra `greenlet`, que SQLAlchemy necesita para su capa
+# async. NO viene como dependencia transitiva en python:3.14-slim, asi que sin
+# esto la imagen arranca y muere en el import con "The SQLAlchemy asyncio
+# module requires that the Python 'greenlet' library is installed".
+# Localmente no se nota: el venv ya suele traer greenlet de arrastre, y el
+# fallo aparece recien dentro del contenedor.
+sqlalchemy[asyncio]>=2.0
 aiosqlite>=0.20
-asyncpg>=0.30
 aio-pika>=9.4
 httpx>=0.27
-psycopg2-binary
-asyncpg
+
+# SQL Server (S5-HU-17.1). aioodbc es el driver async que usa SQLAlchemy con el
+# dialecto mssql+aioodbc; pyodbc es su capa sincrona por debajo y lo necesita
+# alembic, que no es async. Los dos exigen el "ODBC Driver 18 for SQL Server"
+# instalado en el sistema - ver Dockerfile.
+aioodbc>=0.5
+pyodbc>=5.2
+
+# Sin alembic a proposito (S5-HU-17.2): su `--autogenerate` lee la base entera
+# y propone borrar lo que sus modelos no conocen. Contra la base real genero 36
+# `op.drop_table` sobre tablas de Cotifly, que comparte `dbTarifario_Nexo_Pruebas`.
+# El esquema del motor 3D vive en docs/Database/ESQUEMA_CUBICADOR.sql y se aplica
+# a mano, mismo criterio que ESQUEMA_NEXO.sql en la raiz de NEXO.
 
 # dev
 pytest>=8.3

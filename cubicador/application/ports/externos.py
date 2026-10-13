@@ -16,6 +16,12 @@ class PosicionCarga:
     ancho_cm: float
     alto_cm: float
     peso_kg: float | None
+    # Codigo del catalogo de tipos de mercancia (S5-HU-17.6). NEXO lo agrega al
+    # JSON de `Dimensiones` por posicion; las lineas capturadas antes no lo
+    # traen y el puente las rechaza con motivo. **No se les pone un default**:
+    # el tipo de mercancia arrastra la carroceria, asi que asumir uno elegiria
+    # el vehiculo equivocado en silencio.
+    codigo_mercancia: str | None = None
 
 
 @dataclass(frozen=True)
@@ -48,3 +54,21 @@ class IEventosPort(Protocol):
     async def publicar_vehiculo_creado(self, vehiculo_id: str, vehiculo: dict[str, Any]) -> None: ...
 
     async def publicar_vehiculo_actualizado(self, vehiculo_id: str, vehiculo: dict[str, Any]) -> None: ...
+
+    # --- Catalogo del contrato unico (S5-HU-17.4) --------------------------
+    # NEXO proyecta mercancias y carrocerias igual que ya proyecta vehiculos:
+    # sin estos eventos su copia se queda vieja y nadie se entera hasta que un
+    # usuario elige una mercancia que ya no existe. Los publican las
+    # escrituras de los CRUD (S5-HU-17.5); aca solo queda declarado el puerto.
+
+    async def publicar_mercancia_creada(self, mercancia_id: str, mercancia: dict[str, Any]) -> None: ...
+
+    async def publicar_mercancia_actualizada(self, mercancia_id: str, mercancia: dict[str, Any]) -> None: ...
+
+    async def publicar_mercancia_eliminada(self, mercancia_id: str) -> None: ...
+
+    async def publicar_carroceria_creada(self, carroceria_id: str, carroceria: dict[str, Any]) -> None: ...
+
+    async def publicar_carroceria_actualizada(self, carroceria_id: str, carroceria: dict[str, Any]) -> None: ...
+
+    async def publicar_carroceria_eliminada(self, carroceria_id: str) -> None: ...

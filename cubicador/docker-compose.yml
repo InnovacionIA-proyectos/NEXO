@@ -1,5 +1,13 @@
-# Ver DECISIONES_TECNICAS.md #9: la base de datos es propia (db, Postgres),
-# pero el broker de mensajeria YA NO lo es - se conecta al `rabbit` compartido
+# S5-HU-17.1: la base paso de Postgres propio a SQL Server. En QA y produccion
+# el Cubicador NO tiene base propia - vive en el esquema `dbo_cubicador` de
+# `dbTarifario_Nexo_Pruebas`, que COMPARTE CON COTIFLY (`dbo_cotifly`). NEXO
+# no esta ahi: usa su propia base `Nexo`. Este compose levanta un SQL Server
+# LOCAL que imita
+# esa forma (misma base, mismo esquema, otro host) para desarrollo y para el
+# smoke test de CI; ahi no se toca la base compartida.
+#
+# Ver DECISIONES_TECNICAS.md #9: el broker de mensajeria tampoco es propio -
+# se conecta al `rabbit` compartido
 # del docker-compose.yml raiz de NEXO via un nombre de red EXTERNO
 # (nexo_internal, fijado por el `name:` de ese archivo). Requiere que el
 # stack raiz de NEXO ya tenga corriendo (o corra) el servicio `rabbit`:
@@ -11,29 +19,82 @@
 
 services:
   db:
-    image: postgres:16-alpine
+    # 2019 para igualar la instancia real de QA. OJO: docker-compose.ci.yml de
+    # la raiz (pruebas .NET) usa 2022 - son instancias distintas, no un
+    # descuido, pero conviene saberlo si algo se comporta diferente.
+    image: mcr.microsoft.com/mssql/server:2019-latest
     environment:
-      POSTGRES_DB: cubicador
-      POSTGRES_USER: cubicador
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?definir en .env}
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?definir en .env}
+      MSSQL_PID: Developer
     volumes:
-      - db_data:/var/lib/postgresql/data
+      # Volumen PROPIO de SQL Server. `db_data` NO se reutiliza: todavia tiene
+      # los datos de PostgreSQL (uid 70), que hay que MIGRAR, no perder. Ademas
+      # SQL Server corre con otro usuario y no puede escribir en ese directorio:
+      # el contenedor entra en bucle de reinicio con "Permission denied".
+      - db_data_mssql:/var/opt/mssql
     ports:
-      - "5433:5432"  # puerto distinto de 5432 por si corre junto a otro Postgres local
+      - "1434:1433"  # puerto distinto de 1433 por si corre junto a otro SQL Server local
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U cubicador -d cubicador"]
-      interval: 3s
-      timeout: 3s
-      retries: 10
+      # La imagen 2019 trae sqlcmd en /opt/mssql-tools; las mas nuevas en
+      # /opt/mssql-tools18 (que exige -C para aceptar el certificado propio).
+      # Se prueban los dos para no depender de la version exacta del tag.
+      test:
+        - CMD-SHELL
+        - >
+          (/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$$MSSQL_SA_PASSWORD" -C -Q "SELECT 1"
+          || /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P "$$MSSQL_SA_PASSWORD" -Q "SELECT 1")
+          > /dev/null 2>&1
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s  # SQL Server tarda bastante mas que Postgres en quedar listo
     restart: unless-stopped
+
+  # Crea la base y el esquema una sola vez y termina. El DDL de
+  # docs/Database/ESQUEMA_CUBICADOR.sql crea tablas, pero no la BASE ni el
+  # esquema: sin este paso el primer arranque falla con "Cannot open
+  # database". En QA/produccion no existe - la base y el esquema ya estan.
+  db-init:
+    image: mcr.microsoft.com/mssql/server:2019-latest
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?definir en .env}
+      CUBICADOR_DB_ESQUEMA: ${CUBICADOR_DB_ESQUEMA:-dbo_cubicador}
+    entrypoint:
+      - /bin/bash
+      - -c
+      - |
+        set -e
+        if [ -x /opt/mssql-tools18/bin/sqlcmd ]; then
+          SQLCMD="/opt/mssql-tools18/bin/sqlcmd -C"
+        else
+          SQLCMD="/opt/mssql-tools/bin/sqlcmd"
+        fi
+        $$SQLCMD -S db -U sa -P "$$MSSQL_SA_PASSWORD" -b -Q \
+          "IF DB_ID('dbTarifario_Nexo_Pruebas') IS NULL CREATE DATABASE [dbTarifario_Nexo_Pruebas];"
+        $$SQLCMD -S db -U sa -P "$$MSSQL_SA_PASSWORD" -b -d dbTarifario_Nexo_Pruebas -Q \
+          "IF SCHEMA_ID('$$CUBICADOR_DB_ESQUEMA') IS NULL EXEC('CREATE SCHEMA [$$CUBICADOR_DB_ESQUEMA]');"
+        echo "Base y esquema $$CUBICADOR_DB_ESQUEMA listos."
+    restart: "no"
 
   api:
     build:
       context: .
       dockerfile: Dockerfile
     environment:
-      DATABASE_URL: postgresql+asyncpg://cubicador:${POSTGRES_PASSWORD}@db:5432/cubicador
+      # Apunta al SQL Server LOCAL de este compose, no a la base compartida.
+      # `sa` solo existe aca: en QA/produccion se define DATABASE_URL entera
+      # como variable de entorno (ver .env.dokploy).
+      DATABASE_URL: mssql+aioodbc://sa:${MSSQL_SA_PASSWORD}@db:1433/dbTarifario_Nexo_Pruebas?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes
+      CUBICADOR_DB_ESQUEMA: ${CUBICADOR_DB_ESQUEMA:-dbo_cubicador}
       CUBICADOR_API_KEY: ${CUBICADOR_API_KEY:?definir en .env}
+      # Llave por sistema: de aca sale el origenSistema verificado de
+      # POST /recomendaciones (ver .env.example).
+      CUBICADOR_API_KEY_NEXO: ${CUBICADOR_API_KEY_NEXO:-}
+      CUBICADOR_API_KEY_COTIFLY: ${CUBICADOR_API_KEY_COTIFLY:-}
       # rabbit compartido de NEXO (mismas credenciales que su .env raiz) - ver
       # comentario de cabecera de este archivo.
       CUBICADOR_RABBITMQ_URL: amqp://${RABBITMQ_USER:?definir en .env}:${RABBITMQ_PASSWORD:?definir en .env}@rabbit:5672/
@@ -48,6 +109,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      db-init:
+        condition: service_completed_successfully
     networks:
       - default
       - nexo_shared
@@ -64,7 +127,11 @@ services:
       context: .
       dockerfile: Dockerfile.worker
     environment:
-      DATABASE_URL: postgresql+asyncpg://cubicador:${POSTGRES_PASSWORD}@db:5432/cubicador
+      # Apunta al SQL Server LOCAL de este compose, no a la base compartida.
+      # `sa` solo existe aca: en QA/produccion se define DATABASE_URL entera
+      # como variable de entorno (ver .env.dokploy).
+      DATABASE_URL: mssql+aioodbc://sa:${MSSQL_SA_PASSWORD}@db:1433/dbTarifario_Nexo_Pruebas?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes
+      CUBICADOR_DB_ESQUEMA: ${CUBICADOR_DB_ESQUEMA:-dbo_cubicador}
       CUBICADOR_RABBITMQ_URL: amqp://${RABBITMQ_USER:?definir en .env}:${RABBITMQ_PASSWORD:?definir en .env}@rabbit:5672/
       NEXO_BASE_URL: ${NEXO_BASE_URL:?definir en .env}
       NEXO_CALLBACK_API_KEY: ${NEXO_CALLBACK_API_KEY:?definir en .env}
@@ -87,6 +154,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      db-init:
+        condition: service_completed_successfully
     networks:
       - default
       - nexo_shared
@@ -104,4 +173,8 @@ networks:
     external: true
 
 volumes:
+  # Datos de SQL Server (el motor actual).
+  db_data_mssql:
+  # Datos viejos de PostgreSQL. Se conservan hasta migrarlos (S5-HU-17.1):
+  # aqui estan los planes de cargue que ya existen. No borrar antes de eso.
   db_data:

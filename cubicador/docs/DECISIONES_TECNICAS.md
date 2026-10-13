@@ -94,7 +94,7 @@ correctamente, no existía.
 La pasada de humo end-to-end (crear plan, optimizar, ajustar) contra el
 entorno real está en `tests/api/test_smoke.py` + verificación manual/CI
 contra Docker real (ver `testDocumentation/PRUEBAS_DE_INTEGRACION.md`) — es
-un nivel distinto (flujo completo vía HTTP/RabbitMQ/Postgres), no paridad
+un nivel distinto (flujo completo vía HTTP/RabbitMQ/base de datos), no paridad
 del motor.
 
 ## 4. Contrato REST: mismas rutas, mismos DTOs, mismos códigos
@@ -262,8 +262,17 @@ otro host" (la razón original para mantenerlos separados) sigue siendo
 igual de fácil compartiendo un broker: es la MISMA operación (cambiar una
 connection string), y ahora solo hay que hacerla una vez, no dos.
 
-**Decisión vigente**: la base de datos (Postgres, `db`) sigue siendo propia
-de este `docker-compose.yml` — eso no cambió. RabbitMQ SÍ se comparte: `api`
+**Actualizado en S5-HU-17.1 (2026-10-09)**: la base dejó de ser Postgres y
+dejó de ser propia. Ahora es **SQL Server**, y en QA y producción el Cubicador
+vive en el esquema `dbo_cubicador` de `dbTarifario_Nexo_Pruebas`, una base
+**compartida con Cotifly** (`dbo_cotifly`) — NEXO no está ahí, usa la suya. El
+servicio `db` del `docker-compose.yml` sigue existiendo pero ya es un SQL
+Server **local**, para desarrollo y para el smoke de CI, que imita esa forma
+(misma base, mismo esquema, otro host) sin tocar la compartida. El esquema lo
+lo gobierna `docs/Database/ESQUEMA_CUBICADOR.sql`, que se aplica a mano, no
+`create_all` ni migraciones automaticas.
+
+**Decisión vigente**: RabbitMQ SÍ se comparte: `api`
 y `worker` se conectan al `rabbit` del `docker-compose.yml` raíz de NEXO
 (proyecto Compose separado — no se fusionaron los archivos, siguen siendo dos
 `docker compose up` independientes) enganchándose a su red `internal` por
@@ -389,17 +398,54 @@ Confirmado también en el capturador (`GET /api/Messages`): `rowCount: 6`,
 los 6 destinatarios, asunto `[Cubicador] Mensaje tipo_invalido_ci cayo a la
 cola de error tras 3 intentos`.
 
-**Motor de base de datos**: se eligió **PostgreSQL** para producción
-(`docker-compose.yml`) por ser el más común en stacks Python/FastAPI; el
-desarrollo/tests usan SQLite (`DATABASE_URL` por defecto) — mismo código
-SQLAlchemy sirve para ambos, solo cambia la URL. **Verificado**: el flujo
-completo (crear vehículo → plan → ítem → optimizar → ajustar) corrió contra
-un Postgres 16 real en Docker Compose sin cambios de código. Confirmar con
-el equipo si se prefiere otro motor antes de desplegar a producción.
+**Motor de base de datos** — *reemplazado en S5-HU-17.1 (2026-10-09)*: ahora
+es **SQL Server**, el mismo motor que el resto de NEXO. Se dejó de elegir
+PostgreSQL "por ser el más común en stacks Python/FastAPI" porque mantener dos
+motores en la casa costaba más que la comodidad que daba, y porque el catálogo
+nuevo lo administra gente que ya trabaja contra SQL Server.
+
+Dialecto `mssql+aioodbc`, con el *ODBC Driver 18* instalado en la imagen (ver
+`Dockerfile`, que tiene documentadas tres trampas nada evidentes de esa
+instalación). Desarrollo y tests siguen usando SQLite por defecto: el mismo
+código SQLAlchemy sirve para ambos, solo cambia la URL — con una excepción, el
+esquema, que solo se declara contra SQL Server porque SQLite no los soporta
+(ver `infrastructure/persistence/db.py`).
+
+**Verificado el 2026-10-09**: la suite entera en verde dentro de la imagen (142 pruebas a esa fecha), el
+esquema del motor 3D aplicado contra SQL Server 2019 real, y la api
+arrancando y sirviendo el catálogo de vehículos desde ahí.
+
+**Cómo se gobierna el esquema** — *decidido en S5-HU-17.2 (2026-10-09),
+reemplaza a Alembic*: con **scripts `.sql` versionados** en `docs/Database/`,
+aplicados con `scripts/aplicar_sql.py`. La propuesta original era Alembic con
+`--autogenerate` desde los modelos, y se retiró al probarla: su autogenerado
+lee la base **entera**, no solo nuestro esquema, y como `dbo_cubicador` vive en
+la misma base que `dbo_cotifly`, la primera corrida propuso **36 `op.drop_table`
+contra tablas de Cotifly**. `include_object` no alcanzaba — filtra por nombre de
+tabla, no por esquema — y localmente el problema era invisible, porque el SQL
+Server de desarrollo no tiene `dbo_cotifly`. Un `upgrade head` en QA habría
+borrado datos de otro equipo. DDL explícito es además el formato que ya usan
+NEXO y Cotifly, así que el equipo de Datos revisa uno solo.
+
+El costo que se acepta: el modelo de SQLAlchemy y el DDL son dos
+descripciones del mismo esquema y pueden separarse en silencio.
+`scripts/verificar_mapeo_catalogo.py` es lo que lo detecta — compara cada
+columna de los modelos contra `sys.columns` de la base real (tipo, largo,
+precisión y nulabilidad). Las pruebas de pytest corren contra SQLite y por
+definición no pueden ver esa divergencia. En su primera corrida encontró una
+real: `recomendacionVehiculoMercancia.VolumenMercanciaM3` es `DECIMAL(18,4)` en
+la base y el modelo la declaraba `(18,3)`.
+
+**Dos `MetaData` separados** (S5-HU-17.2): `modelos.py` tiene las 5 tablas del
+motor 3D, que gobierna este repo; `modelos_catalogo.py` tiene las 10 del
+catálogo, que administra el equipo de Datos. Tienen `MetaData` propio cada uno
+porque compartirlo haría que un `create_all` las tratara igual, y el Cubicador
+nunca debe crear ni alterar las del catálogo: solo leerlas.
 
 **Nota operativa encontrada al probar**: `api` y `worker` necesitan esperar a
 que `db` esté realmente lista (`condition: service_healthy` en `depends_on`),
-no solo a que el contenedor haya arrancado — Postgres tarda ~15s en el ciclo
+no solo a que el contenedor haya arrancado — SQL Server tarda bastante mas que
+Postgres en quedar listo (de ahi el `start_period: 20s` del healthcheck); Postgres tardaba ~15s en el ciclo
 de init/restart interno la primera vez, y sin el healthcheck ambos servicios
 se caían al intentar conectar antes de tiempo. Ya corregido en
 `docker-compose.yml`. (RabbitMQ tenía el mismo problema cuando era un
@@ -466,3 +512,325 @@ con `KeyError: 'tipo'` (documentado con la traza real en
 `NEXO/docs/mensajeria/CUBICACION.md` #4, incluido un bug que ese mismo
 `KeyError` exponía en el manejo de error de `_mover_a_dlq`, ya corregido de
 paso al aplicar el mismo desenvuelto ahí).
+
+## 13. Motor de selección de flota (S5-HU-17.3)
+
+**Decisión**: reemplazar la heurística de `cubicacion_rapida.py` por
+`domain/motor/seleccion_flota.py`, que lee el catálogo de base y resuelve en
+tres partes: filtrar candidatos, empacar con DBLF y elegir la flota mínima.
+
+**Por qué un módulo nuevo y no reescribir el viejo en sitio.** De las 692
+líneas de `cubicacion_rapida.py` sobreviven unas 35 (`detectar_extradimension`).
+Se van el catálogo de 9 arquetipos quemados, la heurística de estanterías, el
+clasificador de categorías por palabras (`"oxidante"`, `"papel"`, `"madera"`),
+el criterio de reparto por eje —fuera del alcance por falta de datos— y la
+forma de respuesta entera. No es un refactor del mismo algoritmo: es otro
+algoritmo, con otra entrada y otra salida. El viejo sigue en pie solo porque
+`POST /api/cubicacion` y `application/plan_cargue/desde_linea.py` todavía lo
+llaman; **muere en S5-HU-17.4**, que retira ese endpoint.
+
+**DBLF no es un empacador nuevo.** `DeepestBottomLeftFill` se agregó al
+registro de `optimizadores.py` junto a FFD y BFD, reusando el mecanismo de
+puntos extremos y sus validadores de colisión, soporte y apilamiento. Cambia
+una sola cosa: el orden de recorrido de los puntos pasa de `(z, x, y)` a
+`(x, z, y)`, que llena la rebanada del fondo antes de avanzar hacia la puerta.
+Escribir un segundo empacador habría duplicado la lógica que ya sostienen 33
+casos dorados y 27 de paridad con el motor C#.
+
+**Se decide por `max(%volumen, %peso)`.** Una carga de bebidas llena el peso
+mucho antes que el volumen; una de cajas vacías al revés. El motor viejo solo
+tenía `factorUtilizacion`, volumétrico puro, así que en el primer caso pedía
+vehículos de menos. Los dos porcentajes se reportan siempre.
+
+**La capacidad es la de la combinación, no la del chasis.** `3S3 + FURGON` son
+30.000 kg porque el furgón pesa; usar los 34.000 del chasis sería creer que
+caben 4 toneladas de más.
+
+**Las mercancías incompatibles se reparten, no vetan.** El motor viejo
+rechazaba la carga entera al encontrar un par incompatible. Ahora van en
+vehículos distintos, que es lo que haría un planillador. La regla es por
+**pares de categorías concretas**, así que no sirve el `grupo_compatibilidad`
+del motor 3D, que separa cualquier par de grupos distintos: bebidas y cajas de
+cartón son categorías distintas y comparten camión sin problema.
+
+**La carrocería de respaldo entra también cuando la principal no tiene
+vehículos.** No solo cuando no hay carrocería común. Es el caso real de
+`CARGA_CONTENERIZADA` (su principal `CONTENEDOR_SECO` está sembrada sin
+vehículo) y de `VIDRIO_PLANO` (`PORTAVIDRIOS`). Sin esto, 2 de las 31
+mercancías se quedaban sin recomendación.
+
+**Maximal Empty Spaces no hace falta** — *medido, no supuesto*. El último
+criterio de la issue pedía justificar con medición si MES era necesario sobre
+DBLF. `scripts/medir_empaque_dblf.py` compara DBLF contra la rejilla óptima
+(el tope exacto alcanzable con una orientación uniforme) en 20 combinaciones de
+vehículo y bulto.
+
+La primera corrida encontró una brecha real: **6,0 puntos porcentuales por
+debajo en promedio y 28,8 en el peor caso** — una estiba de 120×100×150 en un
+Sencillo daba 48,1% contra 76,9%, que es pedir dos camiones donde alcanza uno.
+La causa **no era fragmentación del espacio vacío**, que es lo que resolvería
+MES, sino la elección de orientación: DBLF tomaba la primera válida, que es la
+original. Ordenar las orientaciones por cuántas unidades entrarían en el
+vehículo vacío cuesta una división entera por orientación y cierra la brecha a
+**0,0 puntos en las 20 combinaciones**.
+
+Esa preferencia es **solo de DBLF**: FFD y BFD conservan el orden histórico de
+`orientaciones_de`, porque los 27 casos dorados de paridad con el motor C#
+dependen de él.
+
+**La validación contra despachos históricos no se pudo hacer: los datos no
+existen.** El criterio pedía comparar el motor contra 50 a 100 solicitudes
+entregadas con posiciones capturadas. Medido sobre `db_NEXO`, que es la fuente
+de despachos del sistema:
+
+| | |
+|---|---|
+| Líneas de solicitud | 3.122 |
+| Con `Dimensiones` no vacío | **182**, y las 182 son la misma fila de prueba repetida: `Pallet, 3 unidades, 120×100×100 cm, 500 kg` |
+| Con dimensiones **y** vehículo elegido | **4** |
+| Con peso y vehículo canónico (2L2/C2/C3/2S2/3S3) | 84, de las cuales **18** pertenecen a una solicitud entregada |
+| Con posiciones capturadas | **ninguna** — las 417 colocaciones que existen son de 12 planes de cargue de prueba, y los 12 tienen `LineaSolicitudId` en NULL |
+
+Lo único reconstruible es `(peso, vehículo elegido)` en 84 líneas: sirve para
+el filtro por peso, no para el volumen ni el empaque, que es lo que el criterio
+quería medir. La captura de dimensiones por mercancía **entra con este
+contrato**, así que el histórico anterior no la tiene ni la va a tener. La
+comparación contra despachos reales se puede hacer después del corte, cuando se
+acumulen recomendaciones con su resultado.
+
+Lo que sí acota el error mientras tanto es la medición de arriba: DBLF contra
+el tope geométrico exacto, con brecha cero. La única fuente restante de
+"vehículos de más" es el catálogo —por ejemplo que `C3` no admita furgón, que
+deja un salto de 8.500 a 18.000 kg sin escalón intermedio—, no el algoritmo.
+
+## 14. El contrato único (S5-HU-17.4)
+
+**Decisión**: `POST /recomendaciones` reemplaza a `POST /api/cubicacion`, que se
+retiró en el mismo corte. No queda endpoint de transición.
+
+**Lo que antes era error ahora es resultado.** `SIN_SELECCION_AUTOMATICA`,
+`condicionada` y `extradimension` vuelven con **200**, dentro de `resultado`.
+Los códigos de error quedan solo para fallos reales. Un vehículo que no se pudo
+recomendar no es una falla del servicio: es una respuesta, y el consumidor tiene
+que poder distinguirla de un 500.
+
+**El `origenSistema` sale de la llave, no del cuerpo.** Dos variables,
+`CUBICADOR_API_KEY_NEXO` y `CUBICADOR_API_KEY_COTIFLY`, en vez de un mapa en una
+sola cadena: se leen mejor en Dokploy y rotar una no obliga a tocar la otra. La
+llave genérica `CUBICADOR_API_KEY` sigue sirviendo para `/api/planes-cargue` y
+los catálogos, pero **no** para `/recomendaciones`: identifica al servicio, no a
+un sistema, y una recomendación tiene que saber de quién viene para poder
+reconsultarla. Si el cuerpo declara un `origenSistema` que no corresponde a la
+llave, 401 — declararlo es opcional, mentir no.
+
+**Las mercancías viajan con id y código.** En el request va el id (acordado con
+Cotifly el 2026-10-08, su HU-021.5; la primera versión de la hoja de ruta
+proponía el código). En la respuesta van los dos, igual que
+`GET /tipos-mercancia`: Cotifly persiste el id y NEXO usa el código estable.
+Darlos juntos cuesta una columna más en el JSON y evita que cada consumidor
+tenga que resolver el otro por su cuenta.
+
+**Dos columnas nuevas en `dbo_cubicador`**
+(`docs/Database/S5-HU-17.4_columnas_recomendacion.sql`), las dos `NOT NULL` con
+default según el criterio del equipo de Datos:
+
+- `recomendaciones.MercanciasCondicionadasJson` — no se puede derivar al releer.
+  Una mercancía queda condicionada por su propia marca **o** por haberse usado
+  su carrocería de respaldo, y esa segunda razón se pierde si no se guarda.
+- `recomendacionVehiculo.AlertaBajoLlenado` — no se puede recalcular.
+  `umbral_alerta_llenado` es editable por CRUD y estas tablas son append-only:
+  una fila consultada dentro de dos años tiene que decir lo que dijo el día que
+  se calculó, no lo que diría con el umbral de hoy.
+
+**Los ids se generan en mayúsculas** — *encontrado al probar contra QA real, no
+al diseñar*. SQL Server devuelve las columnas `uniqueidentifier` en mayúsculas y
+no es configurable. Escribiendo `b9c435cf-...`, la reconsulta traía
+`B9C435CF-...`: el `idRecomendacionVehiculo` del POST y el de la reconsulta no
+eran el mismo texto, y guardar ese id es exactamente para lo que existe. SQLite
+no lo muestra, porque devuelve lo que se escribió. Se generan ya en mayúsculas,
+y además las búsquedas por uuid no distinguen caja: un consumidor puede
+guardarlo en minúsculas de su lado y es el mismo uuid.
+
+**La escala decimal se normaliza en el borde HTTP.** La misma cifra llegaba al
+DTO con distinta precisión según el camino: en el POST sale del motor y en la
+reconsulta de la columna, que tiene su propia escala (`VolumenTotalM3` es
+`DECIMAL(18,3)`). Sin normalizar, un consumidor que guarda la respuesta del POST
+y después reconsulta recibe `9.60` y `9.600` para el mismo volumen.
+
+**`docs/openapi.json` se regenera, no se edita.** `scripts/generar_openapi.py`
+lo escribe desde la app, y con `--verificar` falla si quedó desactualizado.
+Hasta ahora se mantenía a mano, que es justo lo que no puede pasar con un
+contrato que programan dos equipos de afuera.
+
+### Las dos bases: QA y la local del compose
+
+Es la confusión más fácil de este servicio y conviene tenerla escrita.
+
+| | **QA corporativo** | **Local del `docker-compose`** |
+|---|---|---|
+| Host | `10.10.40.85:1433` | `127.0.0.1:1434` (servicio `db`) |
+| Base | `dbTarifario_Nexo_Pruebas` | `dbTarifario_Nexo_Pruebas` (mismo nombre, otro servidor) |
+| Esquema | `dbo_cubicador`, **compartido con `dbo_cotifly`** | `dbo_cubicador`, solo |
+| Quién lo administra | el equipo de Datos | este repo |
+| Qué lo llena | `sqlcmd` del equipo de Datos + `docs/Database/*.sql` | `docs/Database/*.sql` + `scripts/preparar_catalogo_local.py` |
+
+El `.env` apunta a **QA** — lo usan pytest contra base real y los scripts de
+verificación. El `docker-compose.yml` arma su propia `DATABASE_URL` apuntando al
+contenedor `db`, así que el servicio levantado con `docker compose up` **no habla
+con QA**.
+
+Por eso el stack local arrancaba con `GET /tipos-carroceria` en 503 aunque QA
+tuviera sus 15 tablas desde el principio: el contenedor local solo había corrido
+`ESQUEMA_CUBICADOR.sql`, que son las 5 tablas del motor 3D. El DDL de las 10 del
+catálogo nunca estuvo en el repo porque el equipo de Datos lo aplicó directo en
+QA. `scripts/preparar_catalogo_local.py` lo resuelve creando y sembrando esas
+tablas **solo en la base local**: se niega a correr contra cualquier host que no
+sea `db`, `localhost`, `127.0.0.1` o `host.docker.internal`, porque crea tablas y
+apuntarlo por error a QA es exactamente lo que no puede pasar.
+
+### Verificación del contrato contra el servicio real
+
+`scripts/verificar_contrato.py` recorre los criterios de aceptación de
+S5-HU-17.4 contra el servicio corriendo, por HTTP. No reemplaza a pytest: lo
+complementa donde pytest no llega, que es el motor de base real y la
+serialización de verdad. Las dos diferencias que encontró —los `uniqueidentifier`
+en mayúsculas y los decimales como texto— eran invisibles contra SQLite y por
+ASGI.
+
+## 15. CRUD de los seis catálogos (S5-HU-17.5)
+
+**Dónde viven: en el Cubicador**, que es donde está el dominio. El portal los
+consume por passthrough desde NEXO, nunca directo: no hay CORS —se retiró a
+propósito—, la llave terminaría en el bundle (ya pasó una vez y obligó a
+rotarla) y, sobre todo, **el rol no se podría aplicar**, porque el Bearer del
+Cubicador autoriza un backend y no a una persona.
+
+**Lo que la base ya hacía, y por eso no se repite.** Buena parte de las
+validaciones de la issue ya estaban puestas por el equipo de Datos: las llaves
+foráneas impiden borrar una categoría o una carrocería referenciada, hay
+`UNIQUE` en las siete claves de negocio, y tres `CHECK` —categoría 1 distinta de
+categoría 2, secundaria distinta de principal, y la bandera condicionada en
+falso cuando no hay secundaria—. Lo que agrega esta capa es **traducir esos
+choques a un 400 o un 409 con un mensaje que diga qué pasó**, en vez de dejar
+salir el error de SQL. Por ejemplo, el borrado de una categoría cuenta las
+referencias antes para responder *"hay 4 en mercancías"*, porque el error 547 de
+SQL Server no dice cuántas ni de dónde.
+
+**Concurrencia optimista con un entero, no con `ROWVERSION`.** Se agregó
+`Version INT NOT NULL DEFAULT 1` a los seis catálogos
+(`docs/Database/S5-HU-17.5_crud_catalogos.sql`). Un `ROWVERSION` lo llevaría el
+motor —más robusto ante escrituras que no pasen por el ORM— pero SQLite no lo
+tiene y las pruebas no podrían verificarlo. El criterio de la issue pide
+`version_id_col` de SQLAlchemy, y con un entero funciona igual en los dos
+motores.
+
+Un detalle que no es evidente: **la versión que manda el cliente se compara a
+mano**, no se le asigna a la instancia. `version_id_col` arma el `WHERE` del
+`UPDATE` con el valor **cargado**, no con el asignado, así que escribirle encima
+no compara nada y la concurrencia no protegería de nada. Las dos capas conviven:
+la comparación explícita rechaza al segundo editor, y `version_id_col` cubre la
+ventana entre el `SELECT` y el `UPDATE`.
+
+**`relacionVehiculosCarroceria` no lleva versión propia.** No se edita sola:
+viaja dentro del payload del vehículo, y es la versión del **vehículo** la que
+se exige y se sube, aunque el cambio solo toque las relaciones. Si no se subiera,
+dos administradores editando las carrocerías del mismo vehículo no verían
+conflicto, porque la fila del vehículo no cambia. Las relaciones se **reconcilian**
+en vez de borrarse y reinsertarse: las que no cambian conservan su `CreatedAt`,
+que es lo único que dice desde cuándo existe esa combinación.
+
+**La dominancia se valida antes de escribir.** Se proyecta cómo quedaría el
+catálogo con el vehículo ya cambiado y se corre la misma validación que el motor
+hace al arrancar. Hacerlo después obligaría a deshacer una escritura ya
+confirmada; hacerlo antes cuesta una lectura.
+
+**El par de las reglas se guarda normalizado.** El `UNIQUE` de la tabla es sobre
+el par *ordenado*, así que por sí solo no impide que entre `(B,A)` habiendo
+`(A,B)`. Guardando siempre el id menor primero, ese índice pasa a garantizarlo.
+La incompatibilidad es simétrica —`aplica_a` la evalúa en las dos direcciones—
+así que el orden no significa nada. La comparación es **por texto**, no con el
+orden nativo de `uniqueidentifier`: SQL Server ordena ese tipo por los últimos
+seis bytes primero, y comparar distinto en cada lado dejaría filas que un lado
+cree normalizadas y el otro no. El script normalizó la única fila que estaba al
+revés.
+
+**Solo tres catálogos publican evento.** NEXO proyecta mercancías, carrocerías y
+vehículos. Categorías, parámetros y reglas no los proyecta nadie: publicarles un
+evento sería mandar mensajes que ninguna cola consume.
+
+**`CreadoPor` lo declara el llamante.** El Cubicador no tiene usuarios. NEXO
+manda el id como campo del cuerpo y aquí se guarda como lo que es, un dato
+declarado y no una identidad comprobada. Es obligatorio en toda escritura para
+que ninguna quede sin rastro de quién la pidió.
+
+**Las carrocerías de un vehículo le pertenecen.** No son una referencia de
+afuera que deba bloquear su borrado: se van con él, igual que se reconcilian con
+él al guardarlo. Lo que sí bloquea a un vehículo es una recomendación que lo
+nombre, porque esa es de otro y es append-only. Sin esta distinción, la relación
+que el propio vehículo creó le impedía borrarse y salía como un
+`CONFLICTO_DE_DATOS` genérico.
+
+## 16. El puente desde línea y el fin del fallback silencioso (S5-HU-17.6)
+
+**Murió el default silencioso.** `crear_plan_desde_linea` asumía un furgón de
+13,6 metros cuando no reconocía el vehículo sugerido
+(`_PRESET_POR_UNIDAD_RAPIDA.get(unidad, "Tractocamion furgon 13.6 m")`). Ponía
+la carga en una caja que podía no existir y el plan salía creíble pero
+equivocado. Ahora cada traducción que falla es un rechazo con motivo:
+`MERCANCIA_NO_DECLARADA`, `MERCANCIA_DESCONOCIDA`, `SIN_FLOTA_RECOMENDADA`,
+`VEHICULO_SIN_PRESET` o `PRESET_VEHICULO_NO_ENCONTRADO`.
+
+**El puente consume la recomendación en vez de adivinar.** Antes llenaba un
+vehículo con el optimizador 3D, miraba qué sobraba, abría otro igual, y así
+hasta veinte veces. Ahora el motor de selección responde **cuántos y de qué
+tipo** —y la flota puede ser mixta—, así que el bucle recorre los vehículos que
+el motor indicó. Si después del último queda carga sin ubicar, los dos motores
+no coincidieron y se rechaza con `FLOTA_INSUFICIENTE`: el 3D valida soporte y
+apilamiento por unidad, el de selección empaca con DBLF, y devolver un plan
+incompleto en silencio sería peor que avisar.
+
+**Las posiciones declaran su tipo de mercancía.** `PosicionCarga` ganó
+`codigo_mercancia`, que NEXO agrega al JSON de `Dimensiones` por posición
+(S5-HU-18). Las líneas capturadas antes no lo traen y **se rechazan**: no se les
+pone un default porque el tipo arrastra la carrocería, y asumirlo elegiría el
+vehículo equivocado sin que nada avise.
+
+**El diccionario de compatibilidad es deuda declarada.** Entre el código
+canónico (`2L2`, `C2`, `C3`, `2S2`, `3S3`) y el nombre del preset del 3D hay dos
+diccionarios en `desde_linea.py`. El `3S3` es el único que depende de la
+carrocería, y no es cosmético: con furgón carga 30.000 kg —el furgón pesa— y con
+plataforma los 34.000 del chasis. Mandarlo siempre al mismo preset regalaría o
+quitaría cuatro toneladas. Hay pruebas que verifican que los presets declarados
+existan y que sus capacidades coincidan con las del catálogo.
+
+Ese diccionario existe solo porque existen **dos catálogos de vehículos**;
+se retira el día que se unifiquen. El detalle, con lo que cuesta cada punto,
+está en [`DEUDA_DIFERIDA_3D.md`](./DEUDA_DIFERIDA_3D.md).
+
+**`domain/motor/cubicacion_rapida.py` se retiró.** Con él se va el catálogo de
+nueve arquetipos quemados, la heurística de estanterías, el clasificador de
+categorías por palabras y el criterio de reparto por eje. Lo único que
+sobrevivía —`detectar_extradimension`— ya vive en `seleccion_flota.py` con la
+forma que pide el contrato.
+
+**`SqlParametrosCubicacionRepository` devuelve la entidad de dominio.** Devolvía
+`MedidasEstandar` de ese módulo mientras el puerto declaraba
+`ParametrosCubicacion`: funcionaba por casualidad, porque los dos tipos tienen
+los mismos cuatro campos. Ahora devuelve lo que el puerto dice, y la
+infraestructura deja de depender del motor viejo.
+
+
+**Los eventos de catálogo llevan la fila entera.** NEXO hace upsert por Id, así
+que un payload parcial le dejaría la proyección con los demás campos vacíos y
+sus desplegables mostrarían filas a medias. Se reusa el DTO del `GET` para
+armarlo —mismo criterio ya documentado en `vehiculo_repo._a_evento_payload`—
+para que la forma del evento no diverja de la que devuelve la consulta.
+
+**Hay `republicar-catalogo` por catálogo proyectado**
+(`POST /tipos-carroceria/republicar-catalogo` y sus equivalentes para
+mercancías y vehículos). Reemite el evento de creación para todas las filas, no
+solo las nuevas. Es la misma herramienta que ya existía para los vehículos del
+motor 3D, que hizo falta cuando esa proyección quedó en 13 filas contra 20 de
+este lado. Seguro de correr más de una vez, y no es parte de ningún flujo
+automático. Los tres catálogos que NEXO no proyecta no la tienen: no habría a
+quién reemitirle.

@@ -56,6 +56,8 @@ from infrastructure.alertas.correo import alertar_mensaje_en_dlq
 from infrastructure.clientes.nexo_client import NexoLineaSolicitudClient
 from infrastructure.mensajeria.rabbitmq import EXCHANGE, RabbitMqEventosPublisher, conectar_con_reintentos
 from infrastructure.persistence.db import SessionLocal, crear_tablas
+from infrastructure.persistence.repositorios.catalogo_repo import SqlCatalogoRepository
+from infrastructure.persistence.repositorios.parametros_repo import SqlParametrosCubicacionRepository
 from infrastructure.persistence.repositorios.plan_cargue_repo import SqlPlanCargueRepository
 from infrastructure.persistence.repositorios.vehiculo_repo import SqlVehiculoCubicacionRepository
 
@@ -92,6 +94,8 @@ def _ajuste_de_solicitud(solicitud: dict) -> "ajustar_uc.AjusteColocacionInput":
 async def _ejecutar_solicitud(
     cuerpo: dict, planes: SqlPlanCargueRepository, vehiculos: SqlVehiculoCubicacionRepository,
     publisher: RabbitMqEventosPublisher,
+    catalogo: SqlCatalogoRepository | None = None,
+    parametros: SqlParametrosCubicacionRepository | None = None,
 ) -> str | None:
     """Corre el caso de uso. Devuelve el plan_id resultante para que `_procesar`
     reporte "plan-de-cargue.generado" (None para los tipos en
@@ -130,7 +134,15 @@ async def _ejecutar_solicitud(
 
     if tipo == "crear_desde_linea":
         lineas = NexoLineaSolicitudClient(NEXO_BASE_URL, NEXO_CALLBACK_API_KEY)
-        plan = await crear_plan_desde_linea(planes, vehiculos, lineas, solicitud["lineaSolicitudId"])
+        # El puente consume la recomendacion del motor de seleccion
+        # (S5-HU-17.6), asi que necesita el catalogo y las medidas estandar.
+        # Llegan desde `_consumir`, que los arma sobre la misma sesion que el
+        # resto: es una sola unidad de trabajo.
+        if catalogo is None or parametros is None:
+            raise RuntimeError(
+                "crear_desde_linea necesita el repositorio de catalogo y el de parametros.")
+        plan = await crear_plan_desde_linea(
+            planes, vehiculos, lineas, catalogo, parametros, solicitud["lineaSolicitudId"])
         return plan.id
 
     if tipo == "crear_plan":
@@ -244,7 +256,9 @@ async def _procesar(mensaje: aio_pika.IncomingMessage, publisher: RabbitMqEvento
         # por cola en vez de por GET /vehiculos).
         vehiculos = SqlVehiculoCubicacionRepository(sesion, publisher)
         try:
-            plan_id = await _ejecutar_solicitud(cuerpo, planes, vehiculos, publisher)
+            plan_id = await _ejecutar_solicitud(
+                cuerpo, planes, vehiculos, publisher,
+                SqlCatalogoRepository(sesion), SqlParametrosCubicacionRepository(sesion))
             # "guardar_vehiculo" no tiene plan que reportar y "eliminar_plan"
             # ya borro el suyo - para esos dos no hay
             # "plan-de-cargue.generado" que publicar (ver TIPOS_SIN_RESULTADO_FINAL).
@@ -277,7 +291,7 @@ async def _procesar(mensaje: aio_pika.IncomingMessage, publisher: RabbitMqEvento
             logger.exception("Fallo procesando mensaje (intento %d/%d)", intentos_previos + 1, MAX_INTENTOS)
             try:
                 # La sesion puede haber quedado INUTILIZABLE: si el fallo fue durante
-                # un flush (p.ej. ForeignKeyViolationError al insertar un item contra
+                # un flush (p.ej. IntegrityError por llave foranea al insertar un item contra
                 # un plan que no existe), SQLAlchemy la deja en estado "pending
                 # rollback" y CUALQUIER operacion posterior sobre ella lanza
                 # PendingRollbackError - incluido el `marcar_error` de abajo, que es

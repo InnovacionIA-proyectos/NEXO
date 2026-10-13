@@ -1,0 +1,6 @@
+﻿Id,CodigoCarroceria,NombreCarroceria,Activo,CreadoPor
+54a9f78b-dfa3-4fb3-a6a2-8e2691fae312,FURGON,Furgon,1,seeder
+deac2ce0-ac55-4b14-aad3-26492e4604cc,ESTACAS,Estacas,1,seeder
+5a37e996-42ab-445a-8f2b-2cfd1c729b6c,PLATAFORMA,Plataforma (plancha / planchon),1,seeder
+1a43684d-2529-4cbf-8259-0b171943d926,CONTENEDOR,Contenedor,1,seeder
+468c6aef-e229-407a-96be-0791a18c7ddb,PORTAVIDRIOS,Estructura portavidrios,0,seeder
