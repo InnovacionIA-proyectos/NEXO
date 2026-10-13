@@ -17,12 +17,15 @@ public class clsAgregarConexosCotizacionCommandTests
 {
     private readonly Mock<ICotizacionRepository> _cotizaciones = new();
     private readonly Mock<IServiciosConexosPort> _servicios = new();
+    private readonly Mock<ISolicitudesPort> _solicitudes = new();
+    private readonly Mock<IPublicadorDeMensajes> _publicador = new();
     private readonly Mock<IAuditoriaPort> _auditoria = new();
     private readonly Mock<ICurrentUserPort> _usuarioActual = new();
     private readonly Mock<IUnitOfWork> _uow = new();
 
     private clsAgregarConexosCotizacionCommandHandler Handler() => new(
-        _cotizaciones.Object, _servicios.Object, _auditoria.Object, _usuarioActual.Object, _uow.Object);
+        _cotizaciones.Object, _servicios.Object, _solicitudes.Object, _auditoria.Object, _publicador.Object,
+        _usuarioActual.Object, TimeProvider.System, _uow.Object);
 
     private static clsServicioConexo ServicioActivo(Guid id) => new()
     {
@@ -68,17 +71,19 @@ public class clsAgregarConexosCotizacionCommandTests
     }
 
     [Fact]
-    public async Task Cotizacion_no_editable_lanza_ConflictException_sin_tocar_el_repositorio()
+    // S5-HU-20.1/#286: antes "Entregada" también bloqueaba; ahora solo un resultado cierra.
+    public async Task Cotizacion_con_resultado_lanza_COTIZACION_CERRADA_sin_tocar_el_repositorio()
     {
         var cotizacionId = Guid.NewGuid();
         var lineaId = Guid.NewGuid();
-        var cotizacion = new clsCotizacion { Id = cotizacionId, Estado = EstadoCotizacion.Entregada };
+        var cotizacion = new clsCotizacion { Id = cotizacionId, Estado = EstadoCotizacion.Entregada, Resultado = ResultadoCotizacion.Ganada };
         cotizacion.Lineas.Add(new clsCotizacionLinea { Id = lineaId, CotizacionId = cotizacionId });
         _cotizaciones.Setup(c => c.ObtenerConLineasYConexosAsync(cotizacionId, default)).ReturnsAsync(cotizacion);
 
-        await Assert.ThrowsAsync<clsConflictException>(() => Handler().Handle(
+        var ex = await Assert.ThrowsAsync<clsConflictException>(() => Handler().Handle(
             new clsAgregarConexosCotizacionCommand(cotizacionId, [new clsConexoItem(lineaId, Guid.NewGuid(), 1, null)])));
 
+        Assert.Equal("COTIZACION_CERRADA", ex.Code);
         _servicios.Verify(s => s.ObtenerPorIdAsync(It.IsAny<Guid>(), default), Times.Never);
     }
 

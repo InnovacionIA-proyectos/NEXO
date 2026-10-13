@@ -10,6 +10,7 @@ public static class clsDependencyInjection
     public static IServiceCollection AddCotizacionesUseCases(this IServiceCollection services) => services
         .AddScoped<ICommandHandler<clsCrearCotizacionCommand, clsCotizacionDto>, clsCrearCotizacionCommandHandler>()
         .AddScoped<ICommandHandler<clsAgregarLineaCotizacionCommand, clsCotizacionDto>, clsAgregarLineaCotizacionCommandHandler>()
+        .AddScoped<ICommandHandler<clsEditarLineaCotizacionCommand, clsCotizacionDto>, clsEditarLineaCotizacionCommandHandler>()
         .AddScoped<ICommandHandler<clsAgregarConexosCotizacionCommand, clsCotizacionDto>, clsAgregarConexosCotizacionCommandHandler>()
         .AddScoped<ICommandHandler<clsEditarConexoCotizacionCommand, clsCotizacionDto>, clsEditarConexoCotizacionCommandHandler>()
         .AddScoped<ICommandHandler<clsEliminarConexoCotizacionCommand, clsCotizacionDto>, clsEliminarConexoCotizacionCommandHandler>()
@@ -17,5 +18,6 @@ public static class clsDependencyInjection
         .AddScoped<ICommandHandler<clsEntregarCotizacionCommand, clsEntregarCotizacionResultDto>, clsEntregarCotizacionCommandHandler>()
         .AddScoped<ICommandHandler<clsMarcarResultadoCommand, clsCotizacionDto>, clsMarcarResultadoCommandHandler>()
         .AddScoped<IQueryHandler<clsObtenerCotizacionQuery, clsCotizacionDto>, clsObtenerCotizacionQueryHandler>()
+        .AddScoped<IQueryHandler<clsObtenerCotizacionPorSolicitudQuery, clsCotizacionDto?>, clsObtenerCotizacionPorSolicitudQueryHandler>()
         .AddScoped<IQueryHandler<clsExportarCotizacionExcelQuery, clsArchivoDto>, clsExportarCotizacionExcelQueryHandler>();
 }

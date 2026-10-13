@@ -8,6 +8,7 @@ using Nexo.Application.Common.Ports;
 using Nexo.Domain.Catalogos.Entidades;
 using Nexo.Domain.Cotizaciones.Entidades;
 using Nexo.Domain.Enums;
+using Nexo.Mensajes.Notificaciones;
 
 namespace Nexo.Application.CasosDeUso.Cotizaciones;
 
@@ -16,15 +17,24 @@ namespace Nexo.Application.CasosDeUso.Cotizaciones;
 /// "general" — ver clsCotizacionConexo.Origen.</summary>
 public sealed record clsConexoItem(Guid LineaId, Guid ServicioConexoId, decimal Cantidad, decimal? ValorAplicado, string Origen = "individual");
 
-/// <summary>Agregar servicios conexos (logísticos/adicionales) a la cotización.</summary>
+/// <summary>
+/// Agregar servicios conexos (logísticos/adicionales) a la cotización. S5-HU-20.1/#286:
+/// se admite mientras la cotización no tenga resultado (Borrador o Entregada); si ya está
+/// Ganada/Perdida → 409 COTIZACION_CERRADA. Tras la entrega deja la marca
+/// <c>ModificadaTrasEntregaAt</c> y avisa a quien creó la solicitud (ver
+/// <see cref="clsCambioDeConexos"/>).
+/// </summary>
 public sealed record clsAgregarConexosCotizacionCommand(
     Guid CotizacionId, IReadOnlyList<clsConexoItem> Items) : ICommand<clsCotizacionDto>;
 
 public sealed class clsAgregarConexosCotizacionCommandHandler(
     ICotizacionRepository cotizaciones,
     IServiciosConexosPort serviciosConexos,
+    ISolicitudesPort solicitudes,
     IAuditoriaPort auditoria,
+    IPublicadorDeMensajes publicador,
     Common.ICurrentUserPort usuarioActual,
+    TimeProvider clock,
     IUnitOfWork uow)
     : ICommandHandler<clsAgregarConexosCotizacionCommand, clsCotizacionDto>
 {
@@ -32,9 +42,9 @@ public sealed class clsAgregarConexosCotizacionCommandHandler(
     {
         var c = await cotizaciones.ObtenerConLineasYConexosAsync(command.CotizacionId, ct)
             ?? throw new clsNotFoundException("COTIZACION_NO_ENCONTRADA", "Cotización no encontrada.");
-        if (c.Estado != EstadoCotizacion.Borrador)
-            throw new clsConflictException("COTIZACION_NO_EDITABLE", "La cotización ya fue entregada y no admite cambios.");
+        clsCambioDeConexos.ExigirSinResultado(c);
 
+        var agregados = new List<clsConexoCambiado>();
         foreach (var item in command.Items)
         {
             if (c.Lineas.All(l => l.Id != item.LineaId))
@@ -60,9 +70,14 @@ public sealed class clsAgregarConexosCotizacionCommandHandler(
                 Origen = origen,
             };
             c.Conexos.Add(conexo);
+            agregados.Add(new clsConexoCambiado(servicio.TipoServicio, item.Cantidad, valor));
         }
         clsCotizacionCalculos.Recalcular(c);
-        auditoria.Registrar(usuarioActual.Id, "cotizaciones", c.Id, "agregar_conexos", $"{{\"items\":{command.Items.Count}}}");
+
+        var trasEntrega = c.Estado == EstadoCotizacion.Entregada;
+        await clsCambioDeConexos.RegistrarTrasEntregaAsync(c, "agregado", agregados, solicitudes, publicador, usuarioActual, clock, ct);
+        auditoria.Registrar(usuarioActual.Id, "cotizaciones", c.Id, "agregar_conexos",
+            clsCambioDeConexos.DetalleDeAuditoria(agregados, trasEntrega));
         await uow.SaveChangesAsync(ct);
         return c.ToDto();
     }

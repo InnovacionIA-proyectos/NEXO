@@ -435,7 +435,8 @@ public sealed class clsTarifarioSapAdapter : ITarifarioSapPort
         return new clsCandidatoTarifaDto(
             "sicetac", valor,
             $"{top.NombreRuta} · {top.Configuracion} · {top.NombreTipoCarga} · {top.NombreUnidadTransporte} · vía estándar",
-            $"oficial · periodo {periodo} · CARGADO · carga '{tipoCarga}' · unidad '{unidad}' · configuración {config}", 1);
+            $"oficial · periodo {periodo} · CARGADO · carga '{tipoCarga}' · unidad '{unidad}' · configuración {config}", 1,
+            ValorPisoBase: top.Valor, ValorTiemposLogisticos: valor - top.Valor);
     }
 
     private async Task<string?> ConfigPorRangoPesoAsync(int? claseContId, decimal? peso, CancellationToken ct)
