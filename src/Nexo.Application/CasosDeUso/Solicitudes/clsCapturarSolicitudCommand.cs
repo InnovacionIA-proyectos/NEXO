@@ -208,7 +208,15 @@ public sealed class clsCapturarSolicitudCommandHandler(
             foreach (var linea in solicitud.Lineas)
             {
                 var p = propuesta.Lineas.FirstOrDefault(x => x.LineaId == linea.Id);
-                if (p?.ValorPropuesto is { } valor)
+
+                // S5-HU-19.2/#282: solo se auto-guarda el flete en SoloSicetac/
+                // PlazaVigenteMayor. ConsultaCompleta NUNCA auto-guarda, aunque haya un
+                // único candidato con valor (antes de esta issue, "valor propuesto" era
+                // el único criterio — eso aplicaba de una el caso 7 de la tabla del
+                // milestone, que debe quedar pendiente igual que el resto de consulta
+                // completa).
+                var esModoAutomatico = p?.ModoDecision is nameof(ModoDecision.SoloSicetac) or nameof(ModoDecision.PlazaVigenteMayor);
+                if (esModoAutomatico && p?.ValorPropuesto is { } valor)
                 {
                     cotizacion.Lineas.Add(new clsCotizacionLinea
                     {
@@ -229,10 +237,22 @@ public sealed class clsCapturarSolicitudCommandHandler(
                     linea.MotivoPendiente = null;
                     fletes++;
                 }
+                else if (p is not null)
+                {
+                    // ConsultaCompleta: queda pendiente, con el recomendado visible si lo
+                    // hay (para que el Administrador de Tarifas no empiece de cero) —
+                    // sin esa parte si no hay ningún candidato (casos 9/10 de la tabla).
+                    linea.EstadoLinea = EstadoLinea.PorCostear;
+                    linea.MotivoPendiente = p.ValorPropuesto is { } recomendado
+                        ? $"Consulta completa: el Administrador de Tarifas debe elegir la tarifa (recomendado: {recomendado:C0} - {p.FuentePropuesta})."
+                        : "Consulta completa: el Administrador de Tarifas debe elegir la tarifa.";
+                }
                 else
                 {
+                    // No debería pasar en la práctica (toda línea de la solicitud tiene su
+                    // propuesta) — red de seguridad.
                     linea.EstadoLinea = EstadoLinea.PorCostear;
-                    linea.MotivoPendiente = p?.Justificacion;
+                    linea.MotivoPendiente = "No se pudo consultar la Biblioteca para esta línea.";
                 }
             }
 

@@ -12,6 +12,12 @@ namespace Nexo.Application.CasosDeUso.Costeo.Interfaces;
 ///
 /// Devuelve el resultado de dominio, no un DTO: quien decide qué hacer con él es el
 /// caso de uso, y la decisión ya está tomada por la regla.
+///
+/// S5-HU-19.2/#282: devuelve <see cref="clsDecisionDeFlujo"/> (antes
+/// <see cref="clsResultadoDeCosteo"/> a secas) — el <c>Modo</c> es lo que decide si quien
+/// llama puede auto-guardar el flete (SoloSicetac/PlazaVigenteMayor) o debe dejar la
+/// línea esperando a una persona (ConsultaCompleta), aunque <c>Resultado.Valor</c> no sea
+/// null (consulta completa con un solo candidato SÍ tiene valor, pero no se auto-aplica).
 /// </summary>
 public interface IPropuestaDeLineaPort
 {
@@ -20,5 +26,5 @@ public interface IPropuestaDeLineaPort
     /// el puerto por solicitud, y las dos firmas serían idénticas salvo el tipo de
     /// retorno — algo que C# no permite sobrecargar.
     /// </remarks>
-    Task<clsResultadoDeCosteo> ProponerParaLineaAsync(Guid lineaId, CancellationToken ct = default);
+    Task<clsDecisionDeFlujo> ProponerParaLineaAsync(Guid lineaId, CancellationToken ct = default);
 }

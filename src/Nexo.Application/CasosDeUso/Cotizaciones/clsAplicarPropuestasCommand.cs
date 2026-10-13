@@ -13,8 +13,13 @@ namespace Nexo.Application.CasosDeUso.Cotizaciones;
 /// <summary>
 /// Precarga como flete por defecto el valor más alto propuesto por la Biblioteca
 /// (plaza vs SICE-TAC) en cada línea de la solicitud que aún no tiene flete.
+///
+/// <paramref name="SoloAutomaticas"/> (S5-HU-19.2/#282, default false = aplica todas,
+/// el botón de siempre): con true, salta las líneas en modo ConsultaCompleta — esas
+/// necesitan que el Administrador de Tarifas elija, no se auto-aplican aunque tengan un
+/// valor recomendado.
 /// </summary>
-public sealed record clsAplicarPropuestasCommand(Guid CotizacionId) : ICommand<clsAplicarPropuestasResultDto>;
+public sealed record clsAplicarPropuestasCommand(Guid CotizacionId, bool SoloAutomaticas = false) : ICommand<clsAplicarPropuestasResultDto>;
 
 public sealed class clsAplicarPropuestasCommandHandler(
     ICotizacionRepository cotizaciones,
@@ -50,6 +55,7 @@ public sealed class clsAplicarPropuestasCommandHandler(
         foreach (var p in propuesta.Lineas)
         {
             if (p.ValorPropuesto is not { } valor || conFlete.Contains(p.LineaId)) continue;
+            if (command.SoloAutomaticas && p.ModoDecision == nameof(Nexo.Domain.Costeo.Reglas.ModoDecision.ConsultaCompleta)) continue;
             var linea = new clsCotizacionLinea
             {
                 CotizacionId = c.Id,

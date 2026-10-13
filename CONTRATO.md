@@ -346,6 +346,7 @@ interface MunicipioDto { // catálogo completo, ~3.800 filas — id numérico, e
 interface CandidatoTarifaDto {
   fuente: string; valor: Decimal; detalle: string; criterio: string; coincidencias: number
   advertencia: string | null // no-nulo cuando NO es un match exacto — mostrar al usuario antes de confirmar
+  tablaOrigen: "SAP" | "NEXO" // S5-HU-19.1/#281: "SAP" = tabla externa (tblSAPTarifas/tblSAPTarifasLog/DWSice), "NEXO" = tabla propia (tbl_tarifas_plaza/tbl_tarifas_plaza_historico)
 }
 interface AprovisionamientoDto { candidato: CandidatoTarifaDto | null }
 
@@ -371,6 +372,7 @@ interface PropuestaLineaDto {
   sicetac: CandidatoTarifaDto | null; plaza: CandidatoTarifaDto | null; historicoSap: CandidatoTarifaDto | null
   valorPropuesto: Decimal | null; fuentePropuesta: string | null; justificacion: string
   retornoContenedor: CandidatoTarifaDto | null
+  modoDecision: "SoloSicetac" | "PlazaVigenteMayor" | "ConsultaCompleta" // S5-HU-19.2/#282: decide si el auto-costeo guarda el flete (los dos primeros) o la línea queda pendiente de un humano (ConsultaCompleta) — esto último AUNQUE valorPropuesto no sea null
 }
 interface PropuestaSolicitudDto { solicitudId: UUID; lineas: PropuestaLineaDto[]; advertencias: string[] }
 
@@ -644,8 +646,16 @@ catálogo. No crea ninguna solicitud; es el paso previo a `lineas:bulk`.
 - **Errores**: `404 SOLICITUD_NO_ENCONTRADA`
 
 #### `GET /api/solicitudes/{id}/propuesta-tarifa`
-Compara plaza SAP, SICE-TAC e histórico SAP y propone el valor más alto por
-línea. No persiste nada.
+Compara plaza (SAP y propia), SICE-TAC e histórico (SAP y propio) y propone el
+valor más alto por línea. No persiste nada.
+
+S5-HU-19.1/#281: **orden de fuentes de plaza/histórico** — SAP oficial (match
+exacto) → SAP tolerante (por zona) → propia de NEXO (`tbl_tarifas_plaza`/
+`tbl_tarifas_plaza_historico`), ganando la primera VIGENTE (externa primero).
+Una plaza SAP vencida ya NO detiene la búsqueda: se sigue intentando SAP
+tolerante y luego la propia antes de rendirse a la vencida como referencia.
+`plaza`/`historicoSap` llevan `tablaOrigen` ("SAP" | "NEXO") para saber de
+cuál de las dos vino el candidato ganador.
 
 - **Roles**: Todos.
 - **→** `200 PropuestaSolicitudDto`
@@ -796,6 +806,10 @@ Comercial/Admin.
 Precarga como fletes el valor más alto propuesto por la Biblioteca en las
 líneas pendientes. Sin body.
 
+| Query | | Tipo | Restricción |
+|---|---|---|---|
+| `soloAutomaticas` | *opcional* | boolean | S5-HU-19.2/#282. Default `false` (aplica todas). Con `true`, salta las líneas en modo `ConsultaCompleta` — el Administrador de Tarifas debe elegirlas a mano |
+
 - **Roles**: `Comercial`, `AdminTarifas`, `CoordinadorFletes`, `Admin`.
 - **→** `200 AplicarPropuestasResultDto`
 - **Errores**: `404 COTIZACION_NO_ENCONTRADA` · `409 COTIZACION_NO_EDITABLE`
@@ -810,8 +824,18 @@ líneas pendientes. Sin body.
 | `lineaSolicitudId` | *opcional* | UUID | debe pertenecer a la solicitud |
 | `valorRetornoContenedor` | *opcional* | decimal | monetario; suma al total aparte |
 
+S5-HU-19.3/#283 — con `lineaSolicitudId`, el servidor recalcula la propuesta de esa
+línea (no confía en lo que diga el navegador) y valida:
+
+- **Nunca bajo el piso SICE-TAC**, con cualquier `fuente` (tarifario, histórica o
+  manual): `valorFlete < piso` → `400 FLETE_BAJO_PISO_SICETAC`. Se bloquea con aviso, no
+  pide confirmación. Sin piso para la línea, se guarda normal.
+- **Fuente `historica`**: se acepta si hay una "histórica sugerida" vigente (≤ 1 semana)
+  **o** si `valorFlete` coincide con el histórico de la propuesta de esa línea
+  (ventana de 3 meses). Si no viene de ninguna de las dos → `409 HISTORICA_VENCIDA`.
+
 - **→** `200 CotizacionDto`
-- **Errores**: `400 FUENTE_INVALIDA` · `400 LINEA_INVALIDA` · `404 COTIZACION_NO_ENCONTRADA` · `409 COTIZACION_NO_EDITABLE` · `409 HISTORICA_VENCIDA`
+- **Errores**: `400 FUENTE_INVALIDA` · `400 LINEA_INVALIDA` · `400 FLETE_BAJO_PISO_SICETAC` · `404 COTIZACION_NO_ENCONTRADA` · `409 COTIZACION_NO_EDITABLE` · `409 HISTORICA_VENCIDA`
 
 #### `POST /api/cotizaciones/{id}/conexos` — agregar servicios conexos
 - **Roles**: `Comercial`, `CoordinadorFletes`, `Admin`. (`AdminTarifas` **no**.)
@@ -857,8 +881,11 @@ Marca la entrega y envía la cotización por correo al comercial responsable
 - **Roles**: `AdminTarifas`, `CoordinadorFletes`, `Admin`. (`Comercial` **no**.)
 - **Body**: `multipart/form-data`, campo `formato` *opcional* (PDF, máx. 10 MB).
   Se puede enviar la petición sin cuerpo.
+- S5-HU-19.3/#283: no se entrega mientras queden líneas del pliego `PorCostear` —
+  todas deben estar `AutoResuelta` o `Revisada`. `COTIZACION_SIN_FLETE` sigue
+  cubriendo el caso de cero líneas en la cotización.
 - **→** `200 EntregarCotizacionResultDto`
-- **Errores**: `400 COTIZACION_SIN_FLETE` · `404 COTIZACION_NO_ENCONTRADA` · `409 COTIZACION_YA_ENTREGADA` · `409 SOLICITUD_NO_TRANSICIONABLE`
+- **Errores**: `400 COTIZACION_SIN_FLETE` · `404 COTIZACION_NO_ENCONTRADA` · `409 COTIZACION_CON_LINEAS_PENDIENTES` · `409 COTIZACION_YA_ENTREGADA` · `409 SOLICITUD_NO_TRANSICIONABLE`
 
 #### `POST /api/cotizaciones/{id}/resultado` — ganada/perdida
 Si `resultado = "ganada"`, realimenta la biblioteca de Tarifas Ganadas.

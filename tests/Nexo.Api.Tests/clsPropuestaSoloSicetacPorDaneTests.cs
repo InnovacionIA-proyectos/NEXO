@@ -70,12 +70,16 @@ public class clsPropuestaSoloSicetacPorDaneTests
 
         using var scope = _fx.Factory.Services.CreateScope();
         var propuestas = scope.ServiceProvider.GetRequiredService<IPropuestaDeLineaPort>();
-        var resultado = await propuestas.ProponerParaLineaAsync(lineaId);
+        var decision = await propuestas.ProponerParaLineaAsync(lineaId);
 
-        // El camino "solo SICE-TAC" (clsPropuestaTarifaAdapter.ProponerLineaAsync) siempre
-        // menciona "SOLO SICE-TAC" en la justificación, tanto si encuentra piso como si no
-        // — nunca llega a comparar plaza/histórico. Antes de #254/#255 esto caía siempre
-        // al camino normal (comparación contra plaza), porque la clave nunca coincidía.
-        Assert.Contains("SOLO SICE-TAC", resultado.Justificacion, StringComparison.OrdinalIgnoreCase);
+        // S5-HU-19.2/#282: con regla y CON piso, el modo es SoloSicetac y la justificación
+        // sigue mencionando "SOLO SICE-TAC", sin comparar plaza/histórico — igual que
+        // antes. Con regla pero SIN piso para esta ruta/periodo real, el modo ya no es
+        // "atención manual": cae a ConsultaCompleta (ahora sí compara plaza/histórico),
+        // así que solo se afirma el modo SoloSicetac cuando de verdad hay piso.
+        if (decision.Modo == Nexo.Domain.Costeo.Reglas.ModoDecision.SoloSicetac)
+            Assert.Contains("SOLO SICE-TAC", decision.Resultado.Justificacion, StringComparison.OrdinalIgnoreCase);
+        else
+            Assert.Equal(Nexo.Domain.Costeo.Reglas.ModoDecision.ConsultaCompleta, decision.Modo);
     }
 }

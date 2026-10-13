@@ -32,6 +32,7 @@ public sealed record clsEntregarCotizacionCommand(
 public sealed class clsEntregarCotizacionCommandHandler(
     ICotizacionRepository cotizaciones,
     ISolicitudesPort solicitudes,
+    ILineasSolicitudPort lineasSolicitud,
     IAuditoriaPort auditoria,
     Common.ICurrentUserPort usuarioActual,
     IPublicadorDeMensajes publicador,
@@ -47,6 +48,16 @@ public sealed class clsEntregarCotizacionCommandHandler(
             throw new clsConflictException("COTIZACION_YA_ENTREGADA", "La cotización ya fue entregada.");
         if (c.Lineas.Count == 0)
             throw new clsCotizacionSinFleteException("entregar");
+
+        // S5-HU-19.3/#283: la cotización se arma línea por línea (clsAgregarLineaCotizacionCommand
+        // marca Revisada), así que tener al menos 1 flete NO implica que el pliego completo
+        // esté costeado — se puede entregar con líneas del pliego todavía PorCostear. Una
+        // línea sigue PorCostear tanto si nunca se tocó como si quedó en ConsultaCompleta
+        // (S5-HU-19.2/#282) sin que nadie la resolviera a mano todavía.
+        var lineasSol = await lineasSolicitud.ObtenerPorSolicitudAsync(c.SolicitudId, ct);
+        if (lineasSol.Values.Any(l => l.EstadoLinea is not (EstadoLinea.AutoResuelta or EstadoLinea.Revisada)))
+            throw new clsConflictException("COTIZACION_CON_LINEAS_PENDIENTES",
+                "Hay líneas del pliego sin costear todavía. Complete o revise todas las líneas antes de entregar.");
 
         clsCotizacionCalculos.Recalcular(c);
         c.Estado = EstadoCotizacion.Entregada;

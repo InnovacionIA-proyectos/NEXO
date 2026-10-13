@@ -2,6 +2,7 @@ using Nexo.Application.CasosDeUso.AjustesVigenciaPlaza.Interfaces;
 using Nexo.Application.CasosDeUso.Biblioteca.Interfaces;
 using Nexo.Application.CasosDeUso.BibliotecaSapHistorico.Interfaces;
 using Nexo.Application.CasosDeUso.Catalogos.Interfaces;
+using Nexo.Application.CasosDeUso.Costeo.Interfaces;
 using Nexo.Application.CasosDeUso.Cotizaciones.Interfaces;
 using Nexo.Application.CasosDeUso.Cubicacion.Interfaces;
 using Nexo.Application.CasosDeUso.Metricas.Interfaces;
@@ -209,6 +210,14 @@ public static class clsDependencyInjection
         // "Aplicar propuestas" en Cotizaciones) + matriz SICE-TAC de solo lectura.
         services.AddScoped<ITarifarioSapPort, clsTarifarioSapAdapter>();
         services.AddScoped<IPropuestaTarifaPort, clsPropuestaTarifaAdapter>();
+
+        // S5-HU-19.1/#281: plaza/histórico contra las tablas propias de NEXO
+        // (tbl_tarifas_plaza/tbl_tarifas_plaza_historico) — un solo adaptador, los dos
+        // puertos (mismo criterio que clsPropuestaTarifaAdapter con IPropuestaTarifaPort/
+        // IPropuestaDeLineaPort).
+        services.AddScoped<clsTarifaPlazaInternaAdapter>();
+        services.AddScoped<ITarifaPlazaInternaPort>(sp => sp.GetRequiredService<clsTarifaPlazaInternaAdapter>());
+        services.AddScoped<IHistoricoPlazaInternoPort>(sp => sp.GetRequiredService<clsTarifaPlazaInternaAdapter>());
 
         // Conexión SAP nueva (plaza en vivo), todavía inexistente. "Deshabilitado"
         // (default) y "Real" (sin adaptador real todavía) resuelven al

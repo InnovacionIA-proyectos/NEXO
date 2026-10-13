@@ -24,14 +24,22 @@ public class clsEntregaNoEsperaAlCorreoTests
 {
     private readonly Mock<ICotizacionRepository> _cotizaciones = new();
     private readonly Mock<ISolicitudesPort> _solicitudes = new();
+    private readonly Mock<ILineasSolicitudPort> _lineasSolicitud = new();
     private readonly Mock<IAuditoriaPort> _auditoria = new();
     private readonly Mock<ICurrentUserPort> _usuarioActual = new();
     private readonly Mock<IPublicadorDeMensajes> _publicador = new();
     private readonly Mock<IUnitOfWork> _uow = new();
     private static readonly TimeProvider Reloj = TimeProvider.System;
 
+    public clsEntregaNoEsperaAlCorreoTests()
+    {
+        // S5-HU-19.3/#283: por defecto la solicitud no tiene líneas pendientes.
+        _lineasSolicitud.Setup(l => l.ObtenerPorSolicitudAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyDictionary<Guid, clsLineaSolicitud>)new Dictionary<Guid, clsLineaSolicitud>());
+    }
+
     private clsEntregarCotizacionCommandHandler Handler() => new(
-        _cotizaciones.Object, _solicitudes.Object, _auditoria.Object, _usuarioActual.Object,
+        _cotizaciones.Object, _solicitudes.Object, _lineasSolicitud.Object, _auditoria.Object, _usuarioActual.Object,
         _publicador.Object, Reloj, _uow.Object);
 
     private clsCotizacion Preparar(Guid cotizacionId, Guid solicitudId)
