@@ -267,8 +267,8 @@ public class clsCotizacionesTests
         Assert.Equal(HttpStatusCode.NotFound, resp.StatusCode);
     }
 
-    [Fact] // la cotización ya entregada no admite editar ni quitar conexos.
-    public async Task Editar_o_eliminar_conexo_en_cotizacion_entregada_devuelve_409()
+    [Fact] // editar la CANTIDAD de un conexo sigue siendo solo Borrador; quitarlo ya se admite tras entregar (S5-HU-20.1/#286).
+    public async Task Editar_conexo_en_cotizacion_entregada_devuelve_409()
     {
         var cli = _fx.Client();
         var (cid, lineaId) = await NuevaCotizacionConLinea();
@@ -279,8 +279,5 @@ public class clsCotizacionesTests
 
         var editar = await cli.PatchJson($"/api/cotizaciones/{cid}/conexos/{conexoId}", new { cantidad = 2 });
         Assert.Equal(HttpStatusCode.Conflict, editar.StatusCode);
-
-        var eliminar = await cli.DeleteAsync($"/api/cotizaciones/{cid}/conexos/{conexoId}");
-        Assert.Equal(HttpStatusCode.Conflict, eliminar.StatusCode);
     }
 }

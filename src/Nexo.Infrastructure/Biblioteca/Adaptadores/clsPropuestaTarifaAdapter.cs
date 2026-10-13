@@ -458,7 +458,8 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
         return new clsCandidatoTarifaDto(
             "sicetac", valor,
             $"{fila.NombreRuta} · {fila.Configuracion} · {fila.NombreTipoCarga} · {fila.NombreUnidadTransporte}",
-            criterio, 1);
+            criterio, 1,
+            ValorPisoBase: fila.Valor, ValorTiemposLogisticos: valor - fila.Valor);
     }
 
     /// <summary>

@@ -329,6 +329,7 @@ interface LineaCosteoDto {
   horasCargue: Decimal | null; horasDescargue: Decimal | null   // #251, horas EFECTIVAS con las que se costeó
   grupoRutaId: UUID | null         // S5-HU-18.3/#275: lo pone SIEMPRE Cotifly, agrupa líneas de una misma ruta heterogénea
   idRecomendacionVehiculo: string | null  // S5-HU-18.2/#274: recomendación del Cubicador usada para esta línea
+  valorMercancia: Decimal | null   // S5-HU-20.1/#286: lo capturado en la línea (clsLineaSolicitud.ValorMercancia); null si no se capturó
 }
 interface TiemposLogisticosDto { horasCargue: Decimal; horasDescargue: Decimal }
 interface SolicitudCosteoDto { solicitud: SolicitudDto; tiempos: TiemposLogisticosDto; lineas: LineaCosteoDto[] }
@@ -347,6 +348,10 @@ interface CandidatoTarifaDto {
   fuente: string; valor: Decimal; detalle: string; criterio: string; coincidencias: number
   advertencia: string | null // no-nulo cuando NO es un match exacto — mostrar al usuario antes de confirmar
   tablaOrigen: "SAP" | "NEXO" // S5-HU-19.1/#281: "SAP" = tabla externa (tblSAPTarifas/tblSAPTarifasLog/DWSice), "NEXO" = tabla propia (tbl_tarifas_plaza/tbl_tarifas_plaza_historico)
+  // S5-HU-20.1/#286: SOLO el candidato `sicetac` los trae (plaza e histórico vienen null). Invariante: valorPisoBase + valorTiemposLogisticos == valor.
+  // Se calculan en el servidor con las horas REALES de la línea; el front no debe reconstruirlos (la tabla "Tarifas SICE-TAC" es catálogo crudo, con horas por defecto).
+  valorPisoBase: Decimal | null          // el piso de la fila de DWSice, sin horas logísticas
+  valorTiemposLogisticos: Decimal | null // lo que suman las horas logísticas (valor − piso base; sirve también con el valorSiceConHora de respaldo)
 }
 interface AprovisionamientoDto { candidato: CandidatoTarifaDto | null }
 
@@ -364,6 +369,9 @@ interface CotizacionDto {
   id: UUID; solicitudId: UUID; estado: "Borrador" | "Entregada"
   resultado: "SinDefinir" | "Ganada" | "Perdida"; total: Decimal; entregadaAt: FechaISO | null
   lineas: CotizacionLineaDto[]; conexos: CotizacionConexoDto[]
+  esAutoCosteo: boolean
+  // S5-HU-20.1/#286: última vez que se agregó/quitó un conexo DESPUÉS de entregar (null si nunca). NO mueve estado ni entregadaAt: el SLA y las métricas siguen midiendo la entrega original.
+  modificadaTrasEntregaAt: FechaISO | null
 }
 interface AplicarPropuestasResultDto { cotizacion: CotizacionDto; agregadas: number }
 interface EntregarCotizacionResultDto { cotizacion: CotizacionDto; estadoNotificacion: string; mensaje: string }
@@ -802,6 +810,17 @@ Comercial/Admin.
 - **→** `200 CotizacionDto`
 - **Errores**: `404 COTIZACION_NO_ENCONTRADA`
 
+#### `GET /api/cotizaciones/por-solicitud/{solicitudId}` — la cotización que ya existe
+S5-HU-20.1/#286. **Nunca crea nada** (a diferencia de `POST /api/cotizaciones`, que es
+"crear o recuperar" y tiene efecto secundario). Mesa de Costeo la consulta al abrir
+para saber si ya hay una cotización —p. ej. la auto-costeada al capturar— sin tener que
+disparar el POST.
+
+- **Roles**: Todos.
+- **→** `200 CotizacionDto` · `204 No Content` si la solicitud no tiene cotización (o no existe).
+- Elige igual que el POST: si la solicitud ya está `Entregada`, su cotización `Entregada`;
+  si no, el borrador en curso. GET y POST nunca apuntan a cotizaciones distintas.
+
 #### `POST /api/cotizaciones/{id}/aplicar-propuestas`
 Precarga como fletes el valor más alto propuesto por la Biblioteca en las
 líneas pendientes. Sin body.
@@ -837,8 +856,38 @@ línea (no confía en lo que diga el navegador) y valida:
 - **→** `200 CotizacionDto`
 - **Errores**: `400 FUENTE_INVALIDA` · `400 LINEA_INVALIDA` · `400 FLETE_BAJO_PISO_SICETAC` · `404 COTIZACION_NO_ENCONTRADA` · `409 COTIZACION_NO_EDITABLE` · `409 HISTORICA_VENCIDA`
 
+#### `PUT /api/cotizaciones/{id}/lineas/{lineaSolicitudId}` — editar un flete manual
+S5-HU-20.1/#286. Modifica **la misma fila** de la cotización: `POST .../lineas` siempre
+agrega una nueva, así que editar con él duplicaría la línea e inflaría el total. La ruta
+usa el id de la línea del **pliego** (`lineaSolicitudId`, el mismo que manda el POST), no
+el de la fila de la cotización.
+
+- **Roles**: `AdminTarifas`, `CoordinadorFletes`, `Admin`. (`Comercial` **no**.)
+
+| Body | | Tipo | Restricción |
+|---|---|---|---|
+| `valorFlete` | **requerido** | decimal | 0.01–9999999999999.99 |
+| `valorRetornoContenedor` | *opcional* | decimal | monetario. Si se omite no se toca el que tenía |
+
+No recibe `fuente`: editar no puede cambiar de dónde salió el valor. Reglas: solo
+cotización `Borrador`; solo fletes de fuente `Manual` (uno de `tarifario`/`sicetac`/
+`historica` se reemplaza eligiendo otro candidato, no escribiéndole un número encima);
+nunca bajo el piso SICE-TAC (mismo cálculo del servidor que al agregar, #283). Queda
+auditado con el valor anterior y el nuevo (`editar_flete`).
+
+- **→** `200 CotizacionDto` (misma cantidad de líneas, total recalculado)
+- **Errores**: `400 VALIDATION_ERROR` · `400 FLETE_BAJO_PISO_SICETAC` · `404 COTIZACION_NO_ENCONTRADA` · `404 LINEA_NO_ENCONTRADA` · `409 COTIZACION_NO_EDITABLE` · `409 FLETE_NO_EDITABLE`
+
 #### `POST /api/cotizaciones/{id}/conexos` — agregar servicios conexos
-- **Roles**: `Comercial`, `CoordinadorFletes`, `Admin`. (`AdminTarifas` **no**.)
+S5-HU-20.1/#286 (HU-B23): se admite mientras la cotización **no tenga resultado**
+(`resultado == "SinDefinir"`), o sea `Borrador` **o `Entregada`** — un servicio omitido se
+descubre justo después de entregar. `Ganada`/`Perdida` → `409 COTIZACION_CERRADA`.
+Sobre una cotización `Entregada` deja `modificadaTrasEntregaAt` (sin tocar `estado` ni
+`entregadaAt`) y, si quien lo hace **no** es quien creó la solicitud, le llega un correo
+"Cotización actualizada" (ver [README §5.5](docs/contrato-integracion/README.md)). Sobre un
+`Borrador`, o si el actor es el mismo creador, no se envía nada.
+
+- **Roles**: `Comercial`, `AdminTarifas`, `CoordinadorFletes`, `Admin`. (S5-HU-20.1: se agregó `AdminTarifas`.)
 - **Body**: `{ items: [...] }` **requerido**, mínimo 1.
 
 | Cada item | | Tipo | Restricción |
@@ -850,13 +899,13 @@ línea (no confía en lo que diga el navegador) y valida:
 | `origen` | *opcional* | string | S5-HU-18/#262. `individual` (def.) \| `general` — si el usuario pidió agregarlo a TODAS las líneas de una vez (igual manda un item por línea) |
 
 - **→** `200 CotizacionDto`
-- **Errores**: `400 SERVICIO_INVALIDO` · `400 SERVICIO_INACTIVO` · `400 LINEA_INVALIDA` · `400 CANTIDAD_INVALIDA` · `400 ORIGEN_INVALIDO` · `404 COTIZACION_NO_ENCONTRADA` · `409 COTIZACION_NO_EDITABLE`
+- **Errores**: `400 SERVICIO_INVALIDO` · `400 SERVICIO_INACTIVO` · `400 LINEA_INVALIDA` · `400 CANTIDAD_INVALIDA` · `400 ORIGEN_INVALIDO` · `404 COTIZACION_NO_ENCONTRADA` · `409 COTIZACION_CERRADA`
 
 #### `PATCH /api/cotizaciones/{id}/conexos/{conexoId}` — corregir un conexo
 S5-HU-18/#262: antes solo existía el POST (siempre crea una fila nueva); un error
 de cantidad no se podía deshacer, solo compensar agregando otra fila.
 
-- **Roles**: `Comercial`, `CoordinadorFletes`, `Admin`. Solo en cotización `Borrador`.
+- **Roles**: `Comercial`, `CoordinadorFletes`, `Admin`. Solo en cotización `Borrador` (S5-HU-20.1 no extendió este endpoint a `Entregada`: solo agregar y quitar).
 
 | Body | | Tipo | Restricción |
 |---|---|---|---|
@@ -867,11 +916,14 @@ de cantidad no se podía deshacer, solo compensar agregando otra fila.
 - **Errores**: `400 CANTIDAD_INVALIDA` · `400 VALOR_REQUERIDO` (sin servicio para recalcular y sin `valorAplicado`) · `404 COTIZACION_NO_ENCONTRADA` · `404 CONEXO_NO_ENCONTRADO` · `409 COTIZACION_NO_EDITABLE`
 
 #### `DELETE /api/cotizaciones/{id}/conexos/{conexoId}` — quitar un conexo
-S5-HU-18/#262. Solo en cotización `Borrador`.
+S5-HU-18/#262. S5-HU-20.1/#286 (HU-B24): igual que agregar, se admite mientras la cotización
+no tenga resultado (`Borrador` o `Entregada`); `Ganada`/`Perdida` → `409 COTIZACION_CERRADA`.
+Tras la entrega deja `modificadaTrasEntregaAt` y avisa al creador de la solicitud si el
+actor es otra persona.
 
-- **Roles**: `Comercial`, `CoordinadorFletes`, `Admin`.
-- **→** `200 CotizacionDto` (el conexo ya no aparece en `conexos`)
-- **Errores**: `404 COTIZACION_NO_ENCONTRADA` · `404 CONEXO_NO_ENCONTRADO` · `409 COTIZACION_NO_EDITABLE`
+- **Roles**: `Comercial`, `AdminTarifas`, `CoordinadorFletes`, `Admin`. (S5-HU-20.1: se agregó `AdminTarifas`.)
+- **→** `200 CotizacionDto` (el conexo ya no aparece en `conexos`, `total` recalculado)
+- **Errores**: `404 COTIZACION_NO_ENCONTRADA` · `404 CONEXO_NO_ENCONTRADO` (inexistente o de otra cotización) · `409 COTIZACION_CERRADA`
 
 #### `POST /api/cotizaciones/{id}/entregar`
 Marca la entrega y envía la cotización por correo al comercial responsable
@@ -1598,8 +1650,9 @@ abiertos a los 6 roles.
 | `POST /api/solicitudes/{id}/recalcular-score` | | ✅ | | | | ✅ |
 | `POST /api/cotizaciones` · `aplicar-propuestas` | ✅ | ✅ | ✅ | | | ✅ |
 | `POST /api/cotizaciones/{id}/resultado` | ✅ | | | | | ✅ |
-| `POST /api/cotizaciones/{id}/lineas` · `entregar` | | ✅ | ✅ | | | ✅ |
-| `POST/PATCH/DELETE /api/cotizaciones/{id}/conexos` | ✅ | ✅ | | | | ✅ |
+| `POST /api/cotizaciones/{id}/lineas` · `PUT .../lineas/{lineaSolicitudId}` · `entregar` | | ✅ | ✅ | | | ✅ |
+| `POST/DELETE /api/cotizaciones/{id}/conexos` (S5-HU-20.1: + AdminTarifas) | ✅ | ✅ | ✅ | | | ✅ |
+| `PATCH /api/cotizaciones/{id}/conexos/{conexoId}` | ✅ | ✅ | | | | ✅ |
 | Vigencia plaza SAP (`PATCH`, `POST masivo`, `DELETE`) | | ✅ | ✅ | | | ✅ |
 | `/api/reglas-solo-sicetac` (todo, incluido `GET`) | | | ✅ | | | ✅ |
 | `POST/PATCH /api/servicios-conexos`, `importar-excel` | | | ✅ | ✅ | | ✅ |

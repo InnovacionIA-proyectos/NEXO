@@ -28,6 +28,17 @@ public class clsAgregarLineaCotizacionRequest
     public string Fuente { get; set; } = null!;
 }
 
+/// <summary>S5-HU-20.1/#286: editar el flete manual de una línea. No lleva Fuente a propósito.</summary>
+public class clsEditarLineaCotizacionRequest
+{
+    [Range(typeof(decimal), "0.01", "9999999999999.99", ParseLimitsInInvariantCulture = true)]
+    public decimal ValorFlete { get; set; }
+
+    /// <summary>Si no se envía, no se toca el valor que ya tenía.</summary>
+    [Range(typeof(decimal), "0", "9999999999999.99", ParseLimitsInInvariantCulture = true)]
+    public decimal? ValorRetornoContenedor { get; set; }
+}
+
 public class clsAgregarConexosRequest
 {
     [Required, MinLength(1, ErrorMessage = "Debe incluir al menos un servicio conexo.")]

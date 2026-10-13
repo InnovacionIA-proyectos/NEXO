@@ -24,5 +24,6 @@ public static class clsCotizacionDtoMappers
                 x.Id, x.CotizacionLineaId, x.ServicioConexoId, x.clsServicioConexo?.TipoServicio,
                 x.clsServicioConexo?.Categoria ?? "logistico", x.Cantidad, x.ValorAplicado,
                 x.Origen, x.clsServicioConexo?.ToDto())).ToList(),
-            c.EsAutoCosteo);
+            c.EsAutoCosteo,
+            c.ModificadaTrasEntregaAt);
 }

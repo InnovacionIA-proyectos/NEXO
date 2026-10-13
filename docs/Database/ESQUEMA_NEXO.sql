@@ -349,6 +349,7 @@ CREATE TABLE [db_NEXO].[tbl_cotizaciones] (
     [EsAutoCosteo] bit NOT NULL DEFAULT ((0)), -- S4-HU-15.6/#252: auto-costeada nunca pasa por /entregar
     [EntregadaPor] uniqueidentifier NULL,
     [EntregadaAt] datetimeoffset NULL,
+    [ModificadaTrasEntregaAt] datetimeoffset NULL, -- S5-HU-20.1/#286: último cambio de conexos tras entregar; NO mueve Estado ni EntregadaAt (SLA/métricas)
     [CreatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset()),
     [UpdatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset()),
     [RowVersion] timestamp NULL

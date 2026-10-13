@@ -25,6 +25,7 @@ namespace Nexo.Api.Cotizaciones;
 public class clsCotizacionesController(
     ICommandHandler<clsCrearCotizacionCommand, clsCotizacionDto> crear,
     ICommandHandler<clsAgregarLineaCotizacionCommand, clsCotizacionDto> agregarLinea,
+    ICommandHandler<clsEditarLineaCotizacionCommand, clsCotizacionDto> editarLinea,
     ICommandHandler<clsAgregarConexosCotizacionCommand, clsCotizacionDto> agregarConexos,
     ICommandHandler<clsEditarConexoCotizacionCommand, clsCotizacionDto> editarConexo,
     ICommandHandler<clsEliminarConexoCotizacionCommand, clsCotizacionDto> eliminarConexo,
@@ -32,6 +33,7 @@ public class clsCotizacionesController(
     ICommandHandler<clsEntregarCotizacionCommand, clsEntregarCotizacionResultDto> entregar,
     ICommandHandler<clsMarcarResultadoCommand, clsCotizacionDto> marcarResultado,
     IQueryHandler<clsObtenerCotizacionQuery, clsCotizacionDto> obtener,
+    IQueryHandler<clsObtenerCotizacionPorSolicitudQuery, clsCotizacionDto?> obtenerPorSolicitud,
     IQueryHandler<clsExportarCotizacionExcelQuery, clsArchivoDto> exportarExcel)
     : ControllerBase
 {
@@ -52,6 +54,21 @@ public class clsCotizacionesController(
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<clsCotizacionDto>> Obtener(Guid id, CancellationToken ct = default)
         => Ok(await obtener.Handle(new clsObtenerCotizacionQuery(id), ct));
+
+    /// <summary>
+    /// La cotización que ya existe para una solicitud, SIN crear nada (S5-HU-20.1/#286): 200
+    /// con la cotización o 204 si todavía no hay. A diferencia de <c>POST /api/cotizaciones</c>
+    /// (crear o recuperar) no tiene efecto secundario, así que Mesa de Costeo puede
+    /// consultarla al abrir para saber si ya hay una (p. ej. la auto-costeada al capturar).
+    /// </summary>
+    [HttpGet("por-solicitud/{solicitudId:guid}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<ActionResult<clsCotizacionDto>> ObtenerPorSolicitud(Guid solicitudId, CancellationToken ct = default)
+    {
+        var dto = await obtenerPorSolicitud.Handle(new clsObtenerCotizacionPorSolicitudQuery(solicitudId), ct);
+        return dto is null ? NoContent() : Ok(dto);
+    }
 
     /// <summary>
     /// Precarga como fletes por defecto el valor más alto propuesto por la Biblioteca
@@ -79,12 +96,33 @@ public class clsCotizacionesController(
         => Ok(await agregarLinea.Handle(new clsAgregarLineaCotizacionCommand(
             id, req.LineaSolicitudId, req.ValorFlete, req.ValorRetornoContenedor, req.Fuente), ct));
 
-    /// <summary>Agregar servicios conexos a la cotización.</summary>
-    [HttpPost("{id:guid}/conexos")]
-    [Authorize(Roles = "Comercial,CoordinadorFletes,Admin")]
+    /// <summary>
+    /// Corregir el valor de un flete MANUAL ya agregado — modifica la MISMA línea, no suma otra
+    /// (S5-HU-20.1/#286). Solo cotización Borrador (409 COTIZACION_NO_EDITABLE), línea existente
+    /// (404 LINEA_NO_ENCONTRADA), fuente Manual (409 FLETE_NO_EDITABLE) y nunca bajo el piso
+    /// SICE-TAC (400 FLETE_BAJO_PISO_SICETAC). No recibe la fuente: no se puede cambiar.
+    /// </summary>
+    [HttpPut("{id:guid}/lineas/{lineaSolicitudId:guid}")]
+    [Authorize(Roles = "AdminTarifas,CoordinadorFletes,Admin")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<clsCotizacionDto>> EditarLinea(
+        Guid id, Guid lineaSolicitudId, [FromBody] clsEditarLineaCotizacionRequest req, CancellationToken ct = default)
+        => Ok(await editarLinea.Handle(new clsEditarLineaCotizacionCommand(
+            id, lineaSolicitudId, req.ValorFlete, req.ValorRetornoContenedor), ct));
+
+    /// <summary>
+    /// Agregar servicios conexos a la cotización. Se admite mientras no tenga resultado
+    /// (Borrador o Entregada); Ganada/Perdida → 409 COTIZACION_CERRADA (S5-HU-20.1/#286).
+    /// </summary>
+    [HttpPost("{id:guid}/conexos")]
+    [Authorize(Roles = "Comercial,AdminTarifas,CoordinadorFletes,Admin")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<ActionResult<clsCotizacionDto>> AgregarConexos(Guid id, [FromBody] clsAgregarConexosRequest req, CancellationToken ct = default)
         => Ok(await agregarConexos.Handle(new clsAgregarConexosCotizacionCommand(
             id, req.Items.Select(i => new clsConexoItem(i.LineaId, i.ServicioConexoId, i.Cantidad, i.ValorAplicado, i.Origen)).ToList()), ct));
@@ -100,10 +138,10 @@ public class clsCotizacionesController(
     public async Task<ActionResult<clsCotizacionDto>> EditarConexo(Guid id, Guid conexoId, [FromBody] clsEditarConexoRequest req, CancellationToken ct = default)
         => Ok(await editarConexo.Handle(new clsEditarConexoCotizacionCommand(id, conexoId, req.Cantidad, req.ValorAplicado), ct));
 
-    /// <summary>Quitar un conexo agregado por error — solo en cotización Borrador
-    /// (S5-HU-18/#262).</summary>
+    /// <summary>Quitar un conexo (S5-HU-18/#262). Desde S5-HU-20.1/#286 también sobre una cotización
+    /// Entregada: se admite mientras no tenga resultado; Ganada/Perdida → 409 COTIZACION_CERRADA.</summary>
     [HttpDelete("{id:guid}/conexos/{conexoId:guid}")]
-    [Authorize(Roles = "Comercial,CoordinadorFletes,Admin")]
+    [Authorize(Roles = "Comercial,AdminTarifas,CoordinadorFletes,Admin")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]

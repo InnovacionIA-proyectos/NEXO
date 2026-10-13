@@ -36,7 +36,10 @@ public record clsCotizacionDto(
     IReadOnlyList<clsCotizacionConexoDto> Conexos,
     /// <summary>S4-HU-15.6/#252: auto-costeada nunca pasa por /entregar — el frontend
     /// puede usar esto para no ofrecer ese botón en este caso.</summary>
-    bool EsAutoCosteo = false);
+    bool EsAutoCosteo = false,
+    /// <summary>S5-HU-20.1/#286: última vez que se cambiaron servicios conexos tras la entrega
+    /// (null si nunca). No altera Estado ni EntregadaAt.</summary>
+    DateTimeOffset? ModificadaTrasEntregaAt = null);
 
 /// <summary>Resultado de aplicar las propuestas de la Biblioteca como fletes por defecto.</summary>
 public record clsAplicarPropuestasResultDto(clsCotizacionDto Cotizacion, int Agregadas);

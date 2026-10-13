@@ -45,7 +45,7 @@ restringidos por rol, igual que sus escrituras.
 ### CoordinadorFletes
 - Crear solicitudes, resolver catálogos y cargar líneas en bloque
 - Rechazar solicitudes y recalcular el score manualmente
-- Todo lo de cotizaciones (crear, aplicar propuestas, agregar línea de flete, agregar conexos, entregar al comercial, marcar resultado)
+- Todo lo de cotizaciones (crear, aplicar propuestas, agregar línea de flete, editar un flete manual, agregar y quitar conexos, entregar al comercial, marcar resultado)
 - Ajustar vigencia de tarifas de plaza (individual y masivo)
 - Importar el Excel SICE-TAC
 - Cubicación rápida; crear, editar, optimizar y borrar planes de cargue; alta de vehículos del catálogo
@@ -54,7 +54,7 @@ restringidos por rol, igual que sus escrituras.
 - Ajustar vigencia de tarifas de plaza (individual y masivo)
 - Ver, crear y eliminar reglas Solo-SICETAC; importarlas desde Excel
 - Crear y editar servicios conexos; importarlos desde Excel
-- Crear cotización, aplicar propuestas, agregar línea de flete, entregar y marcar resultado (**no** agrega conexos)
+- Crear cotización, aplicar propuestas, agregar línea de flete, editar un flete manual (`PUT .../lineas/{lineaSolicitudId}`), agregar y quitar servicios conexos (también tras entregar, mientras no esté Ganada/Perdida; S5-HU-20.1/#286), entregar y marcar resultado
 - Ver métricas de cumplimiento y KPIs del piloto
 
 ### ServiciosLogisticos
