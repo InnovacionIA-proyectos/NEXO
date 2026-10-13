@@ -444,6 +444,7 @@ interface BibliotecaItemDto {
 }
 
 interface CumplimientoDto {
+  desde: FechaISO | null; hasta: FechaISO | null // S5-HU-21.1/#287: eco del filtro (null = sin límite), igual que KpisPilotoDto
   totalSolicitudes: number; pendientes: number; enCosteo: number; entregadas: number; descartadas: number
   licitacionesTotal: number; licitacionesPerdidas: number; porcentajeLicitacionesPerdidas: number
   entregadasConDeadline: number; entregadasATiempo: number; cumplimientoSla: number
@@ -455,6 +456,7 @@ interface KpisPilotoDto {
   pliegosBajo10Minutos: number; porcentajePliegosBajo10Minutos: number | null
   totalLineas: number; lineasAutoCosteadas: number; porcentajeLineasAutoCosteadas: number | null
   cotizacionesEmitidas: number; lineasConFleteManual: number
+  tamano: "1-10" | "11-100" | "+100" | null // S5-HU-21.1/#287: eco del corte por tamaño aplicado al tiempo de costeo; null = todos
 }
 
 interface ParametrosScoreDto {
@@ -1216,15 +1218,58 @@ Upsert idempotente del Excel SICE-TAC.
 **Todo el controller**: `LiderProceso`, `AdminTarifas`, `Admin`.
 
 #### `GET /api/metricas/cumplimiento`
+Tarjetas de la cola y Cumplimiento SLA. S5-HU-21.1/#287: un **solo filtro `desde`/`hasta`**,
+compartido con `kpis-piloto`.
+
+| Query | | Tipo | Restricción |
+|---|---|---|---|
+| `desde` | *opcional* | fecha ISO | límite inferior, inclusivo |
+| `hasta` | *opcional* | fecha ISO | límite superior, inclusivo |
+
+Qué filtra cada cosa:
+
+- **Pendientes, En costeo, Entregadas, Descartadas y Total** → solicitudes **creadas** en el
+  rango (`Solicitud.CreatedAt`). Para *Descartadas* no existe fecha de descarte: se aproxima
+  por la de creación.
+- **Cumplimiento SLA** (`entregadasConDeadline`, `entregadasATiempo`, `cumplimientoSla`) →
+  cotizaciones **entregadas** en el rango (`EntregadaAt`). Es el % de cotizaciones entregadas
+  con `Deadline` informado que se entregaron a tiempo (`EntregadaAt <= Deadline`); la fórmula
+  no cambió (no cuenta las vencidas sin entregar: aceptado por negocio). Por eso una solicitud
+  creada antes del rango pero entregada dentro **sí** cuenta en el SLA y **no** en la tarjeta.
+- **Licitaciones** (`licitacionesTotal`, `licitacionesPerdidas`, `porcentajeLicitacionesPerdidas`)
+  → **sin filtro** (el Tablero ni siquiera las muestra).
+
+Sin `desde`/`hasta` el resultado es idéntico al de antes (acumulado histórico). La respuesta
+repite el filtro en `desde`/`hasta`.
+
 - **→** `200 CumplimientoDto`
 
 #### `GET /api/metricas/kpis-piloto`
 Los 4 KPIs del piloto: tiempo de costeo del pliego, % de líneas auto-costeadas,
 cotizaciones emitidas y líneas con flete manual.
 
-- **Query**: `desde`, `hasta` *opcionales* (fecha ISO). Sin filtro, corre sobre
-  todo el histórico.
+| Query | | Tipo | Restricción |
+|---|---|---|---|
+| `desde`, `hasta` | *opcional* | fecha ISO | sin filtro, corre sobre todo el histórico. Filtran las sagas por `SolicitadoEn` |
+| `tamano` | *opcional* | string | S5-HU-21.1/#287. `1-10` \| `11-100` \| `+100`, por total de líneas del pliego. Sin él, todos. Un `+` sin codificar llega como espacio y se acepta igual (`%2B100` es lo correcto) |
+
+**Tiempo de costeo (S5-HU-21.1/#287)** — `pliegosResueltos`, `tiempoPromedioResolucionMinutos`,
+`tiempoMedianoResolucionMinutos`, `pliegosBajo10Minutos`, `porcentajePliegosBajo10Minutos`
+(≤ 10 min). Mide el ciclo **completo**, no cuánto tardó el robot en revisar todo:
+
+- Pliego **100% automático** (saga `Completado`) → `TerminadoEn − SolicitadoEn`.
+- Pliego **con intervención manual** (saga `Parcial`) → desde que se creó la solicitud hasta
+  `Cotizacion.EntregadaAt`. Si todavía no se entregó, ese pliego **no entra** (mismo criterio
+  que Cumplimiento SLA).
+- El tiempo **no** es proporcional al número de líneas (se procesan en paralelo): por eso se
+  corta por tamaño en vez de dividir por línea. El tramo `1-10` coincide con el umbral de
+  costeo síncrono (`UmbralCosteoDiferido = 10`).
+- Desde S5-HU-19.3 (`409 COTIZACION_CON_LINEAS_PENDIENTES`) `EntregadaAt` significa pliego completo. Las entregas anteriores a ese cambio
+  pudieron salir con líneas pendientes y subestimar el tiempo.
+- `tamano` solo recorta el tiempo de costeo; las otras tarjetas del endpoint no cambian.
+
 - **→** `200 KpisPilotoDto`
+- **Errores**: `400 TAMANO_INVALIDO`
 
 ### 3.13 Priorización — `/api/priorizacion/parametros`
 
