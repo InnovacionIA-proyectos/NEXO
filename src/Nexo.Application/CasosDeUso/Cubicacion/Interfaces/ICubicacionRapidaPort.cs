@@ -6,28 +6,33 @@ namespace Nexo.Application.CasosDeUso.Cubicacion.Interfaces;
 /// Cierra el único de los 20 métodos de
 /// <c>CubicadorApiService</c>/<c>CapturaApiService</c> sin equivalente en NEXO:
 /// <c>cubicar()</c> (<c>captura-api.service.ts</c>), usado por <c>captura-page</c> y
-/// <c>mesa-costeo-page</c> para una cubicación rápida SIN persistencia — no hay plan, no
-/// hay Id, no hay nada que guardar ni proyectar.
+/// <c>mesa-costeo-page</c>.
 ///
 /// POR QUÉ ES UNA EXCEPCIÓN DECLARADA, NO EL PATRÓN NUEVO. El resto de Cubicación sigue al
 /// pie de la letra "NEXO habla con Cubicador solo por colas, nunca HTTP"
-/// (<c>cubicador/CONTRATO.md</c> sección 5) porque cada operación tiene un dueño async claro
-/// (una cola que la procesa, una proyección que la lee). Este cálculo no tiene ninguno de
-/// los dos: es síncrono por naturaleza (la pantalla necesita el resultado para renderizar
-/// YA, no un aviso más tarde) y no persiste nada que una cola pudiera procesar ni una
-/// proyección pudiera servir después. Inventar una cola+proyección para esto sería
-/// simular una llamada síncrona con más piezas, no evitarla.
+/// (<c>cubicador/CONTRATO.md</c> sección 5). <see cref="CrearAsync"/> es síncrono por
+/// naturaleza: la pantalla necesita el resultado para renderizar YA, no un aviso más
+/// tarde. S5-HU-18.1/#273: el contrato nuevo (<c>POST /recomendaciones</c>) SÍ persiste
+/// (append-only, cada corrida queda guardada en el Cubicador) — ya no es "cálculo puro sin
+/// persistencia" como lo era el viejo <c>POST /api/cubicacion</c>, pero la persistencia es
+/// enteramente responsabilidad del Cubicador: NEXO sigue sin tener nada propio que guardar
+/// ni proyectar de esta llamada, así que la excepción declarada se mantiene.
 ///
-/// La alternativa (ver <c>docs/mensajeria/CUBICACION.md</c> §8.2) era resolverlo con un
-/// patrón de solicitud/respuesta sobre RabbitMQ (reply-to). Se descartó por
-/// desproporcionado: un patrón nuevo, usado en ningún otro flujo, para un cálculo que ya
-/// responde en el orden de cientos de milisegundos por HTTP.
-///
-/// El secreto (mismo Bearer que Cubicador ya valida en <c>verificar_api_key</c>) vive SOLO
-/// en la configuración del backend (<c>Cubicador3D:OutboundApiKey</c>) — nunca en el bundle
-/// del portal. Eso es, en una frase, todo lo que este puerto necesitaba lograr.
+/// El secreto (<c>Cubicador3D:RecomendacionesApiKey</c>, equivalente a
+/// <c>CUBICADOR_API_KEY_NEXO</c> del lado del Cubicador — distinto del
+/// <c>Cubicador3D:OutboundApiKey</c> genérico que usaba el contrato viejo) vive SOLO en la
+/// configuración del backend — nunca en el bundle del portal.
 /// </summary>
 public interface ICubicacionRapidaPort
 {
-    Task<clsCubicacionRapidaResultado> EvaluarAsync(clsCubicacionRapidaSolicitud solicitud, CancellationToken ct = default);
+    /// <summary>POST /recomendaciones — crea una corrida nueva (append-only).</summary>
+    Task<clsRecomendacionDto> CrearAsync(clsCrearRecomendacionInput solicitud, CancellationToken ct = default);
+
+    /// <summary>
+    /// GET /recomendaciones?idLineaSolicitud=&amp;origenSistema= — la última corrida de esa
+    /// línea. <paramref name="origenSistema"/> es obligatorio y NO se infiere de la llave:
+    /// un mismo código de línea puede existir tanto en NEXO como en Cotifly, como rutas
+    /// distintas, y un sistema puede necesitar leer lo que recomendó el otro.
+    /// </summary>
+    Task<clsRecomendacionDto> ConsultarAsync(string idLineaSolicitud, string origenSistema, CancellationToken ct = default);
 }

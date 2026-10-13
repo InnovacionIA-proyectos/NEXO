@@ -44,7 +44,10 @@ public record clsHistoricaSugeridaDto(Guid Id, decimal Valor, DateOnly Fecha, Ti
 /// persistido en clsLineaSolicitud.Dimensiones: lo escribe la captura, lo lee el costeo.
 /// </summary>
 public record clsPosicionCargaDto(
-    string? Descripcion, int Cantidad, decimal LargoCm, decimal AnchoCm, decimal AltoCm, decimal? PesoKg)
+    string? Descripcion, int Cantidad, decimal LargoCm, decimal AnchoCm, decimal AltoCm, decimal? PesoKg,
+    /// <summary>S5-HU-18.2/#274: código del tipo de mercancía (no el uuid) de esta posición —
+    /// null = tipo desconocido, sin default asignado. Ver clsCapturaPosicionRequest.</summary>
+    string? CodigoTipoMercancia = null)
 {
     public static readonly System.Text.Json.JsonSerializerOptions Json = new()
     {
@@ -72,7 +75,13 @@ public record clsLineaCosteoDto(
     clsPisoSicetacDto? PisoSicetac, IReadOnlyList<clsHistoricaSugeridaDto> Historicas,
     /// <summary>S4-HU-15.5/#251: horas de cargue/descargue EFECTIVAS con las que se
     /// resolvió el piso SICE de esta línea — null en líneas capturadas antes de #251.</summary>
-    decimal? HorasCargue = null, decimal? HorasDescargue = null);
+    decimal? HorasCargue = null, decimal? HorasDescargue = null,
+    /// <summary>S5-HU-18.3/#275: id de ruta que Cotifly usa para agrupar las líneas de una
+    /// misma carga heterogénea repartida en varios camiones. Null si NEXO no recibió el dato
+    /// (línea nacida en NEXO, o capturada antes de este cambio).</summary>
+    Guid? GrupoRutaId = null,
+    /// <summary>S5-HU-18.2/#274: recomendación del Cubicador usada para esta línea.</summary>
+    string? IdRecomendacionVehiculo = null);
 
 public record clsSolicitudCosteoDto(clsSolicitudDto Solicitud, clsTiemposLogisticosDto Tiempos, IReadOnlyList<clsLineaCosteoDto> Lineas);
 

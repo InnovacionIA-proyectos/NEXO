@@ -20,7 +20,10 @@ public sealed record clsCrearSolicitudCommand(
 public sealed record clsCrearLineaInput(
     Guid? RutaId, Guid? ConfigVehiculoId, string? Tipologia, decimal? Peso, decimal? ValorMercancia,
     /// <summary>S5-HU-17/#263: horas de ESTA línea — null usa el default de la solicitud.</summary>
-    decimal? HorasCargue = null, decimal? HorasDescargue = null);
+    decimal? HorasCargue = null, decimal? HorasDescargue = null,
+    /// <summary>S5-HU-18.3/#275: id de ruta que Cotifly usa para agrupar varias líneas de
+    /// una misma carga heterogénea — lo pone SIEMPRE Cotifly, nunca NEXO.</summary>
+    Guid? GrupoRutaId = null);
 
 public sealed class clsCrearSolicitudCommandHandler(
     ISolicitudesRepository solicitudes, IClientesPort clientes, IClientesDwPort clientesDw, IAuditoriaPort auditoria,
@@ -64,6 +67,8 @@ public sealed class clsCrearSolicitudCommandHandler(
                 ValorMercancia = lr.ValorMercancia,
                 HorasCargue = horasCargue,
                 HorasDescargue = horasDescargue,
+                GrupoRutaId = lr.GrupoRutaId,
+                NumeroLinea = 1,
             });
         }
 

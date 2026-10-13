@@ -7,15 +7,30 @@ namespace Nexo.Application.CasosDeUso.Cubicacion;
 /// <summary>
 /// POST /api/cubicacion — reemplaza el POST que <c>cubicar()</c>
 /// (<c>captura-api.service.ts</c>) hacía directo contra Cubicador con la clave compartida.
-/// Es Query (no Command) a propósito: "lectura, sin efectos secundarios" describe
-/// exactamente este cálculo — ver <see cref="ICubicacionRapidaPort"/> para el porqué de la
-/// excepción HTTP.
+/// S5-HU-18.1/#273: Command y no Query — el contrato nuevo (<c>POST /recomendaciones</c>)
+/// persiste (append-only) del lado del Cubicador, a diferencia del viejo <c>POST
+/// /api/cubicacion</c> que era cálculo puro. Ver <see cref="ICubicacionRapidaPort"/> para
+/// el porqué de la excepción HTTP.
 /// </summary>
-public sealed record clsCubicarRapidoQuery(clsCubicacionRapidaSolicitud clsSolicitud) : IQuery<clsCubicacionRapidaResultado>;
+public sealed record clsCrearRecomendacionCommand(clsCrearRecomendacionInput clsSolicitud) : ICommand<clsRecomendacionDto>;
 
-public sealed class clsCubicarRapidoQueryHandler(ICubicacionRapidaPort cubicacion)
-    : IQueryHandler<clsCubicarRapidoQuery, clsCubicacionRapidaResultado>
+public sealed class clsCrearRecomendacionCommandHandler(ICubicacionRapidaPort cubicacion)
+    : ICommandHandler<clsCrearRecomendacionCommand, clsRecomendacionDto>
 {
-    public Task<clsCubicacionRapidaResultado> Handle(clsCubicarRapidoQuery query, CancellationToken ct = default)
-        => cubicacion.EvaluarAsync(query.clsSolicitud, ct);
+    public Task<clsRecomendacionDto> Handle(clsCrearRecomendacionCommand command, CancellationToken ct = default)
+        => cubicacion.CrearAsync(command.clsSolicitud, ct);
+}
+
+/// <summary>
+/// GET /api/cubicacion?idLineaSolicitud=&amp;origenSistema= — reconsulta de la última
+/// corrida de una línea. A diferencia de la creación, esto SÍ es una query pura: no agrega
+/// ninguna corrida nueva, solo lee la que ya existe.
+/// </summary>
+public sealed record clsConsultarRecomendacionQuery(string IdLineaSolicitud, string OrigenSistema) : IQuery<clsRecomendacionDto>;
+
+public sealed class clsConsultarRecomendacionQueryHandler(ICubicacionRapidaPort cubicacion)
+    : IQueryHandler<clsConsultarRecomendacionQuery, clsRecomendacionDto>
+{
+    public Task<clsRecomendacionDto> Handle(clsConsultarRecomendacionQuery query, CancellationToken ct = default)
+        => cubicacion.ConsultarAsync(query.IdLineaSolicitud, query.OrigenSistema, ct);
 }

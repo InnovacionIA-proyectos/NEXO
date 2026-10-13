@@ -122,13 +122,14 @@ services:
       # /cubicacion) — debe ser igual a NEXO_CALLBACK_API_KEY en cubicador/.env. Vacía =
       # el endpoint responde 401 a cualquier Bearer (fail-closed).
       Cubicador3D__InboundApiKey: ${CUBICADOR3D_INBOUND_API_KEY}
-      # Única llamada HTTP SALIENTE de NEXO hacia Cubicador (POST
-      # /api/cubicacion, cubicación rápida sin persistencia). Faltaba este par en este
-      # archivo (agregado en la verificación local del 2026-09-14, sección 10 de
-      # docs/VERIFICACION_NEXO_CUBICADOR_2026-09-14.md) — sin él, .env.example documenta
-      # las claves pero nunca llegan al contenedor. Vacías = 503 "no configurada"
-      # (CubicacionRapidaNoConfiguradoAdapter), nunca rompe el arranque.
+      # Llamadas HTTP SALIENTES de NEXO hacia Cubicador. S5-HU-18.1/#273: POST/GET
+      # /recomendaciones (reemplaza al retirado POST /api/cubicacion) — RecomendacionesApiKey
+      # debe ser igual a CUBICADOR_API_KEY_NEXO en cubicador/.env. S5-HU-18.6/#278: los seis
+      # passthrough de catálogo (§3.2) — OutboundApiKey debe ser igual a CUBICADOR_API_KEY
+      # (la llave GENÉRICA, distinta de la de NEXO). Vacías = 503 "no configurado", nunca
+      # rompe el arranque.
       Cubicador3D__OutboundBaseUrl: ${CUBICADOR3D_OUTBOUND_BASE_URL}
+      Cubicador3D__RecomendacionesApiKey: ${CUBICADOR3D_RECOMENDACIONES_API_KEY}
       Cubicador3D__OutboundApiKey: ${CUBICADOR3D_OUTBOUND_API_KEY}
       # Microservicio MailSender (#21, ver .env.example). Mismo defecto ya corregido una
       # vez para Cubicador3D: sin este par, .env.example documenta las claves pero nunca

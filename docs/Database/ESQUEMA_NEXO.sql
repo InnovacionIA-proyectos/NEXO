@@ -104,7 +104,8 @@ CREATE TABLE [db_NEXO].[tbl_configuraciones_vehiculo] (
     [Carroceria] nvarchar(100) NULL,
     [RangoPeso] nvarchar(50) NULL,
     [CreatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset()),
-    [UpdatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset())
+    [UpdatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset()),
+    [EsCatalogoOficial] bit NOT NULL DEFAULT (CONVERT([bit],(0))) -- S5-HU-18.4/#276: fila que calza con un código canónico del Cubicador
     , CONSTRAINT [PK_configuraciones_vehiculo] PRIMARY KEY ([Id])
 );
 
@@ -161,6 +162,41 @@ CREATE TABLE [db_NEXO].[tbl_vehiculos_cubicacion] (
     [CreatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset()),
     [UpdatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset())
     , CONSTRAINT [PK_vehiculos_cubicacion] PRIMARY KEY ([Id])
+);
+
+-- S5-HU-18.5/#277: proyecciones del catálogo del Cubicador (tipo de mercancía/
+-- carrocería), mantenidas por eventos (mercancia.*/carroceria.*). [Id] es el string
+-- que asigna el Cubicador, no un uniqueidentifier generado acá — es la llave que
+-- viaja como idTipoMercancia por toda la Captura (§3.14 de CONTRATO.md).
+CREATE TABLE [db_NEXO].[tbl_tipos_mercancia_catalogo] (
+    [Id] nvarchar(64) NOT NULL,
+    [CodigoMercancia] nvarchar(40) NOT NULL,
+    [NombreMercancia] nvarchar(150) NOT NULL,
+    [Categoria] nvarchar(100) NOT NULL,
+    [Cubicable] bit NOT NULL,
+    [CondicionadaCubicacion] bit NOT NULL,
+    [CarroceriaPrincipal] nvarchar(40) NULL,
+    [CarroceriaSecundaria] nvarchar(40) NULL,
+    [CarroceriaSecundariaCondicionada] bit NOT NULL,
+    [ControlAmbientalRequerido] nvarchar(40) NOT NULL,
+    [Apilable] bit NOT NULL,
+    [Fragil] bit NOT NULL,
+    [RotacionLibre] bit NOT NULL,
+    [ComentarioCondicion] nvarchar(500) NULL,
+    [Activo] bit NOT NULL,
+    [Version] int NOT NULL,
+    [UpdatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset())
+    , CONSTRAINT [PK_tipos_mercancia_catalogo] PRIMARY KEY ([Id])
+);
+
+CREATE TABLE [db_NEXO].[tbl_tipos_carroceria_catalogo] (
+    [Id] nvarchar(64) NOT NULL,
+    [CodigoCarroceria] nvarchar(40) NOT NULL,
+    [NombreCarroceria] nvarchar(150) NOT NULL,
+    [Activo] bit NOT NULL,
+    [Version] int NOT NULL,
+    [UpdatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset())
+    , CONSTRAINT [PK_tipos_carroceria_catalogo] PRIMARY KEY ([Id])
 );
 
 -- Servicio adicional facturable (cargue, descargue, ITR, almacenamiento,
@@ -253,7 +289,10 @@ CREATE TABLE [db_NEXO].[tbl_lineas_solicitud] (
     [RetornaContenedor] bit NOT NULL DEFAULT (CONVERT([bit],(0))),
     [MotivoPendiente] nvarchar(500) NULL,
     [HorasCargue] decimal(6,2) NULL, -- S4-HU-15.5/#251: horas efectivas de ESTA línea, resueltas al capturar
-    [HorasDescargue] decimal(6,2) NULL
+    [HorasDescargue] decimal(6,2) NULL,
+    [GrupoRutaId] uniqueidentifier NULL, -- S5-HU-18.3/#275: lo pone Cotifly, agrupa líneas de una misma ruta heterogénea
+    [NumeroLinea] int NULL, -- S5-HU-18.3/#275: orden de captura dentro de la solicitud
+    [IdRecomendacionVehiculo] nvarchar(64) NULL -- S5-HU-18.2/#274: recomendación del Cubicador usada para esta línea
     , CONSTRAINT [PK_lineas_solicitud] PRIMARY KEY ([Id])
 );
 

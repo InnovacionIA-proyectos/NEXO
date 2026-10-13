@@ -13,13 +13,22 @@ Correr **todo en un solo bloque, en la misma consola** que ejecuta `dotnet test`
 `dotnet test` vuelve a caer al fallback de `localhost`):
 
 ```powershell
-Get-Content .env | Where-Object { $_ -match '^(ConnectionStrings__Nexo|Database__Esquema|ConnectionStrings__DwSice|ConnectionStrings__DbSolucionesTi|ConnectionStrings__DwCubos|ConnectionStrings__IdentidadPortal)=' } | ForEach-Object {
+Get-Content .env | Where-Object { $_ -match '^(ConnectionStrings__Nexo|Database__Esquema|ConnectionStrings__DwSice|ConnectionStrings__DbSolucionesTi|ConnectionStrings__DwCubos|ConnectionStrings__IdentidadPortal|Cubicador3D__OutboundBaseUrl|Cubicador3D__RecomendacionesApiKey)=' } | ForEach-Object {
     $k, $v = $_ -split '=', 2
     Set-Item -Path "env:$k" -Value $v
 }
 $env:TEST_DB_CONNECTION = $env:ConnectionStrings__Nexo
 dotnet test Nexo.Clean.sln -c Release
 ```
+
+Las dos variables `Cubicador3D__*` (S5-HU-18.1/#273) son necesarias para
+`tests/Nexo.Api.Tests/Cubicacion/clsCubicacionControllerE2ETests.cs`, que llama
+al Cubicador real — requiere el stack de `cubicador/docker-compose.yml` arriba
+(`docker compose up -d --wait` dentro de `cubicador/`, con la red compartida
+`nexo_internal` del `docker-compose.yml` raíz ya levantada) y el catálogo local
+sembrado (`docker compose exec api python scripts/preparar_catalogo_local.py`).
+`Cubicador3D__OutboundBaseUrl` debe usar `127.0.0.1`, no `localhost` — ver el
+comentario en `.env.example` sobre por qué (IPv6 + Docker Desktop en Windows).
 
 ## Opción 2 — Docker Compose (sin SDK de .NET instalado)
 

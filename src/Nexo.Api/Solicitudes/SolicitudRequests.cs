@@ -53,6 +53,10 @@ public class clsCrearLineaRequest
 
     [Range(typeof(decimal), "0", "240", ParseLimitsInInvariantCulture = true)]
     public decimal? HorasDescargue { get; set; }
+
+    /// <summary>S5-HU-18.3/#275: id de ruta que Cotifly usa para agrupar varias líneas de
+    /// una misma carga heterogénea — lo pone SIEMPRE Cotifly, nunca NEXO.</summary>
+    public Guid? GrupoRutaId { get; set; }
 }
 
 /// <summary>Carga masiva de líneas de un pliego de licitación.</summary>

@@ -32,7 +32,13 @@ public sealed record clsCapturaLineaInput(
     /// <summary>S5-HU-16.1/#254: Id de tbl_municipios cuando Origen/Destino se escogió
     /// desde el buscador de ciudades — null si viene de texto libre (formulario viejo,
     /// importación de Excel sin ese dato).</summary>
-    int? OrigenMunicipioId = null, int? DestinoMunicipioId = null);
+    int? OrigenMunicipioId = null, int? DestinoMunicipioId = null,
+    /// <summary>S5-HU-18.3/#275: id de ruta que Cotifly usa para agrupar las líneas de una
+    /// misma carga heterogénea — lo pone SIEMPRE Cotifly, nunca NEXO.</summary>
+    Guid? GrupoRutaId = null,
+    /// <summary>S5-HU-18.2/#274: id de la recomendación del Cubicador usada para capturar
+    /// esta línea — null si se capturó sin pasar por el Cubicador.</summary>
+    string? IdRecomendacionVehiculo = null);
 
 public sealed record clsCapturarSolicitudCommand(
     Guid? ClienteId, string? ClienteBp, string Tipo, string? Modalidad, DateTimeOffset? Deadline,
@@ -145,6 +151,9 @@ public sealed class clsCapturarSolicitudCommandHandler(
                 Dimensiones = lr.Posiciones is { Count: > 0 }
                     ? System.Text.Json.JsonSerializer.Serialize(lr.Posiciones, clsPosicionCargaDto.Json)
                     : null,
+                GrupoRutaId = lr.GrupoRutaId,
+                NumeroLinea = numeroLinea,
+                IdRecomendacionVehiculo = lr.IdRecomendacionVehiculo,
             });
         }
 
