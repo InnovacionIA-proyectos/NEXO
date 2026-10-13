@@ -696,3 +696,76 @@ complementa donde pytest no llega, que es el motor de base real y la
 serialización de verdad. Las dos diferencias que encontró —los `uniqueidentifier`
 en mayúsculas y los decimales como texto— eran invisibles contra SQLite y por
 ASGI.
+
+## 15. CRUD de los seis catálogos (S5-HU-17.5)
+
+**Dónde viven: en el Cubicador**, que es donde está el dominio. El portal los
+consume por passthrough desde NEXO, nunca directo: no hay CORS —se retiró a
+propósito—, la llave terminaría en el bundle (ya pasó una vez y obligó a
+rotarla) y, sobre todo, **el rol no se podría aplicar**, porque el Bearer del
+Cubicador autoriza un backend y no a una persona.
+
+**Lo que la base ya hacía, y por eso no se repite.** Buena parte de las
+validaciones de la issue ya estaban puestas por el equipo de Datos: las llaves
+foráneas impiden borrar una categoría o una carrocería referenciada, hay
+`UNIQUE` en las siete claves de negocio, y tres `CHECK` —categoría 1 distinta de
+categoría 2, secundaria distinta de principal, y la bandera condicionada en
+falso cuando no hay secundaria—. Lo que agrega esta capa es **traducir esos
+choques a un 400 o un 409 con un mensaje que diga qué pasó**, en vez de dejar
+salir el error de SQL. Por ejemplo, el borrado de una categoría cuenta las
+referencias antes para responder *"hay 4 en mercancías"*, porque el error 547 de
+SQL Server no dice cuántas ni de dónde.
+
+**Concurrencia optimista con un entero, no con `ROWVERSION`.** Se agregó
+`Version INT NOT NULL DEFAULT 1` a los seis catálogos
+(`docs/Database/S5-HU-17.5_crud_catalogos.sql`). Un `ROWVERSION` lo llevaría el
+motor —más robusto ante escrituras que no pasen por el ORM— pero SQLite no lo
+tiene y las pruebas no podrían verificarlo. El criterio de la issue pide
+`version_id_col` de SQLAlchemy, y con un entero funciona igual en los dos
+motores.
+
+Un detalle que no es evidente: **la versión que manda el cliente se compara a
+mano**, no se le asigna a la instancia. `version_id_col` arma el `WHERE` del
+`UPDATE` con el valor **cargado**, no con el asignado, así que escribirle encima
+no compara nada y la concurrencia no protegería de nada. Las dos capas conviven:
+la comparación explícita rechaza al segundo editor, y `version_id_col` cubre la
+ventana entre el `SELECT` y el `UPDATE`.
+
+**`relacionVehiculosCarroceria` no lleva versión propia.** No se edita sola:
+viaja dentro del payload del vehículo, y es la versión del **vehículo** la que
+se exige y se sube, aunque el cambio solo toque las relaciones. Si no se subiera,
+dos administradores editando las carrocerías del mismo vehículo no verían
+conflicto, porque la fila del vehículo no cambia. Las relaciones se **reconcilian**
+en vez de borrarse y reinsertarse: las que no cambian conservan su `CreatedAt`,
+que es lo único que dice desde cuándo existe esa combinación.
+
+**La dominancia se valida antes de escribir.** Se proyecta cómo quedaría el
+catálogo con el vehículo ya cambiado y se corre la misma validación que el motor
+hace al arrancar. Hacerlo después obligaría a deshacer una escritura ya
+confirmada; hacerlo antes cuesta una lectura.
+
+**El par de las reglas se guarda normalizado.** El `UNIQUE` de la tabla es sobre
+el par *ordenado*, así que por sí solo no impide que entre `(B,A)` habiendo
+`(A,B)`. Guardando siempre el id menor primero, ese índice pasa a garantizarlo.
+La incompatibilidad es simétrica —`aplica_a` la evalúa en las dos direcciones—
+así que el orden no significa nada. La comparación es **por texto**, no con el
+orden nativo de `uniqueidentifier`: SQL Server ordena ese tipo por los últimos
+seis bytes primero, y comparar distinto en cada lado dejaría filas que un lado
+cree normalizadas y el otro no. El script normalizó la única fila que estaba al
+revés.
+
+**Solo tres catálogos publican evento.** NEXO proyecta mercancías, carrocerías y
+vehículos. Categorías, parámetros y reglas no los proyecta nadie: publicarles un
+evento sería mandar mensajes que ninguna cola consume.
+
+**`CreadoPor` lo declara el llamante.** El Cubicador no tiene usuarios. NEXO
+manda el id como campo del cuerpo y aquí se guarda como lo que es, un dato
+declarado y no una identidad comprobada. Es obligatorio en toda escritura para
+que ninguna quede sin rastro de quién la pidió.
+
+**Las carrocerías de un vehículo le pertenecen.** No son una referencia de
+afuera que deba bloquear su borrado: se van con él, igual que se reconcilian con
+él al guardarlo. Lo que sí bloquea a un vehículo es una recomendación que lo
+nombre, porque esa es de otro y es append-only. Sin esta distinción, la relación
+que el propio vehículo creó le impedía borrarse y salía como un
+`CONFLICTO_DE_DATOS` genérico.

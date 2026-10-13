@@ -1,6 +1,294 @@
 {
   "components": {
     "schemas": {
+      "ActualizarCarroceriaDto": {
+        "properties": {
+          "activo": {
+            "default": true,
+            "title": "Activo",
+            "type": "boolean"
+          },
+          "nombreCarroceria": {
+            "minLength": 1,
+            "title": "Nombrecarroceria",
+            "type": "string"
+          },
+          "usuarioId": {
+            "minLength": 1,
+            "title": "Usuarioid",
+            "type": "string"
+          },
+          "version": {
+            "minimum": 1.0,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "usuarioId",
+          "version",
+          "nombreCarroceria"
+        ],
+        "title": "ActualizarCarroceriaDto",
+        "type": "object"
+      },
+      "ActualizarCategoriaDto": {
+        "properties": {
+          "nombreCategoria": {
+            "minLength": 1,
+            "title": "Nombrecategoria",
+            "type": "string"
+          },
+          "usuarioId": {
+            "minLength": 1,
+            "title": "Usuarioid",
+            "type": "string"
+          },
+          "version": {
+            "minimum": 1.0,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "usuarioId",
+          "version",
+          "nombreCategoria"
+        ],
+        "title": "ActualizarCategoriaDto",
+        "type": "object"
+      },
+      "ActualizarMercanciaDto": {
+        "properties": {
+          "activo": {
+            "default": true,
+            "title": "Activo",
+            "type": "boolean"
+          },
+          "apilable": {
+            "default": true,
+            "title": "Apilable",
+            "type": "boolean"
+          },
+          "carroceriaSecundariaCondicionada": {
+            "default": false,
+            "title": "Carroceriasecundariacondicionada",
+            "type": "boolean"
+          },
+          "codigoMercancia": {
+            "minLength": 1,
+            "title": "Codigomercancia",
+            "type": "string"
+          },
+          "comentarioCondicion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comentariocondicion"
+          },
+          "condicionadaCubicacion": {
+            "default": false,
+            "title": "Condicionadacubicacion",
+            "type": "boolean"
+          },
+          "controlAmbientalRequerido": {
+            "default": "NINGUNO",
+            "title": "Controlambientalrequerido",
+            "type": "string"
+          },
+          "cubicable": {
+            "default": true,
+            "title": "Cubicable",
+            "type": "boolean"
+          },
+          "fragil": {
+            "default": false,
+            "title": "Fragil",
+            "type": "boolean"
+          },
+          "idCarroceriaPrincipal": {
+            "title": "Idcarroceriaprincipal",
+            "type": "string"
+          },
+          "idCarroceriaSecundaria": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Idcarroceriasecundaria"
+          },
+          "idCategoria": {
+            "title": "Idcategoria",
+            "type": "string"
+          },
+          "nombreMercancia": {
+            "minLength": 1,
+            "title": "Nombremercancia",
+            "type": "string"
+          },
+          "rotacionLibre": {
+            "default": true,
+            "title": "Rotacionlibre",
+            "type": "boolean"
+          },
+          "usuarioId": {
+            "minLength": 1,
+            "title": "Usuarioid",
+            "type": "string"
+          },
+          "version": {
+            "minimum": 1.0,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "usuarioId",
+          "version",
+          "codigoMercancia",
+          "nombreMercancia",
+          "idCategoria",
+          "idCarroceriaPrincipal"
+        ],
+        "title": "ActualizarMercanciaDto",
+        "type": "object"
+      },
+      "ActualizarParametroDto": {
+        "properties": {
+          "usuarioId": {
+            "minLength": 1,
+            "title": "Usuarioid",
+            "type": "string"
+          },
+          "valor": {
+            "minLength": 1,
+            "title": "Valor",
+            "type": "string"
+          },
+          "version": {
+            "minimum": 1.0,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "usuarioId",
+          "version",
+          "valor"
+        ],
+        "title": "ActualizarParametroDto",
+        "type": "object"
+      },
+      "ActualizarVehiculoDto": {
+        "properties": {
+          "activo": {
+            "default": true,
+            "title": "Activo",
+            "type": "boolean"
+          },
+          "altoUtilCm": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Altoutilcm"
+          },
+          "anchoCm": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Anchocm"
+          },
+          "capacidadMaximaKg": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Capacidadmaximakg"
+          },
+          "carrocerias": {
+            "items": {
+              "$ref": "#/components/schemas/CarroceriaDeVehiculoEntradaDto"
+            },
+            "title": "Carrocerias",
+            "type": "array"
+          },
+          "codigoVehiculo": {
+            "minLength": 1,
+            "title": "Codigovehiculo",
+            "type": "string"
+          },
+          "largoCm": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Largocm"
+          },
+          "nombreVehiculo": {
+            "minLength": 1,
+            "title": "Nombrevehiculo",
+            "type": "string"
+          },
+          "usuarioId": {
+            "minLength": 1,
+            "title": "Usuarioid",
+            "type": "string"
+          },
+          "version": {
+            "minimum": 1.0,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "usuarioId",
+          "version",
+          "codigoVehiculo",
+          "nombreVehiculo",
+          "largoCm",
+          "anchoCm",
+          "altoUtilCm",
+          "capacidadMaximaKg",
+          "carrocerias"
+        ],
+        "title": "ActualizarVehiculoDto",
+        "type": "object"
+      },
       "AjusteColocacionInput": {
         "properties": {
           "bloqueada": {
@@ -82,6 +370,110 @@
           }
         },
         "title": "AjusteColocacionInput",
+        "type": "object"
+      },
+      "BorrarDto": {
+        "description": "Cuerpo de un `DELETE`. Lleva version por lo mismo que el `PUT`: borrar\nuna fila que cambio desde que se leyo es tan destructivo como pisarla.",
+        "properties": {
+          "usuarioId": {
+            "minLength": 1,
+            "title": "Usuarioid",
+            "type": "string"
+          },
+          "version": {
+            "minimum": 1.0,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "usuarioId",
+          "version"
+        ],
+        "title": "BorrarDto",
+        "type": "object"
+      },
+      "CarroceriaDeVehiculoDto": {
+        "properties": {
+          "capacidadMaximaEspecifica": {
+            "title": "Capacidadmaximaespecifica",
+            "type": "number"
+          },
+          "codigoCarroceria": {
+            "title": "Codigocarroceria",
+            "type": "string"
+          },
+          "idCarroceria": {
+            "title": "Idcarroceria",
+            "type": "string"
+          },
+          "usaCapacidadMaximaDelVehiculo": {
+            "title": "Usacapacidadmaximadelvehiculo",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "idCarroceria",
+          "codigoCarroceria",
+          "usaCapacidadMaximaDelVehiculo",
+          "capacidadMaximaEspecifica"
+        ],
+        "title": "CarroceriaDeVehiculoDto",
+        "type": "object"
+      },
+      "CarroceriaDeVehiculoEntradaDto": {
+        "properties": {
+          "capacidadMaximaEspecifica": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "default": 0,
+            "title": "Capacidadmaximaespecifica"
+          },
+          "idCarroceria": {
+            "title": "Idcarroceria",
+            "type": "string"
+          },
+          "usaCapacidadMaximaDelVehiculo": {
+            "default": true,
+            "title": "Usacapacidadmaximadelvehiculo",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "idCarroceria"
+        ],
+        "title": "CarroceriaDeVehiculoEntradaDto",
+        "type": "object"
+      },
+      "CategoriaMercanciaDto": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "nombreCategoria": {
+            "title": "Nombrecategoria",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "nombreCategoria",
+          "version"
+        ],
+        "title": "CategoriaMercanciaDto",
         "type": "object"
       },
       "ColocacionCargueDto": {
@@ -223,6 +615,150 @@
         "title": "ColocacionCargueDto",
         "type": "object"
       },
+      "CrearCarroceriaDto": {
+        "properties": {
+          "codigoCarroceria": {
+            "minLength": 1,
+            "title": "Codigocarroceria",
+            "type": "string"
+          },
+          "nombreCarroceria": {
+            "minLength": 1,
+            "title": "Nombrecarroceria",
+            "type": "string"
+          },
+          "usuarioId": {
+            "minLength": 1,
+            "title": "Usuarioid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "usuarioId",
+          "codigoCarroceria",
+          "nombreCarroceria"
+        ],
+        "title": "CrearCarroceriaDto",
+        "type": "object"
+      },
+      "CrearCategoriaDto": {
+        "properties": {
+          "nombreCategoria": {
+            "minLength": 1,
+            "title": "Nombrecategoria",
+            "type": "string"
+          },
+          "usuarioId": {
+            "minLength": 1,
+            "title": "Usuarioid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "usuarioId",
+          "nombreCategoria"
+        ],
+        "title": "CrearCategoriaDto",
+        "type": "object"
+      },
+      "CrearMercanciaDto": {
+        "properties": {
+          "activo": {
+            "default": true,
+            "title": "Activo",
+            "type": "boolean"
+          },
+          "apilable": {
+            "default": true,
+            "title": "Apilable",
+            "type": "boolean"
+          },
+          "carroceriaSecundariaCondicionada": {
+            "default": false,
+            "title": "Carroceriasecundariacondicionada",
+            "type": "boolean"
+          },
+          "codigoMercancia": {
+            "minLength": 1,
+            "title": "Codigomercancia",
+            "type": "string"
+          },
+          "comentarioCondicion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comentariocondicion"
+          },
+          "condicionadaCubicacion": {
+            "default": false,
+            "title": "Condicionadacubicacion",
+            "type": "boolean"
+          },
+          "controlAmbientalRequerido": {
+            "default": "NINGUNO",
+            "title": "Controlambientalrequerido",
+            "type": "string"
+          },
+          "cubicable": {
+            "default": true,
+            "title": "Cubicable",
+            "type": "boolean"
+          },
+          "fragil": {
+            "default": false,
+            "title": "Fragil",
+            "type": "boolean"
+          },
+          "idCarroceriaPrincipal": {
+            "title": "Idcarroceriaprincipal",
+            "type": "string"
+          },
+          "idCarroceriaSecundaria": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Idcarroceriasecundaria"
+          },
+          "idCategoria": {
+            "title": "Idcategoria",
+            "type": "string"
+          },
+          "nombreMercancia": {
+            "minLength": 1,
+            "title": "Nombremercancia",
+            "type": "string"
+          },
+          "rotacionLibre": {
+            "default": true,
+            "title": "Rotacionlibre",
+            "type": "boolean"
+          },
+          "usuarioId": {
+            "minLength": 1,
+            "title": "Usuarioid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "usuarioId",
+          "codigoMercancia",
+          "nombreMercancia",
+          "idCategoria",
+          "idCarroceriaPrincipal"
+        ],
+        "title": "CrearMercanciaDto",
+        "type": "object"
+      },
       "CrearPlanRequest": {
         "properties": {
           "nombre": {
@@ -293,6 +829,132 @@
           "mercancias"
         ],
         "title": "CrearRecomendacionDto",
+        "type": "object"
+      },
+      "CrearReglaDto": {
+        "description": "Sin `PUT`: una regla se borra y se crea. Cambiarle el par a una regla\nexistente es, en los hechos, otra regla.",
+        "properties": {
+          "idCategoria1": {
+            "title": "Idcategoria1",
+            "type": "string"
+          },
+          "idCategoria2": {
+            "title": "Idcategoria2",
+            "type": "string"
+          },
+          "motivo": {
+            "minLength": 1,
+            "title": "Motivo",
+            "type": "string"
+          },
+          "usuarioId": {
+            "minLength": 1,
+            "title": "Usuarioid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "usuarioId",
+          "idCategoria1",
+          "idCategoria2",
+          "motivo"
+        ],
+        "title": "CrearReglaDto",
+        "type": "object"
+      },
+      "CrearVehiculoDto": {
+        "properties": {
+          "activo": {
+            "default": true,
+            "title": "Activo",
+            "type": "boolean"
+          },
+          "altoUtilCm": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Altoutilcm"
+          },
+          "anchoCm": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Anchocm"
+          },
+          "capacidadMaximaKg": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Capacidadmaximakg"
+          },
+          "carrocerias": {
+            "items": {
+              "$ref": "#/components/schemas/CarroceriaDeVehiculoEntradaDto"
+            },
+            "title": "Carrocerias",
+            "type": "array"
+          },
+          "codigoVehiculo": {
+            "minLength": 1,
+            "title": "Codigovehiculo",
+            "type": "string"
+          },
+          "largoCm": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Largocm"
+          },
+          "nombreVehiculo": {
+            "minLength": 1,
+            "title": "Nombrevehiculo",
+            "type": "string"
+          },
+          "usuarioId": {
+            "minLength": 1,
+            "title": "Usuarioid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "usuarioId",
+          "codigoVehiculo",
+          "nombreVehiculo",
+          "largoCm",
+          "anchoCm",
+          "altoUtilCm",
+          "capacidadMaximaKg",
+          "carrocerias"
+        ],
+        "title": "CrearVehiculoDto",
         "type": "object"
       },
       "EjeVehiculoDto": {
@@ -1244,6 +1906,46 @@
         "title": "OptimizarRequestDto",
         "type": "object"
       },
+      "ParametroMotorDto": {
+        "properties": {
+          "clave": {
+            "title": "Clave",
+            "type": "string"
+          },
+          "descripcion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descripcion"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "valor": {
+            "title": "Valor",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "clave",
+          "valor",
+          "descripcion",
+          "version"
+        ],
+        "title": "ParametroMotorDto",
+        "type": "object"
+      },
       "PiezaFueraDeMedidaDto": {
         "properties": {
           "codigoMercancia": {
@@ -1532,6 +2234,39 @@
         "title": "RecomendacionDto",
         "type": "object"
       },
+      "ReglaIncompatibilidadDto": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "idCategoria1": {
+            "title": "Idcategoria1",
+            "type": "string"
+          },
+          "idCategoria2": {
+            "title": "Idcategoria2",
+            "type": "string"
+          },
+          "motivo": {
+            "title": "Motivo",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "idCategoria1",
+          "idCategoria2",
+          "motivo",
+          "version"
+        ],
+        "title": "ReglaIncompatibilidadDto",
+        "type": "object"
+      },
       "ResultadoPlanDto": {
         "properties": {
           "colocaciones": {
@@ -1611,13 +2346,18 @@
           "nombreCarroceria": {
             "title": "Nombrecarroceria",
             "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
           }
         },
         "required": [
           "id",
           "codigoCarroceria",
           "nombreCarroceria",
-          "activo"
+          "activo",
+          "version"
         ],
         "title": "TipoCarroceriaDto",
         "type": "object"
@@ -1704,6 +2444,10 @@
           "rotacionLibre": {
             "title": "Rotacionlibre",
             "type": "boolean"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
           }
         },
         "required": [
@@ -1721,7 +2465,8 @@
           "fragil",
           "rotacionLibre",
           "comentarioCondicion",
-          "activo"
+          "activo",
+          "version"
         ],
         "title": "TipoMercanciaDto",
         "type": "object"
@@ -1764,6 +2509,68 @@
           "type"
         ],
         "title": "ValidationError",
+        "type": "object"
+      },
+      "VehiculoCatalogoDto": {
+        "description": "El vehiculo del catalogo que alimenta al motor.\n\n**No confundir con `/api/planes-cargue/vehiculos`**, que es el catalogo\npropio del motor 3D (`vehiculos_cubicacion`): otra tabla, otro proposito.",
+        "properties": {
+          "activo": {
+            "title": "Activo",
+            "type": "boolean"
+          },
+          "altoUtilCm": {
+            "title": "Altoutilcm",
+            "type": "number"
+          },
+          "anchoCm": {
+            "title": "Anchocm",
+            "type": "number"
+          },
+          "capacidadMaximaKg": {
+            "title": "Capacidadmaximakg",
+            "type": "number"
+          },
+          "carrocerias": {
+            "items": {
+              "$ref": "#/components/schemas/CarroceriaDeVehiculoDto"
+            },
+            "title": "Carrocerias",
+            "type": "array"
+          },
+          "codigoVehiculo": {
+            "title": "Codigovehiculo",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "largoCm": {
+            "title": "Largocm",
+            "type": "number"
+          },
+          "nombreVehiculo": {
+            "title": "Nombrevehiculo",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "codigoVehiculo",
+          "nombreVehiculo",
+          "largoCm",
+          "anchoCm",
+          "altoUtilCm",
+          "capacidadMaximaKg",
+          "activo",
+          "version",
+          "carrocerias"
+        ],
+        "title": "VehiculoCatalogoDto",
         "type": "object"
       },
       "VehiculoCubicacionDto": {
@@ -3006,6 +3813,185 @@
         ]
       }
     },
+    "/categorias-mercancia": {
+      "get": {
+        "operationId": "listar_categorias_categorias_mercancia_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CategoriaMercanciaDto"
+                  },
+                  "title": "Response Listar Categorias Categorias Mercancia Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Categorias",
+        "tags": [
+          "catalogo"
+        ]
+      },
+      "post": {
+        "operationId": "crear_categoria_categorias_mercancia_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CrearCategoriaDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CategoriaMercanciaDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Crear Categoria",
+        "tags": [
+          "catalogo"
+        ]
+      }
+    },
+    "/categorias-mercancia/{id}": {
+      "delete": {
+        "operationId": "borrar_categoria_categorias_mercancia__id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BorrarDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Borrar Categoria",
+        "tags": [
+          "catalogo"
+        ]
+      },
+      "put": {
+        "operationId": "actualizar_categoria_categorias_mercancia__id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActualizarCategoriaDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CategoriaMercanciaDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Actualizar Categoria",
+        "tags": [
+          "catalogo"
+        ]
+      }
+    },
     "/health": {
       "get": {
         "operationId": "health_health_get",
@@ -3093,6 +4079,93 @@
           }
         ],
         "summary": "Actualizar Medidas",
+        "tags": [
+          "catalogo"
+        ]
+      }
+    },
+    "/parametros-motor": {
+      "get": {
+        "operationId": "listar_parametros_parametros_motor_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ParametroMotorDto"
+                  },
+                  "title": "Response Listar Parametros Parametros Motor Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Parametros",
+        "tags": [
+          "catalogo"
+        ]
+      }
+    },
+    "/parametros-motor/{clave}": {
+      "put": {
+        "operationId": "actualizar_parametro_parametros_motor__clave__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "clave",
+            "required": true,
+            "schema": {
+              "title": "Clave",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActualizarParametroDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ParametroMotorDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Actualizar Parametro",
         "tags": [
           "catalogo"
         ]
@@ -3250,9 +4323,133 @@
         ]
       }
     },
+    "/reglas-incompatibilidad": {
+      "get": {
+        "operationId": "listar_reglas_reglas_incompatibilidad_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ReglaIncompatibilidadDto"
+                  },
+                  "title": "Response Listar Reglas Reglas Incompatibilidad Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Reglas",
+        "tags": [
+          "catalogo"
+        ]
+      },
+      "post": {
+        "operationId": "crear_regla_reglas_incompatibilidad_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CrearReglaDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReglaIncompatibilidadDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Crear Regla",
+        "tags": [
+          "catalogo"
+        ]
+      }
+    },
+    "/reglas-incompatibilidad/{id}": {
+      "delete": {
+        "operationId": "borrar_regla_reglas_incompatibilidad__id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BorrarDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Borrar Regla",
+        "tags": [
+          "catalogo"
+        ]
+      }
+    },
     "/tipos-carroceria": {
       "get": {
-        "operationId": "tipos_carroceria_tipos_carroceria_get",
+        "operationId": "listar_carrocerias_tipos_carroceria_get",
         "responses": {
           "200": {
             "content": {
@@ -3261,7 +4458,7 @@
                   "items": {
                     "$ref": "#/components/schemas/TipoCarroceriaDto"
                   },
-                  "title": "Response Tipos Carroceria Tipos Carroceria Get",
+                  "title": "Response Listar Carrocerias Tipos Carroceria Get",
                   "type": "array"
                 }
               }
@@ -3274,7 +4471,156 @@
             "HTTPBearer": []
           }
         ],
-        "summary": "Tipos Carroceria",
+        "summary": "Listar Carrocerias",
+        "tags": [
+          "catalogo"
+        ]
+      },
+      "post": {
+        "operationId": "crear_carroceria_tipos_carroceria_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CrearCarroceriaDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TipoCarroceriaDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Crear Carroceria",
+        "tags": [
+          "catalogo"
+        ]
+      }
+    },
+    "/tipos-carroceria/{id}": {
+      "delete": {
+        "operationId": "borrar_carroceria_tipos_carroceria__id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BorrarDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Borrar Carroceria",
+        "tags": [
+          "catalogo"
+        ]
+      },
+      "put": {
+        "operationId": "actualizar_carroceria_tipos_carroceria__id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActualizarCarroceriaDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TipoCarroceriaDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Actualizar Carroceria",
         "tags": [
           "catalogo"
         ]
@@ -3282,7 +4628,7 @@
     },
     "/tipos-mercancia": {
       "get": {
-        "operationId": "tipos_mercancia_tipos_mercancia_get",
+        "operationId": "listar_mercancias_tipos_mercancia_get",
         "responses": {
           "200": {
             "content": {
@@ -3291,7 +4637,7 @@
                   "items": {
                     "$ref": "#/components/schemas/TipoMercanciaDto"
                   },
-                  "title": "Response Tipos Mercancia Tipos Mercancia Get",
+                  "title": "Response Listar Mercancias Tipos Mercancia Get",
                   "type": "array"
                 }
               }
@@ -3304,7 +4650,335 @@
             "HTTPBearer": []
           }
         ],
-        "summary": "Tipos Mercancia",
+        "summary": "Listar Mercancias",
+        "tags": [
+          "catalogo"
+        ]
+      },
+      "post": {
+        "operationId": "crear_mercancia_tipos_mercancia_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CrearMercanciaDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TipoMercanciaDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Crear Mercancia",
+        "tags": [
+          "catalogo"
+        ]
+      }
+    },
+    "/tipos-mercancia/{id}": {
+      "delete": {
+        "operationId": "borrar_mercancia_tipos_mercancia__id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BorrarDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Borrar Mercancia",
+        "tags": [
+          "catalogo"
+        ]
+      },
+      "put": {
+        "operationId": "actualizar_mercancia_tipos_mercancia__id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActualizarMercanciaDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TipoMercanciaDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Actualizar Mercancia",
+        "tags": [
+          "catalogo"
+        ]
+      }
+    },
+    "/vehiculos-catalogo": {
+      "get": {
+        "operationId": "listar_vehiculos_vehiculos_catalogo_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/VehiculoCatalogoDto"
+                  },
+                  "title": "Response Listar Vehiculos Vehiculos Catalogo Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Vehiculos",
+        "tags": [
+          "catalogo"
+        ]
+      },
+      "post": {
+        "operationId": "crear_vehiculo_vehiculos_catalogo_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CrearVehiculoDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VehiculoCatalogoDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Crear Vehiculo",
+        "tags": [
+          "catalogo"
+        ]
+      }
+    },
+    "/vehiculos-catalogo/{id}": {
+      "delete": {
+        "operationId": "borrar_vehiculo_vehiculos_catalogo__id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BorrarDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Borrar Vehiculo",
+        "tags": [
+          "catalogo"
+        ]
+      },
+      "put": {
+        "operationId": "actualizar_vehiculo_vehiculos_catalogo__id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActualizarVehiculoDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VehiculoCatalogoDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Actualizar Vehiculo",
         "tags": [
           "catalogo"
         ]

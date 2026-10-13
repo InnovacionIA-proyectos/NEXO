@@ -79,6 +79,15 @@ class Vehiculo(BaseCatalogo):
     created_at: Mapped[datetime] = mapped_column("CreatedAt", DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column("UpdatedAt", DateTime(timezone=True))
 
+    # Concurrencia optimista (S5-HU-17.5). SQLAlchemy la sube en cada UPDATE y
+    # levanta StaleDataError si la fila cambio desde que se leyo; el borde HTTP
+    # lo traduce a 409. Sin esto dos administradores editando el mismo registro
+    # se pisan en silencio, y en un catalogo que alimenta el motor eso no sale
+    # como error sino como recomendaciones sutilmente equivocadas.
+    version: Mapped[int] = mapped_column("Version", Integer, nullable=False, default=1)
+
+    __mapper_args__ = {"version_id_col": version}
+
     carrocerias: Mapped[list[RelacionVehiculoCarroceria]] = relationship(
         back_populates="vehiculo", lazy="selectin")
 
@@ -101,6 +110,15 @@ class TipoCarroceria(BaseCatalogo):
     creado_por: Mapped[str] = mapped_column("CreadoPor", String(100))
     created_at: Mapped[datetime] = mapped_column("CreatedAt", DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column("UpdatedAt", DateTime(timezone=True))
+
+    # Concurrencia optimista (S5-HU-17.5). SQLAlchemy la sube en cada UPDATE y
+    # levanta StaleDataError si la fila cambio desde que se leyo; el borde HTTP
+    # lo traduce a 409. Sin esto dos administradores editando el mismo registro
+    # se pisan en silencio, y en un catalogo que alimenta el motor eso no sale
+    # como error sino como recomendaciones sutilmente equivocadas.
+    version: Mapped[int] = mapped_column("Version", Integer, nullable=False, default=1)
+
+    __mapper_args__ = {"version_id_col": version}
 
 
 class RelacionVehiculoCarroceria(BaseCatalogo):
@@ -154,6 +172,15 @@ class CategoriaMercancia(BaseCatalogo):
     created_at: Mapped[datetime] = mapped_column("CreatedAt", DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column("UpdatedAt", DateTime(timezone=True))
 
+    # Concurrencia optimista (S5-HU-17.5). SQLAlchemy la sube en cada UPDATE y
+    # levanta StaleDataError si la fila cambio desde que se leyo; el borde HTTP
+    # lo traduce a 409. Sin esto dos administradores editando el mismo registro
+    # se pisan en silencio, y en un catalogo que alimenta el motor eso no sale
+    # como error sino como recomendaciones sutilmente equivocadas.
+    version: Mapped[int] = mapped_column("Version", Integer, nullable=False, default=1)
+
+    __mapper_args__ = {"version_id_col": version}
+
 
 class TipoMercancia(BaseCatalogo):
     """31 tipos de la matriz de Operaciones.
@@ -192,6 +219,15 @@ class TipoMercancia(BaseCatalogo):
     created_at: Mapped[datetime] = mapped_column("CreatedAt", DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column("UpdatedAt", DateTime(timezone=True))
 
+    # Concurrencia optimista (S5-HU-17.5). SQLAlchemy la sube en cada UPDATE y
+    # levanta StaleDataError si la fila cambio desde que se leyo; el borde HTTP
+    # lo traduce a 409. Sin esto dos administradores editando el mismo registro
+    # se pisan en silencio, y en un catalogo que alimenta el motor eso no sale
+    # como error sino como recomendaciones sutilmente equivocadas.
+    version: Mapped[int] = mapped_column("Version", Integer, nullable=False, default=1)
+
+    __mapper_args__ = {"version_id_col": version}
+
     categoria: Mapped[CategoriaMercancia] = relationship(lazy="selectin")
 
 
@@ -216,6 +252,15 @@ class ReglaIncompatibilidad(BaseCatalogo):
     created_at: Mapped[datetime] = mapped_column("CreatedAt", DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column("UpdatedAt", DateTime(timezone=True))
 
+    # Concurrencia optimista (S5-HU-17.5). SQLAlchemy la sube en cada UPDATE y
+    # levanta StaleDataError si la fila cambio desde que se leyo; el borde HTTP
+    # lo traduce a 409. Sin esto dos administradores editando el mismo registro
+    # se pisan en silencio, y en un catalogo que alimenta el motor eso no sale
+    # como error sino como recomendaciones sutilmente equivocadas.
+    version: Mapped[int] = mapped_column("Version", Integer, nullable=False, default=1)
+
+    __mapper_args__ = {"version_id_col": version}
+
 
 class ParametroMotor(BaseCatalogo):
     """Parametros del motor por clave, incluido `k_max = 10`."""
@@ -229,6 +274,15 @@ class ParametroMotor(BaseCatalogo):
     creado_por: Mapped[str] = mapped_column("CreadoPor", String(100))
     created_at: Mapped[datetime] = mapped_column("CreatedAt", DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column("UpdatedAt", DateTime(timezone=True))
+
+    # Concurrencia optimista (S5-HU-17.5). SQLAlchemy la sube en cada UPDATE y
+    # levanta StaleDataError si la fila cambio desde que se leyo; el borde HTTP
+    # lo traduce a 409. Sin esto dos administradores editando el mismo registro
+    # se pisan en silencio, y en un catalogo que alimenta el motor eso no sale
+    # como error sino como recomendaciones sutilmente equivocadas.
+    version: Mapped[int] = mapped_column("Version", Integer, nullable=False, default=1)
+
+    __mapper_args__ = {"version_id_col": version}
 
 
 # --- Recomendaciones (append-only) -----------------------------------------

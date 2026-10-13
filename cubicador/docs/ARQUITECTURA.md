@@ -49,6 +49,10 @@ cubicador/
                                 # y la reconsulta (S5-HU-17.4).
     parametros/
       casos_de_uso.py           # medidas estandar (venian de cubicacion_rapida/)
+    catalogo/
+      casos_de_uso.py            # CRUD de los seis catalogos (S5-HU-17.5): las
+                                  # validaciones que la base no puede hacer sola, y la
+                                  # traduccion de las que si hace a 400/409 con mensaje
     plan_cargue/
       mapeos.py                # traduce entidades <-> tipos del motor (clave "id#indice")
       vehiculos.py              # guardar/eliminar/listar vehiculos + presets
@@ -73,6 +77,7 @@ cubicador/
       repositorios/               # implementan los Ports de persistencia
         catalogo_repo.py           # SqlCatalogoRepository: lee el catalogo entero
         recomendacion_repo.py       # append-only: solo INSERT y SELECT, ni un UPDATE
+        catalogo_crud_repo.py        # escritura de los seis catalogos, con la version
     mensajeria/
       rabbitmq.py                 # implementa IEventosPort con aio-pika
     clientes/
@@ -82,11 +87,11 @@ cubicador/
     dtos/
       comun.py                     # ApiModel base (camelCase)
       recomendaciones.py            # DTOs del contrato unico (S5-HU-17.4)
-      catalogo.py                    # DTOs de /tipos-mercancia y /tipos-carroceria
+      catalogo.py                    # DTOs de los seis catalogos, lectura y escritura
       plan_cargue.py                  # DTOs de /api/planes-cargue
     routers/
       recomendaciones.py             # POST /recomendaciones + reconsulta
-      catalogo.py                     # catalogos publicos y /medidas-estandar
+      catalogo.py                     # catalogos publicos + los seis CRUD + medidas
       planes_cargue.py                 # FastAPI router: /api/planes-cargue
     main.py                          # app FastAPI, manejo de excepciones, healthcheck
   worker/
@@ -104,8 +109,11 @@ scripts/
   verificar_contrato.py                  # los criterios del contrato contra el servicio
                                           # corriendo, por HTTP: campos obligatorios,
                                           # origen verificado, append-only, 200 vs error
+  verificar_crud_catalogos.py             # los seis CRUD contra el servicio corriendo.
+                                          # ESCRIBE: se niega si el servicio no es local
   preparar_catalogo_local.py              # crea y siembra el catalogo en la base LOCAL
-                                          # (se niega a correr contra un host remoto)
+                                          # (se niega a correr contra un host remoto;
+                                          # --recrear lo rehace cuando cambia el modelo)
   verificar_integracion_mssql.py        # humo end-to-end contra SQL Server real
   verificar_aislamiento.sql              # confirma que no tocamos dbo ni dbo_cotifly
 docs/Database/ESQUEMA_CUBICADOR.sql   # DDL del motor 3D, fuente de verdad, se aplica a mano

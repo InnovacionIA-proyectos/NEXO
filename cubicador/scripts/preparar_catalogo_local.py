@@ -18,10 +18,15 @@ tablas, asi que apuntarlo por error a QA es exactamente lo que no puede pasar.
 Correr (dentro del contenedor, que es el que tiene el driver ODBC):
 
     docker compose exec api python scripts/preparar_catalogo_local.py
+
+Con `--recrear` borra las tablas del catalogo y las vuelve a hacer. Hace falta
+cuando el modelo gana una columna -las tablas locales las crea `create_all`, que
+nunca altera una existente- y son datos de desarrollo: se rehacen en segundos.
 """
 
 from __future__ import annotations
 
+import argparse
 import asyncio
 import os
 import sys
@@ -109,6 +114,11 @@ PARAMETROS = [
 
 
 async def main() -> int:
+    parser = argparse.ArgumentParser(description="Catalogo de la base LOCAL.")
+    parser.add_argument("--recrear", action="store_true",
+                        help="Borra las tablas del catalogo y las vuelve a hacer.")
+    args = parser.parse_args()
+
     url = os.environ.get("DATABASE_URL", "")
     if not url:
         raise SystemExit("Falta DATABASE_URL.")
@@ -116,6 +126,10 @@ async def main() -> int:
     print(f"Base local: {host}")
 
     engine = create_async_engine(url, echo=False)
+    if args.recrear:
+        async with engine.begin() as conn:
+            await conn.run_sync(m.BaseCatalogo.metadata.drop_all)
+        print("Tablas del catalogo borradas.")
     async with engine.begin() as conn:
         await conn.run_sync(m.BaseCatalogo.metadata.create_all)
     print("Tablas del catalogo creadas (las que faltaran).")

@@ -189,7 +189,60 @@ devolviendo lo mismo.
 DTOs reales en `api/dtos/recomendaciones.py` y `api/dtos/catalogo.py`; el esquema
 completo, en `docs/openapi.json` (lo regenera `scripts/generar_openapi.py`).
 
-### 3.2 `/api/planes-cargue` — motor 3D (con persistencia)
+### 3.2 Los seis CRUD de catálogo (S5-HU-17.5)
+
+Viven en el Cubicador, que es donde está el dominio. **El portal nunca llama
+acá directo**: no hay CORS, la llave terminaría en el bundle y el rol no se
+podría aplicar, porque este Bearer autoriza un backend y no a una persona. Entre
+el formulario y este servicio hay un passthrough en NEXO que espeja estas rutas
+y aplica el rol (`AdminTarifas,Admin` para escribir, `[Authorize]` a secas para
+leer).
+
+| Catálogo | Rutas | Qué administra |
+|---|---|---|
+| Parámetros del motor | `GET /parametros-motor`<br>`PUT /parametros-motor/{clave}` | `k_max`, `umbral_alerta_llenado`, `usar_alternativa`, `factor_vol_util`, `margen_cg` |
+| Categorías de mercancía | `GET` `POST` `PUT/{id}` `DELETE/{id}` en `/categorias-mercancia` | Las familias que agrupan las mercancías y sobre las que se declaran las incompatibilidades |
+| Tipos de carrocería | ídem en `/tipos-carroceria` | El catálogo de carrocerías y qué vehículos las admiten |
+| Tipos de mercancía | ídem en `/tipos-mercancia` | Qué se transporta, con qué carrocería y bajo qué condiciones |
+| Vehículos del catálogo | ídem en `/vehiculos-catalogo` | Las configuraciones con sus medidas, capacidad y carrocerías |
+| Reglas de incompatibilidad | `GET` `POST` `DELETE/{id}` en `/reglas-incompatibilidad`, **sin `PUT`** | Qué pares de categorías no pueden viajar juntos |
+
+> `/vehiculos-catalogo` **no es** `/api/planes-cargue/vehiculos`. Son dos tablas
+> distintas: la primera es el catálogo que alimenta al motor de selección de
+> flota, la segunda es el catálogo propio del motor 3D.
+
+**Concurrencia optimista.** Todo `GET` devuelve `version` y todo `PUT`/`DELETE`
+la exige en el cuerpo. Si la fila cambió desde que el formulario la cargó, el
+servicio responde **409 `CONFLICTO_DE_VERSION`** en vez de pisar el cambio
+ajeno. En un catálogo que alimenta al motor eso no se manifestaría como error
+sino como recomendaciones sutilmente equivocadas.
+
+`relacionVehiculosCarroceria` no tiene versión propia: viaja dentro del payload
+del vehículo, y es la versión del **vehículo** la que se exige y se sube, aunque
+el cambio solo toque las relaciones.
+
+**`usuarioId` es obligatorio en toda escritura.** El Cubicador no tiene
+usuarios: NEXO manda el id y acá queda en `CreadoPor` como dato declarado, no
+como identidad comprobada.
+
+**Errores.** Mismo formato `{ "codigo": "...", "mensaje": "..." }` de la sección
+4:
+
+| HTTP | Código | Cuándo |
+|---|---|---|
+| 400 | `CARROCERIA_SECUNDARIA_IGUAL`, `CONDICIONADA_SIN_SECUNDARIA`, `SIN_CARROCERIAS`, `CAPACIDAD_ESPECIFICA_INVALIDA`, `DOMINANCIA_ROTA`, `CATEGORIAS_IGUALES`, … | Una validación de negocio |
+| 404 | `NO_ENCONTRADO`, `PARAMETRO_NO_ENCONTRADO` | El id o la clave no existen |
+| 409 | `CONFLICTO_DE_VERSION` | La fila cambió desde que se leyó |
+| 409 | `CATALOGO_REFERENCIADO` | Hay filas que la referencian; el mensaje dice cuántas y de dónde |
+| 409 | `REGLA_DUPLICADA` | Ya existe esa regla, en un sentido o en el otro |
+| 409 | `CONFLICTO_DE_DATOS` | Un `UNIQUE`, un `CHECK` o una llave foránea de la base |
+
+**Eventos.** Las escrituras de **mercancías, carrocerías y vehículos** publican
+su evento para que la proyección de NEXO no quede vieja. Categorías, parámetros
+y reglas no los publican: NEXO no los proyecta, y serían mensajes que ninguna
+cola consume.
+
+### 3.3 `/api/planes-cargue` — motor 3D (con persistencia)
 
 | Método | Ruta | Notas |
 |---|---|---|
@@ -463,7 +516,7 @@ class SolicitudEncoladaDto(ApiModel):
 > como ausencia — aceptar el null solo en el borde habría movido el fallo a la base, no
 > lo habría quitado. Para quien consume el DTO, el tipo sigue siendo `str`.
 
-### 3.3 Catálogo de `codigo_rechazo` en `ColocacionCargueDto`
+### 3.4 Catálogo de `codigo_rechazo` en `ColocacionCargueDto`
 
 Distinto del catálogo de errores HTTP de la sección 4 — estos son razones de
 negocio dentro de una respuesta `200` exitosa, cuando una unidad no se pudo

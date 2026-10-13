@@ -186,3 +186,52 @@ class IRecomendacionRepository(Protocol):
     ) -> list[MercanciaRecomendada] | None:
         """Las mercancias de un camion. None si ese id no existe."""
         ...
+
+
+class ICatalogoCrudRepository(Protocol):
+    """Escritura de los seis catalogos (S5-HU-17.5).
+
+    Separado de `ICatalogoRepository`, que **solo lee** y es el que usa el
+    motor. Son dos usos distintos de las mismas tablas: el motor las consume
+    enteras en cada corrida, el CRUD toca una fila a la vez y necesita saber de
+    versiones, de referencias y de conflictos. Mezclarlos obligaria al motor a
+    cargar con una interfaz de escritura que nunca usa.
+
+    **Concurrencia optimista**: cada `actualizar` recibe la version que el
+    llamante leyo. Si la fila cambio desde entonces, levanta `StaleDataError`
+    de SQLAlchemy y el borde HTTP responde 409.
+
+    Las operaciones son genericas sobre el modelo porque los seis catalogos
+    tienen la misma forma de persistencia -id, clave de negocio, auditoria y
+    version-; lo que los distingue son las validaciones, y esas viven en los
+    casos de uso.
+    """
+
+    async def listar(self, catalogo: str) -> list[object]:
+        """Todas las filas de un catalogo, ordenadas por su clave de negocio."""
+        ...
+
+    async def obtener(self, catalogo: str, id: str) -> object | None: ...
+
+    async def crear(self, catalogo: str, datos: dict, creado_por: str) -> object:
+        """Inserta y devuelve la fila con su id y su version."""
+        ...
+
+    async def actualizar(
+        self, catalogo: str, id: str, datos: dict, version: int, creado_por: str,
+    ) -> object | None:
+        """Actualiza exigiendo la version. None si el id no existe."""
+        ...
+
+    async def eliminar(self, catalogo: str, id: str, version: int) -> bool:
+        """Borra fisicamente. False si el id no existe."""
+        ...
+
+    async def contar_referencias(self, catalogo: str, id: str) -> dict[str, int]:
+        """Que filas de otras tablas apuntan a esta, por tabla.
+
+        Las llaves foraneas ya impiden el borrado, pero el error 547 de SQL
+        Server no dice cuantas ni de donde: con esto el CRUD responde "3
+        mercancias la referencian" en vez de un conflicto generico.
+        """
+        ...

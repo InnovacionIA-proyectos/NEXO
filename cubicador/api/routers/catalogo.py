@@ -1,15 +1,18 @@
-"""Catalogos publicos y medidas estandar (S5-HU-17.4).
+"""Catalogos: lectura publica (S5-HU-17.4) y CRUD (S5-HU-17.5).
 
 `GET /tipos-mercancia` y `GET /tipos-carroceria` son la seccion 2.7 del
-contrato: solo lectura. NEXO proyecta estos catalogos por eventos y Cotifly los
-consulta con cache. Las escrituras son los CRUD de S5-HU-17.5.
+contrato: NEXO proyecta estos catalogos por eventos y Cotifly los consulta con
+cache.
 
-`/medidas-estandar` vivia bajo `/api/cubicacion`, que se retira en este corte.
-Se muda aca sin cambios de comportamiento: sigue siendo la unica forma de
-editar los topes contra los que se detecta extradimension, que el contrato
-nuevo sigue devolviendo en la seccion 2.4.
+Las escrituras son los CRUD. **El portal nunca llama aqui directo**: no hay
+CORS -se retiro a proposito-, la llave terminaria en el bundle (ya paso una vez
+y obligo a rotarla) y, sobre todo, el rol no se podria aplicar, porque el
+Bearer del Cubicador autoriza un backend y no a una persona. Entre el
+formulario y este servicio hay un passthrough en NEXO que espeja estas rutas y
+aplica el rol (S5-HU-18.6).
 
-Van sin prefijo comun porque son tres rutas de primer nivel distintas.
+`/medidas-estandar` vivia bajo `/api/cubicacion`, que se retiro: se mudo aca
+sin cambios de comportamiento.
 """
 
 from __future__ import annotations
@@ -19,54 +22,332 @@ from decimal import Decimal
 from fastapi import APIRouter, Depends
 
 from api.dependencias import (
+    obtener_catalogo_crud_repo,
     obtener_catalogo_repo,
+    obtener_eventos_publisher,
     obtener_parametros_repo,
     verificar_api_key,
 )
-from api.dtos.catalogo import TipoCarroceriaDto, TipoMercanciaDto
+from api.dtos.catalogo import (
+    ActualizarCarroceriaDto,
+    ActualizarCategoriaDto,
+    ActualizarMercanciaDto,
+    ActualizarParametroDto,
+    ActualizarVehiculoDto,
+    BorrarDto,
+    CarroceriaDeVehiculoDto,
+    CategoriaMercanciaDto,
+    CrearCarroceriaDto,
+    CrearCategoriaDto,
+    CrearMercanciaDto,
+    CrearReglaDto,
+    CrearVehiculoDto,
+    ParametroMotorDto,
+    ReglaIncompatibilidadDto,
+    TipoCarroceriaDto,
+    TipoMercanciaDto,
+    VehiculoCatalogoDto,
+)
 from api.dtos.recomendaciones import MedidasEstandarDto
+from application.catalogo import casos_de_uso as cu
 from application.parametros import casos_de_uso as cu_parametros
 from domain.entidades.entidades import ParametrosCubicacion
 
 router = APIRouter(tags=["catalogo"], dependencies=[Depends(verificar_api_key)])
 
 
+# --- traductores ------------------------------------------------------------
+
+
+def _carroceria(fila) -> TipoCarroceriaDto:
+    return TipoCarroceriaDto(
+        id=fila.id, codigo_carroceria=fila.codigo, nombre_carroceria=fila.nombre,
+        activo=fila.activo, version=fila.version)
+
+
+def _categoria(fila) -> CategoriaMercanciaDto:
+    return CategoriaMercanciaDto(id=fila.id, nombre_categoria=fila.nombre,
+                                 version=fila.version)
+
+
+def _parametro(fila) -> ParametroMotorDto:
+    return ParametroMotorDto(id=fila.id, clave=fila.clave, valor=fila.valor,
+                             descripcion=fila.descripcion, version=fila.version)
+
+
+def _regla(fila) -> ReglaIncompatibilidadDto:
+    return ReglaIncompatibilidadDto(
+        id=fila.id, id_categoria_1=fila.categoria_1_id, id_categoria_2=fila.categoria_2_id,
+        motivo=fila.motivo, version=fila.version)
+
+
+def _mercancia(fila, categorias: dict[str, str], carrocerias: dict[str, str]) -> TipoMercanciaDto:
+    return TipoMercanciaDto(
+        id=fila.id, codigo_mercancia=fila.codigo, nombre_mercancia=fila.nombre,
+        categoria=categorias.get(fila.categoria_id, ""),
+        cubicable=fila.cubicable, condicionada_cubicacion=fila.condicionada,
+        carroceria_principal=carrocerias.get(fila.carroceria_principal_id or ""),
+        carroceria_secundaria=carrocerias.get(fila.carroceria_secundaria_id or ""),
+        carroceria_secundaria_condicionada=fila.secundaria_condicionada,
+        control_ambiental_requerido=fila.control_ambiental,
+        apilable=fila.apilable, fragil=fila.fragil, rotacion_libre=fila.rotacion_libre,
+        comentario_condicion=fila.comentario_condicion, activo=fila.activo,
+        version=fila.version)
+
+
+def _vehiculo(fila, relaciones, carrocerias: dict[str, str]) -> VehiculoCatalogoDto:
+    return VehiculoCatalogoDto(
+        id=fila.id, codigo_vehiculo=fila.codigo, nombre_vehiculo=fila.nombre,
+        largo_cm=fila.largo_cm, ancho_cm=fila.ancho_cm, alto_util_cm=fila.alto_util_cm,
+        capacidad_maxima_kg=fila.capacidad_kg, activo=fila.activo, version=fila.version,
+        carrocerias=[
+            CarroceriaDeVehiculoDto(
+                id_carroceria=r.carroceria_id,
+                codigo_carroceria=carrocerias.get(r.carroceria_id, ""),
+                usa_capacidad_maxima_del_vehiculo=r.usa_capacidad_del_vehiculo,
+                capacidad_maxima_especifica=r.capacidad_especifica_kg)
+            for r in relaciones
+        ])
+
+
+async def _codigos_de_carroceria(repo) -> dict[str, str]:
+    return {c.id: c.codigo for c in await repo.listar("carrocerias")}
+
+
+# --- tipos de carroceria ----------------------------------------------------
+
+
 @router.get("/tipos-carroceria", response_model=list[TipoCarroceriaDto])
-async def tipos_carroceria(catalogo_repo=Depends(obtener_catalogo_repo)):
-    catalogo = await catalogo_repo.cargar()
-    return [
-        TipoCarroceriaDto(
-            id=c.id, codigo_carroceria=c.codigo, nombre_carroceria=c.nombre, activo=c.activa)
-        for c in catalogo.carrocerias
-    ]
+async def listar_carrocerias(repo=Depends(obtener_catalogo_crud_repo)):
+    return [_carroceria(f) for f in await repo.listar("carrocerias")]
+
+
+@router.post("/tipos-carroceria", response_model=TipoCarroceriaDto, status_code=201)
+async def crear_carroceria(peticion: CrearCarroceriaDto,
+                           repo=Depends(obtener_catalogo_crud_repo),
+                           eventos=Depends(obtener_eventos_publisher)):
+    fila = await cu.crear_carroceria(repo, peticion.codigo_carroceria,
+                                     peticion.nombre_carroceria, peticion.usuario_id, eventos)
+    return _carroceria(fila)
+
+
+@router.put("/tipos-carroceria/{id}", response_model=TipoCarroceriaDto)
+async def actualizar_carroceria(id: str, peticion: ActualizarCarroceriaDto,
+                                repo=Depends(obtener_catalogo_crud_repo),
+                                eventos=Depends(obtener_eventos_publisher)):
+    fila = await repo.actualizar(
+        "carrocerias", id,
+        {"nombre": peticion.nombre_carroceria, "activo": peticion.activo},
+        peticion.version, peticion.usuario_id)
+    if fila is None:
+        from application.excepciones import NotFoundException
+        raise NotFoundException("NO_ENCONTRADO", f"No existe la carroceria '{id}'.")
+    await eventos.publicar_carroceria_actualizada(
+        fila.id, {"codigo": fila.codigo, "nombre": fila.nombre, "activo": fila.activo})
+    return _carroceria(fila)
+
+
+@router.delete("/tipos-carroceria/{id}", status_code=204)
+async def borrar_carroceria(id: str, peticion: BorrarDto,
+                            repo=Depends(obtener_catalogo_crud_repo),
+                            eventos=Depends(obtener_eventos_publisher)):
+    await cu.eliminar_del_catalogo(repo, "carrocerias", id, peticion.version, eventos)
+
+
+# --- categorias de mercancia ------------------------------------------------
+
+
+@router.get("/categorias-mercancia", response_model=list[CategoriaMercanciaDto])
+async def listar_categorias(repo=Depends(obtener_catalogo_crud_repo)):
+    return [_categoria(f) for f in await repo.listar("categorias")]
+
+
+@router.post("/categorias-mercancia", response_model=CategoriaMercanciaDto, status_code=201)
+async def crear_categoria(peticion: CrearCategoriaDto,
+                          repo=Depends(obtener_catalogo_crud_repo)):
+    return _categoria(await cu.crear_categoria(repo, peticion.nombre_categoria,
+                                               peticion.usuario_id))
+
+
+@router.put("/categorias-mercancia/{id}", response_model=CategoriaMercanciaDto)
+async def actualizar_categoria(id: str, peticion: ActualizarCategoriaDto,
+                               repo=Depends(obtener_catalogo_crud_repo)):
+    fila = await repo.actualizar(
+        "categorias", id, {"nombre": peticion.nombre_categoria.strip().upper()},
+        peticion.version, peticion.usuario_id)
+    if fila is None:
+        from application.excepciones import NotFoundException
+        raise NotFoundException("NO_ENCONTRADO", f"No existe la categoria '{id}'.")
+    return _categoria(fila)
+
+
+@router.delete("/categorias-mercancia/{id}", status_code=204)
+async def borrar_categoria(id: str, peticion: BorrarDto,
+                           repo=Depends(obtener_catalogo_crud_repo)):
+    await cu.eliminar_del_catalogo(repo, "categorias", id, peticion.version)
+
+
+# --- tipos de mercancia -----------------------------------------------------
+
+
+def _datos_de_mercancia(peticion) -> dict:
+    return {
+        "codigo": peticion.codigo_mercancia.strip().upper(),
+        "nombre": peticion.nombre_mercancia.strip(),
+        "categoria_id": peticion.id_categoria,
+        "cubicable": peticion.cubicable,
+        "condicionada": peticion.condicionada_cubicacion,
+        "comentario_condicion": peticion.comentario_condicion,
+        "carroceria_principal_id": peticion.id_carroceria_principal,
+        "carroceria_secundaria_id": peticion.id_carroceria_secundaria,
+        "secundaria_condicionada": peticion.carroceria_secundaria_condicionada,
+        "control_ambiental": peticion.control_ambiental_requerido,
+        "apilable": peticion.apilable,
+        "fragil": peticion.fragil,
+        "rotacion_libre": peticion.rotacion_libre,
+        "activo": peticion.activo,
+    }
 
 
 @router.get("/tipos-mercancia", response_model=list[TipoMercanciaDto])
-async def tipos_mercancia(catalogo_repo=Depends(obtener_catalogo_repo)):
-    catalogo = await catalogo_repo.cargar()
+async def listar_mercancias(repo=Depends(obtener_catalogo_crud_repo)):
+    categorias = {c.id: c.nombre for c in await repo.listar("categorias")}
+    carrocerias = await _codigos_de_carroceria(repo)
+    return [_mercancia(f, categorias, carrocerias) for f in await repo.listar("mercancias")]
+
+
+@router.post("/tipos-mercancia", response_model=TipoMercanciaDto, status_code=201)
+async def crear_mercancia(peticion: CrearMercanciaDto,
+                          repo=Depends(obtener_catalogo_crud_repo),
+                          eventos=Depends(obtener_eventos_publisher)):
+    fila = await cu.crear_mercancia(repo, _datos_de_mercancia(peticion),
+                                    peticion.usuario_id, eventos)
+    categorias = {c.id: c.nombre for c in await repo.listar("categorias")}
+    return _mercancia(fila, categorias, await _codigos_de_carroceria(repo))
+
+
+@router.put("/tipos-mercancia/{id}", response_model=TipoMercanciaDto)
+async def actualizar_mercancia(id: str, peticion: ActualizarMercanciaDto,
+                               repo=Depends(obtener_catalogo_crud_repo),
+                               eventos=Depends(obtener_eventos_publisher)):
+    fila = await cu.actualizar_mercancia(repo, id, _datos_de_mercancia(peticion),
+                                         peticion.version, peticion.usuario_id, eventos)
+    categorias = {c.id: c.nombre for c in await repo.listar("categorias")}
+    return _mercancia(fila, categorias, await _codigos_de_carroceria(repo))
+
+
+@router.delete("/tipos-mercancia/{id}", status_code=204)
+async def borrar_mercancia(id: str, peticion: BorrarDto,
+                           repo=Depends(obtener_catalogo_crud_repo),
+                           eventos=Depends(obtener_eventos_publisher)):
+    await cu.eliminar_mercancia(repo, id, peticion.version, peticion.usuario_id, eventos)
+
+
+# --- vehiculos del catalogo -------------------------------------------------
+
+
+def _datos_de_vehiculo(peticion) -> dict:
+    return {
+        "codigo": peticion.codigo_vehiculo.strip().upper(),
+        "nombre": peticion.nombre_vehiculo.strip(),
+        "largo_cm": peticion.largo_cm,
+        "ancho_cm": peticion.ancho_cm,
+        "alto_util_cm": peticion.alto_util_cm,
+        "capacidad_kg": peticion.capacidad_maxima_kg,
+        "activo": peticion.activo,
+    }
+
+
+def _carrocerias_de(peticion) -> list[dict]:
     return [
-        TipoMercanciaDto(
-            id=m.id,
-            codigo_mercancia=m.codigo,
-            nombre_mercancia=m.nombre,
-            categoria=m.categoria.nombre,
-            cubicable=m.cubicable,
-            condicionada_cubicacion=m.condicionada,
-            carroceria_principal=m.carroceria_principal.codigo if m.carroceria_principal else None,
-            carroceria_secundaria=m.carroceria_secundaria.codigo if m.carroceria_secundaria else None,
-            carroceria_secundaria_condicionada=m.secundaria_condicionada,
-            control_ambiental_requerido=m.control_ambiental,
-            apilable=m.apilable,
-            fragil=m.fragil,
-            rotacion_libre=m.rotacion_libre,
-            comentario_condicion=m.comentario_condicion,
-            activo=m.activo,
-        )
-        for m in catalogo.mercancias
+        {"carroceria_id": c.id_carroceria,
+         "usa_capacidad_del_vehiculo": c.usa_capacidad_maxima_del_vehiculo,
+         "capacidad_especifica_kg": c.capacidad_maxima_especifica}
+        for c in peticion.carrocerias
     ]
 
 
-def _a_dto(parametros: ParametrosCubicacion) -> MedidasEstandarDto:
+@router.get("/vehiculos-catalogo", response_model=list[VehiculoCatalogoDto])
+async def listar_vehiculos(repo=Depends(obtener_catalogo_crud_repo)):
+    carrocerias = await _codigos_de_carroceria(repo)
+    salida = []
+    for fila in await repo.listar("vehiculos"):
+        salida.append(_vehiculo(fila, await repo.carrocerias_de(fila.id), carrocerias))
+    return salida
+
+
+@router.post("/vehiculos-catalogo", response_model=VehiculoCatalogoDto, status_code=201)
+async def crear_vehiculo(peticion: CrearVehiculoDto,
+                         repo=Depends(obtener_catalogo_crud_repo),
+                         catalogo_repo=Depends(obtener_catalogo_repo),
+                         eventos=Depends(obtener_eventos_publisher)):
+    fila = await cu.guardar_vehiculo(
+        repo, catalogo_repo, _datos_de_vehiculo(peticion), _carrocerias_de(peticion),
+        peticion.usuario_id, eventos=eventos)
+    return _vehiculo(fila, await repo.carrocerias_de(fila.id),
+                     await _codigos_de_carroceria(repo))
+
+
+@router.put("/vehiculos-catalogo/{id}", response_model=VehiculoCatalogoDto)
+async def actualizar_vehiculo(id: str, peticion: ActualizarVehiculoDto,
+                              repo=Depends(obtener_catalogo_crud_repo),
+                              catalogo_repo=Depends(obtener_catalogo_repo),
+                              eventos=Depends(obtener_eventos_publisher)):
+    fila = await cu.guardar_vehiculo(
+        repo, catalogo_repo, _datos_de_vehiculo(peticion), _carrocerias_de(peticion),
+        peticion.usuario_id, id=id, version=peticion.version, eventos=eventos)
+    return _vehiculo(fila, await repo.carrocerias_de(fila.id),
+                     await _codigos_de_carroceria(repo))
+
+
+@router.delete("/vehiculos-catalogo/{id}", status_code=204)
+async def borrar_vehiculo(id: str, peticion: BorrarDto,
+                          repo=Depends(obtener_catalogo_crud_repo),
+                          eventos=Depends(obtener_eventos_publisher)):
+    await cu.eliminar_del_catalogo(repo, "vehiculos", id, peticion.version, eventos)
+
+
+# --- reglas de incompatibilidad ---------------------------------------------
+
+
+@router.get("/reglas-incompatibilidad", response_model=list[ReglaIncompatibilidadDto])
+async def listar_reglas(repo=Depends(obtener_catalogo_crud_repo)):
+    return [_regla(f) for f in await repo.listar("reglas")]
+
+
+@router.post("/reglas-incompatibilidad", response_model=ReglaIncompatibilidadDto,
+             status_code=201)
+async def crear_regla(peticion: CrearReglaDto, repo=Depends(obtener_catalogo_crud_repo)):
+    return _regla(await cu.crear_regla(
+        repo, peticion.id_categoria_1, peticion.id_categoria_2, peticion.motivo,
+        peticion.usuario_id))
+
+
+@router.delete("/reglas-incompatibilidad/{id}", status_code=204)
+async def borrar_regla(id: str, peticion: BorrarDto,
+                       repo=Depends(obtener_catalogo_crud_repo)):
+    await cu.eliminar_del_catalogo(repo, "reglas", id, peticion.version)
+
+
+# --- parametros del motor ---------------------------------------------------
+
+
+@router.get("/parametros-motor", response_model=list[ParametroMotorDto])
+async def listar_parametros(repo=Depends(obtener_catalogo_crud_repo)):
+    return [_parametro(f) for f in await cu.listar_parametros(repo)]
+
+
+@router.put("/parametros-motor/{clave}", response_model=ParametroMotorDto)
+async def actualizar_parametro(clave: str, peticion: ActualizarParametroDto,
+                               repo=Depends(obtener_catalogo_crud_repo)):
+    return _parametro(await cu.actualizar_parametro(
+        repo, clave, peticion.valor, peticion.version, peticion.usuario_id))
+
+
+# --- medidas estandar -------------------------------------------------------
+
+
+def _medidas(parametros: ParametrosCubicacion) -> MedidasEstandarDto:
     return MedidasEstandarDto(
         largo_max_cm=Decimal(str(parametros.largo_max_cm)),
         ancho_max_cm=Decimal(str(parametros.ancho_max_cm)),
@@ -77,15 +358,13 @@ def _a_dto(parametros: ParametrosCubicacion) -> MedidasEstandarDto:
 
 @router.get("/medidas-estandar", response_model=MedidasEstandarDto)
 async def medidas_estandar(parametros_repo=Depends(obtener_parametros_repo)):
-    return _a_dto(await cu_parametros.obtener_medidas_estandar(parametros_repo))
+    return _medidas(await cu_parametros.obtener_medidas_estandar(parametros_repo))
 
 
 @router.put("/medidas-estandar", response_model=MedidasEstandarDto)
-async def actualizar_medidas(
-    peticion: MedidasEstandarDto, parametros_repo=Depends(obtener_parametros_repo),
-):
+async def actualizar_medidas(peticion: MedidasEstandarDto,
+                             parametros_repo=Depends(obtener_parametros_repo)):
     medidas = ParametrosCubicacion(
         largo_max_cm=float(peticion.largo_max_cm), ancho_max_cm=float(peticion.ancho_max_cm),
-        alto_max_cm=float(peticion.alto_max_cm), peso_max_kg=float(peticion.peso_max_kg),
-    )
-    return _a_dto(await cu_parametros.actualizar_medidas_estandar(parametros_repo, medidas))
+        alto_max_cm=float(peticion.alto_max_cm), peso_max_kg=float(peticion.peso_max_kg))
+    return _medidas(await cu_parametros.actualizar_medidas_estandar(parametros_repo, medidas))
