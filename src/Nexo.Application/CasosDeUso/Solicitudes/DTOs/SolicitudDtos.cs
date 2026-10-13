@@ -24,11 +24,16 @@ public record clsSolicitudDto(
 public record clsBandejaItemDto(
     Guid Id, string clsCliente, string Tipo, string Estado, DateTimeOffset? Deadline, decimal? ValorEstimado,
     decimal ScorePrioridad, int Lineas, decimal? FleteTotal, int LineasSinFlete, DateTimeOffset FechaCaptura,
-    string Atencion, string Vigencia);
+    string Atencion, string Vigencia,
+    /// <summary>S5-HU-23.1/#289 (HU-B25): "SinDefinir" | "Ganada" | "Perdida"; null si la solicitud no tiene
+    /// cotización. Con varias: la que tenga resultado distinto de SinDefinir, si no la más reciente.</summary>
+    string? Resultado = null);
 
-/// <summary>Filtros de la Bandeja: estado, atención, vigencia y rango de fecha de captura.</summary>
+/// <summary>Filtros de la Bandeja: estado, atención, vigencia, rango de fecha de captura y (S5-HU-23.1/#289)
+/// resultado de la cotización: esperando | ganada | perdida (ver <c>clsBandejaResultado</c>).</summary>
 public record clsBandejaFiltro(
-    string? Estado, string? Atencion, DateTimeOffset? Desde, DateTimeOffset? Hasta, string? Vigencia = null);
+    string? Estado, string? Atencion, DateTimeOffset? Desde, DateTimeOffset? Hasta, string? Vigencia = null,
+    string? Resultado = null);
 
 public record clsDesgloseScoreDto(double Total, double Urgencia, double Valor, double Probabilidad, double Tipo);
 

@@ -29,6 +29,17 @@ public class clsSolicitudesController(
     /// Bandeja Priorizada (anti-FIFO). Filtros: estado de la solicitud, atención
     /// (pendientes | automatico | administrador | atendidas | todas) y rango de fecha
     /// de captura (desde/hasta). Sin filtros muestra la cola de pendientes.
+    ///
+    /// S5-HU-23.1/#289 (misma consulta y mismo repositorio para TODOS los roles; para Comercial se
+    /// limita antes a lo que él mismo creó, issue #199):
+    ///  - <c>vigencia</c> (vigente | vencida) se mide contra la FECHA LÍMITE (Deadline), no contra la
+    ///    antigüedad de la captura; una solicitud sin Deadline cuenta como vigente.
+    ///  - atención <c>pendientes</c> incluye también la solicitud con todas las líneas revisadas por el
+    ///    Administrador de Fletes que aún no se entrega (y sigue saliendo en <c>administrador</c>/<c>atendidas</c>).
+    ///  - <c>resultado</c> (esperando | ganada | perdida): <c>esperando</c> = cotización entregada (o
+    ///    auto-costeada) sin resultado y solicitud no descartada. Con resultado informado y sin
+    ///    <c>atencion</c> se trata la atención como "todas" (no se aplica la restricción por defecto a
+    ///    Pendiente/EnCosteo). Valor desconocido -> 400 RESULTADO_INVALIDO. Cada fila trae <c>resultado</c>.
     /// Pagina (page/pageSize, respuesta `{ items, total }`).
     /// </summary>
     [HttpGet]
@@ -36,12 +47,12 @@ public class clsSolicitudesController(
     [EnableRateLimiting(clsRateLimitingExtensions.PoliticaListadosEstandar)]
     public async Task<ActionResult<clsPaginaDto<clsBandejaItemDto>>> GetBandeja(
         [FromQuery] string? estado, [FromQuery] string? atencion, [FromQuery] DateTimeOffset? desde,
-        [FromQuery] DateTimeOffset? hasta, [FromQuery] string? vigencia,
+        [FromQuery] DateTimeOffset? hasta, [FromQuery] string? vigencia, [FromQuery] string? resultado = null,
         [FromQuery] string orderBy = "score", // vestigial, como en el original: siempre ordena por score
         [FromQuery, Range(1, int.MaxValue)] int page = 1,
         [FromQuery, Range(1, 200)] int pageSize = 50,
         CancellationToken ct = default)
-        => Ok(await bandeja.Handle(new clsObtenerBandejaQuery(new clsBandejaFiltro(estado, atencion, desde, hasta, vigencia), page, pageSize), ct));
+        => Ok(await bandeja.Handle(new clsObtenerBandejaQuery(new clsBandejaFiltro(estado, atencion, desde, hasta, vigencia, resultado), page, pageSize), ct));
 
     /// <summary>Abrir solicitud: devuelve el costo base pre-armado (SICE-TAC + históricos) por línea.</summary>
     [HttpGet("{id:guid}")]
