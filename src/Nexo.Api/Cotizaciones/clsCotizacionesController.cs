@@ -56,13 +56,18 @@ public class clsCotizacionesController(
     /// <summary>
     /// Precarga como fletes por defecto el valor más alto propuesto por la Biblioteca
     /// en las líneas pendientes (lo usa la mesa del comercial).
+    ///
+    /// S5-HU-19.2/#282: <c>soloAutomaticas=true</c> salta las líneas en modo
+    /// ConsultaCompleta (necesitan que el Administrador de Tarifas elija) — sin el
+    /// parámetro aplica todas, igual que siempre.
     /// </summary>
     [HttpPost("{id:guid}/aplicar-propuestas")]
     [Authorize(Roles = "Comercial,AdminTarifas,CoordinadorFletes,Admin")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<clsAplicarPropuestasResultDto>> AplicarPropuestas(Guid id, CancellationToken ct = default)
-        => Ok(await aplicarPropuestas.Handle(new clsAplicarPropuestasCommand(id), ct));
+    public async Task<ActionResult<clsAplicarPropuestasResultDto>> AplicarPropuestas(
+        Guid id, [FromQuery] bool soloAutomaticas = false, CancellationToken ct = default)
+        => Ok(await aplicarPropuestas.Handle(new clsAplicarPropuestasCommand(id, soloAutomaticas), ct));
 
     /// <summary>Agregar el flete costeado de una línea.</summary>
     [HttpPost("{id:guid}/lineas")]

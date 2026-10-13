@@ -8,6 +8,7 @@ using Nexo.Domain.Common;
 using Nexo.Domain.Costeo.Reglas;
 using Nexo.Domain.Enums;
 using Nexo.Infrastructure.External;
+using Nexo.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
@@ -42,7 +43,10 @@ public sealed class clsTarifarioSapAdapter : ITarifarioSapPort
     private const string CodigoCarroceriaFurgon = "4";
     private static readonly TimeSpan CacheTtl = TimeSpan.FromHours(1);
 
-    private static readonly Dictionary<LineaNegocio, int> CodigoLinea = new()
+    // internal (no private): S5-HU-19.1/#281 las reutiliza para resolver el NOMBRE del
+    // catálogo externo (ILineasNegocioPort/IClasesViajePort) que necesita el matching
+    // exacto de clsTarifaPlazaInternaAdapter — un único mapeo enum->Id SAP, no dos.
+    internal static readonly Dictionary<LineaNegocio, int> CodigoLinea = new()
     {
         [LineaNegocio.PuertoAInterior] = 1,
         [LineaNegocio.InteriorAPuerto] = 2,
@@ -52,7 +56,7 @@ public sealed class clsTarifarioSapAdapter : ITarifarioSapPort
         [LineaNegocio.Licitaciones] = 8,
     };
 
-    private static readonly Dictionary<ClaseViaje, int> CodigoClaseViaje = new()
+    internal static readonly Dictionary<ClaseViaje, int> CodigoClaseViaje = new()
     {
         [ClaseViaje.Contenedor] = 1,
         [ClaseViaje.Cupo] = 2,
@@ -60,16 +64,25 @@ public sealed class clsTarifarioSapAdapter : ITarifarioSapPort
         [ClaseViaje.Extradimensionado] = 5,
     };
 
+    // S5-HU-19.1/#281: "PTO" por "PUERTO" (ej. zona SAP "ZC_PTO_BOLIVAR" vs ruta
+    // "Puerto Bolívar") — el único caso concreto que trajo el issue. Lista corta y
+    // explícita a propósito: cada abreviatura nueva se agrega acá cuando aparezca un
+    // caso real, no se adivina un diccionario completo sin evidencia.
+    private static readonly (string Abreviatura, string Completo)[] Abreviaturas = [("PTO", "PUERTO")];
+
     private readonly clsDbSolucionesTiDbContext? _dc;
     private readonly clsDwSiceDbContext? _dw;
+    private readonly clsNexoDbContext _db;
     private readonly IMemoryCache _cache;
     private readonly TimeProvider _clock;
     private readonly IAjustesVigenciaPlazaRepository _ajustes;
 
-    public clsTarifarioSapAdapter(IServiceProvider sp, IMemoryCache cache, TimeProvider clock, IAjustesVigenciaPlazaRepository ajustes)
+    public clsTarifarioSapAdapter(
+        IServiceProvider sp, clsNexoDbContext db, IMemoryCache cache, TimeProvider clock, IAjustesVigenciaPlazaRepository ajustes)
     {
         _dc = sp.GetService<clsDbSolucionesTiDbContext>();
         _dw = sp.GetService<clsDwSiceDbContext>();
+        _db = db;
         _cache = cache;
         _clock = clock;
         _ajustes = ajustes;
@@ -127,8 +140,27 @@ public sealed class clsTarifarioSapAdapter : ITarifarioSapPort
         if (candidatas.Count > 0) return (candidatas, criterio);
 
         var zonas = await ZonasTarificacionAsync(ct);
-        var zonasOrigen = zonas.Where(z => z.Transporte.Contains(origen)).Select(z => z.Zona).Distinct().ToList();
-        var zonasDestino = zonas.Where(z => z.Transporte.Contains(destino)).Select(z => z.Zona).Distinct().ToList();
+
+        // S5-HU-19.1/#281: antes solo "z.Transporte.Contains(origen)" — fallaba contra
+        // códigos de zona que traen una ABREVIATURA ("ZC_PTO_BOLIVAR" vs "Puerto Bolívar")
+        // o que no traen el nombre de la ciudad en absoluto (p. ej. "VABURRA" = Valle de
+        // Aburrá = Medellín). clsResolucionZonaSap (que resolvía esto con un diccionario de
+        // alias manual) se retiró en S5-HU-16.1/#254 a favor de tbl_municipios.NombreTarifasPlaza/
+        // ZonaTarificacion, ya sembrados con el código de zona correcto por municipio
+        // (S4-HU-09.1) — se reutiliza ese mismo mecanismo acá en vez de resucitar el
+        // diccionario de alias manual. La comparación directa ahora prueba las DOS
+        // direcciones de "contiene" (antes solo una) y expande abreviaturas conocidas.
+        bool Coincide(string zonaTransporte, string texto)
+        {
+            var expandida = ExpandirAbreviaturas(zonaTransporte);
+            return expandida.Contains(texto) || texto.Contains(expandida);
+        }
+
+        var zonasOrigen = zonas.Where(z => Coincide(z.Transporte, origen)).Select(z => z.Zona).Distinct().ToList();
+        var zonasDestino = zonas.Where(z => Coincide(z.Transporte, destino)).Select(z => z.Zona).Distinct().ToList();
+
+        if (zonasOrigen.Count == 0) zonasOrigen = await ZonasPorMunicipioAsync(origen, ct);
+        if (zonasDestino.Count == 0) zonasDestino = await ZonasPorMunicipioAsync(destino, ct);
 
         if (zonasOrigen.Count > 0 && zonasDestino.Count == 0)
         {
@@ -493,6 +525,49 @@ public sealed class clsTarifarioSapAdapter : ITarifarioSapPort
                 .ToList();
         });
         return zonas!;
+    }
+
+    private static string ExpandirAbreviaturas(string zona)
+    {
+        foreach (var (abreviatura, completo) in Abreviaturas)
+            if (zona.Contains(abreviatura)) return zona.Replace(abreviatura, completo);
+        return zona;
+    }
+
+    /// <summary>
+    /// S5-HU-19.1/#281: antes de rendirse, busca el municipio por nombre (misma regla de
+    /// contención en las 2 direcciones que <see cref="CodigosDaneAsync"/>) y devuelve sus
+    /// códigos de zona YA sembrados (<c>NombreTarifasPlaza</c>/<c>ZonaTarificacion</c>,
+    /// S4-HU-09.1) — el reemplazo de <c>clsResolucionZonaSap.AliasZonasAgregadas</c>
+    /// (retirado en S5-HU-16.1/#254): en vez de un diccionario de alias mantenido a mano
+    /// ("Medellín" -> "VABURRA"), el código de zona ya vive en la fila del municipio.
+    /// </summary>
+    private async Task<List<string>> ZonasPorMunicipioAsync(string textoNormalizado, CancellationToken ct)
+    {
+        var municipios = await _cache.GetOrCreateAsync("tarifario:municipios-zonas", async e =>
+        {
+            e.AbsoluteExpirationRelativeToNow = CacheTtl;
+            return await _db.Municipios.AsNoTracking()
+                .Where(m => m.NombreTarifasPlaza != null || m.ZonaTarificacion != null)
+                .Select(m => new { m.Municipio, m.NombreTarifasPlaza, m.ZonaTarificacion })
+                .ToListAsync(ct);
+        });
+
+        // Exacto primero, contención como último recurso — mismo motivo que
+        // clsTarifaPlazaInternaAdapter.ResolverMunicipiosAsync: nombres cortos o
+        // compuestos ("Buenaventura" contiene a "Ventura", Cañar/Ecuador) cruzan con
+        // municipios de otro país si solo se compara por contención.
+        var exactos = municipios!.Where(m => Normalizar(m.Municipio) == textoNormalizado).ToList();
+        var candidatos = exactos.Count > 0
+            ? exactos
+            : municipios!.Where(m => { var n = Normalizar(m.Municipio); return n.Length > 0 && (textoNormalizado.Contains(n) || n.Contains(textoNormalizado)); }).ToList();
+
+        return candidatos
+            .SelectMany(m => new[] { m.NombreTarifasPlaza, m.ZonaTarificacion })
+            .Where(c => !string.IsNullOrWhiteSpace(c))
+            .Select(c => c!)
+            .Distinct()
+            .ToList();
     }
 
     private async Task<List<string>> CodigosDaneAsync(string ciudad, CancellationToken ct)

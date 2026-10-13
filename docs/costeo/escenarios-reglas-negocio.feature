@@ -20,7 +20,9 @@ Característica: Reglas de negocio del costeo verificadas contra datos reales en
   # Evidencia real: tests/QA/hu-13.4-verificacion-reglas-negocio-datos-reales/esperado-final-pliego.md
   # NO se cumplió en 4 de 12 líneas reales cotizadas (1, 2, 3, 11): había
   # plaza SAP vigente y mayor, y la app propuso el piso SICE-TAC (menor) en
-  # su lugar — ver "Desviación 1" en ese documento, pendiente de revisión.
+  # su lugar — ver "Desviación 1" en ese documento. Investigada en S5-HU-19.4 (#284):
+  # la QA es anterior al matching por municipio y, antes de S5-HU-19, la tabla propia
+  # tapaba a SAP; hoy SAP se consulta primero y gana el mayor.
 
   @regla-del-mayor
   Escenario: La propuesta de flete nunca es menor al mayor entre el piso SICE-TAC y la tarifa de plaza

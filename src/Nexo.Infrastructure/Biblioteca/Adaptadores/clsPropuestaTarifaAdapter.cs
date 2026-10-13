@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using Nexo.Application.CasosDeUso.AjustesVigenciaPlaza.Interfaces;
+using Nexo.Application.CasosDeUso.Catalogos.Interfaces;
 using Nexo.Application.CasosDeUso.Costeo.Interfaces;
 using Nexo.Application.CasosDeUso.Biblioteca.DTOs;
 using Nexo.Application.CasosDeUso.Biblioteca.Interfaces;
@@ -77,7 +78,7 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
     /// consultando una fuente queda contenida en esa línea en vez de llevarse las 300,
     /// que es lo que exige la regla inviolable 6.
     /// </summary>
-    public async Task<clsResultadoDeCosteo> ProponerParaLineaAsync(Guid lineaId, CancellationToken ct = default)
+    public async Task<clsDecisionDeFlujo> ProponerParaLineaAsync(Guid lineaId, CancellationToken ct = default)
     {
         var linea = await _db.LineasSolicitud.AsNoTracking()
             .Include(l => l.clsRuta).ThenInclude(r => r!.OrigenMunicipio)
@@ -102,10 +103,16 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
         var dw = _dwConfigurado ? scope.ServiceProvider.GetService<clsDwSiceDbContext>() : null;
         var dc = _dcConfigurado ? scope.ServiceProvider.GetService<clsDbSolucionesTiDbContext>() : null;
         var tarifario = scope.ServiceProvider.GetRequiredService<ITarifarioSapPort>();
+        var plazaInterna = scope.ServiceProvider.GetRequiredService<ITarifaPlazaInternaPort>();
+        var historicoInterno = scope.ServiceProvider.GetRequiredService<IHistoricoPlazaInternoPort>();
+        var lineasNegocio = scope.ServiceProvider.GetRequiredService<ILineasNegocioPort>();
+        var clasesViaje = scope.ServiceProvider.GetRequiredService<IClasesViajePort>();
 
-        var dto = await ProponerLineaAsync(_db, dw, dc, tarifario, linea, ajustes, soloSice, horasSolicitud, ct);
+        var (dto, modo) = await ProponerLineaAsync(
+            _db, dw, dc, tarifario, plazaInterna, historicoInterno, lineasNegocio, clasesViaje,
+            linea, ajustes, soloSice, horasSolicitud, ct);
         await PublicarVencidaSiAplicaAsync(dto, ct);
-        return new clsResultadoDeCosteo(dto.ValorPropuesto, dto.FuentePropuesta, dto.Justificacion);
+        return new clsDecisionDeFlujo(new clsResultadoDeCosteo(dto.ValorPropuesto, dto.FuentePropuesta, dto.Justificacion), modo);
     }
 
     /// <summary>
@@ -184,8 +191,14 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
                 var dw = _dwConfigurado ? scope.ServiceProvider.GetService<clsDwSiceDbContext>() : null;
                 var dc = _dcConfigurado ? scope.ServiceProvider.GetService<clsDbSolucionesTiDbContext>() : null;
                 var tarifario = scope.ServiceProvider.GetRequiredService<ITarifarioSapPort>();
+                var plazaInterna = scope.ServiceProvider.GetRequiredService<ITarifaPlazaInternaPort>();
+                var historicoInterno = scope.ServiceProvider.GetRequiredService<IHistoricoPlazaInternoPort>();
+                var lineasNegocio = scope.ServiceProvider.GetRequiredService<ILineasNegocioPort>();
+                var clasesViaje = scope.ServiceProvider.GetRequiredService<IClasesViajePort>();
                 var horasGrupo = HorasEfectivasDeLinea(grupo.First(), horasSolicitud);
-                var dto = await ProponerLineaAsync(dbGrupo, dw, dc, tarifario, grupo.First(), ajustes, soloSice, horasGrupo, ct);
+                var (dto, _) = await ProponerLineaAsync(
+                    dbGrupo, dw, dc, tarifario, plazaInterna, historicoInterno, lineasNegocio, clasesViaje,
+                    grupo.First(), ajustes, soloSice, horasGrupo, ct);
                 return grupo.Select(l => dto with { LineaId = l.Id }).ToList();
             }
             catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
@@ -224,16 +237,18 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
     private static decimal HorasEfectivasDeLinea(clsLineaSolicitud linea, decimal horasSolicitud) =>
         linea.HorasCargue is { } hc && linea.HorasDescargue is { } hd ? hc + hd : horasSolicitud;
 
-    private async Task<clsPropuestaLineaDto> ProponerLineaAsync(
+    private async Task<(clsPropuestaLineaDto Dto, ModoDecision Modo)> ProponerLineaAsync(
         clsNexoDbContext db, clsDwSiceDbContext? dw, clsDbSolucionesTiDbContext? dc, ITarifarioSapPort tarifario,
+        ITarifaPlazaInternaPort plazaInterna, IHistoricoPlazaInternoPort historicoInterno,
+        ILineasNegocioPort lineasNegocio, IClasesViajePort clasesViaje,
         clsLineaSolicitud linea, IReadOnlyDictionary<int, DateTime> ajustesVigencia,
         IReadOnlySet<string> soloSice, decimal horasSolicitud, CancellationToken ct)
     {
         if (linea.clsRuta is null)
         {
-            return new clsPropuestaLineaDto(
+            return (new clsPropuestaLineaDto(
                 linea.Id, null, null, linea.Peso, null, null, null, null, null,
-                "La línea no tiene ruta definida: no es posible buscar en la Biblioteca.");
+                "La línea no tiene ruta definida: no es posible buscar en la Biblioteca."), ModoDecision.ConsultaCompleta);
         }
 
         var origen = Normalizar(linea.clsRuta.Origen);
@@ -245,25 +260,13 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
         // o con texto que no matcheó ningún municipio (ver clsResolucionDeCatalogos).
         var origenDane = linea.clsRuta.OrigenMunicipio?.CodigoDane;
         var destinoDane = linea.clsRuta.DestinoMunicipio?.CodigoDane;
-        var origenMunicipioId = linea.clsRuta.OrigenMunicipioId;
-        var destinoMunicipioId = linea.clsRuta.DestinoMunicipioId;
 
-        // Clave por DANE (tbl_reglas_solo_sicetac.Origen/Destino SIEMPRE están en código
-        // DANE — carga masiva S4-HU-09.2): antes comparaba contra el nombre de ciudad en
-        // texto libre de la ruta y nunca coincidía (#255). Sin DANE resuelto para ambos
-        // lados, la ruta no puede marcarse "solo SICE-TAC" por esta vía (igual que hoy,
-        // sin regresión — antes tampoco coincidía nunca).
-        if (origenDane is not null && destinoDane is not null &&
-            soloSice.Contains(clsTexto.ClaveRutaVehiculo(origenDane, destinoDane, vehiculo)))
-        {
-            var sice = dw is null ? null : await CandidatoSicetacAsync(dw, origen, destino, origenDane, destinoDane, vehiculo, linea.Tipologia, linea.clsConfiguracionVehiculo?.Carroceria, horasSolicitud, ct);
-            var justif = sice is not null
-                ? $"clsRuta marcada como SOLO SICE-TAC por el Administrador: se propone el piso SICE-TAC ({sice.Valor:C0}) sin comparar con plaza ni tarifario."
-                : "clsRuta marcada como SOLO SICE-TAC, pero no hay piso SICE-TAC para la ruta/periodo: la línea requiere atención manual.";
-            return new clsPropuestaLineaDto(
-                linea.Id, $"{linea.clsRuta.Origen} → {linea.clsRuta.Destino}", vehiculo, linea.Peso,
-                sice, null, null, sice?.Valor, sice is null ? null : "sicetac", justif);
-        }
+        // S5-HU-19.2/#282: "hay regla" ahora es solo una BANDERA que entra a DecidirFlujo —
+        // ya no corta temprano por su cuenta. Clave por DANE (tbl_reglas_solo_sicetac.Origen/
+        // Destino SIEMPRE están en código DANE — carga masiva S4-HU-09.2): antes comparaba
+        // contra el nombre de ciudad en texto libre de la ruta y nunca coincidía (#255).
+        var hayReglaSoloSicetac = origenDane is not null && destinoDane is not null &&
+            soloSice.Contains(clsTexto.ClaveRutaVehiculo(origenDane, destinoDane, vehiculo));
 
         clsResultadoTarifarioSap? oficial = null;
         if (linea.ClaseViaje is not null && dc is not null)
@@ -276,28 +279,6 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
                 linea.RetornaContenedor, linea.CiudadDevolucionContenedor, horasSolicitud), ct);
         }
 
-        // El camino "oficial" (ITarifarioSapPort, ver comentario mas abajo) exige match
-        // exacto de ClaseContenedor/peso/vehiculo sin fallback. Cuando no encuentra nada
-        // (oficial es null, o oficial.Tarifa queda null porque el filtro exacto descarto
-        // todo) se reintenta con el mismo selector tolerante que ya usa el camino "Solo
-        // SICE-TAC" de arriba, antes de rendirse. Mismo patron que ya se aplico para el
-        // piso SICE-TAC (ver sicetac mas abajo) y para el bug gemelo documentado en
-        // docs/decisiones/matching-sicetac-oficial-vs-solo-sicetac.md.
-        clsCandidatoTarifaDto? plaza = oficial?.Tarifa;
-        var vencida = oficial?.Vencida == true;
-
-        // S5-HU-16.3/#256: antes de caer a la tabla externa (SAP), se consulta primero
-        // nuestra propia tbl_tarifas_plaza (sembrada en S4-HU-10.1/10.2) — match exacto
-        // por Id de municipio, no por texto ni DANE. Solo corre si la ruta ya resolvió
-        // ambos municipios (#254); si no, se salta directo al fallback externo, igual
-        // que antes de esta issue.
-        if (plaza is null && origenMunicipioId is not null && destinoMunicipioId is not null)
-            plaza = await CandidatoPlazaPropiaAsync(db, origenMunicipioId.Value, destinoMunicipioId.Value, vehiculo, linea.Peso, ct);
-        if (plaza is null && dc is not null)
-            plaza = await CandidatoSapAsync(
-                dc, dc.TarifasPlazaSap, "plaza", linea.clsRuta.OrigenMunicipio, linea.clsRuta.DestinoMunicipio,
-                vehiculo, linea.Peso, soloVigentes: true, ajustesVigencia, ct);
-
         // clsTarifarioSapAdapter.SicetacOficialAsync (réplica 1:1 de la lógica SAP
         // legada) exige match exacto de Configuracion/TipoCarga/UnidadTransporte/
         // ViaEstandar sin fallback, y solo aplica a Contenedor/Cupo (nunca a
@@ -305,23 +286,81 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
         // existen y son encontrables (reproducido con Medellín-Guarne), obligando a
         // marcar "Solo SICE-TAC" a mano para que aparezcan (esa marca usa
         // CandidatoSicetacAsync, el selector tolerante de abajo). Si el camino oficial
-        // no encuentra nada, se reintenta con ESE MISMO selector antes de rendirse. El
-        // camino oficial se prueba primero y no se toca: sigue gobernando sin cambios
-        // cuando sí encuentra algo (verificado contra datos reales en pruebas de QA de
-        // reglas de negocio).
+        // no encuentra nada, se reintenta con ESE MISMO selector antes de rendirse.
+        //
+        // S5-HU-19.2/#282: movido ANTES de plaza/histórico a propósito — en modo
+        // SoloSicetac (regla + piso encontrado) ninguno de los dos hace falta, así que se
+        // corta acá sin gastar esas consultas.
         var sicetac = oficial?.SicetacOficial;
         if (sicetac is null && dw is not null)
             sicetac = await CandidatoSicetacAsync(dw, origen, destino, origenDane, destinoDane, vehiculo, linea.Tipologia, linea.clsConfiguracionVehiculo?.Carroceria, horasSolicitud, ct);
 
-        // S5-HU-16.3/#256: mismo criterio que "plaza" — primero tbl_tarifas_plaza_historico
-        // (propia), si no hay nada ahí, el log externo de SAP.
+        if (hayReglaSoloSicetac && sicetac is not null)
+        {
+            var justifSolo = $"clsRuta marcada como SOLO SICE-TAC por el Administrador: se propone el piso SICE-TAC ({sicetac.Valor:C0}) sin comparar con plaza ni histórico.";
+            return (new clsPropuestaLineaDto(
+                linea.Id, $"{linea.clsRuta.Origen} → {linea.clsRuta.Destino}", vehiculo, linea.Peso,
+                sicetac, null, null, sicetac.Valor, "sicetac", justifSolo,
+                ModoDecision: nameof(ModoDecision.SoloSicetac)), ModoDecision.SoloSicetac);
+        }
+
+        // S5-HU-19.1/#281: nombre del catálogo externo (NO el enum, NO un Id) que guardan
+        // tbl_tarifas_plaza/tbl_tarifas_plaza_historico — ver clsTarifaPlaza, doc-comment.
+        var nombreLineaNegocio = await NombreLineaNegocioAsync(lineasNegocio, linea.LineaNegocio, ct);
+        var nombreClaseViaje = await NombreClaseViajeAsync(clasesViaje, linea.ClaseViaje, ct);
+        var consultaInterna = new clsConsultaTarifaPlazaInterna(
+            linea.clsRuta.Origen, linea.clsRuta.Destino, nombreLineaNegocio, nombreClaseViaje,
+            linea.ClaseContenedor, vehiculo, linea.Peso,
+            linea.clsRuta.OrigenMunicipioId, linea.clsRuta.DestinoMunicipioId);
+
+        // El camino "oficial" (ITarifarioSapPort, ver comentario mas abajo) exige match
+        // exacto de ClaseContenedor/peso/vehiculo sin fallback. Cuando no encuentra nada
+        // (oficial es null, o oficial.Tarifa queda null porque el filtro exacto descarto
+        // todo) se reintenta con el mismo selector tolerante que ya usa el camino "Solo
+        // SICE-TAC" de arriba, antes de rendirse. Mismo patron que ya se aplico para el
+        // piso SICE-TAC (ver sicetac mas abajo) y para el bug gemelo documentado en
+        // docs/decisiones/matching-sicetac-oficial-vs-solo-sicetac.md.
+        //
+        // S5-HU-19.1/#281: orden de fuentes de PLAZA = oficial SAP -> tolerante SAP (por
+        // zona) -> propia de NEXO (tbl_tarifas_plaza), ganando la primera VIGENTE. Antes
+        // de esta issue, "oficial" trayendo una VENCIDA ya dejaba `plaza` no-null y las
+        // otras dos fuentes nunca se intentaban — un bug real: una plaza vigente en SAP
+        // tolerante o en la tabla propia nunca se encontraba si oficial traía algo vencido
+        // primero. Ahora se sigue buscando una vigente en las tres fuentes; la vencida
+        // (si la hay) solo queda como referencia cuando NINGUNA fuente trae una vigente.
+        clsCandidatoTarifaDto? plazaVigente = oficial?.Vencida == false ? oficial.Tarifa : null;
+        clsCandidatoTarifaDto? plazaVencidaRef = oficial?.Vencida == true ? oficial.Tarifa : null;
+
+        if (plazaVigente is null && dc is not null)
+            plazaVigente = await CandidatoSapAsync(
+                dc, dc.TarifasPlazaSap, "plaza", linea.clsRuta.OrigenMunicipio, linea.clsRuta.DestinoMunicipio,
+                vehiculo, linea.Peso, soloVigentes: true, ajustesVigencia, ct);
+
+        if (plazaVigente is null)
+        {
+            var resultadoPlazaInterna = await plazaInterna.BuscarAsync(consultaInterna, ct);
+            plazaVigente = resultadoPlazaInterna.Vigente;
+            plazaVencidaRef ??= resultadoPlazaInterna.Vencida;
+        }
+
+        // S5-HU-19.2/#282, Paso 2 anticipado: si la plaza vigente ya va a ganar sola
+        // (PlazaVigenteMayor), el histórico ni se consulta — DecidirFlujo no lo mira en
+        // ese modo, pedirlo sería una consulta tirada a la basura.
+        var seriaPlazaVigenteMayor = !hayReglaSoloSicetac && sicetac is not null &&
+            plazaVigente is not null && plazaVigente.Valor > sicetac.Valor;
+
         clsCandidatoTarifaDto? historico = null;
-        if (origenMunicipioId is not null && destinoMunicipioId is not null)
-            historico = await CandidatoHistoricoPropioAsync(db, origenMunicipioId.Value, destinoMunicipioId.Value, vehiculo, linea.Peso, ct);
-        if (historico is null && dc is not null)
-            historico = await CandidatoSapAsync(
-                dc, dc.TarifasLogSap, "historico_sap", linea.clsRuta.OrigenMunicipio, linea.clsRuta.DestinoMunicipio,
-                vehiculo, linea.Peso, soloVigentes: false, ajustesVigencia, ct, ventanaMeses: 3);
+        if (!seriaPlazaVigenteMayor)
+        {
+            // S5-HU-19.1/#281: mismo orden que plaza — log externo de SAP primero
+            // (ventana de 3 meses), y solo si no hay nada ahí, el histórico propio de NEXO.
+            if (dc is not null)
+                historico = await CandidatoSapAsync(
+                    dc, dc.TarifasLogSap, "historico_sap", linea.clsRuta.OrigenMunicipio, linea.clsRuta.DestinoMunicipio,
+                    vehiculo, linea.Peso, soloVigentes: false, ajustesVigencia, ct, ventanaMeses: 3);
+            if (historico is null)
+                historico = await historicoInterno.BuscarAsync(consultaInterna, ct);
+        }
 
         // Conexión SAP nueva (plaza en vivo), todavía no construida por "el equipo de
         // conexiones". Con SapTarifaFleteEnVivo:Modo en Deshabilitado (default) o
@@ -341,14 +380,16 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
                 linea.RetornaContenedor, linea.CiudadDevolucionContenedor), ct);
             if (enVivo is not null)
             {
-                plaza = enVivo;
-                vencida = false;
+                plazaVigente = enVivo;
+                plazaVencidaRef = null;
             }
         }
 
-        var decision = clsReglaDeCosteo.DecidirConTarifario(
-            ADominio(sicetac), ADominio(plaza), ADominio(historico), vencida);
-        var (valor, fuente, justificacion) = (decision.Valor, decision.Fuente, decision.Justificacion);
+        var decision = clsReglaDeCosteo.DecidirFlujo(
+            hayReglaSoloSicetac, ADominio(sicetac), ADominio(plazaVigente), ADominio(plazaVencidaRef), ADominio(historico));
+        var (valor, fuente, justificacion) = (decision.Resultado.Valor, decision.Resultado.Fuente, decision.Resultado.Justificacion);
+        var plaza = plazaVigente ?? plazaVencidaRef;
+        var vencida = plazaVigente is null && plazaVencidaRef is not null;
 
         // Cuando la propuesta final es plaza y ese candidato viene del fallback
         // conservador (no un match exacto por vehículo/peso), la advertencia se anexa
@@ -362,7 +403,7 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
         else if (linea.RetornaContenedor)
             justificacion += " El viaje retorna contenedor pero no se encontró tarifa de devolución (línea 6 exclusiva) para la ruta.";
 
-        return new clsPropuestaLineaDto(
+        return (new clsPropuestaLineaDto(
             linea.Id,
             $"{linea.clsRuta.Origen} → {linea.clsRuta.Destino}",
             vehiculo,
@@ -370,7 +411,8 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
             sicetac, plaza, historico,
             valor, fuente, justificacion,
             oficial?.Retorno,
-            Vencida: vencida);
+            Vencida: vencida,
+            ModoDecision: decision.Modo.ToString()), decision.Modo);
     }
 
     // La decisión vive en Domain (Costeo/Reglas/clsReglaDeCosteo): son invariantes del
@@ -555,84 +597,25 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
         return periodo;
     }
 
-    // --------------------------------------------- tbl_tarifas_plaza / histórico (propias)
+    // --------------------------------------------- catálogo externo: nombre por enum
 
-    private sealed record clsCandidatoPropioRow(decimal Valor, DateOnly Vigencia, string DetallesTarifa, int? PesoId, string? TipoVehiculo);
-
-    /// <summary>S5-HU-16.3/#256: candidato "plaza" contra nuestra propia tbl_tarifas_plaza
-    /// (sembrada en S4-HU-10.1/10.2) — match EXACTO por Id de municipio, nunca por texto
-    /// ni DANE. "Vigente" aquí es Vigencia &lt;= hoy (fecha desde la que aplica el precio;
-    /// convención inversa a las tablas SAP externas, donde Vigencia es la fecha hasta la
-    /// que el precio sigue siendo válido — confirmado contra datos reales: los 107 registros
-    /// migrados en S4-HU-10.1 traen Vigencia = fecha de la migración, ya pasada).
-    ///
-    /// S5-HU-18/#262: recibe el <see cref="clsNexoDbContext"/> por parámetro (no usa
-    /// el campo `_db` de la instancia) — este método corre dentro de las tareas en
-    /// paralelo de <see cref="ProponerAsync"/>, y EF Core no es thread-safe. Antes de
-    /// esta issue sí usaba `_db` compartido ahí, causando InvalidOperationException
-    /// intermitentes ("A second operation was started on this context instance before
-    /// a previous operation completed") cuando dos grupos corrían a la vez.</summary>
-    private Task<clsCandidatoTarifaDto?> CandidatoPlazaPropiaAsync(
-        clsNexoDbContext db, int origenMunicipioId, int destinoMunicipioId, string? vehiculo, decimal? peso, CancellationToken ct)
+    /// <summary>S5-HU-19.1/#281: resuelve el NOMBRE (no el Id, no el enum) que
+    /// tbl_tarifas_plaza/tbl_tarifas_plaza_historico guardan para línea de negocio — vía
+    /// el mismo mapeo enum-&gt;Id SAP que ya usa clsTarifarioSapAdapter para construir su
+    /// propio filtro (CodigoLinea), aplicado sobre el catálogo real (ILineasNegocioPort)
+    /// en vez de comparar contra un Id de otra base de datos.</summary>
+    private static async Task<string?> NombreLineaNegocioAsync(ILineasNegocioPort port, LineaNegocio? valor, CancellationToken ct)
     {
-        var hoy = DateOnly.FromDateTime(_clock.GetUtcNow().Date);
-        var query = db.TarifasPlaza.AsNoTracking()
-            .Where(t => t.OrigenMunicipioId == origenMunicipioId && t.DestinoMunicipioId == destinoMunicipioId && t.Vigencia <= hoy)
-            .Select(t => new clsCandidatoPropioRow(t.Valor, t.Vigencia, t.DetallesTarifa, t.PesoId, t.TipoVehiculo));
-        return CandidatoPropioAsync(db, query, vehiculo, peso, "plaza", "tbl_tarifas_plaza", ct);
+        if (valor is not { } ln || !clsTarifarioSapAdapter.CodigoLinea.TryGetValue(ln, out var id)) return null;
+        var catalogo = await port.ListarAsync(ct);
+        return catalogo.FirstOrDefault(x => x.Id == id)?.Descripcion;
     }
 
-    /// <summary>Mismo criterio que <see cref="CandidatoPlazaPropiaAsync"/>, contra
-    /// tbl_tarifas_plaza_historico (la llena solo el trigger de BD, nunca la app).</summary>
-    private Task<clsCandidatoTarifaDto?> CandidatoHistoricoPropioAsync(
-        clsNexoDbContext db, int origenMunicipioId, int destinoMunicipioId, string? vehiculo, decimal? peso, CancellationToken ct)
+    private static async Task<string?> NombreClaseViajeAsync(IClasesViajePort port, ClaseViaje? valor, CancellationToken ct)
     {
-        var hoy = DateOnly.FromDateTime(_clock.GetUtcNow().Date);
-        var query = db.TarifasPlazaHistorico.AsNoTracking()
-            .Where(t => t.OrigenMunicipioId == origenMunicipioId && t.DestinoMunicipioId == destinoMunicipioId && t.Vigencia <= hoy)
-            .Select(t => new clsCandidatoPropioRow(t.Valor, t.Vigencia, t.DetallesTarifa, t.PesoId, t.TipoVehiculo));
-        return CandidatoPropioAsync(db, query, vehiculo, peso, "historico_sap", "tbl_tarifas_plaza_historico", ct);
-    }
-
-    /// <summary>
-    /// Vehículo/peso son filtros TOLERANTES (igual que el fallback externo de siempre):
-    /// solo se aplican si dejan al menos una fila — si no, se ignoran y se toma la de
-    /// mayor valor entre todas las que ya cumplen municipio+vigencia. Materializa después
-    /// del filtro por municipio+vigencia (tbl_tarifas_plaza/histórico son tablas chicas,
-    /// ~100-300 filas): EF Core no traduce un Where posterior sobre una propiedad de
-    /// <see cref="clsCandidatoPropioRow"/> ya proyectado (confirmado al verificar esta
-    /// issue — "could not be translated"), así que el resto se filtra en memoria.
-    /// </summary>
-    private async Task<clsCandidatoTarifaDto?> CandidatoPropioAsync(
-        clsNexoDbContext db, IQueryable<clsCandidatoPropioRow> query, string? vehiculo, decimal? peso, string fuente, string tabla, CancellationToken ct)
-    {
-        var candidatos = await query.ToListAsync(ct);
-
-        if (!string.IsNullOrWhiteSpace(vehiculo))
-        {
-            var conVehiculo = candidatos.Where(t => t.TipoVehiculo == vehiculo).ToList();
-            if (conVehiculo.Count > 0) candidatos = conVehiculo;
-        }
-
-        if (peso is not null)
-        {
-            var pesoId = await db.RangosPeso.AsNoTracking()
-                .Where(r => r.PesoMinimo <= peso && (r.PesoMaximo == null || peso <= r.PesoMaximo))
-                .Select(r => (int?)r.Id).FirstOrDefaultAsync(ct);
-            if (pesoId is not null)
-            {
-                var conPeso = candidatos.Where(t => t.PesoId == pesoId).ToList();
-                if (conPeso.Count > 0) candidatos = conPeso;
-            }
-        }
-
-        var top = candidatos.OrderByDescending(t => t.Valor).FirstOrDefault();
-        if (top is null || top.Valor <= 0) return null;
-
-        return new clsCandidatoTarifaDto(
-            fuente, top.Valor,
-            $"vigencia {top.Vigencia:yyyy-MM-dd}" + (top.DetallesTarifa is { Length: > 0 } ? $" · {top.DetallesTarifa}" : ""),
-            $"{tabla} (propia) · municipios", 1);
+        if (valor is not { } cv || !clsTarifarioSapAdapter.CodigoClaseViaje.TryGetValue(cv, out var id)) return null;
+        var catalogo = await port.ListarAsync(ct);
+        return catalogo.FirstOrDefault(x => x.Id == id)?.Descripcion;
     }
 
     // ------------------------------------------------------------- SAP (plaza e histórico)

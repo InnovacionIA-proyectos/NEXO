@@ -124,4 +124,52 @@ public static class clsReglaDeCosteo
 
         return sinPlaza with { Justificacion = justificacion };
     }
+
+    /// <summary>
+    /// S5-HU-19.2/#282: los 3 pasos del flujo de decisión (sección "Flujo objetivo" del
+    /// milestone S5-HU-19) — reemplaza la llamada directa a <see cref="DecidirConTarifario"/>
+    /// desde el adaptador. <see cref="Decidir"/>/<see cref="DecidirConTarifario"/> NO
+    /// cambian: siguen siendo exactamente la regla del Paso 4 (consulta completa), ahora
+    /// invocada desde acá en vez de directo.
+    /// </summary>
+    public static clsDecisionDeFlujo DecidirFlujo(
+        bool hayReglaSoloSicetac, clsCandidatoDeTarifa? sicetac,
+        clsCandidatoDeTarifa? plazaVigente, clsCandidatoDeTarifa? plazaVencida, clsCandidatoDeTarifa? historico)
+    {
+        // Paso 1: con regla y con piso, el piso gobierna solo — ni plaza ni histórico se
+        // miran. Con regla pero SIN piso, no hay nada que proponer por esta vía: sigue al
+        // paso 4 directo (nunca al paso 2 — el paso 2 es explícitamente "sin regla").
+        if (hayReglaSoloSicetac && sicetac is not null)
+            return new clsDecisionDeFlujo(
+                new clsResultadoDeCosteo(sicetac.Valor, sicetac.Fuente,
+                    $"clsRuta marcada como SOLO SICE-TAC por el Administrador: se propone el piso SICE-TAC ({sicetac.Valor:C0}) sin comparar con plaza ni histórico."),
+                ModoDecision.SoloSicetac);
+
+        // Paso 2: sin regla, con piso Y con plaza vigente ESTRICTAMENTE mayor que el
+        // piso, la plaza gobierna sola — el histórico ni se consulta (ver el adaptador,
+        // que ya se ahorra la consulta cuando esta condición se puede anticipar).
+        if (!hayReglaSoloSicetac && sicetac is not null && plazaVigente is not null && plazaVigente.Valor > sicetac.Valor)
+            return new clsDecisionDeFlujo(
+                new clsResultadoDeCosteo(plazaVigente.Valor, plazaVigente.Fuente,
+                    $"La plaza vigente ({plazaVigente.Valor:C0}) supera el piso SICE-TAC ({sicetac.Valor:C0}): se propone la plaza sin consultar el histórico."),
+                ModoDecision.PlazaVigenteMayor);
+
+        // Paso 3/4: todo lo demás (sin plaza vigente, plaza vigente que no supera el
+        // piso, plaza vencida, o sin piso) va a consulta completa — la regla del mayor de
+        // siempre, con la plaza vigente si la hay, o la vencida como referencia si no.
+        var resultado = plazaVigente is not null
+            ? Decidir(sicetac, plazaVigente, historico)
+            : DecidirConTarifario(sicetac, plazaVencida, historico, tarifarioVencido: plazaVencida is not null);
+        return new clsDecisionDeFlujo(resultado, ModoDecision.ConsultaCompleta);
+    }
 }
+
+/// <summary>Los 3 modos del flujo de decisión — ver <see cref="clsReglaDeCosteo.DecidirFlujo"/>.</summary>
+public enum ModoDecision { SoloSicetac, PlazaVigenteMayor, ConsultaCompleta }
+
+/// <summary>
+/// Qué se propuso y por qué camino. <see cref="Modo"/> es lo que decide si el auto-costeo
+/// guarda el flete (SoloSicetac/PlazaVigenteMayor) o deja la línea pendiente de un
+/// humano (ConsultaCompleta) — ver clsCapturarSolicitudCommand/clsCostearLineaCommand.
+/// </summary>
+public sealed record clsDecisionDeFlujo(clsResultadoDeCosteo Resultado, ModoDecision Modo);

@@ -18,8 +18,16 @@ namespace Nexo.Application.Common.Dtos;
 /// el mensaje es explícito para que el frontend se lo muestre al Administrador de
 /// Fletes/cliente antes de confirmar.
 /// </summary>
+/// <summary>
+/// <paramref name="TablaOrigen"/> (S5-HU-19.1/#281): "SAP" si el candidato salió de una
+/// tabla externa (tblSAPTarifas/tblSAPTarifasLog/DWSice) o "NEXO" si salió de una tabla
+/// propia (tbl_tarifas_plaza/tbl_tarifas_plaza_historico). Antes de este campo, la única
+/// forma de distinguirlo era parseando el texto libre de <see cref="Criterio"/> — esto lo
+/// hace un dato estructurado en vez de un detalle de presentación.
+/// </summary>
 public record clsCandidatoTarifaDto(
-    string Fuente, decimal Valor, string Detalle, string Criterio, int Coincidencias, string? Advertencia = null);
+    string Fuente, decimal Valor, string Detalle, string Criterio, int Coincidencias,
+    string? Advertencia = null, string TablaOrigen = "SAP");
 
 /// <summary>
 /// Piso SICE-TAC vigente con el desglose de horas, para Mesa de Costeo
@@ -32,6 +40,14 @@ public record clsPisoSicetacVigenteDto(
     int Periodo, decimal ValorPiso, decimal? ValorHora, decimal? HorasPactadas,
     string Configuracion, string TipoCarga, string UnidadTransporte, string CondicionCarga);
 
+/// <summary>
+/// <paramref name="ModoDecision"/> (S5-HU-19.2/#282): "SoloSicetac" | "PlazaVigenteMayor" |
+/// "ConsultaCompleta" — texto, no el número del enum de Domain (ver
+/// <see cref="Nexo.Domain.Costeo.Reglas.ModoDecision"/>). Decide si el auto-costeo guarda
+/// el flete (los dos primeros) o deja la línea pendiente de que un humano elija
+/// (ConsultaCompleta) — ver clsCapturarSolicitudCommand/clsCostearLineaCommand. Default
+/// "ConsultaCompleta": es el modo más conservador, el que nunca auto-guarda nada.
+/// </summary>
 public record clsPropuestaLineaDto(
     Guid LineaId,
     string? clsRuta,
@@ -44,7 +60,8 @@ public record clsPropuestaLineaDto(
     string? FuentePropuesta,
     string Justificacion,
     clsCandidatoTarifaDto? RetornoContenedor = null,
-    bool Vencida = false);
+    bool Vencida = false,
+    string ModoDecision = "ConsultaCompleta");
 
 public record clsPropuestaSolicitudDto(
     Guid SolicitudId,

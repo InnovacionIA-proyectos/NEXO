@@ -3,6 +3,7 @@ using Nexo.Application.CasosDeUso.Cotizaciones.Interfaces;
 using Nexo.Application.CasosDeUso.Cotizaciones.Mappers;
 using Nexo.Application.CasosDeUso.Cotizaciones.Validadores;
 using Nexo.Application.Common.Abstractions;
+using Nexo.Application.Common.Dtos;
 using Nexo.Application.Common.Exceptions;
 using Nexo.Application.Common.Ports;
 using Nexo.Domain.Cotizaciones.Entidades;
@@ -23,6 +24,7 @@ public sealed class clsAgregarLineaCotizacionCommandHandler(
     ICotizacionRepository cotizaciones,
     ILineasSolicitudPort lineasSolicitud,
     ITarifasHistoricasPort tarifasHistoricas,
+    IPropuestaTarifaPort propuestas,
     IAuditoriaPort auditoria,
     Common.ICurrentUserPort usuarioActual,
     TimeProvider clock,
@@ -36,6 +38,7 @@ public sealed class clsAgregarLineaCotizacionCommandHandler(
         var c = await CargarEditableAsync(command.CotizacionId, ct);
 
         clsLineaSolicitud? lineaSol = null;
+        clsPropuestaLineaDto? propuestaLinea = null;
         if (command.LineaSolicitudId is Guid lid)
         {
             lineaSol = await lineasSolicitud.ObtenerDeSolicitudAsync(lid, c.SolicitudId, ct)
@@ -43,18 +46,32 @@ public sealed class clsAgregarLineaCotizacionCommandHandler(
             // Además de validar, se marca la línea como Revisada (gestión del Administrador de
             // Fletes) para distinguirla del auto-costeo en la bandeja.
             lineaSol.EstadoLinea = EstadoLinea.Revisada;
+
+            // S5-HU-19.3/#283: mismo cálculo que la propuesta — nunca se guarda un flete por
+            // debajo del piso SICE-TAC, sea tarifario, histórico o manual. El servidor NO
+            // confía en lo que diga el navegador (el piso ya se bloquea en pantalla, pero
+            // llamar la API directo lo saltaría si solo se validara ahí).
+            propuestaLinea = (await propuestas.ProponerAsync(c.SolicitudId, ct)).Lineas.FirstOrDefault(x => x.LineaId == lid);
+            if (propuestaLinea?.Sicetac?.Valor is { } piso && command.ValorFlete < piso)
+                throw new clsValidationFailedException("FLETE_BAJO_PISO_SICETAC",
+                    $"El flete ({command.ValorFlete:C0}) está por debajo del piso SICE-TAC ({piso:C0}). No se puede guardar un valor por debajo del piso.");
         }
 
         var fuente = Enum.Parse<FuenteFlete>(command.Fuente, ignoreCase: true);
 
-        // Bloqueo: una tarifa histórica solo se reutiliza si hay al menos una VIGENTE
-        // (≤ 1 semana) para la ruta/tipología. Si todas están vencidas, se exige una
-        // nueva solicitud en vez de reutilizar un valor obsoleto.
+        // Bloqueo: una tarifa histórica solo se reutiliza si se cumple CUALQUIERA de las
+        // dos — (1) hay al menos una "histórica sugerida" VIGENTE (≤ 1 semana) para la
+        // ruta/tipología (regla de siempre, pensada para el botón "Usar" de esa lista), o
+        // (2) el valor coincide con el candidato Histórico de ESTA propuesta (ventana de
+        // 3 meses, ya recalculada arriba para el piso) — "Aplicar propuestas" ya guarda
+        // ese mismo valor sin esta validación; agregarlo a mano con el mismo valor que
+        // muestra la pantalla no debía poder fallar.
         if (fuente == FuenteFlete.Historica && lineaSol is not null)
         {
             var hoy = DateOnly.FromDateTime(clock.GetUtcNow().UtcDateTime);
-            var vigente = await tarifasHistoricas.HayVigenteAsync(lineaSol.RutaId ?? Guid.Empty, lineaSol.Tipologia, hoy.AddDays(-7), hoy, ct);
-            if (!vigente)
+            var hayHistoricaSugeridaVigente = await tarifasHistoricas.HayVigenteAsync(lineaSol.RutaId ?? Guid.Empty, lineaSol.Tipologia, hoy.AddDays(-7), hoy, ct);
+            var coincideConLaPropuesta = propuestaLinea?.HistoricoSap?.Valor == command.ValorFlete;
+            if (!hayHistoricaSugeridaVigente && !coincideConLaPropuesta)
                 throw new clsConflictException("HISTORICA_VENCIDA",
                     "No se puede reutilizar una tarifa histórica vencida (más de 1 semana). Genere una nueva solicitud.");
         }

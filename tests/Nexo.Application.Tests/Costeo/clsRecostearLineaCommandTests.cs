@@ -1,8 +1,10 @@
 using Nexo.Application.CasosDeUso.Costeo;
 using Nexo.Application.CasosDeUso.Costeo.Interfaces;
+using Nexo.Application.CasosDeUso.Cotizaciones.Interfaces;
 using Nexo.Application.CasosDeUso.Trabajos.Interfaces;
 using Nexo.Application.Common.Abstractions;
 using Nexo.Domain.Costeo.Reglas;
+using Nexo.Domain.Cotizaciones.Entidades;
 using Nexo.Domain.Enums;
 using Moq;
 
@@ -11,8 +13,9 @@ namespace Nexo.Application.Tests.Costeo;
 /// <summary>
 /// Recostear una línea que estaba esperando una tarifa.
 ///
-/// Lo que se prueba es sobre todo lo que NO debe pasar: que un recosteo que sigue sin
-/// tarifa no borre el pendiente ni marque la línea como resuelta. Un recosteo optimista
+/// Lo que se prueba es sobre todo lo que NO debe pasar: que un recosteo que sigue en
+/// ConsultaCompleta (S5-HU-19.2/#282 — ya no "sin tarifa", el modo manda, no si hay
+/// valor) no borre el pendiente ni marque la línea como resuelta. Un recosteo optimista
 /// que cierra el pendiente sin haber resuelto nada deja la línea invisible: ya no
 /// aparece en la cola del Administrador de Tarifas y nunca se va a costear.
 /// </summary>
@@ -21,22 +24,36 @@ public class clsRecostearLineaCommandTests
     private readonly Mock<IPropuestaDeLineaPort> _propuesta = new();
     private readonly Mock<IPendientesDeCosteoPort> _pendientes = new();
     private readonly Mock<ILineasCosteadasPort> _lineas = new();
+    private readonly Mock<ICotizacionRepository> _cotizaciones = new();
     private readonly Mock<IUnitOfWork> _uow = new();
 
     private static readonly Guid Trabajo = Guid.Parse("aaaaaaaa-0000-0000-0000-000000000001");
     private static readonly Guid clsSolicitud = Guid.Parse("bbbbbbbb-0000-0000-0000-000000000002");
     private static readonly Guid Linea = Guid.Parse("cccccccc-0000-0000-0000-000000000003");
 
-    private clsRecostearLineaCommandHandler Handler() =>
-        new(_propuesta.Object, _pendientes.Object, _lineas.Object, _uow.Object);
+    public clsRecostearLineaCommandTests()
+    {
+        _cotizaciones.Setup(c => c.ObtenerConLineasYConexosAsync(
+            It.IsAny<System.Linq.Expressions.Expression<Func<clsCotizacion, bool>>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((clsCotizacion?)null);
+    }
 
-    private void CuandoLaPropuestaEs(clsResultadoDeCosteo r) =>
-        _propuesta.Setup(p => p.ProponerParaLineaAsync(Linea, It.IsAny<CancellationToken>())).ReturnsAsync(r);
+    private clsRecostearLineaCommandHandler Handler() =>
+        new(_propuesta.Object, _pendientes.Object, _lineas.Object, _cotizaciones.Object, _uow.Object);
+
+    private void CuandoLaPropuestaEs(clsDecisionDeFlujo d) =>
+        _propuesta.Setup(p => p.ProponerParaLineaAsync(Linea, It.IsAny<CancellationToken>())).ReturnsAsync(d);
+
+    private static clsDecisionDeFlujo Automatica(decimal valor, string fuente, string justificacion) =>
+        new(new clsResultadoDeCosteo(valor, fuente, justificacion), ModoDecision.PlazaVigenteMayor);
+
+    private static clsDecisionDeFlujo ConsultaCompleta(decimal? valor, string? fuente, string justificacion) =>
+        new(new clsResultadoDeCosteo(valor, fuente, justificacion), ModoDecision.ConsultaCompleta);
 
     [Fact]
-    public async Task Si_ya_hay_tarifa_la_linea_se_resuelve_y_el_pendiente_se_cierra()
+    public async Task Si_ahora_resuelve_automatico_la_linea_se_resuelve_y_el_pendiente_se_cierra()
     {
-        CuandoLaPropuestaEs(new clsResultadoDeCosteo(1_100_000m, "plaza", "Ya hay tarifa de plaza vigente."));
+        CuandoLaPropuestaEs(Automatica(1_100_000m, "plaza", "La plaza vigente supera el piso."));
 
         await Handler().Handle(new clsRecostearLineaCommand(Trabajo, clsSolicitud, Linea));
 
@@ -47,9 +64,26 @@ public class clsRecostearLineaCommandTests
     }
 
     [Fact]
-    public async Task Si_sigue_sin_tarifa_el_pendiente_se_queda_donde_estaba()
+    public async Task Si_ahora_resuelve_automatico_agrega_el_flete_a_la_cotizacion_auto_costeada()
     {
-        CuandoLaPropuestaEs(new clsResultadoDeCosteo(null, null, "Sigue sin tarifa para la ruta."));
+        CuandoLaPropuestaEs(Automatica(1_100_000m, "plaza", "La plaza vigente supera el piso."));
+
+        clsCotizacion? agregada = null;
+        _cotizaciones.Setup(c => c.Agregar(It.IsAny<clsCotizacion>())).Callback<clsCotizacion>(c => agregada = c);
+
+        await Handler().Handle(new clsRecostearLineaCommand(Trabajo, clsSolicitud, Linea));
+
+        Assert.NotNull(agregada);
+        var linea = Assert.Single(agregada!.Lineas);
+        Assert.Equal(1_100_000m, linea.ValorFlete);
+    }
+
+    [Fact]
+    public async Task Si_sigue_en_ConsultaCompleta_el_pendiente_se_queda_donde_estaba_AUNQUE_tenga_valor()
+    {
+        // S5-HU-19.2/#282: un solo candidato en consulta completa SÍ trae Valor, pero el
+        // modo manda — sigue pendiente.
+        CuandoLaPropuestaEs(ConsultaCompleta(2_500_000m, "sicetac", "Solo se encontró piso SICE-TAC."));
 
         await Handler().Handle(new clsRecostearLineaCommand(Trabajo, clsSolicitud, Linea));
 
@@ -62,9 +96,9 @@ public class clsRecostearLineaCommandTests
     }
 
     [Fact]
-    public async Task Si_sigue_sin_tarifa_no_se_escribe_nada()
+    public async Task Si_sigue_en_ConsultaCompleta_no_se_escribe_nada()
     {
-        CuandoLaPropuestaEs(new clsResultadoDeCosteo(null, null, "Sigue sin tarifa."));
+        CuandoLaPropuestaEs(ConsultaCompleta(null, null, "Sigue sin tarifa."));
 
         await Handler().Handle(new clsRecostearLineaCommand(Trabajo, clsSolicitud, Linea));
 

@@ -8,18 +8,26 @@ using Nexo.Domain.Solicitudes.Entidades;
 namespace Nexo.Api.Tests;
 
 /// <summary>
-/// S5-HU-16.3/#256: antes de esta issue, el candidato "plaza" solo consultaba la tabla
-/// externa SAP (tblSAPTarifas) — nuestra propia tbl_tarifas_plaza (sembrada en
-/// S4-HU-10.1/10.2) nunca se tocaba. Buenaventura(1012)→Pereira(832), vehículo 2S2, es
-/// una fila real de esa tabla (Valor=3.300.000) — verificado que el motor completo
-/// (ProponerParaLineaAsync) la encuentra y le gana al piso SICE-TAC real de esa ruta
-/// ($1.935.512), sin necesitar tblSAPTarifas.
+/// S5-HU-16.3/#256: candidato "plaza" contra nuestra propia tbl_tarifas_plaza (sembrada
+/// en S4-HU-10.1/10.2) — Buenaventura(1012)→Pereira(832), vehículo 2S2, peso 10000 (banda
+/// PesoId=1), es una fila real de esa tabla (Valor=3.300.000).
+///
+/// S5-HU-19.1/#281 cambió el ORDEN de las fuentes de plaza: antes de esta issue, "plaza
+/// propia" se consultaba ANTES que el selector tolerante de SAP (zona) — ganaba siempre
+/// que existiera, sin competir con SAP. El flujo correcto es SAP oficial -&gt; SAP
+/// tolerante -&gt; propia, ganando la primera VIGENTE (externa primero) — y la base de
+/// pruebas real SÍ tiene una fila SAP vigente para esta misma zona (ZC_BUENAVENTURA -&gt;
+/// ZTC_PEREIRA, vehículo SAP 2, Valor=3.000.000, verificado contra tblSAPTarifas) que
+/// ahora gana legítimamente, antes de llegar a la propia. Este test ya NO prueba que la
+/// propia gana — prueba que SAP gana cuando tiene una vigente, que es exactamente la regla
+/// nueva. La prueba de que la propia SÍ se consulta y SÍ se usa (cuando SAP no tiene nada)
+/// vive en clsTarifaPlazaInternaE2ETests, contra el puerto directamente.
 /// </summary>
 [Collection("api")]
 public class clsPropuestaPlazaPropiaTests(clsApiFixture fx)
 {
     [Fact]
-    public async Task Linea_con_municipios_de_una_tarifa_de_plaza_propia_usa_esa_tarifa()
+    public async Task Linea_con_una_tarifa_SAP_vigente_para_la_zona_le_gana_a_la_tarifa_de_plaza_propia()
     {
         var lineaId = fx.WithDb(db =>
         {
@@ -53,9 +61,9 @@ public class clsPropuestaPlazaPropiaTests(clsApiFixture fx)
 
         using var scope = fx.Factory.Services.CreateScope();
         var propuestas = scope.ServiceProvider.GetRequiredService<IPropuestaDeLineaPort>();
-        var resultado = await propuestas.ProponerParaLineaAsync(lineaId);
+        var decision = await propuestas.ProponerParaLineaAsync(lineaId);
 
-        Assert.Equal("plaza", resultado.Fuente);
-        Assert.Equal(3_300_000m, resultado.Valor);
+        Assert.Equal("plaza", decision.Resultado.Fuente);
+        Assert.Equal(3_000_000m, decision.Resultado.Valor);
     }
 }
