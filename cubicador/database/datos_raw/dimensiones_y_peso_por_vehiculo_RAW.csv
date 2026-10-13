@@ -1,0 +1,9 @@
+Dimenciones y Peso por configuracion para Cubicaje,,,,,
+"Medida Interna util en Metros, espacio aprovechable",,,,,
+,Largo de la plancha,Ancho de la plancha,Alto de la Carroceria,Capacidad ,Aplica para tipo de carrocerias
+Turbo 2L2,4.5,2.2,2.3,4000 kilos,Estacas/Furgon/Plancha
+Sencillo C2,6.5,2.4,2.4,8500 Kilos,Estacas/Furgon/Plancha
+Dobletroque C3,8,2.4,2.6,17000 kilos,Estacas/Plancha
+Minimula 2S2,12.2,2.4,2.6,18000 kilos,Estacas/Furgon/Plancha
+Tractomula 3S3,12.2,2.4,2.6,34000 kilos,Estacas/Plancha
+Tractomula Furgon 3S3,12.2,2.4,2.6,30000 kilos,Furgon
