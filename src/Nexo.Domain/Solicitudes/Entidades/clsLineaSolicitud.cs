@@ -92,6 +92,29 @@ public class clsLineaSolicitud : IAuditable
     [Range(typeof(decimal), "0", "9999999999999.99", ParseLimitsInInvariantCulture = true)]
     public decimal? ValorMercancia { get; set; }
 
+    /// <summary>
+    /// S5-HU-18.3/#275: id de la ruta que Cotifly asigna cuando una carga heterogénea se
+    /// reparte en varios camiones — todas las líneas de la misma ruta llegan con el mismo
+    /// valor. El valor lo pone SIEMPRE Cotifly, nunca NEXO; líneas nacidas directo en NEXO
+    /// quedan en null (no agrupan con nada, y eso no rompe nada existente).
+    /// </summary>
+    public Guid? GrupoRutaId { get; set; }
+
+    /// <summary>
+    /// S5-HU-18.3/#275: orden de captura dentro de la solicitud (1, 2, 3...) — permite
+    /// saber cuál línea de un GrupoRutaId es "la primera" (donde se cuelgan los servicios
+    /// conexos de la ruta). Nulo en líneas capturadas antes de este cambio.
+    /// </summary>
+    public int? NumeroLinea { get; set; }
+
+    /// <summary>
+    /// S5-HU-18.2/#274: id de la recomendación de vehículo del Cubicador que corresponde a
+    /// esta línea — permite cruzar lo recomendado contra lo realmente despachado más
+    /// adelante. Nulo si la línea nunca se cubicó.
+    /// </summary>
+    [MaxLength(64)]
+    public string? IdRecomendacionVehiculo { get; set; }
+
     public EstadoLinea EstadoLinea { get; set; } = EstadoLinea.PorCostear;
 
     /// <summary>

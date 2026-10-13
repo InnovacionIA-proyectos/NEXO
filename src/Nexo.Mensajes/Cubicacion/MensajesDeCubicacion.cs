@@ -259,3 +259,48 @@ public sealed record clsVehiculoCubicacionEvento(
     decimal CapacidadKg, decimal TaraKg, decimal PuertaAnchoMm, decimal PuertaAltoMm, string PuertaPosicion,
     IReadOnlyList<clsEjeVehiculoInput> Ejes, decimal ToleranciaParedesMm, decimal ToleranciaEntreUnidadesMm,
     bool EsPreset);
+
+// ---------------------------------------------------------------------------------
+// S5-HU-18.5/#277: catálogos de tipo de mercancía y tipo de carrocería. Mismo criterio
+// que el catálogo de vehículos de arriba — Cubicador es la fuente de verdad, estos 6
+// eventos mantienen las proyecciones de NEXO (TiposMercanciaCatalogo/
+// TiposCarroceriaCatalogo) al día para que los desplegables de Captura no tengan que
+// preguntarle a Cubicador en caliente. El cuerpo de creado/actualizado es el DTO
+// completo en camelCase — exactamente lo mismo que devuelve GET /tipos-mercancia o
+// GET /tipos-carroceria por fila (cubicador/api/dtos/catalogo.py::como_evento), así
+// que los dos nunca pueden divergir de forma.
+// ---------------------------------------------------------------------------------
+
+/// <summary>Evento entrante: Cubicador -> NEXO, routing key `mercancia.creada`.</summary>
+public sealed record MercanciaCreada(string CorrelationId, clsTipoMercanciaCatalogoEvento Mercancia);
+
+/// <summary>Evento entrante: Cubicador -> NEXO, routing key `mercancia.actualizada`.</summary>
+public sealed record MercanciaActualizada(string CorrelationId, clsTipoMercanciaCatalogoEvento Mercancia);
+
+/// <summary>Evento entrante: Cubicador -> NEXO, routing key `mercancia.eliminada`. Solo el
+/// id, igual que <see cref="VehiculoEliminado"/>: no hay nada que proyectar, solo una fila
+/// que borrar.</summary>
+public sealed record MercanciaEliminada(string CorrelationId, string MercanciaId);
+
+/// <summary>Evento entrante: Cubicador -> NEXO, routing key `carroceria.creada`.</summary>
+public sealed record CarroceriaCreada(string CorrelationId, clsTipoCarroceriaCatalogoEvento Carroceria);
+
+/// <summary>Evento entrante: Cubicador -> NEXO, routing key `carroceria.actualizada`.</summary>
+public sealed record CarroceriaActualizada(string CorrelationId, clsTipoCarroceriaCatalogoEvento Carroceria);
+
+/// <summary>Evento entrante: Cubicador -> NEXO, routing key `carroceria.eliminada`.</summary>
+public sealed record CarroceriaEliminada(string CorrelationId, string CarroceriaId);
+
+/// <summary>Espejo 1:1 de <c>TipoMercanciaDto</c> (cubicador/api/dtos/catalogo.py).
+/// <see cref="CarroceriaPrincipal"/>/<see cref="CarroceriaSecundaria"/> ya llegan resueltas
+/// a CÓDIGO, no a id.</summary>
+public sealed record clsTipoMercanciaCatalogoEvento(
+    string Id, string CodigoMercancia, string NombreMercancia, string Categoria,
+    bool Cubicable, bool CondicionadaCubicacion,
+    string? CarroceriaPrincipal, string? CarroceriaSecundaria, bool CarroceriaSecundariaCondicionada,
+    string ControlAmbientalRequerido, bool Apilable, bool Fragil, bool RotacionLibre,
+    string? ComentarioCondicion, bool Activo, int Version);
+
+/// <summary>Espejo 1:1 de <c>TipoCarroceriaDto</c> (cubicador/api/dtos/catalogo.py).</summary>
+public sealed record clsTipoCarroceriaCatalogoEvento(
+    string Id, string CodigoCarroceria, string NombreCarroceria, bool Activo, int Version);

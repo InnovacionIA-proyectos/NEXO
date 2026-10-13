@@ -96,7 +96,8 @@ public class clsSolicitudesController(
     public async Task<ActionResult> CargarLineas(Guid id, [FromBody] clsCargarLineasBulkRequest req, CancellationToken ct = default)
     {
         var lineas = req.Lineas.Select(lr => new clsCrearLineaInput(
-            lr.RutaId, lr.ConfigVehiculoId, lr.Tipologia, lr.Peso, lr.ValorMercancia, lr.HorasCargue, lr.HorasDescargue)).ToList();
+            lr.RutaId, lr.ConfigVehiculoId, lr.Tipologia, lr.Peso, lr.ValorMercancia, lr.HorasCargue, lr.HorasDescargue,
+            lr.GrupoRutaId)).ToList();
         var trabajoId = await cargarLineas.Handle(new clsCargarLineasBulkCommand(id, lineas), ct);
 
         return Accepted(new

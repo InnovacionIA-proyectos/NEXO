@@ -180,4 +180,89 @@ public class clsContratoCubicacionTests
         Assert.Equal("veh-1", evento.CorrelationId);
         Assert.Equal("veh-1", evento.VehiculoId);
     }
+
+    // S5-HU-18.5/#277: JSON copiado literal de una respuesta real de
+    // GET /tipos-mercancia contra el Cubicador en docker (ver
+    // cubicador/api/dtos/catalogo.py::como_evento — el evento es el DTO completo).
+    private const string MercanciaJson = """
+        {"id": "m-CAJAS_CARTON", "codigoMercancia": "CAJAS_CARTON", "nombreMercancia": "Cajas Carton",
+         "categoria": "GENERAL", "cubicable": true, "condicionadaCubicacion": false,
+         "carroceriaPrincipal": "FURGON", "carroceriaSecundaria": "ESTACAS", "carroceriaSecundariaCondicionada": true,
+         "controlAmbientalRequerido": "NINGUNO", "apilable": true, "fragil": false, "rotacionLibre": true,
+         "comentarioCondicion": null, "activo": true, "version": 1}
+        """;
+
+    [Fact]
+    public void MercanciaCreada_deserializa_el_JSON_real_que_publica_el_Cubicador()
+    {
+        var json = $$"""{"correlationId": "m-CAJAS_CARTON", "mercancia": {{MercanciaJson}}}""";
+
+        var evento = JsonSerializer.Deserialize<MercanciaCreada>(json, Opciones);
+
+        Assert.NotNull(evento);
+        Assert.Equal("CAJAS_CARTON", evento.Mercancia.CodigoMercancia);
+        Assert.Equal("FURGON", evento.Mercancia.CarroceriaPrincipal);
+        Assert.True(evento.Mercancia.Cubicable);
+        Assert.Equal(1, evento.Mercancia.Version);
+    }
+
+    [Fact]
+    public void MercanciaActualizada_deserializa_el_JSON_real_que_publica_el_Cubicador()
+    {
+        var json = $$"""{"correlationId": "m-CAJAS_CARTON", "mercancia": {{MercanciaJson}}}""";
+
+        var evento = JsonSerializer.Deserialize<MercanciaActualizada>(json, Opciones);
+
+        Assert.NotNull(evento);
+        Assert.Equal("Cajas Carton", evento.Mercancia.NombreMercancia);
+    }
+
+    [Fact]
+    public void MercanciaEliminada_deserializa_el_JSON_real_que_publica_el_Cubicador()
+    {
+        const string json = """{"correlationId": "m-CAJAS_CARTON", "mercanciaId": "m-CAJAS_CARTON"}""";
+
+        var evento = JsonSerializer.Deserialize<MercanciaEliminada>(json, Opciones);
+
+        Assert.NotNull(evento);
+        Assert.Equal("m-CAJAS_CARTON", evento.MercanciaId);
+    }
+
+    private const string CarroceriaJson = """
+        {"id": "c-FURGON", "codigoCarroceria": "FURGON", "nombreCarroceria": "Furgón", "activo": true, "version": 1}
+        """;
+
+    [Fact]
+    public void CarroceriaCreada_deserializa_el_JSON_real_que_publica_el_Cubicador()
+    {
+        var json = $$"""{"correlationId": "c-FURGON", "carroceria": {{CarroceriaJson}}}""";
+
+        var evento = JsonSerializer.Deserialize<CarroceriaCreada>(json, Opciones);
+
+        Assert.NotNull(evento);
+        Assert.Equal("FURGON", evento.Carroceria.CodigoCarroceria);
+        Assert.True(evento.Carroceria.Activo);
+    }
+
+    [Fact]
+    public void CarroceriaActualizada_deserializa_el_JSON_real_que_publica_el_Cubicador()
+    {
+        var json = $$"""{"correlationId": "c-FURGON", "carroceria": {{CarroceriaJson}}}""";
+
+        var evento = JsonSerializer.Deserialize<CarroceriaActualizada>(json, Opciones);
+
+        Assert.NotNull(evento);
+        Assert.Equal("Furgón", evento.Carroceria.NombreCarroceria);
+    }
+
+    [Fact]
+    public void CarroceriaEliminada_deserializa_el_JSON_real_que_publica_el_Cubicador()
+    {
+        const string json = """{"correlationId": "c-FURGON", "carroceriaId": "c-FURGON"}""";
+
+        var evento = JsonSerializer.Deserialize<CarroceriaEliminada>(json, Opciones);
+
+        Assert.NotNull(evento);
+        Assert.Equal("c-FURGON", evento.CarroceriaId);
+    }
 }

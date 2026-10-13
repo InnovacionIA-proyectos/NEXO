@@ -4,6 +4,7 @@ using Nexo.Domain.Catalogos.Entidades;
 using Nexo.Domain.Common;
 using Nexo.Domain.Costeo.Entidades;
 using Nexo.Domain.Cotizaciones.Entidades;
+using Nexo.Domain.Cubicacion.Entidades;
 using Nexo.Domain.Enums;
 using Nexo.Domain.PlanDeCargue.Entidades;
 using Nexo.Domain.Priorizacion.Entidades;
@@ -39,6 +40,8 @@ public class clsNexoDbContext : DbContext
     public DbSet<clsAjusteVigenciaPlaza> AjustesVigenciaPlaza => Set<clsAjusteVigenciaPlaza>();
     public DbSet<clsReglaSoloSicetac> ReglasSoloSicetac => Set<clsReglaSoloSicetac>();
     public DbSet<clsVehiculoCubicacion> VehiculosCubicacion => Set<clsVehiculoCubicacion>();
+    public DbSet<clsTipoMercanciaCatalogo> TiposMercanciaCatalogo => Set<clsTipoMercanciaCatalogo>();
+    public DbSet<clsTipoCarroceriaCatalogo> TiposCarroceriaCatalogo => Set<clsTipoCarroceriaCatalogo>();
     public DbSet<clsPlanCargue> PlanesCargue => Set<clsPlanCargue>();
     public DbSet<clsItemPlanCargue> ItemsPlanCargue => Set<clsItemPlanCargue>();
     public DbSet<clsColocacionCargue> ColocacionesCargue => Set<clsColocacionCargue>();
@@ -208,6 +211,7 @@ public class clsNexoDbContext : DbContext
             e.Property(x => x.ValorAprovisionamiento).HasColumnType("decimal(18,2)");
             e.Property(x => x.HorasCargue).HasColumnType("decimal(6,2)");
             e.Property(x => x.HorasDescargue).HasColumnType("decimal(6,2)");
+            e.Property(x => x.IdRecomendacionVehiculo).HasMaxLength(64);
             e.HasOne(x => x.clsSolicitud)
              .WithMany(s => s.Lineas)
              .HasForeignKey(x => x.SolicitudId)
@@ -230,7 +234,11 @@ public class clsNexoDbContext : DbContext
             e.HasOne(x => x.DestinoMunicipio).WithMany().HasForeignKey(x => x.DestinoMunicipioId).OnDelete(DeleteBehavior.Restrict);
         });
 
-        b.Entity<clsConfiguracionVehiculo>(e => e.ToTable("tbl_configuraciones_vehiculo"));
+        b.Entity<clsConfiguracionVehiculo>(e =>
+        {
+            e.ToTable("tbl_configuraciones_vehiculo");
+            e.Property(x => x.EsCatalogoOficial).HasDefaultValue(false);
+        });
 
         b.Entity<clsTarifaHistorica>(e =>
         {
@@ -339,6 +347,21 @@ public class clsNexoDbContext : DbContext
             foreach (var p in new[] { "LargoInternoMm", "AnchoInternoMm", "AltoInternoMm", "CapacidadKg", "TaraKg",
                                        "PuertaAnchoMm", "PuertaAltoMm", "ToleranciaParedesMm", "ToleranciaEntreUnidadesMm" })
                 e.Property(p).HasColumnType("decimal(12,2)");
+        });
+
+        // S5-HU-18.5/#277: proyecciones del catálogo del Cubicador, mantenidas por eventos
+        // (clsMercanciaCatalogoConsumer/clsCarroceriaCatalogoConsumer) — Id es el string que
+        // asigna el Cubicador, no un Guid generado acá.
+        b.Entity<clsTipoMercanciaCatalogo>(e =>
+        {
+            e.ToTable("tbl_tipos_mercancia_catalogo");
+            e.HasKey(x => x.Id);
+        });
+
+        b.Entity<clsTipoCarroceriaCatalogo>(e =>
+        {
+            e.ToTable("tbl_tipos_carroceria_catalogo");
+            e.HasKey(x => x.Id);
         });
 
         b.Entity<clsPlanCargue>(e =>

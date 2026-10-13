@@ -119,6 +119,15 @@ public static class clsMensajeriaDependencyInjection
             x.AddConsumer<clsAlertaDeFalloConsumer<VehiculoCreado>>();
             x.AddConsumer<clsAlertaDeFalloConsumer<VehiculoActualizado>>();
 
+            // S5-HU-18.5/#277: catálogos de tipo de mercancía y tipo de carrocería, mismo
+            // puente, misma tubería que el catálogo de vehículos de arriba.
+            x.AddConsumer<clsMercanciaCatalogoConsumer>();
+            x.AddConsumer<clsAlertaDeFalloConsumer<MercanciaCreada>>();
+            x.AddConsumer<clsAlertaDeFalloConsumer<MercanciaActualizada>>();
+            x.AddConsumer<clsCarroceriaCatalogoConsumer>();
+            x.AddConsumer<clsAlertaDeFalloConsumer<CarroceriaCreada>>();
+            x.AddConsumer<clsAlertaDeFalloConsumer<CarroceriaActualizada>>();
+
             // Refresca el score persistido de las activas cuando la cadena de
             // priorización lo pide. La excepción sube: si esto deja de correr, los
             // reportes empiezan a mentir y hace falta que alguien se entere.
@@ -323,10 +332,74 @@ public static class clsMensajeriaDependencyInjection
                         e.ConfigureConsumer<clsVehiculoCatalogoConsumer>(contexto);
                     });
 
+                    // S5-HU-18.5/#277: mismo patrón de 3 endpoints por catálogo, x2
+                    // (mercancía/carrocería) — cada routing key necesita el suyo propio,
+                    // mismo motivo que el trío de vehículo de arriba.
+                    cfg.ReceiveEndpoint("Cubicacion.clsMercanciaCreada", (IRabbitMqReceiveEndpointConfigurator e) =>
+                    {
+                        e.ConfigureConsumeTopology = false;
+                        e.Bind("cubicador.eventos", b =>
+                        {
+                            b.ExchangeType = "topic";
+                            b.RoutingKey = "mercancia.creada";
+                        });
+                        e.ConfigureConsumer<clsMercanciaCatalogoConsumer>(contexto);
+                    });
+                    cfg.ReceiveEndpoint("Cubicacion.clsMercanciaActualizada", (IRabbitMqReceiveEndpointConfigurator e) =>
+                    {
+                        e.ConfigureConsumeTopology = false;
+                        e.Bind("cubicador.eventos", b =>
+                        {
+                            b.ExchangeType = "topic";
+                            b.RoutingKey = "mercancia.actualizada";
+                        });
+                        e.ConfigureConsumer<clsMercanciaCatalogoConsumer>(contexto);
+                    });
+                    cfg.ReceiveEndpoint("Cubicacion.clsMercanciaEliminada", (IRabbitMqReceiveEndpointConfigurator e) =>
+                    {
+                        e.ConfigureConsumeTopology = false;
+                        e.Bind("cubicador.eventos", b =>
+                        {
+                            b.ExchangeType = "topic";
+                            b.RoutingKey = "mercancia.eliminada";
+                        });
+                        e.ConfigureConsumer<clsMercanciaCatalogoConsumer>(contexto);
+                    });
+                    cfg.ReceiveEndpoint("Cubicacion.clsCarroceriaCreada", (IRabbitMqReceiveEndpointConfigurator e) =>
+                    {
+                        e.ConfigureConsumeTopology = false;
+                        e.Bind("cubicador.eventos", b =>
+                        {
+                            b.ExchangeType = "topic";
+                            b.RoutingKey = "carroceria.creada";
+                        });
+                        e.ConfigureConsumer<clsCarroceriaCatalogoConsumer>(contexto);
+                    });
+                    cfg.ReceiveEndpoint("Cubicacion.clsCarroceriaActualizada", (IRabbitMqReceiveEndpointConfigurator e) =>
+                    {
+                        e.ConfigureConsumeTopology = false;
+                        e.Bind("cubicador.eventos", b =>
+                        {
+                            b.ExchangeType = "topic";
+                            b.RoutingKey = "carroceria.actualizada";
+                        });
+                        e.ConfigureConsumer<clsCarroceriaCatalogoConsumer>(contexto);
+                    });
+                    cfg.ReceiveEndpoint("Cubicacion.clsCarroceriaEliminada", (IRabbitMqReceiveEndpointConfigurator e) =>
+                    {
+                        e.ConfigureConsumeTopology = false;
+                        e.Bind("cubicador.eventos", b =>
+                        {
+                            b.ExchangeType = "topic";
+                            b.RoutingKey = "carroceria.eliminada";
+                        });
+                        e.ConfigureConsumer<clsCarroceriaCatalogoConsumer>(contexto);
+                    });
+
                     Tuberia(
                         contexto, cfg,
                         typeof(clsPlanDeCargueGeneradoConsumer), typeof(clsCubicacionRechazadaConsumer),
-                        typeof(clsVehiculoCatalogoConsumer));
+                        typeof(clsVehiculoCatalogoConsumer), typeof(clsMercanciaCatalogoConsumer), typeof(clsCarroceriaCatalogoConsumer));
                 });
         });
 

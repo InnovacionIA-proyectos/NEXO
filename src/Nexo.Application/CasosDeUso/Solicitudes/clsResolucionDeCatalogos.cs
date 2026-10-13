@@ -69,7 +69,15 @@ public static class clsResolucionDeCatalogos
         return (ruta, true);
     }
 
-    /// <summary>Igual que <see cref="ResolverRuta"/>, pero para el vehículo (opcional: sin tipo, no hay nada que resolver).</summary>
+    /// <summary>
+    /// Igual que <see cref="ResolverRuta"/>, pero para el vehículo (opcional: sin tipo, no
+    /// hay nada que resolver). S5-HU-18.4/#276: una fila nueva SIEMPRE nace en cuarentena
+    /// (EsCatalogoOficial = false) — comparar texto normalizado no es suficiente para saber
+    /// si corresponde a un código canónico del Cubicador ("TMULA"/"T.MULA"/"Tractomula" no
+    /// calzan entre sí hoy, y adivinar la equivalencia aquí perpetuaría el mismo problema).
+    /// Esa decisión la toma un humano en la bandeja de normalización (S5-HU-19.3, fuera de
+    /// este repo) — este método deja de crear filas oficiales en silencio.
+    /// </summary>
     public static (clsConfiguracionVehiculo? Vehiculo, bool Creado) ResolverVehiculo(
         string? tipoVehiculo, string? carroceria,
         IDictionary<string, clsConfiguracionVehiculo> vehiculosPorClave, IConfiguracionesVehiculoPort catalogo)
@@ -79,7 +87,10 @@ public static class clsResolucionDeCatalogos
         var clave = ClaveVehiculo(tipoVehiculo, carroceria);
         if (vehiculosPorClave.TryGetValue(clave, out var vehiculo)) return (vehiculo, false);
 
-        vehiculo = new clsConfiguracionVehiculo { TipoVehiculo = Limpiar(tipoVehiculo)!, Carroceria = Limpiar(carroceria) };
+        vehiculo = new clsConfiguracionVehiculo
+        {
+            TipoVehiculo = Limpiar(tipoVehiculo)!, Carroceria = Limpiar(carroceria), EsCatalogoOficial = false,
+        };
         catalogo.Agregar(vehiculo);
         vehiculosPorClave[clave] = vehiculo;
         return (vehiculo, true);

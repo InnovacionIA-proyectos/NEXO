@@ -45,7 +45,10 @@ public sealed class clsCargarLineasBulkCommandHandler(
         // que ya tenga en CondicionesServicio, o 4h+4h si nunca se serializó — ver
         // clsCrearSolicitudCommand, que no guarda condiciones propias).
         var tiemposSolicitud = clsCondicionesServicioDto.Desde(s.CondicionesServicio).TiemposLogisticos!;
-        var nuevas = command.Lineas.Select(lr =>
+        // S5-HU-18.3/#275: numera en orden de este lote (1..N). Pensado para el caso
+        // común — un bulk sobre una solicitud recién creada, sin líneas previas — no
+        // continúa la numeración de un bulk anterior sobre la misma solicitud.
+        var nuevas = command.Lineas.Select((lr, i) =>
         {
             var (horasCargue, horasDescargue) = clsResolucionHorasLinea.Resolver(
                 lr.HorasCargue, lr.HorasDescargue, retornaContenedor: false,
@@ -60,6 +63,8 @@ public sealed class clsCargarLineasBulkCommandHandler(
                 ValorMercancia = lr.ValorMercancia,
                 HorasCargue = horasCargue,
                 HorasDescargue = horasDescargue,
+                GrupoRutaId = lr.GrupoRutaId,
+                NumeroLinea = i + 1,
             };
         }).ToList();
 

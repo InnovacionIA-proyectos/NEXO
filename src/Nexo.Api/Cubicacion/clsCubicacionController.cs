@@ -1,5 +1,6 @@
 using Nexo.Application.CasosDeUso.Cubicacion;
 using Nexo.Application.CasosDeUso.Cubicacion.DTOs;
+using Nexo.Application.Common;
 using Nexo.Application.Common.Abstractions;
 using Nexo.Application.Common.Exceptions;
 using Microsoft.AspNetCore.Authorization;
@@ -7,54 +8,78 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Nexo.Api.Cubicacion;
 
-public record clsItemCubicacionRequest(
-    string? Descripcion, int Cantidad, decimal LargoCm, decimal AnchoCm, decimal AltoCm,
-    decimal? PesoKg, string? TipoMercancia)
+public record clsMercanciaSolicitadaRequest(
+    string IdTipoMercancia, int Cantidad, decimal LargoCm, decimal AnchoCm, decimal AltoCm, decimal PesoKg)
 {
-    public clsItemCubicacionRapidaDto ADto() => new(Descripcion, Cantidad, LargoCm, AnchoCm, AltoCm, PesoKg, TipoMercancia);
+    public clsMercanciaSolicitadaInput ADto() => new(IdTipoMercancia, Cantidad, LargoCm, AnchoCm, AltoCm, PesoKg);
 }
 
 /// <summary>
-/// "Items" es obligatorio en negocio (400 ITEMS_REQUERIDOS si falta o viene vacío) pero
-/// se tipa como <c>IReadOnlyList&lt;...&gt;?</c> y no sin "?" a propósito: con Nullable
-/// Reference Types habilitado, [ApiController] trata un parámetro de body no-nullable
-/// como implícitamente [Required] y responde su propio 400 VALIDATION_ERROR genérico (en
-/// inglés, sin pasar por el método) antes de llegar a la validación explícita de abajo —
-/// mismo problema ya documentado y revertido en <see cref="Api.Solicitudes.clsCapturaSolicitudesController.Aprovisionamiento"/>.
-/// La validación explícita del controller se mantiene por eso.
+/// "Mercancias" es obligatorio en negocio (400 MERCANCIAS_REQUERIDAS si falta o viene
+/// vacío) pero se tipa como <c>IReadOnlyList&lt;...&gt;?</c> y no sin "?" a propósito: con
+/// Nullable Reference Types habilitado, [ApiController] trata un parámetro de body
+/// no-nullable como implícitamente [Required] y responde su propio 400 VALIDATION_ERROR
+/// genérico (en inglés, sin pasar por el método) antes de llegar a la validación explícita
+/// de abajo — mismo problema ya documentado y revertido en
+/// <see cref="Api.Solicitudes.clsCapturaSolicitudesController.Aprovisionamiento"/>.
 /// </summary>
-public record clsCubicarRequest(IReadOnlyList<clsItemCubicacionRequest>? Items, IReadOnlyList<string>? UnidadIds, string? ClaseViaje)
+public record clsCrearRecomendacionRequest(
+    string IdLineaSolicitud, IReadOnlyList<clsMercanciaSolicitadaRequest>? Mercancias, string? ClaseViajeSeleccionada)
 {
-    public clsCubicacionRapidaSolicitud ASolicitud() => new(Items!.Select(i => i.ADto()).ToList(), UnidadIds, ClaseViaje);
+    public clsCrearRecomendacionInput ASolicitud(string? usuarioId) =>
+        new(IdLineaSolicitud, Mercancias!.Select(m => m.ADto()).ToList(), ClaseViajeSeleccionada, usuarioId);
 }
 
 /// <summary>
-/// Reemplaza el POST que <c>cubicar()</c>
-/// (<c>captura-api.service.ts</c>, usado por <c>captura-page</c> y <c>mesa-costeo-page</c>)
-/// hacía directo contra Cubicador con la clave compartida. Mismos roles que el resto de
-/// Cubicación porque las dos pantallas que lo usan pertenecen a Comercial (captura) y a
-/// Coordinación de Fletes (mesa de costeo).
+/// S5-HU-18.1/#273: reemplaza por completo al contrato viejo de <c>cubicar()</c>
+/// (<c>captura-api.service.ts</c>, usado por <c>captura-page</c> y <c>mesa-costeo-page</c>).
+/// Mismos roles que el resto de Cubicación porque las dos pantallas que lo usan pertenecen
+/// a Comercial (captura) y a Coordinación de Fletes (mesa de costeo).
 /// </summary>
 [ApiController]
 [Route("api/cubicacion")]
-public class clsCubicacionController(IQueryHandler<clsCubicarRapidoQuery, clsCubicacionRapidaResultado> cubicar) : ControllerBase
+public class clsCubicacionController(
+    ICommandHandler<clsCrearRecomendacionCommand, clsRecomendacionDto> crear,
+    IQueryHandler<clsConsultarRecomendacionQuery, clsRecomendacionDto> consultar,
+    ICurrentUserPort usuarioActual) : ControllerBase
 {
     /// <summary>
-    /// Cubicación rápida sin persistencia: dado un conjunto de ítems, devuelve de una vez
-    /// las matrices de evaluación por unidad y la sugerencia de vehículo/flota — igual que
-    /// hoy responde Cubicador, solo que por NEXO. Ver <see cref="Application.CasosDeUso.Cubicacion.Interfaces.ICubicacionRapidaPort"/>
-    /// para por qué esta es la única llamada HTTP saliente hacia Cubicador del sistema.
+    /// Pide al Cubicador una recomendación de flota para una línea — reemplaza la
+    /// cubicación rápida sin persistencia de antes. <c>SIN_SELECCION_AUTOMATICA</c> y
+    /// <c>condicionada</c> son resultados normales de esta llamada, NO errores: siguen
+    /// devolviendo 200, con el detalle dentro de <c>resultado</c>/<c>motivoSinSeleccion</c>.
     /// </summary>
     [Authorize(Roles = "Comercial,CoordinadorFletes,Admin")]
     [HttpPost]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
-    public async Task<ActionResult<clsCubicacionRapidaResultado>> Cubicar([FromBody] clsCubicarRequest body, CancellationToken ct = default)
+    public async Task<ActionResult<clsRecomendacionDto>> Crear([FromBody] clsCrearRecomendacionRequest body, CancellationToken ct = default)
     {
-        if (body.Items is null || body.Items.Count == 0)
-            throw new clsValidationFailedException("ITEMS_REQUERIDOS", "Debe indicar al menos un ítem para cubicar.");
+        if (body.Mercancias is null || body.Mercancias.Count == 0)
+            throw new clsValidationFailedException("MERCANCIAS_REQUERIDAS", "La solicitud no trae ninguna mercancía.");
 
-        return Ok(await cubicar.Handle(new clsCubicarRapidoQuery(body.ASolicitud()), ct));
+        var solicitud = body.ASolicitud(usuarioActual.Id.ToString());
+        return Ok(await crear.Handle(new clsCrearRecomendacionCommand(solicitud), ct));
+    }
+
+    /// <summary>
+    /// Reconsulta la última recomendación de una línea. <paramref name="origenSistema"/> es
+    /// obligatorio: un mismo código de línea puede existir tanto en NEXO como en Cotifly,
+    /// como rutas distintas, y no se infiere del llamante.
+    /// </summary>
+    [Authorize(Roles = "Comercial,CoordinadorFletes,Admin")]
+    [HttpGet]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
+    public async Task<ActionResult<clsRecomendacionDto>> Consultar(
+        [FromQuery] string? idLineaSolicitud, [FromQuery] string? origenSistema, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(idLineaSolicitud) || string.IsNullOrWhiteSpace(origenSistema))
+            throw new clsValidationFailedException(
+                "PARAMETROS_REQUERIDOS", "idLineaSolicitud y origenSistema son obligatorios.");
+
+        return Ok(await consultar.Handle(new clsConsultarRecomendacionQuery(idLineaSolicitud, origenSistema), ct));
     }
 }

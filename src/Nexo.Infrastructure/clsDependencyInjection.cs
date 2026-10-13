@@ -265,23 +265,26 @@ public static class clsDependencyInjection
         // Puente de solo lectura hacia Solicitudes para el Cubicador (crear-desde-línea).
         services.AddScoped<ILineaSolicitudCubicacionPort, clsLineaSolicitudCubicacionAdapter>();
 
-        // cubicar() (captura-api.service.ts): único método de
-        // Cubicación sin cola ni proyección posibles (cálculo puro, sin persistencia) — ver
+        // POST/GET /recomendaciones (S5-HU-18.1/#273, reemplaza al retirado POST
+        // /api/cubicacion): único tramo de Cubicación sin cola ni proyección posibles — ver
         // ICubicacionRapidaPort para por qué esto SÍ es una llamada HTTP saliente, a
-        // diferencia de todo lo demás de este módulo. Sin las dos claves configuradas, se
-        // registra el adapter "no configurado" (503 accionable) en vez de fallar la DI —
-        // mismo criterio que BibliotecaSicetac/SapHistorico más arriba.
+        // diferencia de todo lo demás de este módulo. RecomendacionesApiKey es la llave
+        // DEDICADA de NEXO para este contrato (equivalente a CUBICADOR_API_KEY_NEXO del
+        // lado del Cubicador) — la OutboundApiKey genérica del contrato viejo ya no sirve
+        // acá. Sin las dos claves configuradas, se registra el adapter "no configurado"
+        // (503 accionable) en vez de fallar la DI — mismo criterio que
+        // BibliotecaSicetac/SapHistorico más arriba.
         var cubicadorOutboundBaseUrl = config["Cubicador3D:OutboundBaseUrl"];
-        var cubicadorOutboundApiKey = config["Cubicador3D:OutboundApiKey"];
-        if (!string.IsNullOrWhiteSpace(cubicadorOutboundBaseUrl) && !string.IsNullOrWhiteSpace(cubicadorOutboundApiKey))
+        var cubicadorRecomendacionesApiKey = config["Cubicador3D:RecomendacionesApiKey"];
+        if (!string.IsNullOrWhiteSpace(cubicadorOutboundBaseUrl) && !string.IsNullOrWhiteSpace(cubicadorRecomendacionesApiKey))
         {
             services.AddHttpClient<ICubicacionRapidaPort, clsCubicacionRapidaAdapter>(cliente =>
             {
                 cliente.BaseAddress = new Uri(cubicadorOutboundBaseUrl.TrimEnd('/') + "/");
-                cliente.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", cubicadorOutboundApiKey);
-                // Cálculo en memoria del lado de Cubicador, sin I/O de base de datos: si
-                // tarda más que esto, conviene que la pantalla se entere pronto en vez de
-                // dejar al usuario mirando un spinner.
+                cliente.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", cubicadorRecomendacionesApiKey);
+                // Cálculo en memoria del lado de Cubicador, sin I/O de base de datos (salvo
+                // el insert append-only de la corrida): si tarda más que esto, conviene que
+                // la pantalla se entere pronto en vez de dejar al usuario mirando un spinner.
                 cliente.Timeout = TimeSpan.FromSeconds(
                     int.TryParse(config["Cubicador3D:OutboundTimeoutSegundos"], out var s) ? Math.Clamp(s, 5, 60) : 15);
             });
@@ -289,6 +292,27 @@ public static class clsDependencyInjection
         else
         {
             services.AddScoped<ICubicacionRapidaPort, clsCubicacionRapidaNoConfiguradoAdapter>();
+        }
+
+        // S5-HU-18.6/#278: passthrough de los seis CRUD de catálogo del Cubicador
+        // (cubicador/CONTRATO.md §3.2). OutboundApiKey es la llave GENÉRICA
+        // (CUBICADOR_API_KEY del lado del Cubicador, que `verificar_api_key` valida para
+        // estos endpoints) — distinta de RecomendacionesApiKey, que es solo para
+        // /recomendaciones. Mismo criterio de "adapter no configurado" que arriba.
+        var cubicadorOutboundApiKey = config["Cubicador3D:OutboundApiKey"];
+        if (!string.IsNullOrWhiteSpace(cubicadorOutboundBaseUrl) && !string.IsNullOrWhiteSpace(cubicadorOutboundApiKey))
+        {
+            services.AddHttpClient<ICubicadorCatalogoPort, clsCubicadorCatalogoAdapter>(cliente =>
+            {
+                cliente.BaseAddress = new Uri(cubicadorOutboundBaseUrl.TrimEnd('/') + "/");
+                cliente.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", cubicadorOutboundApiKey);
+                cliente.Timeout = TimeSpan.FromSeconds(
+                    int.TryParse(config["Cubicador3D:OutboundTimeoutSegundos"], out var s2) ? Math.Clamp(s2, 5, 60) : 15);
+            });
+        }
+        else
+        {
+            services.AddScoped<ICubicadorCatalogoPort, clsCubicadorCatalogoNoConfiguradoAdapter>();
         }
 
         return services;

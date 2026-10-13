@@ -6,28 +6,44 @@ using Moq;
 namespace Nexo.Application.Tests.Cubicacion;
 
 /// <summary>
-/// [S3-HU-04.3, issue #78] El handler es un passthrough deliberado: cálculo puro sin
-/// persistencia, nada que este caso de uso deba validar o transformar — toda la lógica
-/// (y la excepción HTTP declarada) vive en <see cref="ICubicacionRapidaPort"/>.
+/// S5-HU-18.1/#273: los dos handlers son passthrough deliberado hacia
+/// <see cref="ICubicacionRapidaPort"/> — nada que este caso de uso deba validar o
+/// transformar, toda la lógica (y la traducción de errores) vive en el adaptador.
 /// </summary>
 public class clsCubicarRapidoQueryHandlerTests
 {
     private readonly Mock<ICubicacionRapidaPort> _puerto = new();
 
-    private static clsCubicacionRapidaSolicitud clsSolicitud() => new(
-        [new clsItemCubicacionRapidaDto("Caja", 1, 100, 80, 60, 50, null)], ["furgon-3-5"], "cupo");
+    private static clsCrearRecomendacionInput clsSolicitud() => new(
+        "LIN-001", [new clsMercanciaSolicitadaInput("tipo-1", 1, 100, 80, 60, 50)], "cupo", "usuario-1");
+
+    private static clsRecomendacionDto clsRespuesta() => new(
+        "REC-1", "LIN-001", "NEXO", "ASIGNADO", null, false, [], [], [], null);
 
     [Fact]
-    public async Task Delega_la_solicitud_al_puerto_sin_modificarla()
+    public async Task Crear_delega_la_solicitud_al_puerto_sin_modificarla()
     {
         var solicitud = clsSolicitud();
-        var resultado = new clsCubicacionRapidaResultado([], null, [], null, null);
-        _puerto.Setup(p => p.EvaluarAsync(solicitud, It.IsAny<CancellationToken>())).ReturnsAsync(resultado);
+        var respuesta = clsRespuesta();
+        _puerto.Setup(p => p.CrearAsync(solicitud, It.IsAny<CancellationToken>())).ReturnsAsync(respuesta);
 
-        var handler = new clsCubicarRapidoQueryHandler(_puerto.Object);
-        var r = await handler.Handle(new clsCubicarRapidoQuery(solicitud));
+        var handler = new clsCrearRecomendacionCommandHandler(_puerto.Object);
+        var r = await handler.Handle(new clsCrearRecomendacionCommand(solicitud));
 
-        Assert.Same(resultado, r);
-        _puerto.Verify(p => p.EvaluarAsync(solicitud, It.IsAny<CancellationToken>()), Times.Once);
+        Assert.Same(respuesta, r);
+        _puerto.Verify(p => p.CrearAsync(solicitud, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Consultar_delega_idLineaSolicitud_y_origenSistema_al_puerto()
+    {
+        var respuesta = clsRespuesta();
+        _puerto.Setup(p => p.ConsultarAsync("LIN-001", "COTIFLY", It.IsAny<CancellationToken>())).ReturnsAsync(respuesta);
+
+        var handler = new clsConsultarRecomendacionQueryHandler(_puerto.Object);
+        var r = await handler.Handle(new clsConsultarRecomendacionQuery("LIN-001", "COTIFLY"));
+
+        Assert.Same(respuesta, r);
+        _puerto.Verify(p => p.ConsultarAsync("LIN-001", "COTIFLY", It.IsAny<CancellationToken>()), Times.Once);
     }
 }

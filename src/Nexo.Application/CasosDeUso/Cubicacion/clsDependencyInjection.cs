@@ -7,5 +7,6 @@ namespace Nexo.Application.CasosDeUso.Cubicacion;
 public static class clsDependencyInjection
 {
     public static IServiceCollection AddCubicacionUseCases(this IServiceCollection services) => services
-        .AddScoped<IQueryHandler<clsCubicarRapidoQuery, clsCubicacionRapidaResultado>, clsCubicarRapidoQueryHandler>();
+        .AddScoped<ICommandHandler<clsCrearRecomendacionCommand, clsRecomendacionDto>, clsCrearRecomendacionCommandHandler>()
+        .AddScoped<IQueryHandler<clsConsultarRecomendacionQuery, clsRecomendacionDto>, clsConsultarRecomendacionQueryHandler>();
 }

@@ -108,6 +108,22 @@ public class clsCapturaLineaRequest
 
     [MaxLength(200, ErrorMessage = "Una línea admite máximo 200 posiciones.")]
     public List<clsCapturaPosicionRequest>? Posiciones { get; set; }
+
+    /// <summary>
+    /// S5-HU-18.3/#275: id de la ruta que agrupa esta línea con las demás de la misma
+    /// carga heterogénea (un camión por línea). SIEMPRE lo manda Cotifly — null si la
+    /// línea nace directo en NEXO (formulario manual, Excel).
+    /// </summary>
+    public Guid? GrupoRutaId { get; set; }
+
+    /// <summary>
+    /// S5-HU-18.2/#274: id de la recomendación de vehículo del Cubicador que se usó para
+    /// capturar esta línea (idRecomendacionVehiculo de POST /api/cubicacion) — permite
+    /// cruzar lo recomendado contra lo realmente despachado más adelante. Null si la línea
+    /// se capturó sin pasar por el Cubicador.
+    /// </summary>
+    [MaxLength(64)]
+    public string? IdRecomendacionVehiculo { get; set; }
 }
 
 /// <summary>
@@ -149,4 +165,14 @@ public class clsCapturaPosicionRequest
 
     [Range(typeof(decimal), "0", "999999.99", ParseLimitsInInvariantCulture = true)]
     public decimal? PesoKg { get; set; }
+
+    /// <summary>
+    /// S5-HU-18.2/#274: código del tipo de mercancía (tbl_tipos_mercancia.CodigoMercancia,
+    /// NO el uuid) para ESTA posición — se guarda el código porque es estable, sobrevive un
+    /// reseed del catálogo y es legible en logs. Null = tipo desconocido; no se asigna un
+    /// default (el tipo mueve la carrocería elegida, un default silencioso produciría una
+    /// recomendación con apariencia correcta pero mal fundamentada).
+    /// </summary>
+    [MaxLength(40)]
+    public string? CodigoTipoMercancia { get; set; }
 }

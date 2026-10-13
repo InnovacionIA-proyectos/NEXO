@@ -44,6 +44,15 @@ public class clsConfiguracionVehiculo : IAuditable
     [MaxLength(50)]
     public string? RangoPeso { get; set; }
 
+    /// <summary>
+    /// S5-HU-18.4/#276: true cuando esta fila corresponde a uno de los códigos canónicos
+    /// del Cubicador (2L2, C2, C3, 2S2, 3S3). ResolverVehiculo ya NO crea filas oficiales
+    /// en silencio — toda fila nueva nace en false (en cuarentena), fuera de cualquier
+    /// desplegable de selección, hasta que alguien la mapee a un código canónico o la
+    /// descarte (pantalla de normalización, S5-HU-19.3, fuera de este repo).
+    /// </summary>
+    public bool EsCatalogoOficial { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 }

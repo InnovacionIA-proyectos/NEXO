@@ -314,6 +314,7 @@ interface CatalogoLineaResueltoDto {             // respuesta de resolver-catalo
 interface PosicionCargaDto {                     // pieza/bulto, dimensiones en CENTÍMETROS
   descripcion: string | null; cantidad: number
   largoCm: Decimal; anchoCm: Decimal; altoCm: Decimal; pesoKg: Decimal | null
+  codigoTipoMercancia: string | null             // S5-HU-18.2/#274: código (no uuid) de tbl_tipos_mercancia; null = tipo desconocido, sin default
 }
 interface PisoSicetacDto {
   id: UUID; valorPiso: Decimal; valorHora: Decimal | null; horasPactadas: Decimal | null
@@ -325,6 +326,9 @@ interface LineaCosteoDto {
   lineaId: UUID; rutaId: UUID | null; ruta: string | null; tipologia: TipologiaCarga | null
   peso: Decimal | null; tipoVehiculo: string | null; carroceria: string | null
   posiciones: PosicionCargaDto[]; pisoSicetac: PisoSicetacDto | null; historicas: HistoricaSugeridaDto[]
+  horasCargue: Decimal | null; horasDescargue: Decimal | null   // #251, horas EFECTIVAS con las que se costeó
+  grupoRutaId: UUID | null         // S5-HU-18.3/#275: lo pone SIEMPRE Cotifly, agrupa líneas de una misma ruta heterogénea
+  idRecomendacionVehiculo: string | null  // S5-HU-18.2/#274: recomendación del Cubicador usada para esta línea
 }
 interface TiemposLogisticosDto { horasCargue: Decimal; horasDescargue: Decimal }
 interface SolicitudCosteoDto { solicitud: SolicitudDto; tiempos: TiemposLogisticosDto; lineas: LineaCosteoDto[] }
@@ -473,17 +477,41 @@ interface VehiculoCubicacionDto {
   esPreset: boolean
 }
 interface LineaParaCubicacionDto { lineaId: UUID; posiciones: PosicionCargaDto[]; origen: string | null; destino: string | null }
-interface CubicacionRapidaResultado {
-  matrices: object[]                 // matriz de evaluación por unidad
-  sugerencia: object | null          // vehículo sugerido
-  advertencias: string[]
-  sugerenciaFlota: object | null
-  extradimension: object | null
+// posiciones[].codigoTipoMercancia viaja igual que en PosicionCargaDto (arriba) — null en líneas capturadas antes de S5-HU-18.2/#274.
+
+// S5-HU-18.1/#273: espejo 1:1 de POST/GET /recomendaciones del Cubicador
+// (cubicador/CONTRATO.md §3.1). Ver §3.14 más abajo para el detalle operativo.
+interface MercanciaSolicitadaInput {
+  idTipoMercancia: string; cantidad: number           // >= 1
+  largoCm: Decimal; anchoCm: Decimal; altoCm: Decimal; pesoKg: Decimal   // por unidad, > 0
 }
-// ResultadoPlanDto (resultado/exportar), ColocacionCargueDto y MetricasCubicacion:
-// shape completo en Nexo.Application/CasosDeUso/PlanDeCargue/DTOs/PlanCargueDtos.cs y
-// Nexo.Application/CasosDeUso/Cubicacion/DTOs/CubicacionRapidaDtos.cs; espejan 1:1 lo
-// documentado en cubicador/CONTRATO.md §3.2.
+interface CrearRecomendacionInput {
+  idLineaSolicitud: string; mercancias: MercanciaSolicitadaInput[]
+  claseViajeSeleccionada: string | null
+}
+interface MercanciaDeVehiculoDto { idTipoMercancia: string; codigoMercancia: string; cantidad: number; pesoKg: Decimal; volumenM3: Decimal }
+interface VehiculoRecomendadoDto {               // TODOS obligatorios y nunca null cuando resultado = "ASIGNADO"
+  idRecomendacionVehiculo: string; numeroVehiculo: number
+  codigoVehiculo: string; nombreVehiculo: string; codigoCarroceria: string
+  pesoTotalKg: Decimal; volumenTotalM3: Decimal
+  porcentajeLlenadoVolumen: Decimal; porcentajeLlenadoPeso: Decimal      // dos porcentajes, no uno
+  alertaBajoLlenado: boolean; heterogenea: boolean
+  mercancias: MercanciaDeVehiculoDto[]
+}
+interface MedidasEstandarDto { largoMaxCm: Decimal; anchoMaxCm: Decimal; altoMaxCm: Decimal; pesoMaxKg: Decimal }
+interface PiezaFueraDeMedidaDto { idTipoMercancia: string; codigoMercancia: string; excesos: string[] }
+interface ExtradimensionDto { hayExtradimension: boolean; medidasEstandar: MedidasEstandarDto; piezas: PiezaFueraDeMedidaDto[] }
+interface RecomendacionDto {
+  idRecomendacion: string; idLineaSolicitud: string; origenSistema: string
+  resultado: "ASIGNADO" | "SIN_SELECCION_AUTOMATICA"          // ambos con 200 — no son error
+  motivoSinSeleccion: "EXTRADIMENSIONADO" | "SIN_CANDIDATOS_DIMENSIONALES" | "SUPERA_K_MAX"
+    | "SIN_CARROCERIA_COMPATIBLE" | "BUSQUEDA_AGOTADA" | null     // null cuando resultado = ASIGNADO
+  condicionada: boolean; mercanciasCondicionadas: string[]
+  vehiculos: VehiculoRecomendadoDto[]; advertencias: string[]
+  extradimension: ExtradimensionDto | null
+}
+// IDs en MAYÚSCULAS (uniqueidentifier de SQL Server). Las decimales viajan como
+// números JSON (no strings): 2 decimales en dinero/volumen, 1 en porcentajes.
 
 interface TipoVehiculoDto { codigo: string; descripcion: string; esCatalogoOficial: boolean } // false = los 5 casos especiales sin código SAP (§3.19)
 interface LineaNegocioDto { id: number; descripcion: string }
@@ -570,6 +598,7 @@ Formato de cada endpoint:
 | `valorMercancia` | *opcional* | decimal | monetario |
 | `horasCargue` | *opcional* | decimal | S5-HU-17/#263. 0–240. Antes se descartaba en silencio |
 | `horasDescargue` | *opcional* | decimal | S5-HU-17/#263. 0–240. Antes se descartaba en silencio |
+| `grupoRutaId` | *opcional* | UUID | S5-HU-18.3/#275. Lo pone SIEMPRE Cotifly — NEXO solo lo guarda tal cual |
 
 Sin horas propias, la línea usa las de la solicitud (`CondicionesServicio`, 4h+4h
 si nunca se guardaron condiciones) — mismo criterio que `clsCapturaLineaRequest`
@@ -669,6 +698,8 @@ Resuelve o crea rutas y vehículos a partir del texto libre de las líneas.
 | `valorAprovisionamiento` | *opcional* | decimal | monetario |
 | `valorMercancia` | *opcional* | decimal | monetario |
 | `posiciones` | *opcional* | array | máx. 200 por línea |
+| `grupoRutaId` | *opcional* | UUID | S5-HU-18.3/#275. Lo pone SIEMPRE Cotifly (agrupa líneas de una misma carga heterogénea) — null si la línea nace en NEXO |
+| `idRecomendacionVehiculo` | *opcional* | string | máx. 64. S5-HU-18.2/#274. `idRecomendacionVehiculo` de `POST /api/cubicacion` (§1.2) si esta línea se capturó a partir de una cubicación |
 
 | Cada posición | | Tipo | Restricción |
 |---|---|---|---|
@@ -676,6 +707,7 @@ Resuelve o crea rutas y vehículos a partir del texto libre de las líneas.
 | `cantidad` | *opcional* | int | 1–100000, def. 1 |
 | `descripcion` | *opcional* | string | máx. 200 |
 | `pesoKg` | *opcional* | decimal | 0–999999.99 (peso unitario) |
+| `codigoTipoMercancia` | *opcional* | string | máx. 40. S5-HU-18.2/#274. Código (no uuid) de `tbl_tipos_mercancia` — null = tipo desconocido, sin default asignado |
 
 Regla de peso: el peso de la línea es `peso` si viene; si no, la suma de
 `cantidad × pesoKg` de las posiciones. Debe ser > 0. Si vienen ambos, deben
@@ -1135,36 +1167,111 @@ el mundo (ver
 - **→** `200 ParametrosScoreDto`. No espera el recálculo (corre aparte).
 - **Errores**: `400 PARAMETROS_SCORE_INVALIDOS` (el `message` lista todos los motivos)
 
-### 3.14 Cubicación rápida — `/api/cubicacion`
+### 3.14 Cubicación — `/api/cubicacion`
 
-#### `POST /api/cubicacion`
-Cubicación sin persistencia: matrices por unidad y sugerencia de
-vehículo/flota. Es la única llamada HTTP síncrona de NEXO hacia el Cubicador.
+S5-HU-18.1/#273: consume el contrato nuevo del Cubicador
+(`POST/GET /recomendaciones`, cubicador/CONTRATO.md §3.1) — reemplaza por
+completo al viejo `POST /api/cubicacion` (cálculo sin persistencia, matrices
+por unidad). **No hay convivencia de los dos contratos**: el Cubicador retiró
+su `POST /api/cubicacion` en el mismo corte. Es la única llamada HTTP síncrona
+de NEXO hacia el Cubicador — ver `ICubicacionRapidaPort` para el porqué.
+
+#### `POST /api/cubicacion` — crear recomendación
+Pide al Cubicador una recomendación de flota para una línea. A diferencia del
+contrato viejo, **SÍ persiste** del lado del Cubicador (append-only: cada
+corrida queda guardada, reconsultable con el GET de abajo).
 
 - **Roles**: `Comercial`, `CoordinadorFletes`, `Admin`.
+- `usuarioId` del contrato del Cubicador lo pone NEXO automáticamente (el id
+  del usuario autenticado) — no es un campo del body.
 
 | Body | | Tipo | Restricción |
 |---|---|---|---|
-| `items` | **requerido** | array | mínimo 1 |
-| `unidadIds` | *opcional* | string[] | limitar la evaluación a esas unidades |
-| `claseViaje` | *opcional* | string | |
+| `idLineaSolicitud` | **requerido** | string | |
+| `mercancias` | **requerido** | array | mínimo 1 |
+| `claseViajeSeleccionada` | *opcional* | string | preferencia de clase de viaje |
 
-| Cada item | | Tipo | Restricción |
+| Cada mercancía | | Tipo | Restricción |
 |---|---|---|---|
-| `cantidad` | **requerido** | int | > 0 (lo valida el Cubicador) |
-| `largoCm`, `anchoCm`, `altoCm` | **requerido** | decimal | > 0 (lo valida el Cubicador) |
-| `descripcion` | *opcional* | string | |
-| `pesoKg` | *opcional* | decimal | |
-| `tipoMercancia` | *opcional* | string | |
+| `idTipoMercancia` | **requerido** | string | el `id` (NO el código) de `GET /tipos-mercancia` del Cubicador |
+| `cantidad` | **requerido** | int | ≥ 1 |
+| `largoCm`, `anchoCm`, `altoCm`, `pesoKg` | **requerido** | decimal | > 0, por unidad |
 
-- **→** `200 CubicacionRapidaResultado`
-- **Errores**: `400 ITEMS_REQUERIDOS` · `503 CUBICACION_RAPIDA_NO_CONFIGURADA` · `503 CUBICADOR_NO_DISPONIBLE` · `503 CUBICADOR_RESPUESTA_VACIA` · `503 CUBICADOR_CREDENCIAL_INVALIDA` · `503 CUBICADOR_ERROR`
+- **→** `200 RecomendacionDto` (ver §2, arriba). `resultado: "SIN_SELECCION_AUTOMATICA"`,
+  `condicionada: true` y `extradimension` no-null son RESULTADOS normales con
+  200, no errores.
+- **Errores**: `400 MERCANCIAS_REQUERIDAS` · `400 MERCANCIA_DESCONOCIDA` ·
+  `400 MERCANCIA_NO_CUBICABLE` · `400 DIMENSIONES_INVALIDAS` ·
+  `400 CUBICACION_DEMASIADO_GRANDE` (> 10.000 unidades) ·
+  `503 CUBICACION_RAPIDA_NO_CONFIGURADA` · `503 CUBICADOR_NO_DISPONIBLE` ·
+  `503 CUBICADOR_RESPUESTA_VACIA` · `503 CUBICADOR_CREDENCIAL_INVALIDA` ·
+  `503 CUBICADOR_ERROR`. Los códigos 400 son los que manda el Cubicador tal
+  cual (catálogo existente, sección 2.6 de su hoja de ruta) — NEXO no los
+  reemplaza por uno propio.
+
+#### `GET /api/cubicacion` — reconsultar
+La última recomendación de una línea.
+
+- **Roles**: `Comercial`, `CoordinadorFletes`, `Admin`.
+
+| Query | | Tipo | Restricción |
+|---|---|---|---|
+| `idLineaSolicitud` | **requerido** | string | |
+| `origenSistema` | **requerido** | string | `NEXO` \| `COTIFLY`. NO se infiere — un mismo código de línea puede existir en los dos sistemas, como rutas distintas |
+
+- **→** `200 RecomendacionDto`
+- **Errores**: `400 PARAMETROS_REQUERIDOS` · mismos 503 que el POST
 
 #### `GET /api/lineas-solicitud/{id}/cubicacion` — solo servicio a servicio
 - **Auth**: `Authorization: Bearer <clave de servicio>` (§1.2). No acepta la
   identidad del portal. **No es para el frontend.**
 - **→** `200 LineaParaCubicacionDto`
 - **Errores**: `401 NO_AUTORIZADO` · `404 LINEA_NO_ENCONTRADA`
+
+### 3.14.1 Passthrough de catálogo del Cubicador
+
+S5-HU-18.6/#278: seis controllers delgados que espejan los seis CRUD de
+catálogo del Cubicador (cubicador/CONTRATO.md §3.2) y aplican el rol — el
+portal nunca llama directo al Cubicador (no hay CORS, la llave terminaría en
+el bundle, y ese Bearer autoriza un backend, no una persona). **No es un
+proxy genérico** (`/{*path}`): cada ruta/verbo se declara a mano, así se
+puede aplicar rol por endpoint y el contrato queda visible en Swagger.
+
+Diseño deliberadamente "tonto": el `body` se reenvía tal cual (sin DTOs
+tipados campo a campo — NEXO no necesita entender el contenido, solo
+reenviarlo), salvo que SIEMPRE se le estampa `usuarioId` con el id del
+usuario **autenticado**, nunca el que mande el cliente en el body.
+
+| Método | Ruta en NEXO | Ruta en el Cubicador |
+|---|---|---|
+| `GET` `PUT` | `/api/parametros-motor`, `/api/parametros-motor/{clave}` | `/parametros-motor` |
+| `GET` `POST` `PUT` `DELETE` | `/api/categorias-mercancia[/{id}]` | `/categorias-mercancia` |
+| `GET` `POST` `PUT` `DELETE` `POST .../republicar-catalogo` | `/api/tipos-carroceria[/{id}]` | `/tipos-carroceria` |
+| `GET` `POST` `PUT` `DELETE` `POST .../republicar-catalogo` | `/api/tipos-mercancia[/{id}]` | `/tipos-mercancia` |
+| `GET` `POST` `PUT` `DELETE` `POST .../republicar-catalogo` | `/api/vehiculos-catalogo[/{id}]` | `/vehiculos-catalogo` |
+| `GET` `POST` `DELETE` (sin `PUT`) | `/api/reglas-incompatibilidad[/{id}]` | `/reglas-incompatibilidad` |
+
+- **Roles de lectura** (`GET`): `[Authorize]` sin rol específico — mismo
+  criterio que el resto de las lecturas propias de NEXO.
+- **Roles de escritura** (`POST`/`PUT`/`DELETE`): `AdminTarifas`, `Admin` —
+  no existe `AdminFletes`; `AdminTarifas` ya administra Reglas Solo-SICETAC y
+  Tarifas de Plaza, encaja con este catálogo.
+- **`DELETE` lleva body** (`{ version, usuarioId }`) — igual de destructivo
+  pisar una fila que borrar una que cambió desde que se leyó. `HttpClient` no
+  manda body en `DeleteAsync`; el adaptador arma el `HttpRequestMessage` a
+  mano.
+- **Concurrencia optimista**: todo `GET` devuelve `version`; `PUT`/`DELETE`
+  la exigen. Si cambió, el Cubicador responde `409 CONFLICTO_DE_VERSION` con
+  un mensaje ya pensado para mostrarse al usuario del portal tal cual
+  ("El registro cambió desde que se cargó. Volver a leerlo y reintentar.") —
+  NEXO lo propaga sin tocarlo.
+- **Errores**: el código REAL que manda el Cubicador se propaga tal cual
+  (catálogo completo en cubicador/CONTRATO.md §4), más los `503` propios del
+  adaptador: `CATALOGO_CUBICADOR_NO_CONFIGURADO` · `CUBICADOR_NO_DISPONIBLE` ·
+  `CUBICADOR_CREDENCIAL_INVALIDA` · `CUBICADOR_ERROR`.
+- Shape exacto de cada catálogo (campos de creación/edición, cuáles son
+  obligatorios): `cubicador/docs/openapi.json` y cubicador/CONTRATO.md §3.2 —
+  NEXO no los redefine, los reenvía.
 
 ### 3.15 Plan de cargue (cubicación 3D) — `/api/planes-cargue`
 
@@ -1478,6 +1585,7 @@ abiertos a los 6 roles.
 | `DELETE /api/vehiculos/{id}` | | | | | | ✅ |
 | `/api/pesos` (todo, incluido `GET`) | | | ✅ | | | ✅ |
 | `/api/tarifas-plaza` (todo, incluido `GET`) | | | ✅ | | | ✅ |
+| Escrituras de los 6 passthrough de catálogo (§3.14.1) | | | ✅ | | | ✅ |
 
 ---
 

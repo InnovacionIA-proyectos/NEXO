@@ -206,4 +206,59 @@ public class clsCargarLineasBulkCommandTests
         Assert.Equal(8m, linea.HorasCargue);
         Assert.Equal(3m, linea.HorasDescargue);
     }
+
+    // S5-HU-18.3/#275: GrupoRutaId lo pone SIEMPRE Cotifly — este handler solo lo guarda
+    // tal cual, nunca lo calcula.
+    [Fact]
+    public async Task Linea_con_GrupoRutaId_lo_guarda_tal_cual()
+    {
+        var solicitudId = Guid.NewGuid();
+        var grupoRutaId = Guid.NewGuid();
+        _solicitudes.Setup(r => r.ObtenerBasicoAsync(solicitudId, default))
+            .ReturnsAsync(new clsSolicitud { Id = solicitudId, Estado = EstadoSolicitud.Pendiente });
+
+        List<clsLineaSolicitud>? guardadas = null;
+        _solicitudes.Setup(r => r.AgregarLineas(It.IsAny<IEnumerable<clsLineaSolicitud>>()))
+            .Callback<IEnumerable<clsLineaSolicitud>>(ls => guardadas = ls.ToList());
+
+        var comando = new clsCargarLineasBulkCommand(solicitudId,
+            [new clsCrearLineaInput(Guid.NewGuid(), Guid.NewGuid(), null, 1000m, null, GrupoRutaId: grupoRutaId)]);
+        await Handler().Handle(comando);
+
+        Assert.Equal(grupoRutaId, Assert.Single(guardadas!).GrupoRutaId);
+    }
+
+    [Fact]
+    public async Task Linea_sin_GrupoRutaId_queda_null()
+    {
+        var solicitudId = Guid.NewGuid();
+        _solicitudes.Setup(r => r.ObtenerBasicoAsync(solicitudId, default))
+            .ReturnsAsync(new clsSolicitud { Id = solicitudId, Estado = EstadoSolicitud.Pendiente });
+
+        List<clsLineaSolicitud>? guardadas = null;
+        _solicitudes.Setup(r => r.AgregarLineas(It.IsAny<IEnumerable<clsLineaSolicitud>>()))
+            .Callback<IEnumerable<clsLineaSolicitud>>(ls => guardadas = ls.ToList());
+
+        await Handler().Handle(Comando(solicitudId, lineas: 1));
+
+        Assert.Null(Assert.Single(guardadas!).GrupoRutaId);
+    }
+
+    // S5-HU-18.3/#275: el orden importa (los conexos de una ruta se cuelgan de la primera
+    // línea del grupo) — el lote se numera 1..N en el orden en que llegó.
+    [Fact]
+    public async Task Las_lineas_del_lote_quedan_numeradas_en_orden_de_llegada()
+    {
+        var solicitudId = Guid.NewGuid();
+        _solicitudes.Setup(r => r.ObtenerBasicoAsync(solicitudId, default))
+            .ReturnsAsync(new clsSolicitud { Id = solicitudId, Estado = EstadoSolicitud.Pendiente });
+
+        List<clsLineaSolicitud>? guardadas = null;
+        _solicitudes.Setup(r => r.AgregarLineas(It.IsAny<IEnumerable<clsLineaSolicitud>>()))
+            .Callback<IEnumerable<clsLineaSolicitud>>(ls => guardadas = ls.ToList());
+
+        await Handler().Handle(Comando(solicitudId, lineas: 3));
+
+        Assert.Equal([1, 2, 3], guardadas!.Select(l => l.NumeroLinea));
+    }
 }
