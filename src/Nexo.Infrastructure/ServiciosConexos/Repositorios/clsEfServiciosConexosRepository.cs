@@ -9,6 +9,7 @@ using Nexo.Domain.Auditoria.Entidades;
 using Nexo.Domain.Catalogos.Entidades;
 using Nexo.Domain.Common;
 using Nexo.Domain.Cotizaciones.Entidades;
+using Nexo.Infrastructure.Common;
 using Nexo.Infrastructure.Persistence;
 using ClosedXML.Excel;
 using Microsoft.EntityFrameworkCore;
@@ -298,15 +299,7 @@ public sealed class clsEfServiciosConexosRepository(clsNexoDbContext db) : IServ
     private static decimal? LeerDecimal(IXLCell celda) =>
         celda.DataType == XLDataType.Number ? celda.GetValue<decimal>() : clsImporteParser.Parse(celda.GetString());
 
-    /// <summary>Lee una fecha de una celda: fecha nativa de Excel o texto (dd/MM/yyyy, ISO).</summary>
-    private static DateOnly? LeerFecha(IXLCell celda)
-    {
-        if (celda.DataType == XLDataType.DateTime) return DateOnly.FromDateTime(celda.GetDateTime());
-        var t = celda.GetString()?.Trim();
-        if (string.IsNullOrEmpty(t)) return null;
-        foreach (var fmt in new[] { "dd/MM/yyyy", "d/M/yyyy", "yyyy-MM-dd", "MM/dd/yyyy" })
-            if (DateTime.TryParseExact(t, fmt, CultureInfo.InvariantCulture, DateTimeStyles.None, out var f))
-                return DateOnly.FromDateTime(f);
-        return DateTime.TryParse(t, CultureInfo.GetCultureInfo("es-CO"), DateTimeStyles.None, out var g) ? DateOnly.FromDateTime(g) : null;
-    }
+    /// <summary>Lee una fecha de una celda con el lector compartido (S5-HU-22.1/#288): fecha
+    /// nativa, serial de Excel, o texto en formatos explícitos — sin depender de la cultura.</summary>
+    private static DateOnly? LeerFecha(IXLCell celda) => clsLectorFechasExcel.Leer(celda);
 }

@@ -7,30 +7,25 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Nexo.Infrastructure.Catalogos.Adaptadores;
 
 /// <summary>
-/// Catálogo de tipos de vehículo: tblSAPTiposVehiculoTarifario (dbSolucionesTI) más los
-/// casos reales de negocio que ese catálogo todavía no cubre — confirmados con datos
-/// reales del seeder de S4-HU-10.1 (docs/Database/seeder/README.md,
-/// "reglas_solo_sicetac.csv"): 80 filas de devolución de contenedor vacío sin tipo de
-/// vehículo real (solo tamaño+modalidad) y 33 filas de la banda "PBV 7500-8000 kg" sin
-/// código confirmado en ningún catálogo. Se agregan aquí, no en la BD, hasta que se
-/// formalicen con código real (issue pendiente, ver comentario de Sara en #210).
+/// Catálogo de tipos de vehículo: solo tblSAPTiposVehiculoTarifario (dbSolucionesTI), tal cual.
+///
+/// S5-HU-22.1/#288: antes se le sumaban 5 valores escritos a mano (CNT20/Consolidado,
+/// CNT20/Exclusivo, CNT40/Consolidado, CNT40/Exclusivo, PBV 7500-8000) para cubrir casos que el
+/// catálogo de SAP no traía. Negocio confirmó que ya no hacen falta y se ELIMINARON (no se
+/// movieron a una tabla). Las reglas ya guardadas con alguno de esos códigos no se tocan.
+///
+/// Los códigos 3S2 y 2L3 siguen faltando en el catálogo de SAP: decisión de negocio, se deja así
+/// por ahora — no se hardcodean.
+///
+/// Si dbSolucionesTI no está disponible devuelve una lista vacía (nunca un catálogo inventado).
 /// </summary>
 public sealed class clsTiposVehiculoAdapter(IServiceProvider sp, IMemoryCache cache) : ITiposVehiculoPort
 {
     private readonly clsDbSolucionesTiDbContext? _dc = sp.GetService<clsDbSolucionesTiDbContext>();
 
-    public static readonly IReadOnlyList<clsTipoVehiculoDto> CasosEspeciales =
-    [
-        new("CNT20/Consolidado", "Devolución contenedor 20' — Consolidado", false),
-        new("CNT20/Exclusivo", "Devolución contenedor 20' — Exclusivo", false),
-        new("CNT40/Consolidado", "Devolución contenedor 40' — Consolidado", false),
-        new("CNT40/Exclusivo", "Devolución contenedor 40' — Exclusivo", false),
-        new("PBV 7500-8000", "Camión liviano PBV 7500-8000 kg (nuevo)", false),
-    ];
-
     public async Task<IReadOnlyList<clsTipoVehiculoDto>> ListarAsync(CancellationToken ct)
     {
-        if (_dc is null) return CasosEspeciales;
+        if (_dc is null) return [];
 
         var oficiales = await cache.GetOrCreateAsync("catalogos:tipos-vehiculo", async e =>
         {
@@ -41,6 +36,6 @@ public sealed class clsTiposVehiculoAdapter(IServiceProvider sp, IMemoryCache ca
                 .ToListAsync(ct);
         });
 
-        return oficiales!.Concat(CasosEspeciales).ToList();
+        return oficiales!;
     }
 }

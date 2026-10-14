@@ -24,7 +24,8 @@ public class clsReglasSoloSicetacController(
     ICommandHandler<clsCrearReglaSoloSicetacCommand, clsReglaSoloSicetacDto> crear,
     ICommandHandler<clsEliminarReglaSoloSicetacCommand, bool> eliminar,
     ICommandHandler<clsImportarReglasSoloSicetacExcelCommand, clsImportarReglasResultDto> importarExcel,
-    IQueryHandler<clsObtenerPlantillaReglasSoloSicetacQuery, clsArchivoDto> plantillaExcel)
+    IQueryHandler<clsObtenerPlantillaReglasSoloSicetacQuery, clsArchivoDto> plantillaExcel,
+    IQueryHandler<clsExportarReglasSoloSicetacExcelQuery, clsArchivoDto> exportarExcel)
     : ControllerBase
 {
     /// <summary>Lista todas las rutas "solo SICE-TAC" demarcadas.</summary>
@@ -72,6 +73,19 @@ public class clsReglasSoloSicetacController(
     public async Task<IActionResult> PlantillaExcel(CancellationToken ct = default)
     {
         var archivo = await plantillaExcel.Handle(new clsObtenerPlantillaReglasSoloSicetacQuery(), ct);
+        return File(archivo.Contenido, archivo.ContentType, archivo.NombreArchivo);
+    }
+
+    /// <summary>
+    /// Descarga las reglas ya cargadas (S5-HU-22.1/#288), con las mismas columnas que acepta
+    /// <c>importar-excel</c>: el archivo se puede editar y reimportar. Las reglas que ya existen
+    /// se reportan como duplicadas al reimportar (no se pisan), así que solo entran las filas nuevas.
+    /// </summary>
+    [HttpGet("exportar-excel")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> ExportarExcel(CancellationToken ct = default)
+    {
+        var archivo = await exportarExcel.Handle(new clsExportarReglasSoloSicetacExcelQuery(), ct);
         return File(archivo.Contenido, archivo.ContentType, archivo.NombreArchivo);
     }
 }

@@ -11,5 +11,6 @@ public static class clsDependencyInjection
         .AddScoped<ICommandHandler<clsEliminarReglaSoloSicetacCommand, bool>, clsEliminarReglaSoloSicetacCommandHandler>()
         .AddScoped<ICommandHandler<clsImportarReglasSoloSicetacExcelCommand, clsImportarReglasResultDto>, clsImportarReglasSoloSicetacExcelCommandHandler>()
         .AddScoped<IQueryHandler<clsListarReglasSoloSicetacQuery, IReadOnlyList<clsReglaSoloSicetacDto>>, clsListarReglasSoloSicetacQueryHandler>()
-        .AddScoped<IQueryHandler<clsObtenerPlantillaReglasSoloSicetacQuery, clsArchivoDto>, clsObtenerPlantillaReglasSoloSicetacQueryHandler>();
+        .AddScoped<IQueryHandler<clsObtenerPlantillaReglasSoloSicetacQuery, clsArchivoDto>, clsObtenerPlantillaReglasSoloSicetacQueryHandler>()
+        .AddScoped<IQueryHandler<clsExportarReglasSoloSicetacExcelQuery, clsArchivoDto>, clsExportarReglasSoloSicetacExcelQueryHandler>();
 }

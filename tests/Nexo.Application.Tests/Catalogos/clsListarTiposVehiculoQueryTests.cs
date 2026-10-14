@@ -13,7 +13,7 @@ public class clsListarTiposVehiculoQueryTests
         port.Setup(p => p.ListarAsync(default)).ReturnsAsync(
         [
             new clsTipoVehiculoDto("3S3", "Tractomula", true),
-            new clsTipoVehiculoDto("PBV 7500-8000", "Camión liviano PBV 7500-8000 kg (nuevo)", false),
+            new clsTipoVehiculoDto("2S3", "Camión doble troque", true),
         ]);
         var handler = new clsListarTiposVehiculoQueryHandler(port.Object);
 
@@ -21,6 +21,6 @@ public class clsListarTiposVehiculoQueryTests
 
         Assert.Equal(2, result.Count);
         Assert.Contains(result, v => v.Codigo == "3S3" && v.EsCatalogoOficial);
-        Assert.Contains(result, v => v.Codigo == "PBV 7500-8000" && !v.EsCatalogoOficial);
+        Assert.Contains(result, v => v.Codigo == "2S3" && v.EsCatalogoOficial);
     }
 }

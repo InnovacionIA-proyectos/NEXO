@@ -13,6 +13,9 @@ public sealed class clsExportadorTarifasPlazaExcelAdapter : IExportadorTarifasPl
     [
         "LINEA DE NEGOCIO", "CLASE DE VIAJE", "ORIGEN", "DESTINO", "CLASE CONTENEDOR",
         "RANGO PESO", "TIPO VEHICULO", "VALOR", "VIGENCIA", "DETALLES",
+        // S5-HU-22.1/#288: al final y opcionales al importar. Sin ellas, exportar y reimportar un
+        // municipio de nombre repetido ("ARMENIA") caería en el primero de la lista.
+        "DEPARTAMENTO ORIGEN", "DEPARTAMENTO DESTINO",
     ];
 
     public (byte[] Contenido, string NombreArchivo) Generar(IReadOnlyList<clsTarifaPlaza> tarifas)
@@ -37,6 +40,8 @@ public sealed class clsExportadorTarifasPlazaExcelAdapter : IExportadorTarifasPl
             ws.Cell(fila, 8).Value = t.Valor;
             ws.Cell(fila, 9).Value = t.Vigencia.ToString("yyyy-MM-dd");
             ws.Cell(fila, 10).Value = t.DetallesTarifa;
+            ws.Cell(fila, 11).Value = t.Origen?.Departamento ?? "";
+            ws.Cell(fila, 12).Value = t.Destino?.Departamento ?? "";
             fila++;
         }
 

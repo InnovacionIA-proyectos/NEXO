@@ -14,10 +14,18 @@ namespace Nexo.Api.Solicitudes;
 /// <summary>
 /// Captura de necesidades del equipo comercial: solicitudes puntuales (spot) o
 /// pliegos de licitación, ingresados a mano o importados desde el Excel del cliente.
-/// Solo Comercial/Admin — es la puerta de entrada de nuevas solicitudes.
+/// La puerta de entrada de nuevas solicitudes (analizar-excel y Capturar) es solo de
+/// Comercial/Admin.
+///
+/// S5-HU-22.1/#288: los roles ya NO están a nivel de clase. Un [Authorize(Roles)] de método no
+/// reemplaza el de la clase —se combinan con AND—, así que con "Comercial,Admin" en la clase el
+/// catálogo de ciudades devolvía 403 a CoordinadorFletes (que sí gestiona servicios en
+/// Biblioteca) y el frontend, que traga ese error, dejaba el campo sin sugerencias. Ahora la
+/// clase exige solo estar autenticado (más la política de respaldo: un rol válido de Nexo) y
+/// cada endpoint dice quién puede usarlo.
 /// </summary>
 [ApiController]
-[Authorize(Roles = "Comercial,Admin")]
+[Authorize]
 [Route("api/captura-solicitudes")]
 public class clsCapturaSolicitudesController(
     IQueryHandler<clsAnalizarExcelQuery, clsAnalisisExcelDto> analizarExcel,
@@ -37,6 +45,7 @@ public class clsCapturaSolicitudesController(
     /// No persiste nada.
     /// </summary>
     [HttpPost("analizar-excel")]
+    [Authorize(Roles = "Comercial,Admin")]
     [RequestSizeLimit(MaxTamanoArchivo)]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -51,6 +60,7 @@ public class clsCapturaSolicitudesController(
     /// configuraciones de vehículo a partir del texto libre de las líneas.
     /// </summary>
     [HttpPost]
+    [Authorize(Roles = "Comercial,Admin")]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<clsCapturaResultDto>> Capturar([FromBody] clsCapturaSolicitudRequest req, CancellationToken ct = default)
@@ -87,6 +97,7 @@ public class clsCapturaSolicitudesController(
     /// cambiar el contrato de error que ya consume el frontend.
     /// </summary>
     [HttpGet("aprovisionamiento")]
+    [Authorize(Roles = "Comercial,Admin")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<clsAprovisionamientoDto>> Aprovisionamiento(
@@ -104,6 +115,7 @@ public class clsCapturaSolicitudesController(
     /// clientes REALES (DimBPSolicitante) por nombre, NIT o BP; sin él, sobre la tabla local.
     /// </summary>
     [HttpGet("clientes")]
+    [Authorize(Roles = "Comercial,Admin")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyList<clsClienteBusquedaDto>>> Clientes([FromQuery] string? q, CancellationToken ct = default)
         => Ok(await buscarClientes.Handle(new clsBuscarClientesQuery(q), ct));
