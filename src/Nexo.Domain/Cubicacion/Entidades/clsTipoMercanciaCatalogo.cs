@@ -11,8 +11,11 @@ namespace Nexo.Domain.Cubicacion.Entidades;
 /// en Captura (S5-HU-18.2/#274).
 ///
 /// <see cref="Id"/> es el id tal como lo asigna el Cubicador (string, no necesariamente
-/// UUID) — es la llave que viaja en <c>idTipoMercancia</c> por toda la Captura y el
-/// contrato de cubicación (§3.14 de CONTRATO.md), así que NEXO no le inventa un id propio.
+/// UUID), así que NEXO no le inventa un id propio. S5-HU-17.7: en el contrato de cubicación
+/// (<c>POST /api/cubicacion</c>, §3.14 de CONTRATO.md) ya NO viaja el id sino el
+/// <see cref="CodigoMercancia"/> (<c>codigoMercancia</c>), que es también lo que la Captura persiste
+/// (<c>CodigoTipoMercancia</c>: estable, sobrevive un reseed y es legible en logs). La entidad conserva
+/// los dos campos y sigue alimentando el desplegable; la respuesta del Cubicador también lleva los dos.
 /// <see cref="CarroceriaPrincipal"/>/<see cref="CarroceriaSecundaria"/> llegan ya resueltas
 /// a CÓDIGO (no id) desde el evento — igual que en la respuesta de
 /// <c>GET /tipos-mercancia</c>.

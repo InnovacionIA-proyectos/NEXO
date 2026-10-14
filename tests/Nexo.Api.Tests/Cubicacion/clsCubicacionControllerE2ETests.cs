@@ -38,7 +38,7 @@ public class clsCubicacionControllerE2ETests(clsApiFixture fixture)
             idLineaSolicitud = $"E2E-{Guid.NewGuid():N}",
             mercancias = new[]
             {
-                new { idTipoMercancia = mercancia.Id, cantidad = 10, largoCm = 40, anchoCm = 30, altoCm = 30, pesoKg = 15 },
+                new { codigoMercancia = mercancia.Codigo, cantidad = 10, largoCm = 40, anchoCm = 30, altoCm = 30, pesoKg = 15 },
             },
         };
 
@@ -72,7 +72,7 @@ public class clsCubicacionControllerE2ETests(clsApiFixture fixture)
             idLineaSolicitud = idLinea,
             mercancias = new[]
             {
-                new { idTipoMercancia = mercancia.Id, cantidad = 5, largoCm = 40, anchoCm = 30, altoCm = 30, pesoKg = 15 },
+                new { codigoMercancia = mercancia.Codigo, cantidad = 5, largoCm = 40, anchoCm = 30, altoCm = 30, pesoKg = 15 },
             },
         });
         // Si la creación falla, que el mensaje diga eso y no un 503 confuso en la reconsulta.
@@ -98,7 +98,7 @@ public class clsCubicacionControllerE2ETests(clsApiFixture fixture)
             idLineaSolicitud = $"E2E-{Guid.NewGuid():N}",
             mercancias = new[]
             {
-                new { idTipoMercancia = "no-existe", cantidad = 1, largoCm = 10, anchoCm = 10, altoCm = 10, pesoKg = 1 },
+                new { codigoMercancia = "NO_EXISTE", cantidad = 1, largoCm = 10, anchoCm = 10, altoCm = 10, pesoKg = 1 },
             },
         });
 

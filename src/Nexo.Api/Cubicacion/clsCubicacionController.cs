@@ -9,9 +9,9 @@ using Microsoft.AspNetCore.Mvc;
 namespace Nexo.Api.Cubicacion;
 
 public record clsMercanciaSolicitadaRequest(
-    string IdTipoMercancia, int Cantidad, decimal LargoCm, decimal AnchoCm, decimal AltoCm, decimal PesoKg)
+    string CodigoMercancia, int Cantidad, decimal LargoCm, decimal AnchoCm, decimal AltoCm, decimal PesoKg)
 {
-    public clsMercanciaSolicitadaInput ADto() => new(IdTipoMercancia, Cantidad, LargoCm, AnchoCm, AltoCm, PesoKg);
+    public clsMercanciaSolicitadaInput ADto() => new(CodigoMercancia, Cantidad, LargoCm, AnchoCm, AltoCm, PesoKg);
 }
 
 /// <summary>

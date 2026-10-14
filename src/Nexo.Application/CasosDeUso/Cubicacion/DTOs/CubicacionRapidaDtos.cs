@@ -10,7 +10,7 @@ namespace Nexo.Application.CasosDeUso.Cubicacion.DTOs;
 /// esto es una excepción declarada al patrón "solo colas" del resto de Cubicación.
 /// </summary>
 public sealed record clsMercanciaSolicitadaInput(
-    string IdTipoMercancia, int Cantidad, decimal LargoCm, decimal AnchoCm, decimal AltoCm, decimal PesoKg);
+    string CodigoMercancia, int Cantidad, decimal LargoCm, decimal AnchoCm, decimal AltoCm, decimal PesoKg);
 
 /// <summary>
 /// <c>OrigenSistema</c> NO viaja en el body a propósito: el Cubicador lo deriva del Bearer

@@ -92,7 +92,9 @@ public class clsCubicacionRapidaAdapterTests
         await adaptador.CrearAsync(clsSolicitud());
 
         Assert.Contains("\"idLineaSolicitud\"", servidor.CuerpoRecibido);
-        Assert.Contains("\"idTipoMercancia\"", servidor.CuerpoRecibido);
+        Assert.Contains("\"codigoMercancia\"", servidor.CuerpoRecibido);
+        // S5-HU-17.7: el Cubicador responde 422 si llega el campo viejo (no conviven): no debe viajar.
+        Assert.DoesNotContain("\"idTipoMercancia\"", servidor.CuerpoRecibido);
     }
 
     // S5-HU-18.1/#273: el código REAL que manda el Cubicador se propaga tal cual — ya no se
