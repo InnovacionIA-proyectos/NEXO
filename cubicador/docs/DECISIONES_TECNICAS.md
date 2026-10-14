@@ -834,3 +834,50 @@ motor 3D, que hizo falta cuando esa proyección quedó en 13 filas contra 20 de
 este lado. Seguro de correr más de una vez, y no es parte de ningún flujo
 automático. Los tres catálogos que NEXO no proyecta no la tienen: no habría a
 quién reemitirle.
+
+
+## 17. En el cable viaja el código de mercancía, no el id (S5-HU-17.7)
+
+El `POST /recomendaciones` recibe `codigoMercancia` (`BEBIDAS`,
+`CAJAS_CARTON`), no `idTipoMercancia`. Revierte el acuerdo del 2026-10-08 con
+Cotifly, que había cambiado el campo del código al id.
+
+**Por qué se revirtió: el dato tenía dos formas en el mismo recorrido.** NEXO
+persiste el **código** en la captura —`CapturaRequests.CodigoTipoMercancia`,
+con la razón escrita en su propio comentario: *"se guarda el código porque es
+estable, sobrevive un reseed del catálogo y es legible en logs"*— y acto
+seguido mandaba el **id** por el cable. Los dos campos salen del mismo
+desplegable. `codigoVehiculo` y `codigoCarroceria` ya viajaban como código, así
+que la mercancía era la única excepción. Con el id, NEXO tenía que traducir de
+un campo al otro para llamar a este servicio, teniendo los dos a la mano.
+
+**No se revirtió por riesgo, y conviene dejarlo claro para que nadie repita el
+argumento equivocado.** Los ids del catálogo **no** son aleatorios: son `uuid5`
+deterministas, sembrados por `database/seeder/_generar_seeders.py` con el
+namespace `c9b1b1a0-6f3e-4b1a-9c2d-a1b2c3d40001` sobre la semilla
+`mercancia:{codigo}`. Un reseed los reproduce idénticos —se verificó contra las
+71 filas reales—, así que el id es **tan estable como el código**. El cambio es
+por coherencia y por quitarle a NEXO un paso de traducción, no porque el id
+fuera frágil.
+
+**La respuesta sigue llevando los dos.** `MercanciaDeVehiculoDto` y
+`PiezaFueraDeMedidaDto` devuelven `idTipoMercancia` **y** `codigoMercancia`,
+igual que `GET /tipos-mercancia`. No se quitó el id: es la llave para unir
+contra el catálogo y contra las tablas de recomendación, que siguen guardando
+`MercanciaId`. Lo que cambió es **solo lo que entra**.
+
+**Lo que persiste no cambió.** `recomendacion_vehiculo_mercancia.MercanciaId`
+sigue siendo el uuid, que es la FK correcta. El código se resuelve a id en
+`recomendar_flota` y de ahí para adentro nada se enteró del cambio.
+
+**El puente quedó más corto.** `application/plan_cargue/desde_linea.py` hacía
+`mercancia_por_codigo(...)` solo para sacar el `tipo.id` y pasárselo al caso de
+uso, que volvía a resolverlo con `mercancia_por_id(...)`. Ahora pasa el código
+tal cual: una sola resolución, en un solo lugar, y el puente dejó de cargar el
+catálogo completo para algo que el caso de uso ya hacía.
+
+**`mercancia_por_codigo` tolera caja y espacios**, igual que `mercancia_por_id`
+ya toleraba la caja del uuid. Los códigos son mayúsculas con guion bajo por
+convención y son únicos sin importar la caja, así que aceptar `bebidas` por
+`BEBIDAS` no crea ambigüedad y evita un `MERCANCIA_DESCONOCIDA` falso por cómo
+el llamante guarde la cadena.

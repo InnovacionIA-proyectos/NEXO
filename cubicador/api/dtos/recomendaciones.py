@@ -5,11 +5,17 @@ estos DTOs la implementan. Reemplazan a los de `cubicacion_rapida.py`, que
 describian matrices, criterios y bandas - una forma que el contrato nuevo no
 tiene.
 
-**Mercancias: viajan id Y codigo.** En el request va el `idTipoMercancia`
-(acordado con Cotifly el 2026-10-08, su HU-021.5). En la respuesta van los dos,
-igual que en `GET /tipos-mercancia`: el id es lo que Cotifly persiste y el
-codigo estable es lo que usa NEXO (S5-HU-18.2). Dar los dos evita que cada
-consumidor tenga que resolver el otro por su cuenta.
+**Mercancias: entra el codigo, salen los dos.** En el request va el
+`codigoMercancia` (S5-HU-17.7, reemplaza al `idTipoMercancia` que se habia
+acordado el 2026-10-08). En la respuesta siguen viajando los dos, igual que en
+`GET /tipos-mercancia`: dar los dos evita que cada consumidor tenga que
+resolver el otro por su cuenta, y el id sigue siendo la llave para unir contra
+el catalogo.
+
+El request cambio al codigo porque es la forma que el dato ya tiene en el resto
+del recorrido: NEXO lo persiste asi en la captura
+(`CapturaRequests.CodigoTipoMercancia`) y `codigoVehiculo`/`codigoCarroceria`
+tambien viajan como codigo. Ver `docs/DECISIONES_TECNICAS.md` #17.
 """
 
 from __future__ import annotations
@@ -23,7 +29,8 @@ from .comun import ApiModel, DecimalJson
 
 
 class MercanciaSolicitadaDto(ApiModel):
-    id_tipo_mercancia: str
+    # El `codigoMercancia` de `GET /tipos-mercancia`, no el id (S5-HU-17.7).
+    codigo_mercancia: str
     cantidad: int = Field(ge=1)
     largo_cm: DecimalJson = Field(gt=0)
     ancho_cm: DecimalJson = Field(gt=0)

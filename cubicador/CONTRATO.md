@@ -159,11 +159,18 @@ Límite: **10.000 unidades totales por request**
 (`application/recomendaciones/casos_de_uso.py`) — por encima,
 `400 CUBICACION_DEMASIADO_GRANDE`.
 
-**Las mercancías viajan con id y código.** En el request va el `idTipoMercancia`
-que devolvió `GET /tipos-mercancia` (acordado con Cotifly el 2026-10-08, su
-HU-021.5). En la respuesta van **los dos**: el id es lo que Cotifly persiste y el
-código estable es lo que usa NEXO. Un uuid se acepta en cualquier caja —
-mayúsculas o minúsculas— porque es el mismo uuid.
+**En el request entra el código; en la respuesta salen los dos.** El request
+lleva el `codigoMercancia` que devolvió `GET /tipos-mercancia` (S5-HU-17.7,
+reemplaza al `idTipoMercancia` acordado el 2026-10-08). Se acepta en cualquier
+caja y con espacios de sobra: es el mismo código. La respuesta sigue llevando
+**los dos** —`idTipoMercancia` y `codigoMercancia`—, así que nadie tiene que
+resolver el otro por su cuenta.
+
+El request cambió al código para que el dato tenga una sola forma en todo el
+recorrido: NEXO ya lo persiste así en la captura
+(`CapturaRequests.CodigoTipoMercancia`) y `codigoVehiculo` / `codigoCarroceria`
+también viajan como código. Con el id, NEXO tenía que traducir de un campo al
+otro para hablar con este servicio. Ver `docs/DECISIONES_TECNICAS.md` #17.
 
 **Los ids que devuelve este servicio vienen en MAYÚSCULAS.** SQL Server
 devuelve así las columnas `uniqueidentifier` y no es configurable; se generan ya

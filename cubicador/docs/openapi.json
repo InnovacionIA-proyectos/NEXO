@@ -1680,8 +1680,8 @@
             "title": "Cantidad",
             "type": "integer"
           },
-          "idTipoMercancia": {
-            "title": "Idtipomercancia",
+          "codigoMercancia": {
+            "title": "Codigomercancia",
             "type": "string"
           },
           "largoCm": {
@@ -1712,7 +1712,7 @@
           }
         },
         "required": [
-          "idTipoMercancia",
+          "codigoMercancia",
           "cantidad",
           "largoCm",
           "anchoCm",

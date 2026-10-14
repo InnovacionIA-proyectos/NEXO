@@ -116,7 +116,7 @@ async def crear(
         origen_sistema=origen_sistema,
         mercancias=[
             cu.LineaMercancia(
-                id_tipo_mercancia=m.id_tipo_mercancia, cantidad=m.cantidad,
+                codigo_mercancia=m.codigo_mercancia, cantidad=m.cantidad,
                 largo_cm=m.largo_cm, ancho_cm=m.ancho_cm, alto_cm=m.alto_cm,
                 peso_kg=m.peso_kg,
             )

@@ -495,7 +495,7 @@ interface LineaParaCubicacionDto { lineaId: UUID; posiciones: PosicionCargaDto[]
 // S5-HU-18.1/#273: espejo 1:1 de POST/GET /recomendaciones del Cubicador
 // (cubicador/CONTRATO.md §3.1). Ver §3.14 más abajo para el detalle operativo.
 interface MercanciaSolicitadaInput {
-  idTipoMercancia: string; cantidad: number           // >= 1
+  codigoMercancia: string; cantidad: number           // >= 1
   largoCm: Decimal; anchoCm: Decimal; altoCm: Decimal; pesoKg: Decimal   // por unidad, > 0
 }
 interface CrearRecomendacionInput {
@@ -1362,7 +1362,7 @@ corrida queda guardada, reconsultable con el GET de abajo).
 
 | Cada mercancía | | Tipo | Restricción |
 |---|---|---|---|
-| `idTipoMercancia` | **requerido** | string | el `id` (NO el código) de `GET /tipos-mercancia` del Cubicador |
+| `codigoMercancia` | **requerido** | string | el `codigoMercancia` (NO el id) de `GET /tipos-mercancia` del Cubicador. S5-HU-17.7: antes era `idTipoMercancia`. Se acepta en cualquier caja |
 | `cantidad` | **requerido** | int | ≥ 1 |
 | `largoCm`, `anchoCm`, `altoCm`, `pesoKg` | **requerido** | decimal | > 0, por unidad |
 

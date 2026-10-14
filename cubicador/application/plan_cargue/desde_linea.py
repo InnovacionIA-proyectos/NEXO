@@ -79,13 +79,18 @@ def _preset_de(codigo_vehiculo: str, codigo_carroceria: str) -> str | None:
         (codigo_vehiculo, codigo_carroceria), _PRESET_POR_CODIGO.get(codigo_vehiculo))
 
 
-def _a_lineas_de_mercancia(posiciones: list[PosicionCarga], catalogo) -> list[LineaMercancia]:
+def _a_lineas_de_mercancia(posiciones: list[PosicionCarga]) -> list[LineaMercancia]:
     """Traduce las posiciones capturadas a lo que el motor necesita.
 
     Cada posicion tiene que declarar su codigo de mercancia. Las lineas
     capturadas antes de S5-HU-17.6 no lo traen: se rechazan con motivo en vez
     de asumir un tipo, porque el tipo arrastra la carroceria y asumirlo
     elegiria el vehiculo equivocado sin que nada avise.
+
+    El codigo se pasa tal cual: desde S5-HU-17.7 el contrato entra por codigo,
+    asi que no hay que traducirlo a id para despues volverlo a resolver. Quien
+    valida que exista es `recomendar_flota`, con el mismo codigo de rechazo
+    (`MERCANCIA_DESCONOCIDA`) y el mismo mensaje.
     """
     sin_codigo = [p.descripcion or "(sin descripcion)" for p in posiciones if not p.codigo_mercancia]
     if sin_codigo:
@@ -95,22 +100,17 @@ def _a_lineas_de_mercancia(posiciones: list[PosicionCarga], catalogo) -> list[Li
             f"{', '.join(sin_codigo)}. Sin el tipo no se puede saber que carroceria "
             "necesita la carga; recapturar la linea con el tipo de cada posicion.")
 
-    lineas: list[LineaMercancia] = []
-    for posicion in posiciones:
-        tipo = catalogo.mercancia_por_codigo(posicion.codigo_mercancia)
-        if tipo is None:
-            raise ValidationFailedException(
-                "MERCANCIA_DESCONOCIDA",
-                f"'{posicion.codigo_mercancia}' no esta en el catalogo de tipos de mercancia.")
-        lineas.append(LineaMercancia(
-            id_tipo_mercancia=tipo.id,
+    return [
+        LineaMercancia(
+            codigo_mercancia=posicion.codigo_mercancia,
             cantidad=max(1, posicion.cantidad),
             largo_cm=Decimal(str(posicion.largo_cm)),
             ancho_cm=Decimal(str(posicion.ancho_cm)),
             alto_cm=Decimal(str(posicion.alto_cm)),
             peso_kg=Decimal(str(posicion.peso_kg or 1)),
-        ))
-    return lineas
+        )
+        for posicion in posiciones
+    ]
 
 
 async def crear_plan_desde_linea(
@@ -130,9 +130,8 @@ async def crear_plan_desde_linea(
             "La linea no tiene posiciones con dimensiones: capturalas antes de generar "
             "el plan de cargue 3D.")
 
-    catalogo = await catalogo_repo.cargar()
     recomendacion = await recomendar_flota(
-        catalogo_repo, parametros_repo, _a_lineas_de_mercancia(linea.posiciones, catalogo))
+        catalogo_repo, parametros_repo, _a_lineas_de_mercancia(linea.posiciones))
 
     if recomendacion.resultado != RESULTADO_ASIGNADO or not recomendacion.vehiculos:
         raise ValidationFailedException(

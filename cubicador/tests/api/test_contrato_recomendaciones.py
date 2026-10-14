@@ -125,7 +125,7 @@ def _cuerpo(**extra) -> dict:
     cuerpo = {
         "idLineaSolicitud": "LINEA-001",
         "mercancias": [{
-            "idTipoMercancia": ID_BEBIDAS, "cantidad": 100,
+            "codigoMercancia": "BEBIDAS", "cantidad": 100,
             "largoCm": 60, "anchoCm": 40, "altoCm": 40, "pesoKg": 25,
         }],
     }
@@ -155,14 +155,14 @@ async def test_una_recomendacion_asignada_trae_todos_los_campos_del_contrato(cli
         assert vehiculo[campo] is not None, campo
 
     mercancia = vehiculo["mercancias"][0]
-    assert mercancia["idTipoMercancia"] == ID_BEBIDAS
-    assert mercancia["codigoMercancia"] == "BEBIDAS", "el codigo viaja junto al id"
+    assert mercancia["codigoMercancia"] == "BEBIDAS"
+    assert mercancia["idTipoMercancia"] == ID_BEBIDAS, "el id viaja junto al codigo"
 
 
 async def test_sin_seleccion_automatica_vuelve_con_200(client):
     """Lo que antes era error ahora es resultado (seccion 2.6)."""
     r = await client.post("/recomendaciones", headers=COTIFLY, json=_cuerpo(
-        mercancias=[{"idTipoMercancia": ID_BEBIDAS, "cantidad": 2,
+        mercancias=[{"codigoMercancia": "BEBIDAS", "cantidad": 2,
                      "largoCm": 1400, "anchoCm": 40, "altoCm": 40, "pesoKg": 25}]))
     assert r.status_code == 200, r.text
     datos = r.json()
@@ -175,7 +175,7 @@ async def test_sin_seleccion_automatica_vuelve_con_200(client):
 
 async def test_una_mercancia_desconocida_es_400(client):
     r = await client.post("/recomendaciones", headers=COTIFLY, json=_cuerpo(
-        mercancias=[{"idTipoMercancia": "no-existe", "cantidad": 1,
+        mercancias=[{"codigoMercancia": "NO_EXISTE", "cantidad": 1,
                      "largoCm": 60, "anchoCm": 40, "altoCm": 40, "pesoKg": 25}]))
     assert r.status_code == 400
     assert r.json()["codigo"] == "MERCANCIA_DESCONOCIDA"
@@ -241,7 +241,7 @@ async def test_recalcular_crea_una_corrida_nueva_sin_tocar_la_anterior(client):
     """Append-only (seccion 2.9): la segunda corrida no pisa la primera."""
     primera = (await client.post("/recomendaciones", headers=COTIFLY, json=_cuerpo())).json()
     segunda = (await client.post("/recomendaciones", headers=COTIFLY, json=_cuerpo(
-        mercancias=[{"idTipoMercancia": ID_CARNICOS, "cantidad": 50,
+        mercancias=[{"codigoMercancia": "CARNICOS", "cantidad": 50,
                      "largoCm": 60, "anchoCm": 40, "altoCm": 40, "pesoKg": 25}]))).json()
 
     assert primera["idRecomendacion"] != segunda["idRecomendacion"]
@@ -316,12 +316,12 @@ async def test_los_ids_salen_en_mayusculas(client):
         datos["vehiculos"][0]["idRecomendacionVehiculo"].upper()
 
 
-async def test_un_id_de_mercancia_en_otra_caja_se_resuelve_igual(client):
-    """Un consumidor puede guardar el uuid en minusculas de su lado y
-    devolverlo asi. Es el mismo uuid: rechazarlo seria un
+async def test_un_codigo_de_mercancia_en_otra_caja_se_resuelve_igual(client):
+    """Un consumidor puede guardar el codigo en minusculas de su lado y
+    devolverlo asi. Es el mismo codigo: rechazarlo seria un
     `MERCANCIA_DESCONOCIDA` falso."""
     r = await client.post("/recomendaciones", headers=COTIFLY, json=_cuerpo(
-        mercancias=[{"idTipoMercancia": ID_BEBIDAS.upper(), "cantidad": 10,
+        mercancias=[{"codigoMercancia": " bebidas ", "cantidad": 10,
                      "largoCm": 60, "anchoCm": 40, "altoCm": 40, "pesoKg": 25}]))
     assert r.status_code == 200, r.text
     assert r.json()["resultado"] == "ASIGNADO"

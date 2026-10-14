@@ -200,6 +200,7 @@ Exponer el contrato que consumen NEXO y Cotifly. **La especificación completa �
 - `SIN_SELECCION_AUTOMATICA`, `condicionada` y `extradimension` vuelven con **HTTP 200** dentro de `resultado`. Los códigos de error quedan solo para fallos reales: mercancía desconocida, no cubicable, dimensiones inválidas, no autorizado y servicio no disponible.
 - En un `ASIGNADO`, cada vehículo trae **siempre y sin `null`**: `idRecomendacionVehiculo`, `codigoVehiculo`, `codigoCarroceria`, `pesoTotalKg`, `volumenTotalM3` y los dos porcentajes. El peso en kilos importa especialmente porque **es el que Cotifly le manda a NEXO al crear la solicitud** — no alcanza con el porcentaje.
 - El request lleva **`idTipoMercancia`**, el id que el cubicador devolvió en `GET /tipos-mercancia`. Acordado con Cotifly el 2026-10-08 (su HU-021.5). El `GET` devuelve id **y** código; el código estable se usa del lado de NEXO (S5-HU-18.2), no en el cable.
+  > **Superado por S5-HU-17.7 (2026-10-14): en el cable viaja el `codigoMercancia`.** La respuesta sigue llevando los dos. Ver `DECISIONES_TECNICAS.md` #17.
 - `verificar_api_key` pasa de comparar contra una sola llave a un **mapa `llave → sistema`**, y de ahí sale el `origenSistema` **verificado**. Si el `origenSistema` del cuerpo no corresponde a la llave, responde 401.
 
 **Criterios de aceptación:**
