@@ -167,6 +167,32 @@ def test_la_flota_reparte_toda_la_carga_sin_perder_unidades(catalogo):
     assert colocadas == 400
 
 
+def test_dos_posiciones_del_mismo_tipo_no_se_pisan(catalogo):
+    """Dos posiciones del MISMO codigo con medidas y pesos distintos.
+
+    El peso y el volumen se acumulan por POSICION y recien despues se suman
+    por codigo. Agrupando por codigo antes de multiplicar, las 15 unidades
+    tomaban los valores unitarios de la ultima posicion: 30 kg en vez de 210,
+    y `pesoTotalKg` es justo lo que se usa para costear el flete.
+    """
+    r = _pedir(
+        catalogo,
+        _linea(BEBIDAS, 10, 100, 50, 50, 20),   # 10 x 20 kg = 200 kg
+        _linea(BEBIDAS, 5, 30, 30, 30, 2),      #  5 x  2 kg =  10 kg
+    )
+    assert r.resultado == sf.RESULTADO_ASIGNADO
+
+    assert sum(m.cantidad for v in r.vehiculos for m in v.mercancias) == 15
+    assert sum(v.peso_total_kg for v in r.vehiculos) == D(210)
+
+    # 10 x 0.25 m3 + 5 x 0.027 m3
+    assert sum(v.volumen_total_m3 for v in r.vehiculos) == D("2.64")
+
+    # Siguen siendo UNA entrada por codigo, no una por posicion.
+    for v in r.vehiculos:
+        assert len({m.codigo_mercancia for m in v.mercancias}) == len(v.mercancias)
+
+
 # --- 3. los dos porcentajes -------------------------------------------------
 
 

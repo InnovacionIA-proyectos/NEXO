@@ -881,3 +881,49 @@ ya toleraba la caja del uuid. Los códigos son mayúsculas con guion bajo por
 convención y son únicos sin importar la caja, así que aceptar `bebidas` por
 `BEBIDAS` no crea ambigüedad y evita un `MERCANCIA_DESCONOCIDA` falso por cómo
 el llamante guarde la cadena.
+
+
+## 18. La identidad de una mercancía es su posición, no su código
+
+El motor identificaba cada línea de la solicitud por el `codigoMercancia`. Pero
+una solicitud puede traer **dos posiciones del mismo tipo con medidas y pesos
+distintos** —dos tamaños de caja del mismo producto— y ahí el código deja de
+identificar nada.
+
+**Lo que pasaba.** `_armar_vehiculo` construía
+`unitarios = {m.tipo.codigo: m for m in mercancias}`: un diccionario indexado
+por código, donde la segunda posición pisaba a la primera. Después multiplicaba
+el peso y el volumen **unitarios de la superviviente** por la cantidad total de
+unidades de ese código. Con 10 cajas de 20 kg más 5 de 2 kg, reportaba **30 kg
+donde había 210**. Los `id` de ítem también colisionaban:
+`f"{codigo}#{i}"` producía `CAJAS_CARTON#0` dos veces.
+
+**Por qué importaba.** `pesoTotalKg` es, por contrato, *"el peso que Cotifly le
+manda a NEXO al crear la solicitud"*. El flete se habría costeado sobre el peso
+equivocado, sin que nada avisara: la respuesta era un 200 con forma correcta.
+
+**El empaque nunca estuvo mal.** Los ítems se construyen por línea con sus
+medidas reales y la selección de flota suma `peso_total_kg` por línea, así que
+el vehículo elegido siempre fue el correcto. Lo roto era solo el reporte.
+
+**El arreglo.** `MercanciaSolicitada` gana `indice`, la posición de la línea en
+la solicitud, y esa pasa a ser su identidad: `sku = str(indice)` e
+`id = f"{indice}#{i}"`. El peso y el volumen se acumulan **por posición** y
+recién después se suman por código, así que la respuesta no cambia de forma
+—sigue trayendo una entrada por tipo de mercancía— pero los números quedan
+bien.
+
+El `indice` lo asigna `recomendar()` a partir del orden recibido, en el único
+punto por el que entra todo. Por eso tiene default: ningún llamante ni ninguna
+prueba necesita calcularlo. Cambiar `sku` es seguro porque **nada en el motor
+3D ramifica por él** —es una etiqueta que viaja y se guarda—, y el puente
+`desde_linea.py` ya usaba `sku=f"POS-{idx}"` para los planes de cargue: la
+posición como identidad ya era el criterio en la otra mitad del sistema.
+
+**Lo que queda pendiente.** El contrato sigue devolviendo una entrada por
+código, así que un consumidor que mande dos posiciones del mismo tipo recibe
+los totales correctos pero **no sabe cuántas unidades de cada posición** fueron
+a cada camión. Para repartir las posiciones capturadas entre las líneas que se
+crean por camión hace falta exponer el `indice` en la respuesta —y una columna
+en `recomendacionVehiculoMercancia` para que la reconsulta no lo pierda—. Eso
+es un cambio de contrato y va aparte; este es solo el arreglo de corrección.
