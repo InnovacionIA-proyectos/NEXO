@@ -22,8 +22,14 @@ public sealed record clsCrearRecomendacionInput(
     string IdLineaSolicitud, IReadOnlyList<clsMercanciaSolicitadaInput> Mercancias,
     string? ClaseViajeSeleccionada = null, string? UsuarioId = null);
 
+/// <summary>
+/// <paramref name="IndicePosicion"/> (S5-HU-17.8): índice base 0 en el arreglo <c>mercancias</c> del request — una fila por
+/// POSICIÓN, no por código. Dos filas del mismo camión pueden compartir <c>CodigoMercancia</c>: quien agrupe por
+/// código tiene que SUMAR. Llega null al reconsultar una corrida guardada antes de ese cambio (se guardó agrupada
+/// por código): no es un error. La respuesta no devuelve medidas: el llamante ya las tiene, las mandó él.
+/// </summary>
 public sealed record clsMercanciaDeVehiculoDto(
-    string IdTipoMercancia, string CodigoMercancia, int Cantidad, decimal PesoKg, decimal VolumenM3);
+    int? IndicePosicion, string IdTipoMercancia, string CodigoMercancia, int Cantidad, decimal PesoKg, decimal VolumenM3);
 
 /// <summary>
 /// Cada campo es obligatorio y nunca llega null cuando <c>Resultado == "ASIGNADO"</c>
@@ -38,7 +44,8 @@ public sealed record clsVehiculoRecomendadoDto(
 
 public sealed record clsMedidasEstandarDto(decimal LargoMaxCm, decimal AnchoMaxCm, decimal AltoMaxCm, decimal PesoMaxKg);
 
-public sealed record clsPiezaFueraDeMedidaDto(string IdTipoMercancia, string CodigoMercancia, IReadOnlyList<string> Excesos);
+/// <summary><paramref name="IndicePosicion"/>: ver <see cref="clsMercanciaDeVehiculoDto"/> (null en corridas anteriores a S5-HU-17.8).</summary>
+public sealed record clsPiezaFueraDeMedidaDto(int? IndicePosicion, string IdTipoMercancia, string CodigoMercancia, IReadOnlyList<string> Excesos);
 
 public sealed record clsExtradimensionDto(
     bool HayExtradimension, clsMedidasEstandarDto MedidasEstandar, IReadOnlyList<clsPiezaFueraDeMedidaDto> Piezas);

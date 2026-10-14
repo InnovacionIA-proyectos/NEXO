@@ -111,7 +111,8 @@ public class clsCapturaLineaRequest
 
     /// <summary>
     /// S5-HU-18.3/#275: id de la ruta que agrupa esta línea con las demás de la misma
-    /// carga heterogénea (un camión por línea). SIEMPRE lo manda Cotifly — null si la
+    /// carga heterogénea (un camión por línea). Lo manda quien crea las líneas del grupo (Cotifly o el
+    /// portal; NEXO lo guarda tal cual y nunca lo genera, S5-HU-17.8) — null si la
     /// línea nace directo en NEXO (formulario manual, Excel).
     /// </summary>
     public Guid? GrupoRutaId { get; set; }

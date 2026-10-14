@@ -66,6 +66,39 @@ public class clsCubicacionRapidaAdapterTests
         Assert.EndsWith("recomendaciones", servidor.Recibida.RequestUri!.ToString());
     }
 
+    // S5-HU-17.8: el detalle por camión va POR POSICIÓN. Dos filas del mismo camión comparten código pero
+    // llevan indicePosicion distinto; en una corrida guardada antes de ese cambio llega null (no es un error).
+    [Fact]
+    public async Task El_detalle_por_camion_trae_indicePosicion_y_dos_filas_pueden_compartir_codigo()
+    {
+        const string cuerpo = """
+            {"idRecomendacion":"REC-3","idLineaSolicitud":"LIN-003","origenSistema":"NEXO","resultado":"ASIGNADO",
+             "motivoSinSeleccion":null,"condicionada":false,"mercanciasCondicionadas":[],
+             "vehiculos":[{"idRecomendacionVehiculo":"V-1","numeroVehiculo":1,"codigoVehiculo":"3S3","nombreVehiculo":"Tractomula",
+               "codigoCarroceria":"FURGON","pesoTotalKg":10900.0,"volumenTotalM3":30.0,"porcentajeLlenadoVolumen":80.0,
+               "porcentajeLlenadoPeso":50.0,"alertaBajoLlenado":false,"heterogenea":false,
+               "mercancias":[
+                 {"indicePosicion":0,"idTipoMercancia":"U-1","codigoMercancia":"CAJAS_CARTON","cantidad":500,"pesoKg":10000.0,"volumenM3":20.0},
+                 {"indicePosicion":1,"idTipoMercancia":"U-1","codigoMercancia":"CAJAS_CARTON","cantidad":300,"pesoKg":900.0,"volumenM3":10.0}]},
+              {"idRecomendacionVehiculo":"V-2","numeroVehiculo":2,"codigoVehiculo":"C2","nombreVehiculo":"Camion",
+               "codigoCarroceria":"ESTACAS","pesoTotalKg":10.0,"volumenTotalM3":1.0,"porcentajeLlenadoVolumen":5.0,
+               "porcentajeLlenadoPeso":1.0,"alertaBajoLlenado":true,"heterogenea":false,
+               "mercancias":[{"indicePosicion":null,"idTipoMercancia":"U-2","codigoMercancia":"BEBIDAS","cantidad":1,"pesoKg":10.0,"volumenM3":1.0}]}],
+             "advertencias":[],"extradimension":{"hayExtradimension":true,"medidasEstandar":{"largoMaxCm":1,"anchoMaxCm":1,"altoMaxCm":1,"pesoMaxKg":1},
+               "piezas":[{"indicePosicion":2,"idTipoMercancia":"U-3","codigoMercancia":"VIGAS","excesos":["LARGO"]}]}}
+            """;
+        var (adaptador, _) = Armar(_ => Responder(HttpStatusCode.OK, cuerpo));
+
+        var r = await adaptador.CrearAsync(clsSolicitud());
+
+        var filas = r.Vehiculos[0].Mercancias;
+        Assert.Equal([0, 1], filas.Select(f => f.IndicePosicion));
+        Assert.Equal(["CAJAS_CARTON", "CAJAS_CARTON"], filas.Select(f => f.CodigoMercancia));   // mismo código: quien agrupe suma
+        Assert.Equal(10900m, filas.Sum(f => f.PesoKg));
+        Assert.Null(r.Vehiculos[1].Mercancias[0].IndicePosicion);                              // corrida anterior a 17.8
+        Assert.Equal(2, r.Extradimension!.Piezas[0].IndicePosicion);
+    }
+
     // S5-HU-18.1/#273: SIN_SELECCION_AUTOMATICA y condicionada son RESULTADOS normales con
     // 200, no fallos — el adaptador no les da ningún tratamiento especial.
     [Fact]
