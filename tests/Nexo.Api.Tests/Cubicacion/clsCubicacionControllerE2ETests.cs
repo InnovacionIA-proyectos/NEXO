@@ -20,7 +20,7 @@ namespace Nexo.Api.Tests.Cubicacion;
 [Collection("api")]
 public class clsCubicacionControllerE2ETests(clsApiFixture fixture)
 {
-    [Fact]
+    [clsHechoConCubicadorReal("Cubicador3D__RecomendacionesApiKey")]
     public async Task Crear_contra_el_Cubicador_real_devuelve_ASIGNADO_con_el_contrato_nuevo()
     {
         var cliente = fixture.Client("Comercial");
@@ -46,7 +46,7 @@ public class clsCubicacionControllerE2ETests(clsApiFixture fixture)
         Assert.Equal(dto.IdRecomendacion.ToUpperInvariant(), dto.IdRecomendacion);
     }
 
-    [Fact]
+    [clsHechoConCubicadorReal("Cubicador3D__RecomendacionesApiKey")]
     public async Task Consultar_trae_de_vuelta_la_misma_recomendacion_que_se_creo()
     {
         var cliente = fixture.Client("Comercial");
@@ -68,7 +68,7 @@ public class clsCubicacionControllerE2ETests(clsApiFixture fixture)
         Assert.Equal(creada!.IdRecomendacion, reconsultada!.IdRecomendacion);
     }
 
-    [Fact]
+    [clsHechoConCubicadorReal("Cubicador3D__RecomendacionesApiKey")]
     public async Task Una_mercancia_desconocida_propaga_el_codigo_real_del_Cubicador_como_400()
     {
         var cliente = fixture.Client("Comercial");
