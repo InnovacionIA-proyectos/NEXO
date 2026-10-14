@@ -172,6 +172,22 @@ recorrido: NEXO ya lo persiste así en la captura
 también viajan como código. Con el id, NEXO tenía que traducir de un campo al
 otro para hablar con este servicio. Ver `docs/DECISIONES_TECNICAS.md` #17.
 
+**El detalle por camión es por POSICIÓN, no por código** (S5-HU-17.8).
+`mercancias[].indicePosicion` es el índice —base 0— de la posición en el arreglo
+`mercancias` del request. Dos filas del mismo camión **pueden traer el mismo
+`codigoMercancia`** si la solicitud declaró dos posiciones de ese tipo con
+medidas distintas: **quien agrupe por código tiene que sumar.**
+
+Es lo que permite crear una línea de solicitud por camión sabiendo qué
+posiciones capturadas le tocan. Las medidas no se devuelven porque el llamante
+ya las tiene —las mandó él— y el índice se las devuelve. `piezas[]` de
+`extradimension` lo lleva por la misma razón: dos posiciones del mismo tipo
+pueden tener medidas distintas y que solo una exceda.
+
+Viaja en `null` al reconsultar una corrida anterior a S5-HU-17.8.
+`heterogenea` se calcula sobre códigos **distintos**, no sobre el número de
+filas. Ver `docs/DECISIONES_TECNICAS.md` #19.
+
 **Los ids que devuelve este servicio vienen en MAYÚSCULAS.** SQL Server
 devuelve así las columnas `uniqueidentifier` y no es configurable; se generan ya
 en mayúsculas para que el id del POST y el de la reconsulta sean el mismo texto.

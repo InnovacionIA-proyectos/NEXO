@@ -927,3 +927,43 @@ a cada camión. Para repartir las posiciones capturadas entre las líneas que se
 crean por camión hace falta exponer el `indice` en la respuesta —y una columna
 en `recomendacionVehiculoMercancia` para que la reconsulta no lo pierda—. Eso
 es un cambio de contrato y va aparte; este es solo el arreglo de corrección.
+
+
+## 19. El detalle por camión es por posición (S5-HU-17.8)
+
+`MercanciaDeVehiculoDto` y `PiezaFueraDeMedidaDto` llevan `indicePosicion`: el
+índice —base 0— de la posición en el arreglo `mercancias` del request. Una fila
+por posición, no por código.
+
+**Por qué.** Es la mitad que faltaba de la #18. Esa arregló los *números*; esta
+arregla la *trazabilidad*. Con el detalle agrupado por código, un consumidor
+recibía "800 unidades de `CAJAS_CARTON` en este camión" sin saber cuántas eran
+de cada posición capturada, y sin medidas en la respuesta no podía deducirlo.
+Sin ese dato no puede hacer lo que el negocio ya decidió en #217: **crear una
+línea de solicitud por camión recomendado**, con las posiciones que le tocan.
+
+**No se devuelven las medidas, se devuelve el índice.** El llamante ya tiene las
+medidas: las mandó él. Devolvérselas sería duplicar un dato que podría quedar
+desincronizado; el índice se las devuelve sin copiarlas.
+
+**`heterogenea` pasa a contar códigos distintos.** Era `len(detalle) > 1`, que
+con filas por posición habría marcado como heterogéneo un camión con dos
+posiciones del mismo producto. Carga heterogénea significa **tipos** distintos
+compartiendo camión, no filas.
+
+**La columna es nullable y las filas viejas no se rellenan.** Las corridas
+anteriores no tienen posición; ponerles `0` sería inventarse que todas eran la
+primera. `NULL` dice lo que es. Es el mismo criterio de
+`CapturaRequests.CodigoTipoMercancia` en NEXO (*"Null = tipo desconocido; no se
+asigna un default"*), y las tablas de recomendación son append-only: lo guardado
+no se reescribe. Verificado contra 43 filas reales que vuelven con
+`indicePosicion: null` y 200.
+
+**Las piezas extradimensionadas no necesitaron DDL**: ya se guardaban como JSON
+en `MercanciasCondicionadasJson`, así que el índice entró como una clave más y
+las corridas viejas lo leen como `null`.
+
+**Lo que esto le rompe a quien agrupe por código.** Dos filas del mismo camión
+pueden compartir `codigoMercancia`. Nadie puede asumir que el código es único
+dentro de un vehículo; hay que sumar. Queda dicho en `CONTRATO.md` §3.1 y en la
+§2.3 de la hoja de ruta.

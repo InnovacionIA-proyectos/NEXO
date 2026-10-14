@@ -146,7 +146,7 @@ release que lo publica.
       "alertaBajoLlenado": false,
       "heterogenea": false,
       "mercancias": [
-        { "idTipoMercancia": "2B213679-...", "codigoMercancia": "BEBIDAS", "cantidad": 421, "pesoKg": 8420.0, "volumenM3": 33.68 }
+        { "indicePosicion": 0, "idTipoMercancia": "2B213679-...", "codigoMercancia": "BEBIDAS", "cantidad": 421, "pesoKg": 8420.0, "volumenM3": 33.68 }
       ]
     },
     {
@@ -162,7 +162,7 @@ release que lo publica.
       "alertaBajoLlenado": false,
       "heterogenea": false,
       "mercancias": [
-        { "idTipoMercancia": "2B213679-...", "codigoMercancia": "BEBIDAS", "cantidad": 779, "pesoKg": 15580.0, "volumenM3": 62.32 }
+        { "indicePosicion": 0, "idTipoMercancia": "2B213679-...", "codigoMercancia": "BEBIDAS", "cantidad": 779, "pesoKg": 15580.0, "volumenM3": 62.32 }
       ]
     }
   ],
@@ -190,6 +190,20 @@ trae, sin excepción y sin `null`:
 Está declarado así a propósito: cada lado puede validar que no le llegó algo incompleto en
 vez de aceptar un `null` silencioso. Es la misma clase de fallo que describe la sección 5.
 
+> **El detalle de `mercancias[]` es por POSICIÓN, no por código** (S5-HU-17.8).
+> `indicePosicion` es el índice —base 0— de la posición en el arreglo `mercancias`
+> del request. Dos filas del mismo camión **pueden traer el mismo
+> `codigoMercancia`** si la solicitud declaró dos posiciones de ese tipo con medidas
+> distintas: quien agrupe por código tiene que sumar.
+>
+> Es lo que permite crear una línea de solicitud por camión sabiendo qué posiciones
+> capturadas le tocan a cada uno. No se devuelven las medidas porque el llamante ya
+> las tiene: las mandó él, y el índice se las devuelve.
+>
+> Viaja en `null` al reconsultar una corrida anterior a S5-HU-17.8. `heterogenea` se
+> calcula sobre códigos **distintos**, no sobre el número de filas: dos posiciones del
+> mismo producto en un camión no son carga heterogénea.
+
 ### 2.4 Respuesta — sin selección automática
 
 ```json
@@ -204,7 +218,7 @@ vez de aceptar un `null` silencioso. Es la misma clase de fallo que describe la 
     "hayExtradimension": true,
     "medidasEstandar": { "largoMaxCm": 1220, "anchoMaxCm": 260, "altoMaxCm": 300, "pesoMaxKg": 34000 },
     "piezas": [
-      { "idTipoMercancia": "9F2C...", "codigoMercancia": "VIGAS_ESTRUCTURAS", "excesos": ["largo 1400.0 cm > 1220.0 cm"] }
+      { "indicePosicion": 1, "idTipoMercancia": "9F2C...", "codigoMercancia": "VIGAS_ESTRUCTURAS", "excesos": ["largo 1400.0 cm > 1220.0 cm"] }
     ]
   }
 }

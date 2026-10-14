@@ -328,7 +328,8 @@ interface LineaCosteoDto {
   peso: Decimal | null; tipoVehiculo: string | null; carroceria: string | null
   posiciones: PosicionCargaDto[]; pisoSicetac: PisoSicetacDto | null; historicas: HistoricaSugeridaDto[]
   horasCargue: Decimal | null; horasDescargue: Decimal | null   // #251, horas EFECTIVAS con las que se costeó
-  grupoRutaId: UUID | null         // S5-HU-18.3/#275: lo pone SIEMPRE Cotifly, agrupa líneas de una misma ruta heterogénea
+  grupoRutaId: UUID | null         // S5-HU-18.3/#275: agrupa las líneas de una misma carga heterogénea.
+                                   // Lo pone QUIEN CREA las líneas del grupo (Cotifly o el portal); NEXO lo guarda tal cual.
   idRecomendacionVehiculo: string | null  // S5-HU-18.2/#274: recomendación del Cubicador usada para esta línea
   valorMercancia: Decimal | null   // S5-HU-20.1/#286: lo capturado en la línea (clsLineaSolicitud.ValorMercancia); null si no se capturó
 }
@@ -502,7 +503,10 @@ interface CrearRecomendacionInput {
   idLineaSolicitud: string; mercancias: MercanciaSolicitadaInput[]
   claseViajeSeleccionada: string | null
 }
-interface MercanciaDeVehiculoDto { idTipoMercancia: string; codigoMercancia: string; cantidad: number; pesoKg: Decimal; volumenM3: Decimal }
+interface MercanciaDeVehiculoDto { indicePosicion: number | null; idTipoMercancia: string; codigoMercancia: string; cantidad: number; pesoKg: Decimal; volumenM3: Decimal }
+// S5-HU-17.8: UNA FILA POR POSICION del request, no por codigo. Dos filas del mismo
+// camion pueden compartir codigoMercancia: quien agrupe por codigo tiene que sumar.
+// null al reconsultar una corrida anterior al cambio.
 interface VehiculoRecomendadoDto {               // TODOS obligatorios y nunca null cuando resultado = "ASIGNADO"
   idRecomendacionVehiculo: string; numeroVehiculo: number
   codigoVehiculo: string; nombreVehiculo: string; codigoCarroceria: string
@@ -512,7 +516,7 @@ interface VehiculoRecomendadoDto {               // TODOS obligatorios y nunca n
   mercancias: MercanciaDeVehiculoDto[]
 }
 interface MedidasEstandarDto { largoMaxCm: Decimal; anchoMaxCm: Decimal; altoMaxCm: Decimal; pesoMaxKg: Decimal }
-interface PiezaFueraDeMedidaDto { idTipoMercancia: string; codigoMercancia: string; excesos: string[] }
+interface PiezaFueraDeMedidaDto { indicePosicion: number | null; idTipoMercancia: string; codigoMercancia: string; excesos: string[] }
 interface ExtradimensionDto { hayExtradimension: boolean; medidasEstandar: MedidasEstandarDto; piezas: PiezaFueraDeMedidaDto[] }
 interface RecomendacionDto {
   idRecomendacion: string; idLineaSolicitud: string; origenSistema: string
@@ -634,7 +638,7 @@ esta es la forma de seguirla. **No se mezcla en Pendientes.**
 | `valorMercancia` | *opcional* | decimal | monetario |
 | `horasCargue` | *opcional* | decimal | S5-HU-17/#263. 0–240. Antes se descartaba en silencio |
 | `horasDescargue` | *opcional* | decimal | S5-HU-17/#263. 0–240. Antes se descartaba en silencio |
-| `grupoRutaId` | *opcional* | UUID | S5-HU-18.3/#275. Lo pone SIEMPRE Cotifly — NEXO solo lo guarda tal cual |
+| `grupoRutaId` | *opcional* | UUID | S5-HU-18.3/#275. Lo pone **quien crea las líneas del grupo** (Cotifly, o el portal al crear una línea por camión recomendado) — NEXO solo lo guarda tal cual, nunca lo genera |
 
 Sin horas propias, la línea usa las de la solicitud (`CondicionesServicio`, 4h+4h
 si nunca se guardaron condiciones) — mismo criterio que `clsCapturaLineaRequest`
@@ -751,7 +755,7 @@ Resuelve o crea rutas y vehículos a partir del texto libre de las líneas.
 | `valorAprovisionamiento` | *opcional* | decimal | monetario |
 | `valorMercancia` | *opcional* | decimal | monetario |
 | `posiciones` | *opcional* | array | máx. 200 por línea |
-| `grupoRutaId` | *opcional* | UUID | S5-HU-18.3/#275. Lo pone SIEMPRE Cotifly (agrupa líneas de una misma carga heterogénea) — null si la línea nace en NEXO |
+| `grupoRutaId` | *opcional* | UUID | S5-HU-18.3/#275. Agrupa las líneas de una misma carga heterogénea. Lo pone **quien crea las líneas del grupo** (Cotifly, o el portal al crear una línea por camión); null solo en la línea suelta |
 | `idRecomendacionVehiculo` | *opcional* | string | máx. 64. S5-HU-18.2/#274. `idRecomendacionVehiculo` de `POST /api/cubicacion` (§1.2) si esta línea se capturó a partir de una cubicación |
 
 | Cada posición | | Tipo | Restricción |
