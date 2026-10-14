@@ -14,7 +14,7 @@ namespace Nexo.Api.Tests.Cubicacion;
 [Collection("api")]
 public class clsCatalogoCubicadorPassthroughE2ETests(clsApiFixture fixture)
 {
-    [Fact]
+    [clsHechoConCubicadorReal("Cubicador3D__OutboundApiKey")]
     public async Task GET_categorias_mercancia_con_rol_sin_privilegio_trae_el_catalogo_real()
     {
         // GET no exige rol específico (solo [Authorize]) — un CoordinadorFletes puede leer.
@@ -38,7 +38,7 @@ public class clsCatalogoCubicadorPassthroughE2ETests(clsApiFixture fixture)
         Assert.Equal(HttpStatusCode.Forbidden, respuesta.StatusCode);
     }
 
-    [Fact]
+    [clsHechoConCubicadorReal("Cubicador3D__OutboundApiKey")]
     public async Task Crear_actualizar_y_eliminar_una_carroceria_via_passthrough_contra_el_Cubicador_real()
     {
         var cliente = fixture.Client("AdminTarifas");
@@ -88,7 +88,7 @@ public class clsCatalogoCubicadorPassthroughE2ETests(clsApiFixture fixture)
         Assert.DoesNotContain(carrocerias!, c => c!["id"]!.GetValue<string>() == id);
     }
 
-    [Fact]
+    [clsHechoConCubicadorReal("Cubicador3D__OutboundApiKey")]
     public async Task Republicar_catalogo_de_carrocerias_responde_200_con_el_catalogo_completo()
     {
         var cliente = fixture.Client("AdminTarifas");

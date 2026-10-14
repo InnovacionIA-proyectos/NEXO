@@ -20,16 +20,25 @@ namespace Nexo.Api.Tests.Cubicacion;
 [Collection("api")]
 public class clsCubicacionControllerE2ETests(clsApiFixture fixture)
 {
-    [Fact]
+    /// <summary>El Cubicador deriva el origen de la LLAVE: Cubicador3D__RecomendacionesApiKey tiene que ser
+    /// CUBICADOR_API_KEY_NEXO (ver .env.example). Con la de Cotifly responde 200 pero con origen COTIFLY.</summary>
+    private static string MensajeOrigen(string? actual) =>
+        $"origenSistema='{actual}', se esperaba 'NEXO': Cubicador3D__RecomendacionesApiKey no es la llave NEXO del Cubicador " +
+        "(CUBICADOR_API_KEY_NEXO). Revisar el secreto CUBICADOR3D_RECOMENDACIONES_API_KEY del repo.";
+
+    [clsHechoConCubicadorReal("Cubicador3D__RecomendacionesApiKey")]
     public async Task Crear_contra_el_Cubicador_real_devuelve_ASIGNADO_con_el_contrato_nuevo()
     {
         var cliente = fixture.Client("Comercial");
+        // La mercancía sale del catálogo REAL del Cubicador (ver clsMercanciaDelCubicador): el desplegado
+        // no trae la fila de la semilla local y la prueba fallaba por el dato, no por el contrato.
+        var mercancia = await clsMercanciaDelCubicador.ElegirAsync(cliente);
         var body = new
         {
             idLineaSolicitud = $"E2E-{Guid.NewGuid():N}",
             mercancias = new[]
             {
-                new { idTipoMercancia = "m-CAJAS_CARTON", cantidad = 10, largoCm = 40, anchoCm = 30, altoCm = 30, pesoKg = 15 },
+                new { idTipoMercancia = mercancia.Id, cantidad = 10, largoCm = 40, anchoCm = 30, altoCm = 30, pesoKg = 15 },
             },
         };
 
@@ -38,28 +47,39 @@ public class clsCubicacionControllerE2ETests(clsApiFixture fixture)
         Assert.Equal(HttpStatusCode.OK, respuesta.StatusCode);
         var dto = await respuesta.Content.ReadFromJsonAsync<clsRecomendacionDto>();
         Assert.NotNull(dto);
-        Assert.Equal("NEXO", dto!.OrigenSistema);
-        Assert.Equal("ASIGNADO", dto.Resultado);
-        Assert.NotEmpty(dto.Vehiculos);
-        Assert.Equal("2L2", dto.Vehiculos[0].CodigoVehiculo);
+        Assert.True(dto!.OrigenSistema == "NEXO", MensajeOrigen(dto.OrigenSistema));
+        Assert.False(string.IsNullOrWhiteSpace(dto.Resultado));
         // SQL Server devuelve uniqueidentifier en MAYÚSCULAS (doc del Cubicador).
         Assert.Equal(dto.IdRecomendacion.ToUpperInvariant(), dto.IdRecomendacion);
+
+        // El desenlace exacto solo se conoce para la mercancía de la semilla local.
+        if (mercancia.EsLaDeLaSemilla)
+        {
+            Assert.Equal("ASIGNADO", dto.Resultado);
+            Assert.NotEmpty(dto.Vehiculos);
+            Assert.Equal("2L2", dto.Vehiculos[0].CodigoVehiculo);
+        }
     }
 
-    [Fact]
+    [clsHechoConCubicadorReal("Cubicador3D__RecomendacionesApiKey")]
     public async Task Consultar_trae_de_vuelta_la_misma_recomendacion_que_se_creo()
     {
         var cliente = fixture.Client("Comercial");
+        var mercancia = await clsMercanciaDelCubicador.ElegirAsync(cliente);
         var idLinea = $"E2E-{Guid.NewGuid():N}";
         var creacion = await cliente.PostAsJsonAsync("/api/cubicacion", new
         {
             idLineaSolicitud = idLinea,
             mercancias = new[]
             {
-                new { idTipoMercancia = "m-CAJAS_CARTON", cantidad = 5, largoCm = 40, anchoCm = 30, altoCm = 30, pesoKg = 15 },
+                new { idTipoMercancia = mercancia.Id, cantidad = 5, largoCm = 40, anchoCm = 30, altoCm = 30, pesoKg = 15 },
             },
         });
+        // Si la creación falla, que el mensaje diga eso y no un 503 confuso en la reconsulta.
+        Assert.Equal(HttpStatusCode.OK, creacion.StatusCode);
         var creada = await creacion.Content.ReadFromJsonAsync<clsRecomendacionDto>();
+        // Si el origen no es NEXO la reconsulta (origenSistema=NEXO) no la encuentra y falla con un 503 confuso.
+        Assert.True(creada!.OrigenSistema == "NEXO", MensajeOrigen(creada.OrigenSistema));
 
         var respuesta = await cliente.GetAsync($"/api/cubicacion?idLineaSolicitud={idLinea}&origenSistema=NEXO");
 
@@ -68,7 +88,8 @@ public class clsCubicacionControllerE2ETests(clsApiFixture fixture)
         Assert.Equal(creada!.IdRecomendacion, reconsultada!.IdRecomendacion);
     }
 
-    [Fact]
+
+    [clsHechoConCubicadorReal("Cubicador3D__RecomendacionesApiKey")]
     public async Task Una_mercancia_desconocida_propaga_el_codigo_real_del_Cubicador_como_400()
     {
         var cliente = fixture.Client("Comercial");

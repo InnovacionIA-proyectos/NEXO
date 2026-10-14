@@ -63,7 +63,46 @@ public class clsPropuestaPlazaPropiaTests(clsApiFixture fx)
         var propuestas = scope.ServiceProvider.GetRequiredService<IPropuestaDeLineaPort>();
         var decision = await propuestas.ProponerParaLineaAsync(lineaId);
 
+        // Qué dice SAP HOY para esta zona + vehículo, leído de la misma base que usa el motor. La regla
+        // que se prueba es la del ORDEN (S5-HU-19.1/#281): si SAP tiene una tarifa vigente para la zona,
+        // gana ella; solo si no tiene nada se cae a la propia (3.300.000). No se fija "3.000.000" a mano:
+        // es un dato de una base externa que cambia con cada sincronización de SAP, y en un entorno sin
+        // dbSolucionesTI (o con otra copia) esta prueba fallaba aunque el código estuviera bien — como
+        // pasó en el CI del 2026-10-14.
+        var sapVigente = SapVigenteParaLaZona(scope.ServiceProvider);
+        var diagnostico =
+            $"SAP configurado: {sapVigente is not null}; vigentes SAP para la zona+2S2: [{string.Join(", ", sapVigente ?? [])}]; " +
+            $"resultado: {decision.Resultado.Valor} ({decision.Resultado.Fuente}); modo: {decision.Modo}; justificación: {decision.Resultado.Justificacion}";
+
         Assert.Equal("plaza", decision.Resultado.Fuente);
-        Assert.Equal(3_000_000m, decision.Resultado.Valor);
+        if (sapVigente is { Count: > 0 })
+            Assert.True(sapVigente.Contains(decision.Resultado.Valor ?? -1m), $"SAP tiene vigente para la zona: debía ganar SAP. {diagnostico}");
+        else
+            Assert.True(decision.Resultado.Valor == 3_300_000m, $"SAP no tiene vigente para la zona: debía usarse la propia. {diagnostico}");
+    }
+
+    /// <summary>Valores SAP vigentes (zona origen/destino de los municipios 1012/832 + vehículo 2S2), o
+    /// null si el entorno no tiene dbSolucionesTI configurada.</summary>
+    private List<decimal>? SapVigenteParaLaZona(IServiceProvider sp)
+    {
+        var dc = sp.GetService<Nexo.Infrastructure.External.clsDbSolucionesTiDbContext>();
+        if (dc is null) return null;
+
+        var (origen, destino) = fx.WithDb(db =>
+        {
+            List<string> Zonas(int id) => db.Municipios.Where(m => m.Id == id)
+                .Select(m => new[] { m.NombreTarifasPlaza, m.ZonaTarificacion }).AsEnumerable()
+                .SelectMany(z => z).Where(c => !string.IsNullOrWhiteSpace(c)).Select(c => c!).ToList();
+            return (Zonas(1012), Zonas(832));
+        });
+        var idVehiculo = dc.TiposVehiculo.AsEnumerable()
+            .FirstOrDefault(v => v.Codigo.Trim().Equals("2S2", StringComparison.OrdinalIgnoreCase))?.Id.ToString();
+        if (idVehiculo is null) return [];
+
+        var hoy = DateTime.UtcNow.Date;
+        return dc.TarifasPlazaSap
+            .Where(t => origen.Contains(t.Origen) && destino.Contains(t.Destino) && t.TipoVehiculo == idVehiculo && t.Vigencia >= hoy)
+            .Select(t => t.Valor).AsEnumerable()
+            .Select(v => Nexo.Domain.Common.clsImporteParser.Parse(v)).Where(v => v is not null).Select(v => v!.Value).ToList();
     }
 }

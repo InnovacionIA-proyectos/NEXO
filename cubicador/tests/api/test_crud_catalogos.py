@@ -170,6 +170,34 @@ async def test_el_get_devuelve_version_y_el_put_la_exige(client):
     assert r.json()["version"] == 2, "la version sube en cada escritura"
 
 
+async def test_actualizar_una_carroceria_publica_la_fila_entera_con_el_contrato_de_NEXO(client, publisher):
+    """El evento `carroceria.actualizada` lleva el DTO completo (id, codigoCarroceria,
+    nombreCarroceria, activo, version): NEXO hace upsert por Id. Antes salia `{codigo, nombre, activo}`
+    sin id y el consumidor de NEXO fallaba con 'primary key property Id is null' (2026-10-14)."""
+    carroceria = await _version(client, "/tipos-carroceria", "codigoCarroceria", "ESTACAS")
+
+    r = await client.put(f"/tipos-carroceria/{carroceria['id']}", headers=LLAVE, json={
+        "nombreCarroceria": "Estacas contrato", "activo": False,
+        "usuarioId": USUARIO, "version": 1})
+    assert r.status_code == 200, r.text
+
+    metodo, id_, datos = next(e for e in publisher.eventos if e[0] == "publicar_carroceria_actualizada")
+    assert id_ == carroceria["id"]
+    assert datos == {
+        "id": carroceria["id"], "codigoCarroceria": "ESTACAS", "nombreCarroceria": "Estacas contrato",
+        "activo": False, "version": 2,
+    }
+    assert datos == r.json(), "el evento es exactamente lo que devuelve el PUT: un solo DTO"
+
+
+async def test_actualizar_una_carroceria_inexistente_es_404_y_no_publica(client, publisher):
+    r = await client.put("/tipos-carroceria/no-existe", headers=LLAVE, json={
+        "nombreCarroceria": "X", "activo": True, "usuarioId": USUARIO, "version": 1})
+
+    assert r.status_code == 404
+    assert not [e for e in publisher.eventos if e[0] == "publicar_carroceria_actualizada"]
+
+
 async def test_guardar_con_una_version_vieja_es_409(client):
     """Dos administradores abren la misma fila; el segundo no puede pisar al
     primero en silencio."""

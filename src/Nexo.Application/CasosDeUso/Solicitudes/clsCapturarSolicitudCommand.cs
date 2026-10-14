@@ -243,9 +243,11 @@ public sealed class clsCapturarSolicitudCommandHandler(
                     // hay (para que el Administrador de Tarifas no empiece de cero) —
                     // sin esa parte si no hay ningún candidato (casos 9/10 de la tabla).
                     linea.EstadoLinea = EstadoLinea.PorCostear;
-                    linea.MotivoPendiente = p.ValorPropuesto is { } recomendado
+                    // S5-HU-20.5/#297: una línea de Cupo sin vehículo trae su propio motivo, literal (los
+                    // candidatos siguen visibles en la Mesa como referencia).
+                    linea.MotivoPendiente = p.MotivoPendiente ?? (p.ValorPropuesto is { } recomendado
                         ? $"Consulta completa: el Administrador de Tarifas debe elegir la tarifa (recomendado: {recomendado:C0} - {p.FuentePropuesta})."
-                        : "Consulta completa: el Administrador de Tarifas debe elegir la tarifa.";
+                        : "Consulta completa: el Administrador de Tarifas debe elegir la tarifa.");
                 }
                 else
                 {

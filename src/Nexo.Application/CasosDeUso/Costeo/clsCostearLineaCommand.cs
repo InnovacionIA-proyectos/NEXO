@@ -47,17 +47,19 @@ public sealed class clsCostearLineaCommandHandler(
     {
         var decision = await propuesta.ProponerParaLineaAsync(command.LineaId, ct);
         var resultado = decision.Resultado;
+        // S5-HU-20.5/#297: la línea de Cupo sin vehículo queda con su motivo propio, no con el texto largo de la justificación.
+        var motivo = decision.MotivoPendiente ?? resultado.Justificacion;
 
         if (decision.Modo == ModoDecision.ConsultaCompleta)
         {
             await pendientes.RegistrarAsync(
                 command.TrabajoId, command.SolicitudId, command.LineaId,
-                TipoPendienteDeCosteo.Manual, resultado.Justificacion, ct);
+                TipoPendienteDeCosteo.Manual, motivo, ct);
 
-            await lineas.MarcarPendienteAsync(command.LineaId, resultado.Justificacion, ct);
+            await lineas.MarcarPendienteAsync(command.LineaId, motivo, ct);
 
             await publicador.PublicarAsync(new clsLineaRequiereTarifaManual(
-                command.TrabajoId, command.SolicitudId, command.LineaId, resultado.Justificacion), ct);
+                command.TrabajoId, command.SolicitudId, command.LineaId, motivo), ct);
 
             await uow.SaveChangesAsync(ct);
             return Unit.Value;
