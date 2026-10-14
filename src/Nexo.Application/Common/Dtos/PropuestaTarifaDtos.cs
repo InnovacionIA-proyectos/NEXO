@@ -73,7 +73,10 @@ public record clsPropuestaLineaDto(
     string Justificacion,
     clsCandidatoTarifaDto? RetornoContenedor = null,
     bool Vencida = false,
-    string ModoDecision = "ConsultaCompleta");
+    string ModoDecision = "ConsultaCompleta",
+    /// <summary>S5-HU-20.5/#297: motivo específico con el que queda pendiente la línea cuando no es el
+    /// genérico de consulta completa (hoy: "Línea sin vehículo: requiere consulta completa"). null = el genérico.</summary>
+    string? MotivoPendiente = null);
 
 public record clsPropuestaSolicitudDto(
     Guid SolicitudId,

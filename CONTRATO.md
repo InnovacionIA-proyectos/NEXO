@@ -331,6 +331,7 @@ interface LineaCosteoDto {
   grupoRutaId: UUID | null         // S5-HU-18.3/#275: lo pone SIEMPRE Cotifly, agrupa líneas de una misma ruta heterogénea
   idRecomendacionVehiculo: string | null  // S5-HU-18.2/#274: recomendación del Cubicador usada para esta línea
   valorMercancia: Decimal | null   // S5-HU-20.1/#286: lo capturado en la línea (clsLineaSolicitud.ValorMercancia); null si no se capturó
+  numeroLinea: number | null       // S5-HU-20.5/#297: orden de la línea en el arreglo de la captura (1, 2, 3...); null en líneas capturadas antes de S5-HU-18.3. El GET ya las devuelve ORDENADAS por este campo
 }
 interface TiemposLogisticosDto { horasCargue: Decimal; horasDescargue: Decimal }
 interface SolicitudCosteoDto { solicitud: SolicitudDto; tiempos: TiemposLogisticosDto; lineas: LineaCosteoDto[] }
@@ -382,6 +383,7 @@ interface PropuestaLineaDto {
   valorPropuesto: Decimal | null; fuentePropuesta: string | null; justificacion: string
   retornoContenedor: CandidatoTarifaDto | null
   modoDecision: "SoloSicetac" | "PlazaVigenteMayor" | "ConsultaCompleta" // S5-HU-19.2/#282: decide si el auto-costeo guarda el flete (los dos primeros) o la línea queda pendiente de un humano (ConsultaCompleta) — esto último AUNQUE valorPropuesto no sea null
+  motivoPendiente: string | null // S5-HU-20.5/#297: motivo ESPECÍFICO con el que queda pendiente la línea; hoy solo "Línea sin vehículo: requiere consulta completa". null = el motivo genérico de consulta completa
 }
 interface PropuestaSolicitudDto { solicitudId: UUID; lineas: PropuestaLineaDto[]; advertencias: string[] }
 
@@ -605,6 +607,11 @@ esta es la forma de seguirla. **No se mezcla en Pendientes.**
 #### `GET /api/solicitudes/{id}` — abrir solicitud (costeo pre-armado)
 - **Roles**: Todos.
 - **→** `200 SolicitudCosteoDto`
+- **Orden de `lineas` (S5-HU-20.5/#297)**: estable. Por `numeroLinea` ascendente (las líneas viejas, sin
+  número, al final), luego por fecha de creación y luego por `id`. Antes no se ordenaba y el orden podía
+  cambiar entre consultas. **NEXO numera por el orden del arreglo** con que se capturó la solicitud
+  (`lineas[0]` → 1, `lineas[1]` → 2...): no existe —ni se agrega— un campo "orden" de entrada, y Cotifly no
+  manda un número. Varios camiones de la misma ruta (`grupoRutaId`) conservan el orden en que se enviaron.
 - **Errores**: `404 SOLICITUD_NO_ENCONTRADA` · `409 SOLICITUD_DESCARTADA`
 
 #### `POST /api/solicitudes` — alta spot (o cabecera de licitación)
@@ -717,6 +724,22 @@ No persiste; lee el Excel para que el usuario mapee columnas.
 
 #### `POST /api/captura-solicitudes` — crear solicitud completa
 Resuelve o crea rutas y vehículos a partir del texto libre de las líneas.
+
+**Línea de Cupo sin vehículo (S5-HU-20.5/#297).** Una línea sin `tipoVehiculo` se acepta, pero si su
+`claseViaje` es **Cupo** (o no trae `claseViaje`) **no se autocostea**: sin vehículo el motor busca el piso
+SICE-TAC sin filtro y toma el menor valor, y la plaza cae al "mayor valor vigente" solo con una advertencia
+— un precio bajo que nadie revisa. Queda `estadoLinea = "PorCostear"` sin ningún flete, con
+`motivoPendiente = "Línea sin vehículo: requiere consulta completa"` (visible en la Mesa), y su propuesta
+(`GET /api/solicitudes/{id}/propuesta-tarifa`) sale `modoDecision = "ConsultaCompleta"` con
+`motivoPendiente` y los candidatos como **referencia**: el Administrador de Tarifas elige o ingresa el valor
+(nunca bajo el piso). Una línea a la que luego se le pone vehículo se costea normalmente.
+**No aplica** a Contenedor (el vehículo se deduce por peso y clase de contenedor), ni a Carga suelta, ni a
+Extradimensionado (decidido por Sara: solo Cupo).
+
+**Normalización de nombres.** `origen`, `destino`, `tipoVehiculo` y `carroceria` se comparan sin tildes y con
+`_` y `-` equivalentes a espacio, así que "Bogotá"/"Bogota" o "Furgon Refrigerado"/"FURGON_REFRIGERADO"
+resuelven a la **misma** fila en vez de crear otra. Lo que se guarda en una fila nueva sigue siendo el texto
+tal como llegó (limpio de espacios).
 
 | Body (cabecera) | | Tipo | Restricción |
 |---|---|---|---|

@@ -109,15 +109,9 @@ async def crear_carroceria(peticion: CrearCarroceriaDto,
 async def actualizar_carroceria(id: str, peticion: ActualizarCarroceriaDto,
                                 repo=Depends(obtener_catalogo_crud_repo),
                                 eventos=Depends(obtener_eventos_publisher)):
-    fila = await repo.actualizar(
-        "carrocerias", id,
-        {"nombre": peticion.nombre_carroceria, "activo": peticion.activo},
-        peticion.version, peticion.usuario_id)
-    if fila is None:
-        from application.excepciones import NotFoundException
-        raise NotFoundException("NO_ENCONTRADO", f"No existe la carroceria '{id}'.")
-    await eventos.publicar_carroceria_actualizada(
-        fila.id, {"codigo": fila.codigo, "nombre": fila.nombre, "activo": fila.activo})
+    fila = await cu.actualizar_carroceria(
+        repo, id, peticion.nombre_carroceria, peticion.activo, peticion.version,
+        peticion.usuario_id, eventos)
     return _carroceria(fila)
 
 

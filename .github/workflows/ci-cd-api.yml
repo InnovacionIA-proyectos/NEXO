@@ -108,9 +108,20 @@ jobs:
       # Se definen con el MISMO nombre de variable que lee IConfiguration
       # (ConnectionStrings__*, doble guion bajo) — ASP.NET Core las mapea solo,
       # cero cambio de código.
+      # Cubicador3D__* (OPCIONALES): 6 pruebas de Nexo.Api.Tests hablan con el Cubicador REAL
+      # (clsCubicacionControllerE2ETests y clsCatalogoCubicadorPassthroughE2ETests, S5-HU-18). Este
+      # runner no levanta el stack del Cubicador, así que SIN estas variables esas pruebas se
+      # OMITEN con un motivo explícito (clsHechoConCubicadorRealAttribute) — antes la app respondía
+      # 503 "no configurado" y la suite quedaba en rojo (corrida del 2026-10-14). Para que corran en
+      # CI: crear los 3 secretos con un Cubicador alcanzable desde el runner (con el catálogo local
+      # sembrado, ver cubicador/docker-compose.yml). Si la URL está definida y el Cubicador no
+      # responde, FALLAN: ahí sí es una señal real. Un secreto inexistente llega como cadena vacía.
       - name: "Ejecutar toda la suite (dotnet test Nexo.Clean.sln)"
         env:
           TEST_DB_CONNECTION: ${{ secrets.TEST_DB_CONNECTION }}
+          Cubicador3D__OutboundBaseUrl: ${{ secrets.CUBICADOR3D_OUTBOUND_BASE_URL }}
+          Cubicador3D__RecomendacionesApiKey: ${{ secrets.CUBICADOR3D_RECOMENDACIONES_API_KEY }}
+          Cubicador3D__OutboundApiKey: ${{ secrets.CUBICADOR3D_OUTBOUND_API_KEY }}
           ConnectionStrings__DwSice: ${{ secrets.CONNECTIONSTRINGS_DWSICE }}
           ConnectionStrings__DbSolucionesTi: ${{ secrets.CONNECTIONSTRINGS_DBSOLUCIONESTI }}
           ConnectionStrings__DwCubos: ${{ secrets.CONNECTIONSTRINGS_DWCUBOS }}

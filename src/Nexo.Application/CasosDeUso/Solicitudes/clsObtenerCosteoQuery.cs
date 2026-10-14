@@ -36,7 +36,13 @@ public sealed class clsObtenerCosteoQueryHandler(
         var ahora = clock.GetUtcNow();
 
         var lineas = new List<clsLineaCosteoDto>();
-        foreach (var l in s.Lineas)
+        // S5-HU-20.5/#297: orden ESTABLE — NumeroLinea ascendente (las líneas viejas, sin número, al final),
+        // luego fecha de creación y luego Id. Antes no se ordenaba y el orden del GET podía cambiar entre
+        // consultas. NEXO numera por el orden del arreglo de la captura: no hay un campo "orden" de entrada.
+        var ordenadas = s.Lineas
+            .OrderBy(l => l.NumeroLinea is null).ThenBy(l => l.NumeroLinea)
+            .ThenBy(l => l.CreatedAt).ThenBy(l => l.Id);
+        foreach (var l in ordenadas)
         {
             var piso = l.clsRuta is { } ruta
                 ? await tarifas.PisoVigenteAsync(
@@ -51,7 +57,7 @@ public sealed class clsObtenerCosteoQueryHandler(
                 l.Id, l.RutaId, l.clsRuta == null ? null : $"{l.clsRuta.Origen} → {l.clsRuta.Destino}",
                 l.Tipologia, l.Peso, l.clsConfiguracionVehiculo?.TipoVehiculo, l.clsConfiguracionVehiculo?.Carroceria,
                 clsPosicionCargaDto.Desde(l.Dimensiones), piso, historicas, l.HorasCargue, l.HorasDescargue,
-                l.GrupoRutaId, l.IdRecomendacionVehiculo, l.ValorMercancia));
+                l.GrupoRutaId, l.IdRecomendacionVehiculo, l.ValorMercancia, l.NumeroLinea));
         }
 
         // Al abrir, marca la solicitud en costeo (si estaba pendiente).
