@@ -1,3 +1,5 @@
+using Nexo.Domain.Enums;
+
 namespace Nexo.Domain.Costeo.Reglas;
 
 /// <summary>
@@ -125,6 +127,17 @@ public static class clsReglaDeCosteo
         return sinPlaza with { Justificacion = justificacion };
     }
 
+    /// <summary>Motivo con el que queda pendiente una línea sin vehículo (S5-HU-20.5/#297).</summary>
+    public const string MotivoLineaSinVehiculo = "Línea sin vehículo: requiere consulta completa";
+
+    /// <summary>
+    /// S5-HU-20.5/#297: <c>true</c> cuando la línea es de Cupo —o no trae clase de viaje— y llega sin
+    /// vehículo. NO aplica a Contenedor (el vehículo se deduce por peso y clase de contenedor), ni a
+    /// Carga suelta ni a Extradimensionado (decidido por Sara: solo Cupo).
+    /// </summary>
+    public static bool LineaSinVehiculoQueExigeConsultaCompleta(ClaseViaje? claseViaje, string? tipoVehiculo) =>
+        (claseViaje is null or ClaseViaje.Cupo) && string.IsNullOrWhiteSpace(tipoVehiculo);
+
     /// <summary>
     /// S5-HU-19.2/#282: los 3 pasos del flujo de decisión (sección "Flujo objetivo" del
     /// milestone S5-HU-19) — reemplaza la llamada directa a <see cref="DecidirConTarifario"/>
@@ -134,8 +147,25 @@ public static class clsReglaDeCosteo
     /// </summary>
     public static clsDecisionDeFlujo DecidirFlujo(
         bool hayReglaSoloSicetac, clsCandidatoDeTarifa? sicetac,
-        clsCandidatoDeTarifa? plazaVigente, clsCandidatoDeTarifa? plazaVencida, clsCandidatoDeTarifa? historico)
+        clsCandidatoDeTarifa? plazaVigente, clsCandidatoDeTarifa? plazaVencida, clsCandidatoDeTarifa? historico,
+        bool lineaSinVehiculoQueLoExige = false)
     {
+        // S5-HU-20.5/#297: una línea de Cupo (o sin clase de viaje) SIN vehículo nunca se autocostea.
+        // Sin vehículo el piso SICE-TAC se busca sin filtro y toma el menor valor, y la plaza cae al
+        // "mayor valor vigente" solo con una advertencia: el precio sale bajo y nadie lo mira. Se
+        // salta la regla Solo-SICETAC (Paso 1) y la plaza que gana sola (Paso 2) y va directo a
+        // consulta completa: los candidatos siguen saliendo como referencia, y la línea queda
+        // pendiente de que el Administrador de Tarifas elija o ingrese el valor (nunca bajo el piso).
+        if (lineaSinVehiculoQueLoExige)
+        {
+            var referencia = plazaVigente is not null
+                ? Decidir(sicetac, plazaVigente, historico)
+                : DecidirConTarifario(sicetac, plazaVencida, historico, tarifarioVencido: plazaVencida is not null);
+            return new clsDecisionDeFlujo(
+                referencia with { Justificacion = $"{MotivoLineaSinVehiculo}. Referencia: {referencia.Justificacion}" },
+                ModoDecision.ConsultaCompleta, MotivoLineaSinVehiculo);
+        }
+
         // Paso 1: con regla y con piso, el piso gobierna solo — ni plaza ni histórico se
         // miran. Con regla pero SIN piso, no hay nada que proponer por esta vía: sigue al
         // paso 4 directo (nunca al paso 2 — el paso 2 es explícitamente "sin regla").
@@ -171,5 +201,7 @@ public enum ModoDecision { SoloSicetac, PlazaVigenteMayor, ConsultaCompleta }
 /// Qué se propuso y por qué camino. <see cref="Modo"/> es lo que decide si el auto-costeo
 /// guarda el flete (SoloSicetac/PlazaVigenteMayor) o deja la línea pendiente de un
 /// humano (ConsultaCompleta) — ver clsCapturarSolicitudCommand/clsCostearLineaCommand.
+/// <see cref="MotivoPendiente"/> (S5-HU-20.5/#297): motivo específico con el que queda pendiente
+/// la línea cuando no es el genérico de consulta completa (hoy: línea de Cupo sin vehículo).
 /// </summary>
-public sealed record clsDecisionDeFlujo(clsResultadoDeCosteo Resultado, ModoDecision Modo);
+public sealed record clsDecisionDeFlujo(clsResultadoDeCosteo Resultado, ModoDecision Modo, string? MotivoPendiente = null);

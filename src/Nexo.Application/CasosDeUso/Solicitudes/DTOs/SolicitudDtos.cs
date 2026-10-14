@@ -89,7 +89,10 @@ public record clsLineaCosteoDto(
     string? IdRecomendacionVehiculo = null,
     /// <summary>S5-HU-20.1/#286: valor de la mercancía capturado para la línea (clsLineaSolicitud.ValorMercancia),
     /// null si no se capturó. Mismo patrón que LineaNegocio/ClaseViaje/ClaseContenedor.</summary>
-    decimal? ValorMercancia = null);
+    decimal? ValorMercancia = null,
+    /// <summary>S5-HU-20.5/#297: orden de la línea en el arreglo con que se capturó (1, 2, 3...). null en líneas
+    /// capturadas antes de S5-HU-18.3, que además salen al final del GET.</summary>
+    int? NumeroLinea = null);
 
 public record clsSolicitudCosteoDto(clsSolicitudDto Solicitud, clsTiemposLogisticosDto Tiempos, IReadOnlyList<clsLineaCosteoDto> Lineas);
 

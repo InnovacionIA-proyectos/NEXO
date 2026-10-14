@@ -22,7 +22,22 @@ public static class clsResolucionDeCatalogos
         return System.Text.RegularExpressions.Regex.Replace(colapsado, @"\s+([.,])", "$1");
     }
 
-    public static string Normalizar(string? s) => (Limpiar(s) ?? string.Empty).ToUpperInvariant();
+    /// <summary>
+    /// Clave de comparación (NO lo que se guarda: eso sale de <see cref="Limpiar"/>). S5-HU-20.5/#297:
+    /// sin tildes y con los separadores <c>_</c> y <c>-</c> unificados a espacio, para que "Bogotá" y
+    /// "Bogota", o "Furgon Refrigerado" y "FURGON_REFRIGERADO", resuelvan a la MISMA fila en vez de crear
+    /// una nueva. Las claves de lo ya guardado se calculan con este mismo método al cargar el catálogo,
+    /// así que no hace falta migrar nada; si dos filas viejas colapsan en una clave gana la primera.
+    /// A propósito NO se unifican otras formas ("T.MULA" vs "Tractomula"): adivinar equivalencias es lo
+    /// que decide un humano en la cuarentena (S5-HU-18.4).
+    /// </summary>
+    public static string Normalizar(string? s)
+    {
+        var limpio = Limpiar(s);
+        if (limpio is null) return string.Empty;
+        var sinSeparadores = limpio.Replace('_', ' ').Replace('-', ' ');
+        return (Limpiar(SinTildes(sinSeparadores)) ?? string.Empty).ToUpperInvariant();
+    }
 
     public static string ClaveRuta(string origen, string destino) => $"{Normalizar(origen)}|{Normalizar(destino)}";
 

@@ -112,7 +112,8 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
             _db, dw, dc, tarifario, plazaInterna, historicoInterno, lineasNegocio, clasesViaje,
             linea, ajustes, soloSice, horasSolicitud, ct);
         await PublicarVencidaSiAplicaAsync(dto, ct);
-        return new clsDecisionDeFlujo(new clsResultadoDeCosteo(dto.ValorPropuesto, dto.FuentePropuesta, dto.Justificacion), modo);
+        return new clsDecisionDeFlujo(
+            new clsResultadoDeCosteo(dto.ValorPropuesto, dto.FuentePropuesta, dto.Justificacion), modo, dto.MotivoPendiente);
     }
 
     /// <summary>
@@ -255,6 +256,11 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
         var destino = Normalizar(linea.clsRuta.Destino);
         var vehiculo = linea.clsConfiguracionVehiculo?.TipoVehiculo;
 
+        // S5-HU-20.5/#297: Cupo (o sin clase de viaje) sin vehículo nunca se autocostea — ver
+        // clsReglaDeCosteo.DecidirFlujo. Se calcula una sola vez y gobierna Solo-SICETAC, plaza que
+        // gana sola y el atajo del histórico.
+        var sinVehiculoQueLoExige = clsReglaDeCosteo.LineaSinVehiculoQueExigeConsultaCompleta(linea.ClaseViaje, vehiculo);
+
         // S5-HU-16.1/#254 + S5-HU-16.2/#255: código DANE real del municipio (tbl_municipios),
         // cuando la ruta ya resolvió contra el buscador de ciudades — null en rutas viejas
         // o con texto que no matcheó ningún municipio (ver clsResolucionDeCatalogos).
@@ -265,7 +271,7 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
         // ya no corta temprano por su cuenta. Clave por DANE (tbl_reglas_solo_sicetac.Origen/
         // Destino SIEMPRE están en código DANE — carga masiva S4-HU-09.2): antes comparaba
         // contra el nombre de ciudad en texto libre de la ruta y nunca coincidía (#255).
-        var hayReglaSoloSicetac = origenDane is not null && destinoDane is not null &&
+        var hayReglaSoloSicetac = !sinVehiculoQueLoExige && origenDane is not null && destinoDane is not null &&
             soloSice.Contains(clsTexto.ClaveRutaVehiculo(origenDane, destinoDane, vehiculo));
 
         clsResultadoTarifarioSap? oficial = null;
@@ -346,7 +352,7 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
         // S5-HU-19.2/#282, Paso 2 anticipado: si la plaza vigente ya va a ganar sola
         // (PlazaVigenteMayor), el histórico ni se consulta — DecidirFlujo no lo mira en
         // ese modo, pedirlo sería una consulta tirada a la basura.
-        var seriaPlazaVigenteMayor = !hayReglaSoloSicetac && sicetac is not null &&
+        var seriaPlazaVigenteMayor = !sinVehiculoQueLoExige && !hayReglaSoloSicetac && sicetac is not null &&
             plazaVigente is not null && plazaVigente.Valor > sicetac.Valor;
 
         clsCandidatoTarifaDto? historico = null;
@@ -386,7 +392,8 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
         }
 
         var decision = clsReglaDeCosteo.DecidirFlujo(
-            hayReglaSoloSicetac, ADominio(sicetac), ADominio(plazaVigente), ADominio(plazaVencidaRef), ADominio(historico));
+            hayReglaSoloSicetac, ADominio(sicetac), ADominio(plazaVigente), ADominio(plazaVencidaRef), ADominio(historico),
+            lineaSinVehiculoQueLoExige: sinVehiculoQueLoExige);
         var (valor, fuente, justificacion) = (decision.Resultado.Valor, decision.Resultado.Fuente, decision.Resultado.Justificacion);
         var plaza = plazaVigente ?? plazaVencidaRef;
         var vencida = plazaVigente is null && plazaVencidaRef is not null;
@@ -412,7 +419,8 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
             valor, fuente, justificacion,
             oficial?.Retorno,
             Vencida: vencida,
-            ModoDecision: decision.Modo.ToString()), decision.Modo);
+            ModoDecision: decision.Modo.ToString(),
+            MotivoPendiente: decision.MotivoPendiente), decision.Modo);
     }
 
     // La decisión vive en Domain (Costeo/Reglas/clsReglaDeCosteo): son invariantes del
