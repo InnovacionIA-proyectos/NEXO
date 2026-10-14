@@ -55,6 +55,19 @@ class CrearRecomendacionDto(ApiModel):
 
 
 class MercanciaDeVehiculoDto(ApiModel):
+    """Lo que de UNA posicion de la solicitud viaja en este camion.
+
+    **Una fila por posicion, no por codigo** (S5-HU-17.8): dos filas del mismo
+    camion pueden traer el mismo `codigoMercancia` si la solicitud declaro dos
+    posiciones de ese tipo con medidas distintas. Quien agrupe por codigo tiene
+    que sumar.
+
+    `indicePosicion` es el indice (base 0) en el arreglo `mercancias` del
+    request, que es como el llamante recupera las medidas: las mando el. Viaja
+    en null al reconsultar una corrida anterior a S5-HU-17.8.
+    """
+
+    indice_posicion: int | None
     id_tipo_mercancia: str
     codigo_mercancia: str
     cantidad: int
@@ -90,6 +103,10 @@ class MedidasEstandarDto(ApiModel):
 
 
 class PiezaFueraDeMedidaDto(ApiModel):
+    # `indicePosicion` por la misma razon que en MercanciaDeVehiculoDto: dos
+    # posiciones del mismo tipo pueden tener medidas distintas y que solo una
+    # exceda. Null al releer una corrida anterior a S5-HU-17.8.
+    indice_posicion: int | None
     id_tipo_mercancia: str
     codigo_mercancia: str
     excesos: list[str]

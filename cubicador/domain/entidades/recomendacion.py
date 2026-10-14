@@ -26,13 +26,21 @@ from decimal import Decimal
 
 @dataclass(frozen=True)
 class MercanciaRecomendada:
-    """Que mercancia va en un camion, en que cantidad.
+    """Lo que de UNA posicion de la solicitud va en un camion.
 
-    Viajan **id y codigo**: el id es lo que Cotifly manda en el request (su
-    HU-021.5) y el codigo es lo que NEXO usa de su lado (S5-HU-18.2). Dar los
-    dos evita que cada consumidor tenga que resolver el otro por su cuenta.
+    `indice` es la posicion en el arreglo `mercancias` del request. La fila es
+    por posicion, no por codigo: un camion puede traer dos filas con el mismo
+    `codigo_mercancia` si la solicitud declaro dos posiciones de ese tipo con
+    medidas distintas. Quien agrupe por codigo tiene que sumar.
+
+    Es **nullable** al releer corridas viejas: las guardadas antes de
+    S5-HU-17.8 no tienen posicion y no se les inventa una.
+
+    Del tipo viajan **id y codigo**: el id para unir contra el catalogo y el
+    codigo para leerlo, igual que en `GET /tipos-mercancia`.
     """
 
+    indice: int | None
     id_tipo_mercancia: str
     codigo_mercancia: str
     cantidad: int
@@ -64,6 +72,7 @@ class VehiculoDeRecomendacion:
 
 @dataclass(frozen=True)
 class PiezaFueraDeMedida:
+    indice: int | None
     id_tipo_mercancia: str
     codigo_mercancia: str
     excesos: tuple[str, ...]

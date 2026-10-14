@@ -258,6 +258,43 @@ async def test_recalcular_crea_una_corrida_nueva_sin_tocar_la_anterior(client):
     assert ultima["idRecomendacion"] == segunda["idRecomendacion"]
 
 
+async def test_dos_posiciones_del_mismo_codigo_viajan_separadas(client):
+    """Una fila por POSICION, no por codigo (S5-HU-17.8).
+
+    Importa que sobreviva el viaje por la base: el POST arma la respuesta desde
+    el motor, pero la reconsulta y `GET /{id}/mercancias` la releen de
+    `recomendacionVehiculoMercancia`. Si la posicion no se guardara, esos dos
+    caminos devolverian algo distinto al POST.
+    """
+    cuerpo = {"idLineaSolicitud": "LINEA-POS", "mercancias": [
+        {"codigoMercancia": "BEBIDAS", "cantidad": 10,
+         "largoCm": 100, "anchoCm": 50, "altoCm": 50, "pesoKg": 20},
+        {"codigoMercancia": "BEBIDAS", "cantidad": 5,
+         "largoCm": 30, "anchoCm": 30, "altoCm": 30, "pesoKg": 2},
+    ]}
+    creada = (await client.post("/recomendaciones", headers=COTIFLY, json=cuerpo)).json()
+    assert creada["resultado"] == "ASIGNADO"
+
+    filas = [m for v in creada["vehiculos"] for m in v["mercancias"]]
+    assert [(m["indicePosicion"], m["cantidad"], m["pesoKg"]) for m in filas] == [
+        (0, 10, 200.0), (1, 5, 10.0)]
+    assert {m["codigoMercancia"] for m in filas} == {"BEBIDAS"}
+
+    # Dos posiciones del mismo producto NO vuelven heterogeneo el camion.
+    assert all(v["heterogenea"] is False for v in creada["vehiculos"])
+
+    # La reconsulta por linea lo relee de la base y dice lo mismo.
+    releida = (await client.get("/recomendaciones", headers=COTIFLY, params={
+        "idLineaSolicitud": "LINEA-POS", "origenSistema": "COTIFLY"})).json()
+    assert [m["indicePosicion"] for v in releida["vehiculos"] for m in v["mercancias"]] == [0, 1]
+
+    # Y el detalle por vehiculo tambien.
+    id_vehiculo = creada["vehiculos"][0]["idRecomendacionVehiculo"]
+    detalle = (await client.get(
+        f"/recomendaciones/{id_vehiculo}/mercancias", headers=COTIFLY)).json()
+    assert [(m["indicePosicion"], m["cantidad"]) for m in detalle] == [(0, 10), (1, 5)]
+
+
 async def test_mercancias_de_un_vehiculo_que_no_existe_es_404(client):
     r = await client.get("/recomendaciones/no-existe/mercancias", headers=COTIFLY)
     assert r.status_code == 404

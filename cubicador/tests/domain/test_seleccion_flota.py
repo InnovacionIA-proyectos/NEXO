@@ -188,9 +188,13 @@ def test_dos_posiciones_del_mismo_tipo_no_se_pisan(catalogo):
     # 10 x 0.25 m3 + 5 x 0.027 m3
     assert sum(v.volumen_total_m3 for v in r.vehiculos) == D("2.64")
 
-    # Siguen siendo UNA entrada por codigo, no una por posicion.
-    for v in r.vehiculos:
-        assert len({m.codigo_mercancia for m in v.mercancias}) == len(v.mercancias)
+    # Una fila por POSICION: las dos comparten codigo y no se confunden.
+    filas = [m for v in r.vehiculos for m in v.mercancias]
+    assert [(m.indice, m.cantidad, m.peso_kg) for m in filas] == [
+        (0, 10, D(200)), (1, 5, D(10))]
+
+    # Dos posiciones del mismo producto NO son carga heterogenea.
+    assert all(not v.heterogenea for v in r.vehiculos)
 
 
 # --- 3. los dos porcentajes -------------------------------------------------

@@ -128,12 +128,14 @@ class SqlRecomendacionRepository:
                     id=_nuevo_id(),
                     recomendacion_vehiculo_id=vehiculo_id,
                     mercancia_id=id_tipo,
+                    indice_posicion=mercancia.indice,
                     cantidad=mercancia.cantidad,
                     peso_kg=mercancia.peso_kg,
                     volumen_m3=mercancia.volumen_m3,
                     creado_por=creado_por, created_at=ahora, updated_at=ahora,
                 ))
                 mercancias.append(MercanciaRecomendada(
+                    indice=mercancia.indice,
                     id_tipo_mercancia=id_tipo, codigo_mercancia=mercancia.codigo_mercancia,
                     cantidad=mercancia.cantidad, peso_kg=mercancia.peso_kg,
                     volumen_m3=mercancia.volumen_m3,
@@ -201,11 +203,17 @@ class SqlRecomendacionRepository:
                 alerta_bajo_llenado=v.alerta_bajo_llenado, heterogenea=v.heterogenea,
                 mercancias=tuple(
                     MercanciaRecomendada(
+                        indice=x.indice_posicion,
                         id_tipo_mercancia=x.mercancia_id,
                         codigo_mercancia=codigos_mercancia.get(x.mercancia_id, ""),
                         cantidad=x.cantidad, peso_kg=x.peso_kg, volumen_m3=x.volumen_m3,
                     )
-                    for x in sorted(v.mercancias, key=lambda x: x.mercancia_id)
+                    # Por posicion cuando la hay; las corridas viejas no la
+                    # tienen y se ordenan por mercancia como siempre.
+                    for x in sorted(
+                        v.mercancias,
+                        key=lambda x: (x.indice_posicion is None,
+                                       x.indice_posicion or 0, x.mercancia_id))
                 ),
             )
             for v in sorted(fila.vehiculos, key=lambda v: v.numero_vehiculo)
@@ -243,11 +251,15 @@ class SqlRecomendacionRepository:
         codigos = await self._codigos_por_id(m.TipoMercancia)
         return [
             MercanciaRecomendada(
+                indice=f.indice_posicion,
                 id_tipo_mercancia=f.mercancia_id,
                 codigo_mercancia=codigos.get(f.mercancia_id, ""),
                 cantidad=f.cantidad, peso_kg=f.peso_kg, volumen_m3=f.volumen_m3,
             )
-            for f in sorted(filas, key=lambda f: f.mercancia_id)
+            for f in sorted(
+                filas,
+                key=lambda f: (f.indice_posicion is None,
+                               f.indice_posicion or 0, f.mercancia_id))
         ]
 
     # ------------------------------------------------------------- auxiliares
@@ -287,6 +299,7 @@ def _extradimension_a_dict(extradimension) -> dict | None:
         },
         "piezas": [
             {
+                "indicePosicion": p.indice,
                 "idTipoMercancia": p.id_tipo_mercancia,
                 "codigoMercancia": p.codigo_mercancia,
                 "excesos": list(p.excesos),
@@ -308,6 +321,8 @@ def _a_extradimension(datos: dict | None) -> ExtradimensionGuardada | None:
         peso_max_kg=Decimal(str(medidas.get("pesoMaxKg", "0"))),
         piezas=tuple(
             PiezaFueraDeMedida(
+                # Las corridas anteriores a S5-HU-17.8 no la traen.
+                indice=p.get("indicePosicion"),
                 id_tipo_mercancia=p.get("idTipoMercancia", ""),
                 codigo_mercancia=p.get("codigoMercancia", ""),
                 excesos=tuple(p.get("excesos", [])),

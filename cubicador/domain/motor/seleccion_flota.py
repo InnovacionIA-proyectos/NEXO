@@ -108,6 +108,15 @@ class SolicitudRecomendacion:
 
 @dataclass(frozen=True)
 class MercanciaEnVehiculo:
+    """Lo que de UNA posicion de la solicitud viaja en un camion.
+
+    La fila es por **posicion**, no por codigo: un mismo camion puede traer
+    dos filas con el mismo `codigo_mercancia` si la solicitud declaro dos
+    posiciones de ese tipo con medidas distintas. Quien agrupe por codigo
+    tiene que sumar.
+    """
+
+    indice: int
     codigo_mercancia: str
     cantidad: int
     peso_kg: Decimal
@@ -136,9 +145,14 @@ class VehiculoRecomendado:
 
 @dataclass(frozen=True)
 class PiezaExcedida:
-    # Los dos identificadores: el id es lo que Cotifly manda en el request y el
-    # codigo lo que usa NEXO. Darlos juntos evita que cada consumidor tenga que
+    # `indice` es la posicion en la solicitud: dos posiciones del mismo tipo
+    # pueden tener medidas distintas y que solo una exceda, asi que el codigo
+    # no basta para saber cual.
+    #
+    # Los dos identificadores del tipo: el id para unir contra el catalogo y
+    # el codigo para leerlo. Darlos juntos evita que cada consumidor tenga que
     # resolver el otro por su cuenta.
+    indice: int
     id_tipo_mercancia: str
     codigo_mercancia: str
     excesos: tuple[str, ...]
@@ -494,7 +508,8 @@ def _detectar_extradimension(
         if m.peso_kg > medidas.peso_max_kg:
             excesos.append(f"peso {m.peso_kg:.1f} kg > {medidas.peso_max_kg:.1f} kg")
         if excesos:
-            excedidas.append(PiezaExcedida(m.tipo.id, m.tipo.codigo, tuple(excesos)))
+            excedidas.append(
+                PiezaExcedida(m.indice, m.tipo.id, m.tipo.codigo, tuple(excesos)))
     return DeteccionExtradimension(bool(excedidas), medidas, tuple(excedidas))
 
 
@@ -538,30 +553,26 @@ def _armar_vehiculo(
 
     unitarios = {str(m.indice): m for m in mercancias}
 
-    # Recien despues de multiplicar se suma por codigo, para que la respuesta
-    # siga trayendo una entrada por tipo de mercancia.
-    acumulado: dict[str, dict[str, Decimal]] = {}
-    for posicion, cantidad in sorted(por_posicion.items()):
-        unitaria = unitarios[posicion]
-        fila = acumulado.setdefault(
-            unitaria.tipo.codigo,
-            {"cantidad": Decimal(0), "peso": Decimal(0), "volumen": Decimal(0)})
-        fila["cantidad"] += cantidad
-        fila["peso"] += unitaria.peso_kg * cantidad
-        fila["volumen"] += unitaria.volumen_unitario_m3 * cantidad
-
+    # Una fila por POSICION, no por codigo: es lo que permite saber cuantas
+    # unidades de cada posicion capturada se fue en este camion. Dos filas
+    # pueden compartir `codigo_mercancia`.
     detalle = tuple(
         MercanciaEnVehiculo(
-            codigo_mercancia=codigo,
-            cantidad=int(fila["cantidad"]),
-            peso_kg=fila["peso"],
-            volumen_m3=fila["volumen"].quantize(Decimal("0.01")),
+            indice=unitarios[posicion].indice,
+            codigo_mercancia=unitarios[posicion].tipo.codigo,
+            cantidad=cantidad,
+            peso_kg=unitarios[posicion].peso_kg * cantidad,
+            volumen_m3=(
+                unitarios[posicion].volumen_unitario_m3 * cantidad).quantize(Decimal("0.01")),
         )
-        for codigo, fila in sorted(acumulado.items())
+        for posicion, cantidad in sorted(por_posicion.items(), key=lambda p: int(p[0]))
     )
 
     peso = sum((d.peso_kg for d in detalle), Decimal(0))
-    volumen = sum((fila["volumen"] for fila in acumulado.values()), Decimal(0))
+    volumen = sum(
+        (unitarios[str(d.indice)].volumen_unitario_m3 * d.cantidad for d in detalle),
+        Decimal(0),
+    )
     pct_volumen = _porcentaje(volumen, vehiculo.volumen_m3)
     pct_peso = _porcentaje(peso, capacidad_kg)
 
@@ -575,7 +586,9 @@ def _armar_vehiculo(
         porcentaje_llenado_volumen=pct_volumen,
         porcentaje_llenado_peso=pct_peso,
         alerta_bajo_llenado=max(pct_volumen, pct_peso) < umbral_alerta * CIEN,
-        heterogenea=len(detalle) > 1,
+        # Por tipos DISTINTOS, no por numero de filas: dos posiciones del
+        # mismo producto en un camion no lo vuelven carga heterogenea.
+        heterogenea=len({d.codigo_mercancia for d in detalle}) > 1,
         mercancias=detalle,
     )
 

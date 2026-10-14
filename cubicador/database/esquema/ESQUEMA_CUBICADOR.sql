@@ -205,6 +205,9 @@ CREATE TABLE [dbo_cubicador].[recomendacionVehiculoMercancia] (
     [Id] uniqueidentifier NOT NULL DEFAULT (newid()),
     [IdRecomendacionVehiculo] uniqueidentifier NOT NULL,
     [IdMercancia] uniqueidentifier NOT NULL,
+    -- S5-HU-17.8: posicion de la mercancia en la solicitud. NULL en corridas
+    -- anteriores al cambio, que agrupaban por codigo.
+    [IndicePosicion] int NULL,
     [CantidadUnidadesMercancia] int NOT NULL,
     [PesoMercanciaKg] decimal(18,2) NOT NULL,
     [VolumenMercanciaM3] decimal(18,4) NOT NULL,
