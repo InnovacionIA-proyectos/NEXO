@@ -302,7 +302,8 @@ interface BandejaItemDto {                       // fila de GET /api/solicitudes
   lineas: number; fleteTotal: Decimal | null; lineasSinFlete: number
   fechaCaptura: FechaISO
   atencion: "pendiente" | "automatico" | "administrador" | string
-  vigencia: "vigente" | "vencida"
+  vigencia: "vigente" | "vencida"                // S5-HU-23.1/#289: por Fecha Límite (deadline), no por antigüedad de la captura; sin deadline = "vigente"
+  resultado: "SinDefinir" | "Ganada" | "Perdida" | null // S5-HU-23.1/#289: de la cotización; null si no hay. Con varias: la que tenga resultado distinto de SinDefinir (la más reciente), si no la más reciente
 }
 interface DesgloseScoreDto { total: number; urgencia: number; valor: number; probabilidad: number; tipo: number }
 interface CatalogoLineaResueltoDto {             // respuesta de resolver-catalogos
@@ -569,14 +570,37 @@ Formato de cada endpoint:
 | Query | | Tipo | Restricción |
 |---|---|---|---|
 | `estado` | *opcional* | string | `EstadoSolicitud` |
-| `atencion` | *opcional* | string | `pendientes` \| `automatico` \| `administrador` \| `atendidas` \| `todas`. Sin filtros → cola de pendientes |
+| `atencion` | *opcional* | string | `pendientes` \| `automatico` \| `administrador` \| `atendidas` \| `todas`. Sin filtros → cola de pendientes (ver abajo) |
 | `desde`, `hasta` | *opcional* | fecha ISO | rango de fecha de captura |
-| `vigencia` | *opcional* | string | `vigente` \| `vencida` |
+| `vigencia` | *opcional* | string | `vigente` \| `vencida`. S5-HU-23.1/#289: se mide contra la **Fecha Límite** (`deadline`) vs. "ahora"; una solicitud **sin deadline cuenta como vigente**. Antes: "capturada hace menos de 7 días" |
+| `resultado` | *opcional* | string | S5-HU-23.1/#289 (HU-B25). `esperando` \| `ganada` \| `perdida`. Valor desconocido → `400 RESULTADO_INVALIDO` |
 | `orderBy` | *opcional* | string | ignorado: siempre ordena por score |
 | `page` | *opcional* | int | ≥ 1, def. 1 |
 | `pageSize` | *opcional* | int | 1–200, def. 50 |
 
+**La misma consulta sirve a todos los roles.** Para `Comercial` se limita **antes** a las solicitudes
+que él mismo creó (aislamiento de #199 / S4-HU-19.1); el resto de los roles ve todo. Los filtros de
+abajo operan sobre ese universo, así que un Comercial nunca ve filas de otro.
+
+**`atencion=pendientes` (la cola de trabajo del Administrador de Tarifas)** —
+S5-HU-23.1/#289— suma a las solicitudes con alguna línea **sin flete** las que tienen **todas las
+líneas con flete y alguna `Revisada`** por el Administrador de Fletes pero que todavía no se
+entregan (antes no salían en ninguna cola). No es una categoría nueva: esa solicitud **sigue**
+apareciendo en `administrador`/`atendidas`. No aplica a `automatico` (el auto-costeo tiene su
+propio atajo, S4-HU-15.6). Con estado `Pendiente`/`EnCosteo` implícito, al pasar a `Entregada`
+deja de salir en Pendientes.
+
+**`resultado`** — al marcar Ganada/Perdida la solicitud pasa a `Entregada` y sale de Pendientes;
+esta es la forma de seguirla. **No se mezcla en Pendientes.**
+- `esperando`: cotización `Entregada` (o auto-costeada en `Borrador`, que nunca se entrega) **sin**
+  resultado, y solicitud no `Descartada` — aunque la solicitud esté `Entregada`. Excluye Ganadas,
+  Perdidas y descartadas.
+- `ganada` / `perdida`: solo esas.
+- Con `resultado` informado y **sin `atencion`**, la atención se trata como `todas` (no se aplica la
+  restricción por defecto a `Pendiente`/`EnCosteo`). Con `atencion` explícita se respeta y se combina.
+
 - **→** `200 Pagina<BandejaItemDto>`
+- **Errores**: `400 RESULTADO_INVALIDO`
 
 #### `GET /api/solicitudes/{id}` — abrir solicitud (costeo pre-armado)
 - **Roles**: Todos.
