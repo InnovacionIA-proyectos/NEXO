@@ -136,6 +136,26 @@ async def crear_carroceria(
     return fila
 
 
+async def actualizar_carroceria(
+    repo: ICatalogoCrudRepository, id: str, nombre: str, activo: bool, version: int,
+    usuario_id: str, eventos=None,
+):
+    """Actualiza una carroceria y avisa a NEXO con la FILA ENTERA.
+
+    Antes el router publicaba a mano `{"codigo", "nombre", "activo"}`: sin `id` ni `version` y con
+    claves distintas a las del DTO. NEXO hace upsert por Id, asi que el consumidor recibia Id nulo y
+    el mensaje agotaba sus reintentos y caia a la cola de error (alerta del 2026-10-14, disparada por
+    el E2E de carrocerias del CI). Crear y republicar ya usaban `_evento_carroceria`; actualizar era
+    el unico camino que armaba el payload aparte.
+    """
+    fila = await repo.actualizar(
+        "carrocerias", id, {"nombre": nombre, "activo": activo}, version, usuario_id)
+    if fila is None:
+        raise NotFoundException("NO_ENCONTRADO", f"No existe la carroceria '{id}'.")
+    await _publicar(eventos, "carrocerias", "actualizada", fila.id, _evento_carroceria(fila))
+    return fila
+
+
 async def eliminar_del_catalogo(
     repo: ICatalogoCrudRepository, catalogo: str, id: str, version: int, eventos=None,
 ) -> None:
