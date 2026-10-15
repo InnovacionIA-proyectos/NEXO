@@ -107,13 +107,23 @@ public class clsSicetacPeriodoYTramosVaciosTests
         });
     }
 
-    private void Limpiar(Guid solicitudId) => _fx.WithDb(db =>
+    /// <summary>Limpieza de MEJOR ESFUERZO: la base de pruebas es compartida y un bloqueo ajeno (CI del 2026-10-15: el
+    /// DELETE de cotizaciones esperó 30 s) no debe tumbar una prueba cuyas aserciones ya pasaron. Si no se pudo borrar,
+    /// la solicitud queda como residuo de prueba (ruta/solicitud con sufijo único), igual que si la corrida se cortara.</summary>
+    private void Limpiar(Guid solicitudId)
     {
-        db.Cotizaciones.Where(c => c.SolicitudId == solicitudId).ExecuteDelete();
-        db.LineasSolicitud.Where(l => l.SolicitudId == solicitudId).ExecuteDelete();
-        db.Solicitudes.Where(s => s.Id == solicitudId).ExecuteDelete();
-        return 0;
-    });
+        try
+        {
+            _fx.WithDb(db =>
+            {
+                db.Cotizaciones.Where(c => c.SolicitudId == solicitudId).ExecuteDelete();
+                db.LineasSolicitud.Where(l => l.SolicitudId == solicitudId).ExecuteDelete();
+                db.Solicitudes.Where(s => s.Id == solicitudId).ExecuteDelete();
+                return 0;
+            });
+        }
+        catch (Microsoft.Data.SqlClient.SqlException) { }
+    }
 
     // ------------------------------------------------------------------ (2) SICE-TAC solo del mes actual
 
