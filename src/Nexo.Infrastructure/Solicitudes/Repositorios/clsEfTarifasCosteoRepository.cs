@@ -15,6 +15,8 @@ public sealed class clsEfTarifasCosteoRepository(clsNexoDbContext db, IPropuesta
     /// período vigente). Ahora lee la misma fuente DWSice que ya usa el motor
     /// automático de costeo (<see cref="IPropuestaTarifaPort.PisoSicetacVigenteAsync"/>),
     /// así que "vencida" ya no aplica: DWSice solo trae el período actual.
+    /// #300: y solo se usa si ese período es el del mes y año actuales (sin mes de gracia); si no, devuelve null y
+    /// <see cref="MotivoSicetacNoUsadoAsync"/> dice por qué.
     /// </summary>
     public async Task<clsPisoSicetacDto?> PisoVigenteAsync(
         string origen, string destino, string? vehiculo, TipologiaCarga? tipologia,
@@ -26,6 +28,8 @@ public sealed class clsEfTarifasCosteoRepository(clsNexoDbContext db, IPropuesta
             Guid.Empty, piso.ValorPiso, piso.ValorHora, piso.HorasPactadas, piso.Periodo,
             "vigente", piso.Configuracion, piso.TipoCarga, piso.UnidadTransporte, piso.CondicionCarga);
     }
+
+    public Task<string?> MotivoSicetacNoUsadoAsync(CancellationToken ct) => propuestas.MotivoSicetacNoUsadoAsync(ct);
 
     public async Task<IReadOnlyList<clsHistoricaSugeridaDto>> HistoricasSugeridasAsync(
         Guid rutaId, TipologiaCarga? tipologia, DateTimeOffset ahora, int top, CancellationToken ct)

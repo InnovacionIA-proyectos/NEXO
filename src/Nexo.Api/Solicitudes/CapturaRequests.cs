@@ -86,8 +86,9 @@ public class clsCapturaLineaRequest
 
     /// <summary>
     /// S4-HU-15.5/#251: horas de cargue/descargue de ESTA línea — sobreescribe el
-    /// default (4h+4h, o 2h totales si RetornaContenedor=true) cuando el Comercial las
-    /// conoce de antemano. Sin esto, cae al default de la línea.
+    /// default (4h+4h; 1h+1h si la línea ES una devolución de contenedor, lineaNegocio=DevolucionContenedor)
+    /// cuando el Comercial las conoce de antemano. Sin esto, cae al default de la línea. #300: marcar
+    /// RetornaContenedor ya NO cambia estas horas — el tramo vacío de retorno se costea aparte con 1h+1h.
     /// </summary>
     [Range(typeof(decimal), "0", "240", ParseLimitsInInvariantCulture = true)]
     public decimal? HorasCargue { get; set; }

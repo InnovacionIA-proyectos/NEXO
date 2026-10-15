@@ -56,6 +56,10 @@ public sealed class clsAplicarPropuestasCommandHandler(
         {
             if (p.ValorPropuesto is not { } valor || conFlete.Contains(p.LineaId)) continue;
             if (command.SoloAutomaticas && p.ModoDecision == nameof(Nexo.Domain.Costeo.Reglas.ModoDecision.ConsultaCompleta)) continue;
+            // #300: una línea con motivo propio de pendiente (sin vehículo, o sin piso SICE-TAC porque su período no es
+            // el del mes actual) nunca se aplica en bloque: queda para que el Administrador de Tarifas la valide.
+            // Sin piso contra el cual comparar, aplicar la propuesta sería guardar un flete sin validar.
+            if (p.MotivoPendiente is not null) continue;
             var linea = new clsCotizacionLinea
             {
                 CotizacionId = c.Id,

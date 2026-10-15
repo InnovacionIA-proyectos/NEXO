@@ -54,4 +54,27 @@ public class clsPisoConHorasTests
 
         Assert.Equal(1_000_000m, valor);
     }
+
+    // #300: tramo vacío (levante / retorno) = 1+1 = 2 h. Con horas pactadas de 8 h, el piso se recalcula con 2 h:
+    // base + valorHora × 2, no el ValorSiceConHora de las 8 h (que sobrestimaba el tramo vacío).
+    [Fact]
+    public void Tramo_vacio_con_2_horas_recalcula_el_piso_con_2_horas_y_no_con_las_8_pactadas()
+    {
+        var valor = clsPisoConHoras.Calcular(
+            valorBase: 1_000_000m, valorHora: 50_000m, horasPactadas: 8m, valorSiceConHora: 1_400_000m,
+            horasSolicitud: clsResolucionHorasLinea.HorasTotalesTramoVacio);
+
+        Assert.Equal(1_100_000m, valor); // 1_000_000 + 50_000 × 2
+    }
+
+    // Filas VACIO de DWSice (Sin carga) traen ValorHora = 0: las horas no mueven el valor.
+    [Fact]
+    public void Tramo_vacio_con_valorHora_cero_deja_el_valor_base()
+    {
+        var valor = clsPisoConHoras.Calcular(
+            valorBase: 5_877_577m, valorHora: 0m, horasPactadas: 8m, valorSiceConHora: 5_877_577m,
+            horasSolicitud: clsResolucionHorasLinea.HorasTotalesTramoVacio);
+
+        Assert.Equal(5_877_577m, valor);
+    }
 }

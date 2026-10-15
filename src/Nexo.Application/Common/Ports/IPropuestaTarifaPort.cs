@@ -31,4 +31,12 @@ public interface IPropuestaTarifaPort
     Task<clsPisoSicetacVigenteDto?> PisoSicetacVigenteAsync(
         string origen, string destino, string? vehiculo, TipologiaCarga? tipologia,
         string? carroceria, CancellationToken ct = default);
+
+    /// <summary>
+    /// #300: el piso SICE-TAC solo se usa si su período es el del mes y año actuales (sin mes de gracia).
+    /// Devuelve el motivo visible cuando el período más reciente cargado en DWSice NO lo es — y entonces el
+    /// piso, la propuesta y el aprovisionamiento salen sin SICE-TAC. Null si se usa con normalidad, o si el DW
+    /// no está configurado o no tiene ningún período cargado.
+    /// </summary>
+    Task<string?> MotivoSicetacNoUsadoAsync(CancellationToken ct = default);
 }

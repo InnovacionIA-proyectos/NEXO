@@ -94,7 +94,11 @@ public record clsLineaCosteoDto(
     /// capturadas antes de S5-HU-18.3, que además salen al final del GET.</summary>
     int? NumeroLinea = null);
 
-public record clsSolicitudCosteoDto(clsSolicitudDto Solicitud, clsTiemposLogisticosDto Tiempos, IReadOnlyList<clsLineaCosteoDto> Lineas);
+public record clsSolicitudCosteoDto(
+    clsSolicitudDto Solicitud, clsTiemposLogisticosDto Tiempos, IReadOnlyList<clsLineaCosteoDto> Lineas,
+    /// <summary>#300: aviso visible cuando el piso SICE-TAC NO se usa porque el período más reciente cargado no es
+    /// el del mes actual (las líneas salen con <c>pisoSicetac</c> null). null = el piso se usa con normalidad.</summary>
+    string? AvisoSicetac = null);
 
 /// <summary>Resultado de la captura, incluido el auto-costeo con la Biblioteca.</summary>
 public record clsCapturaResultDto(

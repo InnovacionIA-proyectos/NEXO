@@ -26,8 +26,8 @@ public sealed record clsCapturaLineaInput(
     string? CiudadLevanteContenedor, decimal? ValorAprovisionamiento, decimal? Peso, decimal? ValorMercancia,
     IReadOnlyList<clsPosicionCargaDto>? Posiciones,
     /// <summary>S4-HU-15.5/#251: horas de ESTA línea — null usa el default
-    /// (clsResolucionHorasLinea.Resolver: 2h si RetornaContenedor, si no las de la
-    /// solicitud completa).</summary>
+    /// (clsResolucionHorasLinea.Resolver: 1h+1h si la línea ES una devolución de contenedor, si no las de la
+    /// solicitud completa; #300: "retorna contenedor" ya no las cambia).</summary>
     decimal? HorasCargue = null, decimal? HorasDescargue = null,
     /// <summary>S5-HU-16.1/#254: Id de tbl_municipios cuando Origen/Destino se escogió
     /// desde el buscador de ciudades — null si viene de texto libre (formulario viejo,
@@ -123,8 +123,13 @@ public sealed class clsCapturarSolicitudCommandHandler(
 
             var ciudadDevolucion = clsResolucionDeCatalogos.Limpiar(lr.CiudadDevolucionContenedor);
             var retornaContenedor = (lr.RetornaContenedor ?? false) || ciudadDevolucion is not null;
+            // #300: solo una línea que ES una devolución de contenedor arranca con 1h+1h. "Retorna contenedor"
+            // de un viaje cargado ya no toca las horas de la línea (RN-03): el tramo vacío de retorno se calcula
+            // aparte, con sus propias 1h+1h (clsPropuestaTarifaAdapter).
+            var lineaNegocio = ParseLineaNegocio(lr.LineaNegocio);
             var (horasCargue, horasDescargue) = clsResolucionHorasLinea.Resolver(
-                lr.HorasCargue, lr.HorasDescargue, retornaContenedor, horasCargueSolicitud, horasDescargueSolicitud);
+                lr.HorasCargue, lr.HorasDescargue, lineaNegocio == LineaNegocio.DevolucionContenedor,
+                horasCargueSolicitud, horasDescargueSolicitud);
 
             solicitud.Lineas.Add(new clsLineaSolicitud
             {
@@ -134,7 +139,7 @@ public sealed class clsCapturarSolicitudCommandHandler(
                 ConfigVehiculoId = vehiculo?.Id,
                 clsConfiguracionVehiculo = vehiculo,
                 Tipologia = ParseTipologia(lr.Tipologia),
-                LineaNegocio = ParseLineaNegocio(lr.LineaNegocio),
+                LineaNegocio = lineaNegocio,
                 ClaseViaje = ParseClaseViaje(lr.ClaseViaje),
                 ClaseContenedor = ParseClaseContenedor(lr.ClaseContenedor),
                 Exclusivo = lr.Exclusivo ?? false,

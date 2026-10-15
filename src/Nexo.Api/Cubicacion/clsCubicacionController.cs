@@ -49,7 +49,7 @@ public class clsCubicacionController(
     /// <c>condicionada</c> son resultados normales de esta llamada, NO errores: siguen
     /// devolviendo 200, con el detalle dentro de <c>resultado</c>/<c>motivoSinSeleccion</c>.
     /// </summary>
-    [Authorize(Roles = "Comercial,CoordinadorFletes,Admin")]
+    [Authorize(Roles = "Comercial,CoordinadorFletes,AdminTarifas,Admin")]
     [HttpPost]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -68,7 +68,7 @@ public class clsCubicacionController(
     /// obligatorio: un mismo código de línea puede existir tanto en NEXO como en Cotifly,
     /// como rutas distintas, y no se infiere del llamante.
     /// </summary>
-    [Authorize(Roles = "Comercial,CoordinadorFletes,Admin")]
+    [Authorize(Roles = "Comercial,CoordinadorFletes,AdminTarifas,Admin")]
     [HttpGet]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]

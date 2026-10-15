@@ -51,7 +51,7 @@ public sealed class clsCargarLineasBulkCommandHandler(
         var nuevas = command.Lineas.Select((lr, i) =>
         {
             var (horasCargue, horasDescargue) = clsResolucionHorasLinea.Resolver(
-                lr.HorasCargue, lr.HorasDescargue, retornaContenedor: false,
+                lr.HorasCargue, lr.HorasDescargue, esDevolucionContenedor: false,
                 tiemposSolicitud.HorasCargue, tiemposSolicitud.HorasDescargue);
             return new clsLineaSolicitud
             {
