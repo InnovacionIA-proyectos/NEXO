@@ -58,6 +58,7 @@ Biblioteca que no son de Comercial. Capturar y analizar un Excel siguen siendo s
 - Crear y editar servicios conexos; importarlos desde Excel
 - Crear cotización, aplicar propuestas, agregar línea de flete, editar un flete manual (`PUT .../lineas/{lineaSolicitudId}`), agregar y quitar servicios conexos (también tras entregar, mientras no esté Ganada/Perdida; S5-HU-20.1/#286), entregar y marcar resultado
 - Ver métricas de cumplimiento y KPIs del piloto
+- Cubicación rápida (`POST` y `GET /api/cubicacion`) — #300: antes solo Comercial, CoordinadorFletes y Admin
 
 ### ServiciosLogisticos
 - Crear y editar servicios conexos; importarlos desde Excel

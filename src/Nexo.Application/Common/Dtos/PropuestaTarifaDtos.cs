@@ -39,7 +39,10 @@ namespace Nexo.Application.Common.Dtos;
 public record clsCandidatoTarifaDto(
     string Fuente, decimal Valor, string Detalle, string Criterio, int Coincidencias,
     string? Advertencia = null, string TablaOrigen = "SAP",
-    decimal? ValorPisoBase = null, decimal? ValorTiemposLogisticos = null);
+    decimal? ValorPisoBase = null, decimal? ValorTiemposLogisticos = null,
+    /// <summary>#300: configuración SICE-TAC de la fila (2L2, C2, 3S3...) cuando el candidato es SICE-TAC. Permite que el
+    /// tramo vacío de retorno use el MISMO vehículo del viaje cargado aunque la línea no traiga uno (contenedor).</summary>
+    string? Configuracion = null);
 
 /// <summary>
 /// Piso SICE-TAC vigente con el desglose de horas, para Mesa de Costeo

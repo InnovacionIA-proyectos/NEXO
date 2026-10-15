@@ -98,6 +98,16 @@ comparan sin tildes y con `_` y `-` equivalentes a espacio (`Bogotá` = `Bogota`
   las posiciones. Si vienen los dos, deben coincidir (tolerancia 1 %). Es `400 PESO_INCONSISTENTE`
   si no.
 
+### 3.6 Horas de cargue y descargue por línea (#300)
+
+- Cotifly puede mandar `horasCargue` y `horasDescargue` en la línea (0–240). Hay que mandar **las dos**: si
+  falta una, NEXO ignora la que llegó y aplica el default. Si vienen las dos, **se respetan**.
+- Default del viaje **cargado**: **4 + 4** (o las de la solicitud, si traen).
+- Una línea que **es** una devolución de contenedor vacío (`lineaNegocio` = devolución) arranca con **1 + 1**.
+- `retornaContenedor` + `ciudadDevolucionContenedor` **no cambian** las horas de la línea: NEXO suma aparte el
+  tramo vacío de retorno (piso SICE-TAC de viaje vacío, 1 + 1). Lo mismo el levante en otra ciudad. Esas horas
+  de los tramos vacíos no se mandan ni se guardan por línea: son fijas.
+
 ## 4. "Línea sin vehículo": solo Cupo
 
 Una línea **sin `tipoVehiculo`** se acepta. Pero:

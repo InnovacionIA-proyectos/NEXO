@@ -326,7 +326,9 @@ interface HistoricaSugeridaDto { id: UUID; valor: Decimal; fecha: Fecha; tipolog
 interface LineaCosteoDto {
   lineaId: UUID; rutaId: UUID | null; ruta: string | null; tipologia: TipologiaCarga | null
   peso: Decimal | null; tipoVehiculo: string | null; carroceria: string | null
-  posiciones: PosicionCargaDto[]; pisoSicetac: PisoSicetacDto | null; historicas: HistoricaSugeridaDto[]
+  posiciones: PosicionCargaDto[]
+  pisoSicetac: PisoSicetacDto | null // #300: null también cuando el período más reciente cargado en DWSice NO es el del mes actual (ver avisoSicetac)
+  historicas: HistoricaSugeridaDto[]
   horasCargue: Decimal | null; horasDescargue: Decimal | null   // #251, horas EFECTIVAS con las que se costeó
   grupoRutaId: UUID | null         // S5-HU-18.3/#275: agrupa las líneas de una misma carga heterogénea.
                                    // Lo pone QUIEN CREA las líneas del grupo (Cotifly o el portal); NEXO lo guarda tal cual.
@@ -335,7 +337,12 @@ interface LineaCosteoDto {
   numeroLinea: number | null       // S5-HU-20.5/#297: orden de la línea en el arreglo de la captura (1, 2, 3...); null en líneas capturadas antes de S5-HU-18.3. El GET ya las devuelve ORDENADAS por este campo
 }
 interface TiemposLogisticosDto { horasCargue: Decimal; horasDescargue: Decimal }
-interface SolicitudCosteoDto { solicitud: SolicitudDto; tiempos: TiemposLogisticosDto; lineas: LineaCosteoDto[] }
+interface SolicitudCosteoDto {
+  solicitud: SolicitudDto; tiempos: TiemposLogisticosDto; lineas: LineaCosteoDto[]
+  // #300: aviso visible cuando alguna línea quedó sin piso porque el período SICE-TAC más reciente cargado NO es el del mes y año
+  // actuales (p. ej. "SICE-TAC no se usa: el período más reciente cargado es 202609 y el del mes actual es 202610 (sin mes de gracia)."). null = el piso se usa con normalidad
+  avisoSicetac: string | null
+}
 interface CapturaResultDto {
   id: UUID; lineas: number; rutasCreadas: number; vehiculosCreados: number
   scorePrioridad: Decimal; fletesCalculados: number; lineasPorCostear: number; costeoEnProceso: boolean
@@ -355,6 +362,7 @@ interface CandidatoTarifaDto {
   // Se calculan en el servidor con las horas REALES de la línea; el front no debe reconstruirlos (la tabla "Tarifas SICE-TAC" es catálogo crudo, con horas por defecto).
   valorPisoBase: Decimal | null          // el piso de la fila de DWSice, sin horas logísticas
   valorTiemposLogisticos: Decimal | null // lo que suman las horas logísticas (valor − piso base; sirve también con el valorSiceConHora de respaldo)
+  configuracion: string | null           // #300: configuración SICE-TAC de la fila (2L2, C2, 3S3...) — solo el candidato `sicetac` (y los de tramo vacío) la traen
 }
 interface AprovisionamientoDto { candidato: CandidatoTarifaDto | null }
 
@@ -382,9 +390,9 @@ interface PropuestaLineaDto {
   lineaId: UUID; ruta: string | null; vehiculo: string | null; peso: Decimal | null
   sicetac: CandidatoTarifaDto | null; plaza: CandidatoTarifaDto | null; historicoSap: CandidatoTarifaDto | null
   valorPropuesto: Decimal | null; fuentePropuesta: string | null; justificacion: string
-  retornoContenedor: CandidatoTarifaDto | null
+  retornoContenedor: CandidatoTarifaDto | null // #300: piso SICE-TAC de VIAJE VACÍO (destino → ciudad de devolución) con 1h+1h, fuente "retorno_contenedor". Ya NO es la tarifa de plaza de la línea 6
   modoDecision: "SoloSicetac" | "PlazaVigenteMayor" | "ConsultaCompleta" // S5-HU-19.2/#282: decide si el auto-costeo guarda el flete (los dos primeros) o la línea queda pendiente de un humano (ConsultaCompleta) — esto último AUNQUE valorPropuesto no sea null
-  motivoPendiente: string | null // S5-HU-20.5/#297: motivo ESPECÍFICO con el que queda pendiente la línea; hoy solo "Línea sin vehículo: requiere consulta completa". null = el motivo genérico de consulta completa
+  motivoPendiente: string | null // S5-HU-20.5/#297: motivo ESPECÍFICO con el que queda pendiente la línea; "Línea sin vehículo: requiere consulta completa" o, desde #300, "SICE-TAC no se usa: el período más reciente cargado es AAAAMM y el del mes actual es AAAAMM (sin mes de gracia). El Administrador de Tarifas debe validar el flete.". null = el motivo genérico de consulta completa
 }
 interface PropuestaSolicitudDto { solicitudId: UUID; lineas: PropuestaLineaDto[]; advertencias: string[] }
 
@@ -702,6 +710,22 @@ tolerante y luego la propia antes de rendirse a la vencida como referencia.
 `plaza`/`historicoSap` llevan `tablaOrigen` ("SAP" | "NEXO") para saber de
 cuál de las dos vino el candidato ganador.
 
+**SICE-TAC solo del mes y año actuales (#300).** El piso SICE-TAC se usa únicamente si su período (AAAAMM)
+es el del mes y año actuales **en hora de Colombia**, **sin mes de gracia**: el día 1 del mes siguiente el
+período anterior ya no sirve. Antes se tomaba el período más alto cargado en DWSice sin compararlo con hoy.
+Si no es el actual, `sicetac` sale `null`, la línea queda en `modoDecision = "ConsultaCompleta"` (sin piso nunca
+hay modo automático), la `justificacion` empieza por el motivo y `motivoPendiente` lo trae — el usuario lo ve
+en la Mesa. Lo mismo aplica al piso de la Mesa (`pisoSicetac` null + `avisoSicetac`) y al aprovisionamiento.
+`POST .../aplicar-propuestas` **no** aplica una línea con `motivoPendiente`: sin piso contra el cual validar,
+guardar el flete sería guardarlo sin validar.
+
+**Tramos vacíos con 1 h + 1 h (#300).** Todo tramo vacío se calcula como piso SICE-TAC de viaje VACÍO con
+1 h de cargue + 1 h de descargue (`clsResolucionHorasLinea.HorasTramoVacio`): el **retorno del contenedor**
+(`retornoContenedor`, destino de la línea → `ciudadDevolucionContenedor`) y el **levante en otra ciudad**
+(`GET /api/captura-solicitudes/aprovisionamiento`). Las horas son **por tramo**: el viaje cargado conserva las
+de la línea (4 + 4 por defecto) y marcar `retornaContenedor` ya **no** las cambia. Las horas de los tramos
+vacíos son una constante de negocio, no un campo de la línea.
+
 - **Roles**: Todos.
 - **→** `200 PropuestaSolicitudDto`
 - **Errores**: `404 SOLICITUD_NO_ENCONTRADA` · `404 LINEA_NO_ENCONTRADA`
@@ -772,7 +796,8 @@ tal como llegó (limpio de espacios).
 | `lineaNegocio` | *opcional* | string | máx. 100 |
 | `claseViaje` | *opcional* | string | máx. 50 |
 | `claseContenedor` | *opcional* | string | máx. 20 |
-| `exclusivo`, `consolidado`, `retornaContenedor`, `levanteContenedorDiferente` | *opcional* | boolean | |
+| `exclusivo`, `consolidado`, `retornaContenedor`, `levanteContenedorDiferente` | *opcional* | boolean | #300: `retornaContenedor` agrega el tramo vacío de retorno (1 h + 1 h, aparte) y **ya no cambia las horas de la línea** (RN-03) |
+| `horasCargue`, `horasDescargue` | *opcional* | decimal | 0–240. S4-HU-15.5/#251. Hay que mandar **las dos** para que se respeten; si falta una, aplica el default. Default: **4 + 4** (o las de la solicitud); **1 + 1** si la línea ES una devolución de contenedor (`lineaNegocio` = devolución). #300 |
 | `ciudadDevolucionContenedor` | *opcional* | string | máx. 150 |
 | `ciudadLevanteContenedor` | *opcional* | string | máx. 150 |
 | `valorAprovisionamiento` | *opcional* | decimal | monetario |
@@ -797,7 +822,8 @@ coincidir con tolerancia del 1 %.
 - **Errores**: `400 CLIENTE_REQUERIDO` · `400 CLIENTE_INVALIDO` · `400 CLIENTE_BP_INVALIDO` · `400 DWCUBOS_NO_CONFIGURADO` (se usó `clienteBp` y el DW no está configurado en el ambiente) · `400 ENUM_INVALIDO` · `400 LINEA_INCOMPLETA` · `400 PESO_REQUERIDO` · `400 PESO_INCONSISTENTE`
 
 #### `GET /api/captura-solicitudes/aprovisionamiento`
-Piso SICE-TAC del viaje vacío (levante → origen del cargue).
+Piso SICE-TAC del viaje vacío (levante → origen del cargue). #300: se calcula con **1 h + 1 h** (2 h en total), no con las horas
+pactadas de DWSice, y solo con el período SICE-TAC del mes actual (si no, `candidato: null`).
 
 | Query | | Tipo | Restricción |
 |---|---|---|---|
@@ -1377,7 +1403,7 @@ Pide al Cubicador una recomendación de flota para una línea. A diferencia del
 contrato viejo, **SÍ persiste** del lado del Cubicador (append-only: cada
 corrida queda guardada, reconsultable con el GET de abajo).
 
-- **Roles**: `Comercial`, `CoordinadorFletes`, `Admin`.
+- **Roles**: `Comercial`, `CoordinadorFletes`, `AdminTarifas`, `Admin` (#300: se agregó `AdminTarifas`).
 - `usuarioId` del contrato del Cubicador lo pone NEXO automáticamente (el id
   del usuario autenticado) — no es un campo del body.
 
@@ -1408,7 +1434,7 @@ corrida queda guardada, reconsultable con el GET de abajo).
 #### `GET /api/cubicacion` — reconsultar
 La última recomendación de una línea.
 
-- **Roles**: `Comercial`, `CoordinadorFletes`, `Admin`.
+- **Roles**: `Comercial`, `CoordinadorFletes`, `AdminTarifas`, `Admin` (#300).
 
 | Query | | Tipo | Restricción |
 |---|---|---|---|
@@ -1788,6 +1814,7 @@ abiertos a los 6 roles.
 | `POST /api/solicitudes/resolver-catalogos` | ✅ | ✅ | | | | ✅ |
 | `POST /api/solicitudes/{id}/lineas:bulk` | | ✅ | | | | ✅ |
 | `POST /api/solicitudes/{id}/rechazar` | ✅ | ✅ | | | | ✅ |
+| `POST /api/cubicacion` · `GET /api/cubicacion` (#300: + AdminTarifas) | ✅ | ✅ | ✅ | | | ✅ |
 | `POST /api/solicitudes/{id}/recalcular-score` | | ✅ | | | | ✅ |
 | `POST /api/cotizaciones` · `aplicar-propuestas` | ✅ | ✅ | ✅ | | | ✅ |
 | `POST /api/cotizaciones/{id}/resultado` | ✅ | | | | | ✅ |

@@ -79,4 +79,27 @@ public class clsAplicarPropuestasCommandTests
         var linea = Assert.Single(cotizacion.Lineas);
         Assert.Equal(lineaAuto, linea.LineaSolicitudId);
     }
+
+    // #300: sin piso SICE-TAC (su período no es el del mes actual) la línea trae un motivo propio de pendiente y NO se
+    // aplica en bloque, ni siquiera sin soloAutomaticas: aplicarla sería guardar un flete sin validar contra ningún piso.
+    [Fact]
+    public async Task Una_linea_con_motivo_de_pendiente_no_se_aplica_en_bloque_aunque_traiga_valor()
+    {
+        var solicitudId = Guid.NewGuid();
+        var cotizacion = PrepararCotizacionVacia(solicitudId);
+        var lineaSinPiso = Guid.NewGuid();
+        var lineaAuto = Guid.NewGuid();
+        _propuestas.Setup(p => p.ProponerAsync(solicitudId, It.IsAny<CancellationToken>())).ReturnsAsync(
+            new clsPropuestaSolicitudDto(solicitudId, [
+                new clsPropuestaLineaDto(lineaSinPiso, "A → B", "C2", 1000, null, null, null, 2_000_000m, "plaza", "Solo plaza.",
+                    ModoDecision: nameof(ModoDecision.ConsultaCompleta),
+                    MotivoPendiente: "SICE-TAC no se usa: el período más reciente cargado es 202609 y el del mes actual es 202610 (sin mes de gracia)."),
+                new clsPropuestaLineaDto(lineaAuto, "C → D", "C2", 1000, null, null, null, 1_000_000m, "plaza", "Plaza vigente mayor.", ModoDecision: nameof(ModoDecision.PlazaVigenteMayor)),
+            ], []));
+
+        var resultado = await Handler().Handle(new clsAplicarPropuestasCommand(cotizacion.Id, SoloAutomaticas: false));
+
+        Assert.Equal(1, resultado.Agregadas);
+        Assert.Equal(lineaAuto, Assert.Single(cotizacion.Lineas).LineaSolicitudId);
+    }
 }

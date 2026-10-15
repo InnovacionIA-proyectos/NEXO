@@ -55,7 +55,7 @@ public sealed class clsCrearSolicitudCommandHandler(
             // notas/horas propias), así que el default de horas es siempre 4h+4h.
             var tiempos = clsCondicionesServicioDto.Desde(null).TiemposLogisticos!;
             var (horasCargue, horasDescargue) = clsResolucionHorasLinea.Resolver(
-                lr.HorasCargue, lr.HorasDescargue, retornaContenedor: false, tiempos.HorasCargue, tiempos.HorasDescargue);
+                lr.HorasCargue, lr.HorasDescargue, esDevolucionContenedor: false, tiempos.HorasCargue, tiempos.HorasDescargue);
 
             solicitud.Lineas.Add(new clsLineaSolicitud
             {

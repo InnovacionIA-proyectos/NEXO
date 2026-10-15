@@ -105,12 +105,8 @@ public sealed class clsTarifarioSapAdapter : ITarifarioSapPort
 
         var sicetac = await SicetacOficialAsync(c, origen, destino, claseContId, vehiculoId, carroceriaCod, ct);
 
-        var retorno = c.RetornaContenedor && !string.IsNullOrWhiteSpace(c.CiudadDevolucion)
-            ? await RetornoAsync(claseViajeId, claseContId, destino, Normalizar(c.CiudadDevolucion), ct)
-            : null;
-
         if (candidatas.Count == 0)
-            return new clsResultadoTarifarioSap(null, Vencida: false, sicetac, retorno);
+            return new clsResultadoTarifarioSap(null, Vencida: false, sicetac);
 
         var ajustes = await _ajustes.MapaAsync(ct);
         if (ajustes.Count > 0)
@@ -121,7 +117,7 @@ public sealed class clsTarifarioSapAdapter : ITarifarioSapPort
         candidatas = candidatas.OrderByDescending(t => t.Vigencia).ToList();
         var hoy = _clock.GetUtcNow().Date;
         var (tarifa, vencida) = Seleccionar(c, candidatas, hoy, lineaId, claseViajeId, claseContId, vehiculoId, carroceriaCod, criterio);
-        return new clsResultadoTarifarioSap(tarifa, vencida, sicetac, retorno);
+        return new clsResultadoTarifarioSap(tarifa, vencida, sicetac);
     }
 
     private async Task<(List<clsSapTarifaPlaza> Candidatas, string Criterio)> BuscarConZonasAsync(
@@ -193,29 +189,6 @@ public sealed class clsTarifarioSapAdapter : ITarifarioSapPort
         }
 
         return (candidatas.GroupBy(t => t.Id).Select(g => g.First()).ToList(), criterio);
-    }
-
-    private async Task<clsCandidatoTarifaDto?> RetornoAsync(
-        int? claseViajeId, int? claseContId, string origenRetorno, string destinoRetorno, CancellationToken ct)
-    {
-        var (candidatas, criterio) = await BuscarConZonasAsync(
-            lineaId: 6, claseViajeId, claseContId, vehiculoId: null, carroceriaCod: null, peso: null,
-            origenRetorno, destinoRetorno, ct);
-
-        var hoy = _clock.GetUtcNow().Date;
-        var top = candidatas
-            .Where(t => t.Exclusivo == true && t.Vigencia > hoy &&
-                        (claseContId is null || t.ClaseContenedor == claseContId))
-            .OrderByDescending(t => t.Vigencia)
-            .Select(t => (Fila: t, Valor: ParseValor(t.Valor)))
-            .FirstOrDefault(x => x.Valor is > 0);
-        if (top.Fila is null) return null;
-
-        return new clsCandidatoTarifaDto(
-            "retorno_contenedor", top.Valor!.Value,
-            $"{top.Fila.Origen.Trim()} → {top.Fila.Destino.Trim()} · vigencia {top.Fila.Vigencia:yyyy-MM-dd}" +
-                (top.Fila.DetallesTarifa is { Length: > 0 } det ? $" · {det}" : ""),
-            $"retorno · línea 6 exclusivo · {criterio}", candidatas.Count);
     }
 
     private static (clsCandidatoTarifaDto? Tarifa, bool Vencida) Seleccionar(
@@ -407,12 +380,16 @@ public sealed class clsTarifarioSapAdapter : ITarifarioSapPort
             ? "FURGON"
             : await ParametroAsync(458, ct) ?? "ESTACAS";
 
-        var periodo = await _cache.GetOrCreateAsync("tarifario:sice-periodo", async e =>
+        // #300: solo el período del mes y año actuales (sin mes de gracia). Se busca el más reciente HASTA el
+        // actual: un período futuro ya cargado no tapa al vigente. Si no es el actual (o no hay ninguno) no hay piso.
+        var ahora = _clock.GetUtcNow();
+        var actual = clsPeriodoSicetac.Actual(ahora);
+        var periodo = await _cache.GetOrCreateAsync($"tarifario:sice-periodo:{actual}", async e =>
         {
             e.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(15);
-            return await _dw.RutasSicetac.Where(r => r.Periodo > 0).MaxAsync(r => (int?)r.Periodo, ct) ?? 0;
+            return await _dw.RutasSicetac.Where(r => r.Periodo > 0 && r.Periodo <= actual).MaxAsync(r => (int?)r.Periodo, ct) ?? 0;
         });
-        if (periodo == 0) return null;
+        if (!clsPeriodoSicetac.EsElDelMesActual(periodo, ahora)) return null;
 
         var top = await _dw.RutasSicetac
             .Where(r => r.Periodo == periodo &&
@@ -436,7 +413,7 @@ public sealed class clsTarifarioSapAdapter : ITarifarioSapPort
             "sicetac", valor,
             $"{top.NombreRuta} · {top.Configuracion} · {top.NombreTipoCarga} · {top.NombreUnidadTransporte} · vía estándar",
             $"oficial · periodo {periodo} · CARGADO · carga '{tipoCarga}' · unidad '{unidad}' · configuración {config}", 1,
-            ValorPisoBase: top.Valor, ValorTiemposLogisticos: valor - top.Valor);
+            ValorPisoBase: top.Valor, ValorTiemposLogisticos: valor - top.Valor, Configuracion: top.Configuracion);
     }
 
     private async Task<string?> ConfigPorRangoPesoAsync(int? claseContId, decimal? peso, CancellationToken ct)

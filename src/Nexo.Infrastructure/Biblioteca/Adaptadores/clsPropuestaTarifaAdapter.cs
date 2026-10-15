@@ -301,6 +301,13 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
         if (sicetac is null && dw is not null)
             sicetac = await CandidatoSicetacAsync(dw, origen, destino, origenDane, destinoDane, vehiculo, linea.Tipologia, linea.clsConfiguracionVehiculo?.Carroceria, horasSolicitud, ct);
 
+        // #300: si no hay piso SICE-TAC porque el período más reciente cargado no es el del mes actual, se dice
+        // (justificación + motivo de pendiente) en vez de un "sin piso" mudo. Sin piso nunca hay modo automático
+        // (DecidirFlujo exige sicetac para SoloSicetac y PlazaVigenteMayor): la línea queda para validación humana.
+        string? motivoSice = null;
+        if (sicetac is null && dw is not null)
+            motivoSice = clsPeriodoSicetac.MotivoNoVigente(await PeriodoSiceAsync(dw, ct), _clock.GetUtcNow());
+
         if (hayReglaSoloSicetac && sicetac is not null)
         {
             var justifSolo = $"clsRuta marcada como SOLO SICE-TAC por el Administrador: se propone el piso SICE-TAC ({sicetac.Valor:C0}) sin comparar con plaza ni histórico.";
@@ -405,10 +412,23 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
         if (fuente == "plaza" && plaza?.Advertencia is { } advertenciaPlaza)
             justificacion += $" ⚠ {advertenciaPlaza}";
 
-        if (oficial?.Retorno is { } retorno)
-            justificacion += $" Retorno del contenedor a {linea.CiudadDevolucionContenedor}: {retorno.Valor:C0} (línea devolución, exclusivo).";
+        // #300: el retorno del contenedor es un tramo VACÍO: piso SICE-TAC de viaje vacío (destino -> ciudad de
+        // devolución) con 1h+1h, no la tarifa de plaza de la línea 6. Mismo vehículo que el viaje cargado.
+        clsCandidatoTarifaDto? retorno = null;
+        if (linea.RetornaContenedor && !string.IsNullOrWhiteSpace(linea.CiudadDevolucionContenedor) && dw is not null)
+            retorno = await RetornoContenedorAsync(dw, destino, Normalizar(linea.CiudadDevolucionContenedor), vehiculo ?? sicetac?.Configuracion, ct);
+
+        if (retorno is not null)
+            justificacion += $" Retorno del contenedor a {linea.CiudadDevolucionContenedor}: {retorno.Valor:C0} (viaje vacío SICE-TAC, {clsResolucionHorasLinea.HorasCargueTramoVacio:0.##} h + {clsResolucionHorasLinea.HorasDescargueTramoVacio:0.##} h).";
         else if (linea.RetornaContenedor)
-            justificacion += " El viaje retorna contenedor pero no se encontró tarifa de devolución (línea 6 exclusiva) para la ruta.";
+            justificacion += " El viaje retorna contenedor pero no se encontró piso SICE-TAC de viaje vacío para el retorno.";
+
+        var motivoPendiente = decision.MotivoPendiente;
+        if (motivoSice is not null)
+        {
+            justificacion = $"{motivoSice} {justificacion}";
+            motivoPendiente ??= $"{motivoSice} El Administrador de Tarifas debe validar el flete.";
+        }
 
         return (new clsPropuestaLineaDto(
             linea.Id,
@@ -417,10 +437,10 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
             linea.Peso,
             sicetac, plaza, historico,
             valor, fuente, justificacion,
-            oficial?.Retorno,
+            retorno,
             Vencida: vencida,
             ModoDecision: decision.Modo.ToString(),
-            MotivoPendiente: decision.MotivoPendiente), decision.Modo);
+            MotivoPendiente: motivoPendiente), decision.Modo);
     }
 
     // La decisión vive en Domain (Costeo/Reglas/clsReglaDeCosteo): son invariantes del
@@ -441,11 +461,40 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
         if (dw is null) return null;
 
         // Sin contexto de solicitud (es una estimación de tramo de posicionamiento, no de
-        // una línea, sin clsRuta/municipio resuelto): horasSolicitud null, siempre usa el
-        // ValorSiceConHora de DWSice, y sigue comparando por texto (sin DANE disponible).
+        // una línea, sin clsRuta/municipio resuelto): sigue comparando por texto (sin DANE disponible).
+        // #300: es un tramo VACÍO — 1h+1h (2 h en total, antes null = las pactadas de DWSice) y el piso se
+        // recalcula con clsPisoConHoras, igual que el retorno del contenedor.
         return await CandidatoSicetacAsync(
             dw, Normalizar(ciudadLevante), Normalizar(origen), origenDane: null, destinoDane: null, configuracion,
-            "VACIO", tipologia: null, carroceria: null, horasSolicitud: null, ct);
+            "VACIO", tipologia: null, carroceria: null, clsResolucionHorasLinea.HorasTotalesTramoVacio, ct);
+    }
+
+    /// <summary>
+    /// #300: retorno del contenedor vacío = piso SICE-TAC de viaje VACÍO desde el destino de la línea hasta la ciudad
+    /// de devolución, con 1h+1h — en vez de la tarifa de plaza de la línea 6 (que se retiró de este cálculo). El
+    /// viaje cargado de la misma línea conserva sus propias horas (4+4 por defecto). Null si no hay piso para la ruta.
+    /// </summary>
+    private async Task<clsCandidatoTarifaDto?> RetornoContenedorAsync(
+        clsDwSiceDbContext dw, string origenRetorno, string destinoRetorno, string? configuracion, CancellationToken ct)
+    {
+        var c = await CandidatoSicetacAsync(
+            dw, origenRetorno, destinoRetorno, origenDane: null, destinoDane: null, configuracion,
+            "VACIO", tipologia: null, carroceria: null, clsResolucionHorasLinea.HorasTotalesTramoVacio, ct);
+        return c is null ? null : c with
+        {
+            Fuente = "retorno_contenedor",
+            Criterio = $"retorno de contenedor · viaje vacío · {clsResolucionHorasLinea.HorasCargueTramoVacio:0.##} h + {clsResolucionHorasLinea.HorasDescargueTramoVacio:0.##} h · {c.Criterio}",
+        };
+    }
+
+    /// <summary>#300: motivo visible cuando el piso SICE-TAC no se usa por período (ver
+    /// <see cref="IPropuestaTarifaPort.MotivoSicetacNoUsadoAsync"/>). Null si DWSice no está configurado.</summary>
+    public async Task<string?> MotivoSicetacNoUsadoAsync(CancellationToken ct = default)
+    {
+        if (!_dwConfigurado) return null;
+        using var scope = _scopes.CreateScope();
+        var dw = scope.ServiceProvider.GetService<clsDwSiceDbContext>();
+        return dw is null ? null : clsPeriodoSicetac.MotivoNoVigente(await PeriodoSiceAsync(dw, ct), _clock.GetUtcNow());
     }
 
     private Task<clsCandidatoTarifaDto?> CandidatoSicetacAsync(
@@ -467,7 +516,7 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
             "sicetac", valor,
             $"{fila.NombreRuta} · {fila.Configuracion} · {fila.NombreTipoCarga} · {fila.NombreUnidadTransporte}",
             criterio, 1,
-            ValorPisoBase: fila.Valor, ValorTiemposLogisticos: valor - fila.Valor);
+            ValorPisoBase: fila.Valor, ValorTiemposLogisticos: valor - fila.Valor, Configuracion: fila.Configuracion);
     }
 
     /// <summary>
@@ -512,8 +561,10 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
         clsDwSiceDbContext dw, string origen, string destino, string? origenDane, string? destinoDane,
         string? vehiculo, string condicionCarga, TipologiaCarga? tipologia, string? carroceria, CancellationToken ct)
     {
+        // #300: solo se usa el período del mes y año actuales (sin mes de gracia): si el más reciente cargado no
+        // lo es, no hay piso. El motivo visible sale de MotivoSicetacNoUsadoAsync / ProponerLineaAsync.
         var periodo = await PeriodoSiceAsync(dw, ct);
-        if (periodo == 0) return (null, string.Empty);
+        if (!clsPeriodoSicetac.EsElDelMesActual(periodo, _clock.GetUtcNow())) return (null, string.Empty);
 
         IQueryable<clsRutaSicetacDw> baseQ;
         string criterio;
@@ -596,14 +647,19 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
             return await q.ToListAsync(ct);
         }))!;
 
+    /// <summary>
+    /// Período AAAAMM más reciente cargado en DWSice HASTA el mes actual (0 si no hay ninguno). Un período futuro ya
+    /// cargado no tapa al vigente. La clave de caché lleva el período actual: al cambiar de mes no se reusa el
+    /// valor del mes anterior. Quien lo usa decide si es el vigente (<see cref="clsPeriodoSicetac"/>).
+    /// </summary>
     private async Task<int> PeriodoSiceAsync(clsDwSiceDbContext dw, CancellationToken ct)
     {
-        var periodo = await _cache.GetOrCreateAsync("prop:sice-periodo", async e =>
+        var actual = clsPeriodoSicetac.Actual(_clock.GetUtcNow());
+        return await _cache.GetOrCreateAsync($"prop:sice-periodo:{actual}", async e =>
         {
             e.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(15);
-            return await dw.RutasSicetac.Where(r => r.Periodo > 0).MaxAsync(r => (int?)r.Periodo, ct) ?? 0;
+            return await dw.RutasSicetac.Where(r => r.Periodo > 0 && r.Periodo <= actual).MaxAsync(r => (int?)r.Periodo, ct) ?? 0;
         });
-        return periodo;
     }
 
     // --------------------------------------------- catálogo externo: nombre por enum

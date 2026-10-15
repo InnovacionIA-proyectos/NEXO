@@ -24,15 +24,15 @@ public record clsConsultaTarifarioSap(
 
 /// <summary>
 /// Resultado del motor: la tarifa de plaza seleccionada por las reglas (si está
-/// vencida NUNCA se propone, solo se informa), el candidato SICETAC oficial
-/// cuando la condición de comparación aplica, y la tarifa del retorno del
-/// contenedor vacío cuando el viaje lo incluye.
+/// vencida NUNCA se propone, solo se informa) y el candidato SICETAC oficial
+/// cuando la condición de comparación aplica. #300: el retorno del contenedor
+/// vacío YA NO sale de aquí (era la tarifa de plaza de la línea 6): se calcula
+/// como viaje vacío SICE-TAC con 1h+1h en <c>clsPropuestaTarifaAdapter</c>.
 /// </summary>
 public record clsResultadoTarifarioSap(
     clsCandidatoTarifaDto? Tarifa,
     bool Vencida,
-    clsCandidatoTarifaDto? SicetacOficial,
-    clsCandidatoTarifaDto? Retorno = null);
+    clsCandidatoTarifaDto? SicetacOficial);
 
 /// <summary>Ítem de la matriz oficial SICE-TAC (DWSice), espejo 1:1 de la fila del Data Warehouse.</summary>
 public record clsRutaSicetacItemDto(

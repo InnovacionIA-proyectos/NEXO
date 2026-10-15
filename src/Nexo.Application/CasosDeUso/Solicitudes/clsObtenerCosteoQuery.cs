@@ -69,6 +69,10 @@ public sealed class clsObtenerCosteoQueryHandler(
 
         var tiempos = clsCondicionesServicioDto.Desde(s.CondicionesServicio).TiemposLogisticos
             ?? clsTiemposLogisticosDto.PorDefecto;
-        return new clsSolicitudCosteoDto(s.ToDto(), tiempos, lineas);
+        // #300: si el piso de TODAS las líneas faltó porque DWSice no trae el período del mes actual, se dice
+        // (en vez de un "sin piso" mudo que parece un dato que no existe). Solo se consulta si alguna línea
+        // quedó sin piso: el caso normal no paga nada.
+        var avisoSicetac = lineas.Any(l => l.PisoSicetac is null) ? await tarifas.MotivoSicetacNoUsadoAsync(ct) : null;
+        return new clsSolicitudCosteoDto(s.ToDto(), tiempos, lineas, avisoSicetac);
     }
 }
