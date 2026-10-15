@@ -95,7 +95,8 @@ public class clsLineaSolicitud : IAuditable
     /// <summary>
     /// S5-HU-18.3/#275: id de la ruta que Cotifly asigna cuando una carga heterogénea se
     /// reparte en varios camiones — todas las líneas de la misma ruta llegan con el mismo
-    /// valor. El valor lo pone SIEMPRE Cotifly, nunca NEXO; líneas nacidas directo en NEXO
+    /// valor. NEXO lo guarda tal cual y NUNCA lo genera: lo pone quien crea las líneas del grupo
+    /// (Cotifly, o el portal al crear una línea por camión — S5-HU-17.8); líneas nacidas directo en NEXO
     /// quedan en null (no agrupan con nada, y eso no rompe nada existente).
     /// </summary>
     public Guid? GrupoRutaId { get; set; }

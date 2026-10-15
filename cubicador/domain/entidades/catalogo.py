@@ -187,13 +187,26 @@ class Catalogo:
         return next((v for v in self.vehiculos if v.codigo == codigo), None)
 
     def mercancia_por_codigo(self, codigo: str) -> TipoMercancia | None:
-        return next((m for m in self.mercancias if m.codigo == codigo), None)
+        """Sin distinguir mayusculas ni espacios de sobra.
+
+        El codigo es lo que entra por el contrato (S5-HU-17.7), asi que esta
+        es la busqueda caliente. Los codigos del catalogo son mayusculas con
+        guion bajo por convencion y son unicos sin importar la caja: aceptar
+        `bebidas` por `BEBIDAS` no crea ambiguedad y evita un
+        `MERCANCIA_DESCONOCIDA` falso por como el llamante guarde la cadena.
+        """
+        buscado = (codigo or "").strip().casefold()
+        return next((m for m in self.mercancias if m.codigo.casefold() == buscado), None)
 
     def mercancia_por_id(self, id_mercancia: str) -> TipoMercancia | None:
         """Sin distinguir mayusculas: SQL Server devuelve los `uniqueidentifier`
         en mayusculas y un consumidor puede guardarlos en minusculas de su lado.
         Es el mismo uuid; rechazarlo por la caja seria un
-        `MERCANCIA_DESCONOCIDA` falso."""
+        `MERCANCIA_DESCONOCIDA` falso.
+
+        Ya no la usa el contrato -desde S5-HU-17.7 entra el codigo-, pero sigue
+        siendo la forma de resolver lo que quedo persistido por id.
+        """
         buscado = (id_mercancia or "").strip().casefold()
         return next((m for m in self.mercancias if m.id.casefold() == buscado), None)
 

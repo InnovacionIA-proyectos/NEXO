@@ -84,7 +84,7 @@ release que lo publica.
   "usuarioId": "1042",
   "mercancias": [
     {
-      "idTipoMercancia": "2B213679-A42E-5E30-A6AF-E3A4FB42BD92",
+      "codigoMercancia": "BEBIDAS",
       "cantidad": 1200,
       "largoCm": 50,
       "anchoCm": 40,
@@ -101,16 +101,25 @@ release que lo publica.
 | `origenSistema` | enum `NEXO` / `COTIFLY` | sí | Se valida contra la llave: si no coincide, 401 |
 | `claseViajeSeleccionada` | string | no | **Preferencia, no filtro.** El motor corre completo y da su mejor respuesta; si no coincide con lo que el usuario marcó, lo dice en `advertencias[]`. No hay campo dedicado: se evaluó y ningún consumidor lo necesita — el portal deja de escribir la clase de viaje al formulario, así que no queda quién lo lea |
 | `usuarioId` | string | no | Dato declarado por el llamante, para auditoría. El Cubicador no lo verifica |
-| `mercancias[].idTipoMercancia` | string | sí | El **id** que devolvió `GET /tipos-mercancia`. Acordado con Cotifly el 2026-10-08 (su HU-021.5); reemplaza al `codigoMercancia` que proponía la primera versión de esta hoja. Se acepta en cualquier caja: es el mismo uuid |
+| `mercancias[].codigoMercancia` | string | sí | El **código** que devolvió `GET /tipos-mercancia` (por ejemplo `BEBIDAS`). Se acepta en cualquier caja y con espacios de sobra: es el mismo código |
 | `mercancias[].cantidad` | entero ≥ 1 | sí | |
 | `mercancias[].largoCm` / `anchoCm` / `altoCm` | decimal > 0 | sí | |
 | `mercancias[].pesoKg` | decimal > 0 | sí | Por unidad, no total |
 
-> **Cerrado el 2026-10-08.** La primera versión de esta hoja proponía mandar el **código**
-> y dejaba el punto por confirmar con Cotifly. Se adoptó lo de ellos: en el request viaja
-> el **id**. A cambio, la **respuesta lleva los dos** —`idTipoMercancia` y
-> `codigoMercancia`, igual que `GET /tipos-mercancia`—, así que nadie tiene que resolver el
-> otro por su cuenta: Cotifly persiste el id y NEXO usa el código estable (S5-HU-18.2).
+> **Cerrado el 2026-10-14 (S5-HU-17.7).** El 2026-10-08 se había acordado mandar el
+> **id**; se revirtió al **código**, que es lo que proponía la primera versión de esta
+> hoja. La razón es que el dato tenga una sola forma en todo el recorrido: NEXO ya
+> persiste el código en la captura (`CapturaRequests.CodigoTipoMercancia`, #274) y
+> `codigoVehiculo` / `codigoCarroceria` también viajan como código — con el id, NEXO
+> tenía que traducir de un campo al otro para llamar a este servicio.
+>
+> La **respuesta sigue llevando los dos** —`idTipoMercancia` y `codigoMercancia`, igual
+> que `GET /tipos-mercancia`—, así que nadie tiene que resolver el otro por su cuenta y
+> el id sigue siendo la llave para unir contra el catálogo.
+>
+> Los dos son igual de estables: los ids del catálogo son `uuid5` deterministas
+> sembrados por `database/seeder/_generar_seeders.py`, así que un reseed los reproduce
+> idénticos. El cambio es por coherencia, no por riesgo. Ver `DECISIONES_TECNICAS.md` #17.
 
 ### 2.3 Respuesta — caso asignado
 
@@ -137,7 +146,7 @@ release que lo publica.
       "alertaBajoLlenado": false,
       "heterogenea": false,
       "mercancias": [
-        { "idTipoMercancia": "2B213679-...", "codigoMercancia": "BEBIDAS", "cantidad": 421, "pesoKg": 8420.0, "volumenM3": 33.68 }
+        { "indicePosicion": 0, "idTipoMercancia": "2B213679-...", "codigoMercancia": "BEBIDAS", "cantidad": 421, "pesoKg": 8420.0, "volumenM3": 33.68 }
       ]
     },
     {
@@ -153,7 +162,7 @@ release que lo publica.
       "alertaBajoLlenado": false,
       "heterogenea": false,
       "mercancias": [
-        { "idTipoMercancia": "2B213679-...", "codigoMercancia": "BEBIDAS", "cantidad": 779, "pesoKg": 15580.0, "volumenM3": 62.32 }
+        { "indicePosicion": 0, "idTipoMercancia": "2B213679-...", "codigoMercancia": "BEBIDAS", "cantidad": 779, "pesoKg": 15580.0, "volumenM3": 62.32 }
       ]
     }
   ],
@@ -181,6 +190,20 @@ trae, sin excepción y sin `null`:
 Está declarado así a propósito: cada lado puede validar que no le llegó algo incompleto en
 vez de aceptar un `null` silencioso. Es la misma clase de fallo que describe la sección 5.
 
+> **El detalle de `mercancias[]` es por POSICIÓN, no por código** (S5-HU-17.8).
+> `indicePosicion` es el índice —base 0— de la posición en el arreglo `mercancias`
+> del request. Dos filas del mismo camión **pueden traer el mismo
+> `codigoMercancia`** si la solicitud declaró dos posiciones de ese tipo con medidas
+> distintas: quien agrupe por código tiene que sumar.
+>
+> Es lo que permite crear una línea de solicitud por camión sabiendo qué posiciones
+> capturadas le tocan a cada uno. No se devuelven las medidas porque el llamante ya
+> las tiene: las mandó él, y el índice se las devuelve.
+>
+> Viaja en `null` al reconsultar una corrida anterior a S5-HU-17.8. `heterogenea` se
+> calcula sobre códigos **distintos**, no sobre el número de filas: dos posiciones del
+> mismo producto en un camión no son carga heterogénea.
+
 ### 2.4 Respuesta — sin selección automática
 
 ```json
@@ -195,7 +218,7 @@ vez de aceptar un `null` silencioso. Es la misma clase de fallo que describe la 
     "hayExtradimension": true,
     "medidasEstandar": { "largoMaxCm": 1220, "anchoMaxCm": 260, "altoMaxCm": 300, "pesoMaxKg": 34000 },
     "piezas": [
-      { "idTipoMercancia": "9F2C...", "codigoMercancia": "VIGAS_ESTRUCTURAS", "excesos": ["largo 1400.0 cm > 1220.0 cm"] }
+      { "indicePosicion": 1, "idTipoMercancia": "9F2C...", "codigoMercancia": "VIGAS_ESTRUCTURAS", "excesos": ["largo 1400.0 cm > 1220.0 cm"] }
     ]
   }
 }
@@ -622,7 +645,7 @@ Es una sesión de una o dos horas, y es el **camino crítico** de todo lo demás
 | ~~Qué significa `COMBUSTIBLE`~~ ✅ **Cerrado.** El equipo de Datos dejó `CARBURANTE` y `MATERIAL_INFLAMABLE` como **dos categorías separadas**, con papel, cartón y madera bajo la segunda — no una sola como proponía esta hoja | — | — |
 | ~~Agregar los 10 tipos excluidos al seeder~~ ✅ **Cerrado: no se agregan.** `tiposMercancia` se queda con las 31 filas reales de la matriz. Si hace falta rechazar graneles o cemento con motivo, entran por CRUD cuando se necesiten | — | — |
 | Revisar `Apilable`, que está en `1` en las **31** mercancías | Operaciones | Las otras dos banderas sí tienen datos variados, así que esa uniformidad parece el default y no una declaración. Las tres son `NOT NULL` con default: no hay "no declarado" |
-| ~~Confirmar qué viaja en el cable~~ ✅ **Cerrado el 2026-10-08: viaja el `idTipoMercancia`.** Se adoptó lo de Cotifly; a cambio la respuesta lleva id **y** código. Ver sección 2.2 | — | — |
+| ~~Confirmar qué viaja en el cable~~ ✅ **Cerrado el 2026-10-14 (S5-HU-17.7): viaja el `codigoMercancia`.** Revierte el acuerdo del 2026-10-08; la respuesta sigue llevando id **y** código. Ver sección 2.2 | — | — |
 | Dimensiones y capacidad de los contenedores 40HC y 20STD | Negocio | "Carga contenerizada" cae en sin selección hasta que se resuelva. Entra por CRUD |
 | Con qué vehículos emparejan `CAMA_BAJA` y `PORTACONTENEDORES` | Administrador de Fletes | Nada: se decide desde el CRUD cuando se use |
 | Matriz de compatibilidad más allá de la regla sembrada | Operaciones | Nada: el resto entra por CRUD |

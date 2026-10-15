@@ -50,6 +50,7 @@ _UN_DECIMAL = Decimal("0.1")
 
 def _mercancia(m: MercanciaRecomendada) -> MercanciaDeVehiculoDto:
     return MercanciaDeVehiculoDto(
+        indice_posicion=m.indice,
         id_tipo_mercancia=m.id_tipo_mercancia, codigo_mercancia=m.codigo_mercancia,
         cantidad=m.cantidad,
         peso_kg=m.peso_kg.quantize(_DOS_DECIMALES),
@@ -68,6 +69,7 @@ def _a_dto(guardada: RecomendacionGuardada) -> RecomendacionDto:
                 alto_max_cm=e.alto_max_cm, peso_max_kg=e.peso_max_kg),
             piezas=[
                 PiezaFueraDeMedidaDto(
+                    indice_posicion=p.indice,
                     id_tipo_mercancia=p.id_tipo_mercancia,
                     codigo_mercancia=p.codigo_mercancia, excesos=list(p.excesos))
                 for p in e.piezas
@@ -116,7 +118,7 @@ async def crear(
         origen_sistema=origen_sistema,
         mercancias=[
             cu.LineaMercancia(
-                id_tipo_mercancia=m.id_tipo_mercancia, cantidad=m.cantidad,
+                codigo_mercancia=m.codigo_mercancia, cantidad=m.cantidad,
                 largo_cm=m.largo_cm, ancho_cm=m.ancho_cm, alto_cm=m.alto_cm,
                 peso_kg=m.peso_kg,
             )

@@ -834,3 +834,136 @@ motor 3D, que hizo falta cuando esa proyección quedó en 13 filas contra 20 de
 este lado. Seguro de correr más de una vez, y no es parte de ningún flujo
 automático. Los tres catálogos que NEXO no proyecta no la tienen: no habría a
 quién reemitirle.
+
+
+## 17. En el cable viaja el código de mercancía, no el id (S5-HU-17.7)
+
+El `POST /recomendaciones` recibe `codigoMercancia` (`BEBIDAS`,
+`CAJAS_CARTON`), no `idTipoMercancia`. Revierte el acuerdo del 2026-10-08 con
+Cotifly, que había cambiado el campo del código al id.
+
+**Por qué se revirtió: el dato tenía dos formas en el mismo recorrido.** NEXO
+persiste el **código** en la captura —`CapturaRequests.CodigoTipoMercancia`,
+con la razón escrita en su propio comentario: *"se guarda el código porque es
+estable, sobrevive un reseed del catálogo y es legible en logs"*— y acto
+seguido mandaba el **id** por el cable. Los dos campos salen del mismo
+desplegable. `codigoVehiculo` y `codigoCarroceria` ya viajaban como código, así
+que la mercancía era la única excepción. Con el id, NEXO tenía que traducir de
+un campo al otro para llamar a este servicio, teniendo los dos a la mano.
+
+**No se revirtió por riesgo, y conviene dejarlo claro para que nadie repita el
+argumento equivocado.** Los ids del catálogo **no** son aleatorios: son `uuid5`
+deterministas, sembrados por `database/seeder/_generar_seeders.py` con el
+namespace `c9b1b1a0-6f3e-4b1a-9c2d-a1b2c3d40001` sobre la semilla
+`mercancia:{codigo}`. Un reseed los reproduce idénticos —se verificó contra las
+71 filas reales—, así que el id es **tan estable como el código**. El cambio es
+por coherencia y por quitarle a NEXO un paso de traducción, no porque el id
+fuera frágil.
+
+**La respuesta sigue llevando los dos.** `MercanciaDeVehiculoDto` y
+`PiezaFueraDeMedidaDto` devuelven `idTipoMercancia` **y** `codigoMercancia`,
+igual que `GET /tipos-mercancia`. No se quitó el id: es la llave para unir
+contra el catálogo y contra las tablas de recomendación, que siguen guardando
+`MercanciaId`. Lo que cambió es **solo lo que entra**.
+
+**Lo que persiste no cambió.** `recomendacion_vehiculo_mercancia.MercanciaId`
+sigue siendo el uuid, que es la FK correcta. El código se resuelve a id en
+`recomendar_flota` y de ahí para adentro nada se enteró del cambio.
+
+**El puente quedó más corto.** `application/plan_cargue/desde_linea.py` hacía
+`mercancia_por_codigo(...)` solo para sacar el `tipo.id` y pasárselo al caso de
+uso, que volvía a resolverlo con `mercancia_por_id(...)`. Ahora pasa el código
+tal cual: una sola resolución, en un solo lugar, y el puente dejó de cargar el
+catálogo completo para algo que el caso de uso ya hacía.
+
+**`mercancia_por_codigo` tolera caja y espacios**, igual que `mercancia_por_id`
+ya toleraba la caja del uuid. Los códigos son mayúsculas con guion bajo por
+convención y son únicos sin importar la caja, así que aceptar `bebidas` por
+`BEBIDAS` no crea ambigüedad y evita un `MERCANCIA_DESCONOCIDA` falso por cómo
+el llamante guarde la cadena.
+
+
+## 18. La identidad de una mercancía es su posición, no su código
+
+El motor identificaba cada línea de la solicitud por el `codigoMercancia`. Pero
+una solicitud puede traer **dos posiciones del mismo tipo con medidas y pesos
+distintos** —dos tamaños de caja del mismo producto— y ahí el código deja de
+identificar nada.
+
+**Lo que pasaba.** `_armar_vehiculo` construía
+`unitarios = {m.tipo.codigo: m for m in mercancias}`: un diccionario indexado
+por código, donde la segunda posición pisaba a la primera. Después multiplicaba
+el peso y el volumen **unitarios de la superviviente** por la cantidad total de
+unidades de ese código. Con 10 cajas de 20 kg más 5 de 2 kg, reportaba **30 kg
+donde había 210**. Los `id` de ítem también colisionaban:
+`f"{codigo}#{i}"` producía `CAJAS_CARTON#0` dos veces.
+
+**Por qué importaba.** `pesoTotalKg` es, por contrato, *"el peso que Cotifly le
+manda a NEXO al crear la solicitud"*. El flete se habría costeado sobre el peso
+equivocado, sin que nada avisara: la respuesta era un 200 con forma correcta.
+
+**El empaque nunca estuvo mal.** Los ítems se construyen por línea con sus
+medidas reales y la selección de flota suma `peso_total_kg` por línea, así que
+el vehículo elegido siempre fue el correcto. Lo roto era solo el reporte.
+
+**El arreglo.** `MercanciaSolicitada` gana `indice`, la posición de la línea en
+la solicitud, y esa pasa a ser su identidad: `sku = str(indice)` e
+`id = f"{indice}#{i}"`. El peso y el volumen se acumulan **por posición** y
+recién después se suman por código, así que la respuesta no cambia de forma
+—sigue trayendo una entrada por tipo de mercancía— pero los números quedan
+bien.
+
+El `indice` lo asigna `recomendar()` a partir del orden recibido, en el único
+punto por el que entra todo. Por eso tiene default: ningún llamante ni ninguna
+prueba necesita calcularlo. Cambiar `sku` es seguro porque **nada en el motor
+3D ramifica por él** —es una etiqueta que viaja y se guarda—, y el puente
+`desde_linea.py` ya usaba `sku=f"POS-{idx}"` para los planes de cargue: la
+posición como identidad ya era el criterio en la otra mitad del sistema.
+
+**Lo que queda pendiente.** El contrato sigue devolviendo una entrada por
+código, así que un consumidor que mande dos posiciones del mismo tipo recibe
+los totales correctos pero **no sabe cuántas unidades de cada posición** fueron
+a cada camión. Para repartir las posiciones capturadas entre las líneas que se
+crean por camión hace falta exponer el `indice` en la respuesta —y una columna
+en `recomendacionVehiculoMercancia` para que la reconsulta no lo pierda—. Eso
+es un cambio de contrato y va aparte; este es solo el arreglo de corrección.
+
+
+## 19. El detalle por camión es por posición (S5-HU-17.8)
+
+`MercanciaDeVehiculoDto` y `PiezaFueraDeMedidaDto` llevan `indicePosicion`: el
+índice —base 0— de la posición en el arreglo `mercancias` del request. Una fila
+por posición, no por código.
+
+**Por qué.** Es la mitad que faltaba de la #18. Esa arregló los *números*; esta
+arregla la *trazabilidad*. Con el detalle agrupado por código, un consumidor
+recibía "800 unidades de `CAJAS_CARTON` en este camión" sin saber cuántas eran
+de cada posición capturada, y sin medidas en la respuesta no podía deducirlo.
+Sin ese dato no puede hacer lo que el negocio ya decidió en #217: **crear una
+línea de solicitud por camión recomendado**, con las posiciones que le tocan.
+
+**No se devuelven las medidas, se devuelve el índice.** El llamante ya tiene las
+medidas: las mandó él. Devolvérselas sería duplicar un dato que podría quedar
+desincronizado; el índice se las devuelve sin copiarlas.
+
+**`heterogenea` pasa a contar códigos distintos.** Era `len(detalle) > 1`, que
+con filas por posición habría marcado como heterogéneo un camión con dos
+posiciones del mismo producto. Carga heterogénea significa **tipos** distintos
+compartiendo camión, no filas.
+
+**La columna es nullable y las filas viejas no se rellenan.** Las corridas
+anteriores no tienen posición; ponerles `0` sería inventarse que todas eran la
+primera. `NULL` dice lo que es. Es el mismo criterio de
+`CapturaRequests.CodigoTipoMercancia` en NEXO (*"Null = tipo desconocido; no se
+asigna un default"*), y las tablas de recomendación son append-only: lo guardado
+no se reescribe. Verificado contra 43 filas reales que vuelven con
+`indicePosicion: null` y 200.
+
+**Las piezas extradimensionadas no necesitaron DDL**: ya se guardaban como JSON
+en `MercanciasCondicionadasJson`, así que el índice entró como una clave más y
+las corridas viejas lo leen como `null`.
+
+**Lo que esto le rompe a quien agrupe por código.** Dos filas del mismo camión
+pueden compartir `codigoMercancia`. Nadie puede asumir que el código es único
+dentro de un vehículo; hay que sumar. Queda dicho en `CONTRATO.md` §3.1 y en la
+§2.3 de la hoja de ruta.

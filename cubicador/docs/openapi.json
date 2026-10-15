@@ -1615,6 +1615,7 @@
         "type": "object"
       },
       "MercanciaDeVehiculoDto": {
+        "description": "Lo que de UNA posicion de la solicitud viaja en este camion.\n\n**Una fila por posicion, no por codigo** (S5-HU-17.8): dos filas del mismo\ncamion pueden traer el mismo `codigoMercancia` si la solicitud declaro dos\nposiciones de ese tipo con medidas distintas. Quien agrupe por codigo tiene\nque sumar.\n\n`indicePosicion` es el indice (base 0) en el arreglo `mercancias` del\nrequest, que es como el llamante recupera las medidas: las mando el. Viaja\nen null al reconsultar una corrida anterior a S5-HU-17.8.",
         "properties": {
           "cantidad": {
             "title": "Cantidad",
@@ -1628,6 +1629,17 @@
             "title": "Idtipomercancia",
             "type": "string"
           },
+          "indicePosicion": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Indiceposicion"
+          },
           "pesoKg": {
             "title": "Pesokg",
             "type": "number"
@@ -1638,6 +1650,7 @@
           }
         },
         "required": [
+          "indicePosicion",
           "idTipoMercancia",
           "codigoMercancia",
           "cantidad",
@@ -1680,8 +1693,8 @@
             "title": "Cantidad",
             "type": "integer"
           },
-          "idTipoMercancia": {
-            "title": "Idtipomercancia",
+          "codigoMercancia": {
+            "title": "Codigomercancia",
             "type": "string"
           },
           "largoCm": {
@@ -1712,7 +1725,7 @@
           }
         },
         "required": [
-          "idTipoMercancia",
+          "codigoMercancia",
           "cantidad",
           "largoCm",
           "anchoCm",
@@ -1962,9 +1975,21 @@
           "idTipoMercancia": {
             "title": "Idtipomercancia",
             "type": "string"
+          },
+          "indicePosicion": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Indiceposicion"
           }
         },
         "required": [
+          "indicePosicion",
           "idTipoMercancia",
           "codigoMercancia",
           "excesos"

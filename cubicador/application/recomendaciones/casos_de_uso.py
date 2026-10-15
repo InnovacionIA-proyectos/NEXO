@@ -40,12 +40,17 @@ SISTEMAS_VALIDOS = ("NEXO", "COTIFLY")
 class LineaMercancia:
     """Una linea tal como llega del llamante.
 
-    Viaja el **id** del tipo de mercancia, no el codigo: acordado con Cotifly
-    el 2026-10-08 (su HU-021.5). Es el id que este servicio devolvio en
-    `GET /tipos-mercancia`. El codigo estable se usa del lado de NEXO.
+    Viaja el **codigo** del tipo de mercancia, no el id (S5-HU-17.7). Es el
+    `codigoMercancia` que este servicio devuelve en `GET /tipos-mercancia`.
+
+    Se cambio del id al codigo para que el dato tenga una sola forma en todo
+    el recorrido: NEXO ya persiste el codigo en la captura
+    (`CapturaRequests.CodigoTipoMercancia`) y `codigoVehiculo` y
+    `codigoCarroceria` tambien viajan como codigo. Con el id, NEXO tenia que
+    traducir de un campo al otro para hablar con este servicio.
     """
 
-    id_tipo_mercancia: str
+    codigo_mercancia: str
     cantidad: int
     largo_cm: Decimal
     ancho_cm: Decimal
@@ -70,8 +75,9 @@ async def recomendar_flota(
 ) -> motor.Recomendacion:
     """Resuelve las lineas contra el catalogo y corre el motor, sin persistir.
 
-    Las mercancias se resuelven **aca y no en el motor**: un id que no existe o
-    una mercancia no cubicable son errores del llamante (400 en el contrato),
+    Las mercancias se resuelven **aca y no en el motor**: un codigo que no
+    existe o una mercancia no cubicable son errores del llamante (400 en el
+    contrato),
     no un resultado del algoritmo. Nunca se cae a un default silencioso - ese
     es justamente el fallback que mata S5-HU-17.6.
     """
@@ -92,17 +98,17 @@ async def recomendar_flota(
         if linea.cantidad < 1:
             raise ValidationFailedException(
                 "DIMENSIONES_INVALIDAS",
-                f"La cantidad de '{linea.id_tipo_mercancia}' debe ser al menos 1.")
+                f"La cantidad de '{linea.codigo_mercancia}' debe ser al menos 1.")
         if min(linea.largo_cm, linea.ancho_cm, linea.alto_cm, linea.peso_kg) <= 0:
             raise ValidationFailedException(
                 "DIMENSIONES_INVALIDAS",
-                f"Las medidas y el peso de '{linea.id_tipo_mercancia}' deben ser mayores que cero.")
+                f"Las medidas y el peso de '{linea.codigo_mercancia}' deben ser mayores que cero.")
 
-        tipo = catalogo.mercancia_por_id(linea.id_tipo_mercancia)
+        tipo = catalogo.mercancia_por_codigo(linea.codigo_mercancia)
         if tipo is None:
             raise ValidationFailedException(
                 "MERCANCIA_DESCONOCIDA",
-                f"'{linea.id_tipo_mercancia}' no esta en el catalogo de tipos de mercancia.")
+                f"'{linea.codigo_mercancia}' no esta en el catalogo de tipos de mercancia.")
         if not tipo.cubicable:
             raise ValidationFailedException(
                 "MERCANCIA_NO_CUBICABLE",

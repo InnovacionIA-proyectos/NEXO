@@ -99,7 +99,7 @@ def main() -> int:
     print("\nPOST /recomendaciones")
     linea = "VERIF-" + str(os.getpid())
     cuerpo = {"idLineaSolicitud": linea, "mercancias": [{
-        "idTipoMercancia": id_mercancia, "cantidad": 1200,
+        "codigoMercancia": codigo_mercancia, "cantidad": 1200,
         "largoCm": 50, "anchoCm": 40, "altoCm": 40, "pesoKg": 20}]}
     estado, creada = pedir("POST", "/recomendaciones", LLAVE_COTIFLY, cuerpo)
     revisar("responde 200", estado == 200, str(estado))
@@ -178,7 +178,7 @@ def main() -> int:
     print("\nResultados que no son errores")
     estado, extra = pedir("POST", "/recomendaciones", LLAVE_COTIFLY, {
         "idLineaSolicitud": linea + "-X", "mercancias": [{
-            "idTipoMercancia": id_mercancia, "cantidad": 2,
+            "codigoMercancia": codigo_mercancia, "cantidad": 2,
             "largoCm": 1400, "anchoCm": 40, "altoCm": 40, "pesoKg": 25}]})
     revisar("extradimensionado vuelve con 200", estado == 200, str(estado))
     revisar("con resultado SIN_SELECCION_AUTOMATICA",
@@ -191,7 +191,7 @@ def main() -> int:
     print("\nErrores reales")
     estado, error = pedir("POST", "/recomendaciones", LLAVE_COTIFLY, {
         "idLineaSolicitud": linea, "mercancias": [{
-            "idTipoMercancia": "00000000-0000-0000-0000-000000000000", "cantidad": 1,
+            "codigoMercancia": "NO_EXISTE_EN_EL_CATALOGO", "cantidad": 1,
             "largoCm": 60, "anchoCm": 40, "altoCm": 40, "pesoKg": 25}]})
     revisar("mercancia desconocida es 400", estado == 400, str(estado))
     revisar("con el formato de error del contrato",

@@ -379,7 +379,12 @@ class RecomendacionVehiculo(BaseCatalogo):
 
 
 class RecomendacionVehiculoMercancia(BaseCatalogo):
-    """Que mercancia va en que camion, con cuanto peso y volumen."""
+    """Que mercancia va en que camion, con cuanto peso y volumen.
+
+    Una fila por POSICION de la solicitud (S5-HU-17.8), no por codigo: dos
+    filas del mismo camion pueden compartir `IdMercancia` si la solicitud
+    declaro dos posiciones de ese tipo con medidas distintas.
+    """
 
     __tablename__ = "recomendacionVehiculoMercancia"
 
@@ -388,6 +393,10 @@ class RecomendacionVehiculoMercancia(BaseCatalogo):
         "IdRecomendacionVehiculo", String(36),
         ForeignKey("recomendacionVehiculo.Id"), index=True)
     mercancia_id: Mapped[str] = mapped_column("IdMercancia", String(36))
+    # Null en las corridas anteriores a S5-HU-17.8, que agrupaban por codigo.
+    # No se rellenan: las tablas de recomendacion son append-only.
+    indice_posicion: Mapped[int | None] = mapped_column(
+        "IndicePosicion", Integer, nullable=True)
     cantidad: Mapped[int] = mapped_column("CantidadUnidadesMercancia", Integer)
     peso_kg: Mapped[Decimal] = mapped_column("PesoMercanciaKg", Numeric(18, 2))
     # (18,4), no (18,3) como el resto de los volumenes: asi la creo el equipo

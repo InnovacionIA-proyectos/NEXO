@@ -29,7 +29,7 @@ Puro: sin I/O, sin SQLAlchemy. El catalogo entra ya resuelto como
 from __future__ import annotations
 
 import itertools
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from decimal import Decimal
 
 from domain.entidades.catalogo import Catalogo, TipoMercancia, Vehiculo
@@ -55,6 +55,14 @@ class MercanciaSolicitada:
 
     `peso_kg` es **por unidad**, no el total - igual que en el contrato
     (seccion 2.2 de la hoja de ruta).
+
+    `indice` es la **posicion de esta linea en la solicitud**, y es la
+    identidad real de la mercancia dentro del motor. No es el codigo: una
+    solicitud puede traer dos posiciones del MISMO tipo con medidas y pesos
+    distintos -dos tamanos de caja del mismo producto-, y agruparlas por
+    codigo aplicaria los valores unitarios de una sola a todas las unidades.
+    Lo asigna `recomendar()` a partir del orden recibido; por eso tiene
+    default y ningun llamante necesita calcularlo.
     """
 
     tipo: TipoMercancia
@@ -63,6 +71,7 @@ class MercanciaSolicitada:
     ancho_cm: Decimal
     alto_cm: Decimal
     peso_kg: Decimal
+    indice: int = 0
 
     @property
     def volumen_unitario_m3(self) -> Decimal:
@@ -99,6 +108,15 @@ class SolicitudRecomendacion:
 
 @dataclass(frozen=True)
 class MercanciaEnVehiculo:
+    """Lo que de UNA posicion de la solicitud viaja en un camion.
+
+    La fila es por **posicion**, no por codigo: un mismo camion puede traer
+    dos filas con el mismo `codigo_mercancia` si la solicitud declaro dos
+    posiciones de ese tipo con medidas distintas. Quien agrupe por codigo
+    tiene que sumar.
+    """
+
+    indice: int
     codigo_mercancia: str
     cantidad: int
     peso_kg: Decimal
@@ -127,9 +145,14 @@ class VehiculoRecomendado:
 
 @dataclass(frozen=True)
 class PiezaExcedida:
-    # Los dos identificadores: el id es lo que Cotifly manda en el request y el
-    # codigo lo que usa NEXO. Darlos juntos evita que cada consumidor tenga que
+    # `indice` es la posicion en la solicitud: dos posiciones del mismo tipo
+    # pueden tener medidas distintas y que solo una exceda, asi que el codigo
+    # no basta para saber cual.
+    #
+    # Los dos identificadores del tipo: el id para unir contra el catalogo y
+    # el codigo para leerlo. Darlos juntos evita que cada consumidor tenga que
     # resolver el otro por su cuenta.
+    indice: int
     id_tipo_mercancia: str
     codigo_mercancia: str
     excesos: tuple[str, ...]
@@ -338,7 +361,7 @@ def _a_items(mercancias: tuple[MercanciaSolicitada, ...]) -> list[ItemCarga]:
     for m in mercancias:
         for i in range(m.cantidad):
             items.append(ItemCarga(
-                id=f"{m.tipo.codigo}#{i}", sku=m.tipo.codigo, descripcion=m.tipo.nombre,
+                id=f"{m.indice}#{i}", sku=str(m.indice), descripcion=m.tipo.nombre,
                 pedido=None, cliente=None, destino=None, secuencia_entrega=1,
                 largo_mm=float(m.largo_cm) * 10, ancho_mm=float(m.ancho_cm) * 10,
                 alto_mm=float(m.alto_cm) * 10, peso_kg=float(m.peso_kg),
@@ -485,7 +508,8 @@ def _detectar_extradimension(
         if m.peso_kg > medidas.peso_max_kg:
             excesos.append(f"peso {m.peso_kg:.1f} kg > {medidas.peso_max_kg:.1f} kg")
         if excesos:
-            excedidas.append(PiezaExcedida(m.tipo.id, m.tipo.codigo, tuple(excesos)))
+            excedidas.append(
+                PiezaExcedida(m.indice, m.tipo.id, m.tipo.codigo, tuple(excesos)))
     return DeteccionExtradimension(bool(excedidas), medidas, tuple(excedidas))
 
 
@@ -518,24 +542,35 @@ def _armar_vehiculo(
     Los porcentajes van contra el volumen GEOMETRICO del vehiculo y contra la
     capacidad de ESTA combinacion vehiculo-carroceria, no contra el chasis.
     """
-    por_codigo: dict[str, int] = {}
+    # `sku` es la POSICION en la solicitud, no el codigo - ver
+    # `MercanciaSolicitada.indice`. Se cuenta por posicion y se multiplica por
+    # los valores unitarios de ESA posicion; agrupar por codigo antes de
+    # multiplicar le aplicaria a todas las unidades el peso y el volumen de
+    # una sola de las posiciones.
+    por_posicion: dict[str, int] = {}
     for item in items:
-        por_codigo[item.sku] = por_codigo.get(item.sku, 0) + 1
+        por_posicion[item.sku] = por_posicion.get(item.sku, 0) + 1
 
-    unitarios = {m.tipo.codigo: m for m in mercancias}
+    unitarios = {str(m.indice): m for m in mercancias}
+
+    # Una fila por POSICION, no por codigo: es lo que permite saber cuantas
+    # unidades de cada posicion capturada se fue en este camion. Dos filas
+    # pueden compartir `codigo_mercancia`.
     detalle = tuple(
         MercanciaEnVehiculo(
-            codigo_mercancia=codigo,
+            indice=unitarios[posicion].indice,
+            codigo_mercancia=unitarios[posicion].tipo.codigo,
             cantidad=cantidad,
-            peso_kg=unitarios[codigo].peso_kg * cantidad,
-            volumen_m3=(unitarios[codigo].volumen_unitario_m3 * cantidad).quantize(Decimal("0.01")),
+            peso_kg=unitarios[posicion].peso_kg * cantidad,
+            volumen_m3=(
+                unitarios[posicion].volumen_unitario_m3 * cantidad).quantize(Decimal("0.01")),
         )
-        for codigo, cantidad in sorted(por_codigo.items())
+        for posicion, cantidad in sorted(por_posicion.items(), key=lambda p: int(p[0]))
     )
 
     peso = sum((d.peso_kg for d in detalle), Decimal(0))
     volumen = sum(
-        (unitarios[d.codigo_mercancia].volumen_unitario_m3 * d.cantidad for d in detalle),
+        (unitarios[str(d.indice)].volumen_unitario_m3 * d.cantidad for d in detalle),
         Decimal(0),
     )
     pct_volumen = _porcentaje(volumen, vehiculo.volumen_m3)
@@ -551,7 +586,9 @@ def _armar_vehiculo(
         porcentaje_llenado_volumen=pct_volumen,
         porcentaje_llenado_peso=pct_peso,
         alerta_bajo_llenado=max(pct_volumen, pct_peso) < umbral_alerta * CIEN,
-        heterogenea=len(detalle) > 1,
+        # Por tipos DISTINTOS, no por numero de filas: dos posiciones del
+        # mismo producto en un camion no lo vuelven carga heterogenea.
+        heterogenea=len({d.codigo_mercancia for d in detalle}) > 1,
         mercancias=detalle,
     )
 
@@ -579,7 +616,11 @@ def recomendar(catalogo: Catalogo, solicitud: SolicitudRecomendacion) -> Recomen
     """
     validar_dominancia(catalogo)
 
-    mercancias = solicitud.mercancias
+    # La posicion en la solicitud es la identidad de cada linea - ver
+    # `MercanciaSolicitada.indice`. Se asigna aca, en el unico punto por el
+    # que entra todo, para que ningun llamante tenga que acordarse.
+    mercancias = tuple(
+        replace(m, indice=i) for i, m in enumerate(solicitud.mercancias))
     advertencias: list[str] = []
 
     extradimension = _detectar_extradimension(mercancias, solicitud.medidas_estandar)

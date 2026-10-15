@@ -159,11 +159,34 @@ Límite: **10.000 unidades totales por request**
 (`application/recomendaciones/casos_de_uso.py`) — por encima,
 `400 CUBICACION_DEMASIADO_GRANDE`.
 
-**Las mercancías viajan con id y código.** En el request va el `idTipoMercancia`
-que devolvió `GET /tipos-mercancia` (acordado con Cotifly el 2026-10-08, su
-HU-021.5). En la respuesta van **los dos**: el id es lo que Cotifly persiste y el
-código estable es lo que usa NEXO. Un uuid se acepta en cualquier caja —
-mayúsculas o minúsculas— porque es el mismo uuid.
+**En el request entra el código; en la respuesta salen los dos.** El request
+lleva el `codigoMercancia` que devolvió `GET /tipos-mercancia` (S5-HU-17.7,
+reemplaza al `idTipoMercancia` acordado el 2026-10-08). Se acepta en cualquier
+caja y con espacios de sobra: es el mismo código. La respuesta sigue llevando
+**los dos** —`idTipoMercancia` y `codigoMercancia`—, así que nadie tiene que
+resolver el otro por su cuenta.
+
+El request cambió al código para que el dato tenga una sola forma en todo el
+recorrido: NEXO ya lo persiste así en la captura
+(`CapturaRequests.CodigoTipoMercancia`) y `codigoVehiculo` / `codigoCarroceria`
+también viajan como código. Con el id, NEXO tenía que traducir de un campo al
+otro para hablar con este servicio. Ver `docs/DECISIONES_TECNICAS.md` #17.
+
+**El detalle por camión es por POSICIÓN, no por código** (S5-HU-17.8).
+`mercancias[].indicePosicion` es el índice —base 0— de la posición en el arreglo
+`mercancias` del request. Dos filas del mismo camión **pueden traer el mismo
+`codigoMercancia`** si la solicitud declaró dos posiciones de ese tipo con
+medidas distintas: **quien agrupe por código tiene que sumar.**
+
+Es lo que permite crear una línea de solicitud por camión sabiendo qué
+posiciones capturadas le tocan. Las medidas no se devuelven porque el llamante
+ya las tiene —las mandó él— y el índice se las devuelve. `piezas[]` de
+`extradimension` lo lleva por la misma razón: dos posiciones del mismo tipo
+pueden tener medidas distintas y que solo una exceda.
+
+Viaja en `null` al reconsultar una corrida anterior a S5-HU-17.8.
+`heterogenea` se calcula sobre códigos **distintos**, no sobre el número de
+filas. Ver `docs/DECISIONES_TECNICAS.md` #19.
 
 **Los ids que devuelve este servicio vienen en MAYÚSCULAS.** SQL Server
 devuelve así las columnas `uniqueidentifier` y no es configurable; se generan ya
