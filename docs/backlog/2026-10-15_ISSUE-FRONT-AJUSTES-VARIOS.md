@@ -1,4 +1,7 @@
 ### [S5-HU-XX.X] Ajustes de pantalla: botones, filtros, encabezados fijos y horas de devolución (solo frontend)
+
+_Fecha: 2026-10-15_
+
 Labels: `nexo`, `sprint-5`, `tarea-tecnica`, `frontend` · Tipo: Task · Prioridad: por definir · Esfuerzo: por definir
 Asignado a: por definir (Frontend)
 ```

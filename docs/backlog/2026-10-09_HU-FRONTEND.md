@@ -1,5 +1,7 @@
 # HU — Frontend
 
+_Última actualización: 2026-10-14_
+
 Historias de usuario de **frontend**, pendientes de implementar por el
 equipo de frontend, de **todos los módulos** que se van encontrando en
 la revisión paso a paso de NEXO (no solo Mesa de Costeo — cada HU
@@ -13,7 +15,7 @@ exacto y realizable — no para dejar el código ya hecho. La
 implementación real, de verdad, la hace el equipo de frontend sobre
 estas HU. Detalle técnico de la investigación/prototipo (archivo:línea,
 snippets) en `REVISION-NEXO-PASO-A-PASO.md`, por módulo. La parte de
-backend que soporta algunas de estas está en `HU-BACKEND.md`.
+backend que soporta algunas de estas está en `2026-10-09_HU-BACKEND.md`.
 
 ---
 
@@ -189,7 +191,7 @@ contexto comercial completo sin ir a otra pantalla.
   de viaje es Contenedor.
 - Depende de que el backend envíe estos 3 campos en el DTO de costeo —
   **ya resuelto del lado NEXO**, código real y compilado (ver
-  `HU-BACKEND.md`, nota de referencia bajo Mesa de Costeo), pendiente
+  `2026-10-09_HU-BACKEND.md`, nota de referencia bajo Mesa de Costeo), pendiente
   de que el backend desplegado se actualice para poder probarlo en
   pantalla.
 
@@ -352,7 +354,7 @@ las marca `Revisada`). Agregárselo a `CoordinadorFletes` arreglaría
 este síntoma pero activaría ese efecto secundario no deseado para
 todos los Admin Fletes — **no es la solución**.
 
-**Depende de:** la consulta nueva de backend (`HU-BACKEND.md`, HU-B7) —
+**Depende de:** la consulta nueva de backend (`2026-10-09_HU-BACKEND.md`, HU-B7) —
 un método nuevo en `cotizaciones-api.service.ts` que la consuma, y que
 `mesa-costeo-page.component.ts` la llame **siempre** al abrir la
 pantalla, sin el `if (!this.access.puede('autoAplicarPropuestas'))` que
@@ -465,7 +467,7 @@ líneas.
 **Resultado:** con 1 de 2 líneas costeadas, el botón ya aparece
 habilitado — se puede entregar al comercial una cotización con líneas
 del pliego todavía en `PorCostear`. Confirmado también en backend (ver
-`HU-BACKEND.md`, HU-B8): la API no bloquea esto tampoco.
+`2026-10-09_HU-BACKEND.md`, HU-B8): la API no bloquea esto tampoco.
 
 **Criterios de aceptación:**
 - `puedeEntregar()` agrega la condición de que
@@ -657,7 +659,7 @@ SICE-TAC + tiempos logísticos" via `candidateSourceLabel()`,
 `mesa-costeo-page.component.ts:507-509`) muestra un solo número
 combinado — `candidateText()` (líneas 511-513) solo formatea
 `candidate.valor`, sin desglose. Hoy el backend tampoco expone los 2
-componentes por separado (ver **HU-B9** en `HU-BACKEND.md`, que agrega
+componentes por separado (ver **HU-B9** en `2026-10-09_HU-BACKEND.md`, que agrega
 `ValorPisoBase`/`ValorTiemposLogisticos` al DTO).
 
 **Depende de HU-B9** — sin esos 2 campos nuevos del backend, no hay
@@ -719,7 +721,7 @@ igual que los nuevos campos del DTO de backend.
 flete manual ya guardado, **para** corregir el valor sin tener que
 borrar y volver a capturar.
 
-**Depende de HU-B10** (`HU-BACKEND.md`, sección Mesa de Costeo) — ya
+**Depende de HU-B10** (`2026-10-09_HU-BACKEND.md`, sección Mesa de Costeo) — ya
 implementado y compilado, nuevo endpoint
 `PUT /api/cotizaciones/{id}/lineas/{lineaSolicitudId}`.
 
@@ -784,7 +786,7 @@ salió cada candidato, cuál es el recomendado, y —solo cuando hay algo
 que elegir— poder tomar cualquiera de los candidatos con un clic,
 **para** tener la última palabra sin reescribir valores a mano.
 
-**Fuente de verdad del flujo:** `HU-BACKEND.md`, sección **"Motor de
+**Fuente de verdad del flujo:** `2026-10-09_HU-BACKEND.md`, sección **"Motor de
 decisión de tarifa"** (flujo de 4 pasos, tabla de 10 casos y decisiones
 de Sara del 2026-10-12). Esta HU es solo la parte de pantalla.
 
@@ -1073,7 +1075,7 @@ línea por línea y sin aplicarlo por error.
    versión es la que vale. (Al dejar el botón, también se resuelve el
    problema de los pliegos: sus líneas quedan autocosteadas pero sin
    flete guardado, y este botón es la forma de llenarlas todas de una
-   vez — ver `HU-BACKEND.md`, "Motor de decisión de tarifa", punto 6.)
+   vez — ver `2026-10-09_HU-BACKEND.md`, "Motor de decisión de tarifa", punto 6.)
 
 **Dónde:** `mesa-costeo-page.component.html:79-87` (la `<section>`
 `mesa-propuestas-action`) y `aplicarPropuestas()` en el `.ts`
@@ -2220,7 +2222,7 @@ commitear.
 - ~~Ciudades ambiguas sin aviso~~ — **decidido (Sara, 2026-10-12):** la
   vista previa muestra cuál se usó y de qué departamento, y deja
   cambiarlo antes de confirmar. Ver **HU-9** en la sección "Carga masiva
-  de Excel" y **HU-B21** en `HU-BACKEND.md`.
+  de Excel" y **HU-B21** en `2026-10-09_HU-BACKEND.md`.
 - ~~Tipo de Vehículo no se valida contra Rango de Peso~~ — **decidido
   (Sara, 2026-10-12): no se hace.** El importador sigue aceptando el
   tipo de vehículo que venga en el Excel sin cruzarlo contra la banda
@@ -2236,7 +2238,7 @@ commitear.
 exportar las reglas ya cargadas a Excel, **para** poder editarlas y
 reimportarlas sin reconstruir el archivo desde cero.
 
-**Depende de:** el endpoint nuevo de backend (`HU-BACKEND.md`, HU-B6).
+**Depende de:** el endpoint nuevo de backend (`2026-10-09_HU-BACKEND.md`, HU-B6).
 
 **Archivo:** `reglas-solo-sicetac-api.service.ts` — solo tiene
 `importarExcel` (línea 38), no hay método `exportarExcel`.
@@ -2260,7 +2262,7 @@ de qué es esta vista aparezca en un ícono de información, **para** no
 tener un párrafo fijo ocupando espacio bajo el título.
 
 **Mismo patrón exacto que ya se aplicó en Biblioteca** (ver
-`HU-FRONTEND.md`, sección Biblioteca, HU-6) y que ya existe en
+`2026-10-09_HU-FRONTEND.md`, sección Biblioteca, HU-6) y que ya existe en
 Bandeja — nada que inventar, solo reusarlo aquí.
 
 **Archivo:** `reglas-solo-sicetac-page.component.html:2-5`:
@@ -2305,7 +2307,7 @@ componentes Angular), copiarlo igual que se hizo en Biblioteca.
 
 > **Decidido (2026-10-09): 100% frontend, sin cambios de backend.** Se
 > evaluó agregar 2 endpoints nuevos para separar "analizar" de
-> "confirmar" (ver nota en `HU-BACKEND.md`, misma sección — se descartó),
+> "confirmar" (ver nota en `2026-10-09_HU-BACKEND.md`, misma sección — se descartó),
 > pero Sara prefirió resolverlo todo en este repo, reusando el patrón
 > que ya existe en Servicios de Biblioteca y reutilizando los endpoints
 > de catálogo que ya existen para Tarifas Plaza.
@@ -3383,7 +3385,7 @@ final. Se filtra por `Cotizacion.EntregadaAt` (cumplimiento de lo
 entregado en ese rango), no por `Solicitud.CreatedAt` como las otras 5
 tarjetas.
 
-**Depende de que se actualice HU-B12** (`HU-BACKEND.md`, sección
+**Depende de que se actualice HU-B12** (`2026-10-09_HU-BACKEND.md`, sección
 Tablero, ya corregida con este mismo cambio) — el endpoint
 `GET /api/metricas/cumplimiento` necesita el filtro de fecha, con
 Cumplimiento SLA filtrado por `EntregadaAt` y las otras 5 tarjetas por
@@ -3441,7 +3443,7 @@ promedio/mediana/%bajo10min pero solo sobre los pliegos de ese tamaño
 resultados al instante.
 
 **No es solo frontend** — depende de un cambio de backend real (ver
-**HU-B13** en `HU-BACKEND.md`, sección Tablero): hay que cruzar la saga
+**HU-B13** en `2026-10-09_HU-BACKEND.md`, sección Tablero): hay que cruzar la saga
 de auto-costeo con las cotizaciones entregadas, y agregar el filtro de
 tamaño al query. Se documenta aquí la parte de pantalla; la lógica de
 cálculo vive en el backend.

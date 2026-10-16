@@ -197,7 +197,7 @@ por Admin. de Fletes y Tarifas / Automático / Todas). Desde acá se
 entra con un clic a la Mesa de Costeo de cada solicitud.
 
 **2 bugs reales confirmados esta sesión, documentados y pendientes de
-implementar** (ver `HU-BACKEND.md`, sección Bandeja): el filtro
+implementar** (ver `2026-10-09_HU-BACKEND.md`, sección Bandeja): el filtro
 "vigente" compara la fecha de captura en vez de la Fecha Límite real;
 y las solicitudes ya revisadas pero sin entregar todavía no aparecen
 en "Pendientes" como deberían.
@@ -223,7 +223,7 @@ Cubicador) y se exporta/entrega la cotización final (Excel/PDF por
 correo).
 
 Esta pantalla fue objeto de una sesión completa de ajustes de UX este
-mes — ver `HU-FRONTEND.md`/`HU-BACKEND.md`, sección Mesa de Costeo,
+mes — ver `2026-10-09_HU-FRONTEND.md`/`2026-10-09_HU-BACKEND.md`, sección Mesa de Costeo,
 para el detalle exacto de cada cambio (consolidación de cajas de
 propuesta, numeración de líneas, etc.) y un bug real encontrado y
 documentado ("Iniciar costeo" aparece en solicitudes ya entregadas o
@@ -253,7 +253,7 @@ auto-costeadas, para roles sin el permiso de auto-aplicar).
 Varios hallazgos y mejoras de esta pestaña de Servicios (bug del
 semáforo de vigencia, orden por vigencia, paginación de Histórico SAP,
 vista previa editable de la carga masiva de Excel) están documentados
-en `HU-FRONTEND.md`/`HU-BACKEND.md`, sección Biblioteca, y en curso de
+en `2026-10-09_HU-FRONTEND.md`/`2026-10-09_HU-BACKEND.md`, sección Biblioteca, y en curso de
 implementación en este momento.
 
 ### 4.6 Tarifas Plaza — mantenimiento manual del dato de plaza
@@ -375,9 +375,9 @@ Cada paso queda auditado (`AuditLog`).
 > existe el paso "plaza vigente mayor gana sola", y la plaza/histórico
 > solo se buscan en SAP, nunca en las tablas propias de NEXO). La
 > especificación completa —tabla de 10 casos, qué cambia, casos borde
-> y HU para implementarlo— está en `docs/HU-BACKEND.md`, sección
+> y HU para implementarlo— está en `docs/2026-10-09_HU-BACKEND.md`, sección
 > **"Motor de decisión de tarifa"** (HU-B14, B15, B16, B17) y la parte
-> de pantalla en `docs/HU-FRONTEND.md`, **HU-16**.
+> de pantalla en `docs/2026-10-09_HU-FRONTEND.md`, **HU-16**.
 
 Basado en el diagrama `NEXO FLUJO.pdf`, con los ajustes que confirmó
 Sara el 2026-10-12. Ante una línea de solicitud (línea de negocio,
@@ -449,6 +449,6 @@ plaza vigente ya es la mayor) resuelve solo y ni presenta opciones.
 - Revisión directa del código: `administracion_embarqa_nexo/src/app/cabina-fletes/`
   (routing, guards, `nexo-access.models.ts`, cada página) y
   `NEXO/src/Nexo.Api/` (`[Authorize(Roles=...)]` de cada controller).
-- `docs/REVISION-NEXO-PASO-A-PASO.md`, `docs/HU-FRONTEND.md`,
-  `docs/HU-BACKEND.md` — hallazgos y mejoras de esta misma revisión,
+- `docs/REVISION-NEXO-PASO-A-PASO.md`, `docs/2026-10-09_HU-FRONTEND.md`,
+  `docs/2026-10-09_HU-BACKEND.md` — hallazgos y mejoras de esta misma revisión,
   para el detalle técnico de cada bug/mejora mencionado arriba.

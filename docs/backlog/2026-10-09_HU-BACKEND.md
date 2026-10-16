@@ -1,12 +1,14 @@
 # HU — Backend
 
+_Última actualización: 2026-10-16_
+
 Historias de usuario de **backend** (NEXO, .NET), de **todos los
 módulos** que se van encontrando en la revisión paso a paso de NEXO (no
 solo Mesa de Costeo — cada HU indica su módulo en el título de
-sección). A diferencia de `HU-FRONTEND.md`, este sí es el repo de
+sección). A diferencia de `2026-10-09_HU-FRONTEND.md`, este sí es el repo de
 Sara — una HU marcada como ya resuelta aquí es código real,
 compilado, en el repo real (pendiente a lo sumo de desplegar). La parte
-de frontend que consume estas está en `HU-FRONTEND.md`.
+de frontend que consume estas está en `2026-10-09_HU-FRONTEND.md`.
 
 ---
 
@@ -237,7 +239,7 @@ por caso antes de implementar (no asumir).
 
 **Confirmado por partida doble:** este mismo hallazgo ya estaba
 documentado antes, encontrado el 2026-10-05 al depurar un rechazo real
-al reimportar un Excel exportado (`docs/REPARACIONES-FINALES-TARIFAS-PLAZA.md`,
+al reimportar un Excel exportado (`docs/2026-10-05_REPARACIONES-FINALES-TARIFAS-PLAZA.md`,
 punto 1) — caso real: celda VIGENCIA en formato General con serial
 `46315` (2026-10-20 real), rechazada porque `DateOnly.TryParse("46315", ...)`
 falla. Dos investigaciones independientes llegaron a la misma causa
@@ -461,7 +463,7 @@ que no tenga el efecto secundario de crear una cotización nueva si no
 existía. Por eso el front de Mesa de Costeo solo llama esto cuando el
 usuario hace clic en algo, o si tiene el permiso `autoAplicarPropuestas`
 — para cualquier otro caso, la pantalla no sabe que ya existe una
-cotización real, aunque la haya (ver `HU-FRONTEND.md`, HU-9).
+cotización real, aunque la haya (ver `2026-10-09_HU-FRONTEND.md`, HU-9).
 
 **Patrón a replicar, archivo por archivo** (mismo esquema Command/Query
 que ya usa el proyecto, controller delgado):
@@ -547,7 +549,7 @@ menos una** `clsCotizacionLinea` — nunca compara ese conteo contra el
 total de líneas del pliego (`clsSolicitud.Lineas`) ni revisa si alguna
 sigue en `EstadoLinea.PorCostear`. Confirmado que no hay ningún otro
 validador, máquina de estados ni test que cubra este caso (ver
-`HU-FRONTEND.md`, HU-11, para el mismo hueco confirmado en el botón del
+`2026-10-09_HU-FRONTEND.md`, HU-11, para el mismo hueco confirmado en el botón del
 frontend).
 
 **Cómo se construye hoy:** `clsCotizacion.Lineas` se arma
@@ -622,7 +624,7 @@ candidato SICE-TAC.
   estén informados (control de consistencia, no un campo inventado).
 - Plaza e Histórico SAP no cambian — siguen solo con `Valor`.
 
-Ver también la HU de frontend correspondiente (`HU-FRONTEND.md`,
+Ver también la HU de frontend correspondiente (`2026-10-09_HU-FRONTEND.md`,
 sección Mesa de Costeo) para la parte de pantalla.
 
 ---
@@ -633,7 +635,7 @@ sección Mesa de Costeo) para la parte de pantalla.
 un flete manual que ya guardé, **para** no tener que vivir con un error
 de captura hasta el final de la cotización.
 
-**Causa raíz (documentada antes en `FUTURAS-PROPUESTAS.md`, punto 1):**
+**Causa raíz (documentada antes en `2026-10-09_FUTURAS-PROPUESTAS.md`, punto 1):**
 `clsAgregarLineaCotizacionCommand` siempre **agrega** una fila nueva
 (`c.Lineas.Add(linea)`), nunca revisa si ya existe un flete para esa
 línea — habilitar "editar" en el frontend sin un comando nuevo
@@ -658,12 +660,12 @@ en silencio.
 - Registrado en DI (`clsDependencyInjection.cs`, Cotizaciones).
 
 **Alcance decidido (resuelve las preguntas abiertas de
-`FUTURAS-PROPUESTAS.md` punto 1):** solo fletes de fuente **Manual**,
+`2026-10-09_FUTURAS-PROPUESTAS.md` punto 1):** solo fletes de fuente **Manual**,
 solo mientras la cotización siga en **Borrador** — igual criterio que
 ya aplica para agregar un flete nuevo.
 
 **Pendiente:** desplegar (el frontend apunta al backend ya desplegado,
-no al código local). La parte de pantalla (HU-15 en `HU-FRONTEND.md`)
+no al código local). La parte de pantalla (HU-15 en `2026-10-09_HU-FRONTEND.md`)
 ya está implementada en el sandbox y compilando — no se puede probar de
 punta a punta hasta que este backend se despliegue.
 
@@ -774,7 +776,7 @@ la solicitud (igual que las demás), aceptando que no es exactamente
 "se descartó en esa fecha" sino "se creó en ese rango y hoy está
 descartada".
 
-Ver también **HU-3** en `HU-FRONTEND.md` (sección Tablero) para la
+Ver también **HU-3** en `2026-10-09_HU-FRONTEND.md` (sección Tablero) para la
 parte de pantalla.
 
 **Nota de proceso (2026-10-12):** esta HU se implementó una primera
@@ -796,7 +798,7 @@ segmentarlo por tamaño de pliego, **para** que la métrica refleje el
 ciclo completo y no solo lo que tardó el motor automático.
 
 **Redefinición del tiempo, por pliego (confirmada por Sara — ver
-también HU-4 en `HU-FRONTEND.md`, sección Tablero):**
+también HU-4 en `2026-10-09_HU-FRONTEND.md`, sección Tablero):**
 - Saga `Completado` (se auto-costeó 100% sola): tiempo = como hoy,
   `TerminadoEn - SolicitadoEn` (`clsEstadoAutoCosteo`).
 - Saga `Parcial` (alguna línea requirió Admin Tarifas): tiempo = desde
@@ -852,7 +854,7 @@ JavaScript las reglas de validación que hoy solo viven aquí (catálogo
 de municipios, rangos de peso, líneas de negocio, clases de viaje) —
 riesgo aceptado conscientemente: si esas reglas cambian en el backend,
 hay que acordarse de replicarlas también en el frontend. Detalle
-completo de la implementación en `HU-FRONTEND.md`, sección "Carga
+completo de la implementación en `2026-10-09_HU-FRONTEND.md`, sección "Carga
 masiva de Excel".
 
 ---
@@ -869,7 +871,7 @@ masiva de Excel".
 > hoy vs. qué debe quedar; (4) los casos borde ya decididos; (5) los
 > hallazgos relacionados que quedan fuera de alcance; y (6) las HU de
 > backend para cerrarlo. La parte de pantalla es **HU-16** en
-> `HU-FRONTEND.md` (sección Mesa de Costeo).
+> `2026-10-09_HU-FRONTEND.md` (sección Mesa de Costeo).
 >
 > **Aplica a:** todo cálculo de propuesta de flete — auto-costeo al
 > capturar, auto-costeo de pliegos (saga) y la "Propuesta de la
@@ -1666,7 +1668,7 @@ departamento no existe en el catálogo, la fila se rechaza con un error
 claro ("'Armenia' no existe en el departamento 'X'").
 
 **De dónde salen esas columnas:** las llena la vista previa del
-frontend (HU-9 de "Carga masiva de Excel" en `HU-FRONTEND.md`) cuando
+frontend (HU-9 de "Carga masiva de Excel" en `2026-10-09_HU-FRONTEND.md`) cuando
 el usuario confirma el departamento de una ciudad repetida — el
 frontend ya reconstruye el Excel antes de mandarlo al mismo endpoint
 `importar-excel`, así que no cambia el contrato del endpoint.
@@ -1804,7 +1806,7 @@ quedar atado a un estado que no cambia el trabajo real.
 2. **Estado:** `clsAgregarConexosCotizacionCommand.cs` lanza 409
    `COTIZACION_NO_EDITABLE` si `Estado != Borrador`, es decir, bloquea toda
    cotización Entregada.
-3. (El frontend repite ambos bloqueos; ver HU-22 y HU-23 en `HU-FRONTEND.md`.)
+3. (El frontend repite ambos bloqueos; ver HU-22 y HU-23 en `2026-10-09_HU-FRONTEND.md`.)
 
 **Regla nueva (única, en backend):** agregar o quitar conexos se permite
 mientras `Resultado == SinDefinir` (cotización Borrador o Entregada). Si
@@ -1932,7 +1934,7 @@ ignora o se rechaza con 403. Nexo no usa el resultado para decisiones de negocio
 
 ### HU-B26 — Contrato de captura con Cotifly: ruta, orden, recomendación del cubicador, líneas sin vehículo y normalización
 
-> Detalle completo en la issue S5-HU-20.5 (`docs/backlog/ISSUES-NEXO-S5.md`).
+> Detalle completo en la issue S5-HU-20.5 (`docs/backlog/2026-10-12_ISSUES-NEXO-S5.md`).
 
 Cotifly manda a `POST /api/captura-solicitudes` una línea por camión. NEXO necesita:
 1. **`grupoRutaId` (GUID, opcional) y `orden` (int, opcional)** por línea: guardados en `tbl_lineas_solicitud`, devueltos por `GET /api/solicitudes/{id}`, que ordena las líneas por `orden` (hoy no hay orden estable: el número de línea no se persiste y el GET no ordena).

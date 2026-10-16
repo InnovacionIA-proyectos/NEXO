@@ -135,7 +135,7 @@ align-items:center; gap:8px` a `.cabina-page-header h1` (que antes no
 lo tenía) para que el ícono quedara alineado junto al título. Compiló
 bien.
 
-Esto queda como **HU-6** en `HU-FRONTEND.md` — pendiente de que el
+Esto queda como **HU-6** en `2026-10-09_HU-FRONTEND.md` — pendiente de que el
 equipo de frontend la implemente de verdad en el repo real.
 
 ### Bug — Semáforo de vigencia siempre mostraba "Vigente" (✅ Resuelto)
@@ -268,7 +268,7 @@ página 1 y delegando a un `cargarSap()` privado que sí manda `top`/
 página). HTML: mismo bloque de paginación de "plaza", renombrado a
 `sap*`, antes de la tabla. Compiló bien.
 
-Esto queda como **HU-4** en `HU-FRONTEND.md` — pendiente de que el
+Esto queda como **HU-4** en `2026-10-09_HU-FRONTEND.md` — pendiente de que el
 equipo de frontend la implemente de verdad en el repo real.
 
 ### Mejora — Quitar "mostrando las primeras X" en plaza y sap (validado en sandbox, pendiente para el front)
@@ -291,7 +291,7 @@ consistencia — las 3 pestañas quedan iguales. Se validó también en el
 sandbox: `Periodo <strong>{{ formatPeriodo(sicetacResultado.periodo) }}</strong> · {{ sicetacResultado.total }} tarifas encontradas · Fuente: DWSice · tblRutasSicetac (solo lectura)`
 — mismo criterio, solo se quitó el `<ng-container>`. Compiló bien.
 
-Esto queda como **HU-5** en `HU-FRONTEND.md` (ahora cubriendo las 3
+Esto queda como **HU-5** en `2026-10-09_HU-FRONTEND.md` (ahora cubriendo las 3
 pestañas) — pendiente de que el equipo de frontend la implemente de
 verdad en el repo real.
 
@@ -311,7 +311,7 @@ por un `<select>` con "Por estiba"/"Por unidad", solo para
 `tipoMiniVista === 'almacenamiento'` — el resto de tipos sigue
 bloqueado igual que antes. Compiló bien.
 
-Esto queda como **HU-7** en `HU-FRONTEND.md` — pendiente de que el
+Esto queda como **HU-7** en `2026-10-09_HU-FRONTEND.md` — pendiente de que el
 equipo de frontend la implemente de verdad en el repo real.
 
 ### Bug confirmado — CoordinadorFletes no puede buscar ciudades al crear un servicio "Almacenamiento"
@@ -359,7 +359,7 @@ dejarla solo en los métodos que sí la necesitan (`Capturar`,
 roles válidos de NEXO vía la política de respaldo de
 `clsProgram.cs:144-149`).
 
-Esto queda como **HU-B3** en `HU-BACKEND.md` (ya corregida con el
+Esto queda como **HU-B3** en `2026-10-09_HU-BACKEND.md` (ya corregida con el
 diseño real) — pendiente de implementar.
 
 ### Mejora — Código de "Almacenamiento" en mayúscula inicial (validado en sandbox, pendiente para el front)
@@ -380,7 +380,7 @@ no toca NEXO backend para nada.
 servicio) — `itr: 'ITR'` se dejó igual, ahí no había inconsistencia.
 Compiló bien.
 
-Esto queda como **HU-8** en `HU-FRONTEND.md` — pendiente de que el
+Esto queda como **HU-8** en `2026-10-09_HU-FRONTEND.md` — pendiente de que el
 equipo de frontend la implemente de verdad en el repo real.
 
 ### Futuro alcance — decidir si usar solo las tarifas de plaza propias de NEXO, o seguir usando también las de DbSolucionesTI
@@ -433,8 +433,8 @@ Riesgo aceptado: el **algoritmo** de validación (no los datos, que
 siempre se consultan en vivo) queda duplicado entre backend y
 frontend.
 
-Documentado completo como **HU-1** en `HU-FRONTEND.md`, sección "Carga
-masiva de Excel" (al final del archivo) — `HU-BACKEND.md` solo tiene
+Documentado completo como **HU-1** en `2026-10-09_HU-FRONTEND.md`, sección "Carga
+masiva de Excel" (al final del archivo) — `2026-10-09_HU-BACKEND.md` solo tiene
 una nota explicando por qué no hizo falta tocar nada ahí.
 
 **Prototipo validado en el sandbox — ambos módulos, de punta a punta:**
@@ -469,7 +469,7 @@ fijo (Almacenamiento, ITR), deberían corregirse solas en vez de
 marcarse como error. Se confirmó que el código ya auto-corregía
 Tipo de servicio/Unidad/Categoría al guardarlos, pero igual marcaba
 error (inconsistencia); Código ni se auto-corregía. Queda como **HU-2**
-en `HU-FRONTEND.md`, misma sección.
+en `2026-10-09_HU-FRONTEND.md`, misma sección.
 
 **Prototipo validado en el sandbox:** `validarFila()` ahora resuelve
 `codigo`/`tipoServicio`/`unidad` como `config.tipoServicioFijo ??
@@ -504,7 +504,7 @@ desplegable, no texto libre; (6) Costo Unitario con separador de miles
 mientras se escribe. Todos estos patrones ya existen en otras partes
 del mismo repo (formulario manual de Servicios, `mesa-costeo-page.component.ts`)
 — no hay que inventar nada nuevo, solo reusarlos en la grilla. Queda
-como **HU-3** en `HU-FRONTEND.md`, misma sección.
+como **HU-3** en `2026-10-09_HU-FRONTEND.md`, misma sección.
 
 **Prototipo validado en el sandbox:** los 6 puntos ya están aplicados
 (`biblioteca-page.component.html:376-411`): Código/Tipo de servicio/
@@ -555,7 +555,7 @@ los datos reales ya cargados (`docs/Database/seeder/servicios_conexos.csv`):
 `"Manual - 1 Movimiento"` — patrón `{máquina} - {N} Movimiento(s)`
 (singular si N=1).
 
-Queda como **HU-9** en `HU-FRONTEND.md`, sección Biblioteca — aplica
+Queda como **HU-9** en `2026-10-09_HU-FRONTEND.md`, sección Biblioteca — aplica
 solo al formulario manual de "Nuevo servicio"/"Editar servicio", no a
 la carga masiva de Excel (que ya trae el texto combinado en una sola
 columna).
@@ -599,7 +599,7 @@ existente" ya existe en el código (misma lógica que cuenta "creadas"
 vs. "actualizadas"), solo hace falta filtrar qué se renderiza, sin
 tocar la lógica de guardado.
 
-Queda como **HU-4** en `HU-FRONTEND.md`, sección "Carga masiva de
+Queda como **HU-4** en `2026-10-09_HU-FRONTEND.md`, sección "Carga masiva de
 Excel".
 
 **Validado en el sandbox:** campo `esNueva` calculado en la
@@ -628,7 +628,7 @@ cerrado). Los 6 catálogos ya están cargados en el componente (son los
 mismos que usa `tarifas-plaza-excel.util.ts` para validar cada fila),
 no hay que pedir nada nuevo.
 
-Queda como **HU-5** en `HU-FRONTEND.md`, sección "Carga masiva de
+Queda como **HU-5** en `2026-10-09_HU-FRONTEND.md`, sección "Carga masiva de
 Excel".
 
 **Validado en el sandbox:** hecho tal cual el mapeo pedido. **Bug real
@@ -654,7 +654,7 @@ manual se queda igual, sin tocar); (3) **Vigencia** debe ser un
 selector de calendario (`<input type="date">`), no texto libre —
 mismo patrón que ya usa el formulario manual y la grilla de Servicios.
 
-Queda como **HU-6** en `HU-FRONTEND.md`, sección "Carga masiva de
+Queda como **HU-6** en `2026-10-09_HU-FRONTEND.md`, sección "Carga masiva de
 Excel".
 
 **Investigado y validado en el sandbox:** confirmado que era el bug
@@ -684,7 +684,7 @@ decidido antes de dejarlo como sugerencia), por consistencia visual;
 (3) pidió revisar que todos los desplegables de la grilla usen el
 mismo estilo CSS que el resto de la página.
 
-Queda como **HU-7** en `HU-FRONTEND.md`, sección "Carga masiva de
+Queda como **HU-7** en `2026-10-09_HU-FRONTEND.md`, sección "Carga masiva de
 Excel".
 
 **Investigado y validado en el sandbox:** eran 2 causas distintas.
@@ -776,7 +776,7 @@ desplegable de Tipo de vehículo que solo se ve el nombre descriptivo
 reconoce. Reglas Solo-SICETAC ya resuelve esto bien
 (`reglas-solo-sicetac-page.component.html:48`, `{{ tipo.codigo }} ·
 {{ tipo.descripcion }}`) — mismo arreglo para la grilla. Queda como
-**HU-8** en `HU-FRONTEND.md`, sección "Carga masiva de Excel". **Ya
+**HU-8** en `2026-10-09_HU-FRONTEND.md`, sección "Carga masiva de Excel". **Ya
 aplicado y compilado.**
 
 **Nota de contexto:** en la misma captura siguen apareciendo los 5
@@ -817,7 +817,7 @@ terminando con cultura `es-CO` fijada a propósito (no la del servidor).
 **Arreglo:** copiar `LeerFecha()` a `clsEfTarifasPlazaRepository.cs` y
 usarlo en vez de `Str(row, cols, "VIGENCIA")` + `DateOnly.TryParse(...)`.
 
-Esto queda como **HU-B4** en `HU-BACKEND.md` — pendiente de
+Esto queda como **HU-B4** en `2026-10-09_HU-BACKEND.md` — pendiente de
 implementar (Sara decidió solo documentarlo por ahora, no aplicarlo
 todavía).
 
@@ -830,39 +830,39 @@ aplica); la carga masiva de líneas de licitación (`clsExcelSolicitudesAdapter.
 usa un mecanismo distinto (sniffer de texto genérico, mapeo libre) y no
 se confirmó que tenga este bug — queda para revisar aparte si algún día
 se reporta algo similar ahí. Detalle completo de la tabla y la regla
-general en `HU-BACKEND.md`, HU-B4.
+general en `2026-10-09_HU-BACKEND.md`, HU-B4.
 
 ### Hallazgo — mismo bug de fecha ya documentado antes, por partida doble
 
 Al revisar el desplegable de Tipo de Vehículo de Reglas Solo-SICETAC
-apareció `docs/REPARACIONES-FINALES-TARIFAS-PLAZA.md`, un documento
+apareció `docs/2026-10-05_REPARACIONES-FINALES-TARIFAS-PLAZA.md`, un documento
 previo (2026-10-05) con 6 hallazgos propios, nunca fusionados a
-`HU-FRONTEND.md`/`HU-BACKEND.md`. Su punto 1 es **el mismo bug** que
+`2026-10-09_HU-FRONTEND.md`/`2026-10-09_HU-BACKEND.md`. Su punto 1 es **el mismo bug** que
 HU-B4 (fecha VIGENCIA leída como texto crudo en vez de como valor
 nativo de la celda) — confirmado con un caso real (`46315` = serial de
 2026-10-20, rechazado al reimportar). Ya se fusionó la nota en HU-B4.
 Sara pidió fusionar también los otros 5 hallazgos de ese documento —
 quedan repartidos abajo (Tarifas Plaza, Reglas Solo-SICETAC, Mesa de
-Costeo) y en `HU-BACKEND.md`.
+Costeo) y en `2026-10-09_HU-BACKEND.md`.
 
 ### Mostrar detalle de errores de importación (frontend) — ya documentado, no implementado
 
 El backend ya devuelve el detalle por fila de cada rechazo
 (`resultado.errores`), pero el frontend solo muestra el conteo
-("N rechazada(s)"). Queda como **HU-1** en `HU-FRONTEND.md`, sección
+("N rechazada(s)"). Queda como **HU-1** en `2026-10-09_HU-FRONTEND.md`, sección
 Tarifas Plaza.
 
 ### Editar línea rechazada sin reimportar todo el Excel — ya documentado, no implementado
 
 Depende de la HU anterior (hace falta saber qué campo falló antes de
-poder editarlo). Queda como **HU-2** en `HU-FRONTEND.md`, sección
+poder editarlo). Queda como **HU-2** en `2026-10-09_HU-FRONTEND.md`, sección
 Tarifas Plaza.
 
 ### 2 hallazgos secundarios, sin HU todavía (pendientes de decidir alcance)
 
 Ciudades ambiguas resueltas en silencio (toma un departamento sin
 avisar si el nombre choca entre 2+) y Tipo de Vehículo no validado
-contra Rango de Peso en la carga masiva. Detalle en `HU-FRONTEND.md`,
+contra Rango de Peso en la carga masiva. Detalle en `2026-10-09_HU-FRONTEND.md`,
 sección Tarifas Plaza, al final.
 
 ## Reglas Solo-SICETAC
@@ -878,7 +878,7 @@ datos — el propio comentario del código ya lo marcaba como pendiente
 Sara (2026-10-12): esos 5 casos ya no son necesarios** — no se trata
 de moverlos a una tabla, sino de **eliminarlos** del desplegable. Las
 reglas ya existentes que los usen no se tocan. Queda como **HU-B5** en
-`HU-BACKEND.md`.
+`2026-10-09_HU-BACKEND.md`.
 
 **✅ Implementado (2026-10-12):** se detectó de nuevo este mismo
 catálogo (el desplegable con los 5 casos especiales) apareciendo en el
@@ -893,8 +893,8 @@ de desplegar.
 
 Reglas Solo-SICETAC solo tiene importar + plantilla en blanco; Tarifas
 de Plaza ya tiene exportar-el-catálogo-cargado (que sirve de plantilla
-para reimportar). Queda como **HU-B6** en `HU-BACKEND.md` (backend) y
-**HU-1** en `HU-FRONTEND.md`, sección Reglas Solo-SICETAC (botón).
+para reimportar). Queda como **HU-B6** en `2026-10-09_HU-BACKEND.md` (backend) y
+**HU-1** en `2026-10-09_HU-FRONTEND.md`, sección Reglas Solo-SICETAC (botón).
 
 ### Mejora — Reemplazar texto descriptivo fijo por ícono de información, mismo patrón de Bandeja/Biblioteca
 
@@ -904,7 +904,7 @@ y tipo de vehículo que se cotizan EXCLUSIVAMENTE con el piso SICE-TAC...")
 debe desaparecer y quedar como tooltip de un ícono de información,
 junto al título "Rutas solo SICE".
 
-Queda como **HU-2** en `HU-FRONTEND.md`, sección Reglas Solo-SICETAC —
+Queda como **HU-2** en `2026-10-09_HU-FRONTEND.md`, sección Reglas Solo-SICETAC —
 pendiente de que el equipo de frontend la implemente.
 
 ### Mejora — Mismo tratamiento de ícono de información en Cubicador, Tablero y Tarifas Plaza
@@ -920,7 +920,7 @@ pendiente de que el equipo de frontend la implemente.
 - **Tarifas Plaza**: "Tarifas de plaza gobernadas por Nexo, con carga
   y descarga masiva por Excel."
 
-Quedan como **HU-1** en `HU-FRONTEND.md` (sección Cubicador), **HU-1**
+Quedan como **HU-1** en `2026-10-09_HU-FRONTEND.md` (sección Cubicador), **HU-1**
 (sección Tablero) y **HU-3** (sección Tarifas Plaza).
 
 **Validado en el sandbox, las 3:** texto del tooltip idéntico en cada
@@ -956,7 +956,7 @@ en `ngOnInit()`. Mismo patrón visual/accesibilidad de pestañas que ya
 usa Biblioteca (`tabs`/`tab`/`cambiarTab()`/`onTabKeydown()`, roles
 ARIA, navegación por flechas).
 
-Queda como **HU-2** en `HU-FRONTEND.md`, sección Tablero — pendiente
+Queda como **HU-2** en `2026-10-09_HU-FRONTEND.md`, sección Tablero — pendiente
 de implementar.
 
 ### Pedido — Filtro de fecha para Pendientes/En costeo/Entregadas/Descartadas/Total
@@ -981,8 +981,8 @@ Se implementó primero el backend completo (compilado, 0 errores) y se
 le pidió al chat del frontend que lo prototipara — **Sara pidió
 detener eso y dejarlo solo documentado por ahora**, así que se revirtió
 todo (backend acá, y el frontend también revirtió lo que había
-alcanzado a aplicar). Queda como **HU-B12** en `HU-BACKEND.md` y
-**HU-3** en `HU-FRONTEND.md` (ambos en sección Tablero) — pendiente de
+alcanzado a aplicar). Queda como **HU-B12** en `2026-10-09_HU-BACKEND.md` y
+**HU-3** en `2026-10-09_HU-FRONTEND.md` (ambos en sección Tablero) — pendiente de
 implementar, ninguno de los dos lados.
 
 ### Especificación final del bloque "Cumplimiento SLA / cola" y "KPIs del Piloto" (2026-10-12)
@@ -1008,8 +1008,8 @@ corrigiendo varias cosas de las rondas anteriores:
   que se había discutido antes, con el hueco conocido de HU-B8). Se
   suma un filtro de tamaño de pliego (1-10/11-100/+100 líneas) que
   recalcula el promedio dinámicamente, sin perder el número general.
-  Documentado como **HU-B13** (`HU-BACKEND.md`) y **HU-4**
-  (`HU-FRONTEND.md`), sección Tablero — pendiente de implementar.
+  Documentado como **HU-B13** (`2026-10-09_HU-BACKEND.md`) y **HU-4**
+  (`2026-10-09_HU-FRONTEND.md`), sección Tablero — pendiente de implementar.
 - **% líneas auto-costeadas** y sus 2 derivados: confirmado que quedan
   igual, sin cambios.
 - **2 métricas nuevas propuestas** (recomendadas por Claude, a
@@ -1021,7 +1021,7 @@ corrigiendo varias cosas de las rondas anteriores:
   compilaba bien. **Sara pidió revertirlo** ("después miramos si los
   aplicamos") — confirmado revertido por completo (HTML, TS, CSS,
   import del módulo). Queda documentado como **HU-5** en
-  `HU-FRONTEND.md` (sección Tablero), como propuesta sin decisión
+  `2026-10-09_HU-FRONTEND.md` (sección Tablero), como propuesta sin decisión
   todavía, no como HU aprobada.
 
 ## Mesa de Costeo
@@ -1033,7 +1033,7 @@ Entregada, o en Borrador con `esAutoCosteo = true`) está bien aplicada
 en `cotizacion-resumen-page.component.ts`, pero Mesa de Costeo tiene
 sus propios botones que no la replican — solo revisan el permiso del
 usuario. Se puede marcar Perdida/Ganada sin que la cotización se haya
-entregado ni auto-costeado. Queda como **HU-10** en `HU-FRONTEND.md`,
+entregado ni auto-costeado. Queda como **HU-10** en `2026-10-09_HU-FRONTEND.md`,
 sección Mesa de Costeo.
 
 ### 1. FRONTEND — "Piso SICE-TAC + tiempos logísticos" ignora las horas propias de la línea
@@ -1347,7 +1347,7 @@ dos lugares.
 
 Esto **no está en el diff todavía** — se discutió como recomendación (en
 vez de habilitar edición, que sí requeriría cambios de backend — ver
-`FUTURAS-PROPUESTAS.md` punto 1), pero nunca se mandó como pedido concreto
+`2026-10-09_FUTURAS-PROPUESTAS.md` punto 1), pero nunca se mandó como pedido concreto
 al front. Falta pedirlo: un texto de advertencia visible en el formulario
 de `agregarFlete` (`mesa-flete-editor`), algo como "Verifique el valor,
 no podrá editarlo después de guardar."
@@ -1517,8 +1517,8 @@ pliego todavía sin costear**.
   (`clsMaquinaEstados.cs`) ni test que cubra "pliego completo" antes de
   entregar — es un hueco real, no una regla que exista en otro lado.
 
-Queda documentado como **HU-B8** en `HU-BACKEND.md` y **HU-11** en
-`HU-FRONTEND.md` (sección Mesa de Costeo) — pendiente de implementar,
+Queda documentado como **HU-B8** en `2026-10-09_HU-BACKEND.md` y **HU-11** en
+`2026-10-09_HU-FRONTEND.md` (sección Mesa de Costeo) — pendiente de implementar,
 los dos lados.
 
 ### Hallazgo — Un flete manual puede quedar por debajo del piso SICE-TAC sin ningún aviso
@@ -1540,7 +1540,7 @@ el piso SICE-TAC cargado por línea (misma "Propuesta de la Biblioteca"
 de HU-1 de Mesa de Costeo), se puede resolver sin tocar backend —
 decisión explícita de Sara de no mover tanto el backend por ahora.
 
-Queda como **HU-12** en `HU-FRONTEND.md` (sección Mesa de Costeo) —
+Queda como **HU-12** en `2026-10-09_HU-FRONTEND.md` (sección Mesa de Costeo) —
 pendiente de implementar, con la decisión de aviso-vs-bloqueo todavía
 abierta.
 
@@ -1568,7 +1568,7 @@ botón de verdad hoy (es el único que también tiene acceso a Mesa de
 Costeo); los otros 3 no llegan a esa pantalla, así que el permiso
 quedaría sin efecto práctico inmediato para ellos.
 
-Queda como **HU-13** en `HU-FRONTEND.md` (sección Mesa de Costeo) —
+Queda como **HU-13** en `2026-10-09_HU-FRONTEND.md` (sección Mesa de Costeo) —
 **solo documentado, sin implementar**, por pedido explícito de Sara.
 
 ### Pedido — Desglosar "Piso SICE-TAC + tiempos logísticos"
@@ -1588,14 +1588,14 @@ patrón que otros huecos ya encontrados en esta revisión (se calcula,
 no se guarda/expone). Requiere agregar 2 campos nuevos al DTO de
 candidato de tarifa.
 
-Queda como **HU-B9** en `HU-BACKEND.md` y **HU-14** en
-`HU-FRONTEND.md` (ambos en sección Mesa de Costeo) — pendiente de
+Queda como **HU-B9** en `2026-10-09_HU-BACKEND.md` y **HU-14** en
+`2026-10-09_HU-FRONTEND.md` (ambos en sección Mesa de Costeo) — pendiente de
 implementar, ninguno de los dos lados.
 
 ### Pedido — Editar un flete manual ya guardado, sin duplicar la línea
 
 Sara pidió implementar directamente lo que ya estaba anotado en
-`FUTURAS-PROPUESTAS.md` punto 1: poder corregir el valor de un flete
+`2026-10-09_FUTURAS-PROPUESTAS.md` punto 1: poder corregir el valor de un flete
 MANUAL ya guardado, en vez de solo mostrar una advertencia antes de
 guardar (que era la alternativa barata que se había dejado anotada).
 
@@ -1612,8 +1612,8 @@ de flete guardado (solo para fuente manual), reutiliza el mismo
 formulario y el mismo popup de "flete bajo el piso SICE-TAC" de HU-12
 — pendiente de confirmar compilando.
 
-Queda como **HU-B10** en `HU-BACKEND.md` y **HU-15** en
-`HU-FRONTEND.md` (ambos en sección Mesa de Costeo). `FUTURAS-PROPUESTAS.md`
+Queda como **HU-B10** en `2026-10-09_HU-BACKEND.md` y **HU-15** en
+`2026-10-09_HU-FRONTEND.md` (ambos en sección Mesa de Costeo). `2026-10-09_FUTURAS-PROPUESTAS.md`
 punto 1 actualizado para reflejar que ya no es una propuesta futura,
 está en implementación.
 
@@ -1669,8 +1669,8 @@ backend exponga explícitamente si la propuesta vino de Solo-SICETAC
 si plaza/histórico están en `null` (pueden estarlo por Solo-SICETAC O
 por simple falta de coincidencia en la comparación real).
 
-Queda como **HU-B11** en `HU-BACKEND.md` y **HU-16** en
-`HU-FRONTEND.md` (ambos en sección Mesa de Costeo) — pendiente de
+Queda como **HU-B11** en `2026-10-09_HU-BACKEND.md` y **HU-16** en
+`2026-10-09_HU-FRONTEND.md` (ambos en sección Mesa de Costeo) — pendiente de
 implementar, ninguno de los dos lados.
 
 **Pendiente de decisión de Sara, no resuelto en esta sesión:** si el
@@ -1708,7 +1708,7 @@ completa aplica el mayor y **queda autocosteada**; si la externa solo
 tiene vencida y la interna vigente, gana la interna vigente.
 
 **Todo quedó escrito como una sola especificación** en
-`HU-BACKEND.md`, sección nueva **"Motor de decisión de tarifa"**: flujo
+`2026-10-09_HU-BACKEND.md`, sección nueva **"Motor de decisión de tarifa"**: flujo
 de 4 pasos, tabla de 10 casos con ejemplos, hoy vs. debe quedar, casos
 borde ya decididos, hallazgos fuera de alcance, y las HU:
 - **HU-B14** — doble fuente para plaza (externa → interna).
@@ -1728,7 +1728,7 @@ borde ya decididos, hallazgos fuera de alcance, y las HU:
 que el sistema "resuelve en este orden", y no es cierto — ahora dice que
 es el flujo objetivo y apunta a la especificación.
 
-**Renumeración en `HU-BACKEND.md`** (para que los números vuelvan a
+**Renumeración en `2026-10-09_HU-BACKEND.md`** (para que los números vuelvan a
 quedar en orden dentro del archivo; las referencias cruzadas de los 4
 documentos ya se actualizaron):
 
@@ -1745,7 +1745,7 @@ tarifa de plaza?" va a la **consulta completa**, no a "solo SICE-TAC"
 como decía `MAPA-FUNCIONAL-NEXO.md` (y como se le planteó a Sara en la
 pregunta). La decisión de Sara (sin plaza → consulta completa) coincide
 con el PDF. Corregido en `MAPA-FUNCIONAL-NEXO.md` 6.1 y en
-`HU-BACKEND.md` (sección "Motor de decisión de tarifa", decisión 4).
+`2026-10-09_HU-BACKEND.md` (sección "Motor de decisión de tarifa", decisión 4).
 Documento del flujo para adjuntar a la issue:
 `docs/documentacion/FLUJO-DECISION-TARIFA.md`.
 
@@ -1821,7 +1821,7 @@ Resueltos después en la misma conversación:
   descripción) y `MAPA-FUNCIONAL-NEXO.md` 6.1.
 
 Las HU de backend nuevas de otros módulos (HU-B20, HU-B21) quedaron al
-final de `HU-BACKEND.md` en una sección "Otros módulos — decisiones del
+final de `2026-10-09_HU-BACKEND.md` en una sección "Otros módulos — decisiones del
 2026-10-12", con notas que apuntan a ellas desde Mesa de Costeo y
 Tarifas Plaza, para no volver a desordenar la numeración.
 

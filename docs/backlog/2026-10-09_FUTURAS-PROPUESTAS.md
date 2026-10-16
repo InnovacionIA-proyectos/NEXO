@@ -1,5 +1,7 @@
 # Futuras propuestas — NEXO
 
+_Última actualización: 2026-10-12_
+
 Ideas de mejora que surgen durante la revisión paso a paso, pero que **no
 son bugs** ni pendientes de decisión inmediata — son trabajo más grande,
 para evaluar más adelante. Para los hallazgos reales del día a día, ver
@@ -12,7 +14,7 @@ Sara pidió avanzar con esto directamente. Backend implementado y
 compilado (nuevo `clsEditarLineaCotizacionCommand` +
 `PUT /api/cotizaciones/{id}/lineas/{lineaSolicitudId}`), frontend
 relayado al peer de sandbox, pendiente de confirmar. Ver **HU-B10**
-(`HU-BACKEND.md`) y **HU-15** (`HU-FRONTEND.md`), ambos en Mesa de
+(`2026-10-09_HU-BACKEND.md`) y **HU-15** (`2026-10-09_HU-FRONTEND.md`), ambos en Mesa de
 Costeo, para el detalle completo — lo que sigue abajo queda como
 registro histórico de las preguntas que originaron la decisión.
 
