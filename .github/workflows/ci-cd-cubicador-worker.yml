@@ -2,7 +2,7 @@ name: CI/CD Cubicador-Worker
 
 # Los `paths` de este workflow y los de ci-cd-cubicador-api.yml son IDENTICOS
 # a proposito — el razonamiento completo esta en el encabezado de ese archivo
-# y en docs/CI_CD_RUTAS_COMPARTIDAS.md. En dos lineas: el job de pruebas es
+# y en docs/despliegue/CI_CD_RUTAS_COMPARTIDAS.md. En dos lineas: el job de pruebas es
 # uno solo y ejercita api+worker juntos (pytest corre la suite entera; el
 # smoke levanta los dos contenedores), y las dos imagenes hacen `COPY . .`,
 # asi que cualquier archivo bajo cubicador/ cambia las dos. Lo unico distinto
@@ -12,7 +12,7 @@ name: CI/CD Cubicador-Worker
 # domain/application/infrastructure) dejaba afuera cubicador/api/, y el worker
 # SI importa de ahi — worker/main.py toma `api.dependencias` y
 # `api.dtos.plan_cargue`. Ese es exactamente el archivo del bug 2 (ver
-# docs/CI_CD_RUTAS_COMPARTIDAS.md): un cambio bajo cubicador/api/ que rompia
+# docs/despliegue/CI_CD_RUTAS_COMPARTIDAS.md): un cambio bajo cubicador/api/ que rompia
 # al worker mandando items a la DLQ.
 # Con el filtro anterior ese arreglo habria desplegado solo la API, dejando al
 # worker con el codigo roto.

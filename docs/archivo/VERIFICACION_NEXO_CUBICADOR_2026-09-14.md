@@ -25,7 +25,7 @@ una variable de entorno faltante y se documentan los hallazgos.
   funciona" hoy**, no uno solo:
   1. La compuerta de paridad sigue cerrada (`503 CUBICACION_EN_VERIFICACION`)
      — comportamiento esperado y documentado, pendiente de que Kevin Cano
-     confirme la evidencia de paridad (ver `docs/CHECKLIST_DESPLIEGUE.md`).
+     confirme la evidencia de paridad (ver `docs/despliegue/CHECKLIST_DESPLIEGUE.md`).
   2. **El build desplegado en Dokploy es más viejo que la rama actual**: le
      faltan TODOS los endpoints del plan de cargue (crear plan, ítems,
      catálogo de vehículos, proyección de lectura del visor 3D). Confirmado
@@ -523,7 +523,7 @@ conocidos para el flujo NEXO ↔ Cubicador en este ambiente.
 Kevin Cano (@kcano-ux) autorizó encender la compuerta de paridad
 (`Domain.PlanDeCargue.Reglas.CompuertaDeParidad`) para el ambiente Dokploy
 "DEPLOY". No había una corrida de GitHub Actions ya
-enlazada como evidencia formal (ver `docs/CHECKLIST_DESPLIEGUE.md`, que
+enlazada como evidencia formal (ver `docs/despliegue/CHECKLIST_DESPLIEGUE.md`, que
 además tenía una referencia desactualizada a `cubicador-ci.yml`, ya
 retirado) ni acceso a `gh`/Actions desde esta sesión para traer una — en su
 lugar se corrió la MISMA suite de paridad de forma directa y verificable,

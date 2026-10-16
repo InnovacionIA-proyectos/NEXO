@@ -1,6 +1,6 @@
 # Normaliza terminadores de línea: todo texto se guarda en el repo como LF,
 # sin importar en qué SO se edite (evita diffs completos de un archivo por
-# CRLF/LF, que no son cambios reales — ver docs/Testing/PRUEBAS-LOCALES.md).
+# CRLF/LF, que no son cambios reales — ver docs/pruebas/PRUEBAS-LOCALES.md).
 * text=auto eol=lf
 
 # Binarios explícitos: nunca se tocan los line endings.

@@ -263,7 +263,7 @@ operaciones de datos, no de cálculo — la compuerta de paridad solo bloquea
 
 > **Por qué son 9 y no 8.** El #9 no venía en la lista original, y se
 > agregó porque su ausencia bloqueaba el cierre de CORS y rotación de claves
-> de Cubicador (`docs/CHECKLIST_DESPLIEGUE.md`, sección 2). El frontend llama
+> de Cubicador (`docs/despliegue/CHECKLIST_DESPLIEGUE.md`, sección 2). El frontend llama
 > `eliminarVehiculo()` (`cubicador-api.service.ts`), así que sin este comando esa
 > escritura seguiría saliendo del navegador directo a Cubicador con la API key en
 > el bundle — y retirar el CORS y rotar la clave exige **cero** llamadas de
@@ -561,7 +561,7 @@ vez de irse a reintentos y DLQ.
 
 **Por qué `[Authorize]` sin rol específico**: es la regla general de NEXO
 para lecturas —
-[`docs/ROLES_Y_PERMISOS.md`](../ROLES_Y_PERMISOS.md): "cualquiera de los 6
+[`docs/documentacion/ROLES_Y_PERMISOS.md`](../documentacion/ROLES_Y_PERMISOS.md): "cualquiera de los 6
 roles puede consultar (listados, detalles, exportar) casi todo el sistema".
 Ninguna de estas 7 consultas escribe ni cambia estado; no hay razón para
 restringirlas por rol — mismo criterio que ya usaba
@@ -600,7 +600,7 @@ los controladores de este repo. Es el insumo de la tabla de
 equivalencia y del punto de coordinación con el frontend.
 
 > **Por qué existe esta sección.** El retiro del CORS de Cubicador y la
-> rotación de la clave (`docs/CHECKLIST_DESPLIEGUE.md`, sección 2) dieron por
+> rotación de la clave (`docs/despliegue/CHECKLIST_DESPLIEGUE.md`, sección 2) dieron por
 > hecho que *"el visor 3D ya consume solo esos endpoints de NEXO"*. **Eso
 > todavía no ocurrió**: el frontend sigue con 12 puntos de llamada directa
 > (`cubicadorBaseUrl` en `cubicador-api.service.ts` y

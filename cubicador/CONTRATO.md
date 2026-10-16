@@ -103,7 +103,7 @@ público del portal mientras el navegador todavía llamaba directo.
       `cubicador/.env`.
 - [ ] Backend .NET: compuerta de paridad configurada, o `/optimizar`
       responde `503` siempre (sección 1.1) — checklist de encendido en
-      `docs/CHECKLIST_DESPLIEGUE.md`.
+      `docs/despliegue/CHECKLIST_DESPLIEGUE.md`.
 - [ ] `POST /desde-linea/{id}`: `NEXO_CALLBACK_API_KEY` (`cubicador/.env`) debe
       ser IDÉNTICA a `Cubicador3D__InboundApiKey` (`NEXO/.env`) — es el mismo
       secreto compartido, visto desde cada lado (sección 5).
