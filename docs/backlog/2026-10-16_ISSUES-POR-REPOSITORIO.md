@@ -58,7 +58,7 @@ Además:
 | 4 | Rechazo de línea: todas rechazadas | Se envía igual al comercial, con los motivos de cada línea. |
 | 5 | Desglose | Flete, levante y retorno se ven separados **solo en la Mesa de Costeo**. El Excel y el PDF siguen con el valor final de la línea. |
 | 6 | Tara | La nota de tara aplica a todas las líneas. Se quita la validación contra la suma de las posiciones. |
-| 7 | Diccionario de vehículos | Vive en **Nexo**. No se duplica en Cotifly ni va en el Cubicador. |
+| 7 | Diccionario de vehículos | Vive en **Nexo**. No se duplica en Cotifly ni va en el Cubicador; Cotifly lo consulta por un endpoint para resolver lo que el usuario escribe a mano en el Excel de licitación (no para la solicitud puntual, que ya usa una lista cerrada). |
 | 8 | Unidad del peso | Selector kg/t en la pantalla (opción A). El backend siempre recibe kg. |
 | 9 | Roles | CoordinadorFletes pasa a AdminBiblioteca, en backend y front. AdminTarifas, Admin y Comercial quedan igual. |
 | 10 | Costo de conexos | El Comercial sigue viendo el costo unitario de los servicios conexos. Los permisos se manejan desde el front. |
@@ -95,7 +95,7 @@ Lectura: **A** = hay que cambiar algo · **R** = riesgo si no se coordina · **�
 | Rechazo de línea | A | A | A | A | — | A (columnas nuevas) |
 | Ajuste manual con plaza | A | A | — | — | — | — |
 | Roles (AdminBiblioteca) | A | A | R (solo textos de error) | — | — | A (script de usuarios) |
-| Diccionario de vehículos | A | — | — (hoy ignora el vehículo) | — | — | A (tabla y carga) |
+| Diccionario de vehículos | A | — | — | A (lee el endpoint de Nexo al importar) | — | A (tabla y carga) |
 | Unidad de peso kg/t | — | A | — | A (su propio importador) | — | — |
 | Desglose en la Mesa | — | A | — | — | — | — |
 | Lista de empaque/posiciones | — | A | — | — | — | — |
@@ -292,21 +292,25 @@ Contexto (verificado)
 Qué hacer
 1. Tabla de alias en la base de Nexo (DATA-2): alias, alias normalizado, configuración de vehículo de destino, activo.
 2. ResolverVehiculo busca primero el alias y, si lo encuentra, usa la configuración oficial. Si no, sigue a cuarentena.
-3. Endpoint de lectura (GET /api/catalogos/alias-vehiculos) para quien lo necesite. Cotifly hoy no lo usa.
-4. Endpoint o proceso para agregar alias desde la bandeja de normalización (ver S5-HU-18.4).
-5. Pruebas: "TB", "T.B", "Turbo" y "2L2" resuelven a la misma configuración; un alias desconocido va a cuarentena.
+3. Endpoint de LECTURA (GET /api/catalogos/alias-vehiculos) para quien quiera la lista completa.
+4. Endpoint de RESOLVER un texto suelto (por ejemplo GET /api/catalogos/alias-vehiculos/resolver?texto=…): recibe el texto que escribió un usuario (p. ej. "T.MULA") y responde a qué configuración de vehículo corresponde, o que no se reconoce ninguna. Es lo que necesita Cotifly para avisar al usuario en el momento de importar su Excel de licitación, antes de que la solicitud se mande a Nexo (ver CTF-F5).
+5. Endpoint o proceso para agregar alias desde la bandeja de normalización (ver S5-HU-18.4).
+6. Pruebas: "TB", "T.B", "Turbo" y "2L2" resuelven a la misma configuración; un alias desconocido va a cuarentena y el "resolver" dice que no se reconoce.
 
 Decisión D6: el mapeo de cada columna del archivo a un código de Nexo se define dentro de DATA-2.
 
+Por qué hace falta "resolver" y no solo "listar": en la solicitud puntual el vehículo se elige de una lista cerrada (sin riesgo de error). En el Excel de licitación el usuario lo escribe libre, y ahí aparecen las variantes ("Turbo", "TB", "T.B"...). Cotifly necesita poder preguntarle a Nexo "¿qué es esto que escribió el usuario?" en el momento de importar, no solo bajar la lista completa de alias y adivinar.
+
 Impacto
-- Cotifly: nada que hacer ahora (ignora el vehículo). Podría pedir el endpoint más adelante.
+- Cotifly: usa el endpoint de "resolver" al importar su Excel de licitación (ver CTF-F5). No tiene su propia tabla de alias: el diccionario sigue siendo uno solo, en Nexo.
 - Front de Nexo: el campo de vehículo en el mapeo del Excel ya manda texto; el backend resuelve.
 - Cubicador: el archivo fuente sigue donde está; no se modifica.
 
 CRITERIOS DE ACEPTACION
 - [ ] «TB», «T.B», «Turbo» y «2L2» resuelven a la misma configuración de vehículo.
 - [ ] Un alias desconocido sigue yendo a cuarentena.
-- [ ] Existe el endpoint de lectura de alias.
+- [ ] Existe el endpoint de lectura de alias (lista completa).
+- [ ] Existe el endpoint de resolver un texto suelto, y responde correctamente con alias conocidos y con uno inventado.
 - [ ] Los códigos del Cubicador que manda Cotifly resuelven con el diccionario cuando hay alias.
 - [ ] Las pruebas están en verde.
 ```
@@ -861,7 +865,28 @@ CRITERIOS DE ACEPTACION
 - [ ] Los cinco valores reales aparecen en el selector.
 ```
 
-**No requiere cambio:** el desglose de flete, levante y retorno. Su API de costeo no lo expone y el desglose es solo de la Mesa de Nexo (decisión 5). El campo de vehículo en el Excel de licitación tampoco se agrega: Cotifly no usa el vehículo y el diccionario vive en Nexo.
+### CTF-F5 — Reconocer el vehículo escrito a mano en el Excel de licitación
+Labels: `cotifly`, `frontend` · Depende de: NEXO-B4 (endpoint de "resolver") · Esfuerzo: por estimar
+```
+Por qué: en la solicitud puntual el vehículo se elige de una lista cerrada, sin riesgo de error. En el Excel de licitación el usuario lo escribe libre, y ahí aparecen variantes del mismo vehículo ("Turbo", "TB", "T.B", "2L2"...). Esto es precisamente lo que el diccionario de Nexo busca evitar.
+
+Hoy (verificado por Cotifly): el Excel de licitación NO mapea ninguna columna de vehículo (CAMPOS_LICITACION no la tiene). Aunque la bandera Captura:AceptarVehiculoCliente estuviera encendida (hoy apagada), no hay ningún paso que lea esa columna del Excel.
+
+Hacer
+1. Agregar un campo mapeable de "vehículo" en el paso de mapeo de columnas del Excel de licitación (mismo patrón que los demás campos de CAMPOS_LICITACION).
+2. Al detectar esa columna, llamar al endpoint de "resolver" de Nexo (NEXO-B4, GET /api/catalogos/alias-vehiculos/resolver) con el texto de cada fila.
+3. Mostrar al usuario qué vehículo se reconoció para cada fila, o avisar si no se reconoció ninguno, ANTES de enviar la solicitud, para que pueda corregirlo.
+4. El diccionario no se duplica en Cotifly: todo pasa por el endpoint de Nexo, nada se guarda en una tabla propia.
+5. Si el usuario no corrige un vehículo no reconocido, decidir qué pasa: ¿se envía igual (y cae en cuarentena del lado de Nexo) o se bloquea el envío de esa fila? (decisión pendiente, no asumir ninguna de las dos).
+
+CRITERIOS DE ACEPTACION
+- [ ] El mapeo de columnas del Excel de licitación tiene un campo de vehículo.
+- [ ] Cada fila importada muestra el vehículo reconocido, usando el endpoint de "resolver" de Nexo.
+- [ ] Una variante conocida ("T.MULA", "TB", etc.) se reconoce igual que su forma completa.
+- [ ] Un texto no reconocido se le muestra claramente al usuario antes de enviar.
+```
+
+**No requiere cambio:** el desglose de flete, levante y retorno. Su API de costeo no lo expone y el desglose es solo de la Mesa de Nexo (decisión 5).
 
 ---
 
