@@ -238,8 +238,8 @@ def test_el_catalogo_encuentra_la_incompatibilidad_entre_dos_mercancias():
 def test_los_parametros_caen_a_su_default_si_la_clave_no_esta_o_esta_rota():
     """El catalogo es editable por CRUD: un valor que no sea numero no debe
     tumbar el motor, tiene que caer al default documentado."""
-    assert ParametrosMotor().k_max == 10
-    assert ParametrosMotor(valores={"k_max": "no es un numero"}).k_max == 10
+    assert ParametrosMotor().k_max == 25
+    assert ParametrosMotor(valores={"k_max": "no es un numero"}).k_max == 25
     assert ParametrosMotor(valores={"k_max": "4"}).k_max == 4
 
 

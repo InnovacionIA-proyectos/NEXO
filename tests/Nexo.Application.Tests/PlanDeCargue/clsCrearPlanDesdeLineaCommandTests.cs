@@ -22,10 +22,11 @@ public class clsCrearPlanDesdeLineaCommandTests
     private readonly Mock<ILineaSolicitudCubicacionPort> _lineas = new();
     private readonly Mock<ICubicacionPort> _cubicacion = new();
     private readonly Mock<IUnitOfWork> _uow = new();
+    private readonly Mock<IRechazoCubicacionLineaPort> _rechazos = new();
 
     private static readonly Guid LineaId = Guid.Parse("dddd0000-0000-0000-0000-000000000001");
 
-    private clsCrearPlanDesdeLineaCommandHandler Handler() => new(_lineas.Object, _cubicacion.Object, _uow.Object);
+    private clsCrearPlanDesdeLineaCommandHandler Handler() => new(_lineas.Object, _cubicacion.Object, _rechazos.Object, _uow.Object);
 
     private void LineaExiste() =>
         _lineas.Setup(l => l.ObtenerAsync(LineaId, It.IsAny<CancellationToken>()))
@@ -62,6 +63,77 @@ public class clsCrearPlanDesdeLineaCommandTests
             It.Is<clsCrearPlanDesdeLineaInput>(i => i.LineaSolicitudId == LineaId.ToString()),
             It.IsAny<CancellationToken>()),
             Times.Once);
+    }
+
+    // #304: el puente del Cubicador ya no inventa 1 kg: rechaza con PESO_NO_DECLARADO. Ese rechazo nacía en el worker,
+    // después del 202, y NEXO solo lo registraba en el log. Ahora se valida ANTES de encolar, con el mismo código.
+    [Theory]
+    [InlineData(null)]
+    [InlineData(0)] // el cero cuenta como no declarado
+    public async Task Una_posicion_sin_peso_se_rechaza_con_PESO_NO_DECLARADO_y_no_publica_nada(int? pesoKg)
+    {
+        _lineas.Setup(l => l.ObtenerAsync(LineaId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new clsLineaParaCubicacionDto(LineaId,
+            [
+                new clsPosicionCargaDto("Vidrio", 1, 100, 100, 100, 15m, "VIDRIO_PLANO"),
+                new clsPosicionCargaDto("Cajas de cartón", 5, 40, 30, 30, pesoKg, "CAJAS_CARTON"),
+            ], "Bogotá", "Medellín"));
+
+        var ex = await Assert.ThrowsAsync<clsValidationFailedException>(
+            () => Handler().Handle(new clsCrearPlanDesdeLineaCommand(LineaId)));
+
+        Assert.Equal("PESO_NO_DECLARADO", ex.Code);
+        Assert.Contains("Cajas de cartón", ex.Message);
+        Assert.DoesNotContain("Vidrio", ex.Message); // solo nombra las que faltan
+        _cubicacion.Verify(c => c.PublicarComandoAsync(
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<object>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        _uow.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Con_el_peso_de_todas_las_posiciones_publica_normal()
+    {
+        _lineas.Setup(l => l.ObtenerAsync(LineaId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new clsLineaParaCubicacionDto(LineaId,
+                [new clsPosicionCargaDto("Cajas", 5, 40, 30, 30, 20m, "CAJAS_CARTON")], "Bogotá", "Medellín"));
+
+        var r = await Handler().Handle(new clsCrearPlanDesdeLineaCommand(LineaId));
+
+        Assert.Equal("procesando", r.Estado);
+        _cubicacion.Verify(c => c.PublicarComandoAsync(
+            "crear_desde_linea", LineaId.ToString(), It.IsAny<object>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    // #304: pedir el plan otra vez empieza de cero: se borra el rechazo del intento anterior, ANTES de guardar (con el
+    // mismo SaveChanges que flushea el Outbox), para que el estado vuelva a "procesando".
+    [Fact]
+    public async Task Pedir_el_plan_otra_vez_borra_el_rechazo_anterior_antes_de_guardar()
+    {
+        LineaExiste();
+        var orden = new List<string>();
+        _rechazos.Setup(r => r.LimpiarAsync(LineaId, It.IsAny<CancellationToken>()))
+            .Callback(() => orden.Add("limpiar")).Returns(Task.CompletedTask);
+        _uow.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .Callback(() => orden.Add("guardar")).ReturnsAsync(1);
+
+        await Handler().Handle(new clsCrearPlanDesdeLineaCommand(LineaId));
+
+        Assert.Equal(new[] { "limpiar", "guardar" }, orden);
+    }
+
+    // Si ni siquiera se encola (peso sin declarar), no se toca un rechazo anterior.
+    [Fact]
+    public async Task Si_se_rechaza_antes_de_encolar_no_toca_el_rechazo_anterior()
+    {
+        _lineas.Setup(l => l.ObtenerAsync(LineaId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new clsLineaParaCubicacionDto(LineaId,
+                [new clsPosicionCargaDto("Cajas", 5, 40, 30, 30, null, "CAJAS_CARTON")], "Bogotá", "Medellín"));
+
+        await Assert.ThrowsAsync<clsValidationFailedException>(
+            () => Handler().Handle(new clsCrearPlanDesdeLineaCommand(LineaId)));
+
+        _rechazos.Verify(r => r.LimpiarAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]

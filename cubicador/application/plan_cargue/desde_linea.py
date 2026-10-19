@@ -91,6 +91,13 @@ def _a_lineas_de_mercancia(posiciones: list[PosicionCarga]) -> list[LineaMercanc
     asi que no hay que traducirlo a id para despues volverlo a resolver. Quien
     valida que exista es `recomendar_flota`, con el mismo codigo de rechazo
     (`MERCANCIA_DESCONOCIDA`) y el mismo mensaje.
+
+    **El peso tampoco se asume** (#304). Hasta aca el puente ponia 1 kg cuando
+    la posicion no lo traia -`posicion.peso_kg or 1`-, y el peso es lo que
+    decide si la carga cabe por capacidad: un kilo inventado puede meter en un
+    Turbo lo que necesitaba una Minimula. Es el mismo fallback silencioso que
+    S5-HU-17.6 elimino para el tipo de mercancia, y se habia quedado vivo. Se
+    puede alcanzar porque `PesoKg` es opcional en la captura de NEXO.
     """
     sin_codigo = [p.descripcion or "(sin descripcion)" for p in posiciones if not p.codigo_mercancia]
     if sin_codigo:
@@ -100,6 +107,18 @@ def _a_lineas_de_mercancia(posiciones: list[PosicionCarga]) -> list[LineaMercanc
             f"{', '.join(sin_codigo)}. Sin el tipo no se puede saber que carroceria "
             "necesita la carga; recapturar la linea con el tipo de cada posicion.")
 
+    sin_peso = [
+        p.descripcion or "(sin descripcion)"
+        for p in posiciones
+        if p.peso_kg is None or Decimal(str(p.peso_kg)) <= 0
+    ]
+    if sin_peso:
+        raise ValidationFailedException(
+            "PESO_NO_DECLARADO",
+            "Estas posiciones no declaran su peso: "
+            f"{', '.join(sin_peso)}. El peso decide la capacidad del vehiculo; "
+            "recapturar la linea con el peso de cada posicion.")
+
     return [
         LineaMercancia(
             codigo_mercancia=posicion.codigo_mercancia,
@@ -107,7 +126,7 @@ def _a_lineas_de_mercancia(posiciones: list[PosicionCarga]) -> list[LineaMercanc
             largo_cm=Decimal(str(posicion.largo_cm)),
             ancho_cm=Decimal(str(posicion.ancho_cm)),
             alto_cm=Decimal(str(posicion.alto_cm)),
-            peso_kg=Decimal(str(posicion.peso_kg or 1)),
+            peso_kg=Decimal(str(posicion.peso_kg)),
         )
         for posicion in posiciones
     ]
@@ -190,7 +209,11 @@ async def crear_plan_desde_linea(
                              and posicion.descripcion.strip() else f"Posicion {idx}"),
                 destino=linea.destino, secuencia_entrega=1,
                 largo_mm=posicion.largo_cm * 10, ancho_mm=posicion.ancho_cm * 10,
-                alto_mm=posicion.alto_cm * 10, peso_kg=posicion.peso_kg or 1.0,
+                # Sin `or 1`: `_a_lineas_de_mercancia` ya rechazo la linea si
+                # alguna posicion no declara peso (#304), asi que aca siempre
+                # hay uno. Dejar el default seria repetir el fallback que se
+                # acaba de matar, esperando a que alguien reordene el flujo.
+                alto_mm=posicion.alto_cm * 10, peso_kg=posicion.peso_kg,
                 cantidad=cantidad,
             )
             guardado = await planes.guardar_item(plan.id, None, item)

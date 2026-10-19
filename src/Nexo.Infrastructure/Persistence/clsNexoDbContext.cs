@@ -43,6 +43,7 @@ public class clsNexoDbContext : DbContext
     public DbSet<clsTipoMercanciaCatalogo> TiposMercanciaCatalogo => Set<clsTipoMercanciaCatalogo>();
     public DbSet<clsTipoCarroceriaCatalogo> TiposCarroceriaCatalogo => Set<clsTipoCarroceriaCatalogo>();
     public DbSet<clsPlanCargue> PlanesCargue => Set<clsPlanCargue>();
+    public DbSet<clsRechazoCubicacionLinea> RechazosCubicacionLinea => Set<clsRechazoCubicacionLinea>();
     public DbSet<clsItemPlanCargue> ItemsPlanCargue => Set<clsItemPlanCargue>();
     public DbSet<clsColocacionCargue> ColocacionesCargue => Set<clsColocacionCargue>();
     public DbSet<clsMunicipio> Municipios => Set<clsMunicipio>();
@@ -362,6 +363,16 @@ public class clsNexoDbContext : DbContext
         {
             e.ToTable("tbl_tipos_carroceria_catalogo");
             e.HasKey(x => x.Id);
+        });
+
+        // #304: el rechazo del Cubicador a "crear_desde_linea", una fila por línea (la clave ES la línea).
+        b.Entity<clsRechazoCubicacionLinea>(e =>
+        {
+            e.ToTable("tbl_rechazos_cubicacion_linea");
+            e.HasKey(x => x.LineaSolicitudId);
+            e.Property(x => x.Codigo).HasMaxLength(60).IsRequired();
+            e.Property(x => x.Mensaje).HasMaxLength(1000).IsRequired();
+            e.HasOne<clsLineaSolicitud>().WithMany().HasForeignKey(x => x.LineaSolicitudId).OnDelete(DeleteBehavior.Cascade);
         });
 
         b.Entity<clsPlanCargue>(e =>

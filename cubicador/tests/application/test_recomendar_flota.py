@@ -152,3 +152,29 @@ async def test_una_carga_desmesurada_se_rechaza_antes_de_expandirla(
     with pytest.raises(ValidationFailedException) as error:
         await _recomendar(catalogo_sembrado, [_linea("BEBIDAS", 50_000, 60, 40, 40, 25)])
     assert error.value.codigo == "CUBICACION_DEMASIADO_GRANDE"
+
+
+@pytest.mark.asyncio
+async def test_demasiadas_posiciones_se_rechazan_aunque_sumen_pocas_unidades(
+    catalogo_sembrado: AsyncSession,
+):
+    """El tope de posiciones es distinto del de unidades (#304).
+
+    300 posiciones de una unidad pasan el tope de 10.000 unidades sin problema,
+    pero desde S5-HU-17.8 el detalle es por posicion: serian 300 filas en la
+    respuesta y otras tantas en `recomendacionVehiculoMercancia`. El maximo son
+    las 200 que admite una linea de captura en NEXO.
+    """
+    lineas = [_linea("BEBIDAS", 1, 60, 40, 40, 25) for _ in range(300)]
+    with pytest.raises(ValidationFailedException) as error:
+        await _recomendar(catalogo_sembrado, lineas)
+    assert error.value.codigo == "CUBICACION_DEMASIADO_GRANDE"
+    assert "posiciones" in str(error.value)
+
+
+@pytest.mark.asyncio
+async def test_doscientas_posiciones_son_aceptables(catalogo_sembrado: AsyncSession):
+    """El limite es inclusivo: 200 es exactamente lo que NEXO puede capturar."""
+    lineas = [_linea("BEBIDAS", 1, 60, 40, 40, 25) for _ in range(200)]
+    r = await _recomendar(catalogo_sembrado, lineas)
+    assert r.resultado == "ASIGNADO"

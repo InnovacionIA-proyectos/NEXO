@@ -269,6 +269,7 @@ public static class clsDependencyInjection
         // (ICubicacionPort lo registra AddMensajeria(), no este método) + compuerta de
         // paridad.
         services.AddScoped<IPlanCargueRepository, clsEfPlanCargueRepository>();
+        services.AddScoped<IRechazoCubicacionLineaPort, clsRechazoCubicacionLineaAdapter>();
         // Catálogo de vehículos, proyectado por clsVehiculoCatalogoConsumer.
         services.AddScoped<IVehiculoCubicacionRepository, clsEfVehiculoCubicacionRepository>();
         services.AddScoped<IParidadCubicadorPort, clsParidadCubicadorAdapter>();

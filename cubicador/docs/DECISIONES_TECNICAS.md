@@ -777,8 +777,15 @@ que el propio vehículo creó le impedía borrarse y salía como un
 (`_PRESET_POR_UNIDAD_RAPIDA.get(unidad, "Tractocamion furgon 13.6 m")`). Ponía
 la carga en una caja que podía no existir y el plan salía creíble pero
 equivocado. Ahora cada traducción que falla es un rechazo con motivo:
-`MERCANCIA_NO_DECLARADA`, `MERCANCIA_DESCONOCIDA`, `SIN_FLOTA_RECOMENDADA`,
-`VEHICULO_SIN_PRESET` o `PRESET_VEHICULO_NO_ENCONTRADO`.
+`MERCANCIA_NO_DECLARADA`, `PESO_NO_DECLARADO`, `MERCANCIA_DESCONOCIDA`,
+`SIN_FLOTA_RECOMENDADA`, `VEHICULO_SIN_PRESET` o
+`PRESET_VEHICULO_NO_ENCONTRADO`.
+
+> `PESO_NO_DECLARADO` se agregó en #304. Hasta entonces el puente ponía **1 kg**
+> cuando la posición no traía peso (`posicion.peso_kg or 1`): otro default
+> silencioso, del mismo tipo que este apartado dice haber matado, que se había
+> quedado vivo. El peso decide la capacidad del vehículo, así que un kilo
+> inventado puede meter en un Turbo lo que necesitaba una Minimula.
 
 **El puente consume la recomendación en vez de adivinar.** Antes llenaba un
 vehículo con el optimizador 3D, miraba qué sobraba, abría otro igual, y así
@@ -967,3 +974,172 @@ las corridas viejas lo leen como `null`.
 pueden compartir `codigoMercancia`. Nadie puede asumir que el código es único
 dentro de un vehículo; hay que sumar. Queda dicho en `CONTRATO.md` §3.1 y en la
 §2.3 de la hoja de ruta.
+
+
+## 20. Tres correcciones de borde del motor de selección (#304)
+
+Salieron de reproducir las dos pruebas que el front hizo contra el despliegue y
+que fallaron, con la suite en verde. Ninguna es de las reglas de negocio: las
+tres están en los límites de entrada.
+
+**Hay tope de posiciones, y es distinto del de unidades.** `_MAX_UNIDADES_TOTALES`
+limita cuántas unidades físicas se expanden; `_MAX_POSICIONES` limita cuántas
+filas trae la solicitud. Son dos costos distintos: 10.000 posiciones de una
+unidad pasaban el tope de unidades y producían 10.000 filas en la respuesta y
+otras tantas en `recomendacionVehiculoMercancia`. Medido: 3.000 posiciones
+tardaban 13 s.
+
+S5-HU-17.8 agravó esto sin querer — antes el detalle se agrupaba por código,
+con un máximo de 31 filas por camión; ahora es una fila por posición, sin techo.
+El cambio es correcto; lo que faltaba era el límite.
+
+El número sale de NEXO: `clsCapturaLineaRequest.Posiciones` admite máximo 200
+por línea, así que aceptar más acá sería aceptar algo que la captura no puede
+haber producido. Se reusa `CUBICACION_DEMASIADO_GRANDE` en vez de agregar un
+código nuevo: el contrato ya lo declara y significa exactamente esto.
+
+**El peso tampoco se asume.** El puente ponía 1 kg cuando la posición no lo
+traía (`posicion.peso_kg or 1`). El peso decide la capacidad del vehículo: un
+kilo inventado mete en un Turbo lo que necesitaba una Minimula, y el plan sale
+creíble pero equivocado. Es el mismo fallback silencioso que la decisión #16
+dice haber matado para el tipo de mercancía, y este se había quedado vivo. Se
+alcanza porque `PesoKg` es opcional en la captura de NEXO. Ahora es
+`PESO_NO_DECLARADO`, y el cero cuenta como no declarado.
+
+**El umbral de extradimensión se alineó con la flota.** Era 1220 × **260** ×
+**300**, por encima de los 1220 × 240 × 260 del vehículo más grande. Una pieza
+de 245 × 245 × 255 no excedía el umbral pero no cabía en ningún vehículo en
+ninguna orientación: salía `SIN_CANDIDATOS_DIMENSIONALES`, que le decía al
+operario *"no hay candidatos"* cuando lo que tenía era una pieza sobreancha
+que necesita permiso especial.
+
+Ahora el umbral son los máximos del vehículo más grande que no es
+extradimensionado: **1220 × 240 × 260 × 34000**, corregido en los dos defaults
+de código —el de `ParametrosCubicacion` y el del modelo—.
+
+**No hizo falta tocar la base.** `parametros_cubicacion` es una fila única
+*opcional*: si no existe, `SqlParametrosCubicacionRepository.obtener()` devuelve
+el default, y la fila aparece solo cuando alguien la edita con
+`PUT /medidas-estandar` (`guardar()` la crea si falta). Verificado el
+2026-10-19 contra `10.10.40.85/dbTarifario_Nexo_Pruebas`: **cero filas**.
+
+Se llegó a escribir un script de migración y se descartó. Insertar la fila
+habría puesto una segunda fuente de verdad por encima del default, y desde ahí
+un cambio en el código quedaría tapado en silencio por un dato que nadie pidió.
+Queda en su lugar una **comprobación** antes de desplegar —ver el orden de
+despliegue en `docs/304-QUE-DEBEN-HACER-FRONT-Y-BACK.md`—, porque si alguien
+edita el umbral por el CRUD antes del despliegue, esa fila mandaría sobre el
+default y el valor viejo seguiría en pie.
+
+> **Cambia lo que ve el usuario.** Piezas entre 241 y 260 de ancho, o entre 261
+> y 300 de alto, pasan de `SIN_CANDIDATOS_DIMENSIONALES` a `EXTRADIMENSIONADO`.
+>
+> **El 260 de alto es el alto útil de la carga**, confirmado con Operaciones:
+> el espacio que queda para la mercancía dentro del vehículo. No se confunde
+> con los **4,40 m** reglamentarios, que son la altura *total* del vehículo
+> desde el suelo hasta el tope e incluyen chasis y piso del remolque. Lo que se
+> compara acá es la pieza contra el espacio de carga, no el conjunto contra el
+> gálibo de la vía.
+
+`SIN_CANDIDATOS_DIMENSIONALES` sigue vivo, pero ahora se alcanza por
+**capacidad** y no por medidas: una pieza dentro del máximo estándar de peso
+cuya carrocería solo existe en vehículos que no la aguantan —por ejemplo
+`CARNICOS` de 32.000 kg, que solo viaja en furgón refrigerado y ahí el 3S3 topa
+en 30.000—.
+
+**Lo que esto NO arregla.** Siguen abiertos en #304 el cálculo de la cota
+mínima de vehículos y el costo cuadrático del empaque, que son el mismo trabajo
+—resolver carga homogénea con la rejilla en vez de pieza por pieza— y el de
+mayor impacto.
+
+
+## 21. La carga homogénea se resuelve con una rejilla, no empacándola (#304)
+
+Cierra los dos problemas de fondo de #304, que resultaron ser el mismo: el
+motor empacaba pieza por pieza para averiguar cosas que podía calcular.
+
+**La identidad del problema.** Cuando todas las unidades son idénticas, cuántas
+caben en un vehículo es una división entera probando las seis orientaciones —
+una fórmula—, no una búsqueda. `_caben_por_rejilla` la implementa, igual que
+`rejilla_optima` de `scripts/medir_empaque_dblf.py`, respetando las banderas del
+catálogo: sin rotación libre solo la orientación original, y no apilable limita
+a una capa.
+
+**No es una aproximación.** Colocar en filas rectas siempre es realizable, así
+que es un piso garantizado. Y no es un piso flojo: la medición de #268 sigue
+dando **0,0 puntos de brecha** entre DBLF y la rejilla en los 16 casos, desde
+que las orientaciones se ordenan por capacidad (decisión #13). Para carga
+homogénea el resultado es el mismo; lo que cambia es el costo.
+
+**Tres usos, un cálculo.**
+
+1. **La cota mínima de vehículos.** Era volumen de carga entre volumen
+   geométrico, y el volumen miente cuando la pieza no tesela: un cubo de 1 m
+   deja 48 de los 76,1 m³ de una tractomula, el 63 %. El motor pedía 3 donde
+   hacían falta 5, agotaba sus 25 intentos probando combinaciones imposibles y
+   devolvía `BUSQUEDA_AGOTADA` ante una carga que sí sabía resolver — se
+   comprobó subiendo el presupuesto a 500 intentos: salían 5 camiones.
+
+2. **El filtro de cada combinación.** Corregir solo la cota no alcanzaba: las
+   combinaciones se ordenan por volumen ascendente, así que seguía mandando a
+   empacar flotas de vehículos chicos que suman volumen de sobra y aun así no
+   admiten las piezas. Ahora también se exige que la suma de unidades que
+   caben alcance. Es aritmética: descartarlas no cuesta nada.
+
+3. **El reparto.** Con una sola posición, `_repartir_homogenea` asigna a cada
+   vehículo el menor entre lo que cabe por geometría y lo que aguanta la
+   capacidad de esa combinación. Sin empacar.
+
+**Lo medido**, con el catálogo real contra SQL Server:
+
+| Caso | Antes | Ahora |
+|---|---|---|
+| L5 del pliego, 6.400 bultos de 5 kg | 83,6 s | **0,61 s** |
+| 10.000 ladrillos de 10×10×10 | ~145 s | **0,27 s**, 2 camiones |
+| 200 láminas de 1 m | `BUSQUEDA_AGOTADA` | **5 camiones** |
+| 400 láminas de 1 m | `BUSQUEDA_AGOTADA` | **9 camiones** |
+| 600 láminas de 1 m | `BUSQUEDA_AGOTADA` | **`SUPERA_K_MAX`** |
+
+Las dos últimas filas son las pruebas que el front hizo contra el despliegue y
+que fallaron con la suite en verde. El cambio de `BUSQUEDA_AGOTADA` a
+`SUPERA_K_MAX` importa tanto como el tiempo: *"me quedé sin intentos"* no le
+dice nada al comercial; *"supera el máximo de vehículos"* sí.
+
+**Hay techo de segundos, y está incompleto.** `_MAX_SEGUNDOS_BUSQUEDA` corta la
+búsqueda, pero se revisa **entre** intentos de empaque. La carga heterogénea
+masiva —muchas posiciones de medidas distintas— no pasa por la rejilla, sigue
+empacando pieza por pieza, y ahí un solo intento puede tardar minutos sin que
+el techo lo interrumpa. El tope de 200 posiciones acota el problema pero no lo
+cierra: 200 × 50 son 10.000 unidades heterogéneas, entrada legal.
+
+**Por qué el camino rápido es solo para una posición.** Con varias, aunque
+compartan medidas, el peso unitario puede diferir y entonces cuántas entran
+depende de cuáles entren. Generalizarlo a "todas las posiciones con la misma
+geometría y el mismo peso" es posible y no se hizo: una sola posición cubre
+todos los casos que se rompían, y ampliarlo sin un caso que lo pida sería
+adivinar.
+
+**`k_max` pasa de 10 a 25.** Con el tope en 10 se rechazaban cargas
+resolubles: 600 piezas de 1 m necesitan 13 vehículos. Se midió qué cuesta
+subirlo —son `C(k+4, 4)` combinaciones con 5 tipos de vehículo, o sea **k⁴**—:
+
+| k_max | Tiempo |
+|---|---|
+| 25 | 0,01 s |
+| 50 | 0,75 s |
+| 100 | 9,8 s |
+
+25 es gratis y cubre los casos reales que aparecieron. Más allá habría que
+dejar de enumerar combinaciones, que es otro trabajo.
+
+**Vive en cuatro sitios y manda el primero:** la fila `k_max` de
+`parametrosMotor` —editable por `PUT /parametros-motor/k_max`, sin desplegar—,
+el respaldo en `ParametrosMotor.k_max` por si la fila falta, la semilla
+(`_generar_seeders.py` y `parametrosMotor.csv`) para que un entorno nuevo nazca
+en 25, y el fixture de pruebas. **Cambiar solo la fila deja los otros tres en
+10**, y un entorno nuevo volvería a nacer con el tope viejo.
+
+Tiene consecuencia operativa, no solo técnica: por #217 cada vehículo
+recomendado crea una línea de solicitud, así que este tope decide cuántas
+líneas puede producir una sola captura. Con 25, una carga grande puede generar
+25 líneas con sus 25 líneas de cotización.

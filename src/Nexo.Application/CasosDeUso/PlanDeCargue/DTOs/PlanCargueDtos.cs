@@ -107,3 +107,13 @@ public record clsResultadoPlanDto(
 /// misma línea de solicitud (una carga que no cabe en un vehículo se reparte en varios
 /// planes con la misma LineaSolicitudId).</summary>
 public record clsPlanFlotaItemDto(Guid Id, int NumeroVehiculo, int TotalVehiculos, int UnidadesCargadas, int UnidadesTotales);
+
+/// <summary>
+/// #304: estado del "crear plan desde línea" — lo que el sondeo (<c>GET .../por-linea/{lineaId}</c>, que solo devuelve la
+/// lista de la flota) no puede decir: si todavía procesa o si el Cubicador lo rechazó.
+/// <paramref name="Estado"/>: <c>procesando</c> (aún no hay flota ni rechazo), <c>listo</c> (hay flota) o
+/// <c>rechazado</c> (<paramref name="Codigo"/>/<paramref name="Mensaje"/> traen el motivo del Cubicador; manda sobre una
+/// flota vieja, porque el rechazo es del último intento).
+/// </summary>
+public record clsEstadoCubicacionLineaDto(
+    string Estado, string? Codigo, string? Mensaje, DateTimeOffset? RechazadoAt, IReadOnlyList<clsPlanFlotaItemDto> Vehiculos);
