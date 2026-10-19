@@ -492,6 +492,12 @@ interface PlanCargueDto {
 }
 interface AvisoPlanCargueDto { planCargueId: UUID; estado: string; puntaje: Decimal; motivo: string | null }
 interface PlanFlotaItemDto { id: UUID; numeroVehiculo: number; totalVehiculos: number; unidadesCargadas: number; unidadesTotales: number }
+interface EstadoCubicacionLineaDto { // #304
+  estado: "procesando" | "listo" | "rechazado"  // rechazado manda sobre una flota vieja: el rechazo es del ÚLTIMO intento
+  codigo: string | null; mensaje: string | null   // solo si rechazado: el código y el mensaje del Cubicador tal cual (FLOTA_INSUFICIENTE, VEHICULO_SIN_PRESET, ERROR_INTERNO...)
+  rechazadoAt: FechaISO | null
+  vehiculos: PlanFlotaItemDto[]                   // lo mismo que devuelve GET por-linea
+}
 interface EjeVehiculoDto { posicionMm: Decimal; capacidadKg: Decimal }
 interface VehiculoCubicacionDto {
   id: UUID; nombre: string; descripcion: string | null
@@ -809,17 +815,21 @@ tal como llegó (limpio de espacios).
 | Cada posición | | Tipo | Restricción |
 |---|---|---|---|
 | `largoCm`, `anchoCm`, `altoCm` | **requerido** | decimal | 0.1–999999 |
-| `cantidad` | *opcional* | int | 1–100000, def. 1 |
+| `cantidad` | *opcional* | int | 1–**10000**, def. 1 (#304: antes 100000; el Cubicador corta en 10.000 unidades por petición) |
 | `descripcion` | *opcional* | string | máx. 200 |
-| `pesoKg` | *opcional* | decimal | 0–999999.99 (peso unitario) |
+| `pesoKg` | **requerido** | decimal | 0.01–999999.99. **Peso de UNA unidad, no el total de la posición** (el motor hace `pesoKg × cantidad`: mandar el total lo multiplica dos veces). #304: antes era opcional; ahora es obligatorio en cada posición (una línea **sin** posiciones se sigue capturando solo con su `peso`) |
 | `codigoTipoMercancia` | *opcional* | string | máx. 40. S5-HU-18.2/#274. Código (no uuid) de `tbl_tipos_mercancia` — null = tipo desconocido, sin default asignado |
 
 Regla de peso: el peso de la línea es `peso` si viene; si no, la suma de
 `cantidad × pesoKg` de las posiciones. Debe ser > 0. Si vienen ambos, deben
 coincidir con tolerancia del 1 %.
 
+Tope de unidades (#304): la **suma** de `cantidad` de las posiciones de una línea no puede pasar de **10.000** — el mismo
+tope del Cubicador. Antes la línea se guardaba y el Cubicador rechazaba la recomendación entera más tarde, lejos de donde
+nació el error.
+
 - **→** `201 CapturaResultDto`, header `Location: /api/solicitudes/{id}`
-- **Errores**: `400 CLIENTE_REQUERIDO` · `400 CLIENTE_INVALIDO` · `400 CLIENTE_BP_INVALIDO` · `400 DWCUBOS_NO_CONFIGURADO` (se usó `clienteBp` y el DW no está configurado en el ambiente) · `400 ENUM_INVALIDO` · `400 LINEA_INCOMPLETA` · `400 PESO_REQUERIDO` · `400 PESO_INCONSISTENTE`
+- **Errores**: `400 CLIENTE_REQUERIDO` · `400 CLIENTE_INVALIDO` · `400 CLIENTE_BP_INVALIDO` · `400 DWCUBOS_NO_CONFIGURADO` (se usó `clienteBp` y el DW no está configurado en el ambiente) · `400 ENUM_INVALIDO` · `400 LINEA_INCOMPLETA` · `400 PESO_REQUERIDO` · `400 PESO_INCONSISTENTE` · `400 CUBICACION_DEMASIADO_GRANDE` (#304: más de 10.000 unidades en las posiciones de una línea). Una posición sin `pesoKg`, con `pesoKg` 0 o con `cantidad` > 10000 sale como `400 VALIDATION_ERROR` (validación de campos)
 
 #### `GET /api/captura-solicitudes/aprovisionamiento`
 Piso SICE-TAC del viaje vacío (levante → origen del cargue). #300: se calcula con **1 h + 1 h** (2 h en total), no con las horas
@@ -1424,7 +1434,7 @@ corrida queda guardada, reconsultable con el GET de abajo).
   200, no errores.
 - **Errores**: `400 MERCANCIAS_REQUERIDAS` · `400 MERCANCIA_DESCONOCIDA` ·
   `400 MERCANCIA_NO_CUBICABLE` · `400 DIMENSIONES_INVALIDAS` ·
-  `400 CUBICACION_DEMASIADO_GRANDE` (> 10.000 unidades) ·
+  `400 CUBICACION_DEMASIADO_GRANDE` (> 200 posiciones o > 10.000 unidades) ·
   `503 CUBICACION_RAPIDA_NO_CONFIGURADA` · `503 CUBICADOR_NO_DISPONIBLE` ·
   `503 CUBICADOR_RESPUESTA_VACIA` · `503 CUBICADOR_CREDENCIAL_INVALIDA` ·
   `503 CUBICADOR_ERROR`. Los códigos 400 son los que manda el Cubicador tal
@@ -1526,8 +1536,14 @@ Puente Mesa de Costeo → 3D: el Cubicador arma la flota a partir de las
 posiciones de la línea. Sin body. No pasa por la compuerta de paridad.
 
 - **→** `202 ComandoAceptadoDto` (`correlationId` = `lineaId`). Sondear con
-  `GET /api/planes-cargue/por-linea/{lineaId}`.
-- **Errores**: `404 LINEA_SOLICITUD_NO_ENCONTRADA`
+  `GET /api/planes-cargue/por-linea/{lineaId}/estado` (#304: dice si el Cubicador rechazó el pedido; la lista de
+  `.../por-linea/{lineaId}` no puede decirlo). Volver a pedir el plan borra el rechazo del intento anterior.
+- **Errores**: `404 LINEA_SOLICITUD_NO_ENCONTRADA` · `400 PESO_NO_DECLARADO` (#304)
+- **`PESO_NO_DECLARADO` (#304)**: el puente del Cubicador ya no inventa 1 kg para una posición sin peso (el peso decide la
+  capacidad del vehículo). NEXO lo valida **antes de encolar**, con el mismo código y mensaje del Cubicador, y responde `400`
+  con las posiciones que faltan — sin publicar nada. El cero cuenta como no declarado. Antes ese rechazo nacía en el worker
+  después del `202` y solo quedaba en el log (el front sondeaba para siempre). Se alcanza solo con líneas capturadas antes
+  de #304 (la captura ya exige `pesoKg`) o creadas por otro camino.
 
 #### `POST /api/planes-cargue/{id}/optimizar`
 - **Body** *opcional* (se puede omitir entero):
@@ -1594,7 +1610,8 @@ Todos los campos *opcionales*: `x`, `y`, `z` (decimal), `orientacionIndice`
 |---|---|---|---|
 | `GET /api/planes-cargue` | `page` (≥1, def. 1), `pageSize` (1–200, def. 50) | `200 Pagina<PlanCargueDto>` | — (rate limit estándar) |
 | `GET /api/planes-cargue/{id}` | — | `200 PlanCargueDto` | `404 PLAN_CARGUE_NO_ENCONTRADO` |
-| `GET /api/planes-cargue/por-linea/{lineaId}` | — | `200 PlanFlotaItemDto[]` (vacío mientras el Cubicador procesa; nunca 404) | — |
+| `GET /api/planes-cargue/por-linea/{lineaId}` | — | `200 PlanFlotaItemDto[]` (vacío mientras el Cubicador procesa; nunca 404). **No avisa un rechazo**: vacío es "procesando" o "rechazado" — usar `/estado` | — |
+| `GET /api/planes-cargue/por-linea/{lineaId}/estado` | — | `200 EstadoCubicacionLineaDto` (#304): `procesando` · `listo` · `rechazado` con `codigo`/`mensaje` del Cubicador; nunca 404 | — |
 | `GET /api/planes-cargue/{id}/resultado` | — | `200 ResultadoPlanDto` (ítems, colocaciones, métricas, incidencias) | `404 PLAN_CARGUE_NO_ENCONTRADO` · `404 VEHICULO_NO_ENCONTRADO` |
 | `GET /api/planes-cargue/{id}/flota` | — | `200 PlanFlotaItemDto[]` | — |
 | `GET /api/planes-cargue/{id}/metricas` | — | `200 MetricasCubicacion` o `200 null` si nunca se optimizó | `404 PLAN_CARGUE_NO_ENCONTRADO` |

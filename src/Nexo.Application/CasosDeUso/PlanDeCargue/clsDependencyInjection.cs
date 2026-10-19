@@ -35,5 +35,6 @@ public static class clsDependencyInjection
         // hablarle directo al Cubicador: crear_desde_linea, su sondeo por línea, y colocaciones.
         .AddScoped<ICommandHandler<clsCrearPlanDesdeLineaCommand, clsComandoAceptadoDto>, clsCrearPlanDesdeLineaCommandHandler>()
         .AddScoped<IQueryHandler<clsObtenerPlanesPorLineaQuery, IReadOnlyList<clsPlanFlotaItemDto>>, clsObtenerPlanesPorLineaQueryHandler>()
+        .AddScoped<IQueryHandler<clsObtenerEstadoCubicacionLineaQuery, clsEstadoCubicacionLineaDto>, clsObtenerEstadoCubicacionLineaQueryHandler>()
         .AddScoped<IQueryHandler<clsObtenerColocacionesPlanQuery, IReadOnlyList<clsColocacionCargueDto>>, clsObtenerColocacionesPlanQueryHandler>();
 }

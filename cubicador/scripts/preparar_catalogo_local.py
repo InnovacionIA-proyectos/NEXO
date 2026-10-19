@@ -105,7 +105,7 @@ MERCANCIAS = [
 ]
 
 PARAMETROS = [
-    ("k_max", "10", "Tope de vehiculos por grupo antes de sin seleccion automatica"),
+    ("k_max", "25", "Tope de vehiculos por grupo antes de sin seleccion automatica"),
     ("umbral_alerta_llenado", "0.75", "Por debajo de este porcentaje se marca alerta"),
     ("usar_alternativa", "solo_respaldo", "Si la carroceria alternativa entra siempre o solo como respaldo"),
     ("factor_vol_util", "0.90", "Fraccion del volumen util aprovechable en la practica"),

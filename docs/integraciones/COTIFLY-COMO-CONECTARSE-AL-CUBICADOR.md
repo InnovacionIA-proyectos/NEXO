@@ -113,7 +113,12 @@ Content-Type: application/json
 
 - **Una posición = una fila de `mercancias`.** Dos filas pueden compartir `codigoMercancia` si las
   medidas son distintas (como `CAJAS_CARTON` arriba).
-- **Máximo 10.000 unidades en total por request** (`400 CUBICACION_DEMASIADO_GRANDE`).
+- **Topes por request (#304)**: máximo **10.000 unidades en total** y máximo **200 posiciones**; pasarse de cualquiera
+  de los dos es `400 CUBICACION_DEMASIADO_GRANDE`. Son los mismos topes de una línea de captura en NEXO, así que una captura
+  válida nunca los supera. Se recomienda **hasta 25 camiones por recomendación** (antes 10): 600 piezas de 1 m necesitan 13.
+- **`pesoKg` es el peso de UNA unidad, no el total de la posición.** El motor hace `pesoTotal = pesoKg × cantidad`: si se
+  manda el total, se multiplica otra vez por la cantidad y piden camiones de más (100 cajas de 20 kg: mandar `2000` en
+  vez de `20` produce 200.000 kg y una flota absurda).
 - **No reintente el `POST` a ciegas.** Cada llamada crea una **corrida nueva** (el historial es
   *append-only*): un reintento tras un timeout puede dejar dos corridas. Si no llegó respuesta,
   reconsulte con el `GET` (§7) antes de volver a pedir.
@@ -185,7 +190,7 @@ La respuesta **no devuelve medidas**: las tiene Cotifly, las mandó él, y el í
 { "resultado": "SIN_SELECCION_AUTOMATICA", "motivoSinSeleccion": "EXTRADIMENSIONADO", "vehiculos": [],
   "advertencias": ["2 pieza(s) exceden las medidas estándar."],
   "extradimension": { "hayExtradimension": true,
-    "medidasEstandar": { "largoMaxCm": 1220, "anchoMaxCm": 260, "altoMaxCm": 300, "pesoMaxKg": 34000 },
+    "medidasEstandar": { "largoMaxCm": 1220, "anchoMaxCm": 240, "altoMaxCm": 260, "pesoMaxKg": 34000 },
     "piezas": [ { "indicePosicion": 1, "idTipoMercancia": "9F2C…", "codigoMercancia": "VIGAS_ESTRUCTURAS",
                   "excesos": ["largo 1400.0 cm > 1220.0 cm"] } ] } }
 ```
@@ -196,6 +201,13 @@ Valores de `motivoSinSeleccion`: `EXTRADIMENSIONADO`, `SIN_CANDIDATOS_DIMENSIONA
 buscador se quedó sin intentos; no le diga al usuario que su carga no cabe).
 `extradimension.piezas[]` también lleva `indicePosicion`: solo una de dos posiciones del mismo tipo
 puede ser la que excede.
+
+**Umbral de extradimensión (#304): `1220 × 240 × 260` cm** (antes `1220 × 260 × 300`) — los máximos del vehículo más grande
+que no es extradimensionado. Una pieza de 241–260 cm de ancho o de 261–300 cm de alto ahora es `EXTRADIMENSIONADO` (antes
+`SIN_CANDIDATOS_DIMENSIONALES`): si hay textos por motivo, hay que revisarlos. El 260 de alto es el alto **útil de la carga**,
+no los 4,40 m reglamentarios del vehículo completo: en pantalla, "alto de la carga". `SIN_CANDIDATOS_DIMENSIONALES` sigue
+existiendo, pero ahora se alcanza por **capacidad** (p. ej. 32.000 kg de carne, que solo viaja refrigerada y ahí el mayor
+vehículo topa en 30.000).
 
 ### 5.4 `condicionada: true` — es 200, y la recomendación es válida
 
@@ -214,7 +226,7 @@ Solo para fallos reales. Formato: `{ "codigo": "...", "mensaje": "..." }`.
 | 400 | `MERCANCIA_DESCONOCIDA` | Un `codigoMercancia` que no está en el catálogo (nunca un default silencioso) | Refrescar el desplegable |
 | 400 | `MERCANCIA_NO_CUBICABLE` | El tipo existe con `cubicable: false` (graneles, combustibles) | No ofrecerlo |
 | 400 | `DIMENSIONES_INVALIDAS` | Medida o peso fuera de rango | Corregir el dato |
-| 400 | `CUBICACION_DEMASIADO_GRANDE` | Más de 10.000 unidades | Partir la carga |
+| 400 | `CUBICACION_DEMASIADO_GRANDE` | Más de 10.000 unidades o más de 200 posiciones | Partir la carga |
 | 401 | `NO_AUTORIZADO` | Bearer ausente o inválido, **o** `origenSistema` que no corresponde a la llave | Revisar la llave y mandar `COTIFLY` |
 | 422 | (validación del esquema) | Falta un campo o llega uno viejo (**`idTipoMercancia` ya no se acepta**) | Mandar `codigoMercancia` |
 | 503 | `CUBICADOR_NO_DISPONIBLE` | Base caída u otro fallo de infraestructura | Reintentar el GET; el POST, ver §4 |

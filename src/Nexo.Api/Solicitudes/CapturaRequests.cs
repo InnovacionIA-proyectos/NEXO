@@ -153,7 +153,13 @@ public class clsCapturaPosicionRequest
     [MaxLength(200)]
     public string? Descripcion { get; set; }
 
-    [Range(1, 100000)]
+    /// <summary>
+    /// Unidades de esta posición. #304: tope 10.000 — el MISMO que el Cubicador (10.000 unidades totales por
+    /// petición); antes admitía 100.000 y una posición así se capturaba y se guardaba, y después el Cubicador rechazaba
+    /// la recomendación entera con <c>CUBICACION_DEMASIADO_GRANDE</c>, lejos de donde nació el error. El tope vale
+    /// también para la SUMA de las posiciones de una línea (ver clsCapturarSolicitudValidador).
+    /// </summary>
+    [Range(1, 10000)]
     public int Cantidad { get; set; } = 1;
 
     [Required, Range(typeof(decimal), "0.1", "999999", ParseLimitsInInvariantCulture = true)]
@@ -165,7 +171,18 @@ public class clsCapturaPosicionRequest
     [Required, Range(typeof(decimal), "0.1", "999999", ParseLimitsInInvariantCulture = true)]
     public decimal AltoCm { get; set; }
 
-    [Range(typeof(decimal), "0", "999999.99", ParseLimitsInInvariantCulture = true)]
+    /// <summary>
+    /// Peso de UNA SOLA UNIDAD en kg — <b>no el total de la posición</b>. El motor del Cubicador hace
+    /// <c>peso_total = pesoKg × cantidad</c> (y la regla de peso de la captura suma <c>cantidad × pesoKg</c>): si aquí
+    /// llega el total, se multiplica otra vez por la cantidad y se piden camiones de más (100 cajas de 20 kg: mandar
+    /// 2000 en vez de 20 produce 200.000 kg y una flota absurda).
+    ///
+    /// #304: OBLIGATORIO (> 0). Antes era opcional, pero una posición sin peso no sirve para su único consumidor: el
+    /// Cubicador la rechaza (<c>PESO_NO_DECLARADO</c>) porque el peso decide la capacidad del vehículo y ya no se inventa
+    /// 1 kg. Exigirlo aquí da el error donde está el error, no más tarde al generar el plan de cargue. Una línea SIN
+    /// posiciones no se ve afectada (sigue pudiendo capturarse solo con su <c>peso</c> total).
+    /// </summary>
+    [Required, Range(typeof(decimal), "0.01", "999999.99", ParseLimitsInInvariantCulture = true)]
     public decimal? PesoKg { get; set; }
 
     /// <summary>

@@ -29,6 +29,7 @@ Puro: sin I/O, sin SQLAlchemy. El catalogo entra ya resuelto como
 from __future__ import annotations
 
 import itertools
+import time
 from dataclasses import dataclass, replace
 from decimal import Decimal
 
@@ -42,6 +43,17 @@ from .optimizadores import obtener_optimizador
 # que la que sirve aparece entre las primeras; el tope evita que una carga
 # patologica dispare miles de corridas de DBLF.
 _MAX_INTENTOS_EMPAQUE = 25
+
+# Techo de SEGUNDOS para la busqueda de flota (#304).
+#
+# El de intentos no alcanza: un intento sobre carga heterogenea de miles de
+# unidades puede tardar minutos el solo, asi que 25 de ellos no acotan nada. Un
+# limite de tiempo si es una promesa que el llamante puede usar: NEXO corta a
+# los 15 segundos, y responder "no alcance" es mejor que dejarlo colgado hasta
+# que su HttpClient se rinda y el usuario vea un 503 generico.
+#
+# La carga homogenea no lo toca: la resuelve la rejilla sin empacar.
+_MAX_SEGUNDOS_BUSQUEDA = 10.0
 
 CIEN = Decimal(100)
 
@@ -418,6 +430,63 @@ def _techo(dividendo: Decimal, divisor: Decimal) -> int:
     return entero + 1 if Decimal(entero) * divisor < dividendo else max(entero, 1)
 
 
+def _caben_por_rejilla(vehiculo: Vehiculo, m: MercanciaSolicitada) -> int:
+    """Cuantas unidades de `m` caben en `vehiculo` por divisiones enteras (#304).
+
+    Prueba las seis orientaciones del prisma y se queda con la mejor, igual que
+    `rejilla_optima` de `scripts/medir_empaque_dblf.py`. Respeta las banderas
+    del catalogo: sin rotacion libre solo la orientacion original, y no apilable
+    limita a UNA capa -nada se puede poner encima de esa pieza-.
+
+    Es un piso **garantizado**, no una estimacion: colocar en filas rectas
+    siempre es realizable. Y no es un piso flojo: DBLF iguala a la rejilla en
+    los 16 casos medidos en S5-HU-17.3, desde que las orientaciones se ordenan
+    por cuantas unidades entran (ver `DECISIONES_TECNICAS.md` #13).
+    """
+    largo, ancho, alto = vehiculo.largo_cm, vehiculo.ancho_cm, vehiculo.alto_util_cm
+    dims = (m.largo_cm, m.ancho_cm, m.alto_cm)
+    orientaciones = set(itertools.permutations(dims)) if m.tipo.rotacion_libre else {dims}
+
+    mejor = 0
+    for l, a, h in orientaciones:
+        if l <= 0 or a <= 0 or h <= 0 or l > largo or a > ancho or h > alto:
+            continue
+        capas = int(alto // h) if m.tipo.apilable else 1
+        mejor = max(mejor, int(largo // l) * int(ancho // a) * capas)
+    return mejor
+
+
+def _repartir_homogenea(
+    orden: list[tuple[Vehiculo, Decimal]], m: MercanciaSolicitada, items: list[ItemCarga],
+) -> list[list[ItemCarga]] | None:
+    """Reparte UNA sola posicion sin empacar pieza por pieza (#304).
+
+    Cuando todas las unidades son identicas, cuantas entran en cada vehiculo es
+    una division -la rejilla- y no una busqueda. Empacarlas una por una con
+    DBLF daba el mismo resultado y costaba tiempo cuadratico: 6.400 bultos de
+    una linea real del pliego tardaban 84 segundos.
+
+    El tope real es el menor entre lo que cabe por geometria y lo que aguanta
+    la capacidad de ESTA combinacion vehiculo-carroceria.
+    """
+    restantes = m.cantidad
+    desde = 0
+    reparto: list[list[ItemCarga]] = []
+    for vehiculo, capacidad in orden:
+        if restantes <= 0:
+            reparto.append([])
+            continue
+        por_geometria = _caben_por_rejilla(vehiculo, m)
+        por_peso = int(capacidad / m.peso_kg) if m.peso_kg > 0 else restantes
+        cabe = min(por_geometria, por_peso, restantes)
+        if cabe <= 0:
+            return None  # no progresa: esta combinacion no va a cerrar
+        reparto.append(items[desde:desde + cabe])
+        desde += cabe
+        restantes -= cabe
+    return None if restantes else reparto
+
+
 def _repartir(
     combinacion: tuple[tuple[Vehiculo, Decimal], ...], mercancias: tuple[MercanciaSolicitada, ...],
 ) -> list[list[ItemCarga]] | None:
@@ -427,6 +496,12 @@ def _repartir(
     final queda algo sin ubicar, la combinacion no sirve.
     """
     orden = sorted(combinacion, key=lambda par: par[0].volumen_m3, reverse=True)
+
+    # Una sola posicion = todas las unidades son identicas: la rejilla lo
+    # resuelve sin empacar. Es el caso mas comun y el unico que se rompia.
+    if len(mercancias) == 1:
+        return _repartir_homogenea(orden, mercancias[0], _a_items(mercancias))
+
     restantes = _a_items(mercancias)
     reparto: list[list[ItemCarga]] = []
     for vehiculo, capacidad in orden:
@@ -455,18 +530,48 @@ def _flota_minima(
     """
     total_volumen = sum((m.volumen_total_m3 for m in mercancias), Decimal(0))
     total_peso = sum((m.peso_total_kg for m in mercancias), Decimal(0))
+
+    # Tercera cota, por GEOMETRIA (#304). Las dos de arriba son de volumen y
+    # peso totales, y el volumen miente cuando la pieza no tesela: un cubo de
+    # 1 m deja 48 de los 76,1 m3 de una tractomula, o sea el 63%. Con solo la
+    # cota de volumen el motor arrancaba pidiendo 3 vehiculos donde hacian
+    # falta 5, agotaba sus intentos probando combinaciones imposibles y
+    # devolvia BUSQUEDA_AGOTADA ante una carga que si sabia resolver.
+    #
+    # Se usa el conteo MAS PERMISIVO de todos los pares (vehiculo, mercancia):
+    # suponer que todas las unidades son la pieza que mejor entra sobreestima
+    # la capacidad del vehiculo, asi que el resultado sigue siendo una cota
+    # inferior valida. Con una sola posicion es exacta.
+    total_unidades = sum(m.cantidad for m in mercancias)
+    # Cuantas unidades entran en cada vehiculo, por su codigo. Se calcula una
+    # vez y sirve para las dos cosas: la cota de abajo y el filtro aritmetico
+    # de cada combinacion.
+    unidades_por_vehiculo = {
+        v.codigo: max(_caben_por_rejilla(v, m) for m in mercancias) for v, _ in candidatos}
+    mejor_por_vehiculo = max(unidades_por_vehiculo.values(), default=0)
+
     minimo = max(
         _techo(total_volumen, max(v.volumen_m3 for v, _ in candidatos)),
         _techo(total_peso, max(c for _, c in candidatos)),
+        _techo(Decimal(total_unidades), Decimal(mejor_por_vehiculo)) if mejor_por_vehiculo else 1,
     )
 
     intentos = 0
+    limite = time.monotonic() + _MAX_SEGUNDOS_BUSQUEDA
     for cantidad in range(minimo, k_max + 1):
         viables: list[tuple[Decimal, Decimal, tuple[tuple[Vehiculo, Decimal], ...]]] = []
         for combinacion in itertools.combinations_with_replacement(candidatos, cantidad):
             volumen = sum((v.volumen_m3 for v, _ in combinacion), Decimal(0))
             capacidad = sum((c for _, c in combinacion), Decimal(0))
-            if volumen >= total_volumen and capacidad >= total_peso:
+            # El filtro de unidades es el que hace falta cuando la pieza no
+            # tesela (#304): cinco vehiculos pueden sumar volumen de sobra y
+            # aun asi no admitir las 200 piezas, porque cada uno desperdicia
+            # un tercio del suyo. Sin esto, el orden por volumen ascendente
+            # mandaba a empacar combinaciones imposibles hasta agotar los
+            # intentos. Es aritmetica: no cuesta nada descartarlas aca.
+            unidades = sum(unidades_por_vehiculo[v.codigo] for v, _ in combinacion)
+            if (volumen >= total_volumen and capacidad >= total_peso
+                    and unidades >= total_unidades):
                 viables.append((volumen, capacidad, combinacion))
         viables.sort(key=lambda t: (t[0], t[1]))
 
@@ -475,6 +580,11 @@ def _flota_minima(
                 raise BusquedaAgotada(
                     f"Se probaron {intentos} combinaciones de flota sin encontrar una que "
                     "empaque la carga.")
+            if time.monotonic() > limite:
+                raise BusquedaAgotada(
+                    f"La busqueda supero los {_MAX_SEGUNDOS_BUSQUEDA:.0f} segundos tras "
+                    f"{intentos} combinaciones. Reducir la cantidad de posiciones distintas "
+                    "o de unidades, o declarar el vehiculo a mano.")
             intentos += 1
             reparto = _repartir(combinacion, mercancias)
             if reparto is not None:

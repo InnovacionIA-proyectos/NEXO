@@ -148,11 +148,22 @@ class PlanCargue:
 @dataclass
 class ParametrosCubicacion:
     """Fila unica (singleton, id=1) con las medidas estandar contra las que
-    se detecta extradimension en el cubicador rapido."""
+    se detecta extradimension.
+
+    Los maximos son los del vehiculo mas grande que NO es extradimensionado
+    (#304). Antes eran 260 de ancho y 300 de alto, por encima de los 240x260 de
+    la flota: una pieza de 245x245x255 pasaba el umbral pero no cabia en ningun
+    vehiculo en ninguna orientacion, y se reportaba `SIN_CANDIDATOS_DIMENSIONALES`
+    en vez de `EXTRADIMENSIONADO`. El operario leia "no hay candidatos" cuando lo
+    que tenia era una pieza sobreancha que necesita permiso especial.
+
+    Son editables por `PUT /medidas-estandar`: esto es el arranque, no la verdad.
+    Si entra un vehiculo mas grande al catalogo, hay que subirlos.
+    """
 
     largo_max_cm: float = 1220.0
-    ancho_max_cm: float = 260.0
-    alto_max_cm: float = 300.0
+    ancho_max_cm: float = 240.0
+    alto_max_cm: float = 260.0
     peso_max_kg: float = 34000.0
     id: int = 1
     updated_at: datetime = field(default_factory=_ahora)

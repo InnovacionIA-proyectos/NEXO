@@ -141,6 +141,29 @@ async def test_una_posicion_sin_tipo_de_mercancia_es_rechazo_explicito():
     assert error.value.codigo == "MERCANCIA_NO_DECLARADA"
 
 
+async def test_una_posicion_sin_peso_es_rechazo_explicito():
+    """Antes el puente le ponia 1 kg (#304).
+
+    El peso decide la capacidad del vehiculo: un kilo inventado mete en un
+    Turbo lo que necesitaba una Minimula, y el plan sale creible pero
+    equivocado. `PesoKg` es opcional en la captura de NEXO, asi que se alcanza.
+    """
+    sin_peso = PosicionCarga(descripcion="Pallet", cantidad=10, largo_cm=60, ancho_cm=40,
+                             alto_cm=40, peso_kg=None, codigo_mercancia="BEBIDAS")
+    with pytest.raises(ValidationFailedException) as error:
+        await _correr(_linea(sin_peso))
+    assert error.value.codigo == "PESO_NO_DECLARADO"
+
+
+async def test_una_posicion_con_peso_cero_tambien_se_rechaza():
+    """Cero no es un peso declarado: es el mismo agujero por otra puerta."""
+    peso_cero = PosicionCarga(descripcion="Pallet", cantidad=10, largo_cm=60, ancho_cm=40,
+                              alto_cm=40, peso_kg=0, codigo_mercancia="BEBIDAS")
+    with pytest.raises(ValidationFailedException) as error:
+        await _correr(_linea(peso_cero))
+    assert error.value.codigo == "PESO_NO_DECLARADO"
+
+
 async def test_un_tipo_que_no_esta_en_el_catalogo_es_rechazo_explicito():
     with pytest.raises(ValidationFailedException) as error:
         await _correr(_linea(_posicion("NO_EXISTE")))

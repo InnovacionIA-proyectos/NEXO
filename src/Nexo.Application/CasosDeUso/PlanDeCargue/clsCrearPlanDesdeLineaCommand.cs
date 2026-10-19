@@ -50,15 +50,33 @@ namespace Nexo.Application.CasosDeUso.PlanDeCargue;
 public sealed record clsCrearPlanDesdeLineaCommand(Guid LineaSolicitudId) : ICommand<clsComandoAceptadoDto>;
 
 public sealed class clsCrearPlanDesdeLineaCommandHandler(
-    ILineaSolicitudCubicacionPort lineas, ICubicacionPort cubicacion, IUnitOfWork uow)
+    ILineaSolicitudCubicacionPort lineas, ICubicacionPort cubicacion, IRechazoCubicacionLineaPort rechazos, IUnitOfWork uow)
     : ICommandHandler<clsCrearPlanDesdeLineaCommand, clsComandoAceptadoDto>
 {
     public async Task<clsComandoAceptadoDto> Handle(clsCrearPlanDesdeLineaCommand command, CancellationToken ct = default)
     {
-        _ = await lineas.ObtenerAsync(command.LineaSolicitudId, ct)
+        var linea = await lineas.ObtenerAsync(command.LineaSolicitudId, ct)
             ?? throw new clsNotFoundException("LINEA_SOLICITUD_NO_ENCONTRADA", "La línea de solicitud no existe.");
 
+        // #304: el puente del Cubicador ya no inventa 1 kg para una posición sin peso: la rechaza con
+        // PESO_NO_DECLARADO (el peso decide la capacidad del vehículo). Pero ese rechazo nace en el worker, DESPUÉS de este
+        // 202, y vuelve por cola: clsCubicacionRechazadaConsumer solo lo registra en el log (no hay PlanCargue que marcar,
+        // el Id es el de la línea) y el front se quedaba sondeando para siempre. Se valida acá, antes de encolar, con el
+        // MISMO código y mensaje del Cubicador: 400 sincrónico y nada que publicar. El cero cuenta como no declarado.
+        var sinPeso = linea.Posiciones
+            .Where(p => p.PesoKg is not > 0)
+            .Select(p => string.IsNullOrWhiteSpace(p.Descripcion) ? "(sin descripcion)" : p.Descripcion)
+            .ToList();
+        if (sinPeso.Count > 0)
+            throw new clsValidationFailedException("PESO_NO_DECLARADO",
+                $"Estas posiciones no declaran su peso: {string.Join(", ", sinPeso)}. " +
+                "El peso decide la capacidad del vehículo; recapturar la línea con el peso de cada posición.");
+
         var lineaIdTexto = command.LineaSolicitudId.ToString();
+
+        // #304: un intento nuevo empieza de cero — se borra el rechazo del anterior (se guarda con el mismo SaveChanges que
+        // flushea el Outbox del mensaje), así el estado vuelve a "procesando" y el front no ve un rechazo ya viejo.
+        await rechazos.LimpiarAsync(command.LineaSolicitudId, ct);
 
         // "crear_desde_linea": el mismo tipo de cola que el worker de Cubicador YA
         // implementa (verificado en cubicador/worker/main.py y
