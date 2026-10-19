@@ -171,7 +171,7 @@ Reemplazar el costeo manual de fletes (SICE-TAC, SAP y Excel cruzados a mano) po
 
 ## 5. Roles y permisos
 
-El sistema aplica 6 roles (`Comercial`, `CoordinadorFletes`, `AdminTarifas`, `ServiciosLogisticos`, `LiderProceso`, `Admin`), documentados en `docs/ROLES_Y_PERMISOS.md`. El documento de entendimiento planteaba 3.
+El sistema aplica 6 roles (`Comercial`, `CoordinadorFletes`, `AdminTarifas`, `ServiciosLogisticos`, `LiderProceso`, `Admin`), documentados en `docs/documentacion/ROLES_Y_PERMISOS.md`. El documento de entendimiento planteaba 3.
 
 **Fuera del conteo:** la validación de la matriz 6 vs 3 depende de un entregable del equipo de negocio que aún no llega; no afecta el porcentaje.
 

@@ -239,7 +239,7 @@ por caso antes de implementar (no asumir).
 
 **Confirmado por partida doble:** este mismo hallazgo ya estaba
 documentado antes, encontrado el 2026-10-05 al depurar un rechazo real
-al reimportar un Excel exportado (`docs/2026-10-05_REPARACIONES-FINALES-TARIFAS-PLAZA.md`,
+al reimportar un Excel exportado (`docs/backlog/2026-10-05_REPARACIONES-FINALES-TARIFAS-PLAZA.md`,
 punto 1) — caso real: celda VIGENCIA en formato General con serial
 `46315` (2026-10-20 real), rechazada porque `DateOnly.TryParse("46315", ...)`
 falla. Dos investigaciones independientes llegaron a la misma causa

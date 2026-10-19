@@ -375,9 +375,9 @@ Cada paso queda auditado (`AuditLog`).
 > existe el paso "plaza vigente mayor gana sola", y la plaza/histórico
 > solo se buscan en SAP, nunca en las tablas propias de NEXO). La
 > especificación completa —tabla de 10 casos, qué cambia, casos borde
-> y HU para implementarlo— está en `docs/2026-10-09_HU-BACKEND.md`, sección
+> y HU para implementarlo— está en `docs/backlog/2026-10-09_HU-BACKEND.md`, sección
 > **"Motor de decisión de tarifa"** (HU-B14, B15, B16, B17) y la parte
-> de pantalla en `docs/2026-10-09_HU-FRONTEND.md`, **HU-16**.
+> de pantalla en `docs/backlog/2026-10-09_HU-FRONTEND.md`, **HU-16**.
 
 Basado en el diagrama `NEXO FLUJO.pdf`, con los ajustes que confirmó
 Sara el 2026-10-12. Ante una línea de solicitud (línea de negocio,
@@ -449,6 +449,6 @@ plaza vigente ya es la mayor) resuelve solo y ni presenta opciones.
 - Revisión directa del código: `administracion_embarqa_nexo/src/app/cabina-fletes/`
   (routing, guards, `nexo-access.models.ts`, cada página) y
   `NEXO/src/Nexo.Api/` (`[Authorize(Roles=...)]` de cada controller).
-- `docs/REVISION-NEXO-PASO-A-PASO.md`, `docs/2026-10-09_HU-FRONTEND.md`,
-  `docs/2026-10-09_HU-BACKEND.md` — hallazgos y mejoras de esta misma revisión,
+- `docs/documentacion/REVISION-NEXO-PASO-A-PASO.md`, `docs/backlog/2026-10-09_HU-FRONTEND.md`,
+  `docs/backlog/2026-10-09_HU-BACKEND.md` — hallazgos y mejoras de esta misma revisión,
   para el detalle técnico de cada bug/mejora mencionado arriba.
