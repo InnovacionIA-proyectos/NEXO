@@ -22,10 +22,11 @@ public class clsCrearPlanDesdeLineaCommandTests
     private readonly Mock<ILineaSolicitudCubicacionPort> _lineas = new();
     private readonly Mock<ICubicacionPort> _cubicacion = new();
     private readonly Mock<IUnitOfWork> _uow = new();
+    private readonly Mock<IRechazoCubicacionLineaPort> _rechazos = new();
 
     private static readonly Guid LineaId = Guid.Parse("dddd0000-0000-0000-0000-000000000001");
 
-    private clsCrearPlanDesdeLineaCommandHandler Handler() => new(_lineas.Object, _cubicacion.Object, _uow.Object);
+    private clsCrearPlanDesdeLineaCommandHandler Handler() => new(_lineas.Object, _cubicacion.Object, _rechazos.Object, _uow.Object);
 
     private void LineaExiste() =>
         _lineas.Setup(l => l.ObtenerAsync(LineaId, It.IsAny<CancellationToken>()))
@@ -102,6 +103,37 @@ public class clsCrearPlanDesdeLineaCommandTests
         Assert.Equal("procesando", r.Estado);
         _cubicacion.Verify(c => c.PublicarComandoAsync(
             "crear_desde_linea", LineaId.ToString(), It.IsAny<object>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    // #304: pedir el plan otra vez empieza de cero: se borra el rechazo del intento anterior, ANTES de guardar (con el
+    // mismo SaveChanges que flushea el Outbox), para que el estado vuelva a "procesando".
+    [Fact]
+    public async Task Pedir_el_plan_otra_vez_borra_el_rechazo_anterior_antes_de_guardar()
+    {
+        LineaExiste();
+        var orden = new List<string>();
+        _rechazos.Setup(r => r.LimpiarAsync(LineaId, It.IsAny<CancellationToken>()))
+            .Callback(() => orden.Add("limpiar")).Returns(Task.CompletedTask);
+        _uow.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .Callback(() => orden.Add("guardar")).ReturnsAsync(1);
+
+        await Handler().Handle(new clsCrearPlanDesdeLineaCommand(LineaId));
+
+        Assert.Equal(new[] { "limpiar", "guardar" }, orden);
+    }
+
+    // Si ni siquiera se encola (peso sin declarar), no se toca un rechazo anterior.
+    [Fact]
+    public async Task Si_se_rechaza_antes_de_encolar_no_toca_el_rechazo_anterior()
+    {
+        _lineas.Setup(l => l.ObtenerAsync(LineaId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new clsLineaParaCubicacionDto(LineaId,
+                [new clsPosicionCargaDto("Cajas", 5, 40, 30, 30, null, "CAJAS_CARTON")], "Bogotá", "Medellín"));
+
+        await Assert.ThrowsAsync<clsValidationFailedException>(
+            () => Handler().Handle(new clsCrearPlanDesdeLineaCommand(LineaId)));
+
+        _rechazos.Verify(r => r.LimpiarAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]

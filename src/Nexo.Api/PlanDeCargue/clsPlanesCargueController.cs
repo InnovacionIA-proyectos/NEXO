@@ -58,6 +58,7 @@ public class clsPlanesCargueController(
     IQueryHandler<clsObtenerResultadoPlanQuery, clsResultadoPlanDto> obtenerResultado,
     IQueryHandler<clsObtenerFlotaPlanQuery, IReadOnlyList<clsPlanFlotaItemDto>> obtenerFlota,
     IQueryHandler<clsObtenerPlanesPorLineaQuery, IReadOnlyList<clsPlanFlotaItemDto>> obtenerPlanesPorLinea,
+    IQueryHandler<clsObtenerEstadoCubicacionLineaQuery, clsEstadoCubicacionLineaDto> obtenerEstadoPorLinea,
     IQueryHandler<clsObtenerMetricasPlanQuery, clsMetricasCubicacionEvento?> obtenerMetricas,
     IQueryHandler<clsObtenerNoCargadasPlanQuery, IReadOnlyList<clsColocacionCargueDto>> obtenerNoCargadas,
     IQueryHandler<clsObtenerColocacionesPlanQuery, IReadOnlyList<clsColocacionCargueDto>> obtenerColocaciones)
@@ -244,6 +245,18 @@ public class clsPlanesCargueController(
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyList<clsPlanFlotaItemDto>>> ObtenerPorLinea(Guid lineaId, CancellationToken ct = default)
         => Ok(await obtenerPlanesPorLinea.Handle(new clsObtenerPlanesPorLineaQuery(lineaId), ct));
+
+    /// <summary>
+    /// #304: GET /api/planes-cargue/por-linea/{lineaId}/estado — dice si el "crear plan desde línea" sigue
+    /// <c>procesando</c>, quedó <c>listo</c> o fue <c>rechazado</c> por el Cubicador (con su código y mensaje, p. ej.
+    /// <c>FLOTA_INSUFICIENTE</c>). Complementa el sondeo de arriba, que solo devuelve la flota y por eso no podía avisar un
+    /// rechazo: el front esperaba para siempre. Siempre 200.
+    /// </summary>
+    [Authorize]
+    [HttpGet("por-linea/{lineaId:guid}/estado")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<ActionResult<clsEstadoCubicacionLineaDto>> ObtenerEstadoPorLinea(Guid lineaId, CancellationToken ct = default)
+        => Ok(await obtenerEstadoPorLinea.Handle(new clsObtenerEstadoCubicacionLineaQuery(lineaId), ct));
 
     /// <summary>GET /api/planes-cargue/{id}/resultado — detalle completo (ítems,
     /// colocaciones con geometría, métricas, incidencias).</summary>

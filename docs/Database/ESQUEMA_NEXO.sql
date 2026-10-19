@@ -573,6 +573,16 @@ CREATE TABLE [db_NEXO].[tbl_planes_cargue] (
     , CONSTRAINT [PK_planes_cargue] PRIMARY KEY ([Id])
 );
 
+-- #304: por qué el Cubicador rechazó "crear plan desde línea" para una línea. Una fila por línea
+-- (la clave es la línea): un rechazo nuevo reemplaza al anterior y pedir el plan otra vez la borra.
+CREATE TABLE [db_NEXO].[tbl_rechazos_cubicacion_linea] (
+    [LineaSolicitudId] uniqueidentifier NOT NULL,
+    [Codigo] nvarchar(60) NOT NULL,
+    [Mensaje] nvarchar(1000) NOT NULL,
+    [RechazadoAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset())
+    , CONSTRAINT [PK_rechazos_cubicacion_linea] PRIMARY KEY ([LineaSolicitudId])
+);
+
 -- Mercancía a cargar dentro de un plan: dimensiones, peso, y reglas físicas
 -- (apilable, frágil, peligroso, refrigerado) que el algoritmo debe respetar.
 CREATE TABLE [db_NEXO].[tbl_items_plan_cargue] (
@@ -739,6 +749,7 @@ ALTER TABLE [db_NEXO].[tbl_cotizacion_lineas] ADD CONSTRAINT [FK_cotizacion_line
 ALTER TABLE [db_NEXO].[tbl_cotizaciones] ADD CONSTRAINT [FK_cotizaciones_solicitudes_SolicitudId] FOREIGN KEY ([SolicitudId]) REFERENCES [db_NEXO].[tbl_solicitudes] ([Id]);
 ALTER TABLE [db_NEXO].[tbl_cotizaciones] ADD CONSTRAINT [FK_cotizaciones_usuarios_EntregadaPor] FOREIGN KEY ([EntregadaPor]) REFERENCES [db_NEXO].[tbl_usuarios] ([Id]);
 ALTER TABLE [db_NEXO].[tbl_items_plan_cargue] ADD CONSTRAINT [FK_items_plan_cargue_planes_cargue_PlanCargueId] FOREIGN KEY ([PlanCargueId]) REFERENCES [db_NEXO].[tbl_planes_cargue] ([Id]) ON DELETE CASCADE;
+ALTER TABLE [db_NEXO].[tbl_rechazos_cubicacion_linea] ADD CONSTRAINT [FK_rechazos_cubicacion_linea_lineas_solicitud_LineaSolicitudId] FOREIGN KEY ([LineaSolicitudId]) REFERENCES [db_NEXO].[tbl_lineas_solicitud] ([Id]) ON DELETE CASCADE;
 ALTER TABLE [db_NEXO].[tbl_lineas_solicitud] ADD CONSTRAINT [FK_lineas_solicitud_configuraciones_vehiculo_ConfigVehiculoId] FOREIGN KEY ([ConfigVehiculoId]) REFERENCES [db_NEXO].[tbl_configuraciones_vehiculo] ([Id]);
 ALTER TABLE [db_NEXO].[tbl_lineas_solicitud] ADD CONSTRAINT [FK_lineas_solicitud_rutas_RutaId] FOREIGN KEY ([RutaId]) REFERENCES [db_NEXO].[tbl_rutas] ([Id]);
 ALTER TABLE [db_NEXO].[tbl_rutas] ADD CONSTRAINT [FK_rutas_municipios_OrigenMunicipioId] FOREIGN KEY ([OrigenMunicipioId]) REFERENCES [db_NEXO].[tbl_municipios] ([Id]);

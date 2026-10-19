@@ -492,6 +492,12 @@ interface PlanCargueDto {
 }
 interface AvisoPlanCargueDto { planCargueId: UUID; estado: string; puntaje: Decimal; motivo: string | null }
 interface PlanFlotaItemDto { id: UUID; numeroVehiculo: number; totalVehiculos: number; unidadesCargadas: number; unidadesTotales: number }
+interface EstadoCubicacionLineaDto { // #304
+  estado: "procesando" | "listo" | "rechazado"  // rechazado manda sobre una flota vieja: el rechazo es del ÚLTIMO intento
+  codigo: string | null; mensaje: string | null   // solo si rechazado: el código y el mensaje del Cubicador tal cual (FLOTA_INSUFICIENTE, VEHICULO_SIN_PRESET, ERROR_INTERNO...)
+  rechazadoAt: FechaISO | null
+  vehiculos: PlanFlotaItemDto[]                   // lo mismo que devuelve GET por-linea
+}
 interface EjeVehiculoDto { posicionMm: Decimal; capacidadKg: Decimal }
 interface VehiculoCubicacionDto {
   id: UUID; nombre: string; descripcion: string | null
@@ -1530,7 +1536,8 @@ Puente Mesa de Costeo → 3D: el Cubicador arma la flota a partir de las
 posiciones de la línea. Sin body. No pasa por la compuerta de paridad.
 
 - **→** `202 ComandoAceptadoDto` (`correlationId` = `lineaId`). Sondear con
-  `GET /api/planes-cargue/por-linea/{lineaId}`.
+  `GET /api/planes-cargue/por-linea/{lineaId}/estado` (#304: dice si el Cubicador rechazó el pedido; la lista de
+  `.../por-linea/{lineaId}` no puede decirlo). Volver a pedir el plan borra el rechazo del intento anterior.
 - **Errores**: `404 LINEA_SOLICITUD_NO_ENCONTRADA` · `400 PESO_NO_DECLARADO` (#304)
 - **`PESO_NO_DECLARADO` (#304)**: el puente del Cubicador ya no inventa 1 kg para una posición sin peso (el peso decide la
   capacidad del vehículo). NEXO lo valida **antes de encolar**, con el mismo código y mensaje del Cubicador, y responde `400`
@@ -1603,7 +1610,8 @@ Todos los campos *opcionales*: `x`, `y`, `z` (decimal), `orientacionIndice`
 |---|---|---|---|
 | `GET /api/planes-cargue` | `page` (≥1, def. 1), `pageSize` (1–200, def. 50) | `200 Pagina<PlanCargueDto>` | — (rate limit estándar) |
 | `GET /api/planes-cargue/{id}` | — | `200 PlanCargueDto` | `404 PLAN_CARGUE_NO_ENCONTRADO` |
-| `GET /api/planes-cargue/por-linea/{lineaId}` | — | `200 PlanFlotaItemDto[]` (vacío mientras el Cubicador procesa; nunca 404) | — |
+| `GET /api/planes-cargue/por-linea/{lineaId}` | — | `200 PlanFlotaItemDto[]` (vacío mientras el Cubicador procesa; nunca 404). **No avisa un rechazo**: vacío es "procesando" o "rechazado" — usar `/estado` | — |
+| `GET /api/planes-cargue/por-linea/{lineaId}/estado` | — | `200 EstadoCubicacionLineaDto` (#304): `procesando` · `listo` · `rechazado` con `codigo`/`mensaje` del Cubicador; nunca 404 | — |
 | `GET /api/planes-cargue/{id}/resultado` | — | `200 ResultadoPlanDto` (ítems, colocaciones, métricas, incidencias) | `404 PLAN_CARGUE_NO_ENCONTRADO` · `404 VEHICULO_NO_ENCONTRADO` |
 | `GET /api/planes-cargue/{id}/flota` | — | `200 PlanFlotaItemDto[]` | — |
 | `GET /api/planes-cargue/{id}/metricas` | — | `200 MetricasCubicacion` o `200 null` si nunca se optimizó | `404 PLAN_CARGUE_NO_ENCONTRADO` |

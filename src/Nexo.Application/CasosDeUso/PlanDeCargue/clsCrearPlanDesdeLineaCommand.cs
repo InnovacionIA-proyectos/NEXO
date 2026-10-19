@@ -50,7 +50,7 @@ namespace Nexo.Application.CasosDeUso.PlanDeCargue;
 public sealed record clsCrearPlanDesdeLineaCommand(Guid LineaSolicitudId) : ICommand<clsComandoAceptadoDto>;
 
 public sealed class clsCrearPlanDesdeLineaCommandHandler(
-    ILineaSolicitudCubicacionPort lineas, ICubicacionPort cubicacion, IUnitOfWork uow)
+    ILineaSolicitudCubicacionPort lineas, ICubicacionPort cubicacion, IRechazoCubicacionLineaPort rechazos, IUnitOfWork uow)
     : ICommandHandler<clsCrearPlanDesdeLineaCommand, clsComandoAceptadoDto>
 {
     public async Task<clsComandoAceptadoDto> Handle(clsCrearPlanDesdeLineaCommand command, CancellationToken ct = default)
@@ -73,6 +73,10 @@ public sealed class clsCrearPlanDesdeLineaCommandHandler(
                 "El peso decide la capacidad del vehículo; recapturar la línea con el peso de cada posición.");
 
         var lineaIdTexto = command.LineaSolicitudId.ToString();
+
+        // #304: un intento nuevo empieza de cero — se borra el rechazo del anterior (se guarda con el mismo SaveChanges que
+        // flushea el Outbox del mensaje), así el estado vuelve a "procesando" y el front no ve un rechazo ya viejo.
+        await rechazos.LimpiarAsync(command.LineaSolicitudId, ct);
 
         // "crear_desde_linea": el mismo tipo de cola que el worker de Cubicador YA
         // implementa (verificado en cubicador/worker/main.py y

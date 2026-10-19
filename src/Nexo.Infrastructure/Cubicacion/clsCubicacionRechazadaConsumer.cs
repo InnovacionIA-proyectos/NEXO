@@ -15,7 +15,8 @@ namespace Nexo.Infrastructure.Cubicacion;
 /// <see cref="clsPlanDeCargueGeneradoConsumer"/> para el porqué de la topología.
 /// </summary>
 public sealed class clsCubicacionRechazadaConsumer(
-    clsNexoDbContext db, INotificadorDePlanCargue avisos, ILogger<clsCubicacionRechazadaConsumer> log)
+    clsNexoDbContext db, INotificadorDePlanCargue avisos, IRechazoCubicacionLineaPort rechazos,
+    ILogger<clsCubicacionRechazadaConsumer> log)
     : IConsumer<CubicacionRechazada>
 {
     public async Task Consume(ConsumeContext<CubicacionRechazada> context)
@@ -50,6 +51,12 @@ public sealed class clsCubicacionRechazadaConsumer(
                 "Rechazo de cubicacion para Id={Id} sin PlanCargue asociado: probablemente un fallo de " +
                 "'crear_desde_linea' (Id = LineaSolicitudId, plan nunca llego a crearse). " +
                 "Codigo={Codigo} Mensaje={Mensaje}", planId, mensaje.Codigo, mensaje.Mensaje);
+
+            // #304: el circuito que este comentario dejaba pendiente — el motivo se guarda por línea y el front lo lee en
+            // GET /api/planes-cargue/por-linea/{lineaId}/estado, en vez de sondear para siempre. Solo si el Id ES una línea
+            // real: cualquier otro Id huérfano sigue siendo solo un log.
+            if (await rechazos.RegistrarAsync(planId, mensaje.Codigo, mensaje.Mensaje, context.CancellationToken))
+                await db.SaveChangesAsync(context.CancellationToken);
             return;
         }
 
