@@ -835,7 +835,7 @@ general en `2026-10-09_HU-BACKEND.md`, HU-B4.
 ### Hallazgo — mismo bug de fecha ya documentado antes, por partida doble
 
 Al revisar el desplegable de Tipo de Vehículo de Reglas Solo-SICETAC
-apareció `docs/2026-10-05_REPARACIONES-FINALES-TARIFAS-PLAZA.md`, un documento
+apareció `docs/backlog/2026-10-05_REPARACIONES-FINALES-TARIFAS-PLAZA.md`, un documento
 previo (2026-10-05) con 6 hallazgos propios, nunca fusionados a
 `2026-10-09_HU-FRONTEND.md`/`2026-10-09_HU-BACKEND.md`. Su punto 1 es **el mismo bug** que
 HU-B4 (fecha VIGENCIA leída como texto crudo en vez de como valor

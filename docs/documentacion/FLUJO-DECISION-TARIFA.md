@@ -368,7 +368,7 @@ Encontrados en la misma revisión, sin decisión todavía:
 ## 11. Referencias
 
 - Especificación técnica completa (archivo y línea de cada cambio,
-  pruebas, orden de implementación): `docs/2026-10-09_HU-BACKEND.md`, sección
+  pruebas, orden de implementación): `docs/backlog/2026-10-09_HU-BACKEND.md`, sección
   **"Motor de decisión de tarifa"**.
   - **HU-B14** — plaza en 2 tablas (SAP → NEXO).
   - **HU-B15** — histórico en 2 tablas (incluye poder consultar
@@ -380,7 +380,7 @@ Encontrados en la misma revisión, sin decisión todavía:
   - **HU-B19** — investigar la "Desviación 1" de QA.
   - **HU-B22** — conectar el traductor de zonas al buscar la plaza en
     SAP.
-- Parte de pantalla: `docs/2026-10-09_HU-FRONTEND.md`, sección Mesa de Costeo:
+- Parte de pantalla: `docs/backlog/2026-10-09_HU-FRONTEND.md`, sección Mesa de Costeo:
   **HU-16** (propuesta según el modo, "Usar este"), **HU-17** (bloqueo
   y aviso por debajo del SICE-TAC) y **HU-19** ("Aplicar todas las
   propuestas" con confirmación).

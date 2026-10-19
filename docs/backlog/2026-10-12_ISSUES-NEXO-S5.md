@@ -2,7 +2,7 @@
 
 _Última actualización: 2026-10-14_
 
-30 issues en 6 milestones. Cada issue se puede ejecutar sin leer nada mas: trae **Contexto**, **Hoy -> Debe quedar**, **Checklist** y **Criterios de aceptacion**. El detalle largo y el codigo de referencia estan en `docs/2026-10-09_HU-BACKEND.md` y `docs/2026-10-09_HU-FRONTEND.md` (cada issue dice su "Origen"). El flujo completo esta en `docs/documentacion/FLUJO-DECISION-TARIFA.md` (adjuntarlo a las issues del milestone S5-HU-19).
+30 issues en 6 milestones. Cada issue se puede ejecutar sin leer nada mas: trae **Contexto**, **Hoy -> Debe quedar**, **Checklist** y **Criterios de aceptacion**. El detalle largo y el codigo de referencia estan en `docs/backlog/2026-10-09_HU-BACKEND.md` y `docs/backlog/2026-10-09_HU-FRONTEND.md` (cada issue dice su "Origen"). El flujo completo esta en `docs/documentacion/FLUJO-DECISION-TARIFA.md` (adjuntarlo a las issues del milestone S5-HU-19).
 
 **Reglas aplicadas**
 - Titulo: `[S5-HU-NN.M] Titulo corto`, sin tildes. Milestone: `S5-HU-NN — Descripcion larga`.
@@ -304,7 +304,7 @@ CONTEXTO (CONEXOS)
 - POST /api/cotizaciones/{id}/conexos (clsCotizacionesController.cs:90) autoriza solo Comercial,CoordinadorFletes,Admin: falta AdminTarifas (en el resto del controlador si esta, lineas 39, 60, 68, 78, 104). Recordar que [Authorize(Roles)] de metodo se combina con AND con el de clase.
 - clsAgregarConexosCotizacionCommand.cs lanza 409 COTIZACION_NO_EDITABLE si Estado != Borrador, o sea bloquea toda cotizacion Entregada.
 - No existe endpoint para quitar un conexo.
-- Referencia completa: HU-B23 y HU-B24 en docs/2026-10-09_HU-BACKEND.md (seccion "Servicios conexos de la cotizacion").
+- Referencia completa: HU-B23 y HU-B24 en docs/backlog/2026-10-09_HU-BACKEND.md (seccion "Servicios conexos de la cotizacion").
 - El aviso por correo reutiliza el patron de la entrega (clsNotificarEntregaCommand.cs): destinatario clsSolicitud.Creador (CreadoPor), evento publicado, correo fuera de la peticion en un consumidor.
 
 HOY -> DEBE QUEDAR (CONEXOS)
@@ -840,7 +840,7 @@ Parte de S5-HU-23 (milestone). Depende de S5-HU-23.1 (campo resultado en la fila
 
 CONTEXTO
 - Al marcar una cotizacion Ganada o Perdida la solicitud pasa a Entregada y sale de la vista por defecto "Pendientes"; la Bandeja no muestra el resultado. Decidido por Sara: columna Resultado y filtro "Esperando resultado"; NO mezclar en "Pendientes" (cola de trabajo del Administrador de Tarifas).
-- Archivos: src/app/cabina-fletes/pages/bandeja/bandeja-page.component.ts / .html / .css (formulario de filtros: selects atencion, estado, vigencia). Referencia: HU-1 de la seccion Bandeja en docs/2026-10-09_HU-FRONTEND.md.
+- Archivos: src/app/cabina-fletes/pages/bandeja/bandeja-page.component.ts / .html / .css (formulario de filtros: selects atencion, estado, vigencia). Referencia: HU-1 de la seccion Bandeja en docs/backlog/2026-10-09_HU-FRONTEND.md.
 
 CHECKLIST
 - [ ] NO copiar al repo real los datos de resultado simulados ni el aviso "datos simulados" del sandbox: el resultado real viene de S5-HU-23.1
@@ -867,7 +867,7 @@ Origen: HU-1 de Bandeja (2026-10-09_HU-FRONTEND.md) y HU-B25.
 
 ## Milestone S5-HU-24 — Frontend: especificaciones validadas en el sandbox (Mesa de Costeo, Biblioteca, Tarifas Plaza, Carga masiva, iconos)
 
-Todo lo de este milestone esta en `administracion_embarqa_nexo` y ya fue prototipado y validado en el sandbox (no esta hecho en el repo real). Cada issue es la lista para implementarlo de verdad. El codigo de referencia esta en `docs/2026-10-09_HU-FRONTEND.md` (cada issue dice su "Origen"); el sandbox solo sirve de modelo visual.
+Todo lo de este milestone esta en `administracion_embarqa_nexo` y ya fue prototipado y validado en el sandbox (no esta hecho en el repo real). Cada issue es la lista para implementarlo de verdad. El codigo de referencia esta en `docs/backlog/2026-10-09_HU-FRONTEND.md` (cada issue dice su "Origen"); el sandbox solo sirve de modelo visual.
 
 ### [S5-HU-24.1] Mesa de Costeo: comparacion de 3 fuentes, chips de cada linea, avance, aviso y resumen completo
 Labels: `nexo`, `sprint-5`, `tarea-tecnica`, `frontend` · Tipo: Task
@@ -1150,7 +1150,7 @@ CONTEXTO
 - nexo-access.models.ts: gestionarServicios esta solo en Comercial, CoordinadorFletes y Admin; falta AdminTarifas (por eso no ve la seccion de servicios).
 - mesa-costeo-page.component.ts: motivoBloqueoLinea() y motivoBloqueoGeneral() bloquean con MENSAJE_COTIZACION_ENTREGADA ("La cotizacion ya fue entregada: no admite mas servicios") cuando estado === 'Entregada'; el html tambien oculta ayudas con cotizacion.estado !== 'Entregada'.
 - No hay forma de quitar un conexo agregado.
-- Referencia completa: HU-22 y HU-23 en docs/2026-10-09_HU-FRONTEND.md.
+- Referencia completa: HU-22 y HU-23 en docs/backlog/2026-10-09_HU-FRONTEND.md.
 
 CHECKLIST
 Permiso y reglas (HU-23)
@@ -1184,7 +1184,7 @@ Parte de S5-HU-24 (milestone). Solo frontend.
 
 CONTEXTO
 - En Captura, al escribir en Origen, Destino o Cliente, si la busqueda devuelve exactamente 1 resultado el campo se autoselecciona solo (ej. escribir "MEDELLIN" deja la ciudad elegida sin mostrar la opcion). Sara quiere que al escribir a mano nunca se autoseleccione: la unica opcion se muestra en la lista y el usuario la elige. La autoseleccion solo debe ocurrir al cargar un Excel.
-- Codigo en captura-page.component.ts: cliente en ngOnInit (~404), origen y destino en createLinea (~1111 y ~1118). Referencia: HU-1 de la seccion Captura en docs/2026-10-09_HU-FRONTEND.md.
+- Codigo en captura-page.component.ts: cliente en ngOnInit (~404), origen y destino en createLinea (~1111 y ~1118). Referencia: HU-1 de la seccion Captura en docs/backlog/2026-10-09_HU-FRONTEND.md.
 
 CHECKLIST
 - [ ] Cliente: quitar la autoseleccion (el Excel nunca llena el cliente); siempre this.clientes = clientes para que la unica opcion se vea en la lista

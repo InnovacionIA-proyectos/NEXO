@@ -355,7 +355,7 @@ Llave natural única: `(Periodo, OrigenDane, DestinoDane, Configuracion, TipoCar
 - Entrada manual (crear/editar desde la pantalla de servicios conexos).
 - **Importación masiva de Excel** (por servicio, según sus dimensiones aplicables).
 - `DataSeeder.cs` sigue sembrando 10 servicios de demostración para ambientes locales/tests (ver nota de reestructuración arriba).
-- **Seeder real (S4-HU-15.1):** [`docs/Database/seeder/servicios_conexos.csv`](./Database/seeder/README.md) — 1346 filas construidas a partir de `docs_raw/conexos costos.xlsx` (2 hojas, 4 tablas) + los 10 servicios de valor único ya existentes, cruzando ciudades contra `tbl_municipios`.
+- **Seeder real (S4-HU-15.1):** [`docs/Database/seeder/servicios_conexos.csv`](./Database/seeder/README.md) — 1346 filas construidas a partir de `docs/docs_raw/conexos costos.xlsx` (2 hojas, 4 tablas) + los 10 servicios de valor único ya existentes, cruzando ciudades contra `tbl_municipios`.
 
 ---
 
@@ -595,7 +595,7 @@ Llave natural única: `(Periodo, OrigenDane, DestinoDane, Configuracion, TipoCar
 **FK:** `OrigenMunicipioId`/`DestinoMunicipioId` → `municipios` (`Restrict`), `PesoId` → `pesos` (`Restrict`).
 
 **De dónde salen los datos:**
-- Tabla creada corriendo `ESQUEMA_NEXO.sql` (no por migración de EF Core) y poblada con `docs/Database/seeder/tarifas_plaza.csv` — 271 filas extraídas de `docs_raw/fletes-plaza-normalizado-plaza.csv`, verificadas contra `tblSAPTarifas` real (valores en el mismo rango, una coincidencia exacta).
+- Tabla creada corriendo `ESQUEMA_NEXO.sql` (no por migración de EF Core) y poblada con `docs/Database/seeder/tarifas_plaza.csv` — 271 filas extraídas de `docs/docs_raw/fletes-plaza-normalizado-plaza.csv`, verificadas contra `tblSAPTarifas` real (valores en el mismo rango, una coincidencia exacta).
 - **No hay CRUD todavía** — entidad/comandos/endpoint quedan como trabajo pendiente de backend (Ismael); esta HU solo dejó el esquema + el dato ya poblado.
 - El trigger `TRG_tarifas_plaza_historico` archiva el valor anterior en `tarifas_plaza_historico` cada vez que alguien actualice `Valor`/`Vigencia`/`DetallesTarifa` de una fila existente.
 
