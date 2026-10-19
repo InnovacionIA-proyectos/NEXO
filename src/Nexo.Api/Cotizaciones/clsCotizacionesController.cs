@@ -111,7 +111,7 @@ public class clsCotizacionesController(
     public async Task<ActionResult<clsCotizacionDto>> EditarLinea(
         Guid id, Guid lineaSolicitudId, [FromBody] clsEditarLineaCotizacionRequest req, CancellationToken ct = default)
         => Ok(await editarLinea.Handle(new clsEditarLineaCotizacionCommand(
-            id, lineaSolicitudId, req.ValorFlete, req.ValorRetornoContenedor), ct));
+            id, lineaSolicitudId, req.ValorFlete, req.ValorRetornoContenedor, req.ConfirmarSinPiso), ct));
 
     /// <summary>
     /// Agregar servicios conexos a la cotización. Se admite mientras no tenga resultado

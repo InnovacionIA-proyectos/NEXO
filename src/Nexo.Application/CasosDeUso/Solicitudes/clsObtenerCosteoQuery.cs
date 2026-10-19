@@ -1,11 +1,13 @@
 using Nexo.Application.CasosDeUso.Solicitudes.DTOs;
 using Nexo.Application.CasosDeUso.Solicitudes.Interfaces;
+using Nexo.Application.CasosDeUso.ReglasSoloSicetac.Interfaces;
 using Nexo.Application.CasosDeUso.Solicitudes.Mappers;
 using Nexo.Application.Common;
 using Nexo.Application.Common.Abstractions;
 using Nexo.Application.Common.Dtos;
 using Nexo.Application.Common.Exceptions;
 using Nexo.Domain.Catalogos.Entidades;
+using Nexo.Domain.Costeo.Reglas;
 using Nexo.Domain.Enums;
 using Nexo.Domain.Solicitudes.Entidades;
 
@@ -16,7 +18,7 @@ public sealed record clsObtenerCosteoQuery(Guid SolicitudId) : IQuery<clsSolicit
 
 public sealed class clsObtenerCosteoQueryHandler(
     ISolicitudesRepository solicitudes, ITarifasCosteoPort tarifas, TimeProvider clock, IUnitOfWork uow,
-    ICurrentUserPort usuarioActual)
+    ICurrentUserPort usuarioActual, IClavesSoloSicetacPort reglasSoloSicetac)
     : IQueryHandler<clsObtenerCosteoQuery, clsSolicitudCosteoDto>
 {
     public async Task<clsSolicitudCosteoDto> Handle(clsObtenerCosteoQuery query, CancellationToken ct = default)
@@ -35,6 +37,7 @@ public sealed class clsObtenerCosteoQueryHandler(
 
         var ahora = clock.GetUtcNow();
 
+        var claves = await reglasSoloSicetac.ClavesRutaVehiculoAsync(ct);
         var lineas = new List<clsLineaCosteoDto>();
         // S5-HU-20.5/#297: orden ESTABLE — NumeroLinea ascendente (las líneas viejas, sin número, al final),
         // luego fecha de creación y luego Id. Antes no se ordenaba y el orden del GET podía cambiar entre
@@ -57,7 +60,11 @@ public sealed class clsObtenerCosteoQueryHandler(
                 l.Id, l.RutaId, l.clsRuta == null ? null : $"{l.clsRuta.Origen} → {l.clsRuta.Destino}",
                 l.Tipologia, l.Peso, l.clsConfiguracionVehiculo?.TipoVehiculo, l.clsConfiguracionVehiculo?.Carroceria,
                 clsPosicionCargaDto.Desde(l.Dimensiones), piso, historicas, l.HorasCargue, l.HorasDescargue,
-                l.GrupoRutaId, l.IdRecomendacionVehiculo, l.ValorMercancia, l.NumeroLinea));
+                l.GrupoRutaId, l.IdRecomendacionVehiculo, l.ValorMercancia, l.NumeroLinea,
+                // S6-HU-26.1/#30: para que la Mesa sepa cuándo NO ofrecer "Editar flete" (con regla responde 409).
+                clsReglaSoloSicetacDeLinea.Tiene(
+                    claves, l.ClaseViaje, l.clsRuta?.OrigenMunicipio?.CodigoDane, l.clsRuta?.DestinoMunicipio?.CodigoDane,
+                    l.clsConfiguracionVehiculo?.TipoVehiculo)));
         }
 
         // Al abrir, marca la solicitud en costeo (si estaba pendiente).

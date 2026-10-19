@@ -271,8 +271,7 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
         // ya no corta temprano por su cuenta. Clave por DANE (tbl_reglas_solo_sicetac.Origen/
         // Destino SIEMPRE están en código DANE — carga masiva S4-HU-09.2): antes comparaba
         // contra el nombre de ciudad en texto libre de la ruta y nunca coincidía (#255).
-        var hayReglaSoloSicetac = !sinVehiculoQueLoExige && origenDane is not null && destinoDane is not null &&
-            soloSice.Contains(clsTexto.ClaveRutaVehiculo(origenDane, destinoDane, vehiculo));
+        var hayReglaSoloSicetac = clsReglaSoloSicetacDeLinea.Tiene(soloSice, linea.ClaseViaje, origenDane, destinoDane, vehiculo);
 
         clsResultadoTarifarioSap? oficial = null;
         if (linea.ClaseViaje is not null && dc is not null)

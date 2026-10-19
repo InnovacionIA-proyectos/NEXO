@@ -46,7 +46,8 @@ public class clsAislamientoPorComercialTests
 
     private clsObtenerCosteoQueryHandler CosteoHandler(
         Mock<ISolicitudesRepository> repo, Mock<ICurrentUserPort> usuario, Mock<IUnitOfWork>? uow = null) =>
-        new(repo.Object, Mock.Of<ITarifasCosteoPort>(), Reloj, (uow ?? new Mock<IUnitOfWork>()).Object, usuario.Object);
+        new(repo.Object, Mock.Of<ITarifasCosteoPort>(), Reloj, (uow ?? new Mock<IUnitOfWork>()).Object, usuario.Object,
+            Mock.Of<Nexo.Application.CasosDeUso.ReglasSoloSicetac.Interfaces.IClavesSoloSicetacPort>());
 
     [Fact]
     public async Task El_dueno_de_la_solicitud_si_puede_abrir_su_costeo()

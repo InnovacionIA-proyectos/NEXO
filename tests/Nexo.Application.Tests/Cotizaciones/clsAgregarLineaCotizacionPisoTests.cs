@@ -87,6 +87,11 @@ public class clsAgregarLineaCotizacionPisoTests
         Assert.Single(dto.Lineas);
     }
 
+    // S6-HU-26.1/#30 (sección 9 del documento de issues — "flete manual sin piso, sin decidir"): ESTO ES UNA CARACTERIZACIÓN, no una
+    // aprobación. Agregar un flete a una línea cuyo piso no se pudo verificar (ruta sin fila en DWSice, período que no es el del mes
+    // actual, consulta fallida) lo guarda igual, con cualquier valor (aquí, 100.000) y sin aviso. La EDICIÓN ya cerró ese hueco
+    // (409 PISO_SICETAC_NO_VERIFICABLE, ver clsEditarLineaCotizacionCommandTests); agregar queda como estaba hasta que se
+    // decida. Si se decide cerrarlo, este es el test que cambia.
     [Fact]
     public async Task Una_linea_sin_piso_se_guarda_normal()
     {
