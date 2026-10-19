@@ -55,8 +55,22 @@ public sealed class clsCrearPlanDesdeLineaCommandHandler(
 {
     public async Task<clsComandoAceptadoDto> Handle(clsCrearPlanDesdeLineaCommand command, CancellationToken ct = default)
     {
-        _ = await lineas.ObtenerAsync(command.LineaSolicitudId, ct)
+        var linea = await lineas.ObtenerAsync(command.LineaSolicitudId, ct)
             ?? throw new clsNotFoundException("LINEA_SOLICITUD_NO_ENCONTRADA", "La línea de solicitud no existe.");
+
+        // #304: el puente del Cubicador ya no inventa 1 kg para una posición sin peso: la rechaza con
+        // PESO_NO_DECLARADO (el peso decide la capacidad del vehículo). Pero ese rechazo nace en el worker, DESPUÉS de este
+        // 202, y vuelve por cola: clsCubicacionRechazadaConsumer solo lo registra en el log (no hay PlanCargue que marcar,
+        // el Id es el de la línea) y el front se quedaba sondeando para siempre. Se valida acá, antes de encolar, con el
+        // MISMO código y mensaje del Cubicador: 400 sincrónico y nada que publicar. El cero cuenta como no declarado.
+        var sinPeso = linea.Posiciones
+            .Where(p => p.PesoKg is not > 0)
+            .Select(p => string.IsNullOrWhiteSpace(p.Descripcion) ? "(sin descripcion)" : p.Descripcion)
+            .ToList();
+        if (sinPeso.Count > 0)
+            throw new clsValidationFailedException("PESO_NO_DECLARADO",
+                $"Estas posiciones no declaran su peso: {string.Join(", ", sinPeso)}. " +
+                "El peso decide la capacidad del vehículo; recapturar la línea con el peso de cada posición.");
 
         var lineaIdTexto = command.LineaSolicitudId.ToString();
 

@@ -165,6 +165,18 @@ El contrato raíz sí lo dice: *"0–999999.99 (peso unitario)"*, y la regla de
 consistencia lo confirma — *"el peso de la línea es `peso` si viene; si no, la
 suma de `cantidad × pesoKg` de las posiciones"*.
 
+### Estado del back de NEXO — resuelto en la rama `304-correcciones-rapidas-cubicador`
+
+| Punto | Qué se hizo |
+|---|---|
+| §2 `PESO_NO_DECLARADO` | **NEXO no lo propagaba**: `desde-linea` responde 202 y el rechazo del worker vuelve por cola, donde `clsCubicacionRechazadaConsumer` solo lo escribe en el log (no hay plan que marcar; el Id es el de la línea), así que el front sondeaba para siempre. Ahora `clsCrearPlanDesdeLineaCommand` valida el peso **antes de encolar** y devuelve `400 PESO_NO_DECLARADO` (mismo código y mensaje del Cubicador, el cero cuenta como no declarado) |
+| §3 peso | Decidido: **obligatorio** en la captura (`[Required]`, 0.01–999999.99). Una línea sin posiciones sigue capturándose solo con su `peso` |
+| §4 cantidades | Decidido: tope por posición **10.000** y, en el validador, **suma ≤ 10.000 por línea** (`400 CUBICACION_DEMASIADO_GRANDE`, el mismo código del Cubicador) |
+| §5 `PesoKg` | Documentado como **peso de UNA unidad** en `CapturaRequests.cs`, `CONTRATO.md` y las guías de Cotifly |
+
+Sigue **sin** existir un estado de rechazo por línea para los demás motivos que nacen en el worker (p. ej. `FLOTA_INSUFICIENTE`,
+`VEHICULO_SIN_PRESET`): solo `PESO_NO_DECLARADO` se adelantó, porque NEXO tiene el dato para validarlo.
+
 ---
 
 ## Cotifly

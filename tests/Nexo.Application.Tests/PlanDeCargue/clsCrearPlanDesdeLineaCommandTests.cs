@@ -64,6 +64,46 @@ public class clsCrearPlanDesdeLineaCommandTests
             Times.Once);
     }
 
+    // #304: el puente del Cubicador ya no inventa 1 kg: rechaza con PESO_NO_DECLARADO. Ese rechazo nacía en el worker,
+    // después del 202, y NEXO solo lo registraba en el log. Ahora se valida ANTES de encolar, con el mismo código.
+    [Theory]
+    [InlineData(null)]
+    [InlineData(0)] // el cero cuenta como no declarado
+    public async Task Una_posicion_sin_peso_se_rechaza_con_PESO_NO_DECLARADO_y_no_publica_nada(int? pesoKg)
+    {
+        _lineas.Setup(l => l.ObtenerAsync(LineaId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new clsLineaParaCubicacionDto(LineaId,
+            [
+                new clsPosicionCargaDto("Vidrio", 1, 100, 100, 100, 15m, "VIDRIO_PLANO"),
+                new clsPosicionCargaDto("Cajas de cartón", 5, 40, 30, 30, pesoKg, "CAJAS_CARTON"),
+            ], "Bogotá", "Medellín"));
+
+        var ex = await Assert.ThrowsAsync<clsValidationFailedException>(
+            () => Handler().Handle(new clsCrearPlanDesdeLineaCommand(LineaId)));
+
+        Assert.Equal("PESO_NO_DECLARADO", ex.Code);
+        Assert.Contains("Cajas de cartón", ex.Message);
+        Assert.DoesNotContain("Vidrio", ex.Message); // solo nombra las que faltan
+        _cubicacion.Verify(c => c.PublicarComandoAsync(
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<object>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        _uow.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Con_el_peso_de_todas_las_posiciones_publica_normal()
+    {
+        _lineas.Setup(l => l.ObtenerAsync(LineaId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new clsLineaParaCubicacionDto(LineaId,
+                [new clsPosicionCargaDto("Cajas", 5, 40, 30, 30, 20m, "CAJAS_CARTON")], "Bogotá", "Medellín"));
+
+        var r = await Handler().Handle(new clsCrearPlanDesdeLineaCommand(LineaId));
+
+        Assert.Equal("procesando", r.Estado);
+        _cubicacion.Verify(c => c.PublicarComandoAsync(
+            "crear_desde_linea", LineaId.ToString(), It.IsAny<object>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
     [Fact]
     public async Task Publica_antes_de_guardar()
     {

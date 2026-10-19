@@ -106,6 +106,7 @@ public class clsPlanesCargueController(
     [Authorize(Roles = "Comercial,CoordinadorFletes,Admin")]
     [HttpPost("desde-linea/{lineaId:guid}")]
     [ProducesResponseType(StatusCodes.Status202Accepted)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)] // #304: PESO_NO_DECLARADO
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<clsComandoAceptadoDto>> CrearDesdeLinea(Guid lineaId, CancellationToken ct = default)
         => Accepted(await crearPlanDesdeLinea.Handle(new clsCrearPlanDesdeLineaCommand(lineaId), ct));

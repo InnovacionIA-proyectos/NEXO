@@ -89,8 +89,10 @@ comparan sin tildes y con `_` y `-` equivalentes a espacio (`Bogotá` = `Bogota`
 ### 3.5 Posiciones y tipo de mercancía
 
 - `posiciones[]` es **opcional**. Cotifly puede dejar de mandarlas; NEXO las sigue aceptando.
-  Si las manda, cada una lleva `largoCm`, `anchoCm`, `altoCm` y opcionalmente `cantidad`, `pesoKg`
-  (unitario) y `descripcion`.
+  Si las manda, cada una lleva `largoCm`, `anchoCm`, `altoCm` y **`pesoKg` (obligatorio desde #304)**, y
+  opcionalmente `cantidad` (1–10.000) y `descripcion`. **`pesoKg` es el peso de UNA unidad, no el total de la
+  posición**: NEXO y el Cubicador multiplican por `cantidad`; mandar el total lo cuenta dos veces. La suma de
+  `cantidad` de las posiciones de una línea no puede pasar de **10.000** (`400 CUBICACION_DEMASIADO_GRANDE`).
 - **El código de mercancía no se manda en la captura.** Si algún día hiciera falta, iría **por
   posición** (`posiciones[].codigoTipoMercancia`, código y no uuid). Hoy Cotifly manda el tipo de
   mercancía solo al Cubicador, para pedir la recomendación.

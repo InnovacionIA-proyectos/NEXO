@@ -14,6 +14,10 @@ namespace Nexo.Application.CasosDeUso.Solicitudes.Validadores;
 /// </summary>
 public static class clsCapturarSolicitudValidador
 {
+    /// <summary>#304: tope de unidades de una línea = el del Cubicador por petición (10.000 en total). Se valida acá, al
+    /// capturar, y no al pedir la recomendación, para que el error aparezca donde se originó.</summary>
+    public const int MaxUnidadesPorLinea = 10_000;
+
     public static void Validar(clsCapturarSolicitudCommand command)
     {
         // Sin ClienteId, el BP es obligatorio: es la otra forma de identificar al cliente.
@@ -36,6 +40,12 @@ public static class clsCapturarSolicitudValidador
     {
         if (string.IsNullOrWhiteSpace(lr.Origen) || string.IsNullOrWhiteSpace(lr.Destino))
             throw new clsValidationFailedException("LINEA_INCOMPLETA", "Cada línea debe traer origen y destino.");
+
+        var unidades = lr.Posiciones?.Sum(p => (long)p.Cantidad) ?? 0;
+        if (unidades > MaxUnidadesPorLinea)
+            throw new clsValidationFailedException("CUBICACION_DEMASIADO_GRANDE",
+                $"La línea {numeroLinea} ({lr.Origen} → {lr.Destino}) trae {unidades:N0} unidades en sus posiciones; " +
+                $"el máximo es {MaxUnidadesPorLinea:N0} (el Cubicador no recomienda cargas más grandes).");
 
         var sumaPosiciones = SumaPosiciones(lr);
         var peso = PesoDeclarado(lr);
