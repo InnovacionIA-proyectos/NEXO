@@ -206,3 +206,38 @@ Excel de costos 2026 cambia (nueva ciudad, nuevo puerto, nueva ruta), este CSV
   cargar `servicios_conexos.csv` con `BULK INSERT` (o el método de carga
   masiva que prefiera quien administre esa base) contra
   `db_NEXO.tbl_servicios_conexos`.
+
+## `alias_elementos.csv`
+
+**Poblado UNA SOLA VEZ, sobre la tabla nueva `tbl_alias_elementos`
+(S6-HU-27.1/#315, DATA-2) — sin sincronización periódica.** Extraído de
+`cubicador/database/datos_raw/diccionario_configuraciones_vehiculo_RAW.csv`
+(diccionario de negocio con 7 columnas: 5 tipos de vehículo y 2 tamaños de
+contenedor, cada una con las variantes de texto libre que se han visto en
+captura real). Cada celda no vacía se convirtió en una fila de alias, con el
+código oficial de su columna.
+
+- **Tabla destino:** `db_NEXO.tbl_alias_elementos`. Columnas del CSV: `Alias`,
+  `AliasNormalizado`, `TipoElemento`, `Codigo`, `Activo`. `Id` (Guid nuevo por
+  fila, igual razón que en `reglas_solo_sicetac.csv`: la tabla no tiene
+  default de BD para esta columna) y `CreatedAt` (default de la tabla) no
+  vienen en el CSV — al cargar con `BULK INSERT`, apuntar solo a las 5
+  columnas del archivo.
+- **`AliasNormalizado` es la clave de comparación**, no lo que se muestra: se
+  calculó con el mismo algoritmo que ya usa el backend para normalizar texto
+  libre (`clsResolucionDeCatalogos.Normalizar` — mayúsculas, sin tildes,
+  `_`/`-` convertidos a espacio, espacios repetidos colapsados). Tiene
+  restricción `UNIQUE` en la tabla.
+- **`Codigo` es texto, no una FK.** Para vehículo es el mismo código que ya
+  comparten Nexo y el Cubicador (`TipoVehiculo`: `2L2`, `C2`, `2S2`, `3S3`,
+  `C3`); para contenedor es el código de `tblSAPClaseContenedor` (`CNT40.HC`,
+  `CNT20.ST`). No apunta a una fila específica de `tbl_configuraciones_vehiculo`
+  porque esa tabla no tiene una única fila "oficial" por tipo — ver
+  `DECISIONES-TECNICAS.md`.
+- **Filas:** 71 (48 de vehículo + 23 de contenedor), sin alias repetidos ni
+  choques entre columnas (verificado: ningún `AliasNormalizado` aparece en más
+  de un tipo/código).
+- **Cómo cargarlo en una base nueva:** después de correr `ESQUEMA_NEXO.sql`,
+  cargar `alias_elementos.csv` con `BULK INSERT` (columnas `Alias`,
+  `AliasNormalizado`, `TipoElemento`, `Codigo`, `Activo` únicamente) contra
+  `db_NEXO.tbl_alias_elementos`.
