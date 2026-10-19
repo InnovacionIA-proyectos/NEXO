@@ -292,7 +292,10 @@ CREATE TABLE [db_NEXO].[tbl_lineas_solicitud] (
     [HorasDescargue] decimal(6,2) NULL,
     [GrupoRutaId] uniqueidentifier NULL, -- S5-HU-18.3/#275: lo pone Cotifly, agrupa líneas de una misma ruta heterogénea
     [NumeroLinea] int NULL, -- S5-HU-18.3/#275: orden de captura dentro de la solicitud
-    [IdRecomendacionVehiculo] nvarchar(64) NULL -- S5-HU-18.2/#274: recomendación del Cubicador usada para esta línea
+    [IdRecomendacionVehiculo] nvarchar(64) NULL, -- S5-HU-18.2/#274: recomendación del Cubicador usada para esta línea
+    [MotivoRechazo] nvarchar(500) NULL, -- S6-HU-24.2/#314: rechazo de línea en la Mesa de Costeo (ver NEXO-B1)
+    [RechazadaPor] uniqueidentifier NULL,
+    [RechazadaAt] datetimeoffset NULL
     , CONSTRAINT [PK_lineas_solicitud] PRIMARY KEY ([Id])
 );
 
