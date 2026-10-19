@@ -723,7 +723,7 @@ CRITERIOS DE ACEPTACION
 
 ## 5. Repo Cotifly — Backend (Duban)
 
-Datos del chat de Cotifly (rama QA, #177). Su repo: `InnovacionIA-proyectos/Cotifly`, backend en `backend-dotnet/`, contrato en `backend-dotnet/specs/openapi.yaml`, scripts de base de datos en `db/`. Cotifly ya dejó el detalle en `docs/backlog/2026-10-16_PENDIENTES_DUBAN_RECHAZO_LINEA_NEXO.md`.
+Datos del chat de Cotifly (rama QA, #177). Su repo: `InnovacionIA-proyectos/Cotifly`, backend en `backend-dotnet/`, contrato en `backend-dotnet/specs/openapi.yaml`, scripts de base de datos en `db/`. Cotifly ya dejó el detalle en `docs/backlog/2026-10-16_PENDIENTES_DUBAN.md` (punto 8).
 
 ### CTF-B1 — Soportar el rechazo de línea que viene de Nexo
 Labels: `cotifly`, `backend` · Depende de: NEXO-B1, NEXO-B6, DATA-4 · Esfuerzo: por estimar en su archivo

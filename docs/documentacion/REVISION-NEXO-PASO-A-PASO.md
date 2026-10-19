@@ -69,8 +69,8 @@ simplemente no cruza ambos campos para resaltar la combinación rara.
 
 **Confirmado en pantalla real (2026-10-09):** filtrando Atención =
 "Atendidas por el Administrador de Fletes", aparecen mezcladas filas en
-`Estado = En Costeo` (ALICO S.A., PREBEL S.A.S. BIC) junto con otras en
-`Estado = Entregada` (FALABELLA DE COL..., Sofasa S.A.) — confirma que el
+`Estado = En Costeo` (clientes A y B) junto con otras en
+`Estado = Entregada` (clientes C y D) — confirma que el
 filtro no distingue "ya la terminé de revisar" de "ya se entregó".
 
 **Decidido (2026-10-09):** no se agrega una opción de atención nueva —
@@ -1445,7 +1445,7 @@ las líneas (costeadas y pendientes), con la misma numeración de 5.6.
 
 ### 6. FRONTEND — "Iniciar costeo" y "Sin propuesta" aparecen en solicitudes ya Entregadas
 
-**Confirmado en pantalla real (2026-10-09, Sofasa S.A.):** Estado =
+**Confirmado en pantalla real (2026-10-09, un cliente):** Estado =
 `Entregada`, pero la pantalla igual mostraba el botón "Iniciar costeo" y
 "Fuente propuesta: Sin propuesta/Sin fuente", como si nunca se hubiera
 costeado nada.
@@ -1512,7 +1512,7 @@ pliego todavía sin costear**.
   tiene exactamente la misma validación incompleta — con 1 de 2 líneas
   costeadas, el botón "Entregar a Comercial" ya aparece habilitado.
   Confirmado con Sara contra una captura de pantalla real (pliego de
-  Sofasa S.A., "0 de 2 líneas costeadas").
+  un cliente, "0 de 2 líneas costeadas").
 - Confirmado también que no hay ningún validador, máquina de estados
   (`clsMaquinaEstados.cs`) ni test que cubra "pliego completo" antes de
   entregar — es un hueco real, no una regla que exista en otro lado.

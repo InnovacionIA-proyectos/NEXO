@@ -9,7 +9,7 @@ Fuentes:
 - Repositorio `NEXO`, rama `DEPLOY` (commit `c503d82`, 7-oct-2026), revisado en solo lectura.
 - `NEXO PENDIENTES - Hoja 1.csv` (trabajo nuevo por rol y módulo).
 - Confirmaciones del equipo: frontend completo y desplegado; conexión directa a SQL Server 2019 alimentada por SAP; RN-03 implementada; correo en producción confirmado.
-- Evidencia adjunta: `cotizacion-falabella-de-colombia-s-a-33c34cae.pdf` y `evidencia-correo-cotizacion-entregada.png` (sección 7).
+- Evidencia adjunta: `cotizacion-<cliente>-33c34cae.pdf` y `evidencia-correo-cotizacion-entregada.png` (sección 7).
 
 > **Alcance y confianza.** El backend se verificó contra el código. Lo del frontend (pantallas, PDF, semáforos) se toma de la declaración del equipo y del CSV; el repositorio no incluye el front. La rama `DEPLOY` no contiene aún el trabajo de la **segunda barrida** (p. ej., el motor nuevo de selección de vehículos está solo en documentación en la rama `260-…`), así que ese trabajo se reporta como "en curso".
 
@@ -111,7 +111,7 @@ Cumplimiento sobre el total (44)     [██████████████
 
 ## 1. Objetivo del proyecto
 
-Reemplazar el costeo manual de fletes (SICE-TAC, SAP y Excel cruzados a mano) por un motor que **propone automáticamente el flete por línea** (spot o pliego masivo), respetando el piso legal SICE-TAC y la tarifa de plaza, y que resuelve la cubicación 3D, los servicios conexos y la cotización final. Motivación: **$14.663 millones COP/año** de margen no capturado, riesgo de sanción por cotizar bajo el piso, criterios inconsistentes entre comerciales y pérdida de la memoria de tarifas. Inversión $0; piloto de 2 semanas. Patrocinio: Dirección de Mercadeo (Leonardo Duque); validación: Coordinación de Fletes/Mercadeo (Cristian Jacobo Álvarez); prioridad Alta.
+Reemplazar el costeo manual de fletes (SICE-TAC, SAP y Excel cruzados a mano) por un motor que **propone automáticamente el flete por línea** (spot o pliego masivo), respetando el piso legal SICE-TAC y la tarifa de plaza, y que resuelve la cubicación 3D, los servicios conexos y la cotización final. Motivación: margen no capturado, riesgo de sanción por cotizar bajo el piso, criterios inconsistentes entre comerciales y pérdida de la memoria de tarifas. Piloto de 2 semanas. Patrocinio: Dirección de Mercadeo (Leonardo Duque); validación: Coordinación de Fletes/Mercadeo (Cristian Jacobo Álvarez); prioridad Alta.
 
 **Lectura actual:** el núcleo (motor de decisión trazable) y todo lo que lo rodea —alertas, KPIs del piloto, fuente de plaza, retorno de contenedor, entrega por correo y PDF— está construido. El piloto ya se ejecutó y cumplió sus metas cuantitativas; lo que queda es cerrar la segunda barrida (Bloque B).
 
@@ -211,8 +211,8 @@ Cambios de permisos ya aplicados: resultado de cotización solo para Comercial y
 
 **Correo en producción: confirmado por el equipo.** Evidencia adjunta:
 
-1. **`cotizacion-falabella-de-colombia-s-a-33c34cae.pdf`** — Cotización N.º 33c34cae del 5-oct-2026: solicitud Spot, ruta ARMENIA → PEREIRA, fletes $885.726, 0 servicios logísticos y adicionales, tiempos 4 h + 4 h, total $885.726. Muestra el PDF final generado por el frontend con la marca Botero Soto.
-2. **`evidencia-correo-cotizacion-entregada.png`** — Correo "Cotización entregada" recibido por la persona solicitante, con el mismo total (885.726 COP, en COP explícito), el aviso de que el PDF va adjunto y el pie "Este aviso es interno: nunca se envía al cliente".
+1. **`cotizacion-<cliente>-33c34cae.pdf`** — Cotización N.º 33c34cae del 5-oct-2026: solicitud Spot, ruta ARMENIA → PEREIRA, fletes [valor], 0 servicios logísticos y adicionales, tiempos 4 h + 4 h, total [valor]. Muestra el PDF final generado por el frontend con la marca Botero Soto.
+2. **`evidencia-correo-cotizacion-entregada.png`** — Correo "Cotización entregada" recibido por la persona solicitante, con el mismo total (en COP explícito), el aviso de que el PDF va adjunto y el pie "Este aviso es interno: nunca se envía al cliente".
 
 Lo que estas dos evidencias demuestran: la cadena **generación de PDF → entrega por correo corporativo** funciona de punta a punta y con cifras coherentes entre ambos artefactos. Las tres alertas de negocio comparten el mismo emisor de correo (`ICorreoPort`) y la misma resolución de destinatarios por rol, de modo que el canal queda validado. Si se quiere evidencia específica de cada alerta, conviene sumar una captura por cada una (tarifa vencida, línea fallida, cotización ganada).
 
