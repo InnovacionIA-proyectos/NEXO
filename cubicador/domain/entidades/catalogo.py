@@ -165,8 +165,19 @@ class ParametrosMotor:
 
     @property
     def k_max(self) -> int:
-        """Tope de vehiculos que el motor evalua para una carga."""
-        return self.entero("k_max", 10)
+        """Tope de vehiculos que el motor evalua para una carga.
+
+        Lo manda la fila `k_max` de `parametrosMotor`; esto es solo el respaldo
+        si falta. Paso de 10 a **25** en #304: 600 piezas de 1 m necesitan 13
+        vehiculos y con el tope en 10 se rechazaban. Medido lo que cuesta
+        subirlo -son `C(k+4, 4)` combinaciones con 5 tipos de vehiculo, o sea
+        k a la cuarta-: 25 son 0,01 s, 50 son 0,75 s y 100 ya son 9,8 s.
+
+        Tiene consecuencia operativa, no solo tecnica: por #217 cada vehiculo
+        recomendado crea una linea de solicitud, asi que este tope decide
+        cuantas lineas puede producir una sola captura.
+        """
+        return self.entero("k_max", 25)
 
 
 @dataclass(frozen=True)
