@@ -59,7 +59,7 @@ public class clsNotificarEntregaCommandTests
             {
                 Id = SolicitudId,
                 clsCliente = new clsCliente { Nombre = "Colanta", Nit = "890900608-9" },
-                Creador = new clsUsuario { Nombre = "Carlos Herrera", Email = correoCreador, Rol = RolUsuario.CoordinadorFletes },
+                Creador = new clsUsuario { Nombre = "Carlos Herrera", Email = correoCreador, Rol = RolUsuario.AdminBiblioteca },
             });
         _correo.SetupGet(c => c.Configurado).Returns(true);
         _correo.Setup(c => c.EnviarAsync(It.IsAny<clsCorreoParaEnviar>(), It.IsAny<CancellationToken>()))

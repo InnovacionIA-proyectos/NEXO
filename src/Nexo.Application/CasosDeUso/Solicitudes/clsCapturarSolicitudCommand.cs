@@ -16,6 +16,7 @@ using Nexo.Mensajes.Bandeja;
 using Nexo.Domain.Priorizacion.Reglas;
 using Nexo.Domain.Solicitudes.Entidades;
 using Microsoft.Extensions.DependencyInjection;
+using Nexo.Domain.Common;
 
 namespace Nexo.Application.CasosDeUso.Solicitudes;
 
@@ -251,7 +252,7 @@ public sealed class clsCapturarSolicitudCommandHandler(
                     // S5-HU-20.5/#297: una línea de Cupo sin vehículo trae su propio motivo, literal (los
                     // candidatos siguen visibles en la Mesa como referencia).
                     linea.MotivoPendiente = p.MotivoPendiente ?? (p.ValorPropuesto is { } recomendado
-                        ? $"Consulta completa: el Administrador de Tarifas debe elegir la tarifa (recomendado: {recomendado:C0} - {p.FuentePropuesta})."
+                        ? $"Consulta completa: el Administrador de Tarifas debe elegir la tarifa (recomendado: {clsMoneda.Pesos(recomendado)} - {p.FuentePropuesta})."
                         : "Consulta completa: el Administrador de Tarifas debe elegir la tarifa.");
                 }
                 else

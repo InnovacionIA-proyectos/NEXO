@@ -59,7 +59,7 @@ public sealed class clsCubicacionRapidaAdapter(HttpClient http, ILogger<clsCubic
                 "CUBICADOR_NO_DISPONIBLE", $"El Cubicador no respondió: {ex.Message}");
         }
 
-        return await LeerRespuestaAsync(respuesta, ct);
+        return await LeerRespuestaAsync(respuesta, esConsulta: false, ct);
     }
 
     public async Task<clsRecomendacionDto> ConsultarAsync(string idLineaSolicitud, string origenSistema, CancellationToken ct = default)
@@ -77,10 +77,10 @@ public sealed class clsCubicacionRapidaAdapter(HttpClient http, ILogger<clsCubic
                 "CUBICADOR_NO_DISPONIBLE", $"El Cubicador no respondió: {ex.Message}");
         }
 
-        return await LeerRespuestaAsync(respuesta, ct);
+        return await LeerRespuestaAsync(respuesta, esConsulta: true, ct);
     }
 
-    private async Task<clsRecomendacionDto> LeerRespuestaAsync(HttpResponseMessage respuesta, CancellationToken ct)
+    private async Task<clsRecomendacionDto> LeerRespuestaAsync(HttpResponseMessage respuesta, bool esConsulta, CancellationToken ct)
     {
         using (respuesta)
         {
@@ -102,6 +102,14 @@ public sealed class clsCubicacionRapidaAdapter(HttpClient http, ILogger<clsCubic
             if (respuesta.StatusCode == HttpStatusCode.BadRequest)
                 throw new clsValidationFailedException(
                     error?.Codigo ?? "CUBICACION_INVALIDA", error?.Mensaje ?? Recortar(detalle));
+
+            // S6-HU-29.2/#312: "no hay recomendación para esta línea" es una respuesta del Cubicador, NO una caída: 404 con código
+            // propio, para que el front distinga "todavía no hay" de "el Cubicador está caído". Solo en la RECONSULTA: un 404 al
+            // CREAR no significa "sin recomendación" (la creación siempre devuelve una), sino una ruta mal configurada, y eso sí es 503.
+            if (esConsulta && respuesta.StatusCode == HttpStatusCode.NotFound)
+                throw new clsNotFoundException(
+                    "RECOMENDACION_NO_ENCONTRADA",
+                    error?.Mensaje ?? "El Cubicador no tiene una recomendación para esta línea.");
 
             if (respuesta.StatusCode == HttpStatusCode.Unauthorized)
                 throw new clsServiceUnavailableException(

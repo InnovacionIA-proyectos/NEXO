@@ -20,11 +20,11 @@ sin rol específico. Lo que diferencia a los roles es quién puede **escribir**
 | Rol | Descripción | Capacidades (para pintar UI) |
 |---|---|---|
 | **Comercial** | Vende y cotiza: captura solicitudes desde Excel, gestiona la cotización y agrega servicios conexos. | `capturarSolicitud`, `gestionarCotizacion`, `agregarConexos` |
-| **CoordinadorFletes** | Da de alta y gestiona el flujo operativo de las solicitudes: crea, carga líneas, recalcula el score de priorización y decide si se rechazan. | `crearSolicitud`, `cargarLineas`, `recalcularScore`, `rechazarSolicitud`, `gestionarCotizacion` |
+| **AdminBiblioteca** | Administra la Biblioteca: Tarifas Plaza, rangos de peso, reglas Solo-SICETAC y vigencia de la plaza. **No** entra a Bandeja, Mesa de Costeo ni cotizaciones (S6-HU-25.1/#307). | `verBiblioteca`, `ajustarVigencia`, `editarReglasSoloSicetac` |
 | **AdminTarifas** | Administra el catálogo de tarifas (Biblioteca, vigencia, reglas Solo-SICETAC) y los servicios conexos. | `verBiblioteca`, `ajustarVigencia`, `editarReglasSoloSicetac`, `gestionarCotizacion`, `editarServiciosConexos` |
 | **ServiciosLogisticos** | Mantiene el catálogo de servicios conexos (cargues, descargues, etc.). | `editarServiciosConexos` |
 | **LiderProceso** | Supervisa el proceso: solo consulta métricas de cumplimiento. | `verMetricas` |
-| **Admin** | Control total sobre Nexo, incluida la priorización (único rol con acceso). | `*` (todas) |
+| **Admin** | Control total sobre Nexo, incluida la priorización (único rol con acceso) y, desde #307, crear solicitudes, cargar líneas en bloque y recalcular el puntaje. | `*` (todas) |
 
 *(Capacidades tomadas de `CapacidadesPorRol` en [`clsSesionController.cs`](../src/Nexo.Api/Sesion/clsSesionController.cs) — las usa el frontend para decidir qué pinta; la autorización real vive en el backend, en la tabla siguiente. Ojo: las capacidades no cubren todo lo que el backend permite — p. ej. Comercial puede cubicar y crear planes de cargue sin tener una capacidad para eso.)*
 
@@ -36,6 +36,8 @@ restringidos por rol, igual que sus escrituras. Los catálogos de ciudades (`GET
 son la excepción a la excepción (S5-HU-22.1/#288): los ve cualquier rol válido, porque los usan formularios de 
 Biblioteca que no son de Comercial. Capturar y analizar un Excel siguen siendo solo de Comercial y Admin.
 
+**#307 — AdminBiblioteca queda fuera de Bandeja, Mesa y cotizaciones, también de sus lecturas.** `GET /api/solicitudes`, `GET /api/solicitudes/{id}`, `GET .../propuesta-tarifa`, el canal `/hubs/bandeja` y todo `/api/cotizaciones` exigen uno de `Comercial`, `AdminTarifas`, `ServiciosLogisticos`, `LiderProceso` o `Admin`: un `[Authorize(Roles)]` de clase se SUMA (AND) al de cada método.
+
 ### Comercial
 - Analizar y capturar solicitudes desde Excel, buscar clientes y estimar aprovisionamiento (`/api/captura-solicitudes*`)
 - Resolver catálogos de líneas (`POST /api/solicitudes/resolver-catalogos`)
@@ -44,13 +46,16 @@ Biblioteca que no son de Comercial. Capturar y analizar un Excel siguen siendo s
 - Cubicación rápida (`POST /api/cubicacion`)
 - Crear, editar, optimizar y borrar planes de cargue; alta de vehículos del catálogo
 
-### CoordinadorFletes
-- Crear solicitudes, resolver catálogos y cargar líneas en bloque
-- Rechazar solicitudes y recalcular el score manualmente
-- Todo lo de cotizaciones (crear, aplicar propuestas, agregar línea de flete, editar un flete manual, agregar y quitar conexos, entregar al comercial, marcar resultado)
+### AdminBiblioteca
+Antes de #307 este rol operaba el flujo de solicitudes y cotizaciones; ahora es el rol de la **Biblioteca**.
+- Consultar la Biblioteca (SICE-TAC, histórico y plaza de SAP, propuesta)
+- Tarifas Plaza completas (listar, crear, editar, eliminar, importar y exportar Excel) y rangos de peso (`/api/pesos`)
+- Reglas Solo-SICETAC (ver, crear, eliminar, importar y exportar)
 - Ajustar vigencia de tarifas de plaza (individual y masivo)
-- Importar el Excel SICE-TAC
-- Cubicación rápida; crear, editar, optimizar y borrar planes de cargue; alta de vehículos del catálogo
+- Cubicación rápida (`POST` y `GET /api/cubicacion`) — conserva este permiso en el backend; el front no le muestra el Cubicador
+- Consultar servicios conexos
+- **No puede**: Bandeja, Mesa de Costeo, solicitudes, cotizaciones ni planes de cargue (`403`)
+- Recibe la alerta de tarifa de plaza vencida
 
 ### AdminTarifas
 - Ajustar vigencia de tarifas de plaza (individual y masivo)
@@ -58,7 +63,10 @@ Biblioteca que no son de Comercial. Capturar y analizar un Excel siguen siendo s
 - Crear y editar servicios conexos; importarlos desde Excel
 - Crear cotización, aplicar propuestas, agregar línea de flete, editar un flete manual (`PUT .../lineas/{lineaSolicitudId}`), agregar y quitar servicios conexos (también tras entregar, mientras no esté Ganada/Perdida; S5-HU-20.1/#286), entregar y marcar resultado
 - Ver métricas de cumplimiento y KPIs del piloto
-- Cubicación rápida (`POST` y `GET /api/cubicacion`) — #300: antes solo Comercial, CoordinadorFletes y Admin
+- Cubicación rápida (`POST` y `GET /api/cubicacion`) — #300
+- **Cubicador completo (#310)**: crear, optimizar y editar planes de cargue (`POST /api/planes-cargue`, `/demo`, `/desde-linea/{id}`, `/{id}/optimizar`, `/{id}/items`, `/{id}/items/importar`; `DELETE /{id}/items/{itemId}` y `DELETE /{id}`), mover colocaciones (`PATCH /{id}/colocaciones/{id}`) y crear vehículos (`POST /api/vehiculos`). `DELETE /api/vehiculos/{id}` sigue solo para Admin
+- Editar el flete de una línea de **cualquier fuente** salvo con regla Solo-SICETAC (`409 FLETE_SOLO_SICETAC`); al guardar, la fuente pasa a Manual (S6-HU-26.1/#30)
+- Recibe la alerta de "línea que no pudo costearse" (#307) y la de tarifa de plaza vencida
 
 ### ServiciosLogisticos
 - Crear y editar servicios conexos; importarlos desde Excel
@@ -70,6 +78,7 @@ Biblioteca que no son de Comercial. Capturar y analizar un Excel siguen siendo s
 - Todo lo anterior, sin excepción
 - Único rol con acceso a Priorización (`GET`/`PUT /api/priorizacion/parametros`)
 - Único rol que puede eliminar vehículos del catálogo (`DELETE /api/vehiculos/{id}`)
+- Único rol (con el `*`) que crea solicitudes (`POST /api/solicitudes`), carga líneas en bloque (`/lineas:bulk`) y recalcula el puntaje (`/recalcular-score`) — #307, decisión D5
 
 ## Referencia rápida por endpoint
 

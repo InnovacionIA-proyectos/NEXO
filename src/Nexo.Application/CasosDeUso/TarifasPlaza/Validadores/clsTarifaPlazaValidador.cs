@@ -7,14 +7,22 @@ namespace Nexo.Application.CasosDeUso.TarifasPlaza.Validadores;
 /// del caso de uso — necesitan consultar catálogos/repositorio.</summary>
 public static class clsTarifaPlazaValidador
 {
+    /// <summary>Largo de la columna DetallesTarifa (nvarchar(2000)).</summary>
+    public const int MaxDetalles = 2000;
+
     public static void Validar(
         string lineaNegocio, string claseViaje, string? claseContenedor,
-        int? pesoId, string? tipoVehiculo, decimal valor, string detallesTarifa)
+        int? pesoId, string? tipoVehiculo, decimal valor, string? detallesTarifa)
     {
         if (string.IsNullOrWhiteSpace(lineaNegocio) || string.IsNullOrWhiteSpace(claseViaje))
             throw new clsValidationFailedException("TARIFA_PLAZA_INVALIDA", "Línea de negocio y clase de viaje son obligatorias.");
-        if (string.IsNullOrWhiteSpace(detallesTarifa))
-            throw new clsValidationFailedException("TARIFA_PLAZA_INVALIDA", "Los detalles de la tarifa son obligatorios.");
+        // S6-HU-29.2/#312: los detalles son OPCIONALES al crear/editar por el API. Decisión de Sara: al guardar como plaza desde
+        // la Mesa de Costeo no hay un detalle que escribir (antes el front mandaba un texto de relleno, "Guardada desde la Mesa
+        // de Costeo."); en la pantalla de Tarifas Plaza el FRONT sigue exigiéndolos. La columna es NOT NULL: vacío se guarda como
+        // texto vacío, no como null. La carga por Excel no cambia (sigue pidiendo DETALLES).
+        if (detallesTarifa is { Length: > MaxDetalles })
+            throw new clsValidationFailedException("TARIFA_PLAZA_INVALIDA",
+                $"Los detalles de la tarifa admiten máximo {MaxDetalles} caracteres (llegaron {detallesTarifa.Length}).");
         if (valor <= 0)
             throw new clsValidationFailedException("TARIFA_PLAZA_INVALIDA", "El valor debe ser mayor que cero.");
 

@@ -71,7 +71,7 @@ public class clsPlanesCargueController(
     /// confirmación de Cubicador (ver <see cref="clsCrearPlanCommand"/> para la carrera que
     /// ese estado evita).
     /// </summary>
-    [Authorize(Roles = "Comercial,CoordinadorFletes,Admin")]
+    [Authorize(Roles = "Comercial,AdminTarifas,Admin")]
     [HttpPost]
     [ProducesResponseType(StatusCodes.Status202Accepted)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -88,7 +88,7 @@ public class clsPlanesCargueController(
     /// vehículo internamente): el plan resultante se sigue por /hubs/plan-cargue una vez
     /// Cubicador lo confirma.
     /// </summary>
-    [Authorize(Roles = "Comercial,CoordinadorFletes,Admin")]
+    [Authorize(Roles = "Comercial,AdminTarifas,Admin")]
     [HttpPost("demo")]
     [ProducesResponseType(StatusCodes.Status202Accepted)]
     public async Task<ActionResult<clsComandoAceptadoDto>> CrearDemo(CancellationToken ct = default)
@@ -103,7 +103,7 @@ public class clsPlanesCargueController(
     /// cuántos vehículos hacen falta) — sondear con <c>GET .../por-linea/{lineaId}</c>
     /// (<see cref="clsObtenerPlanesPorLineaQuery"/>) hasta que aparezca la flota.
     /// </summary>
-    [Authorize(Roles = "Comercial,CoordinadorFletes,Admin")]
+    [Authorize(Roles = "Comercial,AdminTarifas,Admin")]
     [HttpPost("desde-linea/{lineaId:guid}")]
     [ProducesResponseType(StatusCodes.Status202Accepted)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -115,7 +115,7 @@ public class clsPlanesCargueController(
     /// de inmediato, el resultado llega por /hubs/plan-cargue o se consulta con GET
     /// /api/planes-cargue/{id}. 503 si la compuerta de paridad está cerrada.
     /// </summary>
-    [Authorize(Roles = "Comercial,CoordinadorFletes,Admin")]
+    [Authorize(Roles = "Comercial,AdminTarifas,Admin")]
     [HttpPost("{id:guid}/optimizar")]
     [ProducesResponseType(StatusCodes.Status202Accepted)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -141,7 +141,7 @@ public class clsPlanesCargueController(
         => Ok(await consultar.Handle(new clsObtenerPlanCargueQuery(id), ct));
 
     /// <summary>Alta/edición de un ítem del plan (Id nulo = alta).</summary>
-    [Authorize(Roles = "Comercial,CoordinadorFletes,Admin")]
+    [Authorize(Roles = "Comercial,AdminTarifas,Admin")]
     [HttpPost("{id:guid}/items")]
     [ProducesResponseType(StatusCodes.Status202Accepted)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -158,7 +158,7 @@ public class clsPlanesCargueController(
     }
 
     /// <summary>Importación masiva de ítems (1-2.000).</summary>
-    [Authorize(Roles = "Comercial,CoordinadorFletes,Admin")]
+    [Authorize(Roles = "Comercial,AdminTarifas,Admin")]
     [HttpPost("{id:guid}/items/importar")]
     [ProducesResponseType(StatusCodes.Status202Accepted)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -172,7 +172,7 @@ public class clsPlanesCargueController(
     }
 
     /// <summary>Borra un ítem del plan.</summary>
-    [Authorize(Roles = "Comercial,CoordinadorFletes,Admin")]
+    [Authorize(Roles = "Comercial,AdminTarifas,Admin")]
     [HttpDelete("{id:guid}/items/{itemId:guid}")]
     [ProducesResponseType(StatusCodes.Status202Accepted)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -185,7 +185,7 @@ public class clsPlanesCargueController(
     /// de publicar (borrado optimista), el borrado en Cubicador sigue siendo async —
     /// 202 documenta esa asimetría en vez de prometer un 204 que no es del todo cierto.
     /// </summary>
-    [Authorize(Roles = "Comercial,CoordinadorFletes,Admin")]
+    [Authorize(Roles = "Comercial,AdminTarifas,Admin")]
     [HttpDelete("{id:guid}")]
     [ProducesResponseType(StatusCodes.Status202Accepted)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -197,7 +197,7 @@ public class clsPlanesCargueController(
     /// — 202 async, reconciliado por el aviso de rechazo
     /// en /hubs/plan-cargue si Cubicador lo rechaza.
     /// </summary>
-    [Authorize(Roles = "Comercial,CoordinadorFletes,Admin")]
+    [Authorize(Roles = "Comercial,AdminTarifas,Admin")]
     [HttpPatch("{id:guid}/colocaciones/{colocacionId:guid}")]
     [ProducesResponseType(StatusCodes.Status202Accepted)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]

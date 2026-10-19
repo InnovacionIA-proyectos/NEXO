@@ -20,7 +20,8 @@ namespace Nexo.Api.Bandeja;
 /// volver, consulta la bandeja y ya está al día. Es el mismo reparto de siempre — el
 /// aviso es la mejora, la consulta es la garantía.
 /// </summary>
-[Authorize]
+// S6-HU-25.1/#307: AdminBiblioteca no entra a la Bandeja — tampoco a su canal de avisos.
+[Authorize(Roles = "Comercial,AdminTarifas,ServiciosLogisticos,LiderProceso,Admin")]
 public sealed class clsBandejaHub : Hub
 {
     /// <summary>

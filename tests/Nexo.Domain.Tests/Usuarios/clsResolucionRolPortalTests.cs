@@ -39,4 +39,20 @@ public class clsResolucionRolPortalTests
         var efectivo = clsResolucionRolPortal.ElegirRolEfectivo([RolUsuario.ServiciosLogisticos, RolUsuario.LiderProceso]);
         Assert.Equal(RolUsuario.LiderProceso, efectivo);
     }
+
+    // S6-HU-25.1/#307: AdminTarifas ahora puede más que AdminBiblioteca (cotizaciones, Mesa, Cubicador completo): si una persona tiene los dos
+    // roles del portal, entra con el que más puede.
+    [Fact]
+    public void AdminTarifas_le_gana_a_AdminBiblioteca()
+    {
+        var efectivo = clsResolucionRolPortal.ElegirRolEfectivo([RolUsuario.AdminBiblioteca, RolUsuario.AdminTarifas]);
+        Assert.Equal(RolUsuario.AdminTarifas, efectivo);
+    }
+
+    [Fact]
+    public void AdminBiblioteca_le_gana_a_Comercial()
+    {
+        var efectivo = clsResolucionRolPortal.ElegirRolEfectivo([RolUsuario.Comercial, RolUsuario.AdminBiblioteca]);
+        Assert.Equal(RolUsuario.AdminBiblioteca, efectivo);
+    }
 }

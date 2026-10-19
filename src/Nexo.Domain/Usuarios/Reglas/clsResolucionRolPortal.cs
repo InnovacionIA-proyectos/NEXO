@@ -19,8 +19,9 @@ public static class clsResolucionRolPortal
     private static readonly RolUsuario[] OrdenDePrecedencia =
     [
         RolUsuario.Admin,
-        RolUsuario.CoordinadorFletes,
+        // S6-HU-25.1/#307: AdminTarifas ahora puede más que AdminBiblioteca (cotizaciones, Mesa, Cubicador completo), así que va primero.
         RolUsuario.AdminTarifas,
+        RolUsuario.AdminBiblioteca,
         RolUsuario.Comercial,
         RolUsuario.LiderProceso,
         RolUsuario.ServiciosLogisticos,

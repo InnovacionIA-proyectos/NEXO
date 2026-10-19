@@ -136,7 +136,7 @@ public class clsNexoDbContext : DbContext
             e.Property(x => x.DescripcionRolPortal).HasMaxLength(200);
 
             // Equivalencias de ALTA confianza por nombre (docs/contrato-integracion,
-            // sección 2). El resto de los 6 roles de Nexo (CoordinadorFletes,
+            // sección 2). El resto de los 6 roles de Nexo (AdminBiblioteca,
             // LiderProceso, ServiciosLogisticos) no tienen candidato todavía: Pendiente
             // P2, a confirmar por negocio. IdRolPortal queda NULL a propósito: no hay
             // todavía un IDROLES real confirmado contra la base de identidad, y adivinar
@@ -152,7 +152,7 @@ public class clsNexoDbContext : DbContext
                 // dbSolucionesTI — ver docs/contrato-integracion): reemplazan en la
                 // práctica a los 3 de arriba para las pruebas de identidad real.
                 new clsMapeoRolPortal { Id = Guid.Parse("00000000-0000-0000-0001-000000000004"), IdRolPortal = 48, DescripcionRolPortal = "ComercialNEXO", Rol = RolUsuario.Comercial, CreatedAt = new DateTimeOffset(2026, 9, 1, 0, 0, 0, TimeSpan.Zero) },
-                new clsMapeoRolPortal { Id = Guid.Parse("00000000-0000-0000-0001-000000000005"), IdRolPortal = 49, DescripcionRolPortal = "CoordinadorFletesNEXO", Rol = RolUsuario.CoordinadorFletes, CreatedAt = new DateTimeOffset(2026, 9, 1, 0, 0, 0, TimeSpan.Zero) },
+                new clsMapeoRolPortal { Id = Guid.Parse("00000000-0000-0000-0001-000000000005"), IdRolPortal = 49, DescripcionRolPortal = "CoordinadorFletesNEXO", Rol = RolUsuario.AdminBiblioteca, CreatedAt = new DateTimeOffset(2026, 9, 1, 0, 0, 0, TimeSpan.Zero) },
                 new clsMapeoRolPortal { Id = Guid.Parse("00000000-0000-0000-0001-000000000006"), IdRolPortal = 50, DescripcionRolPortal = "AdminTarifasNEXO", Rol = RolUsuario.AdminTarifas, CreatedAt = new DateTimeOffset(2026, 9, 1, 0, 0, 0, TimeSpan.Zero) },
                 new clsMapeoRolPortal { Id = Guid.Parse("00000000-0000-0000-0001-000000000007"), IdRolPortal = 51, DescripcionRolPortal = "ServiciosLogisticosNEXO", Rol = RolUsuario.ServiciosLogisticos, CreatedAt = new DateTimeOffset(2026, 9, 1, 0, 0, 0, TimeSpan.Zero) },
                 new clsMapeoRolPortal { Id = Guid.Parse("00000000-0000-0000-0001-000000000008"), IdRolPortal = 52, DescripcionRolPortal = "LiderProcesoNEXO", Rol = RolUsuario.LiderProceso, CreatedAt = new DateTimeOffset(2026, 9, 1, 0, 0, 0, TimeSpan.Zero) },

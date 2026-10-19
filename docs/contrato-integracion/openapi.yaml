@@ -162,7 +162,7 @@ components:
       type: string
       description: Los seis roles de Nexo. El catálogo del portal se traduce a estos en el servidor.
       enum:
-        - CoordinadorFletes
+        - AdminBiblioteca
         - LiderProceso
         - ServiciosLogisticos
         - Admin

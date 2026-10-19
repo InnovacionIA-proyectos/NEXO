@@ -24,6 +24,11 @@ public class clsBibliotecaSapHistoricoController(
     /// <summary>
     /// Consulta el histórico ordenado por vigencia descendente, con filtros por
     /// texto (código DIVIPOLA de origen/destino o detalles) y línea de negocio.
+    ///
+    /// S6-HU-29.2/#312: <c>page</c> (1-based, opcional, def. 1) agrega la paginación que faltaba (el histórico tiene ~26 mil filas y
+    /// <c>top</c> solo dejaba ver las primeras); <c>top</c> pasa a ser el tamaño de página. <c>total</c> sigue siendo el total sin
+    /// paginar y el orden es estable. Cambio aditivo: mismo shape de respuesta (<c>{ total, items }</c>); sin <c>page</c> responde la
+    /// primera página, como siempre.
     /// </summary>
     [HttpGet]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -35,8 +40,9 @@ public class clsBibliotecaSapHistoricoController(
         [FromQuery] string? tipoCarroseria,
         [FromQuery] int? claseViaje,
         [FromQuery, Range(1, 500)] int top = 50,
+        [FromQuery, Range(1, int.MaxValue)] int page = 1,
         CancellationToken ct = default)
-        => Ok(await buscar.Handle(new clsBuscarSapHistoricoQuery(q, lineaNegocio, tipoVehiculo, tipoCarroseria, claseViaje, top), ct));
+        => Ok(await buscar.Handle(new clsBuscarSapHistoricoQuery(q, lineaNegocio, tipoVehiculo, tipoCarroseria, claseViaje, top, page), ct));
 
     /// <summary>Valores disponibles para los filtros por columna (solo los usados en el histórico).</summary>
     [HttpGet("filtros")]

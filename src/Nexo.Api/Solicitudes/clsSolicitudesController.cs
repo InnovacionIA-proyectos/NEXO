@@ -13,7 +13,9 @@ namespace Nexo.Api.Solicitudes;
 /// <summary>Bandeja Priorizada y ciclo de vida de la solicitud: alta, costeo, rechazo,
 /// recálculo de score y carga masiva de líneas de licitación.</summary>
 [ApiController]
-[Authorize]
+// S6-HU-25.1/#307: AdminBiblioteca NO entra a la Bandeja, a la Mesa ni a las solicitudes (ni a leerlas). El [Authorize(Roles)] de
+// clase se SUMA (AND) a los de cada método.
+[Authorize(Roles = "Comercial,AdminTarifas,ServiciosLogisticos,LiderProceso,Admin")]
 [Route("api/solicitudes")]
 public class clsSolicitudesController(
     IQueryHandler<clsObtenerBandejaQuery, clsPaginaDto<clsBandejaItemDto>> bandeja,
@@ -63,7 +65,7 @@ public class clsSolicitudesController(
 
     /// <summary>Ingresar una solicitud spot (crea la cabecera y su línea inicial).</summary>
     [HttpPost]
-    [Authorize(Roles = "CoordinadorFletes,Admin")]
+    [Authorize(Roles = "Admin")]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult> Crear([FromBody] clsCrearSolicitudRequest req, CancellationToken ct = default)
@@ -80,7 +82,7 @@ public class clsSolicitudesController(
     /// esos IDs resueltos y no los resuelve por su cuenta.
     /// </summary>
     [HttpPost("resolver-catalogos")]
-    [Authorize(Roles = "Comercial,CoordinadorFletes,Admin")]
+    [Authorize(Roles = "Comercial,Admin")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<IReadOnlyList<clsCatalogoLineaResueltoDto>>> ResolverCatalogos(
@@ -99,7 +101,7 @@ public class clsSolicitudesController(
     /// solicitud no está en un estado que admita más líneas.
     /// </summary>
     [HttpPost("{id:guid}/lineas:bulk")]
-    [Authorize(Roles = "CoordinadorFletes,Admin")]
+    [Authorize(Roles = "Admin")]
     [ProducesResponseType(StatusCodes.Status202Accepted)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -122,7 +124,7 @@ public class clsSolicitudesController(
     /// <summary>Rechazo del comercial: descarta la solicitud registrando el motivo. 409 si
     /// ya estaba rechazada/descartada.</summary>
     [HttpPost("{id:guid}/rechazar")]
-    [Authorize(Roles = "Comercial,CoordinadorFletes,Admin")]
+    [Authorize(Roles = "Comercial,Admin")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
@@ -134,7 +136,7 @@ public class clsSolicitudesController(
 
     /// <summary>Recalcula y persiste el score de prioridad. Devuelve el desglose por componente.</summary>
     [HttpPost("{id:guid}/recalcular-score")]
-    [Authorize(Roles = "CoordinadorFletes,Admin")]
+    [Authorize(Roles = "Admin")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<clsDesgloseScoreDto>> Recalcular(Guid id, CancellationToken ct = default)

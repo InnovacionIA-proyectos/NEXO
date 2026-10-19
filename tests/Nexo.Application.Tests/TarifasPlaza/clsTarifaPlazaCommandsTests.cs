@@ -86,6 +86,45 @@ public class clsTarifaPlazaCommandsTests
         Assert.Equal("3-15000", dto.RangoPeso);
     }
 
+    // S6-HU-29.2/#312: al guardar como plaza desde la Mesa de Costeo los detalles son opcionales (decisión de Sara). La columna es NOT NULL:
+    // vacío o null se guarda como texto vacío. La pantalla de Tarifas Plaza sigue exigiéndolos (lo hace el front).
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task Crear_acepta_detalles_vacios_o_nulos_y_los_guarda_como_texto_vacio(string? detalles)
+    {
+        _tarifas.Setup(t => t.ExisteAsync("Oferta de Expedición Nacional", "Carga Suelta", 1, 2, null, null, "3S3", null, default)).ReturnsAsync(false);
+        clsTarifaPlaza? guardada = null;
+        _tarifas.Setup(t => t.Agregar(It.IsAny<clsTarifaPlaza>())).Callback<clsTarifaPlaza>(t => guardada = t);
+
+        var dto = await CrearHandler().Handle(ComandoValido() with { DetallesTarifa = detalles });
+
+        Assert.Equal(string.Empty, dto.DetallesTarifa);
+        Assert.Equal(string.Empty, guardada!.DetallesTarifa);
+        _uow.Verify(u => u.SaveChangesAsync(default), Times.Once);
+    }
+
+    [Fact]
+    public async Task Crear_con_detalles_los_recorta_y_los_guarda()
+    {
+        _tarifas.Setup(t => t.ExisteAsync("Oferta de Expedición Nacional", "Carga Suelta", 1, 2, null, null, "3S3", null, default)).ReturnsAsync(false);
+
+        var dto = await CrearHandler().Handle(ComandoValido() with { DetallesTarifa = "  Con peaje  " });
+
+        Assert.Equal("Con peaje", dto.DetallesTarifa);
+    }
+
+    [Fact]
+    public async Task Detalles_de_mas_de_2000_caracteres_se_rechazan_en_vez_de_truncarse_en_la_base()
+    {
+        var ex = await Assert.ThrowsAsync<clsValidationFailedException>(() =>
+            CrearHandler().Handle(ComandoValido() with { DetallesTarifa = new string('x', 2001) }));
+
+        Assert.Equal("TARIFA_PLAZA_INVALIDA", ex.Code);
+        Assert.Contains("2000", ex.Message);
+    }
+
     [Fact]
     public async Task Sin_ninguna_dimension_lanza_TARIFA_PLAZA_INVALIDA()
     {
@@ -156,6 +195,29 @@ public class clsTarifaPlazaCommandsTests
         Assert.Equal("nueva", dto.DetallesTarifa);
         _tarifas.Verify(t => t.ExisteAsync("Oferta de Expedición Nacional", "Carga Suelta", 1, 2, null, null, "3S3", id, default), Times.Once);
         _uow.Verify(u => u.SaveChangesAsync(default), Times.Once);
+    }
+
+    // S6-HU-29.2/#312: editar también acepta quitar los detalles (texto vacío, no null: la columna es NOT NULL).
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    public async Task Editar_acepta_detalles_vacios_y_deja_texto_vacio(string? detalles)
+    {
+        var id = Guid.NewGuid();
+        var existente = new clsTarifaPlaza
+        {
+            Id = id, LineaNegocio = "Oferta de Expedición Nacional", ClaseViaje = "Carga Suelta",
+            OrigenMunicipioId = 1, DestinoMunicipioId = 2, TipoVehiculo = "3S3",
+            Valor = 1_000_000m, Vigencia = new DateOnly(2026, 1, 1), DetallesTarifa = "vieja",
+        };
+        _tarifas.Setup(t => t.ObtenerAsync(id, default)).ReturnsAsync(existente);
+        _tarifas.Setup(t => t.ExisteAsync("Oferta de Expedición Nacional", "Carga Suelta", 1, 2, null, null, "3S3", id, default)).ReturnsAsync(false);
+
+        var dto = await EditarHandler().Handle(new clsEditarTarifaPlazaCommand(
+            id, "Oferta de Expedición Nacional", "Carga Suelta", 1, 2, null, null, "3S3", 2_000_000m, new DateOnly(2026, 6, 1), detalles));
+
+        Assert.Equal(string.Empty, dto.DetallesTarifa);
+        Assert.Equal(string.Empty, existente.DetallesTarifa);
     }
 
     [Fact]

@@ -96,7 +96,26 @@ public record clsLineaCosteoDto(
     /// <summary>S6-HU-26.1/#30: <c>true</c> si la ruta y el vehículo de la línea tienen regla Solo-SICE. Con regla el flete lo fija el
     /// piso y NO se puede editar (PUT .../lineas/{id} responde 409 FLETE_SOLO_SICETAC): el front no debe ofrecer "Editar flete".
     /// Misma definición que el motor de propuesta y que la edición (clsReglaSoloSicetacDeLinea).</summary>
-    bool TieneReglaSoloSicetac = false);
+    bool TieneReglaSoloSicetac = false,
+    /// <summary>S6-HU-24.1/#309: estado de la línea en el costeo — <c>porCostear</c>, <c>autoResuelta</c> o <c>revisada</c>
+    /// (minúscula inicial). Antes solo vivía en la entidad: Cotifly veía una línea en consulta completa como "pendiente de
+    /// costeo" y no sabía por qué.</summary>
+    string? EstadoLinea = null,
+    /// <summary>S6-HU-24.1/#309: por qué sigue en <c>porCostear</c> (consulta completa, línea sin vehículo, SICE-TAC que no es del
+    /// mes actual...). Texto para mostrar al usuario; null cuando la línea no está pendiente.</summary>
+    string? MotivoPendiente = null,
+    /// <summary>S6-HU-29.1/#311: línea de negocio capturada, con minúscula inicial (<c>puertoAInterior</c>, <c>interiorAPuerto</c>,
+    /// <c>nacional</c>, <c>devolucionContenedor</c>, <c>andino</c>, <c>licitaciones</c>); null si la línea no la trae.</summary>
+    string? LineaNegocio = null,
+    /// <summary>S6-HU-29.1/#311: clase de viaje (<c>contenedor</c>, <c>cupo</c>, <c>cargaSuelta</c>, <c>extradimensionado</c>); null si no.</summary>
+    string? ClaseViaje = null,
+    /// <summary>S6-HU-29.1/#311: clase de contenedor tal como se capturó (<c>CNT20.IT</c>...). <b>null salvo que la clase de viaje sea
+    /// <c>contenedor</c></b>: en otras clases el dato, si llegó, no aplica.</summary>
+    string? ClaseContenedor = null,
+    /// <summary>S6-HU-29.1/#311: id de <c>tbl_municipios</c> del origen/destino de la ruta (el mismo de <c>GET /ciudades</c>), o null si
+    /// la ruta no resolvió municipio. Evita que el front deduzca la ciudad leyendo el texto (68 nombres repetidos en el catálogo,
+    /// p. ej. "Armenia", y nombres que no coinciden con el catálogo, p. ej. "Bogota" contra "BOGOTA, D.C.").</summary>
+    int? OrigenMunicipioId = null, int? DestinoMunicipioId = null);
 
 public record clsSolicitudCosteoDto(
     clsSolicitudDto Solicitud, clsTiemposLogisticosDto Tiempos, IReadOnlyList<clsLineaCosteoDto> Lineas,

@@ -11,6 +11,17 @@ namespace Nexo.Domain.Common;
 /// </summary>
 public static class clsTexto
 {
+    /// <summary>
+    /// Pasa un nombre de enumerado (<c>PuertoAInterior</c>, <c>CargaSuelta</c>) a texto con minúscula inicial
+    /// (<c>puertoAInterior</c>, <c>cargaSuelta</c>) — el formato de los campos de texto nuevos de la línea de costeo
+    /// (S6-HU-24.1/#309 y S6-HU-29.1/#311). Null si no hay valor.
+    /// </summary>
+    public static string? MinusculaInicial<T>(T? valor) where T : struct, Enum =>
+        valor is { } v ? MinusculaInicial(v.ToString()) : null;
+
+    public static string? MinusculaInicial(string? s) =>
+        string.IsNullOrEmpty(s) ? s : char.ToLowerInvariant(s[0]) + s[1..];
+
     /// <summary>Colapsa espacios repetidos y recorta; null si queda vacío.</summary>
     public static string? Limpiar(string? s)
     {

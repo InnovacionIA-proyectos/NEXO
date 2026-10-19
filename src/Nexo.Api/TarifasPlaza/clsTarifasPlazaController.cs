@@ -15,7 +15,7 @@ namespace Nexo.Api.TarifasPlaza;
 /// captura que hoy vive en un sistema externo, con carga/descarga masiva por Excel.
 /// </summary>
 [ApiController]
-[Authorize(Roles = "AdminTarifas,Admin")]
+[Authorize(Roles = "AdminTarifas,AdminBiblioteca,Admin")]
 [Route("api/tarifas-plaza")]
 public class clsTarifasPlazaController(
     IQueryHandler<clsListarTarifasPlazaQuery, IReadOnlyList<clsTarifaPlazaDto>> listar,
@@ -101,5 +101,6 @@ public class clsTarifaPlazaRequest
     public string? TipoVehiculo { get; set; }
     public decimal Valor { get; set; }
     public DateOnly Vigencia { get; set; }
-    public string DetallesTarifa { get; set; } = null!;
+    /// <summary>Opcional (S6-HU-29.2/#312): vacío o null se guarda como texto vacío. Máx. 2000 caracteres.</summary>
+    public string? DetallesTarifa { get; set; }
 }

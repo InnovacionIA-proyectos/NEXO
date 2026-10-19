@@ -8,6 +8,7 @@ using Nexo.Application.Common.Exceptions;
 using Nexo.Application.Common.Ports;
 using Nexo.Domain.Costeo.Reglas;
 using Nexo.Domain.Enums;
+using Nexo.Domain.Common;
 
 namespace Nexo.Application.CasosDeUso.Cotizaciones;
 
@@ -82,7 +83,7 @@ public sealed class clsEditarLineaCotizacionCommandHandler(
         var pisoVerificado = propuesta?.Sicetac?.Valor is not null;
         if (propuesta?.Sicetac?.Valor is { } piso && command.ValorFlete < piso)
             throw new clsValidationFailedException("FLETE_BAJO_PISO_SICETAC",
-                $"El flete ({command.ValorFlete:C0}) está por debajo del piso SICE-TAC ({piso:C0}). No se puede guardar un valor por debajo del piso.");
+                $"El flete ({clsMoneda.Pesos(command.ValorFlete)}) está por debajo del piso SICE-TAC ({clsMoneda.Pesos(piso)}). No se puede guardar un valor por debajo del piso.");
 
         // S6-HU-26.1/#30: el hueco de #283 — la validación del piso se SALTABA cuando no había piso (ruta sin fila en
         // DWSice, período que no es el del mes actual, o la consulta falló), y cualquier valor entraba sin aviso. Ahora se
@@ -94,7 +95,7 @@ public sealed class clsEditarLineaCotizacionCommandHandler(
                 ? "no se encontró un piso SICE-TAC para esta ruta, o no se pudo consultar"
                 : propuesta.MotivoPendiente;
             throw new clsConflictException("PISO_SICETAC_NO_VERIFICABLE",
-                $"No se pudo verificar el piso SICE-TAC de esta línea ({motivo}). El flete ({command.ValorFlete:C0}) no se guardó: " +
+                $"No se pudo verificar el piso SICE-TAC de esta línea ({motivo}). El flete ({clsMoneda.Pesos(command.ValorFlete)}) no se guardó: " +
                 "confirme (confirmarSinPiso = true) si quiere guardarlo sin verificar el piso.");
         }
 

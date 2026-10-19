@@ -135,7 +135,8 @@ Característica: Identidad e integración con el portal de la Administración
       | rol                 | operacion                        | resultado |
       | Comercial           | capturar una solicitud           | permitido |
       | AdminTarifas        | capturar una solicitud           | 403       |
-      | CoordinadorFletes   | cargar líneas de un pliego       | permitido |
+      | Admin               | cargar líneas de un pliego       | permitido |
+      | AdminBiblioteca     | cargar líneas de un pliego       | 403       |
       | Comercial           | cargar líneas de un pliego       | 403       |
       | ServiciosLogisticos | crear un servicio conexo         | permitido |
       | Comercial           | crear un servicio conexo         | 403       |

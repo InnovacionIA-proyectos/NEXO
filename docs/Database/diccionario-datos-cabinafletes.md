@@ -629,7 +629,7 @@ Llave natural única: `(Periodo, OrigenDane, DestinoDane, Configuracion, TipoCar
 | `LineaNegocio` | `PuertoAInterior`, `InteriorAPuerto`, `Nacional`, `DevolucionContenedor`, `Andino`, `Licitaciones` | `LineaSolicitud.LineaNegocio` (catálogo SAP TM) |
 | `ClaseViaje` | `Contenedor`, `Cupo`, `CargaSuelta`, `Extradimensionado` | `LineaSolicitud.ClaseViaje` (catálogo SAP TM) |
 | `EstadoLinea` | `PorCostear`, `AutoResuelta`, `Revisada` | `LineaSolicitud.EstadoLinea` |
-| `RolUsuario` | `CoordinadorFletes`, `LiderProceso`, `ServiciosLogisticos`, `Admin`, `Comercial`, `AdminTarifas` | `Usuario.Rol` — Comercial y AdminTarifas son los dos roles de negocio principales; Admin es superusuario técnico |
+| `RolUsuario` | `AdminBiblioteca`, `LiderProceso`, `ServiciosLogisticos`, `Admin`, `Comercial`, `AdminTarifas` | `Usuario.Rol` — Comercial y AdminTarifas son los dos roles de negocio principales; Admin es superusuario técnico |
 | `CondicionCarga` | `Cargado`, `Vacio` | `TarifaSicetac.CondicionCarga` |
 | `FuenteFlete` | `Sicetac`, `Historica`, `Manual`, `Tarifario` | `CotizacionLinea.Fuente` — de dónde salió el valor del flete |
 | `EstadoCotizacion` | `Borrador`, `Entregada` | `Cotizacion.Estado` |

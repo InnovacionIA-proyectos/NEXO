@@ -5,7 +5,7 @@ namespace Nexo.Domain.Enums;
 /// solicitudes y servicios conexos en la mesa) y AdminTarifas (todos los módulos
 /// excepto captura; costea sin gestionar conexos). Admin es el superusuario técnico.
 /// </summary>
-public enum RolUsuario { CoordinadorFletes, LiderProceso, ServiciosLogisticos, Admin, Comercial, AdminTarifas }
+public enum RolUsuario { AdminBiblioteca, LiderProceso, ServiciosLogisticos, Admin, Comercial, AdminTarifas }
 
 public enum TipoSolicitud { Spot, Licitacion }
 

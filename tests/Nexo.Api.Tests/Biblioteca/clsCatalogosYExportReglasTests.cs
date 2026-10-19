@@ -21,7 +21,7 @@ public class clsCatalogosYExportReglasTests
         ["CNT20/Consolidado", "CNT20/Exclusivo", "CNT40/Consolidado", "CNT40/Exclusivo", "PBV 7500-8000"];
 
     private static readonly string[] RolesValidos =
-        ["CoordinadorFletes", "AdminTarifas", "ServiciosLogisticos", "LiderProceso", "Comercial", "Admin"];
+        ["AdminBiblioteca", "AdminTarifas", "ServiciosLogisticos", "LiderProceso", "Comercial", "Admin"];
 
     // ------------------------------------------------------------------ tipos de vehículo
 
@@ -41,7 +41,7 @@ public class clsCatalogosYExportReglasTests
     [InlineData("/api/captura-solicitudes/ciudades?q=med")]
     [InlineData("/api/captura-solicitudes/departamentos")]
     [InlineData("/api/captura-solicitudes/municipios")]
-    public async Task Las_ciudades_las_ve_cualquier_rol_valido_incluido_CoordinadorFletes(string url)
+    public async Task Las_ciudades_las_ve_cualquier_rol_valido_incluido_AdminBiblioteca(string url)
     {
         foreach (var rol in RolesValidos)
             Assert.Equal(HttpStatusCode.OK, (await _fx.Client(rol).GetAsync(url)).StatusCode);
@@ -57,7 +57,7 @@ public class clsCatalogosYExportReglasTests
     [Fact]
     public async Task Capturar_y_AnalizarExcel_siguen_siendo_solo_de_Comercial_y_Admin()
     {
-        foreach (var rol in new[] { "CoordinadorFletes", "AdminTarifas", "ServiciosLogisticos", "LiderProceso" })
+        foreach (var rol in new[] { "AdminBiblioteca", "AdminTarifas", "ServiciosLogisticos", "LiderProceso" })
         {
             var cli = _fx.Client(rol);
             var capturar = await cli.PostJson("/api/captura-solicitudes", new { });
@@ -77,8 +77,8 @@ public class clsCatalogosYExportReglasTests
     [Fact] // revisado caso por caso: aprovisionamiento y clientes se quedan para Comercial/Admin.
     public async Task Aprovisionamiento_y_Clientes_no_cambian_de_roles()
     {
-        Assert.Equal(HttpStatusCode.Forbidden, (await _fx.Client("CoordinadorFletes").GetAsync("/api/captura-solicitudes/clientes?q=a")).StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, (await _fx.Client("CoordinadorFletes").GetAsync("/api/captura-solicitudes/aprovisionamiento?levante=a&origen=b")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await _fx.Client("AdminBiblioteca").GetAsync("/api/captura-solicitudes/clientes?q=a")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await _fx.Client("AdminBiblioteca").GetAsync("/api/captura-solicitudes/aprovisionamiento?levante=a&origen=b")).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await _fx.Client("Comercial").GetAsync("/api/captura-solicitudes/clientes?q=a")).StatusCode);
     }
 
@@ -148,7 +148,13 @@ public class clsCatalogosYExportReglasTests
 
     [Theory]
     [InlineData("Comercial")]
-    [InlineData("CoordinadorFletes")]
+    [InlineData("ServiciosLogisticos")]
+    [InlineData("LiderProceso")]
     public async Task El_export_de_reglas_con_un_rol_no_autorizado_devuelve_403(string rol) =>
         Assert.Equal(HttpStatusCode.Forbidden, (await _fx.Client(rol).GetAsync("/api/reglas-solo-sicetac/exportar-excel")).StatusCode);
+
+    // S6-HU-25.1/#307: las reglas Solo-SICETAC son de la Biblioteca — AdminBiblioteca entra.
+    [Fact]
+    public async Task El_export_de_reglas_lo_puede_hacer_AdminBiblioteca() =>
+        Assert.Equal(HttpStatusCode.OK, (await _fx.Client("AdminBiblioteca").GetAsync("/api/reglas-solo-sicetac/exportar-excel")).StatusCode);
 }

@@ -58,7 +58,7 @@ public class clsVehiculosController(
     IQueryHandler<clsListarVehiculosQuery, clsPaginaDto<clsVehiculoCubicacionDto>> listar)
     : ControllerBase
 {
-    [Authorize(Roles = "Comercial,CoordinadorFletes,Admin")]
+    [Authorize(Roles = "Comercial,AdminTarifas,Admin")]
     [HttpPost]
     [ProducesResponseType(StatusCodes.Status202Accepted)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
