@@ -3,7 +3,7 @@ name: CI/CD API
 # Dispara SOLO por cambios que puedan afectar al
 # servicio API (.NET) — nunca por cambios exclusivos de cubicador/ (ese
 # servicio tiene sus propios workflows, ver ci-cd-cubicador-api.yml/
-# ci-cd-cubicador-worker.yml). Ver docs/CI_CD_RUTAS_COMPARTIDAS.md para la
+# ci-cd-cubicador-worker.yml). Ver docs/despliegue/CI_CD_RUTAS_COMPARTIDAS.md para la
 # convención completa de qué ruta dispara qué pipeline.
 on:
   push:
@@ -172,7 +172,7 @@ jobs:
 
       # El webhook de arriba solo confirma que Dokploy RECIBIO la
       # orden (curl -f en verde con cualquier 2xx) - nunca que el build/deploy
-      # real termino. Ya paso una vez (docs/VERIFICACION_NEXO_CUBICADOR_2026-09-14.md):
+      # real termino. Ya paso una vez (docs/archivo/VERIFICACION_NEXO_CUBICADOR_2026-09-14.md):
       # el build fallo por disco lleno y Dokploy siguio sirviendo la imagen
       # vieja en silencio, con el job de este mismo workflow en verde. Este
       # paso al menos detecta "el contenedor nuevo nunca volvio a responder"

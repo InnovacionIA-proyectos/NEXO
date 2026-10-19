@@ -1,5 +1,7 @@
 # Reparaciones finales — Importación Excel de Tarifas de Plaza
 
+_Fecha: 2026-10-05_
+
 Encontradas el 2026-10-05 al depurar un rechazo real al reimportar
 `tarifas-plaza-20261005.xlsx` (exportado desde la pantalla, se le agregó una
 fila nueva a mano, y esa fila se rechazó al reimportar — "1 rechazada(s)").

@@ -39,13 +39,13 @@ Thumbs.db
 .DS_Store
 
 # Documentos de trabajo local, no se versionan
-docs/analisis-dw-sap-baseline-cubicador.md
-docs/captura-prueba-rutas-reales.xlsx
+docs/documentacion/analisis-dw-sap-baseline-cubicador.md
+docs/pruebas/captura-prueba-rutas-reales.xlsx
 docs/diccionario-datos-nexo.md
-docs/ejemplo_licitacion.xlsx
-docs/hallazgos-requisitos-estudio-bd.md
-docs/hallazgos-requisitos.md
-docs/propuesta-bd-nexo.md
+docs/pruebas/ejemplo_licitacion.xlsx
+docs/documentacion/hallazgos-requisitos-estudio-bd.md
+docs/documentacion/hallazgos-requisitos.md
+docs/Database/propuesta-bd-nexo.md
 
 # Histórico oficial de SICE-TAC (excels ~100-180 MB c/u) — cada archivo supera
 # el límite de 100 MB de GitHub. Pendiente: manifiesto + almacenamiento externo

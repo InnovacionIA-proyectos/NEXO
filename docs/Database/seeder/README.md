@@ -15,7 +15,7 @@ en la aplicación — el cálculo/cruce que produjo los datos se hizo una vez, c
 consultas directas contra las fuentes, y quedó congelado en el CSV.
 
 Los archivos originales (Excel del negocio, y los CSV intermedios sin normalizar
-del todo que salieron en el camino) NO viven aquí — están en `docs_raw/` (raíz
+del todo que salieron en el camino) NO viven aquí — están en `docs/docs_raw/` (raíz
 del repo), aparte de estos seeders ya limpios y listos para cargar.
 
 ## `municipios.csv`
@@ -32,7 +32,7 @@ existe ningún proceso automático que lo mantenga sincronizado.
 - **De dónde salió:** cruce de `tblSAPDANE` (códigos DANE/DIVIPOLA) +
   `tblZonasTarificacionRelacion` + `tblSAPTarifas`/`tblSAPTarifasLog` del datacenter
   corporativo (`dbSolucionesTI`), corrido una vez con consultas SQL directas — no
-  con un adaptador de la app (ver `docs/diccionario-datos-cabinafletes.md`, catálogo
+  con un adaptador de la app (ver `docs/Database/diccionario-datos-cabinafletes.md`, catálogo
   `municipios`, para el detalle completo del cruce y las excepciones).
 - **Filas:** 3.804 (Colombia 1.128, Venezuela 1.424, Ecuador 1.252) — ya aplicadas
   contra `dbInformesAutomatizados_Pruebas.db_NEXO` (2026-09-26).
@@ -69,7 +69,7 @@ se agreguen bandas nuevas con el tiempo, no asumir que siempre serán estas 8.
 
 **Poblado UNA SOLA VEZ, sobre la tabla `tbl_reglas_solo_sicetac` (ya existía,
 no la creó esta HU) — sin sincronización periódica.** Extraído de
-`docs_raw/fletes-plaza-normalizado-sice.csv` (la hoja "FLETES PLAZA.xlsx"
+`docs/docs_raw/fletes-plaza-normalizado-sice.csv` (la hoja "FLETES PLAZA.xlsx"
 del negocio, ya normalizada): cada celda cuyo valor literal era "sice" se
 convierte en una fila = "para este origen+destino+tipo, la propuesta se
 resuelve solo con SICE-TAC".
@@ -107,7 +107,7 @@ resuelve solo con SICE-TAC".
 
 **Poblado UNA SOLA VEZ, sobre la tabla nueva `tbl_tarifas_plaza` (S4-HU-10.1)
 — sin sincronización periódica.** Extraído de
-`docs_raw/fletes-plaza-normalizado-plaza.csv` (celdas con un valor
+`docs/docs_raw/fletes-plaza-normalizado-plaza.csv` (celdas con un valor
 numérico real, no "sice") — **107 filas** (originalmente 271; se quitaron
 164 filas de la hoja "Fletes Nacional y Expo" — `TURBO`/`SENCILLO`/`MINI
 MULA`/`MULA` — que venían de una sección del Excel llamada "SICE": son
@@ -172,9 +172,9 @@ Excel de costos 2026 cambia (nueva ciudad, nuevo puerto, nueva ruta), este CSV
 
 - **Tabla destino:** `db_NEXO.tbl_servicios_conexos` (reestructurada en esta HU
   para soportar dimensiones de precio distintas por categoría — ver
-  `ESQUEMA_NEXO.sql` y `docs/diccionario-datos-cabinafletes.md`, catálogo
+  `ESQUEMA_NEXO.sql` y `docs/Database/diccionario-datos-cabinafletes.md`, catálogo
   `servicios_conexos`, para el detalle completo de columnas).
-- **De dónde salió:** cruce de `docs_raw/conexos costos.xlsx` (2 hojas,
+- **De dónde salió:** cruce de `docs/docs_raw/conexos costos.xlsx` (2 hojas,
   4 tablas: Almacenamiento por ciudad, ITR por puerto+máquina+movimiento,
   Precinto por ruta, Acompañamiento vehicular por origen-destino) contra
   `tbl_municipios`, más los 10 servicios de valor único ya sembrados hoy
