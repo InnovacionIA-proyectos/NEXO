@@ -19,12 +19,12 @@ name: CI/CD Cubicador-API
 #    protocolo de cola.
 #
 # Lo unico que de verdad distingue a los dos workflows es a que aplicacion de
-# Dokploy le avisan. Ver docs/CI_CD_RUTAS_COMPARTIDAS.md.
+# Dokploy le avisan. Ver docs/despliegue/CI_CD_RUTAS_COMPARTIDAS.md.
 #
 # Separar por carpeta de nivel superior (cubicador/api/** aca,
 # cubicador/worker/** alla) ya estaba mal en la practica, no solo en teoria:
 # worker/main.py importa `api.dependencias` y `api.dtos.plan_cargue`, que es
-# justo donde vivia el bug 2 (ver docs/CI_CD_RUTAS_COMPARTIDAS.md) — un cambio
+# justo donde vivia el bug 2 (ver docs/despliegue/CI_CD_RUTAS_COMPARTIDAS.md) — un cambio
 # bajo cubicador/api/ que
 # rompia al WORKER.
 on:

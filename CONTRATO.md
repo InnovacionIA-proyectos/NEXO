@@ -83,7 +83,7 @@ portal **no** sirve en este endpoint.
 
 Un usuario tiene exactamente uno. `Admin` está incluido en todos los endpoints
 restringidos. La matriz completa está en la [sección 5](#5-matriz-de-permisos) y
-en [`docs/ROLES_Y_PERMISOS.md`](docs/ROLES_Y_PERMISOS.md).
+en [`docs/documentacion/ROLES_Y_PERMISOS.md`](docs/documentacion/ROLES_Y_PERMISOS.md).
 
 ### 1.4 Formato de error (siempre el mismo)
 

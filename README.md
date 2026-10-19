@@ -96,7 +96,7 @@ uno de los 6 roles de Nexo. Errores con forma consistente:
 ```
 
 Referencia completa de endpoints en [`CONTRATO.md`](CONTRATO.md). Permisos
-por rol en [`docs/ROLES_Y_PERMISOS.md`](docs/ROLES_Y_PERMISOS.md).
+por rol en [`docs/documentacion/ROLES_Y_PERMISOS.md`](docs/documentacion/ROLES_Y_PERMISOS.md).
 
 ## Testing
 

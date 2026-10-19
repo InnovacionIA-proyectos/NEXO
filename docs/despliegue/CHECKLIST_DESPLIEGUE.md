@@ -81,7 +81,7 @@ exacto del commit desplegado:
   `test_paridad_caso_10` a `test_paridad_caso_26`) más
   `test_hay_exactamente_26_fixtures_dorados` (confirma que no falta ni sobra
   ningún fixture). Salida completa registrada en
-  `docs/VERIFICACION_NEXO_CUBICADOR_2026-09-14.md`, sección 8.
+  `docs/archivo/VERIFICACION_NEXO_CUBICADOR_2026-09-14.md`, sección 8.
 
 **Valores configurados en Dokploy** (app de la API de NEXO,
 `Cubicacion__*`, con doble guion bajo — Dokploy despliega por Dockerfile,
