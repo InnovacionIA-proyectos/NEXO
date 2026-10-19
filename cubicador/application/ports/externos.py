@@ -15,6 +15,13 @@ class PosicionCarga:
     largo_cm: float
     ancho_cm: float
     alto_cm: float
+    # Peso de UNA unidad, no el total de la posicion. Lo mismo que declara el
+    # contrato de la captura de NEXO ("peso unitario") y lo que espera el
+    # motor: `peso_total_kg = peso_kg * cantidad`. Confundirlo multiplica el
+    # peso por la cantidad y pide camiones de mas.
+    #
+    # Opcional en la captura de NEXO, pero el puente rechaza la linea si falta
+    # (`PESO_NO_DECLARADO`, #304): el peso decide la capacidad del vehiculo.
     peso_kg: float | None
     # Codigo del catalogo de tipos de mercancia (S5-HU-17.6). NEXO lo agrega al
     # JSON de `Dimensiones` por posicion; las lineas capturadas antes no lo

@@ -155,6 +155,15 @@ operativo.
 comportamiento. Sigue siendo la única forma de editar los topes contra los que se
 detecta extradimensión, que el contrato devuelve en el bloque `extradimension`.
 
+Dos límites, por razones distintas (#304): **máximo 200 posiciones** —las mismas
+que admite una línea de captura en NEXO— y **máximo 10.000 unidades totales**.
+Pasarse de cualquiera de los dos es `400 CUBICACION_DEMASIADO_GRANDE`.
+
+El de posiciones existe porque desde S5-HU-17.8 el detalle de cada camión es
+**una fila por posición**: 10.000 posiciones de una unidad pasaban el tope de
+unidades y aun así producían 10.000 filas en la respuesta y otras tantas en
+`recomendacionVehiculoMercancia`.
+
 Límite: **10.000 unidades totales por request**
 (`application/recomendaciones/casos_de_uso.py`) — por encima,
 `400 CUBICACION_DEMASIADO_GRANDE`.

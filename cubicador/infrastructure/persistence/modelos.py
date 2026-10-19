@@ -136,8 +136,10 @@ class ParametrosCubicacionModel(Base):
     __tablename__ = "parametros_cubicacion"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    # Los del vehiculo mas grande que no es extradimensionado (#304) - ver
+    # `ParametrosCubicacion` en domain/entidades/entidades.py.
     largo_max_cm: Mapped[float] = mapped_column(Float, default=1220.0)
-    ancho_max_cm: Mapped[float] = mapped_column(Float, default=260.0)
-    alto_max_cm: Mapped[float] = mapped_column(Float, default=300.0)
+    ancho_max_cm: Mapped[float] = mapped_column(Float, default=240.0)
+    alto_max_cm: Mapped[float] = mapped_column(Float, default=260.0)
     peso_max_kg: Mapped[float] = mapped_column(Float, default=34000.0)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_ahora, onupdate=_ahora)

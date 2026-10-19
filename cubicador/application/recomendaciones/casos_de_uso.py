@@ -33,6 +33,19 @@ from domain.motor import seleccion_flota as motor
 # de negocio. Expandir cantidades a unidades fisicas es lo que cuesta.
 _MAX_UNIDADES_TOTALES = 10_000
 
+# Tope de POSICIONES, que es distinto del de unidades (#304).
+#
+# El de arriba limita cuantas unidades fisicas se expanden; este limita cuantas
+# filas trae la solicitud. Son dos costos distintos: 10.000 posiciones de una
+# unidad pasan el tope de unidades y aun asi producen 10.000 filas en la
+# respuesta y otras tantas en `recomendacionVehiculoMercancia` -desde
+# S5-HU-17.8 el detalle es por posicion y ya no se agrupa por codigo-.
+#
+# El numero sale de NEXO: `clsCapturaLineaRequest.Posiciones` admite maximo 200
+# por linea, asi que aceptar mas aca seria aceptar algo que la captura no puede
+# haber producido.
+_MAX_POSICIONES = 200
+
 SISTEMAS_VALIDOS = ("NEXO", "COTIFLY")
 
 
@@ -84,6 +97,11 @@ async def recomendar_flota(
     if not lineas:
         raise ValidationFailedException(
             "MERCANCIAS_REQUERIDAS", "La solicitud no trae ninguna mercancia.")
+
+    if len(lineas) > _MAX_POSICIONES:
+        raise ValidationFailedException(
+            "CUBICACION_DEMASIADO_GRANDE",
+            f"La solicitud trae {len(lineas)} posiciones; el maximo es {_MAX_POSICIONES}.")
 
     total = sum(linea.cantidad for linea in lineas)
     if total > _MAX_UNIDADES_TOTALES:

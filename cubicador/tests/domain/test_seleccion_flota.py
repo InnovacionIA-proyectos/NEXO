@@ -98,11 +98,13 @@ REGLAS = (
 )
 
 PARAMETROS = ParametrosMotor({
-    "k_max": "10", "umbral_alerta_llenado": "0.75", "usar_alternativa": "solo_respaldo",
+    "k_max": "25", "umbral_alerta_llenado": "0.75", "usar_alternativa": "solo_respaldo",
     "factor_vol_util": "0.90", "margen_cg": "0.30",
 })
 
-MEDIDAS = sf.MedidasEstandar(D(1220), D(260), D(300), D(34000))
+# Los maximos del vehiculo mas grande que no es extradimensionado (#304):
+# el 3S3 mide 1220x240x260. Antes eran 260x300, por encima de la flota.
+MEDIDAS = sf.MedidasEstandar(D(1220), D(240), D(260), D(34000))
 
 
 @pytest.fixture
@@ -327,9 +329,29 @@ def test_mercancias_que_no_comparten_carroceria(catalogo):
     assert r.motivo_sin_seleccion == sf.MOTIVO_SIN_CARROCERIA_COMPATIBLE
 
 
-def test_una_pieza_que_no_cabe_en_ningun_vehiculo_del_catalogo(catalogo):
-    """Dentro de las medidas estandar, pero mas ancha que cualquier furgon."""
+def test_una_pieza_mas_ancha_que_la_flota_es_extradimensionada(catalogo):
+    """255 cm de ancho contra 240 de la flota.
+
+    Antes de #304 el umbral era 260x300 -por encima de los 240x260 del vehiculo
+    mas grande- y esta pieza pasaba el filtro para despues no caber en ninguno:
+    salia `SIN_CANDIDATOS_DIMENSIONALES`, que le decia al operario "no hay
+    candidatos" cuando lo que tenia era una pieza sobreancha que necesita
+    permiso especial. Con el umbral alineado a la flota, se clasifica bien.
+    """
     r = _pedir(catalogo, _linea(BEBIDAS, 1, 300, 255, 250, 100))
+    assert r.resultado == sf.RESULTADO_SIN_SELECCION
+    assert r.motivo_sin_seleccion == sf.MOTIVO_EXTRADIMENSIONADO
+    assert [p.codigo_mercancia for p in r.extradimension.piezas] == ["BEBIDAS"]
+
+
+def test_sin_candidatos_cuando_ninguna_combinacion_aguanta_el_peso(catalogo):
+    """El motivo sigue vivo, pero por capacidad y no por medidas.
+
+    CARNICOS solo viaja en FURGON_REFRIGERADO, y ahi el 3S3 topa en 30.000 kg.
+    Una pieza de 32.000 kg esta dentro del maximo estandar (34.000) pero ningun
+    vehiculo refrigerado la aguanta, y no hay carroceria de respaldo.
+    """
+    r = _pedir(catalogo, _linea(CARNICOS, 1, 200, 200, 200, 32000))
     assert r.resultado == sf.RESULTADO_SIN_SELECCION
     assert r.motivo_sin_seleccion == sf.MOTIVO_SIN_CANDIDATOS_DIMENSIONALES
 
