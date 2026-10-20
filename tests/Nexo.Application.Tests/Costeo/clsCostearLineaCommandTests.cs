@@ -206,4 +206,19 @@ public class clsCostearLineaCommandTests
         _pendientes.Verify(p => p.RegistrarAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<Guid>(),
             It.IsAny<TipoPendienteDeCosteo>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
+
+    // S6-HU-24.3/#320: una línea rechazada a propósito no se costea aunque llegue un mensaje encolado antes del rechazo: ni se le propone
+    // un flete ni se publica nada ni se toca el pendiente.
+    [Fact]
+    public async Task Una_linea_rechazada_no_se_costea()
+    {
+        _lineas.Setup(l => l.EstaRechazadaAsync(Linea, It.IsAny<CancellationToken>())).ReturnsAsync(true);
+
+        await Handler().Handle(Comando());
+
+        _propuesta.Verify(p => p.ProponerParaLineaAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
+        _lineas.Verify(l => l.MarcarAutoResueltaAsync(It.IsAny<Guid>(), It.IsAny<decimal>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        _lineas.Verify(l => l.MarcarPendienteAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        _uow.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
 }

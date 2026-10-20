@@ -49,6 +49,25 @@ public class clsEditarLineaCotizacionRequest
     public bool ConfirmarSinPiso { get; set; }
 }
 
+/// <summary>S6-HU-24.3/#320: rechazar una línea de la cotización. El motivo es obligatorio (hasta 500).</summary>
+public class clsRechazarLineaRequest
+{
+    [Required(AllowEmptyStrings = false, ErrorMessage = "Indica el motivo del rechazo."), MaxLength(500)]
+    public string Motivo { get; set; } = null!;
+}
+
+/// <summary>S6-HU-27.3/#322: cambiar el vehículo de una línea. Se envía UNO: <c>configVehiculoId</c> (configuración oficial) o <c>tipoVehiculo</c> (texto o código, con la <c>carroceria</c> opcional).</summary>
+public class clsCambiarVehiculoLineaRequest
+{
+    public Guid? ConfigVehiculoId { get; set; }
+
+    [MaxLength(100)]
+    public string? TipoVehiculo { get; set; }
+
+    [MaxLength(100)]
+    public string? Carroceria { get; set; }
+}
+
 public class clsAgregarConexosRequest
 {
     [Required, MinLength(1, ErrorMessage = "Debe incluir al menos un servicio conexo.")]

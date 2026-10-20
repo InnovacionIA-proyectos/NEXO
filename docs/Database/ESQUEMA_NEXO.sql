@@ -105,8 +105,28 @@ CREATE TABLE [db_NEXO].[tbl_configuraciones_vehiculo] (
     [RangoPeso] nvarchar(50) NULL,
     [CreatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset()),
     [UpdatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset()),
-    [EsCatalogoOficial] bit NOT NULL DEFAULT (CONVERT([bit],(0))) -- S5-HU-18.4/#276: fila que calza con un código canónico del Cubicador
+    [EsCatalogoOficial] bit NOT NULL DEFAULT (CONVERT([bit],(0))), -- S5-HU-18.4/#276: fila que calza con un código canónico del Cubicador
+    [Descartada] bit NOT NULL DEFAULT (CONVERT([bit],(0))) -- S6-HU-27.3/#322: fila en cuarentena que un humano descartó en la bandeja de normalización (sale de la bandeja, no se borra)
     , CONSTRAINT [PK_configuraciones_vehiculo] PRIMARY KEY ([Id])
+);
+
+-- Diccionario de apodos/variantes de texto libre (S6-HU-27.1/#315, DATA-2):
+-- traduce lo que la gente escribe ("TMULA", "40HC") al código oficial que ya
+-- comparten Nexo y el Cubicador (TipoVehiculo) o al catálogo de SAP
+-- (tblSAPClaseContenedor). TipoElemento distingue los dos catálogos porque
+-- Codigo no es una FK — es texto, para no depender de una fila específica de
+-- tbl_configuraciones_vehiculo (esa tabla no tiene una fila "oficial" única
+-- por tipo, ver docs/Database/seeder/DECISIONES-TECNICAS.md).
+CREATE TABLE [db_NEXO].[tbl_alias_elementos] (
+    [Id] uniqueidentifier NOT NULL,
+    [Alias] nvarchar(100) NOT NULL,
+    [AliasNormalizado] nvarchar(100) NOT NULL,
+    [TipoElemento] nvarchar(20) NOT NULL,
+    [Codigo] nvarchar(20) NOT NULL,
+    [Activo] bit NOT NULL DEFAULT (CONVERT([bit],(1))),
+    [CreatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset())
+    , CONSTRAINT [PK_alias_elementos] PRIMARY KEY ([Id])
+    , CONSTRAINT [UQ_alias_elementos_AliasNormalizado] UNIQUE ([AliasNormalizado])
 );
 
 -- Catálogo propio de municipios (Colombia/Venezuela/Ecuador) para el

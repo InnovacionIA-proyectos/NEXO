@@ -28,6 +28,9 @@ public class clsCotizacionesController(
     ICommandHandler<clsCrearCotizacionCommand, clsCotizacionDto> crear,
     ICommandHandler<clsAgregarLineaCotizacionCommand, clsCotizacionDto> agregarLinea,
     ICommandHandler<clsEditarLineaCotizacionCommand, clsCotizacionDto> editarLinea,
+    ICommandHandler<clsRechazarLineaCotizacionCommand, clsLineaRechazoDto> rechazarLinea,
+    ICommandHandler<clsDeshacerRechazoLineaCotizacionCommand, clsLineaRechazoDto> deshacerRechazoLinea,
+    ICommandHandler<clsCambiarVehiculoLineaCommand, clsLineaVehiculoDto> cambiarVehiculoLinea,
     ICommandHandler<clsAgregarConexosCotizacionCommand, clsCotizacionDto> agregarConexos,
     ICommandHandler<clsEditarConexoCotizacionCommand, clsCotizacionDto> editarConexo,
     ICommandHandler<clsEliminarConexoCotizacionCommand, clsCotizacionDto> eliminarConexo,
@@ -114,6 +117,51 @@ public class clsCotizacionesController(
         Guid id, Guid lineaSolicitudId, [FromBody] clsEditarLineaCotizacionRequest req, CancellationToken ct = default)
         => Ok(await editarLinea.Handle(new clsEditarLineaCotizacionCommand(
             id, lineaSolicitudId, req.ValorFlete, req.ValorRetornoContenedor, req.ConfirmarSinPiso), ct));
+
+    /// <summary>
+    /// S6-HU-24.3/#320: rechaza UNA línea de la cotización con un motivo, para entregar el resto sin que una línea sin costear frene la
+    /// entrega. Solo AdminTarifas y Admin; sin motivo → 400; solo cotización Borrador y línea sin flete (409). La línea queda
+    /// <c>rechazada</c>, sin precio y sin sumar al total.
+    /// </summary>
+    [HttpPost("{id:guid}/lineas/{lineaSolicitudId:guid}/rechazo")]
+    [Authorize(Roles = "AdminTarifas,Admin")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<clsLineaRechazoDto>> RechazarLinea(
+        Guid id, Guid lineaSolicitudId, [FromBody] clsRechazarLineaRequest req, CancellationToken ct = default)
+        => Ok(await rechazarLinea.Handle(new clsRechazarLineaCotizacionCommand(id, lineaSolicitudId, req.Motivo), ct));
+
+    /// <summary>
+    /// S6-HU-24.3/#320: deshace el rechazo de una línea (vuelve a <c>porCostear</c>). Solo mientras la cotización NO esté entregada
+    /// (409 COTIZACION_NO_EDITABLE en otro caso). Solo AdminTarifas y Admin.
+    /// </summary>
+    [HttpDelete("{id:guid}/lineas/{lineaSolicitudId:guid}/rechazo")]
+    [Authorize(Roles = "AdminTarifas,Admin")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<clsLineaRechazoDto>> DeshacerRechazoLinea(
+        Guid id, Guid lineaSolicitudId, CancellationToken ct = default)
+        => Ok(await deshacerRechazoLinea.Handle(new clsDeshacerRechazoLineaCotizacionCommand(id, lineaSolicitudId), ct));
+
+    /// <summary>
+    /// S6-HU-27.3/#322 (D9): cambia el vehículo de una línea. Solo AdminTarifas y Admin y solo con la cotización en Borrador (entregada → 409
+    /// COTIZACION_NO_EDITABLE). El vehículo se indica con <c>configVehiculoId</c> (configuración oficial) o con <c>tipoVehiculo</c> (texto o código,
+    /// resuelto con el diccionario de alias; uno desconocido → 400 VEHICULO_NO_RECONOCIDO). El flete que la línea tuviera se descarta (se calculó con
+    /// el vehículo anterior) y la línea vuelve a <c>porCostear</c>; la respuesta trae la propuesta recalculada con el piso SICE-TAC del vehículo nuevo.
+    /// </summary>
+    [HttpPut("{id:guid}/lineas/{lineaSolicitudId:guid}/vehiculo")]
+    [Authorize(Roles = "AdminTarifas,Admin")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<clsLineaVehiculoDto>> CambiarVehiculoLinea(
+        Guid id, Guid lineaSolicitudId, [FromBody] clsCambiarVehiculoLineaRequest req, CancellationToken ct = default)
+        => Ok(await cambiarVehiculoLinea.Handle(
+            new clsCambiarVehiculoLineaCommand(id, lineaSolicitudId, req.ConfigVehiculoId, req.TipoVehiculo, req.Carroceria), ct));
 
     /// <summary>
     /// Agregar servicios conexos a la cotización. Se admite mientras no tenga resultado

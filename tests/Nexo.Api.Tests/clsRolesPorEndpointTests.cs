@@ -53,6 +53,17 @@ public class clsRolesPorEndpointTests(clsApiFixture fx)
             // ---- cotizaciones: AdminBiblioteca no entra
             new("Cotizaciones GET /{id}", HttpMethod.Get, $"/api/cotizaciones/{Inexistente}", Mesa),
             new("Cotizaciones POST", HttpMethod.Post, "/api/cotizaciones", CosteoYCubicador, new { }),
+            new("Cotizaciones POST lineas/rechazo (#320)", HttpMethod.Post, $"/api/cotizaciones/{Inexistente}/lineas/{Inexistente}/rechazo", ["AdminTarifas", "Admin"], new { motivo = "Sin tarifa" }),
+            new("Cotizaciones DELETE lineas/rechazo (#320)", HttpMethod.Delete, $"/api/cotizaciones/{Inexistente}/lineas/{Inexistente}/rechazo", ["AdminTarifas", "Admin"]),
+            new("Cotizaciones PUT lineas/vehiculo (#322)", HttpMethod.Put, $"/api/cotizaciones/{Inexistente}/lineas/{Inexistente}/vehiculo", ["AdminTarifas", "Admin"], new { configVehiculoId = Inexistente }),
+
+            // ---- diccionario de alias (#321) y bandeja de normalización (#322): leer es para todos; agregar alias y la bandeja, AdminTarifas/Admin
+            new("Alias GET", HttpMethod.Get, "/api/catalogos/alias", Todos),
+            new("Alias GET /resolver", HttpMethod.Get, "/api/catalogos/alias/resolver?texto=TB", Todos),
+            new("Alias POST", HttpMethod.Post, "/api/catalogos/alias", ["AdminTarifas", "Admin"], new { tipo = "vehiculo", alias = "", codigo = "2L2" }),
+            new("Bandeja vehiculos-cuarentena GET", HttpMethod.Get, "/api/catalogos/vehiculos-cuarentena", ["AdminTarifas", "Admin"]),
+            new("Bandeja mapear POST", HttpMethod.Post, $"/api/catalogos/vehiculos-cuarentena/{Inexistente}/mapear", ["AdminTarifas", "Admin"], new { codigo = "2L2" }),
+            new("Bandeja descartar POST", HttpMethod.Post, $"/api/catalogos/vehiculos-cuarentena/{Inexistente}/descartar", ["AdminTarifas", "Admin"]),
 
             // ---- Cubicador completo para AdminTarifas (#310); AdminBiblioteca no
             new("planes-cargue POST", HttpMethod.Post, "/api/planes-cargue", CosteoYCubicador, new { }),

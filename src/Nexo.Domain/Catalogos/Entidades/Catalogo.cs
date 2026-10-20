@@ -53,6 +53,13 @@ public class clsConfiguracionVehiculo : IAuditable
     /// </summary>
     public bool EsCatalogoOficial { get; set; }
 
+    /// <summary>
+    /// S6-HU-27.3/#322: un humano descartó esta fila de la bandeja de normalización (no corresponde a ningún vehículo real). Sale de la
+    /// bandeja pero NO se borra: las líneas que ya apuntan a ella siguen apuntándole, y si el mismo texto vuelve a llegar se reutiliza
+    /// la fila descartada en vez de crear otra en cuarentena.
+    /// </summary>
+    public bool Descartada { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 }

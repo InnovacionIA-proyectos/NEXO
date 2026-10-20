@@ -1,3 +1,4 @@
+using Nexo.Application.CasosDeUso.Catalogos.Interfaces;
 using System.Globalization;
 using System.Text;
 using Nexo.Application.CasosDeUso.Solicitudes.DTOs;
@@ -65,7 +66,7 @@ public sealed record clsCapturarSolicitudCommand(
 /// </summary>
 public sealed class clsCapturarSolicitudCommandHandler(
     ISolicitudesRepository solicitudes, IRutasCatalogoPort rutasCatalogo,
-    IConfiguracionesVehiculoPort vehiculosCatalogo, IClientesPort clientes, IClientesDwPort clientesDw,
+    IConfiguracionesVehiculoPort vehiculosCatalogo, IAliasCatalogoPort aliasCatalogo, IClientesPort clientes, IClientesDwPort clientesDw,
     IPropuestaTarifaPort propuestas, IAuditoriaPort auditoria, ICurrentUserPort usuarioActual,
     TimeProvider clock, IPublicadorDeMensajes publicador, IUnitOfWork uow, IServiceScopeFactory scopes)
     : ICommandHandler<clsCapturarSolicitudCommand, clsCapturaResultDto>
@@ -83,6 +84,8 @@ public sealed class clsCapturarSolicitudCommandHandler(
 
         var vehiculos = await vehiculosCatalogo.ListarAsync(ct);
         var vehiculosPorClave = vehiculos.GroupBy(v => clsResolucionDeCatalogos.ClaveVehiculo(v.TipoVehiculo, v.Carroceria)).ToDictionary(g => g.Key, g => g.First());
+        var aliasVehiculo = await aliasCatalogo.MapaActivoAsync(clsAliasElemento.TipoVehiculo, ct);
+        var aliasContenedor = await aliasCatalogo.MapaActivoAsync(clsAliasElemento.TipoContenedor, ct);
 
         var rutasCreadas = 0;
         var vehiculosCreados = 0;
@@ -115,7 +118,7 @@ public sealed class clsCapturarSolicitudCommandHandler(
                 lr.Origen, lr.Destino, rutasPorClave, rutasCatalogo, lr.OrigenMunicipioId, lr.DestinoMunicipioId);
             if (rutaCreada) rutasCreadas++;
 
-            var (vehiculo, vehiculoCreado) = clsResolucionDeCatalogos.ResolverVehiculo(lr.TipoVehiculo, lr.Carroceria, vehiculosPorClave, vehiculosCatalogo);
+            var (vehiculo, vehiculoCreado) = clsResolucionDeCatalogos.ResolverVehiculo(lr.TipoVehiculo, lr.Carroceria, vehiculosPorClave, vehiculosCatalogo, aliasVehiculo);
             if (vehiculoCreado) vehiculosCreados++;
 
             var ciudadLevante = clsResolucionDeCatalogos.Limpiar(lr.CiudadLevanteContenedor);
@@ -142,7 +145,7 @@ public sealed class clsCapturarSolicitudCommandHandler(
                 Tipologia = ParseTipologia(lr.Tipologia),
                 LineaNegocio = lineaNegocio,
                 ClaseViaje = ParseClaseViaje(lr.ClaseViaje),
-                ClaseContenedor = ParseClaseContenedor(lr.ClaseContenedor),
+                ClaseContenedor = clsResolucionDeCatalogos.ResolverClaseContenedor(lr.ClaseContenedor, aliasContenedor),
                 Exclusivo = lr.Exclusivo ?? false,
                 Consolidado = lr.Consolidado ?? false,
                 RetornaContenedor = retornaContenedor,
@@ -368,17 +371,5 @@ public sealed class clsCapturarSolicitudCommandHandler(
         if (n.Contains("CUPO")) return ClaseViaje.Cupo;
         if (n.Contains("SUELTA")) return ClaseViaje.CargaSuelta;
         return null;
-    }
-
-    private static readonly string[] ClasesContenedor = ["CNT20.IT", "CNT20.RE", "CNT20.ST", "CNT40.HC", "CNT40.RE"];
-
-    private static string? ParseClaseContenedor(string? valor)
-    {
-        var limpio = clsResolucionDeCatalogos.Limpiar(valor);
-        if (limpio is null) return null;
-        var n = limpio.ToUpperInvariant().Replace(" ", "").Replace(".", "").Replace("-", "").Replace("_", "");
-        foreach (var c in ClasesContenedor)
-            if (n.Contains(c.Replace(".", ""))) return c;
-        return limpio.Length <= 20 ? limpio : limpio[..20];
     }
 }

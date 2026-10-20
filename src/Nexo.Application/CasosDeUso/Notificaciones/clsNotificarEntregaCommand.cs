@@ -1,3 +1,4 @@
+using Nexo.Application.CasosDeUso.Cotizaciones.DTOs;
 using Nexo.Application.CasosDeUso.Cotizaciones.Interfaces;
 using Nexo.Application.CasosDeUso.Notificaciones.DTOs;
 using Nexo.Application.CasosDeUso.Notificaciones.Plantillas;
@@ -41,6 +42,7 @@ public sealed record clsNotificarEntregaCommand(
 public sealed class clsNotificarEntregaCommandHandler(
     ICotizacionRepository cotizaciones,
     ISolicitudesPort solicitudes,
+    ILineasSolicitudPort lineasSolicitud,
     ICorreoPort correo)
     : ICommandHandler<clsNotificarEntregaCommand, clsResultadoDeNotificacionDto>
 {
@@ -67,6 +69,12 @@ public sealed class clsNotificarEntregaCommandHandler(
             return clsResultadoDeNotificacionDto.NoHabiaQueEnviar(
                 "La salida de correo corporativo no está configurada.");
 
+        // S6-HU-24.3/#320: el correo lleva el motivo de cada línea rechazada.
+        var rechazadas = (await lineasSolicitud.ObtenerRechazadasAsync(command.SolicitudId, ct))
+            .Select(l => new clsLineaRechazadaInfo(
+                l.clsRuta is { } r ? $"{r.Origen} → {r.Destino}" : "—", l.Tipologia?.ToString(), l.MotivoRechazo ?? string.Empty))
+            .ToList();
+
         var adjuntos = command.FormatoPdf is { Length: > 0 }
             ? new[]
             {
@@ -82,7 +90,7 @@ public sealed class clsNotificarEntregaCommandHandler(
             new clsCorreoParaEnviar(
                 [solicitante.Email.Trim()],
                 clsPlantillaDeEntrega.Asunto(c, cliente),
-                clsPlantillaDeEntrega.CuerpoHtml(c, cliente, solicitante.Nombre),
+                clsPlantillaDeEntrega.CuerpoHtml(c, cliente, solicitante.Nombre, rechazadas),
                 adjuntos,
                 Metadatos: new Dictionary<string, string> { ["cotizacion"] = c.Id.ToString() }),
             ct);

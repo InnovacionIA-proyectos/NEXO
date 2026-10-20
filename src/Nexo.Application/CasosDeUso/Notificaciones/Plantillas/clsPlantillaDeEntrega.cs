@@ -1,4 +1,5 @@
 using System.Globalization;
+using Nexo.Application.CasosDeUso.Cotizaciones.DTOs;
 using Nexo.Domain.Catalogos.Entidades;
 using Nexo.Domain.Cotizaciones.Entidades;
 
@@ -36,8 +37,22 @@ public static class clsPlantillaDeEntrega
     public static string Asunto(clsCotizacion c, clsCliente cliente) =>
         $"Tu cotización para {cliente.Nombre} quedó entregada — {Moneda(c.Total)}";
 
-    public static string CuerpoHtml(clsCotizacion c, clsCliente cliente, string nombreDestinatario)
+    /// <param name="lineasRechazadas">S6-HU-24.3/#320: las líneas que el Administrador de Tarifas rechazó, con su motivo. El correo SÍ lleva
+    /// los motivos (el Excel y el PDF no): es la forma en que el comercial se entera de por qué una línea quedó sin costeo.</param>
+    public static string CuerpoHtml(
+        clsCotizacion c, clsCliente cliente, string nombreDestinatario, IReadOnlyList<clsLineaRechazadaInfo>? lineasRechazadas = null)
     {
+        var rechazadas = lineasRechazadas ?? [];
+        var bloqueRechazadas = rechazadas.Count == 0 ? string.Empty : $"""
+                <div style="margin:20px 0 0;padding:14px;background:#fff6e5;border-radius:6px;font-size:13px;color:#5a4300;">
+                  <strong>Líneas sin costeo ({rechazadas.Count})</strong>
+                  <p style="margin:6px 0 10px;">Estas líneas quedaron fuera de la cotización (sin precio) por el motivo indicado:</p>
+                  <table role="presentation" width="100%" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-size:13px;color:#333;">
+                    {string.Concat(rechazadas.Select(r => $"<tr style=\"border-top:1px solid #f0dca8;\"><td>{System.Security.SecurityElement.Escape(r.Ruta)}</td><td>{System.Security.SecurityElement.Escape(r.Motivo)}</td></tr>"))}
+                  </table>
+                </div>
+            """;
+
         var subtotalFletes = c.Lineas.Sum(l =>
             l.ValorFlete + (l.ValorAprovisionamiento ?? 0) + (l.ValorRetornoContenedor ?? 0));
         var subtotalConexos = c.Conexos.Sum(x => x.ValorAplicado);
@@ -80,6 +95,7 @@ public static class clsPlantillaDeEntrega
                     <td align="right">{Moneda(c.Total)}</td>
                   </tr>
                 </table>
+                {bloqueRechazadas}
                 <hr style="border:none;border-top:1px solid #e3e6ea;margin:24px 0 16px;">
                 <p style="color:#888;font-size:12px;text-align:center;margin:0;">
                   Correo automático de Nexo — Botero Soto Soluciones Logísticas.<br>

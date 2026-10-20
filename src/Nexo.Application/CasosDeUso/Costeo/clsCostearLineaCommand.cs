@@ -45,6 +45,9 @@ public sealed class clsCostearLineaCommandHandler(
 {
     public async Task<Unit> Handle(clsCostearLineaCommand command, CancellationToken ct = default)
     {
+        // S6-HU-24.3/#320: una línea rechazada a propósito no se costea (podría llegar un mensaje encolado antes del rechazo).
+        if (await lineas.EstaRechazadaAsync(command.LineaId, ct)) return Unit.Value;
+
         var decision = await propuesta.ProponerParaLineaAsync(command.LineaId, ct);
         var resultado = decision.Resultado;
         // S5-HU-20.5/#297: la línea de Cupo sin vehículo queda con su motivo propio, no con el texto largo de la justificación.

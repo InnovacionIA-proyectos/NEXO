@@ -126,6 +126,9 @@ public sealed class clsMetricasAdapter(clsNexoDbContext db) : IMetricasPort
         var lineasQuery = db.LineasSolicitud.AsQueryable();
         if (desde is not null) lineasQuery = lineasQuery.Where(l => l.CreatedAt >= desde);
         if (hasta is not null) lineasQuery = lineasQuery.Where(l => l.CreatedAt <= hasta);
+        // S6-HU-24.3/#320: una línea RECHAZADA se dejó sin costear a propósito: no cuenta como "por costear" en la proporción de líneas
+        // autocosteadas (si no, cada rechazo bajaría el porcentaje sin que el motor hubiera fallado en nada).
+        lineasQuery = lineasQuery.Where(l => l.EstadoLinea != EstadoLinea.Rechazada);
         var totalLineas = await lineasQuery.CountAsync(ct);
         var autoCosteadas = await lineasQuery.CountAsync(l => l.EstadoLinea == EstadoLinea.AutoResuelta, ct);
 

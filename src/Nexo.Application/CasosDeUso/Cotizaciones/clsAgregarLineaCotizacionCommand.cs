@@ -44,6 +44,12 @@ public sealed class clsAgregarLineaCotizacionCommandHandler(
         {
             lineaSol = await lineasSolicitud.ObtenerDeSolicitudAsync(lid, c.SolicitudId, ct)
                 ?? throw new clsValidationFailedException("LINEA_INVALIDA", "La línea de solicitud no pertenece a esta cotización.");
+            // S6-HU-24.3/#320: a una línea rechazada no se le agrega flete (una rechazada nunca tiene fila de cotización). Si hay que
+            // costearla, primero se deshace el rechazo.
+            if (lineaSol.EstadoLinea == EstadoLinea.Rechazada)
+                throw new clsConflictException("LINEA_RECHAZADA",
+                    "La línea está rechazada: deshaga el rechazo antes de agregarle un flete.");
+
             // Además de validar, se marca la línea como Revisada (gestión del Administrador de
             // Fletes) para distinguirla del auto-costeo en la bandeja.
             lineaSol.EstadoLinea = EstadoLinea.Revisada;

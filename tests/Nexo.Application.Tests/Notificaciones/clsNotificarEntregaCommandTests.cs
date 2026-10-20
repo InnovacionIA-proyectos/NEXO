@@ -27,12 +27,13 @@ public class clsNotificarEntregaCommandTests
     private readonly Mock<ICotizacionRepository> _cotizaciones = new();
     private readonly Mock<ISolicitudesPort> _solicitudes = new();
     private readonly Mock<ICorreoPort> _correo = new();
+    private readonly Mock<ILineasSolicitudPort> _lineasSolicitud = new();   // S6-HU-24.3/#320: motivos de las líneas rechazadas
 
     private static readonly Guid CotizacionId = Guid.Parse("aaaa0000-0000-0000-0000-000000000001");
     private static readonly Guid SolicitudId = Guid.Parse("bbbb0000-0000-0000-0000-000000000001");
 
     private clsNotificarEntregaCommandHandler Handler() =>
-        new(_cotizaciones.Object, _solicitudes.Object, _correo.Object);
+        new(_cotizaciones.Object, _solicitudes.Object, _lineasSolicitud.Object, _correo.Object);
 
     private static clsNotificarEntregaCommand Comando(byte[]? pdf = null, string? nombre = null) =>
         new(CotizacionId, SolicitudId, pdf, nombre);
@@ -64,6 +65,58 @@ public class clsNotificarEntregaCommandTests
         _correo.SetupGet(c => c.Configurado).Returns(true);
         _correo.Setup(c => c.EnviarAsync(It.IsAny<clsCorreoParaEnviar>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync("id-del-relay-123");
+        Rechazadas();   // por defecto, ninguna línea rechazada
+    }
+
+    /// <summary>S6-HU-24.3/#320: las líneas de la solicitud que se rechazaron (ruta y motivo).</summary>
+    private void Rechazadas(params (string Origen, string Destino, string Motivo)[] lineas) =>
+        _lineasSolicitud.Setup(l => l.ObtenerRechazadasAsync(SolicitudId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(lineas.Select(x => new clsLineaSolicitud
+            {
+                SolicitudId = SolicitudId, EstadoLinea = EstadoLinea.Rechazada, MotivoRechazo = x.Motivo,
+                clsRuta = new clsRuta { Origen = x.Origen, Destino = x.Destino },
+            }).ToList());
+
+    // ---------------------------------------------------------------- S6-HU-24.3/#320: el correo lleva los motivos
+
+    [Fact]
+    public async Task El_correo_lleva_el_motivo_de_cada_linea_rechazada_con_su_ruta()
+    {
+        TodoListo();
+        Rechazadas(("Cali", "Bogotá", "No hay tarifa vigente"), ("Medellín", "Cartagena", "El cliente cambió la carga"));
+
+        await Handler().Handle(Comando());
+
+        _correo.Verify(c => c.EnviarAsync(It.Is<clsCorreoParaEnviar>(m =>
+            m.CuerpoHtml.Contains("Líneas sin costeo (2)")
+            && m.CuerpoHtml.Contains("Cali → Bogotá") && m.CuerpoHtml.Contains("No hay tarifa vigente")
+            && m.CuerpoHtml.Contains("Medellín → Cartagena") && m.CuerpoHtml.Contains("El cliente cambió la carga")),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Sin_lineas_rechazadas_el_correo_no_trae_el_bloque_de_lineas_sin_costeo()
+    {
+        TodoListo();
+
+        await Handler().Handle(Comando());
+
+        _correo.Verify(c => c.EnviarAsync(It.Is<clsCorreoParaEnviar>(m => !m.CuerpoHtml.Contains("sin costeo")),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    // El motivo lo escribe una persona: no puede inyectar HTML en el correo.
+    [Fact]
+    public async Task El_motivo_se_escapa_para_que_no_inyecte_html_en_el_correo()
+    {
+        TodoListo();
+        Rechazadas(("Cali", "Bogotá", "<script>alert(1)</script> & más"));
+
+        await Handler().Handle(Comando());
+
+        _correo.Verify(c => c.EnviarAsync(It.Is<clsCorreoParaEnviar>(m =>
+            !m.CuerpoHtml.Contains("<script>") && m.CuerpoHtml.Contains("&lt;script&gt;") && m.CuerpoHtml.Contains("&amp; más")),
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]

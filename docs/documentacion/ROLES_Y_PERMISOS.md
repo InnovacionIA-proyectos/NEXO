@@ -67,6 +67,9 @@ Antes de #307 este rol operaba el flujo de solicitudes y cotizaciones; ahora es 
 - **Cubicador completo (#310)**: crear, optimizar y editar planes de cargue (`POST /api/planes-cargue`, `/demo`, `/desde-linea/{id}`, `/{id}/optimizar`, `/{id}/items`, `/{id}/items/importar`; `DELETE /{id}/items/{itemId}` y `DELETE /{id}`), mover colocaciones (`PATCH /{id}/colocaciones/{id}`) y crear vehículos (`POST /api/vehiculos`). `DELETE /api/vehiculos/{id}` sigue solo para Admin
 - Editar el flete de una línea de **cualquier fuente** salvo con regla Solo-SICETAC (`409 FLETE_SOLO_SICETAC`); al guardar, la fuente pasa a Manual (S6-HU-26.1/#30)
 - Recibe la alerta de "línea que no pudo costearse" (#307) y la de tarifa de plaza vencida
+- **Rechazar una línea con motivo** y deshacerlo (`POST`/`DELETE /api/cotizaciones/{id}/lineas/{lineaSolicitudId}/rechazo`) — S6-HU-24.3/#320
+- **Cambiar el vehículo de una línea** (`PUT /api/cotizaciones/{id}/lineas/{lineaSolicitudId}/vehiculo`) — S6-HU-27.3/#322
+- **Agregar alias** al diccionario (`POST /api/catalogos/alias`) y trabajar la **bandeja de normalización** de vehículos en cuarentena (`/api/catalogos/vehiculos-cuarentena`: listar, mapear, descartar) — S6-HU-27.2/#321 y S6-HU-27.3/#322. Leer el diccionario y "resolver" un texto lo puede cualquier rol
 
 ### ServiciosLogisticos
 - Crear y editar servicios conexos; importarlos desde Excel

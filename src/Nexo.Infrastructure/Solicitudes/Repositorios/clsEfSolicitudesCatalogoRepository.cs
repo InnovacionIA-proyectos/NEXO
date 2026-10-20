@@ -67,17 +67,17 @@ public sealed class clsEfSolicitudesCatalogoRepository(clsNexoDbContext db) : IS
         // Descartada, así que al entregarla deja de salir en Pendientes.
         q = atencion switch
         {
-            "pendientes" => q.Where(s => s.Lineas.Any(l => !db.CotizacionLineas.Any(cl => cl.LineaSolicitudId == l.Id))
+            "pendientes" => q.Where(s => s.Lineas.Any(l => (l.EstadoLinea != EstadoLinea.Rechazada && !db.CotizacionLineas.Any(cl => cl.LineaSolicitudId == l.Id)))
                 || (s.Lineas.Any()
-                    && !s.Lineas.Any(l => !db.CotizacionLineas.Any(cl => cl.LineaSolicitudId == l.Id))
+                    && !s.Lineas.Any(l => (l.EstadoLinea != EstadoLinea.Rechazada && !db.CotizacionLineas.Any(cl => cl.LineaSolicitudId == l.Id)))
                     && s.Lineas.Any(l => l.EstadoLinea == EstadoLinea.Revisada))),
-            "atendidas" => q.Where(s => s.Lineas.Any() && !s.Lineas.Any(l => !db.CotizacionLineas.Any(cl => cl.LineaSolicitudId == l.Id))),
+            "atendidas" => q.Where(s => s.Lineas.Any() && !s.Lineas.Any(l => (l.EstadoLinea != EstadoLinea.Rechazada && !db.CotizacionLineas.Any(cl => cl.LineaSolicitudId == l.Id)))),
             "automatico" => q.Where(s => s.Lineas.Any()
-                && !s.Lineas.Any(l => !db.CotizacionLineas.Any(cl => cl.LineaSolicitudId == l.Id))
+                && !s.Lineas.Any(l => (l.EstadoLinea != EstadoLinea.Rechazada && !db.CotizacionLineas.Any(cl => cl.LineaSolicitudId == l.Id)))
                 && !s.Lineas.Any(l => l.EstadoLinea == EstadoLinea.Revisada)
                 && s.Lineas.Any(l => l.EstadoLinea == EstadoLinea.AutoResuelta)),
             "administrador" => q.Where(s => s.Lineas.Any()
-                && !s.Lineas.Any(l => !db.CotizacionLineas.Any(cl => cl.LineaSolicitudId == l.Id))
+                && !s.Lineas.Any(l => (l.EstadoLinea != EstadoLinea.Rechazada && !db.CotizacionLineas.Any(cl => cl.LineaSolicitudId == l.Id)))
                 && s.Lineas.Any(l => l.EstadoLinea == EstadoLinea.Revisada)),
             _ => q, // "todas"
         };
@@ -112,7 +112,7 @@ public sealed class clsEfSolicitudesCatalogoRepository(clsNexoDbContext db) : IS
                 s.CreatedAt,
                 Lineas = s.Lineas.Count,
                 FleteTotal = s.Cotizaciones.SelectMany(c => c.Lineas).Sum(l => (decimal?)l.ValorFlete),
-                SinFlete = s.Lineas.Count(l => !db.CotizacionLineas.Any(cl => cl.LineaSolicitudId == l.Id)),
+                SinFlete = s.Lineas.Count(l => (l.EstadoLinea != EstadoLinea.Rechazada && !db.CotizacionLineas.Any(cl => cl.LineaSolicitudId == l.Id))),
                 Auto = s.Lineas.Count(l => l.EstadoLinea == EstadoLinea.AutoResuelta),
                 Revisadas = s.Lineas.Count(l => l.EstadoLinea == EstadoLinea.Revisada),
                 // Cotización representativa: la que tenga resultado distinto de SinDefinir (la más

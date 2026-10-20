@@ -90,24 +90,64 @@ public static class clsResolucionDeCatalogos
     /// (EsCatalogoOficial = false) — comparar texto normalizado no es suficiente para saber
     /// si corresponde a un código canónico del Cubicador ("TMULA"/"T.MULA"/"Tractomula" no
     /// calzan entre sí hoy, y adivinar la equivalencia aquí perpetuaría el mismo problema).
-    /// Esa decisión la toma un humano en la bandeja de normalización (S5-HU-19.3, fuera de
-    /// este repo) — este método deja de crear filas oficiales en silencio.
+    /// Esa decisión la toma un humano en la bandeja de normalización (S6-HU-27.3/#322).
+    ///
+    /// S6-HU-27.2/#321: antes de caer en cuarentena se consulta el diccionario de alias
+    /// (<paramref name="aliasVehiculo"/>: <c>AliasNormalizado → código</c>, de <c>tbl_alias_elementos</c>). Solo aplica a la columna "tipo de
+    /// vehículo": si el texto es un alias ("TB", "T.B", "Turbo", "2L2" → 2L2), el tipo que se busca/guarda es el CÓDIGO, así que todas
+    /// las variantes llegan a la MISMA fila; la carrocería no se toca (viaja tal cual, con la normalización de siempre). Un alias lo
+    /// puso un humano, así que la fila que se cree con el código nace oficial, y una fila (código + carrocería) que estaba en
+    /// cuarentena se promueve a oficial (el tracking de EF la guarda con el SaveChanges del caso de uso). Una fila que alguien
+    /// descartó no se promueve. Sin alias, nada cambia: texto desconocido → cuarentena.
     /// </summary>
     public static (clsConfiguracionVehiculo? Vehiculo, bool Creado) ResolverVehiculo(
         string? tipoVehiculo, string? carroceria,
-        IDictionary<string, clsConfiguracionVehiculo> vehiculosPorClave, IConfiguracionesVehiculoPort catalogo)
+        IDictionary<string, clsConfiguracionVehiculo> vehiculosPorClave, IConfiguracionesVehiculoPort catalogo,
+        IReadOnlyDictionary<string, string>? aliasVehiculo = null)
     {
         if (string.IsNullOrWhiteSpace(tipoVehiculo)) return (null, false);
 
-        var clave = ClaveVehiculo(tipoVehiculo, carroceria);
-        if (vehiculosPorClave.TryGetValue(clave, out var vehiculo)) return (vehiculo, false);
+        string? codigoAlias = null;
+        if (aliasVehiculo is not null && aliasVehiculo.TryGetValue(Normalizar(tipoVehiculo), out var codigo)) codigoAlias = codigo;
+        var tipo = codigoAlias ?? tipoVehiculo;
+
+        var clave = ClaveVehiculo(tipo, carroceria);
+        if (vehiculosPorClave.TryGetValue(clave, out var vehiculo))
+        {
+            if (codigoAlias is not null && !vehiculo.EsCatalogoOficial && !vehiculo.Descartada) vehiculo.EsCatalogoOficial = true;
+            return (vehiculo, false);
+        }
 
         vehiculo = new clsConfiguracionVehiculo
         {
-            TipoVehiculo = Limpiar(tipoVehiculo)!, Carroceria = Limpiar(carroceria), EsCatalogoOficial = false,
+            TipoVehiculo = Limpiar(tipo)!, Carroceria = Limpiar(carroceria), EsCatalogoOficial = codigoAlias is not null,
         };
         catalogo.Agregar(vehiculo);
         vehiculosPorClave[clave] = vehiculo;
         return (vehiculo, true);
     }
+
+    /// <summary>Las clases de contenedor de SAP (tblSAPClaseContenedor) que la captura reconoce dentro de un texto libre.</summary>
+    private static readonly string[] ClasesContenedor = ["CNT20.IT", "CNT20.RE", "CNT20.ST", "CNT40.HC", "CNT40.RE"];
+
+    /// <summary>
+    /// Código de la clase de contenedor a partir del texto que llegó. S6-HU-27.2/#321, en este orden: (1) el diccionario de alias
+    /// (<paramref name="aliasContenedor"/>: "40 HC", "40HC", "20 STD" → CNT40.HC, CNT20.ST); (2) un código real de SAP dentro del texto
+    /// ("CNT40.HC", "cnt 40 hc"); (3) el texto tal cual (máximo 20), como antes. Null si no vino nada.
+    /// </summary>
+    public static string? ResolverClaseContenedor(string? valor, IReadOnlyDictionary<string, string>? aliasContenedor = null)
+    {
+        var limpio = Limpiar(valor);
+        if (limpio is null) return null;
+
+        if (aliasContenedor is not null && aliasContenedor.TryGetValue(Normalizar(limpio), out var codigo)) return codigo;
+
+        var n = limpio.ToUpperInvariant().Replace(" ", "").Replace(".", "").Replace("-", "").Replace("_", "");
+        foreach (var c in ClasesContenedor)
+            if (n.Contains(c.Replace(".", ""))) return c;
+        return limpio.Length <= 20 ? limpio : limpio[..20];
+    }
+
+    /// <summary>Los códigos de clase de contenedor de SAP — el diccionario de alias también los acepta aunque aún no tengan ningún alias.</summary>
+    public static IReadOnlyList<string> CodigosClaseContenedor => ClasesContenedor;
 }

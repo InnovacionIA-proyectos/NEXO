@@ -36,6 +36,9 @@ public sealed class clsRecostearLineaCommandHandler(
 {
     public async Task<Unit> Handle(clsRecostearLineaCommand command, CancellationToken ct = default)
     {
+        // S6-HU-24.3/#320: una línea rechazada a propósito no se re-costea.
+        if (await lineas.EstaRechazadaAsync(command.LineaId, ct)) return Unit.Value;
+
         var decision = await propuesta.ProponerParaLineaAsync(command.LineaId, ct);
 
         // Sigue en ConsultaCompleta: se queda esperando, sin escribir nada.

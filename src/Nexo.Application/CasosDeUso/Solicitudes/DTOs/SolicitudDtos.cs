@@ -115,7 +115,10 @@ public record clsLineaCosteoDto(
     /// <summary>S6-HU-29.1/#311: id de <c>tbl_municipios</c> del origen/destino de la ruta (el mismo de <c>GET /ciudades</c>), o null si
     /// la ruta no resolvió municipio. Evita que el front deduzca la ciudad leyendo el texto (68 nombres repetidos en el catálogo,
     /// p. ej. "Armenia", y nombres que no coinciden con el catálogo, p. ej. "Bogota" contra "BOGOTA, D.C.").</summary>
-    int? OrigenMunicipioId = null, int? DestinoMunicipioId = null);
+    int? OrigenMunicipioId = null, int? DestinoMunicipioId = null,
+    /// <summary>S6-HU-24.3/#320: por qué se rechazó la línea (<c>estadoLinea = "rechazada"</c>); null en cualquier otro estado. Cotifly lo
+    /// necesita para no dejar la cotización "pendiente" por una línea que se dejó sin costear a propósito.</summary>
+    string? MotivoRechazo = null);
 
 public record clsSolicitudCosteoDto(
     clsSolicitudDto Solicitud, clsTiemposLogisticosDto Tiempos, IReadOnlyList<clsLineaCosteoDto> Lineas,
