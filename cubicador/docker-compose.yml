@@ -78,6 +78,22 @@ services:
         $$SQLCMD -S db -U sa -P "$$MSSQL_SA_PASSWORD" -b -d dbTarifario_Nexo_Pruebas -Q \
           "IF SCHEMA_ID('$$CUBICADOR_DB_ESQUEMA') IS NULL EXEC('CREATE SCHEMA [$$CUBICADOR_DB_ESQUEMA]');"
         echo "Base y esquema $$CUBICADOR_DB_ESQUEMA listos."
+        # Las 5 tablas del motor 3D (vehiculos_cubicacion, planes_cargue...) las crea el DDL de
+        # docs/Database/ESQUEMA_CUBICADOR.sql: desde que se retiro Alembic (S5-HU-17.2) nada las crea
+        # solo, y sin ellas GET /api/planes-cargue/vehiculos responde 503 ("Invalid object name
+        # 'dbo_cubicador.vehiculos_cubicacion'") y el smoke de CI nunca pasa. Se aplica SOLO si la
+        # tabla no existe: el DDL no es idempotente y este servicio corre en cada `docker compose up`.
+        # En QA/produccion este servicio no existe: ahi las tablas ya estan.
+        EXISTE=$$($$SQLCMD -S db -U sa -P "$$MSSQL_SA_PASSWORD" -h -1 -W -d dbTarifario_Nexo_Pruebas -Q \
+          "SET NOCOUNT ON; SELECT COUNT(*) FROM sys.tables t JOIN sys.schemas s ON s.schema_id = t.schema_id WHERE s.name = '$$CUBICADOR_DB_ESQUEMA' AND t.name = 'vehiculos_cubicacion'" | tr -d '[:space:]')
+        if [ "$$EXISTE" = "0" ]; then
+          $$SQLCMD -S db -U sa -P "$$MSSQL_SA_PASSWORD" -b -d dbTarifario_Nexo_Pruebas -i /sql/esquema_motor3d.sql
+          echo "Tablas del motor 3D creadas."
+        else
+          echo "Tablas del motor 3D ya existen."
+        fi
+    volumes:
+      - ./docs/Database/ESQUEMA_CUBICADOR.sql:/sql/esquema_motor3d.sql:ro
     restart: "no"
 
   api:
