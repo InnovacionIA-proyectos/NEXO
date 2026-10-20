@@ -253,4 +253,63 @@ propósito.
 
 **Adicionales → Acompañamiento vehicular (por origen-destino):** `CODIGO SERVICIO` → `CodigoServicio` · `DESCRIPCIÓN SERVICIO` → `TipoServicio` · `ORIGEN` → `Origen` · `DESTINO` → `Destino` · `COSTO 2026` → `CostoUnitario` · `VIGENCIA` → `Vigencia` · `Unidad` fija `'Por unidad'` · `Puerto`/`Ruta`/`TipoMaquina` = `'NO APLICA'`.
 
+---
+
+## `alias_elementos.csv`
+
+**Decisión D6 (issue DATA-2/#315): `Codigo` es texto libre, no una FK a
+`tbl_configuraciones_vehiculo`.** El nombre sugerido original de la columna
+era `ConfiguracionVehiculoId` (uniqueidentifier), pero al revisar la tabla
+real contra `dbInformesAutomatizados_Pruebas.db_NEXO` se encontró que no sirve
+como catálogo limpio para apuntar: tiene 1.463 filas, muchas con
+`TipoVehiculo` repetido en decenas de combinaciones de `Carroceria`/`RangoPeso`
+distintas, mezcladas con texto libre sin normalizar (`ResolverVehiculo` en
+`clsResolucionDeCatalogos.cs` crea una fila nueva en cuarentena cada vez que
+el texto no calza exacto con una ya existente — por eso la tabla crece así).
+Y el código `2L2` (Turbo) no tenía, al momento de esta verificación, ninguna
+fila marcada `EsCatalogoOficial = 1`. Guardar el código como texto evita
+depender de una fila específica que puede no existir, y es el mismo valor que
+ya usa `clsConfiguracionVehiculo.TipoVehiculo` — Nexo y el Cubicador comparten
+este vocabulario de códigos (confirmado contra
+`cubicador/database/seeder/vehiculos.csv`: `2L2`=Turbo, `C2`=Sencillo,
+`C3`=Dobletroque, `2S2`=Minimula, `3S3`=Tractomula).
+
+**Decisión D6, ampliada: un solo diccionario para vehículo y contenedor, con
+`TipoElemento` como discriminador.** El archivo original
+(`diccionario_configuraciones_vehiculo_RAW.csv`) trae 7 columnas: 5 de tipo de
+vehículo y 2 de tamaño de contenedor ("Contenedor 40 HC", "Contenedor 20").
+Los dos tamaños de contenedor NO son un tipo de vehículo — igual que ya se
+había decidido para `reglas_solo_sicetac.csv` (ver esa sección arriba: "nunca
+fueron un tipo de vehículo real") — pero en vez de descartarlos, aquí se
+incluyen en la misma tabla con su propio código, porque conviene tener un solo
+diccionario de alias para toda la Captura. Mapeo confirmado contra
+`tblSAPClaseContenedor` (el mismo catálogo del endpoint
+`GET /api/catalogos/clases-contenedor`): "Contenedor 40 HC" → `CNT40.HC`,
+"Contenedor 20" → `CNT20.ST`.
+
+**Decisión: `AliasNormalizado` se calculó con el mismo algoritmo que ya usa
+el backend** (`clsResolucionDeCatalogos.Normalizar`), no uno nuevo — para que
+este diccionario use exactamente la misma noción de "mismo texto" que ya usa
+`ResolverVehiculo`/`ResolverRuta` al capturar.
+
+**Decisión: se mantienen 2 alias ambiguos del Excel original, "40" y "20" a
+secas** (sin "HC"/"STD"), porque así vienen en el diccionario de negocio
+original y no corresponden a ningún otro tipo de vehículo o contenedor en las
+demás columnas (sin choque verificado).
+
+**Verificación de colisiones:** se normalizaron las 7 columnas completas y se
+confirmó que ningún `AliasNormalizado` se repite entre dos columnas distintas
+— 71 filas finales (48 de vehículo + 23 de contenedor), sin duplicados dentro
+de cada columna (el nombre "bonito" de la columna y su primera fila de datos
+suelen repetir el mismo texto, ej. "Turbo"/"Turbo" — se dejó una sola vez).
+
+**Nota fuera de alcance (aclarada con Sara, 2026-10-20):** en el Excel de
+licitación real, "tipo de vehículo" y "carrocería" llegan en dos columnas
+separadas. Este diccionario solo resuelve la columna de tipo de vehículo; la
+carrocería sigue viajando tal cual (solo con la normalización de
+tildes/mayúsculas que ya existe), y `ResolverVehiculo` sigue buscando la fila
+exacta en `tbl_configuraciones_vehiculo` con el código ya resuelto + esa
+carrocería — eso no cambia con esta tabla. Conectar este diccionario con la
+Captura real (código C#) es trabajo de otra issue, no de esta.
+
 **Valor único (los 10 preexistentes, fuera del seeder pero documentado por si se vuelven a necesitar):** `Nombre` → `CodigoServicio`+`TipoServicio` · `ValorBase` → `CostoUnitario` · `VigenteHasta` → `Vigencia` · `Categoria`/`Activo` se conservan · `ReglaCobro` eliminado · todas las columnas de dimensión = `'NO APLICA'`.
