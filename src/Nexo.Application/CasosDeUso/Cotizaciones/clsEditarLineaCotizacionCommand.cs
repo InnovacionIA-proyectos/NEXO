@@ -99,6 +99,20 @@ public sealed class clsEditarLineaCotizacionCommandHandler(
                 "confirme (confirmarSinPiso = true) si quiere guardarlo sin verificar el piso.");
         }
 
+        // S6-HU-26.1/#30: el hueco de #283 — la validación del piso se SALTABA cuando no había piso (ruta sin fila en
+        // DWSice, período que no es el del mes actual, o la consulta falló), y cualquier valor entraba sin aviso. Ahora se
+        // avisa; el que edita decide con ConfirmarSinPiso y queda en la auditoría. No se puede distinguir "no hay piso para
+        // esta ruta" de "la consulta falló" desde acá, y no hace falta: en los dos casos el piso no se verificó.
+        if (!pisoVerificado && !command.ConfirmarSinPiso)
+        {
+            var motivo = string.IsNullOrWhiteSpace(propuesta?.MotivoPendiente) || !propuesta.MotivoPendiente.StartsWith("SICE-TAC no se usa")
+                ? "no se encontró un piso SICE-TAC para esta ruta, o no se pudo consultar"
+                : propuesta.MotivoPendiente;
+            throw new clsConflictException("PISO_SICETAC_NO_VERIFICABLE",
+                $"No se pudo verificar el piso SICE-TAC de esta línea ({motivo}). El flete ({command.ValorFlete:C0}) no se guardó: " +
+                "confirme (confirmarSinPiso = true) si quiere guardarlo sin verificar el piso.");
+        }
+
         var anterior = linea.ValorFlete;
         var fuenteAnterior = linea.Fuente;
         linea.ValorFlete = command.ValorFlete;
