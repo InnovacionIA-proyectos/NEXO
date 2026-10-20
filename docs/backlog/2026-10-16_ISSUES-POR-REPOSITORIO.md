@@ -58,7 +58,7 @@ Además:
 | 4 | Rechazo de línea: todas rechazadas | Se envía igual al comercial, con los motivos de cada línea. |
 | 5 | Desglose | Flete, levante y retorno se ven separados **solo en la Mesa de Costeo**. El Excel y el PDF siguen con el valor final de la línea. |
 | 6 | Tara | La nota de tara aplica a todas las líneas. Se quita la validación contra la suma de las posiciones. |
-| 7 | Diccionario de vehículos | Vive en **Nexo**. No se duplica en Cotifly ni va en el Cubicador; Cotifly lo consulta por un endpoint para resolver lo que el usuario escribe a mano en el Excel de licitación (no para la solicitud puntual, que ya usa una lista cerrada). |
+| 7 | Diccionario de vehículos y de clases de contenedor | Una sola tabla, con una marca de tipo (Vehiculo/Contenedor) para no mezclar los dos catálogos. Vive en **Nexo**. No se duplica en Cotifly ni va en el Cubicador; Cotifly consulta el endpoint propio de su backend (que por dentro consulta a Nexo) para resolver vehículo y clase de contenedor escritos a mano en el Excel de licitación (no para la solicitud puntual, que ya usa listas cerradas). |
 | 8 | Unidad del peso | Selector kg/t en la pantalla (opción A). El backend siempre recibe kg. |
 | 9 | Roles | CoordinadorFletes pasa a AdminBiblioteca, en backend y front. AdminTarifas, Admin y Comercial quedan igual. |
 | 10 | Costo de conexos | El Comercial sigue viendo el costo unitario de los servicios conexos. Los permisos se manejan desde el front. |
@@ -95,7 +95,7 @@ Lectura: **A** = hay que cambiar algo · **R** = riesgo si no se coordina · **�
 | Rechazo de línea | A | A | A | A | — | A (columnas nuevas) |
 | Ajuste manual con plaza | A | A | — | — | — | — |
 | Roles (AdminBiblioteca) | A | A | R (solo textos de error) | — | — | A (script de usuarios) |
-| Diccionario de vehículos | A | — | — | A (lee el endpoint de Nexo al importar) | — | A (tabla y carga) |
+| Diccionario de vehículos y de contenedor | A | — | A (endpoint propio que consulta a Nexo) | A (lee el endpoint de Cotifly al importar) | — | A (tabla y carga) |
 | Unidad de peso kg/t | — | A | — | A (su propio importador) | — | — |
 | Desglose en la Mesa | — | A | — | — | — | — |
 | Lista de empaque/posiciones | — | A | — | — | — | — |
@@ -279,40 +279,50 @@ CRITERIOS DE ACEPTACION
 - [ ] Pruebas de roles por endpoint en verde y script de usuarios probado en una base de pruebas.
 ```
 
-### NEXO-B4 — Diccionario de alias de vehículos
-Labels: `nexo`, `sprint-5`, `backend` · Depende de: DATA-2 · Esfuerzo: 2 a 3 días
+### NEXO-B4 — Diccionario de alias de vehículos y de clases de contenedor
+GitHub: NEXO#321 · Labels: `nexo`, `sprint-5`, `backend` · Depende de: DATA-2 (NEXO#315) · Esfuerzo: 3 a 4 días
 ```
+Depende de: #315 · Esfuerzo: 3 a 4 días
+
 Contexto (verificado)
 - ResolverVehiculo (clsResolucionDeCatalogos) busca una configuración de vehículo por clave normalizada (tipo + carrocería). Si no existe, crea una fila nueva en CUARENTENA (EsCatalogoOficial = false) y un humano decide después.
 - Normalizar ya ignora tildes y unifica "_" y "-" (S5-HU-20.5). A propósito NO unifica formas como "T.MULA" y "Tractomula".
+- ParseClaseContenedor (clsCapturarSolicitudCommand) NO tiene cuarentena ni diccionario: solo limpia el texto y, si lo que escribió el usuario CONTIENE uno de los 5 códigos reales ya pegado (p. ej. "CNT40.HC"), lo reconoce; cualquier otra forma ("40 HC", "20 STD", "x40 HQ") pasa de largo como texto libre, sin normalizar.
 - El Excel de licitación se analiza en el backend (POST /api/captura-solicitudes/analizar-excel) solo para devolver hojas, encabezados y filas. El mapeo de columnas y la lectura de valores ocurren en el front.
 - Los códigos del Cubicador (2S2, FURGON) que manda Cotifly con la bandera encendida también nacen en cuarentena.
-- Fuente de alias: cubicador/database/datos_raw/diccionario_configuraciones_vehiculo_RAW.csv (7 columnas canónicas, unos 19 alias por columna). No está en ninguna tabla.
+- Fuente de alias: cubicador/database/datos_raw/diccionario_configuraciones_vehiculo_RAW.csv (7 columnas canónicas: 5 de vehículo y 2 de contenedor, unos 19 alias por columna). No está en ninguna tabla.
+- En la solicitud puntual tanto el vehículo como la clase de contenedor se eligen de una lista cerrada, sin riesgo de error. En el Excel de licitación el usuario los escribe libre, y ahí aparecen las variantes ("Turbo"/"TB"/"T.B", "40 HC"/"40HC"/"x40 HQ"...).
+- DECIDIDO (conversación con Sara, 2026-10-20): `clsConfiguracionVehiculo.TipoVehiculo` ya usa el MISMO vocabulario de códigos que el Cubicador (verificado en el seeder: filas oficiales con TipoVehiculo = "C2", "C3", "2S2", "3S2", "3S3", etc., no nombres en español). No son dos catálogos distintos: el diccionario resuelve directo a ese código, sin necesitar un segundo mapeo.
+- En el Excel de licitación, tipo de vehículo y carrocería vienen en DOS COLUMNAS SEPARADAS, nunca combinadas. Este diccionario resuelve SOLO la columna de tipo de vehículo; la carrocería sigue llegando tal cual, sin pasar por este diccionario (fuera de alcance de esta issue).
 
 Qué hacer
-1. Tabla de alias en la base de Nexo (DATA-2): alias, alias normalizado, configuración de vehículo de destino, activo.
-2. ResolverVehiculo busca primero el alias y, si lo encuentra, usa la configuración oficial. Si no, sigue a cuarentena.
-3. Endpoint de LECTURA (GET /api/catalogos/alias-vehiculos) para quien quiera la lista completa.
-4. Endpoint de RESOLVER un texto suelto (por ejemplo GET /api/catalogos/alias-vehiculos/resolver?texto=…): recibe el texto que escribió un usuario (p. ej. "T.MULA") y responde a qué configuración de vehículo corresponde, o que no se reconoce ninguna. Es lo que necesita Cotifly para avisar al usuario en el momento de importar su Excel de licitación, antes de que la solicitud se mande a Nexo (ver CTF-F5).
-5. Endpoint o proceso para agregar alias desde la bandeja de normalización (ver S5-HU-18.4).
-6. Pruebas: "TB", "T.B", "Turbo" y "2L2" resuelven a la misma configuración; un alias desconocido va a cuarentena y el "resolver" dice que no se reconoce.
+1. Tabla de alias en la base de Nexo (#315), con TipoElemento ("Vehiculo" | "Contenedor") para no mezclar los dos catálogos.
+2. ResolverVehiculo busca primero el alias de TipoElemento = Vehiculo por el texto de la columna "tipo de vehículo"; si lo encuentra, usa ese código como TipoVehiculo (la carrocería sigue llegando por su propia columna, sin cambios) y busca la configuración oficial con los dos datos juntos, igual que hoy. Si el alias no se encuentra, sigue a cuarentena (como hoy).
+3. ParseClaseContenedor (o un reemplazo equivalente) busca primero el alias de TipoElemento = Contenedor y, si lo encuentra, usa el código real (CNT40.HC, CNT20.ST, etc.). Si no lo encuentra, sigue con el comportamiento actual (buscar el código pegado en el texto, o guardar el texto libre).
+4. Endpoint de LECTURA (GET /api/catalogos/alias?tipo=vehiculo o tipo=contenedor) para quien quiera la lista completa.
+5. Endpoint de RESOLVER un texto suelto (GET /api/catalogos/alias/resolver?tipo=vehiculo&texto=… o tipo=contenedor): recibe el texto que escribió un usuario y responde a qué código corresponde, o que no se reconoce ninguno. Es lo que necesita Cotifly para avisar al usuario en el momento de importar su Excel de licitación, para vehículo Y para clase de contenedor.
+6. Endpoint o proceso para agregar alias desde la bandeja de normalización (ver S5-HU-18.4), para los dos tipos.
+7. Pruebas: "TB", "T.B", "Turbo" y "2L2" resuelven al mismo código de vehículo; "40 HC" y "40HC" resuelven a CNT40.HC; un alias desconocido de cualquiera de los dos tipos sigue su camino de hoy (cuarentena para vehículo, texto libre para contenedor) y el "resolver" dice que no se reconoce.
 
-Decisión D6: el mapeo de cada columna del archivo a un código de Nexo se define dentro de DATA-2.
+Decisión D6: el mapeo de cada columna del archivo a un código de Nexo se define dentro de #315 (ya cerrada para contenedor; para vehículo falta confirmar la pareja exacta columna↔código).
 
-Por qué hace falta "resolver" y no solo "listar": en la solicitud puntual el vehículo se elige de una lista cerrada (sin riesgo de error). En el Excel de licitación el usuario lo escribe libre, y ahí aparecen las variantes ("Turbo", "TB", "T.B"...). Cotifly necesita poder preguntarle a Nexo "¿qué es esto que escribió el usuario?" en el momento de importar, no solo bajar la lista completa de alias y adivinar.
+Por qué hace falta "resolver" y no solo "listar": en la solicitud puntual el vehículo y la clase de contenedor se eligen de una lista cerrada, sin riesgo de error. En el Excel de licitación el usuario los escribe libre. Cotifly necesita poder preguntarle a Nexo "¿qué es esto que escribió el usuario?" en el momento de importar, no solo bajar la lista completa de alias y adivinar.
 
 Impacto
-- Cotifly: usa el endpoint de "resolver" al importar su Excel de licitación (ver CTF-F5). No tiene su propia tabla de alias: el diccionario sigue siendo uno solo, en Nexo.
-- Front de Nexo: el campo de vehículo en el mapeo del Excel ya manda texto; el backend resuelve.
+- Cotifly: usa el endpoint de "resolver" al importar su Excel de licitación, para vehículo y para clase de contenedor. No tiene su propia tabla de alias: el diccionario sigue siendo uno solo, en Nexo.
+- Front de Nexo: los campos de vehículo y de clase de contenedor en el mapeo del Excel ya mandan texto; el backend resuelve.
 - Cubicador: el archivo fuente sigue donde está; no se modifica.
 
 CRITERIOS DE ACEPTACION
-- [ ] «TB», «T.B», «Turbo» y «2L2» resuelven a la misma configuración de vehículo.
-- [ ] Un alias desconocido sigue yendo a cuarentena.
-- [ ] Existe el endpoint de lectura de alias (lista completa).
-- [ ] Existe el endpoint de resolver un texto suelto, y responde correctamente con alias conocidos y con uno inventado.
+- [ ] «TB», «T.B», «Turbo» y «2L2» resuelven al mismo código de vehículo, y ese código se combina con la carrocería (que llega aparte) para encontrar la configuración oficial.
+- [ ] «40 HC», «40HC» y variantes resuelven a CNT40.HC; «20 STD» y variantes resuelven a CNT20.ST.
+- [ ] Un alias de vehículo desconocido sigue yendo a cuarentena; uno de contenedor desconocido sigue el comportamiento actual (texto libre).
+- [ ] Existe el endpoint de lectura de alias (lista completa, filtrable por tipo).
+- [ ] Existe el endpoint de resolver un texto suelto, para vehículo y para contenedor, y responde correctamente con alias conocidos y con uno inventado.
 - [ ] Los códigos del Cubicador que manda Cotifly resuelven con el diccionario cuando hay alias.
 - [ ] Las pruebas están en verde.
+
+Origen: NEXO-B4 del documento 2026-10-16_ISSUES-POR-REPOSITORIO.md.
 ```
 
 ### NEXO-B5 — Peso con tara: confirmar el efecto en el backend
@@ -806,6 +816,25 @@ CRITERIOS DE ACEPTACION
 - [ ] Si Nexo expone motivoPendiente, Cotifly lo muestra o lo guarda; si no lo expone, no se rompe.
 ```
 
+### CTF-B6 — Consumir el endpoint de resolver vehículos y clases de contenedor de Nexo
+GitHub: Cotifly#194 · Labels: `cotifly`, `backend` · Depende de: NEXO-B4 (NEXO#321) · Esfuerzo: por estimar
+```
+Por qué: el front de Cotifly no puede llamar a Nexo directamente (CORS solo permite los dominios del portal, y la identidad del usuario viaja por un header que solo tiene el backend). Igual que con el catálogo de clases de contenedor (CTF-B2), el backend de Cotifly es el intermediario.
+
+El diccionario de Nexo cubre DOS tipos de elemento: vehículo y clase de contenedor (los dos se escriben libre en el Excel de licitación y traen variantes de escritura).
+
+Hacer
+- Endpoint propio (p. ej. GET /web/alias/resolver?tipo=vehiculo&texto=… o tipo=contenedor) que internamente llame a GET /api/catalogos/alias/resolver de Nexo y devuelva la respuesta al front.
+- Debe servir para los dos tipos, no solo vehículo.
+- Decidir si conviene resolver en lote (varias filas del Excel en una sola llamada) en vez de una petición por fila, para no saturar a Nexo al importar licitaciones grandes.
+- Manejar el caso en que Nexo no reconozca el texto (igual que hoy se maneja un catálogo vacío).
+
+CRITERIOS DE ACEPTACION
+- [ ] Existe un endpoint propio de Cotifly que resuelve un vehículo o una clase de contenedor escritos a mano, consultando a Nexo.
+- [ ] Funciona para una fila y, si se decide, también en lote.
+- [ ] Un texto no reconocido por Nexo se informa con claridad al front.
+```
+
 ---
 
 ## 6. Repo clientepro-frontend — Front de Cotifly (Sara)
@@ -865,24 +894,24 @@ CRITERIOS DE ACEPTACION
 - [ ] Los cinco valores reales aparecen en el selector.
 ```
 
-### CTF-F5 — Reconocer el vehículo escrito a mano en el Excel de licitación
-Labels: `cotifly`, `frontend` · Depende de: NEXO-B4 (endpoint de "resolver") · Esfuerzo: por estimar
+### CTF-F5 — Reconocer el vehículo y la clase de contenedor escritos a mano en el Excel de licitación
+GitHub: clientepro-frontend#109 · Labels: `frontend`, `integración` · Depende de: CTF-B6 (Cotifly#194) · Esfuerzo: por estimar
 ```
-Por qué: en la solicitud puntual el vehículo se elige de una lista cerrada, sin riesgo de error. En el Excel de licitación el usuario lo escribe libre, y ahí aparecen variantes del mismo vehículo ("Turbo", "TB", "T.B", "2L2"...). Esto es precisamente lo que el diccionario de Nexo busca evitar.
+Por qué: en la solicitud puntual el vehículo y la clase de contenedor se eligen de una lista cerrada, sin riesgo de error. En el Excel de licitación el usuario los escribe libre, y ahí aparecen variantes ("Turbo", "TB", "T.B", "2L2"; "40 HC", "40HC", "x40 HQ"...). Esto es precisamente lo que el diccionario de Nexo busca evitar.
 
-Hoy (verificado por Cotifly): el Excel de licitación NO mapea ninguna columna de vehículo (CAMPOS_LICITACION no la tiene). Aunque la bandera Captura:AceptarVehiculoCliente estuviera encendida (hoy apagada), no hay ningún paso que lea esa columna del Excel.
+Hoy (verificado por Cotifly): el Excel de licitación NO mapea ninguna columna de vehículo (CAMPOS_LICITACION no la tiene), y la columna de clase de contenedor (si existe) no se valida contra ningún diccionario.
 
 Hacer
-1. Agregar un campo mapeable de "vehículo" en el paso de mapeo de columnas del Excel de licitación (mismo patrón que los demás campos de CAMPOS_LICITACION).
-2. Al detectar esa columna, llamar al endpoint de "resolver" de Nexo (NEXO-B4, GET /api/catalogos/alias-vehiculos/resolver) con el texto de cada fila.
-3. Mostrar al usuario qué vehículo se reconoció para cada fila, o avisar si no se reconoció ninguno, ANTES de enviar la solicitud, para que pueda corregirlo.
-4. El diccionario no se duplica en Cotifly: todo pasa por el endpoint de Nexo, nada se guarda en una tabla propia.
-5. Si el usuario no corrige un vehículo no reconocido, decidir qué pasa: ¿se envía igual (y cae en cuarentena del lado de Nexo) o se bloquea el envío de esa fila? (decisión pendiente, no asumir ninguna de las dos).
+1. Agregar campos mapeables de "vehículo" y "clase de contenedor" en el paso de mapeo de columnas del Excel de licitación (mismo patrón que los demás campos de CAMPOS_LICITACION).
+2. Al detectar esas columnas, llamar al endpoint propio de Cotifly (CTF-B6), que por dentro consulta a Nexo.
+3. Mostrar al usuario qué vehículo y qué clase de contenedor se reconocieron para cada fila, o avisar si no se reconoció ninguno, ANTES de enviar la solicitud, para que pueda corregirlo.
+4. El diccionario no se duplica en Cotifly: todo pasa por el endpoint de su propio backend.
+5. Si el usuario no corrige un valor no reconocido, decidir qué pasa: ¿se envía igual (y cae en cuarentena del lado de Nexo, solo aplica a vehículo) o se bloquea el envío de esa fila? (decisión pendiente, no asumir ninguna de las dos).
 
 CRITERIOS DE ACEPTACION
-- [ ] El mapeo de columnas del Excel de licitación tiene un campo de vehículo.
-- [ ] Cada fila importada muestra el vehículo reconocido, usando el endpoint de "resolver" de Nexo.
-- [ ] Una variante conocida ("T.MULA", "TB", etc.) se reconoce igual que su forma completa.
+- [ ] El mapeo de columnas del Excel de licitación tiene un campo de vehículo y uno de clase de contenedor.
+- [ ] Cada fila importada muestra el vehículo y la clase de contenedor reconocidos, usando el endpoint propio de Cotifly.
+- [ ] Una variante conocida ("T.MULA", "40 HC", etc.) se reconoce igual que su forma completa.
 - [ ] Un texto no reconocido se le muestra claramente al usuario antes de enviar.
 ```
 
@@ -903,17 +932,36 @@ CRITERIOS DE ACEPTACION
 - [ ] Se probó en una base de pruebas, con respaldo previo.
 ```
 
-### DATA-2 — Tabla de alias de vehículos y su carga
+### DATA-2 — Tabla de alias de vehículos y de clases de contenedor, y su carga
+GitHub: NEXO#315
 ```
-Crear la tabla (sugerido db_NEXO.tbl_alias_vehiculo: Id, Alias, AliasNormalizado único, ConfiguracionVehiculoId, Activo, CreatedAt).
-Cargarla con el archivo cubicador/database/datos_raw/diccionario_configuraciones_vehiculo_RAW.csv.
-Decisión D6: el mapeo de cada columna del archivo (Turbo, Sencillo, Minimula, Tractomula, Dobletroque, 40 HC, 20 STD) a un código de Nexo se define dentro de esta issue.
-Actualizar ESQUEMA_NEXO.sql y docs/Database/seeder/README.md.
+Crear la tabla (nombre sugerido `db_NEXO.tbl_alias_elementos`, en vez de `tbl_alias_vehiculo`, porque guarda dos tipos de alias, no solo vehículos):
+
+| Columna | Qué guarda |
+|---|---|
+| Id | — |
+| Alias | el apodo tal cual (ej. "40HC", "T.MULA") |
+| AliasNormalizado | el apodo limpio, único, para buscarlo sin errores |
+| TipoElemento | `"Vehiculo"` o `"Contenedor"` — para no confundir los dos catálogos |
+| Codigo | el código real al que apunta: `C2`, `C3`, `2S2`, `3S3`, etc. para vehículo (DECIDIDO: mismo código que ya usa `clsConfiguracionVehiculo.TipoVehiculo` para las filas oficiales — Nexo y el Cubicador comparten este mismo vocabulario de códigos, no son dos catálogos distintos como se pensó al principio); el código del catálogo de SAP para contenedor (`CNT40.HC`, `CNT40.RE`, `CNT20.ST`, `CNT20.RE`, `CNT20.IT` — mismo catálogo de `GET /api/catalogos/clases-contenedor`) |
+| Activo / CreatedAt | igual que antes |
+
+Cargarla con el archivo `cubicador/database/datos_raw/diccionario_configuraciones_vehiculo_RAW.csv` (7 columnas: Turbo, Sencillo, Minimula, Tractomula, Dobletroque — vehículo — y Contenedor 40 HC, Contenedor 20 — contenedor).
+
+Decisión D6, ampliada y CERRADA: el mapeo de cada columna del archivo a un código de Nexo:
+- Las 2 columnas de contenedor: "Contenedor 40 HC" → `CNT40.HC`, "Contenedor 20" → `CNT20.ST`.
+- Las 5 columnas de vehículo (Turbo, Sencillo, Minimula, Tractomula, Dobletroque) se mapean a los 5 códigos oficiales ya sembrados en `clsConfiguracionVehiculo` (C2, C3, 2S2, 3S2/3S3, 2S3 — confirmar la pareja exacta columna↔código dentro de esta issue, revisando el seeder y la fuente original del Excel de negocio).
+
+Importante sobre el uso de este diccionario en la captura (aclarado en la conversación con Sara, 2026-10-20): en el Excel de licitación, "tipo de vehículo" y "carrocería" vienen en DOS COLUMNAS SEPARADAS, no un solo campo combinado. Este diccionario resuelve SOLO la columna de tipo de vehículo (texto libre → código C2/C3/2S2/etc.); la carrocería viaja tal cual venga en su propia columna, sin pasar por este diccionario (por ahora — queda fuera de alcance; la carrocería solo se le quitan tildes/mayúsculas con la normalización que ya existe). Con el código resuelto + la carrocería tal cual, `ResolverVehiculo` sigue buscando la fila exacta en `tbl_configuraciones_vehiculo` exactamente como hoy.
+
+Actualizar `ESQUEMA_NEXO.sql` y `docs/Database/seeder/README.md`.
 
 CRITERIOS DE ACEPTACION
-- [ ] La tabla de alias existe y está cargada con el diccionario.
-- [ ] El mapeo de cada columna del archivo a un código de Nexo está documentado.
-- [ ] ESQUEMA_NEXO.sql y el README del seeder están actualizados.
+- [ ] La tabla existe, con `TipoElemento` y `Codigo`, y está cargada con el diccionario completo (las 7 columnas, no solo las de vehículo).
+- [ ] El mapeo de cada columna del archivo a un código de Nexo está documentado y confirmado contra el catálogo oficial ya sembrado.
+- [ ] `ESQUEMA_NEXO.sql` y el README del seeder están actualizados.
+
+Origen: DATA-2 del documento 2026-10-16_ISSUES-POR-REPOSITORIO.md.
 ```
 
 ### DATA-3 — Script de usuarios para el cambio de rol
