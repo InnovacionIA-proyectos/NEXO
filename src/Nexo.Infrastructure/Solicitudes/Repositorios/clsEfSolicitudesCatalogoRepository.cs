@@ -33,7 +33,8 @@ public sealed class clsEfSolicitudesCatalogoRepository(clsNexoDbContext db) : IS
     public Task<clsSolicitud?> ObtenerParaCosteoAsync(Guid id, CancellationToken ct) =>
         db.Solicitudes
             .Include(x => x.clsCliente)
-            .Include(x => x.Lineas).ThenInclude(l => l.clsRuta)
+            .Include(x => x.Lineas).ThenInclude(l => l.clsRuta).ThenInclude(r => r!.OrigenMunicipio)
+            .Include(x => x.Lineas).ThenInclude(l => l.clsRuta).ThenInclude(r => r!.DestinoMunicipio)
             .Include(x => x.Lineas).ThenInclude(l => l.clsConfiguracionVehiculo)
             .FirstOrDefaultAsync(x => x.Id == id, ct);
 

@@ -112,7 +112,7 @@ public class clsCotizacionesMesaCosteoTests
         var cli = _fx.Client();
         var (cid, lid, filaId) = await CotizacionConFleteManual(cli);
 
-        var resp = await cli.PutJson($"/api/cotizaciones/{cid}/lineas/{lid}", new { valorFlete = 1_250_000 });
+        var resp = await cli.PutJson($"/api/cotizaciones/{cid}/lineas/{lid}", new { valorFlete = 1_250_000, confirmarSinPiso = true });
 
         Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
         var dto = await resp.Json();
@@ -136,18 +136,36 @@ public class clsCotizacionesMesaCosteoTests
         Assert.Equal("COTIZACION_NO_EDITABLE", await resp.ErrorCode());
     }
 
+    // S6-HU-26.1/#30: antes un flete que no era Manual respondía 409 FLETE_NO_EDITABLE. Ahora se edita (queda Manual).
     [Fact]
-    public async Task Editar_un_flete_que_no_es_manual_devuelve_409_FLETE_NO_EDITABLE()
+    public async Task Editar_un_flete_de_plaza_lo_actualiza_y_la_fuente_pasa_a_Manual()
     {
         var cli = _fx.Client();
         var (sid, lid) = await NuevaSolicitudConLinea(cli);
         var cid = (await (await cli.PostJson("/api/cotizaciones", new { solicitudId = sid })).Json()).GetProperty("id").GetGuid();
         await cli.PostJson($"/api/cotizaciones/{cid}/lineas", new { lineaSolicitudId = lid, valorFlete = 1_000_000, fuente = "tarifario" });
 
+        var resp = await cli.PutJson($"/api/cotizaciones/{cid}/lineas/{lid}", new { valorFlete = 1_250_000, confirmarSinPiso = true });
+
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        var linea = (await resp.Json()).GetProperty("lineas")[0];
+        Assert.Equal(1_250_000m, linea.GetProperty("valorFlete").GetDecimal());
+        Assert.Equal("Manual", linea.GetProperty("fuente").GetString());
+    }
+
+    // S6-HU-26.1/#30: la línea sintética no tiene ruta, así que no hay piso que verificar. Sin confirmar, NO se guarda en silencio.
+    [Fact]
+    public async Task Editar_sin_poder_verificar_el_piso_devuelve_409_PISO_SICETAC_NO_VERIFICABLE_y_no_cambia_nada()
+    {
+        var cli = _fx.Client();
+        var (cid, lid, _) = await CotizacionConFleteManual(cli);
+
         var resp = await cli.PutJson($"/api/cotizaciones/{cid}/lineas/{lid}", new { valorFlete = 1_250_000 });
 
         Assert.Equal(HttpStatusCode.Conflict, resp.StatusCode);
-        Assert.Equal("FLETE_NO_EDITABLE", await resp.ErrorCode());
+        Assert.Equal("PISO_SICETAC_NO_VERIFICABLE", await resp.ErrorCode());
+        var dto = await (await cli.GetAsync($"/api/cotizaciones/{cid}")).Json();
+        Assert.Equal(1_000_000m, dto.GetProperty("lineas")[0].GetProperty("valorFlete").GetDecimal());   // el valor de partida
     }
 
     [Fact]
@@ -192,7 +210,7 @@ public class clsCotizacionesMesaCosteoTests
     {
         var (cid, lid, _) = await CotizacionConFleteManual();
 
-        var resp = await _fx.Client(rol).PutJson($"/api/cotizaciones/{cid}/lineas/{lid}", new { valorFlete = 1_250_000 });
+        var resp = await _fx.Client(rol).PutJson($"/api/cotizaciones/{cid}/lineas/{lid}", new { valorFlete = 1_250_000, confirmarSinPiso = true });
 
         Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
     }

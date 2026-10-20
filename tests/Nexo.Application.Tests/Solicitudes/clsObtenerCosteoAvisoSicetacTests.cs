@@ -1,4 +1,5 @@
 using Moq;
+using Nexo.Application.CasosDeUso.ReglasSoloSicetac.Interfaces;
 using Nexo.Application.CasosDeUso.Solicitudes;
 using Nexo.Application.CasosDeUso.Solicitudes.DTOs;
 using Nexo.Application.CasosDeUso.Solicitudes.Interfaces;
@@ -31,13 +32,19 @@ public class clsObtenerCosteoAvisoSicetacTests
     }
 
     private static clsObtenerCosteoQueryHandler Handler(Mock<ITarifasCosteoPort> tarifas)
+        => Handler(tarifas, SolicitudConUnaLinea(), new HashSet<string>());
+
+    private static clsObtenerCosteoQueryHandler Handler(
+        Mock<ITarifasCosteoPort> tarifas, clsSolicitud solicitud, IReadOnlySet<string> clavesSoloSicetac)
     {
         var repo = new Mock<ISolicitudesRepository>();
-        repo.Setup(r => r.ObtenerParaCosteoAsync(SolicitudId, It.IsAny<CancellationToken>())).ReturnsAsync(SolicitudConUnaLinea());
+        repo.Setup(r => r.ObtenerParaCosteoAsync(SolicitudId, It.IsAny<CancellationToken>())).ReturnsAsync(solicitud);
         var usuario = new Mock<ICurrentUserPort>();
         usuario.SetupGet(u => u.Id).Returns(Dueno);
         usuario.SetupGet(u => u.Rol).Returns(RolUsuario.Admin);
-        return new(repo.Object, tarifas.Object, TimeProvider.System, new Mock<IUnitOfWork>().Object, usuario.Object);
+        var reglas = new Mock<IClavesSoloSicetacPort>();
+        reglas.Setup(r => r.ClavesRutaVehiculoAsync(It.IsAny<CancellationToken>())).ReturnsAsync(clavesSoloSicetac);
+        return new(repo.Object, tarifas.Object, TimeProvider.System, new Mock<IUnitOfWork>().Object, usuario.Object, reglas.Object);
     }
 
     [Fact]
@@ -66,5 +73,57 @@ public class clsObtenerCosteoAvisoSicetacTests
         Assert.NotNull(Assert.Single(dto.Lineas).PisoSicetac);
         Assert.Null(dto.AvisoSicetac);
         tarifas.Verify(t => t.MotivoSicetacNoUsadoAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    // ---------------------------------------------------------------- S6-HU-26.1/#30: tieneReglaSoloSicetac
+
+    private const string DaneOrigen = "11001000";
+    private const string DaneDestino = "05001000";
+
+    private static clsSolicitud SolicitudConRutaYVehiculo(string vehiculo)
+    {
+        var solicitud = new clsSolicitud { Id = SolicitudId, CreadoPor = Dueno, Estado = EstadoSolicitud.Pendiente };
+        solicitud.Lineas.Add(new clsLineaSolicitud
+        {
+            SolicitudId = SolicitudId, Peso = 1000, ClaseViaje = ClaseViaje.Cupo,
+            clsRuta = new clsRuta
+            {
+                Origen = "Bogotá", Destino = "Medellín",
+                OrigenMunicipio = new clsMunicipio { CodigoDane = DaneOrigen },
+                DestinoMunicipio = new clsMunicipio { CodigoDane = DaneDestino },
+            },
+            clsConfiguracionVehiculo = new clsConfiguracionVehiculo { TipoVehiculo = vehiculo },
+        });
+        return solicitud;
+    }
+
+    private static IReadOnlySet<string> Regla(string vehiculo) =>
+        new HashSet<string> { Nexo.Domain.Common.clsTexto.ClaveRutaVehiculo(DaneOrigen, DaneDestino, vehiculo) };
+
+    [Fact]
+    public async Task La_linea_cuya_ruta_y_vehiculo_tienen_regla_Solo_SICE_sale_con_tieneReglaSoloSicetac_true()
+    {
+        var dto = await Handler(new Mock<ITarifasCosteoPort>(), SolicitudConRutaYVehiculo("3S3"), Regla("3S3"))
+            .Handle(new clsObtenerCosteoQuery(SolicitudId));
+
+        Assert.True(Assert.Single(dto.Lineas).TieneReglaSoloSicetac);
+    }
+
+    [Fact]
+    public async Task Con_regla_para_otro_vehiculo_de_la_ruta_sale_false()
+    {
+        var dto = await Handler(new Mock<ITarifasCosteoPort>(), SolicitudConRutaYVehiculo("3S3"), Regla("C2"))
+            .Handle(new clsObtenerCosteoQuery(SolicitudId));
+
+        Assert.False(Assert.Single(dto.Lineas).TieneReglaSoloSicetac);
+    }
+
+    [Fact]
+    public async Task Sin_ninguna_regla_cargada_sale_false()
+    {
+        var dto = await Handler(new Mock<ITarifasCosteoPort>(), SolicitudConRutaYVehiculo("3S3"), new HashSet<string>())
+            .Handle(new clsObtenerCosteoQuery(SolicitudId));
+
+        Assert.False(Assert.Single(dto.Lineas).TieneReglaSoloSicetac);
     }
 }

@@ -28,7 +28,10 @@ public class clsAgregarLineaCotizacionRequest
     public string Fuente { get; set; } = null!;
 }
 
-/// <summary>S5-HU-20.1/#286: editar el flete manual de una línea. No lleva Fuente a propósito.</summary>
+/// <summary>
+/// S5-HU-20.1/#286: editar el flete de una línea. No lleva Fuente a propósito: al guardar, la fuente pasa a Manual (S6-HU-26.1/#30,
+/// decisión D4), venga de donde venga el flete.
+/// </summary>
 public class clsEditarLineaCotizacionRequest
 {
     [Range(typeof(decimal), "0.01", "9999999999999.99", ParseLimitsInInvariantCulture = true)]
@@ -37,6 +40,13 @@ public class clsEditarLineaCotizacionRequest
     /// <summary>Si no se envía, no se toca el valor que ya tenía.</summary>
     [Range(typeof(decimal), "0", "9999999999999.99", ParseLimitsInInvariantCulture = true)]
     public decimal? ValorRetornoContenedor { get; set; }
+
+    /// <summary>
+    /// S6-HU-26.1/#30: <c>true</c> = guardar aunque NO se haya podido verificar el piso SICE-TAC (ruta sin piso, período que
+    /// no es el del mes actual, o consulta fallida). Sin esto, ese caso responde 409 PISO_SICETAC_NO_VERIFICABLE y no se guarda.
+    /// No salta un valor bajo un piso que SÍ se encontró (eso es siempre 400 FLETE_BAJO_PISO_SICETAC). Default false.
+    /// </summary>
+    public bool ConfirmarSinPiso { get; set; }
 }
 
 public class clsAgregarConexosRequest

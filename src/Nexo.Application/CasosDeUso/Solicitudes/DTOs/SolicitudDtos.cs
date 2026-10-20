@@ -92,7 +92,11 @@ public record clsLineaCosteoDto(
     decimal? ValorMercancia = null,
     /// <summary>S5-HU-20.5/#297: orden de la línea en el arreglo con que se capturó (1, 2, 3...). null en líneas
     /// capturadas antes de S5-HU-18.3, que además salen al final del GET.</summary>
-    int? NumeroLinea = null);
+    int? NumeroLinea = null,
+    /// <summary>S6-HU-26.1/#30: <c>true</c> si la ruta y el vehículo de la línea tienen regla Solo-SICE. Con regla el flete lo fija el
+    /// piso y NO se puede editar (PUT .../lineas/{id} responde 409 FLETE_SOLO_SICETAC): el front no debe ofrecer "Editar flete".
+    /// Misma definición que el motor de propuesta y que la edición (clsReglaSoloSicetacDeLinea).</summary>
+    bool TieneReglaSoloSicetac = false);
 
 public record clsSolicitudCosteoDto(
     clsSolicitudDto Solicitud, clsTiemposLogisticosDto Tiempos, IReadOnlyList<clsLineaCosteoDto> Lineas,

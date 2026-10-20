@@ -334,6 +334,7 @@ interface LineaCosteoDto {
                                    // Lo pone QUIEN CREA las líneas del grupo (Cotifly o el portal); NEXO lo guarda tal cual.
   idRecomendacionVehiculo: string | null  // S5-HU-18.2/#274: recomendación del Cubicador usada para esta línea
   valorMercancia: Decimal | null   // S5-HU-20.1/#286: lo capturado en la línea (clsLineaSolicitud.ValorMercancia); null si no se capturó
+  tieneReglaSoloSicetac: boolean   // S6-HU-26.1/#30: la ruta (por DANE) y el vehículo de la línea tienen regla Solo-SICE → su flete NO se puede editar (PUT responde 409 FLETE_SOLO_SICETAC): no ofrecer "Editar flete"
   numeroLinea: number | null       // S5-HU-20.5/#297: orden de la línea en el arreglo de la captura (1, 2, 3...); null en líneas capturadas antes de S5-HU-18.3. El GET ya las devuelve ORDENADAS por este campo
 }
 interface TiemposLogisticosDto { horasCargue: Decimal; horasDescargue: Decimal }
@@ -954,8 +955,8 @@ línea (no confía en lo que diga el navegador) y valida:
 - **→** `200 CotizacionDto`
 - **Errores**: `400 FUENTE_INVALIDA` · `400 LINEA_INVALIDA` · `400 FLETE_BAJO_PISO_SICETAC` · `404 COTIZACION_NO_ENCONTRADA` · `409 COTIZACION_NO_EDITABLE` · `409 HISTORICA_VENCIDA`
 
-#### `PUT /api/cotizaciones/{id}/lineas/{lineaSolicitudId}` — editar un flete manual
-S5-HU-20.1/#286. Modifica **la misma fila** de la cotización: `POST .../lineas` siempre
+#### `PUT /api/cotizaciones/{id}/lineas/{lineaSolicitudId}` — editar un flete
+S5-HU-20.1/#286; **S6-HU-26.1/#30: de cualquier fuente**. Modifica **la misma fila** de la cotización: `POST .../lineas` siempre
 agrega una nueva, así que editar con él duplicaría la línea e inflaría el total. La ruta
 usa el id de la línea del **pliego** (`lineaSolicitudId`, el mismo que manda el POST), no
 el de la fila de la cotización.
@@ -966,15 +967,29 @@ el de la fila de la cotización.
 |---|---|---|---|
 | `valorFlete` | **requerido** | decimal | 0.01–9999999999999.99 |
 | `valorRetornoContenedor` | *opcional* | decimal | monetario. Si se omite no se toca el que tenía |
+| `confirmarSinPiso` | *opcional* | boolean | #30. Def. `false`. `true` = guardar aunque **no se haya podido verificar** el piso SICE-TAC (ver abajo). No salta un valor bajo un piso que SÍ se encontró |
 
-No recibe `fuente`: editar no puede cambiar de dónde salió el valor. Reglas: solo
-cotización `Borrador`; solo fletes de fuente `Manual` (uno de `tarifario`/`sicetac`/
-`historica` se reemplaza eligiendo otro candidato, no escribiéndole un número encima);
-nunca bajo el piso SICE-TAC (mismo cálculo del servidor que al agregar, #283). Queda
-auditado con el valor anterior y el nuevo (`editar_flete`).
+No recibe `fuente`. Reglas (#30):
+
+- **Cualquier fuente se edita** (`manual`, `tarifario`/plaza, `sicetac`, `historica`): una tarifa se corrige en su sitio, sin tener que
+  reemplazarla eligiendo otro candidato. Antes solo la `manual` (`409 FLETE_NO_EDITABLE`, código que ya no existe).
+- **Con regla Solo-SICE no se edita**: si la ruta (por código DANE) y el vehículo de la línea tienen regla en `tbl_reglas_solo_sicetac`,
+  el flete lo fija el piso y responde **`409 FLETE_SOLO_SICETAC`** (también para un flete manual). Misma definición que usa el motor
+  de propuesta; la Mesa la expone como `tieneReglaSoloSicetac` en cada línea de `GET /api/solicitudes/{id}`.
+- **Al guardar, la fuente pasa a `Manual`** (decisión D4): el valor ya no sale de su fuente original sino de una persona.
+- **Auditoría** (`editar_flete`): guarda `valorAnterior` y `fuenteAnterior`, `valorNuevo` y `fuenteNueva`, y `confirmadoSinPiso`.
+- **Nunca bajo el piso SICE-TAC** (`400 FLETE_BAJO_PISO_SICETAC`, mismo cálculo del servidor que al agregar, #283).
+- **Si el piso no se puede verificar, no se guarda en silencio** (`409 PISO_SICETAC_NO_VERIFICABLE`): la ruta no tiene fila en DWSice, el
+  período más reciente cargado no es el del mes actual (#300), o la consulta falló. El mensaje dice la causa cuando es el período. Quien
+  edita decide: reintenta con `confirmarSinPiso = true` y queda registrado en la auditoría. Antes (#283) esta validación simplemente se
+  saltaba y cualquier valor entraba sin aviso.
+- Solo cotización `Borrador`.
 
 - **→** `200 CotizacionDto` (misma cantidad de líneas, total recalculado)
-- **Errores**: `400 VALIDATION_ERROR` · `400 FLETE_BAJO_PISO_SICETAC` · `404 COTIZACION_NO_ENCONTRADA` · `404 LINEA_NO_ENCONTRADA` · `409 COTIZACION_NO_EDITABLE` · `409 FLETE_NO_EDITABLE`
+- **Errores**: `400 VALIDATION_ERROR` · `400 FLETE_BAJO_PISO_SICETAC` · `404 COTIZACION_NO_ENCONTRADA` · `404 LINEA_NO_ENCONTRADA` · `409 COTIZACION_NO_EDITABLE` · `409 FLETE_SOLO_SICETAC` · `409 PISO_SICETAC_NO_VERIFICABLE`
+
+> `POST .../lineas` (agregar) **no cambió**: sin piso verificable sigue guardando el valor sin aviso. Está documentado con una prueba y
+> pendiente de decidir (sección 9 del documento de issues, "flete manual sin piso").
 
 #### `POST /api/cotizaciones/{id}/conexos` — agregar servicios conexos
 S5-HU-20.1/#286 (HU-B23): se admite mientras la cotización **no tenga resultado**
