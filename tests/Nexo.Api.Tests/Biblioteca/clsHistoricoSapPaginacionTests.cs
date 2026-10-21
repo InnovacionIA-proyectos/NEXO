@@ -20,7 +20,7 @@ public class clsHistoricoSapPaginacionTests(clsApiFixture fx)
         return (await resp.Content.ReadFromJsonAsync<clsSapHistoricoResultDto>())!;
     }
 
-    [Fact]
+    [clsHechoConHistoricoSapReal(20)]
     public async Task La_pagina_2_trae_filas_distintas_a_la_pagina_1_y_el_total_es_el_mismo_sin_paginar()
     {
         var p1 = await Pagina("top=10&page=1");
@@ -33,7 +33,7 @@ public class clsHistoricoSapPaginacionTests(clsApiFixture fx)
         Assert.Equal(p1.Total, p2.Total);                                                   // el total NO es el de la página
     }
 
-    [Fact]
+    [clsHechoConHistoricoSapReal(75)]
     public async Task El_orden_es_estable_la_misma_pagina_pedida_dos_veces_da_las_mismas_filas_en_el_mismo_orden()
     {
         var a = await Pagina("top=25&page=3");

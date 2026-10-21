@@ -133,7 +133,7 @@ Id inexistente: 401.
 propio de Cubicador, callback HTTP inverso) funciona correctamente una vez
 con el fix de la sección 2 y la compuerta de paridad abierta.**
 
-## 4. Prueba contra Dokploy — `http://nexo-predesplieguebackend-ijaiqn-cdc194-10-10-40-17.sslip.io`
+## 4. Prueba contra Dokploy — `http://nexodeploy-backend-lkcbu5-b5dba3-10-10-40-17.sslip.io`
 
 Solo se pudo probar desde afuera, por HTTP — no hay acceso a Dokploy en sí
 (dashboard, logs, variables de entorno) desde esta sesión.
@@ -500,7 +500,7 @@ manual. Sin colas `_error`.
 
 ## 9. Verificación final completa (2026-09-14, 17:48 UTC) — TODO EN VERDE
 
-Última pasada contra `http://nexo-predesplieguebackend-ijaiqn-cdc194-10-10-40-17.sslip.io`,
+Última pasada contra `http://nexodeploy-backend-lkcbu5-b5dba3-10-10-40-17.sslip.io`,
 después de resolver la causa raíz de la sección 8.0 (caché de build):
 
 | # | Chequeo | Resultado |

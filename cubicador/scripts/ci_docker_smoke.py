@@ -73,7 +73,9 @@ async def flujo_optimizar_async(client: httpx.AsyncClient) -> None:
     r = await client.get(f"{API_BASE_URL}/api/planes-cargue/vehiculos", headers=HEADERS)
     r.raise_for_status()
     vehiculos = r.json()
-    assert len(vehiculos) == 9, f"se esperaban 9 presets sembrados, llegaron {len(vehiculos)}"
+    # El catalogo de presets crece (hoy son 10): se siembra por nombre y los faltantes se agregan. Un `== 9` fijo rompia el CI cada vez
+    # que se sumaba uno; lo que importa aca es que la siembra corrio y que existe el que usa el flujo de abajo.
+    assert len(vehiculos) >= 9, f"se esperaban al menos 9 presets sembrados, llegaron {len(vehiculos)}"
     furgon = next(v for v in vehiculos if "13.6" in v["nombre"])
 
     r = await client.post(

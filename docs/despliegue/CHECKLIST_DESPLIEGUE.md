@@ -65,7 +65,7 @@ compuerta por defecto — el cierre de CORS y rotación de claves de Cubicador
 
 **Autorizado por Kevin Cano (@kcano-ux)** para el ambiente Dokploy
 "DEPLOY"
-(`http://nexo-predesplieguebackend-ijaiqn-cdc194-10-10-40-17.sslip.io`).
+(`http://nexodeploy-backend-lkcbu5-b5dba3-10-10-40-17.sslip.io`).
 
 **Evidencia**: no se usó una corrida de GitHub Actions (no había una
 enlazada — ver el aviso de arriba sobre `cubicador-ci.yml`). En su lugar se
