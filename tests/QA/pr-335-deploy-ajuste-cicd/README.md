@@ -4,8 +4,11 @@
 
 El diff de GitHub mostraba ~120 archivos porque la rama `DEPLOY` estaba muy
 desactualizada respecto a `QA` (no tenía las PRs #328-#334). El contenido
-REAL y único de esta PR (comparado contra el punto de divergencia real,
-commit `2885b51`) son 4 cambios:
+REAL y único de `DEPLOY` que no estaba ya en `QA` eran estos cambios
+(confirmados con `git diff origin/QA origin/DEPLOY` por archivo, no solo
+leyendo el único commit nuevo — un error que cometí al principio: asumí que
+`2885b51` era la única diferencia y no revisé el resto del diff con el mismo
+cuidado, ver "Hallazgo" abajo):
 
 1. **URL de Dokploy actualizada** en `docs/archivo/VERIFICACION_NEXO_CUBICADOR_2026-09-14.md`
    y `docs/despliegue/CHECKLIST_DESPLIEGUE.md`: de
@@ -20,6 +23,12 @@ commit `2885b51`) son 4 cambios:
 3. **`cubicador/scripts/ci_docker_smoke.py`**: relaja la aserción de
    `len(vehiculos) == 9` a `>= 9` — el catálogo de presets crece con el
    tiempo y un `==` fijo rompía el CI cada vez que se agregaba uno.
+4. **`clsHechoConHistoricoSapRealAttribute.cs`** (nuevo): mismo patrón que
+   `clsHechoConCubicadorRealAttribute` — salta explícitamente
+   `clsHistoricoSapPaginacionTests` cuando `tblSAPTarifasLog` no tiene
+   suficientes filas reales, en vez de fallar. Resuelve exactamente el
+   problema de datos del ambiente que diagnostiqué en las verificaciones de
+   las PRs #333 y #334 (CI del 2026-10-20: 10 esperadas, 0 recibidas).
 
 ## Qué se verificó
 
@@ -56,8 +65,34 @@ merge SÍ dispara el pipeline real de despliegue
 de hacerlo, se lo consulté explícitamente a Kevin y autorizó el push. Hecho
 esto, la PR quedó mergeable y se cerró con `gh pr merge`.
 
+## Hallazgo encontrado y corregido: duplicación por error de merge
+
+Al mergear `DEPLOY` (que traía una versión más vieja de
+`clsEditarLineaCotizacionCommand.cs`, previa a la PR #332) contra `QA`
+(que ya tenía la versión nueva con `clsMoneda.Pesos`), git combinó ambas en
+vez de detectar que eran el mismo cambio: el bloque de validación
+`PISO_SICETAC_NO_VERIFICABLE` quedó **duplicado**, dos veces seguidas,
+idéntico salvo el formato del monto (`clsMoneda.Pesos(...)` vs `:C0`).
+
+- **Efecto en runtime**: ninguno — la primera copia siempre lanza la
+  excepción antes de llegar a la segunda (código muerto, no un bug
+  funcional).
+- **Corrección**: eliminé el segundo bloque (el de formato viejo `:C0`),
+  commit `bb6130d` directo sobre `QA` (autorizado por Kevin), ya que el
+  bug lo introdujo mi propio merge, no una PR de un desarrollador.
+- **Verificación de la corrección**: `dotnet build` compila correcto;
+  reemprendí la suite completa tras el fix → **Domain 203/203, Application
+  521/521, Api 707/717, 0 errores, 10 omitidas** (incluyen los 2 nuevos
+  skips explícitos de `clsHechoConHistoricoSapRealAttribute`, que antes de
+  este fix de PR #335 fallaban con el error de datos ya diagnosticado).
+- **Barrido de seguridad**: busqué otros bloques de comentario/código
+  repetidos en los demás archivos que tocó el merge (`clsBuscarSapHistoricoQuery.cs`,
+  `clsSapHistoricoAdapter.cs`, `Enums.cs`, `clsResolucionRolPortal.cs`,
+  `AlertasDeNegocioCommand.cs`) — sin otras duplicaciones.
+
 ## Resultado
 
-Sin hallazgos. La URL de despliegue documentada ahora es correcta y
-verificada en vivo; las 2 mejoras de CI del Cubicador son seguras y de
-bajo riesgo.
+Sin hallazgos bloqueantes adicionales. La URL de despliegue documentada
+ahora es correcta y verificada en vivo; las 2 mejoras de CI del Cubicador
+son seguras y de bajo riesgo; la duplicación introducida por el merge ya
+está corregida y la suite completa queda en 0 errores.
