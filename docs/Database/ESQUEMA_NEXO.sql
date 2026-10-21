@@ -263,7 +263,7 @@ CREATE TABLE [db_NEXO].[tbl_servicios_conexos] (
 -- de flete, y el rastro de qué líneas quedaron sin poder costearse solas.
 
 -- Cabecera de una solicitud de flete (spot/licitación), con el score que la
--- prioriza en la bandeja del CoordinadorFletes.
+-- prioriza en la bandeja (Comercial, AdminTarifas, ServiciosLogisticos, LiderProceso y Admin).
 CREATE TABLE [db_NEXO].[tbl_solicitudes] (
     [Id] uniqueidentifier NOT NULL,
     [ClienteId] uniqueidentifier NOT NULL,
@@ -838,7 +838,7 @@ CREATE INDEX [IX_servicios_conexos_CodigoServicio] ON [db_NEXO].[tbl_servicios_c
 CREATE INDEX [IX_solicitudes_ClienteId] ON [db_NEXO].[tbl_solicitudes] ([ClienteId]);
 CREATE INDEX [IX_solicitudes_CreadoPor] ON [db_NEXO].[tbl_solicitudes] ([CreadoPor]);
 CREATE INDEX [IX_solicitudes_Deadline] ON [db_NEXO].[tbl_solicitudes] ([Deadline]);
--- La consulta real de la bandeja del CoordinadorFletes: filtra por estado y ordena por score.
+-- La consulta real de la bandeja: filtra por estado y ordena por score.
 CREATE INDEX [IX_solicitudes_Estado_ScorePrioridad] ON [db_NEXO].[tbl_solicitudes] ([Estado], [ScorePrioridad]);
 CREATE INDEX [IX_tarifas_historicas_ConfigVehiculoId] ON [db_NEXO].[tbl_tarifas_historicas] ([ConfigVehiculoId]);
 CREATE INDEX [IX_tarifas_historicas_CotizacionId] ON [db_NEXO].[tbl_tarifas_historicas] ([CotizacionId]);

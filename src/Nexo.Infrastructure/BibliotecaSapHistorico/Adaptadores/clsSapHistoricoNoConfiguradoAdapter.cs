@@ -19,7 +19,7 @@ public sealed class clsSapHistoricoNoConfiguradoAdapter : ISapHistoricoPort
 
     public Task<clsSapHistoricoResultDto> BuscarAsync(
         string? q, int? lineaNegocio, string? tipoVehiculo, string? tipoCarroseria, int? claseViaje,
-        int top, CancellationToken ct = default)
+        int top, int page = 1, CancellationToken ct = default)
         => throw Error();
 
     public Task<clsSapHistoricoFiltrosDto> FiltrosAsync(CancellationToken ct = default)

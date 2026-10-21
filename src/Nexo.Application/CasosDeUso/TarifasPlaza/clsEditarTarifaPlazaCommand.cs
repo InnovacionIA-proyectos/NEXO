@@ -18,7 +18,7 @@ namespace Nexo.Application.CasosDeUso.TarifasPlaza;
 public sealed record clsEditarTarifaPlazaCommand(
     Guid Id, string LineaNegocio, string ClaseViaje, int OrigenMunicipioId, int DestinoMunicipioId,
     string? ClaseContenedor, int? PesoId, string? TipoVehiculo,
-    decimal Valor, DateOnly Vigencia, string DetallesTarifa) : ICommand<clsTarifaPlazaDto>;
+    decimal Valor, DateOnly Vigencia, string? DetallesTarifa) : ICommand<clsTarifaPlazaDto>;
 
 public sealed class clsEditarTarifaPlazaCommandHandler(
     ITarifasPlazaRepository tarifas, IMunicipiosRepository municipios, IRangosPesoRepository rangos,
@@ -61,7 +61,7 @@ public sealed class clsEditarTarifaPlazaCommandHandler(
         tarifa.TipoVehiculo = command.TipoVehiculo;
         tarifa.Valor = command.Valor;
         tarifa.Vigencia = command.Vigencia;
-        tarifa.DetallesTarifa = command.DetallesTarifa;
+        tarifa.DetallesTarifa = command.DetallesTarifa?.Trim() ?? string.Empty;
         await uow.SaveChangesAsync(ct);
 
         tarifa.Origen = origen;

@@ -309,7 +309,7 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
 
         if (hayReglaSoloSicetac && sicetac is not null)
         {
-            var justifSolo = $"clsRuta marcada como SOLO SICE-TAC por el Administrador: se propone el piso SICE-TAC ({sicetac.Valor:C0}) sin comparar con plaza ni histórico.";
+            var justifSolo = $"La ruta marcada como SOLO SICE-TAC por el Administrador: se propone el piso SICE-TAC ({clsMoneda.Pesos(sicetac.Valor)}) sin comparar con plaza ni histórico.";
             return (new clsPropuestaLineaDto(
                 linea.Id, $"{linea.clsRuta.Origen} → {linea.clsRuta.Destino}", vehiculo, linea.Peso,
                 sicetac, null, null, sicetac.Valor, "sicetac", justifSolo,
@@ -418,7 +418,7 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
             retorno = await RetornoContenedorAsync(dw, destino, Normalizar(linea.CiudadDevolucionContenedor), vehiculo ?? sicetac?.Configuracion, ct);
 
         if (retorno is not null)
-            justificacion += $" Retorno del contenedor a {linea.CiudadDevolucionContenedor}: {retorno.Valor:C0} (viaje vacío SICE-TAC, {clsResolucionHorasLinea.HorasCargueTramoVacio:0.##} h + {clsResolucionHorasLinea.HorasDescargueTramoVacio:0.##} h).";
+            justificacion += $" Retorno del contenedor a {linea.CiudadDevolucionContenedor}: {clsMoneda.Pesos(retorno.Valor)} (viaje vacío SICE-TAC, {clsResolucionHorasLinea.HorasCargueTramoVacio:0.##} h + {clsResolucionHorasLinea.HorasDescargueTramoVacio:0.##} h).";
         else if (linea.RetornaContenedor)
             justificacion += " El viaje retorna contenedor pero no se encontró piso SICE-TAC de viaje vacío para el retorno.";
 

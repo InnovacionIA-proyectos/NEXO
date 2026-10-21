@@ -441,7 +441,7 @@ El secreto vive solo en configuración del backend. El navegador nunca llama al 
 
 - Seis controladores, uno por catálogo, con las rutas espejadas y el contrato visible en Swagger.
 - `GET` con `[Authorize]` sin rol específico, el criterio que NEXO ya aplica a sus consultas.
-- `POST`, `PUT` y `DELETE` con `[Authorize(Roles = "AdminTarifas,Admin")]`. **No existe `AdminFletes`**: los seis roles son `CoordinadorFletes`, `LiderProceso`, `ServiciosLogisticos`, `Admin`, `Comercial` y `AdminTarifas`, y el que encaja es `AdminTarifas`, que ya administra reglas Solo-SICETAC y tarifas de plaza.
+- `POST`, `PUT` y `DELETE` con `[Authorize(Roles = "AdminTarifas,Admin")]`. **No existe `AdminFletes`**: los seis roles son `AdminBiblioteca`, `LiderProceso`, `ServiciosLogisticos`, `Admin`, `Comercial` y `AdminTarifas`, y el que encaja es `AdminTarifas`, que ya administra reglas Solo-SICETAC y tarifas de plaza.
 - El id del usuario autenticado se reenvía como campo del cuerpo para que el Cubicador llene `CreadoPor`.
 - El token de concurrencia del `GET` se devuelve al portal y se exige en el `PUT`; un 409 del Cubicador se propaga con un mensaje que el portal pueda mostrar.
 

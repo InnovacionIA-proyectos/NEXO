@@ -28,9 +28,9 @@ public sealed class clsSapHistoricoAdapter(
 
     public Task<clsSapHistoricoResultDto> BuscarAsync(
         string? q, int? lineaNegocio, string? tipoVehiculo, string? tipoCarroseria, int? claseViaje,
-        int top, CancellationToken ct = default)
+        int top, int page = 1, CancellationToken ct = default)
         // El histórico se identifica por Id de log (no de tarifa de plaza): sin ajustes.
-        => BuscarCoreAsync(db.TarifasLogSap, SinAjustes, q, lineaNegocio, tipoVehiculo, tipoCarroseria, claseViaje, top, ct);
+        => BuscarCoreAsync(db.TarifasLogSap, SinAjustes, q, lineaNegocio, tipoVehiculo, tipoCarroseria, claseViaje, top, ct, page);
 
     public async Task<clsSapHistoricoResultDto> BuscarPlazaAsync(
         string? q, int? lineaNegocio, string? tipoVehiculo, string? tipoCarroseria, int? claseViaje,
@@ -73,7 +73,9 @@ public sealed class clsSapHistoricoAdapter(
 
         var total = await query.CountAsync(ct);
         var filas = await query
-            .OrderByDescending(t => t.Vigencia).ThenByDescending(t => t.FechaCreacion)
+            // S6-HU-29.2/#312: orden ESTABLE. Con empates en Vigencia y FechaCreacion (hay muchas filas del mismo día) el motor
+            // podía devolverlas en otro orden entre página y página y repetir o saltarse filas: el Id desempata.
+            .OrderByDescending(t => t.Vigencia).ThenByDescending(t => t.FechaCreacion).ThenByDescending(t => t.Id)
             .Skip((page - 1) * top)
             .Take(top)
             .ToListAsync(ct);

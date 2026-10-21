@@ -152,6 +152,41 @@ public class clsCubicacionRapidaAdapterTests
         Assert.Equal("CUBICACION_INVALIDA", ex.Code);
     }
 
+    // S6-HU-29.2/#312: "no hay recomendación para esta línea" es una respuesta del Cubicador, no una caída: 404 con código propio. Antes
+    // salía como 503 CUBICADOR_ERROR y el front no podía distinguir "todavía no hay" de un Cubicador caído.
+    [Fact]
+    public async Task Una_reconsulta_sin_recomendacion_es_un_404_propio_no_un_503()
+    {
+        var (adaptador, _) = Armar(_ => Responder(
+            HttpStatusCode.NotFound, """{"codigo":"NO_ENCONTRADO","mensaje":"No hay recomendaciones para la línea LIN-001."}"""));
+
+        var ex = await Assert.ThrowsAsync<clsNotFoundException>(() => adaptador.ConsultarAsync("LIN-001", "NEXO"));
+
+        Assert.Equal("RECOMENDACION_NO_ENCONTRADA", ex.Code);
+        Assert.Equal("No hay recomendaciones para la línea LIN-001.", ex.Message);   // el mensaje del Cubicador, tal cual
+    }
+
+    [Fact]
+    public async Task Un_404_sin_cuerpo_parseable_igual_es_RECOMENDACION_NO_ENCONTRADA()
+    {
+        var (adaptador, _) = Armar(_ => Responder(HttpStatusCode.NotFound, "no es json"));
+
+        var ex = await Assert.ThrowsAsync<clsNotFoundException>(() => adaptador.ConsultarAsync("LIN-001", "NEXO"));
+
+        Assert.Equal("RECOMENDACION_NO_ENCONTRADA", ex.Code);
+    }
+
+    // Al CREAR, un 404 no significa "sin recomendación" (crear siempre devuelve una): es una ruta mal configurada, y eso sí es 503.
+    [Fact]
+    public async Task Un_404_al_crear_sigue_siendo_un_fallo_del_Cubicador_503()
+    {
+        var (adaptador, _) = Armar(_ => Responder(HttpStatusCode.NotFound, """{"detail":"Not Found"}"""));
+
+        var ex = await Assert.ThrowsAsync<clsServiceUnavailableException>(() => adaptador.CrearAsync(clsSolicitud()));
+
+        Assert.Equal("CUBICADOR_ERROR", ex.Code);
+    }
+
     [Fact]
     public async Task Un_401_indica_credencial_desactualizada()
     {

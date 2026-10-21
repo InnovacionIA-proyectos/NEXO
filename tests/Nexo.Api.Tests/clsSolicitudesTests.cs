@@ -137,7 +137,7 @@ public class clsSolicitudesTests
     //
     // CreadoPor tiene FK a tbl_usuarios: hace falta un usuario real (no un Guid al
     // azar) para poder crear una solicitud "como" él. La creación en sí se hace con
-    // el rol Admin (POST /api/solicitudes exige CoordinadorFletes/Admin) pero
+    // el rol Admin (POST /api/solicitudes exige AdminBiblioteca/Admin) pero
     // simulando el Id del comercial vía X-Test-UserId, para que CreadoPor quede en
     // ese Id — lo que se prueba acá es el aislamiento en LECTURA/escritura puntual,
     // no el alta (ese flujo real de Comercial es POST /api/captura-solicitudes,
@@ -182,7 +182,7 @@ public class clsSolicitudesTests
     }
 
     [Fact]
-    public async Task Coordinador_de_fletes_sigue_viendo_el_costeo_de_cualquier_comercial()
+    public async Task Administrador_de_tarifas_sigue_viendo_el_costeo_de_cualquier_comercial()
     {
         // Verifica acceso directo por Id en vez de listarla en la Bandeja: la Bandeja
         // pagina y ordena por score, así que una solicitud recién creada (score bajo)
@@ -191,9 +191,20 @@ public class clsSolicitudesTests
         // de aislamiento del comercial, que sí filtra por dueño en vez de por score).
         var idDeA = await CrearComoAsync(CrearUsuarioComercialDePrueba());
 
-        var resp = await _fx.Client("CoordinadorFletes").GetAsync($"/api/solicitudes/{idDeA}");
+        var resp = await _fx.Client("AdminTarifas").GetAsync($"/api/solicitudes/{idDeA}");
 
         Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+    }
+
+    // S6-HU-25.1/#307: AdminBiblioteca no entra a la Mesa de Costeo — ni a leer el costeo de una solicitud.
+    [Fact]
+    public async Task AdminBiblioteca_recibe_403_al_pedir_el_costeo_y_la_bandeja()
+    {
+        var idDeA = await CrearComoAsync(CrearUsuarioComercialDePrueba());
+        var cliente = _fx.Client("AdminBiblioteca");
+
+        Assert.Equal(HttpStatusCode.Forbidden, (await cliente.GetAsync($"/api/solicitudes/{idDeA}")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await cliente.GetAsync("/api/solicitudes")).StatusCode);
     }
 
     [Fact]

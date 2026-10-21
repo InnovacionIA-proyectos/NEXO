@@ -124,7 +124,7 @@ la pantalla es solo cortesía visual.
 Nexo trabaja con seis roles y solo seis:
 
 ```
-CoordinadorFletes · LiderProceso · ServiciosLogisticos · Admin · Comercial · AdminTarifas
+AdminBiblioteca · LiderProceso · ServiciosLogisticos · Admin · Comercial · AdminTarifas
 ```
 
 La administración tiene su propio catálogo, mucho más amplio y con otros nombres.
@@ -140,7 +140,7 @@ Hoy solo hay dos correspondencias con candidato evidente:
 | `TarifasComercial` | `Comercial` | Alta, por nombre |
 | `TarifasAdministrador` | `AdminTarifas` | Alta, por nombre |
 | `Administracion` | `Admin` | Media, revisar alcance |
-| — | `CoordinadorFletes` | Sin candidato |
+| `CoordinadorFletesNEXO` (id 49) | `AdminBiblioteca` | Alta, por nombre (S6-HU-25.1/#307: el rol de Nexo cambió de nombre; el del portal conserva el suyo) |
 | — | `LiderProceso` | Sin candidato |
 | — | `ServiciosLogisticos` | Sin candidato |
 
@@ -166,7 +166,7 @@ un orden de precedencia.
 Propuesta a confirmar por negocio, del que más manda al que menos:
 
 ```
-Admin > CoordinadorFletes > AdminTarifas > Comercial > LiderProceso > ServiciosLogisticos
+Admin > AdminTarifas > AdminBiblioteca > Comercial > LiderProceso > ServiciosLogisticos
 ```
 
 Sale de qué tan a menudo aparece cada rol autorizando operaciones de escritura en
@@ -184,13 +184,15 @@ decide qué mostrar.
 | Operación | Roles admitidos |
 |---|---|
 | `POST /api/captura-solicitudes` y todo el módulo de captura | `Comercial`, `Admin` |
-| `POST /api/solicitudes` · carga masiva de líneas · recalcular score | `CoordinadorFletes`, `Admin` |
-| `POST /api/solicitudes/{id}/rechazar` | `Comercial`, `CoordinadorFletes`, `Admin` |
-| `POST /api/cotizaciones` · aplicar propuestas · registrar resultado | `Comercial`, `AdminTarifas`, `CoordinadorFletes`, `Admin` |
-| `POST /api/cotizaciones/{id}/lineas` · entregar | `AdminTarifas`, `CoordinadorFletes`, `Admin` |
-| `POST /api/cotizaciones/{id}/conexos` | `Comercial`, `CoordinadorFletes`, `Admin` |
+| `GET /api/solicitudes` (Bandeja) · `GET /api/solicitudes/{id}` (Mesa) · `GET /api/cotizaciones/*` | `Comercial`, `AdminTarifas`, `ServiciosLogisticos`, `LiderProceso`, `Admin` (#307: `AdminBiblioteca` no entra) |
+| `POST /api/solicitudes` · carga masiva de líneas · recalcular score | `Admin` (#307, decisión D5) |
+| `POST /api/solicitudes/{id}/rechazar` | `Comercial`, `Admin` |
+| `POST /api/cotizaciones` · aplicar propuestas | `Comercial`, `AdminTarifas`, `Admin` |
+| `POST /api/cotizaciones/{id}/resultado` | `Comercial`, `Admin` |
+| `POST /api/cotizaciones/{id}/lineas` · `PUT .../lineas/{id}` · entregar | `AdminTarifas`, `Admin` |
+| `POST /api/cotizaciones/{id}/conexos` | `Comercial`, `AdminTarifas`, `Admin` |
 | Servicios conexos: crear, editar, importar | `ServiciosLogisticos`, `AdminTarifas`, `Admin` |
-| Reglas solo SICE-TAC (todo) | `AdminTarifas`, `Admin` |
+| Reglas solo SICE-TAC, Tarifas Plaza y rangos de peso (todo) | `AdminTarifas`, `AdminBiblioteca`, `Admin` |
 | Métricas de cumplimiento | `LiderProceso`, `AdminTarifas`, `Admin` |
 | `GET` y `PUT /api/priorizacion/parametros` | `Admin` |
 | Hubs `/hubs/trabajos` y `/hubs/bandeja` | Cualquier rol autenticado |

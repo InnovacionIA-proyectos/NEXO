@@ -210,7 +210,7 @@ public class clsBandejaVigenciaYResultadoTests
 
     [Theory]
     [InlineData(RolUsuario.AdminTarifas)]
-    [InlineData(RolUsuario.CoordinadorFletes)]
+    [InlineData(RolUsuario.AdminBiblioteca)]
     [InlineData(RolUsuario.Admin)]
     public async Task Los_demas_roles_ven_todo_con_los_filtros_nuevos(RolUsuario rol)
     {

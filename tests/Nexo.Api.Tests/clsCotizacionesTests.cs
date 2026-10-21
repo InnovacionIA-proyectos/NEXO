@@ -139,7 +139,7 @@ public class clsCotizacionesTests
     // 6) S4-HU-11.1/#213 — solo Comercial y Admin deciden si una cotización se ganó o se perdió.
     [Theory]
     [InlineData("AdminTarifas")]
-    [InlineData("CoordinadorFletes")]
+    [InlineData("AdminBiblioteca")]
     public async Task Marcar_resultado_con_rol_no_autorizado_devuelve_403(string rol)
     {
         var (sid, lid) = await NuevaSolicitudConLinea();

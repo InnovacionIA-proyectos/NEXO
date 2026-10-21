@@ -20,7 +20,9 @@ namespace Nexo.Api.Cotizaciones;
 /// ningún detalle de Infrastructure.
 /// </summary>
 [ApiController]
-[Authorize]
+// S6-HU-25.1/#307: AdminBiblioteca NO entra a cotizaciones (ni a leerlas). Un [Authorize(Roles)] de clase se SUMA (AND) a los de
+// cada método: aquí deja fuera a ese rol sin repetirlo en cada endpoint; los métodos siguen acotando.
+[Authorize(Roles = "Comercial,AdminTarifas,ServiciosLogisticos,LiderProceso,Admin")]
 [Route("api/cotizaciones")]
 public class clsCotizacionesController(
     ICommandHandler<clsCrearCotizacionCommand, clsCotizacionDto> crear,
@@ -39,7 +41,7 @@ public class clsCotizacionesController(
 {
     /// <summary>Crear o recuperar la cotización (borrador) de una solicitud.</summary>
     [HttpPost]
-    [Authorize(Roles = "Comercial,AdminTarifas,CoordinadorFletes,Admin")]
+    [Authorize(Roles = "Comercial,AdminTarifas,Admin")]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<clsCotizacionDto>> Crear([FromBody] clsCrearCotizacionRequest req, CancellationToken ct = default)
@@ -79,7 +81,7 @@ public class clsCotizacionesController(
     /// parámetro aplica todas, igual que siempre.
     /// </summary>
     [HttpPost("{id:guid}/aplicar-propuestas")]
-    [Authorize(Roles = "Comercial,AdminTarifas,CoordinadorFletes,Admin")]
+    [Authorize(Roles = "Comercial,AdminTarifas,Admin")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<clsAplicarPropuestasResultDto>> AplicarPropuestas(
@@ -88,7 +90,7 @@ public class clsCotizacionesController(
 
     /// <summary>Agregar el flete costeado de una línea.</summary>
     [HttpPost("{id:guid}/lineas")]
-    [Authorize(Roles = "AdminTarifas,CoordinadorFletes,Admin")]
+    [Authorize(Roles = "AdminTarifas,Admin")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -103,7 +105,7 @@ public class clsCotizacionesController(
     /// SICE-TAC (400 FLETE_BAJO_PISO_SICETAC). No recibe la fuente: no se puede cambiar.
     /// </summary>
     [HttpPut("{id:guid}/lineas/{lineaSolicitudId:guid}")]
-    [Authorize(Roles = "AdminTarifas,CoordinadorFletes,Admin")]
+    [Authorize(Roles = "AdminTarifas,Admin")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -118,7 +120,7 @@ public class clsCotizacionesController(
     /// (Borrador o Entregada); Ganada/Perdida → 409 COTIZACION_CERRADA (S5-HU-20.1/#286).
     /// </summary>
     [HttpPost("{id:guid}/conexos")]
-    [Authorize(Roles = "Comercial,AdminTarifas,CoordinadorFletes,Admin")]
+    [Authorize(Roles = "Comercial,AdminTarifas,Admin")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -130,7 +132,7 @@ public class clsCotizacionesController(
     /// <summary>Corregir la cantidad (y opcionalmente el valor) de un conexo ya agregado —
     /// solo en cotización Borrador (S5-HU-18/#262).</summary>
     [HttpPatch("{id:guid}/conexos/{conexoId:guid}")]
-    [Authorize(Roles = "Comercial,CoordinadorFletes,Admin")]
+    [Authorize(Roles = "Comercial,Admin")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -141,7 +143,7 @@ public class clsCotizacionesController(
     /// <summary>Quitar un conexo (S5-HU-18/#262). Desde S5-HU-20.1/#286 también sobre una cotización
     /// Entregada: se admite mientras no tenga resultado; Ganada/Perdida → 409 COTIZACION_CERRADA.</summary>
     [HttpDelete("{id:guid}/conexos/{conexoId:guid}")]
-    [Authorize(Roles = "Comercial,AdminTarifas,CoordinadorFletes,Admin")]
+    [Authorize(Roles = "Comercial,AdminTarifas,Admin")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
@@ -154,7 +156,7 @@ public class clsCotizacionesController(
     /// 409 si ya se había entregado antes (no se reenvía dos veces).
     /// </summary>
     [HttpPost("{id:guid}/entregar")]
-    [Authorize(Roles = "AdminTarifas,CoordinadorFletes,Admin")]
+    [Authorize(Roles = "AdminTarifas,Admin")]
     [RequestSizeLimit(10 * 1024 * 1024)]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -173,7 +175,7 @@ public class clsCotizacionesController(
     }
 
     /// <summary>Registrar el resultado (ganada/perdida) y realimentar la Biblioteca. Solo
-    /// Comercial y Admin (S4-HU-11.1/#213): ni AdminTarifas ni CoordinadorFletes deciden
+    /// Comercial y Admin (S4-HU-11.1/#213): ni AdminTarifas ni AdminBiblioteca deciden
     /// si una cotización se ganó o se perdió, eso es criterio del Comercial dueño del negocio.</summary>
     [HttpPost("{id:guid}/resultado")]
     [Authorize(Roles = "Comercial,Admin")]

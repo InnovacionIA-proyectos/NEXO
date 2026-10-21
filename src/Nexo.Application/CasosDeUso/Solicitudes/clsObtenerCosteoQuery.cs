@@ -7,6 +7,7 @@ using Nexo.Application.Common.Abstractions;
 using Nexo.Application.Common.Dtos;
 using Nexo.Application.Common.Exceptions;
 using Nexo.Domain.Catalogos.Entidades;
+using Nexo.Domain.Common;
 using Nexo.Domain.Costeo.Reglas;
 using Nexo.Domain.Enums;
 using Nexo.Domain.Solicitudes.Entidades;
@@ -28,7 +29,7 @@ public sealed class clsObtenerCosteoQueryHandler(
 
         // Aislamiento por comercial (issue #199, S4-HU-19.1): un Comercial no puede abrir
         // la solicitud de otro comercial, aunque tenga el Id. El resto de los roles
-        // (Mesa de Costeo/CoordinadorFletes, Admin, etc.) no tienen esta restricción.
+        // (Mesa de Costeo/AdminBiblioteca, Admin, etc.) no tienen esta restricción.
         if (usuarioActual.Rol == RolUsuario.Comercial && s.CreadoPor != usuarioActual.Id)
             throw new clsForbiddenException("SOLICITUD_AJENA", "No tiene acceso a esta solicitud.");
 
@@ -64,7 +65,12 @@ public sealed class clsObtenerCosteoQueryHandler(
                 // S6-HU-26.1/#30: para que la Mesa sepa cuándo NO ofrecer "Editar flete" (con regla responde 409).
                 clsReglaSoloSicetacDeLinea.Tiene(
                     claves, l.ClaseViaje, l.clsRuta?.OrigenMunicipio?.CodigoDane, l.clsRuta?.DestinoMunicipio?.CodigoDane,
-                    l.clsConfiguracionVehiculo?.TipoVehiculo)));
+                    l.clsConfiguracionVehiculo?.TipoVehiculo),
+                // S6-HU-24.1/#309 y S6-HU-29.1/#311: campos nuevos, al final y opcionales — no rompen a quien ya lee el DTO.
+                clsTexto.MinusculaInicial((EstadoLinea?)l.EstadoLinea), l.MotivoPendiente,
+                clsTexto.MinusculaInicial(l.LineaNegocio), clsTexto.MinusculaInicial(l.ClaseViaje),
+                l.ClaseViaje == ClaseViaje.Contenedor ? l.ClaseContenedor : null,
+                l.clsRuta?.OrigenMunicipioId, l.clsRuta?.DestinoMunicipioId));
         }
 
         // Al abrir, marca la solicitud en costeo (si estaba pendiente).

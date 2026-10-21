@@ -1,4 +1,5 @@
 using Nexo.Domain.Enums;
+using Nexo.Domain.Common;
 
 namespace Nexo.Domain.Costeo.Reglas;
 
@@ -79,8 +80,8 @@ public static class clsReglaDeCosteo
                 : ("El histórico de plaza (últimos 3 meses)", "el histórico de plaza (últimos 3 meses)");
 
             var justificacion = mejorComercial.Valor >= sicetac.Valor
-                ? $"{sujeto} ({mejorComercial.Valor:C0}) supera el piso SICE-TAC ({sicetac.Valor:C0}) en {porcentaje}%: se propone {mejorComercial.Fuente}."
-                : $"El piso SICE-TAC ({sicetac.Valor:C0}) supera {sujetoObjeto} ({mejorComercial.Valor:C0}) en {porcentaje}%: se propone SICE-TAC para no cotizar bajo el piso.";
+                ? $"{sujeto} ({clsMoneda.Pesos(mejorComercial.Valor)}) supera el piso SICE-TAC ({clsMoneda.Pesos(sicetac.Valor)}) en {porcentaje}%: se propone {mejorComercial.Fuente}."
+                : $"El piso SICE-TAC ({clsMoneda.Pesos(sicetac.Valor)}) supera {sujetoObjeto} ({clsMoneda.Pesos(mejorComercial.Valor)}) en {porcentaje}%: se propone SICE-TAC para no cotizar bajo el piso.";
 
             return new clsResultadoDeCosteo(mayor.Valor, mayor.Fuente, justificacion);
         }
@@ -92,7 +93,7 @@ public static class clsReglaDeCosteo
         // Sin piso vigente, el histórico viaja como referencia, no como propuesta:
         // proponerlo sería costear sin saber si respeta el piso vigente.
         var referencia = historico is not null
-            ? $" Referencia disponible: histórico SAP {historico.Valor:C0} (el Administrador de Fletes decide manualmente)."
+            ? $" Referencia disponible: histórico SAP {clsMoneda.Pesos(historico.Valor)} (el Administrador de Fletes decide manualmente)."
             : string.Empty;
 
         return new clsResultadoDeCosteo(null, null,
@@ -118,7 +119,7 @@ public static class clsReglaDeCosteo
         // por debajo de él.
         var justificacion = sinPlaza.Fuente switch
         {
-            "sicetac" => aviso + $"Se propone el piso SICE-TAC vigente ({sicetac!.Valor:C0}); nunca cotiza por debajo del piso legal.",
+            "sicetac" => aviso + $"Se propone el piso SICE-TAC vigente ({clsMoneda.Pesos(sicetac!.Valor)}); nunca cotiza por debajo del piso legal.",
             null => "La tarifa del tarifario está INACTIVA (vigencia vencida) y no hay piso SICE-TAC vigente para la ruta: " +
                     "requiere revisión manual del Administrador de Fletes.",
             _ => aviso + sinPlaza.Justificacion,
@@ -172,7 +173,7 @@ public static class clsReglaDeCosteo
         if (hayReglaSoloSicetac && sicetac is not null)
             return new clsDecisionDeFlujo(
                 new clsResultadoDeCosteo(sicetac.Valor, sicetac.Fuente,
-                    $"clsRuta marcada como SOLO SICE-TAC por el Administrador: se propone el piso SICE-TAC ({sicetac.Valor:C0}) sin comparar con plaza ni histórico."),
+                    $"La ruta marcada como SOLO SICE-TAC por el Administrador: se propone el piso SICE-TAC ({clsMoneda.Pesos(sicetac.Valor)}) sin comparar con plaza ni histórico."),
                 ModoDecision.SoloSicetac);
 
         // Paso 2: sin regla, con piso Y con plaza vigente ESTRICTAMENTE mayor que el
@@ -181,7 +182,7 @@ public static class clsReglaDeCosteo
         if (!hayReglaSoloSicetac && sicetac is not null && plazaVigente is not null && plazaVigente.Valor > sicetac.Valor)
             return new clsDecisionDeFlujo(
                 new clsResultadoDeCosteo(plazaVigente.Valor, plazaVigente.Fuente,
-                    $"La plaza vigente ({plazaVigente.Valor:C0}) supera el piso SICE-TAC ({sicetac.Valor:C0}): se propone la plaza sin consultar el histórico."),
+                    $"La plaza vigente ({clsMoneda.Pesos(plazaVigente.Valor)}) supera el piso SICE-TAC ({clsMoneda.Pesos(sicetac.Valor)}): se propone la plaza sin consultar el histórico."),
                 ModoDecision.PlazaVigenteMayor);
 
         // Paso 3/4: todo lo demás (sin plaza vigente, plaza vigente que no supera el

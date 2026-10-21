@@ -21,7 +21,7 @@ namespace Nexo.Application.CasosDeUso.Notificaciones;
 public sealed record clsNotificarTarifaVencidaCommand(Guid LineaId, string Justificacion, DateTimeOffset DetectadaEn)
     : ICommand<clsResultadoDeNotificacionDto>;
 
-/// <summary>Urgencia Alta: Administrador de Fletes y Administrador de Reglas (partido hoy entre AdminTarifas y ServiciosLogisticos — ver docs/ROLES_Y_PERMISOS.md).</summary>
+/// <summary>Urgencia Alta: la Biblioteca (AdminBiblioteca), el Administrador de Tarifas y Servicios Logísticos — ver docs/documentacion/ROLES_Y_PERMISOS.md.</summary>
 public sealed class clsNotificarTarifaVencidaCommandHandler(
     IDestinatariosDeAlertaPort destinatarios, ICorreoPort correo)
     : ICommandHandler<clsNotificarTarifaVencidaCommand, clsResultadoDeNotificacionDto>
@@ -32,7 +32,7 @@ public sealed class clsNotificarTarifaVencidaCommandHandler(
             return clsResultadoDeNotificacionDto.NoHabiaQueEnviar("La salida de correo corporativo no está configurada.");
 
         var email = new HashSet<string>(
-            [.. await destinatarios.EmailsPorRolAsync(RolUsuario.CoordinadorFletes, ct),
+            [.. await destinatarios.EmailsPorRolAsync(RolUsuario.AdminBiblioteca, ct),
              .. await destinatarios.EmailsPorRolAsync(RolUsuario.AdminTarifas, ct),
              .. await destinatarios.EmailsPorRolAsync(RolUsuario.ServiciosLogisticos, ct)]);
         if (email.Count == 0)
@@ -56,7 +56,10 @@ public sealed class clsNotificarTarifaVencidaCommandHandler(
 public sealed record clsNotificarLineaFalloTecnicoCommand(Guid TrabajoId, Guid LineaId, string Motivo)
     : ICommand<clsResultadoDeNotificacionDto>;
 
-/// <summary>Urgencia Media: Administrador de Fletes (CoordinadorFletes).</summary>
+/// <summary>
+/// Urgencia Media: Administrador de Tarifas (AdminTarifas). S6-HU-25.1/#307: antes le llegaba al rol de la Biblioteca; ese rol (AdminBiblioteca)
+/// ya no entra a la Mesa de Costeo, que es donde se resuelve una línea que no pudo costearse.
+/// </summary>
 public sealed class clsNotificarLineaFalloTecnicoCommandHandler(
     IDestinatariosDeAlertaPort destinatarios, ICorreoPort correo)
     : ICommandHandler<clsNotificarLineaFalloTecnicoCommand, clsResultadoDeNotificacionDto>
@@ -66,9 +69,9 @@ public sealed class clsNotificarLineaFalloTecnicoCommandHandler(
         if (!correo.Configurado)
             return clsResultadoDeNotificacionDto.NoHabiaQueEnviar("La salida de correo corporativo no está configurada.");
 
-        var email = await destinatarios.EmailsPorRolAsync(RolUsuario.CoordinadorFletes, ct);
+        var email = await destinatarios.EmailsPorRolAsync(RolUsuario.AdminTarifas, ct);
         if (email.Count == 0)
-            return clsResultadoDeNotificacionDto.NoHabiaQueEnviar("No hay usuarios activos con rol CoordinadorFletes.");
+            return clsResultadoDeNotificacionDto.NoHabiaQueEnviar("No hay usuarios activos con rol AdminTarifas.");
 
         var cuerpo = $"""
             <p>Una línea del trabajo <strong>{command.TrabajoId}</strong> no se pudo costear:

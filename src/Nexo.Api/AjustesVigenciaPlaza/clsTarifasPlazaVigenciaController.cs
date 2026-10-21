@@ -14,7 +14,7 @@ namespace Nexo.Api.AjustesVigenciaPlaza;
 /// BibliotecaSapHistoricoService, que todavía no se migró.
 /// </summary>
 [ApiController]
-[Authorize(Roles = "AdminTarifas,CoordinadorFletes,Admin")]
+[Authorize(Roles = "AdminTarifas,AdminBiblioteca,Admin")]
 [Route("api/biblioteca-sap-plaza")]
 public class clsTarifasPlazaVigenciaController(
     ICommandHandler<clsAjustarVigenciaPlazaCommand, Unit> ajustar,

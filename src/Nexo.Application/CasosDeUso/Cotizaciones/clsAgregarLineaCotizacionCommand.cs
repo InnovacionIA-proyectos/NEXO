@@ -9,6 +9,7 @@ using Nexo.Application.Common.Ports;
 using Nexo.Domain.Cotizaciones.Entidades;
 using Nexo.Domain.Enums;
 using Nexo.Domain.Solicitudes.Entidades;
+using Nexo.Domain.Common;
 
 namespace Nexo.Application.CasosDeUso.Cotizaciones;
 
@@ -54,7 +55,7 @@ public sealed class clsAgregarLineaCotizacionCommandHandler(
             propuestaLinea = (await propuestas.ProponerAsync(c.SolicitudId, ct)).Lineas.FirstOrDefault(x => x.LineaId == lid);
             if (propuestaLinea?.Sicetac?.Valor is { } piso && command.ValorFlete < piso)
                 throw new clsValidationFailedException("FLETE_BAJO_PISO_SICETAC",
-                    $"El flete ({command.ValorFlete:C0}) está por debajo del piso SICE-TAC ({piso:C0}). No se puede guardar un valor por debajo del piso.");
+                    $"El flete ({clsMoneda.Pesos(command.ValorFlete)}) está por debajo del piso SICE-TAC ({clsMoneda.Pesos(piso)}). No se puede guardar un valor por debajo del piso.");
         }
 
         var fuente = Enum.Parse<FuenteFlete>(command.Fuente, ignoreCase: true);

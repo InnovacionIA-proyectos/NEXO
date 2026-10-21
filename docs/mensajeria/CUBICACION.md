@@ -270,7 +270,7 @@ operaciones de datos, no de cálculo — la compuerta de paridad solo bloquea
 > navegador. Cerrar el par de `guardar_vehiculo` era la única forma de no dejar
 > ese hilo suelto. Ver el comentario de `EliminarVehiculoCommand`.
 
-Todos exigen rol `Comercial`, `CoordinadorFletes` o `Admin` (mismo criterio
+Todos exigen rol `Comercial`, `AdminTarifas` o `Admin` (mismo criterio
 que `POST /api/planes-cargue/{id}/optimizar`), **salvo `DELETE /api/vehiculos/{id}`,
 que exige `Admin`**: el catálogo de vehículos es maestro y lo comparten todos los
 planes, a diferencia del alta, que un comercial puede necesitar en medio de una

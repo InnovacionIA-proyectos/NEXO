@@ -97,7 +97,7 @@ public class clsServiciosConexosTests
     [Fact] // permiso: el coordinador NO puede gestionar el catálogo -> 403
     public async Task Crear_con_rol_no_autorizado_devuelve_403()
     {
-        var resp = await _fx.Client("CoordinadorFletes").PostJson("/api/servicios-conexos", PayloadValido("X"));
+        var resp = await _fx.Client("AdminBiblioteca").PostJson("/api/servicios-conexos", PayloadValido("X"));
         Assert.Equal(HttpStatusCode.Forbidden, resp.StatusCode);
     }
 

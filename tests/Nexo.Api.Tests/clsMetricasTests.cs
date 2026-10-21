@@ -32,7 +32,7 @@ public class clsMetricasTests
     [Fact]
     public async Task Cumplimiento_con_rol_no_autorizado_devuelve_403()
     {
-        var resp = await _fx.Client("CoordinadorFletes").GetAsync("/api/metricas/cumplimiento");
+        var resp = await _fx.Client("AdminBiblioteca").GetAsync("/api/metricas/cumplimiento");
         Assert.Equal(HttpStatusCode.Forbidden, resp.StatusCode);
     }
 }

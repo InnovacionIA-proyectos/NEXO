@@ -12,7 +12,7 @@ namespace Nexo.Api.Biblioteca;
 /// propone el valor más alto.
 /// </summary>
 [ApiController]
-[Authorize]
+[Authorize(Roles = "Comercial,AdminTarifas,ServiciosLogisticos,LiderProceso,Admin")] // S6-HU-25.1/#307: es la Mesa de Costeo; AdminBiblioteca no entra
 [Route("api/solicitudes/{id:guid}/propuesta-tarifa")]
 public class clsPropuestaTarifaController(IQueryHandler<clsProponerPropuestaTarifaQuery, clsPropuestaSolicitudDto> proponer)
     : ControllerBase

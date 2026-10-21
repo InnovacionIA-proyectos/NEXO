@@ -19,7 +19,7 @@ namespace Nexo.Api.Solicitudes;
 ///
 /// S5-HU-22.1/#288: los roles ya NO están a nivel de clase. Un [Authorize(Roles)] de método no
 /// reemplaza el de la clase —se combinan con AND—, así que con "Comercial,Admin" en la clase el
-/// catálogo de ciudades devolvía 403 a CoordinadorFletes (que sí gestiona servicios en
+/// catálogo de ciudades devolvía 403 a AdminBiblioteca (que sí gestiona servicios en
 /// Biblioteca) y el frontend, que traga ese error, dejaba el campo sin sugerencias. Ahora la
 /// clase exige solo estar autenticado (más la política de respaldo: un rol válido de Nexo) y
 /// cada endpoint dice quién puede usarlo.

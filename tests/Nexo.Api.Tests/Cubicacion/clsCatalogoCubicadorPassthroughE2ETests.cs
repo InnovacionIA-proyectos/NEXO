@@ -17,8 +17,8 @@ public class clsCatalogoCubicadorPassthroughE2ETests(clsApiFixture fixture)
     [clsHechoConCubicadorReal("Cubicador3D__OutboundApiKey")]
     public async Task GET_categorias_mercancia_con_rol_sin_privilegio_trae_el_catalogo_real()
     {
-        // GET no exige rol específico (solo [Authorize]) — un CoordinadorFletes puede leer.
-        var cliente = fixture.Client("CoordinadorFletes");
+        // GET no exige rol específico (solo [Authorize]) — un AdminBiblioteca puede leer.
+        var cliente = fixture.Client("AdminBiblioteca");
 
         var respuesta = await cliente.GetAsync("/api/categorias-mercancia");
 
@@ -31,7 +31,7 @@ public class clsCatalogoCubicadorPassthroughE2ETests(clsApiFixture fixture)
     [Fact]
     public async Task POST_sin_rol_AdminTarifas_responde_403()
     {
-        var cliente = fixture.Client("CoordinadorFletes");
+        var cliente = fixture.Client("AdminBiblioteca");
 
         var respuesta = await cliente.PostAsJsonAsync("/api/categorias-mercancia", new { nombreCategoria = "NO_DEBERIA_CREARSE" });
 

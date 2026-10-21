@@ -110,6 +110,28 @@ comparan sin tildes y con `_` y `-` equivalentes a espacio (`Bogotá` = `Bogota`
   tramo vacío de retorno (piso SICE-TAC de viaje vacío, 1 + 1). Lo mismo el levante en otra ciudad. Esas horas
   de los tramos vacíos no se mandan ni se guardan por línea: son fijas.
 
+### 3.7 Peso de la línea: incluye la tara, y Nexo no la suma (S6-HU-28.1/#308)
+
+Decisiones D2 y D2b de la revisión del 16 de octubre de 2026:
+
+- El `peso` de cada línea es el peso **total que se transporta, INCLUYENDO la tara** (embalaje, estibas, contenedor vacío...). También
+  en las solicitudes que llegan de Cotifly.
+- **La tara la escribe quien captura** (el Comercial, o Cotifly dentro de su campo de peso). **Nexo NO la suma**: guarda `peso` tal cual.
+- **Siempre kilogramos.** Si el origen trabaja en toneladas, la conversión es de quien captura; el backend de Nexo nunca recibe toneladas.
+
+Qué peso usa cada cosa:
+
+| Qué | Usa |
+|---|---|
+| Rango de peso de la tarifa de plaza (SAP y propia de Nexo) y configuración SICE-TAC de un contenedor | el `peso` de la línea (**con** tara) |
+| Recomendación de vehículo (`POST /recomendaciones` del Cubicador, o `POST /api/cubicacion` de Nexo) | el de cada mercancía, `pesoKg` **por unidad** × `cantidad` (**sin** tara). El Cubicador lo compara contra la capacidad del vehículo **menos su tara** — hoy la tara de los vehículos está en 0 |
+| Valor del piso SICE-TAC | no usa el peso (ruta, configuración y horas) |
+
+⚠️ **Cuidado si se mandan `posiciones[]`**: NEXO valida que `peso` coincida con la suma `cantidad × pesoKg` de las posiciones, con
+tolerancia del 1 % (`400 PESO_INCONSISTENTE`). Como las posiciones van **sin** tara y `peso` va **con** tara, una línea con tara mayor al
+1 % del peso y con posiciones se rechaza. Hoy el front de Nexo y Cotifly pueden evitarlo **no mandando `posiciones[]`** (son opcionales, §3.5).
+Está registrado como hallazgo de la revisión y se tratará en una issue aparte (ver el cierre de #308).
+
 ## 4. "Línea sin vehículo": solo Cupo
 
 Una línea **sin `tipoVehiculo`** se acepta. Pero:
@@ -141,6 +163,22 @@ Una línea **sin `tipoVehiculo`** se acepta. Pero:
 - Errores: `400 CLIENTE_REQUERIDO` · `CLIENTE_INVALIDO` · `CLIENTE_BP_INVALIDO` ·
   `DWCUBOS_NO_CONFIGURADO` · `ENUM_INVALIDO` · `LINEA_INCOMPLETA` · `PESO_REQUERIDO` ·
   `PESO_INCONSISTENTE`.
+
+### 5.1 Lo que Cotifly puede leer de cada línea (`GET /api/solicitudes/{id}`)
+
+Todos los campos nuevos van **al final del objeto línea y son opcionales**: quien ya lee la línea sigue leyendo igual.
+
+| Campo | Qué es | Issue |
+|---|---|---|
+| `estadoLinea` | `porCostear`, `autoResuelta` o `revisada` (minúscula inicial) | #309 |
+| `motivoPendiente` | por qué sigue en `porCostear` (consulta completa, línea sin vehículo, SICE-TAC que no es del mes actual...); null si no está pendiente. Cotifly puede mostrarlo en vez de un "pendiente de costeo" mudo | #309 |
+| `lineaNegocio` | `puertoAInterior`, `interiorAPuerto`, `nacional`, `devolucionContenedor`, `andino`, `licitaciones`; null si la línea no la trae | #311 |
+| `claseViaje` | `contenedor`, `cupo`, `cargaSuelta`, `extradimensionado`; null si no | #311 |
+| `claseContenedor` | tal como se capturó (`CNT20.IT`...). **null salvo que `claseViaje` sea `contenedor`** | #311 |
+| `origenMunicipioId`, `destinoMunicipioId` | id de `tbl_municipios` (el de `GET /ciudades`); null si la ruta no resolvió municipio | #311 |
+| `tieneReglaSoloSicetac` | la ruta y el vehículo tienen regla Solo-SICE (su flete no se edita) | S6-HU-26.1/#30 |
+
+Pendiente: `motivoRechazo` llegará con el rechazo de una línea (S6-HU-24), cuando existan las columnas.
 
 ## 6. Decisiones ya tomadas (respuestas de NEXO a Cotifly)
 

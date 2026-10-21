@@ -32,10 +32,10 @@ public static class clsDataSeeder
         // está configurada (clsResolverIdentidadPortalLocalAdapter, ver clsDependencyInjection.cs).
         // No todas tienen: coord3/lider2/sl2 simulan a alguien que todavía no inició sesión
         // por el portal ("edge: sin identidad del portal").
-        var coord1 = new clsUsuario { Nombre = "Carlos Herrera", Email = "cherrera@boterosoto.com.co", Rol = RolUsuario.CoordinadorFletes, IdentidadPortalId = 1001 };
-        var coord2 = new clsUsuario { Nombre = "Yined Zapata", Email = "yzapata@boterosoto.com.co", Rol = RolUsuario.CoordinadorFletes, IdentidadPortalId = 1002 };
-        var coord3 = new clsUsuario { Nombre = "Édinson Molina", Email = "emolina@boterosoto.com.co", Rol = RolUsuario.CoordinadorFletes };
-        var coord4 = new clsUsuario { Nombre = "Mónica Barrera", Email = "mbarrera@boterosoto.com.co", Rol = RolUsuario.CoordinadorFletes, Activo = false }; // edge: inactivo
+        var coord1 = new clsUsuario { Nombre = "Carlos Herrera", Email = "cherrera@boterosoto.com.co", Rol = RolUsuario.AdminBiblioteca, IdentidadPortalId = 1001 };
+        var coord2 = new clsUsuario { Nombre = "Yined Zapata", Email = "yzapata@boterosoto.com.co", Rol = RolUsuario.AdminBiblioteca, IdentidadPortalId = 1002 };
+        var coord3 = new clsUsuario { Nombre = "Édinson Molina", Email = "emolina@boterosoto.com.co", Rol = RolUsuario.AdminBiblioteca };
+        var coord4 = new clsUsuario { Nombre = "Mónica Barrera", Email = "mbarrera@boterosoto.com.co", Rol = RolUsuario.AdminBiblioteca, Activo = false }; // edge: inactivo
         var lider1 = new clsUsuario { Nombre = "Luisa Chaverra", Email = "lchaverra@boterosoto.com.co", Rol = RolUsuario.LiderProceso, IdentidadPortalId = 1003 };
         var lider2 = new clsUsuario { Nombre = "Andrés Pardo", Email = "apardo@boterosoto.com.co", Rol = RolUsuario.LiderProceso };
         var sl1 = new clsUsuario { Nombre = "Sandra Nieto", Email = "snieto@boterosoto.com.co", Rol = RolUsuario.ServiciosLogisticos, IdentidadPortalId = 1004 };

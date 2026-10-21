@@ -18,7 +18,7 @@ namespace Nexo.Application.Tests.Solicitudes;
 /// pruebas usan dos comerciales con Id deliberadamente distintos (mismo espíritu que
 /// clsNotificarEntregaCommandTests: si algún día alguien vuelve a colar acceso a un
 /// recurso ajeno, una prueba con un solo usuario no lo detectaría) y confirman que
-/// Mesa de Costeo (CoordinadorFletes) y Admin no quedan restringidos.
+/// Mesa de Costeo (AdminBiblioteca) y Admin no quedan restringidos.
 /// </summary>
 public class clsAislamientoPorComercialTests
 {
@@ -77,7 +77,7 @@ public class clsAislamientoPorComercialTests
     }
 
     [Theory]
-    [InlineData(RolUsuario.CoordinadorFletes)] // Mesa de Costeo: sin restricción (criterio 3 de la HU)
+    [InlineData(RolUsuario.AdminBiblioteca)] // Mesa de Costeo: sin restricción (criterio 3 de la HU)
     [InlineData(RolUsuario.Admin)]
     public async Task Mesa_de_costeo_y_admin_pueden_abrir_el_costeo_de_cualquiera(RolUsuario rol)
     {
@@ -131,7 +131,7 @@ public class clsAislamientoPorComercialTests
         repo.Setup(r => r.ObtenerBasicoAsync(SolicitudId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(SolicitudDeA());
 
-        await RechazarHandler(repo, Usuario(Guid.NewGuid(), RolUsuario.CoordinadorFletes))
+        await RechazarHandler(repo, Usuario(Guid.NewGuid(), RolUsuario.AdminBiblioteca))
             .Handle(new clsRechazarSolicitudCommand(SolicitudId, "precio", null));
     }
 }

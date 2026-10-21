@@ -24,7 +24,9 @@ public class clsSesionController(ICurrentUser currentUser) : ControllerBase
     private static readonly IReadOnlyDictionary<RolUsuario, string[]> CapacidadesPorRol = new Dictionary<RolUsuario, string[]>
     {
         [RolUsuario.Comercial] = ["capturarSolicitud", "gestionarCotizacion", "agregarConexos"],
-        [RolUsuario.CoordinadorFletes] = ["crearSolicitud", "cargarLineas", "recalcularScore", "rechazarSolicitud", "gestionarCotizacion"],
+        // S6-HU-25.1/#307: la Biblioteca, sin Bandeja, Mesa ni cotizaciones. Crear solicitud, cargar líneas y
+        // recalcular el puntaje pasaron a SOLO Admin (decisión D5): le llegan por el "*".
+        [RolUsuario.AdminBiblioteca] = ["verBiblioteca", "ajustarVigencia", "editarReglasSoloSicetac"],
         [RolUsuario.AdminTarifas] = ["verBiblioteca", "ajustarVigencia", "editarReglasSoloSicetac", "gestionarCotizacion", "editarServiciosConexos"],
         [RolUsuario.ServiciosLogisticos] = ["editarServiciosConexos"],
         [RolUsuario.LiderProceso] = ["verMetricas"],

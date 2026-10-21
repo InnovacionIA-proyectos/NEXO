@@ -17,7 +17,7 @@ namespace Nexo.Api.ReglasSoloSicetac;
 /// todavía no migrada).
 /// </summary>
 [ApiController]
-[Authorize(Roles = "AdminTarifas,Admin")]
+[Authorize(Roles = "AdminTarifas,AdminBiblioteca,Admin")]
 [Route("api/reglas-solo-sicetac")]
 public class clsReglasSoloSicetacController(
     IQueryHandler<clsListarReglasSoloSicetacQuery, IReadOnlyList<clsReglaSoloSicetacDto>> listar,

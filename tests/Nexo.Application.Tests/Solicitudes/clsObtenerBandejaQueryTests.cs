@@ -99,7 +99,7 @@ public class clsObtenerBandejaQueryTests
     }
 
     [Theory]
-    [InlineData(RolUsuario.CoordinadorFletes)] // Mesa de Costeo: no se ve afectado (criterio 3 de la HU)
+    [InlineData(RolUsuario.AdminBiblioteca)] // Mesa de Costeo: no se ve afectado (criterio 3 de la HU)
     [InlineData(RolUsuario.Admin)]
     [InlineData(RolUsuario.AdminTarifas)]
     public async Task Roles_distintos_de_comercial_ven_la_bandeja_completa_sin_filtro(RolUsuario rol)

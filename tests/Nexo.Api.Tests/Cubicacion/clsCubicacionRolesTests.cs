@@ -20,7 +20,7 @@ public class clsCubicacionRolesTests(clsApiFixture fixture)
     // Los 4 roles con permiso. AdminTarifas es el que agregó #300.
     [Theory]
     [InlineData("Comercial")]
-    [InlineData("CoordinadorFletes")]
+    [InlineData("AdminBiblioteca")]
     [InlineData("AdminTarifas")]
     [InlineData("Admin")]
     public async Task Los_roles_con_permiso_pasan_la_autorizacion_en_POST(string rol)
@@ -35,7 +35,7 @@ public class clsCubicacionRolesTests(clsApiFixture fixture)
 
     [Theory]
     [InlineData("Comercial")]
-    [InlineData("CoordinadorFletes")]
+    [InlineData("AdminBiblioteca")]
     [InlineData("AdminTarifas")]
     [InlineData("Admin")]
     public async Task Los_roles_con_permiso_pasan_la_autorizacion_en_GET(string rol)

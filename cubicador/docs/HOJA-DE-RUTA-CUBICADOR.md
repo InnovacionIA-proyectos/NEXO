@@ -474,7 +474,7 @@ backend* y no una persona.
 - `GET` → `[Authorize]` sin rol específico, el criterio que NEXO ya aplica a sus consultas.
 - `POST` / `PUT` / `DELETE` → `[Authorize(Roles = "AdminTarifas,Admin")]`.
 
-> No existe `AdminFletes`. Los seis roles son `CoordinadorFletes`, `LiderProceso`,
+> No existe `AdminFletes`. Los seis roles son `AdminBiblioteca`, `LiderProceso`,
 > `ServiciosLogisticos`, `Admin`, `Comercial` y `AdminTarifas`. El que encaja es
 > `AdminTarifas`: ya administra reglas Solo-SICETAC y tarifas de plaza.
 

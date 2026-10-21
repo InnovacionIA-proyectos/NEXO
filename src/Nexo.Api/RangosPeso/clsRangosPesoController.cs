@@ -12,7 +12,7 @@ namespace Nexo.Api.RangosPeso;
 /// <summary>Catálogo propio de bandas de peso (kg) para Tarifas de Plaza (S4-HU-10.1) —
 /// no es un catálogo cerrado, se pueden agregar bandas nuevas con el tiempo.</summary>
 [ApiController]
-[Authorize(Roles = "AdminTarifas,Admin")]
+[Authorize(Roles = "AdminTarifas,AdminBiblioteca,Admin")]
 [Route("api/pesos")]
 public class clsRangosPesoController(
     IQueryHandler<clsListarRangosPesoQuery, IReadOnlyList<clsRangoPesoDto>> listar,

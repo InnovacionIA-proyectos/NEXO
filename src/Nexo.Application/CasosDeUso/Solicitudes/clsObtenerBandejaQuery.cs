@@ -48,7 +48,7 @@ public sealed class clsObtenerBandejaQueryHandler(
             estado = e;
 
         // Aislamiento por comercial (issue #199, S4-HU-19.1): un Comercial solo ve lo
-        // que él mismo creó. El resto de los roles (Mesa de Costeo/CoordinadorFletes,
+        // que él mismo creó. El resto de los roles (Mesa de Costeo/AdminBiblioteca,
         // Admin, etc.) siguen viendo la bandeja completa, sin restricción.
         var creadoPorFiltro = usuarioActual.Rol == RolUsuario.Comercial ? usuarioActual.Id : (Guid?)null;
 

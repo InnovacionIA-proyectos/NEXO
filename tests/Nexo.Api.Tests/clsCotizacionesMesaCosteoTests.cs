@@ -194,6 +194,7 @@ public class clsCotizacionesMesaCosteoTests
     [Theory]
     [InlineData("Comercial")]
     [InlineData("ServiciosLogisticos")]
+    [InlineData("AdminBiblioteca")]   // #307: ya no entra a cotizaciones
     public async Task Editar_el_flete_con_un_rol_no_autorizado_devuelve_403(string rol)
     {
         var (cid, lid, _) = await CotizacionConFleteManual();
@@ -205,8 +206,8 @@ public class clsCotizacionesMesaCosteoTests
 
     [Theory]
     [InlineData("AdminTarifas")]
-    [InlineData("CoordinadorFletes")]
-    public async Task Editar_el_flete_con_AdminTarifas_o_CoordinadorFletes_devuelve_200(string rol)
+    [InlineData("Admin")]
+    public async Task Editar_el_flete_con_AdminTarifas_o_Admin_devuelve_200(string rol)
     {
         var (cid, lid, _) = await CotizacionConFleteManual();
 
@@ -220,9 +221,8 @@ public class clsCotizacionesMesaCosteoTests
     [Theory]
     [InlineData("Comercial")]
     [InlineData("AdminTarifas")]
-    [InlineData("CoordinadorFletes")]
     [InlineData("Admin")]
-    public async Task Agregar_y_quitar_conexos_lo_pueden_hacer_los_4_roles(string rol)
+    public async Task Agregar_y_quitar_conexos_lo_pueden_hacer_los_3_roles(string rol)
     {
         var (cid, _, filaId) = await CotizacionConFleteManual();
         var cli = _fx.Client(rol);
