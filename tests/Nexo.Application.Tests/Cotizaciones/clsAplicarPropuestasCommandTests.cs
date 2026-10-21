@@ -102,4 +102,30 @@ public class clsAplicarPropuestasCommandTests
         Assert.Equal(1, resultado.Agregadas);
         Assert.Equal(lineaAuto, Assert.Single(cotizacion.Lineas).LineaSolicitudId);
     }
+
+    // S6-HU-24.3/#320: una línea rechazada no se costea ni en bloque: se rechazó a propósito, sin flete.
+    [Fact]
+    public async Task Una_linea_rechazada_no_se_aplica_en_bloque_aunque_traiga_valor_propuesto()
+    {
+        var solicitudId = Guid.NewGuid();
+        var cotizacion = PrepararCotizacionVacia(solicitudId);
+        var lineaRechazada = Guid.NewGuid();
+        var lineaAuto = Guid.NewGuid();
+        _lineasSolicitud.Setup(l => l.ObtenerPorSolicitudAsync(solicitudId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyDictionary<Guid, clsLineaSolicitud>)new Dictionary<Guid, clsLineaSolicitud>
+            {
+                [lineaRechazada] = new() { Id = lineaRechazada, EstadoLinea = EstadoLinea.Rechazada },
+                [lineaAuto] = new() { Id = lineaAuto, EstadoLinea = EstadoLinea.PorCostear },
+            });
+        _propuestas.Setup(p => p.ProponerAsync(solicitudId, It.IsAny<CancellationToken>())).ReturnsAsync(
+            new clsPropuestaSolicitudDto(solicitudId, [
+                new clsPropuestaLineaDto(lineaRechazada, "A → B", "C2", 1000, null, null, null, 2_000_000m, "plaza", "x", ModoDecision: nameof(ModoDecision.PlazaVigenteMayor)),
+                new clsPropuestaLineaDto(lineaAuto, "C → D", "C2", 1000, null, null, null, 1_000_000m, "plaza", "x", ModoDecision: nameof(ModoDecision.PlazaVigenteMayor)),
+            ], []));
+
+        var resultado = await Handler().Handle(new clsAplicarPropuestasCommand(cotizacion.Id, SoloAutomaticas: false));
+
+        Assert.Equal(1, resultado.Agregadas);
+        Assert.Equal(lineaAuto, Assert.Single(cotizacion.Lineas).LineaSolicitudId);
+    }
 }

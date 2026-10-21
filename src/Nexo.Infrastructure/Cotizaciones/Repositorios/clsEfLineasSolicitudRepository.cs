@@ -8,6 +8,13 @@ namespace Nexo.Infrastructure.Cotizaciones.Repositorios;
 
 public sealed class clsEfLineasSolicitudRepository(clsNexoDbContext db) : ILineasSolicitudPort
 {
+    public async Task<IReadOnlyList<clsLineaSolicitud>> ObtenerRechazadasAsync(Guid solicitudId, CancellationToken ct) =>
+        await db.LineasSolicitud.AsNoTracking()
+            .Include(l => l.clsRuta)
+            .Where(l => l.SolicitudId == solicitudId && l.EstadoLinea == EstadoLinea.Rechazada)
+            .OrderBy(l => l.NumeroLinea == null).ThenBy(l => l.NumeroLinea).ThenBy(l => l.CreatedAt).ThenBy(l => l.Id)
+            .ToListAsync(ct);
+
     public Task<clsLineaSolicitud?> ObtenerConRutaYVehiculoAsync(Guid lineaId, Guid solicitudId, CancellationToken ct) =>
         db.LineasSolicitud.AsNoTracking()
             .Include(l => l.clsRuta).ThenInclude(r => r!.OrigenMunicipio)

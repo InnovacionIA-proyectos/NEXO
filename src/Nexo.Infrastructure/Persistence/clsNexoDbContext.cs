@@ -30,6 +30,7 @@ public class clsNexoDbContext : DbContext
     public DbSet<clsLineaSolicitud> LineasSolicitud => Set<clsLineaSolicitud>();
     public DbSet<clsRuta> Rutas => Set<clsRuta>();
     public DbSet<clsConfiguracionVehiculo> ConfiguracionesVehiculo => Set<clsConfiguracionVehiculo>();
+    public DbSet<clsAliasElemento> AliasElementos => Set<clsAliasElemento>();
     public DbSet<clsTarifaHistorica> TarifasHistoricas => Set<clsTarifaHistorica>();
     public DbSet<clsServicioConexo> ServiciosConexos => Set<clsServicioConexo>();
     public DbSet<clsCotizacion> Cotizaciones => Set<clsCotizacion>();
@@ -213,6 +214,7 @@ public class clsNexoDbContext : DbContext
             e.Property(x => x.HorasCargue).HasColumnType("decimal(6,2)");
             e.Property(x => x.HorasDescargue).HasColumnType("decimal(6,2)");
             e.Property(x => x.IdRecomendacionVehiculo).HasMaxLength(64);
+            e.Property(x => x.MotivoRechazo).HasMaxLength(500);   // S6-HU-24.3/#320 (columnas de #314)
             e.HasOne(x => x.clsSolicitud)
              .WithMany(s => s.Lineas)
              .HasForeignKey(x => x.SolicitudId)
@@ -239,6 +241,15 @@ public class clsNexoDbContext : DbContext
         {
             e.ToTable("tbl_configuraciones_vehiculo");
             e.Property(x => x.EsCatalogoOficial).HasDefaultValue(false);
+            e.Property(x => x.Descartada).HasDefaultValue(false);
+        });
+
+        // S6-HU-27.2/#321: diccionario de alias (tabla creada en #315). Sin migración de EF: el esquema vive en ESQUEMA_NEXO.sql.
+        b.Entity<clsAliasElemento>(e =>
+        {
+            e.ToTable("tbl_alias_elementos");
+            e.HasIndex(x => x.AliasNormalizado).IsUnique();
+            e.Property(x => x.Activo).HasDefaultValue(true);
         });
 
         b.Entity<clsTarifaHistorica>(e =>

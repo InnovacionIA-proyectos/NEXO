@@ -60,6 +60,8 @@ public sealed class clsAplicarPropuestasCommandHandler(
             // el del mes actual) nunca se aplica en bloque: queda para que el Administrador de Tarifas la valide.
             // Sin piso contra el cual comparar, aplicar la propuesta sería guardar un flete sin validar.
             if (p.MotivoPendiente is not null) continue;
+            // S6-HU-24.3/#320: una línea rechazada no se costea (ni en bloque): se rechazó a propósito, sin flete.
+            if (lineasSol.GetValueOrDefault(p.LineaId)?.EstadoLinea == Nexo.Domain.Enums.EstadoLinea.Rechazada) continue;
             var linea = new clsCotizacionLinea
             {
                 CotizacionId = c.Id,

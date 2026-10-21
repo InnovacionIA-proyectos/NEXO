@@ -232,4 +232,27 @@ public class clsObtenerCosteoAvisoSicetacTests
 
         Assert.Null(l.MotivoPendiente);
     }
+
+    // S6-HU-24.3/#320: la Mesa y Cotifly ven la línea rechazada y su motivo (Cotifly no debe dejar la cotización "pendiente" por ella).
+    [Fact]
+    public async Task Una_linea_rechazada_trae_estado_rechazada_y_el_motivo_del_rechazo()
+    {
+        var l = await Linea(x =>
+        {
+            x.EstadoLinea = EstadoLinea.Rechazada;
+            x.MotivoRechazo = "No hay tarifa vigente para la ruta";
+        });
+
+        Assert.Equal("rechazada", l.EstadoLinea);
+        Assert.Equal("No hay tarifa vigente para la ruta", l.MotivoRechazo);
+        Assert.Null(l.MotivoPendiente);
+    }
+
+    [Fact]
+    public async Task Una_linea_no_rechazada_trae_motivoRechazo_null()
+    {
+        var l = await Linea(x => x.EstadoLinea = EstadoLinea.AutoResuelta);
+
+        Assert.Null(l.MotivoRechazo);
+    }
 }

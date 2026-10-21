@@ -134,4 +134,19 @@ public class clsAgregarLineaCotizacionPisoTests
 
         Assert.Equal("HISTORICA_VENCIDA", ex.Code);
     }
+
+    // S6-HU-24.3/#320: a una línea rechazada no se le agrega flete (una rechazada nunca tiene fila de cotización): primero se deshace el rechazo.
+    [Fact]
+    public async Task A_una_linea_rechazada_no_se_le_agrega_flete_409()
+    {
+        var (cot, lin) = Preparar(Piso);
+        var solicitudId = (await _cotizaciones.Object.ObtenerConLineasYConexosAsync(cot, default))!.SolicitudId;
+        _lineasSolicitud.Setup(l => l.ObtenerDeSolicitudAsync(lin, solicitudId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new clsLineaSolicitud { Id = lin, SolicitudId = solicitudId, EstadoLinea = EstadoLinea.Rechazada });
+
+        var ex = await Assert.ThrowsAsync<clsConflictException>(() => Handler().Handle(Comando(cot, lin, 3_000_000m, "Manual")));
+
+        Assert.Equal("LINEA_RECHAZADA", ex.Code);
+        _uow.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
 }

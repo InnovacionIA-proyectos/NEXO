@@ -18,4 +18,10 @@ public interface ILineasCosteadasPort
     /// de la línea lo expusiera.
     /// </summary>
     Task MarcarPendienteAsync(Guid lineaId, string motivo, CancellationToken ct = default);
+
+    /// <summary>
+    /// S6-HU-24.3/#320: la línea fue RECHAZADA a propósito por el Administrador de Tarifas. El costeo (y el re-costeo) asíncrono no debe
+    /// tocarla: ni proponerle un flete ni volver a marcarla pendiente — le pisaría la decisión.
+    /// </summary>
+    Task<bool> EstaRechazadaAsync(Guid lineaId, CancellationToken ct = default);
 }

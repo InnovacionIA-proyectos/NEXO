@@ -336,14 +336,14 @@ interface LineaCosteoDto {
   valorMercancia: Decimal | null   // S5-HU-20.1/#286: lo capturado en la línea (clsLineaSolicitud.ValorMercancia); null si no se capturó
   tieneReglaSoloSicetac: boolean   // S6-HU-26.1/#30: la ruta (por DANE) y el vehículo de la línea tienen regla Solo-SICE → su flete NO se puede editar (PUT responde 409 FLETE_SOLO_SICETAC): no ofrecer "Editar flete"
   // ---- campos nuevos, AL FINAL y opcionales (no rompen a quien ya lee el DTO) ----
-  estadoLinea: "porCostear" | "autoResuelta" | "revisada" | null  // S6-HU-24.1/#309 (minúscula inicial)
+  estadoLinea: "porCostear" | "autoResuelta" | "revisada" | "rechazada" | null  // S6-HU-24.1/#309 (minúscula inicial); "rechazada" desde S6-HU-24.3/#320
   motivoPendiente: string | null    // S6-HU-24.1/#309: por qué sigue en porCostear (consulta completa, línea sin vehículo, SICE-TAC que no es del mes actual...); null si no está pendiente
   lineaNegocio: string | null       // S6-HU-29.1/#311: "puertoAInterior" | "interiorAPuerto" | "nacional" | "devolucionContenedor" | "andino" | "licitaciones" (minúscula inicial); null si la línea no la trae
   claseViaje: string | null         // S6-HU-29.1/#311: "contenedor" | "cupo" | "cargaSuelta" | "extradimensionado"; null si no
   claseContenedor: string | null    // S6-HU-29.1/#311: tal como se capturó (CNT20.IT...). NULL salvo que claseViaje sea "contenedor"
   origenMunicipioId: number | null  // S6-HU-29.1/#311: id de tbl_municipios (el de GET /ciudades); null si la ruta no resolvió municipio
   destinoMunicipioId: number | null
-  // Pendiente (S6-HU-24, rechazo de una línea): motivoRechazo llega con esa issue, cuando existan las columnas del rechazo.
+  motivoRechazo: string | null      // S6-HU-24.3/#320: por qué se rechazó la línea (máx. 500); null si no está rechazada. Una línea rechazada NO tiene flete, no suma al total y no cuenta como pendiente
   numeroLinea: number | null       // S5-HU-20.5/#297: orden de la línea en el arreglo de la captura (1, 2, 3...); null en líneas capturadas antes de S5-HU-18.3. El GET ya las devuelve ORDENADAS por este campo
 }
 interface TiemposLogisticosDto { horasCargue: Decimal; horasDescargue: Decimal }
@@ -691,6 +691,9 @@ catálogo. No crea ninguna solicitud; es el paso previo a `lineas:bulk`.
 
 - **→** `200 CatalogoLineaResueltoDto[]`
 - **Errores**: `400 SIN_LINEAS` (array vacío)
+- **Alias (S6-HU-27.2/#321)**: el `tipoVehiculo` se busca primero en el diccionario de alias (§3.19): `TB`, `T.B`, `Turbo` y `2L2` resuelven
+  a la **misma** configuración (se guarda el código, `2L2`, no el texto). La `carroceria` no pasa por el diccionario. Un texto que el
+  diccionario no conoce sigue naciendo en **cuarentena** (`EsCatalogoOficial = false`) hasta que alguien lo mapee en la bandeja (§3.19).
 
 #### `POST /api/solicitudes/{id}/lineas:bulk` — carga masiva de un pliego
 - **Roles**: `Admin` (#307, decisión D5: solo Admin).
@@ -868,7 +871,8 @@ llegan como dos filas con índices distintos, y dos filas de un mismo camión pu
 de 17.8 trae `indicePosicion = null`: no hay forma de saber a qué posición corresponde una fila, así que hay que **volver a pedir la
 recomendación** (se guarda como corrida nueva; la anterior no se toca).
 
-*C. Clase de contenedor de Extradimensionado (D10).* **Opcional y sin validar** (la opción recomendada). El backend la guarda como
+*C. Clase de contenedor de Extradimensionado (D10).* **Opcional y sin validar** (la opción recomendada). S6-HU-27.2/#321: si el texto está en
+el diccionario de alias de contenedor (`40 HC`, `40HC`, `20 STD`... → `CNT40.HC`, `CNT20.ST`) se guarda el código; si no, el backend la guarda como
 texto libre (máx. 20 caracteres) y **no la compara con el catálogo**: los nombres provisionales del front (`CNT20.FT`, `CNT20.OP`,
 `CNT40.FT`, `CNT40.OP`) se aceptan tal cual. Riesgo conocido: si algún día se valida contra el catálogo real (`CNT20.IT`, `RE`, `ST` y
 `CNT40.HC`, `RE`), esos nombres provisionales se rechazarían; eso exigirá una issue propia y migrar los datos. Por ahora la
@@ -1035,6 +1039,50 @@ No recibe `fuente`. Reglas (#30):
 > `POST .../lineas` (agregar) **no cambió**: sin piso verificable sigue guardando el valor sin aviso. Está documentado con una prueba y
 > pendiente de decidir (sección 9 del documento de issues, "flete manual sin piso").
 
+#### `POST /api/cotizaciones/{id}/lineas/{lineaSolicitudId}/rechazo` — rechazar una línea con motivo
+S6-HU-24.3/#320. Para entregar el resto de la cotización sin que una línea que no se puede costear la frene. Antes solo existía rechazar la
+solicitud completa. La línea queda `rechazada`, **sin flete, sin sumar al total** y se considera resuelta para entregar.
+
+- **Roles**: `AdminTarifas`, `Admin`.
+
+| Body | | Tipo | Restricción |
+|---|---|---|---|
+| `motivo` | **requerido** | string | 1–500 caracteres |
+
+- **→** `200 { lineaSolicitudId, estadoLinea: "rechazada", motivoRechazo, rechazadaAt }`
+- Solo con la cotización en Borrador y una línea **sin flete** en la cotización (una línea ya costeada no se rechaza: así una rechazada nunca
+  suma al total ni sale con precio). Se guarda quién, cuándo y por qué (`motivoRechazo`, `rechazadaPor`, `rechazadaAt`) y queda en la auditoría.
+- Una línea rechazada: el costeo automático y "Aplicar propuestas" la saltan; `POST .../lineas` responde `409 LINEA_RECHAZADA`; el Excel la
+  lista como «Sin costeo» (sin precio y **sin el motivo**); el correo de entrega al comercial trae el bloque «Líneas sin costeo» **con** el motivo;
+  `GET /api/solicitudes/{id}` la trae con `estadoLinea = "rechazada"` y `motivoRechazo`; las métricas de líneas autocosteadas no la cuentan.
+- **Errores**: `400 MOTIVO_RECHAZO_REQUERIDO` · `404 COTIZACION_NO_ENCONTRADA` · `404 LINEA_NO_ENCONTRADA` · `409 COTIZACION_NO_EDITABLE` · `409 LINEA_YA_RECHAZADA` · `409 LINEA_CON_FLETE`
+
+#### `DELETE /api/cotizaciones/{id}/lineas/{lineaSolicitudId}/rechazo` — deshacer el rechazo
+S6-HU-24.3/#320. Solo mientras la cotización **no esté entregada** (entregada → `409 COTIZACION_NO_EDITABLE`): la línea vuelve a `porCostear`
+(hay que costearla) y el motivo, quién y cuándo se limpian; el rechazo anterior queda en la auditoría.
+
+- **Roles**: `AdminTarifas`, `Admin`.
+- **→** `200 { lineaSolicitudId, estadoLinea: "porCostear", motivoRechazo: null, rechazadaAt: null }`
+- **Errores**: `404 COTIZACION_NO_ENCONTRADA` · `404 LINEA_NO_ENCONTRADA` · `409 COTIZACION_NO_EDITABLE` · `409 LINEA_NO_RECHAZADA`
+
+#### `PUT /api/cotizaciones/{id}/lineas/{lineaSolicitudId}/vehiculo` — cambiar el vehículo de una línea
+S6-HU-27.3/#322 (decisión D9). Antes el vehículo de la línea solo se escribía al crearla. Solo con la cotización en Borrador.
+
+- **Roles**: `AdminTarifas`, `Admin`.
+
+| Body (uno de los dos) | | Tipo | Restricción |
+|---|---|---|---|
+| `configVehiculoId` | *uno de los dos* | UUID | una configuración **oficial** (no en cuarentena ni descartada) |
+| `tipoVehiculo` | *uno de los dos* | string | máx. 100. Texto o código: se resuelve con el diccionario de alias (§3.19) o contra una configuración oficial ya existente |
+| `carroceria` | *opcional* | string | máx. 100; solo con `tipoVehiculo` |
+
+- **→** `200 { lineaSolicitudId, configVehiculoId, tipoVehiculo, carroceria, esCatalogoOficial, cambioVehiculo, fleteEliminado, estadoLinea, motivoPendiente, propuesta }`
+- El flete que la línea tuviera se calculó con el vehículo anterior: **se descarta** (`fleteEliminado = true`, el total se recalcula) y la línea vuelve a
+  `porCostear`. `propuesta` es la propuesta recalculada de esa línea con el vehículo nuevo, con su piso SICE-TAC; el flete nuevo entra por los caminos de
+  siempre (`POST .../lineas` / `aplicar-propuestas`), que siguen sin dejar pasar un valor bajo el piso. Mismo vehículo que ya tenía: `200` sin tocar nada
+  (`cambioVehiculo = false`). Un texto desconocido **no** crea nada en cuarentena.
+- **Errores**: `400 VEHICULO_REQUERIDO` (ninguno de los dos, o los dos) · `400 VEHICULO_NO_RECONOCIDO` · `404 COTIZACION_NO_ENCONTRADA` · `404 LINEA_NO_ENCONTRADA` · `404 VEHICULO_NO_ENCONTRADO` · `409 COTIZACION_NO_EDITABLE` · `409 LINEA_RECHAZADA` · `409 VEHICULO_NO_OFICIAL`
+
 #### `POST /api/cotizaciones/{id}/conexos` — agregar servicios conexos
 S5-HU-20.1/#286 (HU-B23): se admite mientras la cotización **no tenga resultado**
 (`resultado == "SinDefinir"`), o sea `Borrador` **o `Entregada`** — un servicio omitido se
@@ -1091,8 +1139,11 @@ Marca la entrega y envía la cotización por correo al comercial responsable
 - **Body**: `multipart/form-data`, campo `formato` *opcional* (PDF, máx. 10 MB).
   Se puede enviar la petición sin cuerpo.
 - S5-HU-19.3/#283: no se entrega mientras queden líneas del pliego `PorCostear` —
-  todas deben estar `AutoResuelta` o `Revisada`. `COTIZACION_SIN_FLETE` sigue
-  cubriendo el caso de cero líneas en la cotización.
+  todas deben estar `AutoResuelta`, `Revisada` o `Rechazada` (S6-HU-24.3/#320: una
+  línea rechazada con motivo cuenta como resuelta). `COTIZACION_SIN_FLETE` sigue
+  cubriendo el caso de cero líneas en la cotización, **salvo** que alguna esté rechazada:
+  con todas las líneas rechazadas sí se entrega (la cotización queda en $0 y el correo
+  lista cada línea sin costeo con su motivo).
 - **→** `200 EntregarCotizacionResultDto`
 - **Errores**: `400 COTIZACION_SIN_FLETE` · `404 COTIZACION_NO_ENCONTRADA` · `409 COTIZACION_CON_LINEAS_PENDIENTES` · `409 COTIZACION_YA_ENTREGADA` · `409 SOLICITUD_NO_TRANSICIONABLE`
 
@@ -1115,6 +1166,7 @@ Si `resultado = "ganada"`, realimenta la biblioteca de Tarifas Ganadas.
 
 #### `GET /api/cotizaciones/{id}/exportar-excel`
 - **Roles**: Todos.
+- S6-HU-24.3/#320: las líneas rechazadas salen en la hoja con su ruta y la palabra «Sin costeo» en vez del precio (sin precio y **sin el motivo**), y no suman al total.
 - **→** `200` binario `.xlsx` con `Content-Disposition: attachment`.
 - **Errores**: `404 COTIZACION_NO_ENCONTRADA`
 
@@ -1735,7 +1787,7 @@ Cubicador rechaza el vehículo. Envíalas siempre.
 
 Catálogos oficiales de solo lectura (S4-HU-09/S4-HU-10) para los desplegables
 de Reglas Solo-SICETAC y Tarifas de Plaza — reemplazan el texto libre.
-**Todo el controller**: los 6 roles (solo requiere sesión válida).
+**Los catálogos de solo lectura**: los 6 roles (solo requiere sesión válida). Los alias y la bandeja de vehículos están más abajo.
 
 | Endpoint | Fuente | → |
 |---|---|---|
@@ -1753,6 +1805,47 @@ memoria del front, no se consulta en cada tecleo. Mismo catálogo que
 `GET /api/captura-solicitudes/municipios` (§3.3), expuesto acá también
 porque ese otro controller es solo `Comercial`/`Admin` y `AdminTarifas`
 también lo necesita.
+
+#### Diccionario de alias — S6-HU-27.2/#321
+
+Una sola tabla (`tbl_alias_elementos`) para dos catálogos, distinguidos por `tipoElemento`: `Vehiculo` (código = `2L2`, `C2`, `C3`, `2S2`, `3S3`…) y
+`Contenedor` (código = `CNT40.HC`, `CNT20.ST`…). Un alias es un texto libre que la gente escribe (`TB`, `T.B`, `Turbo`, `40HC`) y su código oficial. El texto
+se compara **normalizado** (sin tildes, mayúsculas, `_` y `-` como espacio, espacios colapsados) y es **único en toda la tabla**.
+
+| Endpoint | Roles | → |
+|---|---|---|
+| `GET /api/catalogos/alias?tipo=vehiculo\|contenedor` | todos (sin `tipo`, los dos) | `200 AliasDto[]` · `400 TIPO_ALIAS_INVALIDO` |
+| `GET /api/catalogos/alias/resolver?tipo=&texto=` | todos | `200 ResolverAliasDto` · `400 TEXTO_REQUERIDO` · `400 TIPO_ALIAS_INVALIDO` |
+| `POST /api/catalogos/alias` | `AdminTarifas`, `Admin` | `201 AliasDto` |
+
+```
+interface AliasDto { id: UUID; alias: string; aliasNormalizado: string; tipoElemento: "Vehiculo" | "Contenedor"; codigo: string; activo: boolean }
+interface ResolverAliasDto { texto: string; tipoElemento: string; reconocido: boolean; codigo: string | null; alias: string | null }
+```
+
+- `resolver` (`tipo` = `vehiculo` por defecto): responde `reconocido: false` para un texto que el diccionario no conoce. Usa el mismo normalizador y diccionario que la
+  captura, así que la respuesta es lo que va a pasar al capturar (Cotifly la usa al importar su Excel de licitación). Solo cuentan los alias activos del tipo pedido.
+- `POST` body: `{ tipo: "vehiculo" | "contenedor", alias: string (máx. 100), codigo: string (máx. 20) }`. El código tiene que ser oficial: uno que el diccionario ya usa
+  para ese tipo o del catálogo (`tblSAPTiposVehiculoTarifario` para vehículos; las clases de contenedor de SAP). **Errores**: `400 CODIGO_NO_RECONOCIDO` ·
+  `400 ALIAS_REQUERIDO` · `400 TIPO_ALIAS_INVALIDO` · `409 ALIAS_DUPLICADO` (el texto normalizado ya existe, en cualquier tipo).
+- En la captura: el `tipoVehiculo` resuelve por alias (el código es lo que se guarda y la fila nace **oficial**); la `carroceria` no pasa por el diccionario;
+  la clase de contenedor resuelve por alias y, si no, como antes (código real de SAP dentro del texto, o texto libre ≤ 20). Un vehículo desconocido sigue yendo a cuarentena.
+
+#### Bandeja de normalización de vehículos — S6-HU-27.3/#322
+
+Las configuraciones de vehículo que la captura creó en **cuarentena** (`EsCatalogoOficial = false`) porque nadie sabía a qué código corresponden. Un humano las
+**mapea** a un código (queda un alias, así el mismo texto no vuelve a caer en cuarentena) o las **descarta**. Ambas salen de la lista; ninguna borra la fila
+(las líneas que ya la usan siguen apuntándole; se cambian con `PUT .../lineas/{id}/vehiculo`, §3.4). **Roles**: `AdminTarifas`, `Admin` (todo).
+
+| Endpoint | → |
+|---|---|
+| `GET /api/catalogos/vehiculos-cuarentena` | `200 VehiculoCuarentenaDto[]` `{ id, tipoVehiculo, carroceria, rangoPeso, createdAt }` — sin las descartadas ni las de un tipo que ya tiene alias activo |
+| `POST /api/catalogos/vehiculos-cuarentena/{id}/mapear` body `{ codigo }` | `200 { id, tipoVehiculo, carroceria, codigo, alias, aliasCreado }` |
+| `POST /api/catalogos/vehiculos-cuarentena/{id}/descartar` | `204` |
+
+- `mapear` crea el alias del **tipo de vehículo** de la fila (la carrocería no entra). Si ese texto ya apuntaba al mismo código no crea otro (`aliasCreado: false`).
+  **Errores**: `400 CODIGO_NO_RECONOCIDO` · `404 VEHICULO_NO_ENCONTRADO` · `409 VEHICULO_NO_ESTA_EN_CUARENTENA` (ya es oficial) · `409 VEHICULO_YA_DESCARTADO` · `409 ALIAS_DUPLICADO` (el texto ya apunta a otro código).
+- `descartar` marca `Descartada = true` (columna nueva de `tbl_configuraciones_vehiculo`). **Errores**: `404 VEHICULO_NO_ENCONTRADO` · `409 VEHICULO_NO_ESTA_EN_CUARENTENA` · `409 VEHICULO_YA_DESCARTADO`.
 
 ### 3.20 Rangos de peso — `/api/pesos`
 
@@ -1902,8 +1995,11 @@ abiertos a los 6 roles.
 | `POST /api/cotizaciones` · `aplicar-propuestas` | ✅ | | ✅ | | | ✅ |
 | `POST /api/cotizaciones/{id}/resultado` | ✅ | | | | | ✅ |
 | `POST /api/cotizaciones/{id}/lineas` · `PUT .../lineas/{lineaSolicitudId}` · `entregar` | | | ✅ | | | ✅ |
+| `POST/DELETE /api/cotizaciones/{id}/lineas/{lineaSolicitudId}/rechazo` (S6-HU-24.3/#320) · `PUT .../lineas/{lineaSolicitudId}/vehiculo` (S6-HU-27.3/#322) | | | ✅ | | | ✅ |
 | `POST/DELETE /api/cotizaciones/{id}/conexos` (S5-HU-20.1: + AdminTarifas) | ✅ | | ✅ | | | ✅ |
 | `PATCH /api/cotizaciones/{id}/conexos/{conexoId}` | ✅ | | | | | ✅ |
+| `GET /api/catalogos/alias` · `GET /api/catalogos/alias/resolver` (S6-HU-27.2/#321: cualquier rol válido) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `POST /api/catalogos/alias` (#321) · bandeja `/api/catalogos/vehiculos-cuarentena` (listar, `mapear`, `descartar`) (#322) | | | ✅ | | | ✅ |
 | Vigencia plaza SAP (`PATCH`, `POST masivo`, `DELETE`) | | ✅ | ✅ | | | ✅ |
 | `/api/reglas-solo-sicetac` (todo, incluido `GET` y `exportar-excel`) (#307: + AdminBiblioteca) | | ✅ | ✅ | | | ✅ |
 | `POST/PATCH /api/servicios-conexos`, `importar-excel` | | | ✅ | ✅ | | ✅ |

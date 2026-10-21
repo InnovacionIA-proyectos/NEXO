@@ -1,3 +1,4 @@
+using Nexo.Application.CasosDeUso.Cotizaciones.DTOs;
 using Nexo.Application.CasosDeUso.Cotizaciones.Interfaces;
 using Nexo.Domain.Catalogos.Entidades;
 using Nexo.Domain.Cotizaciones.Entidades;
@@ -11,8 +12,12 @@ public sealed class clsExportadorCotizacionExcelClosedXml : IExportadorCotizacio
 {
     private const string FormatoMoneda = "\"$\" #,##0";
 
-    public (byte[] Contenido, string NombreArchivo) Generar(clsCotizacion c)
+    /// <summary>Texto de la columna "Flete" de una línea rechazada (S6-HU-24.3/#320): sin precio y sin motivo.</summary>
+    public const string SinCosteo = "Sin costeo";
+
+    public (byte[] Contenido, string NombreArchivo) Generar(clsCotizacion c, IReadOnlyList<clsLineaRechazadaInfo>? lineasRechazadas = null)
     {
+        lineasRechazadas ??= [];
         // Catálogo de los servicios usados: nombre + categoría (logístico | adicional).
         string Nombre(clsCotizacionConexo x) => x.clsServicioConexo?.TipoServicio ?? "Servicio";
         string Categoria(clsCotizacionConexo x) => x.clsServicioConexo?.Categoria == "adicional" ? "adicional" : "logistico";
@@ -36,7 +41,7 @@ public sealed class clsExportadorCotizacionExcelClosedXml : IExportadorCotizacio
         Dato("Generado", DateTimeOffset.UtcNow.ToString("yyyy-MM-dd HH:mm"));
         f++;
 
-        ws.Cell(f, 1).Value = $"FLETES ({c.Lineas.Count})";
+        ws.Cell(f, 1).Value = $"FLETES ({c.Lineas.Count + lineasRechazadas.Count})";
         ws.Cell(f, 1).Style.Font.SetBold();
         f++;
         // S4-HU-17.4/#230: Fuente, Aprovisionamiento y Retorno contenedor se quitan del
@@ -55,6 +60,16 @@ public sealed class clsExportadorCotizacionExcelClosedXml : IExportadorCotizacio
             ws.Cell(f, 2).Value = l.clsLineaSolicitud?.Tipologia?.ToString() ?? "—";
             ws.Cell(f, 3).Value = totalLinea;
             ws.Cell(f, 3).Style.NumberFormat.Format = FormatoMoneda;
+            f++;
+        }
+        // S6-HU-24.3/#320: las líneas rechazadas salen como «Sin costeo» — sin precio y sin motivo — y NO suman al total.
+        foreach (var r in lineasRechazadas)
+        {
+            ws.Cell(f, 1).Value = r.Ruta;
+            ws.Cell(f, 2).Value = r.Tipologia ?? "—";
+            ws.Cell(f, 3).Value = SinCosteo;
+            ws.Cell(f, 3).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
+            ws.Cell(f, 3).Style.Font.SetItalic();
             f++;
         }
         f++;

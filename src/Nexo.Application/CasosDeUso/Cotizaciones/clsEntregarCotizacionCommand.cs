@@ -46,16 +46,21 @@ public sealed class clsEntregarCotizacionCommandHandler(
             ?? throw new clsNotFoundException("COTIZACION_NO_ENCONTRADA", "Cotización no encontrada.");
         if (c.Estado == EstadoCotizacion.Entregada)
             throw new clsConflictException("COTIZACION_YA_ENTREGADA", "La cotización ya fue entregada.");
-        if (c.Lineas.Count == 0)
-            throw new clsCotizacionSinFleteException("entregar");
-
         // S5-HU-19.3/#283: la cotización se arma línea por línea (clsAgregarLineaCotizacionCommand
         // marca Revisada), así que tener al menos 1 flete NO implica que el pliego completo
         // esté costeado — se puede entregar con líneas del pliego todavía PorCostear. Una
         // línea sigue PorCostear tanto si nunca se tocó como si quedó en ConsultaCompleta
         // (S5-HU-19.2/#282) sin que nadie la resolviera a mano todavía.
         var lineasSol = await lineasSolicitud.ObtenerPorSolicitudAsync(c.SolicitudId, ct);
-        if (lineasSol.Values.Any(l => l.EstadoLinea is not (EstadoLinea.AutoResuelta or EstadoLinea.Revisada)))
+
+        // S6-HU-24.3/#320: una cotización sin ningún flete solo se entrega si ES porque todas sus líneas se rechazaron a propósito (se
+        // envía igual al comercial, con los motivos). Sin fletes y sin rechazos sigue siendo "no hay nada que entregar".
+        var hayRechazadas = lineasSol.Values.Any(l => l.EstadoLinea == EstadoLinea.Rechazada);
+        if (c.Lineas.Count == 0 && !hayRechazadas)
+            throw new clsCotizacionSinFleteException("entregar");
+
+        // Una línea RECHAZADA cuenta como resuelta: es una decisión, no una pendiente.
+        if (lineasSol.Values.Any(l => l.EstadoLinea is not (EstadoLinea.AutoResuelta or EstadoLinea.Revisada or EstadoLinea.Rechazada)))
             throw new clsConflictException("COTIZACION_CON_LINEAS_PENDIENTES",
                 "Hay líneas del pliego sin costear todavía. Complete o revise todas las líneas antes de entregar.");
 

@@ -121,4 +121,15 @@ public class clsRecostearLineaCommandTests
         _pendientes.Verify(p => p.MarcarResueltoAsync(
             It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<TipoPendienteDeCosteo>(), It.IsAny<CancellationToken>()), Times.Never);
     }
+
+    [Fact]
+    public async Task Una_linea_rechazada_no_se_recostea()
+    {
+        _lineas.Setup(l => l.EstaRechazadaAsync(Linea, It.IsAny<CancellationToken>())).ReturnsAsync(true);
+
+        await Handler().Handle(new clsRecostearLineaCommand(Trabajo, clsSolicitud, Linea));
+
+        _propuesta.Verify(p => p.ProponerParaLineaAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
+        _lineas.Verify(l => l.MarcarAutoResueltaAsync(It.IsAny<Guid>(), It.IsAny<decimal>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
 }

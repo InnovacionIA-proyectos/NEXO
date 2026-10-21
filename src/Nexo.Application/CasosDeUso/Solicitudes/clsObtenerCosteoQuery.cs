@@ -70,7 +70,7 @@ public sealed class clsObtenerCosteoQueryHandler(
                 clsTexto.MinusculaInicial((EstadoLinea?)l.EstadoLinea), l.MotivoPendiente,
                 clsTexto.MinusculaInicial(l.LineaNegocio), clsTexto.MinusculaInicial(l.ClaseViaje),
                 l.ClaseViaje == ClaseViaje.Contenedor ? l.ClaseContenedor : null,
-                l.clsRuta?.OrigenMunicipioId, l.clsRuta?.DestinoMunicipioId));
+                l.clsRuta?.OrigenMunicipioId, l.clsRuta?.DestinoMunicipioId, l.MotivoRechazo));
         }
 
         // Al abrir, marca la solicitud en costeo (si estaba pendiente).

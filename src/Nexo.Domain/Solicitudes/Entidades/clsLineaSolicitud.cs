@@ -119,6 +119,18 @@ public class clsLineaSolicitud : IAuditable
     public EstadoLinea EstadoLinea { get; set; } = EstadoLinea.PorCostear;
 
     /// <summary>
+    /// S6-HU-24.3/#320: por qué el Administrador de Tarifas rechazó esta línea (obligatorio, hasta 500). Solo con
+    /// <c>EstadoLinea = Rechazada</c>; se limpia al deshacer el rechazo. Una línea rechazada NO tiene flete en la cotización: por eso no suma
+    /// al total ni sale en el Excel con precio.
+    /// </summary>
+    [MaxLength(500)]
+    public string? MotivoRechazo { get; set; }
+
+    /// <summary>S6-HU-24.3/#320: quién la rechazó y cuándo (columnas de #314).</summary>
+    public Guid? RechazadaPor { get; set; }
+    public DateTimeOffset? RechazadaAt { get; set; }
+
+    /// <summary>
     /// Por qué la línea sigue en PorCostear: sin tarifa válida (requiere al Administrador
     /// de Tarifas) o una fuente que falló. Se muestra al usuario, no es para depurar. Nulo
     /// mientras no se haya intentado costear, y se limpia cuando la línea queda resuelta.

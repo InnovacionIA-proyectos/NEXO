@@ -105,7 +105,8 @@ CREATE TABLE [db_NEXO].[tbl_configuraciones_vehiculo] (
     [RangoPeso] nvarchar(50) NULL,
     [CreatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset()),
     [UpdatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset()),
-    [EsCatalogoOficial] bit NOT NULL DEFAULT (CONVERT([bit],(0))) -- S5-HU-18.4/#276: fila que calza con un código canónico del Cubicador
+    [EsCatalogoOficial] bit NOT NULL DEFAULT (CONVERT([bit],(0))), -- S5-HU-18.4/#276: fila que calza con un código canónico del Cubicador
+    [Descartada] bit NOT NULL DEFAULT (CONVERT([bit],(0))) -- S6-HU-27.3/#322: fila en cuarentena que un humano descartó en la bandeja de normalización (sale de la bandeja, no se borra)
     , CONSTRAINT [PK_configuraciones_vehiculo] PRIMARY KEY ([Id])
 );
 

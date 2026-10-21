@@ -86,6 +86,12 @@ el Cubicador**. Un código que NEXO no conoce **no se rechaza**: la fila nace en
 comparan sin tildes y con `_` y `-` equivalentes a espacio (`Bogotá` = `Bogota`,
 `FURGON_REFRIGERADO` = `Furgon Refrigerado`).
 
+**Diccionario de alias (S6-HU-27.2/#321).** Antes de caer en cuarentena, el `tipoVehiculo` se busca en el diccionario de alias de NEXO: `TB`, `T.B`, `Turbo` y `2L2`
+resuelven al mismo código (`2L2`), y los códigos del Cubicador que tengan alias resuelven igual (la fila nace oficial). La `carroceria` **no** pasa por el diccionario.
+Cotifly puede preguntar antes de mandar: `GET /api/catalogos/alias/resolver?tipo=vehiculo&texto=T.MULA` responde `{ reconocido, codigo }` (`reconocido: false` = ese texto caería
+en cuarentena). La lista completa: `GET /api/catalogos/alias?tipo=vehiculo`. El diccionario es uno solo, en NEXO. La clase de contenedor también resuelve por alias
+(`40 HC`, `40HC` → `CNT40.HC`; `20 STD` → `CNT20.ST`; `tipo=contenedor`). Lo que quede en cuarentena lo resuelve un humano en la bandeja de normalización de NEXO.
+
 ### 3.5 Posiciones y tipo de mercancía
 
 - `posiciones[]` es **opcional**. Cotifly puede dejar de mandarlas; NEXO las sigue aceptando.
@@ -170,7 +176,8 @@ Todos los campos nuevos van **al final del objeto línea y son opcionales**: qui
 
 | Campo | Qué es | Issue |
 |---|---|---|
-| `estadoLinea` | `porCostear`, `autoResuelta` o `revisada` (minúscula inicial) | #309 |
+| `estadoLinea` | `porCostear`, `autoResuelta`, `revisada` o `rechazada` (minúscula inicial). **`rechazada`**: el Administrador de Tarifas decidió no costear la línea (S6-HU-24.3/#320); Cotifly **no** debe dejar la cotización «pendiente» por ella | #309, #320 |
+| `motivoRechazo` | por qué se rechazó la línea (máx. 500); null si no está rechazada. Una línea rechazada no tiene flete ni suma al total; en el Excel de la cotización sale como «Sin costeo» (sin precio ni motivo) y el correo al comercial trae el motivo | #320 |
 | `motivoPendiente` | por qué sigue en `porCostear` (consulta completa, línea sin vehículo, SICE-TAC que no es del mes actual...); null si no está pendiente. Cotifly puede mostrarlo en vez de un "pendiente de costeo" mudo | #309 |
 | `lineaNegocio` | `puertoAInterior`, `interiorAPuerto`, `nacional`, `devolucionContenedor`, `andino`, `licitaciones`; null si la línea no la trae | #311 |
 | `claseViaje` | `contenedor`, `cupo`, `cargaSuelta`, `extradimensionado`; null si no | #311 |
@@ -178,7 +185,6 @@ Todos los campos nuevos van **al final del objeto línea y son opcionales**: qui
 | `origenMunicipioId`, `destinoMunicipioId` | id de `tbl_municipios` (el de `GET /ciudades`); null si la ruta no resolvió municipio | #311 |
 | `tieneReglaSoloSicetac` | la ruta y el vehículo tienen regla Solo-SICE (su flete no se edita) | S6-HU-26.1/#30 |
 
-Pendiente: `motivoRechazo` llegará con el rechazo de una línea (S6-HU-24), cuando existan las columnas.
 
 ## 6. Decisiones ya tomadas (respuestas de NEXO a Cotifly)
 

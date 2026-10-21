@@ -24,7 +24,8 @@ public enum LineaNegocio { PuertoAInterior, InteriorAPuerto, Nacional, Devolucio
 /// <summary>Clase de viaje de SAP TM (catálogo dbsolucionesTI.tblSAPClaseViaje).</summary>
 public enum ClaseViaje { Contenedor, Cupo, CargaSuelta, Extradimensionado }
 
-public enum EstadoLinea { PorCostear, AutoResuelta, Revisada }
+// S6-HU-24.3/#320: Rechazada = el Administrador de Tarifas la dejó sin costear A PROPÓSITO, con un motivo, para poder entregar el resto.
+public enum EstadoLinea { PorCostear, AutoResuelta, Revisada, Rechazada }
 
 /// <summary>
 /// Por qué una línea quedó sin costear. Los dos tipos tienen ciclos de vida OPUESTOS y
