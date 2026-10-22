@@ -26,7 +26,8 @@ namespace Nexo.Application.CasosDeUso.Costeo.Interfaces;
 /// </summary>
 public sealed record clsConsultaTarifaPlazaInterna(
     string Origen, string Destino, string? LineaNegocio, string? ClaseViaje, string? ClaseContenedor,
-    string? TipoVehiculo, decimal? Peso, int? OrigenMunicipioId = null, int? DestinoMunicipioId = null);
+    string? TipoVehiculo, decimal? Peso, int? OrigenMunicipioId = null, int? DestinoMunicipioId = null,
+    bool ClaseContenedorEstricta = false);
 
 /// <summary>
 /// <paramref name="Vencida"/>: a propósito SIEMPRE null hoy. <c>tbl_tarifas_plaza.Vigencia</c>

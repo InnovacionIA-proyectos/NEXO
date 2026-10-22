@@ -76,12 +76,10 @@ public class clsCotizacionesController(
     }
 
     /// <summary>
-    /// Precarga como fletes por defecto el valor más alto propuesto por la Biblioteca
-    /// en las líneas pendientes (lo usa la mesa del comercial).
-    ///
-    /// S5-HU-19.2/#282: <c>soloAutomaticas=true</c> salta las líneas en modo
-    /// ConsultaCompleta (necesitan que el Administrador de Tarifas elija) — sin el
-    /// parámetro aplica todas, igual que siempre.
+    /// Precarga como fletes el valor propuesto por la Biblioteca en las líneas sin flete, con su
+    /// aprovisionamiento y su retorno del contenedor. Se saltan las líneas sin valor propuesto, las que
+    /// tienen un motivo de pendiente y las rechazadas. <c>soloAutomaticas</c> se conserva por
+    /// compatibilidad y ya no cambia el resultado.
     /// </summary>
     [HttpPost("{id:guid}/aplicar-propuestas")]
     [Authorize(Roles = "Comercial,AdminTarifas,Admin")]

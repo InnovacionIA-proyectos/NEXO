@@ -13,9 +13,9 @@ using Moq;
 namespace Nexo.Application.Tests.Cotizaciones;
 
 /// <summary>
-/// S5-HU-19.2/#282: <c>soloAutomaticas</c> decide si "Aplicar propuestas" se salta las
-/// líneas en modo ConsultaCompleta (necesitan que el Administrador de Tarifas elija) o
-/// las aplica igual que siempre.
+/// "Aplicar propuestas" guarda el flete de toda línea con valor propuesto y sin motivo de pendiente, con su
+/// aprovisionamiento y su retorno del contenedor; <c>soloAutomaticas</c> se conserva por compatibilidad y ya no
+/// cambia el resultado.
 /// </summary>
 public class clsAplicarPropuestasCommandTests
 {
@@ -61,7 +61,7 @@ public class clsAplicarPropuestasCommandTests
     }
 
     [Fact]
-    public async Task Con_soloAutomaticas_salta_las_lineas_en_ConsultaCompleta()
+    public async Task Con_soloAutomaticas_aplica_igual_las_lineas_de_proceso_completo_con_valor()
     {
         var solicitudId = Guid.NewGuid();
         var cotizacion = PrepararCotizacionVacia(solicitudId);
@@ -75,9 +75,30 @@ public class clsAplicarPropuestasCommandTests
 
         var resultado = await Handler().Handle(new clsAplicarPropuestasCommand(cotizacion.Id, SoloAutomaticas: true));
 
-        Assert.Equal(1, resultado.Agregadas);
-        var linea = Assert.Single(cotizacion.Lineas);
-        Assert.Equal(lineaAuto, linea.LineaSolicitudId);
+        Assert.Equal(2, resultado.Agregadas);
+    }
+
+    [Fact]
+    public async Task Aplicar_guarda_el_aprovisionamiento_y_el_retorno_que_trae_la_propuesta()
+    {
+        var solicitudId = Guid.NewGuid();
+        var cotizacion = PrepararCotizacionVacia(solicitudId);
+        var linea = Guid.NewGuid();
+        _propuestas.Setup(p => p.ProponerAsync(solicitudId, It.IsAny<CancellationToken>())).ReturnsAsync(
+            new clsPropuestaSolicitudDto(solicitudId, [
+                new clsPropuestaLineaDto(linea, "A → B", "2S2", 15000, null, null, null, 4_738_322m, "sicetac", "Solo piso.",
+                    RetornoContenedor: new clsCandidatoTarifaDto("retorno_contenedor", 2_547_021m, "", "", 1),
+                    ModoDecision: nameof(ModoDecision.SoloSicetac),
+                    AprovisionamientoContenedor: new clsCandidatoTarifaDto("aprovisionamiento_contenedor", 2_110_711m, "", "", 1)),
+            ], []));
+
+        await Handler().Handle(new clsAplicarPropuestasCommand(cotizacion.Id));
+
+        var fila = Assert.Single(cotizacion.Lineas);
+        Assert.Equal(4_738_322m, fila.ValorFlete);
+        Assert.Equal(2_110_711m, fila.ValorAprovisionamiento);
+        Assert.Equal(2_547_021m, fila.ValorRetornoContenedor);
+        Assert.Equal(9_396_054m, cotizacion.Total);
     }
 
     // #300: sin piso SICE-TAC (su período no es el del mes actual) la línea trae un motivo propio de pendiente y NO se

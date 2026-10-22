@@ -48,6 +48,9 @@ public class clsApiFixture : IDisposable
 {
     public clsApiFactory Factory { get; }
 
+    /// <summary>Momento en que arrancó la corrida (con un minuto de margen): lo que se creó desde entonces es de esta corrida.</summary>
+    private readonly DateTimeOffset _inicioDeLaCorrida = DateTimeOffset.UtcNow.AddMinutes(-1);
+
     public clsApiFixture()
     {
         Factory = new clsApiFactory();
@@ -100,7 +103,35 @@ public class clsApiFixture : IDisposable
     public Guid AnyClienteId() => WithDb(db => db.Clientes.First().Id);
     public Guid AnyServicioActivoId() => WithDb(db => db.ServiciosConexos.First(s => s.Activo).Id);
 
-    public void Dispose() => Factory.Dispose();
+    public void Dispose()
+    {
+        LimpiarCatalogosHuerfanosDeLaCorrida();
+        Factory.Dispose();
+    }
+
+    /// <summary>
+    /// Al terminar la corrida borra las rutas y configuraciones de vehículo creadas durante ella que ninguna línea ni tarifa
+    /// histórica usa. La aplicación solo crea una ruta o un vehículo junto con la línea que lo usa, así que uno creado en esta
+    /// corrida y sin ningún uso es un residuo de prueba (varias pruebas arman su catálogo a mano y solo borran la solicitud).
+    /// Es de mejor esfuerzo: si la base está ocupada o inaccesible no se rompe el cierre de la corrida.
+    /// </summary>
+    private void LimpiarCatalogosHuerfanosDeLaCorrida()
+    {
+        try
+        {
+            WithDb(db =>
+            {
+                db.ConfiguracionesVehiculo.Where(v => v.CreatedAt >= _inicioDeLaCorrida
+                    && !db.LineasSolicitud.Any(l => l.ConfigVehiculoId == v.Id)
+                    && !db.TarifasHistoricas.Any(h => h.ConfigVehiculoId == v.Id)).ExecuteDelete();
+                db.Rutas.Where(r => r.CreatedAt >= _inicioDeLaCorrida
+                    && !db.LineasSolicitud.Any(l => l.RutaId == r.Id)
+                    && !db.TarifasHistoricas.Any(h => h.RutaId == r.Id)).ExecuteDelete();
+                return 0;
+            });
+        }
+        catch (Exception ex) when (ex is Microsoft.Data.SqlClient.SqlException or InvalidOperationException) { }
+    }
 }
 
 [CollectionDefinition("api")]

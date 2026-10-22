@@ -43,6 +43,15 @@ public static class clsResolucionDeCatalogos
 
     public static string ClaveVehiculo(string tipo, string? carroceria) => $"{Normalizar(tipo)}|{Normalizar(carroceria)}";
 
+    /// <summary>
+    /// Indexa las configuraciones de vehículo por clave normalizada. Varias filas pueden compartir clave ("Furgón" y "FURGON"):
+    /// gana siempre la misma, primero una oficial que no esté descartada y, entre iguales, la más antigua. Así el vehículo que
+    /// se asigna a una línea no depende del orden en que la base devuelva las filas.
+    /// </summary>
+    public static Dictionary<string, clsConfiguracionVehiculo> IndexarVehiculosPorClave(IEnumerable<clsConfiguracionVehiculo> vehiculos) =>
+        vehiculos.GroupBy(v => ClaveVehiculo(v.TipoVehiculo, v.Carroceria))
+            .ToDictionary(g => g.Key, g => g.OrderByDescending(v => v.EsCatalogoOficial && !v.Descartada).ThenBy(v => v.CreatedAt).First());
+
     public static string SinTildes(string s)
     {
         var d = s.Normalize(NormalizationForm.FormD);

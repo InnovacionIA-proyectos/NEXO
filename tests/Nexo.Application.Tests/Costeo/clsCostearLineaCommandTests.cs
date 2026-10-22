@@ -24,10 +24,9 @@ namespace Nexo.Application.Tests.Costeo;
 /// cuando los reintentos se agotan se convierte en un desenlace, y eso ocurre en el
 /// consumidor de fallos.
 ///
-/// S5-HU-19.2/#282: el desenlace ya no depende de si hay valor (RequiereTarifaManual),
-/// depende del <c>Modo</c> — ConsultaCompleta deja la línea pendiente AUNQUE haya un
-/// candidato con valor; SoloSicetac/PlazaVigenteMayor auto-resuelven Y agregan el flete
-/// a la cotización auto-costeada.
+/// El desenlace depende de <c>Autocosteable</c>: una línea con valor propuesto y sin motivo de pendiente se
+/// auto-resuelve Y agrega su flete (con aprovisionamiento y retorno) a la cotización auto-costeada, en cualquiera
+/// de los tres caminos de decisión; sin valor, o con un motivo de pendiente, queda pendiente.
 /// </summary>
 public class clsCostearLineaCommandTests
 {
@@ -162,19 +161,44 @@ public class clsCostearLineaCommandTests
     }
 
     [Fact]
-    public async Task ConsultaCompleta_queda_registrada_como_pendiente_de_tipo_Manual_AUNQUE_tenga_valor()
+    public async Task Proceso_completo_con_valor_se_guarda_solo_con_su_aprovisionamiento_y_su_retorno()
     {
-        // S5-HU-19.2/#282: un solo candidato en consulta completa SÍ trae Valor, pero el
-        // modo manda — sigue pendiente, no se auto-aplica.
-        CuandoLaPropuestaEs(ConsultaCompleta(2_500_000m, "sicetac", "Solo se encontró piso SICE-TAC."));
+        var decision = new clsDecisionDeFlujo(
+            new clsResultadoDeCosteo(2_500_000m, "sicetac", "Solo se encontró piso SICE-TAC."), ModoDecision.ConsultaCompleta,
+            MotivoPendiente: null, ValorAprovisionamiento: 2_110_711m, ValorRetornoContenedor: 1_300_000m);
+        CuandoLaPropuestaEs(decision);
+        clsCotizacion? agregada = null;
+        _cotizaciones.Setup(c => c.Agregar(It.IsAny<clsCotizacion>())).Callback<clsCotizacion>(c => agregada = c);
+
+        await Handler().Handle(Comando());
+
+        _lineas.Verify(l => l.MarcarAutoResueltaAsync(Linea, 2_500_000m, "sicetac", It.IsAny<CancellationToken>()), Times.Once);
+        _pendientes.Verify(p => p.RegistrarAsync(
+            It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<TipoPendienteDeCosteo>(), It.IsAny<string>(),
+            It.IsAny<CancellationToken>()), Times.Never);
+        var linea = Assert.Single(agregada!.Lineas);
+        Assert.Equal(2_500_000m, linea.ValorFlete);
+        Assert.Equal(2_110_711m, linea.ValorAprovisionamiento);
+        Assert.Equal(1_300_000m, linea.ValorRetornoContenedor);
+        Assert.Equal(5_910_711m, agregada.Total);
+    }
+
+    [Fact]
+    public async Task Un_valor_con_motivo_de_pendiente_queda_pendiente_aunque_el_camino_sea_automatico()
+    {
+        const string Motivo = "No se encontró piso SICE-TAC de viaje vacío para el levante del contenedor desde Abejorral.";
+        var decision = new clsDecisionDeFlujo(
+            new clsResultadoDeCosteo(5_600_000m, "plaza", "La plaza vigente supera el piso."), ModoDecision.PlazaVigenteMayor, Motivo);
+        CuandoLaPropuestaEs(decision);
 
         await Handler().Handle(Comando());
 
         _pendientes.Verify(p => p.RegistrarAsync(
-            Trabajo, clsSolicitud, Linea, TipoPendienteDeCosteo.Manual, "Solo se encontró piso SICE-TAC.",
-            It.IsAny<CancellationToken>()), Times.Once);
+            Trabajo, clsSolicitud, Linea, TipoPendienteDeCosteo.Manual, Motivo, It.IsAny<CancellationToken>()), Times.Once);
+        _lineas.Verify(l => l.MarcarPendienteAsync(Linea, Motivo, It.IsAny<CancellationToken>()), Times.Once);
         _lineas.Verify(l => l.MarcarAutoResueltaAsync(
             It.IsAny<Guid>(), It.IsAny<decimal>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        _cotizaciones.Verify(c => c.Agregar(It.IsAny<clsCotizacion>()), Times.Never);
     }
 
     [Fact]

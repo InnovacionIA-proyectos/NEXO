@@ -83,7 +83,7 @@ public sealed class clsCapturarSolicitudCommandHandler(
         var rutasPorClave = rutas.GroupBy(r => clsResolucionDeCatalogos.ClaveRuta(r.Origen, r.Destino)).ToDictionary(g => g.Key, g => g.First());
 
         var vehiculos = await vehiculosCatalogo.ListarAsync(ct);
-        var vehiculosPorClave = vehiculos.GroupBy(v => clsResolucionDeCatalogos.ClaveVehiculo(v.TipoVehiculo, v.Carroceria)).ToDictionary(g => g.Key, g => g.First());
+        var vehiculosPorClave = clsResolucionDeCatalogos.IndexarVehiculosPorClave(vehiculos);
         var aliasVehiculo = await aliasCatalogo.MapaActivoAsync(clsAliasElemento.TipoVehiculo, ct);
         var aliasContenedor = await aliasCatalogo.MapaActivoAsync(clsAliasElemento.TipoContenedor, ct);
 
@@ -218,21 +218,18 @@ public sealed class clsCapturarSolicitudCommandHandler(
             {
                 var p = propuesta.Lineas.FirstOrDefault(x => x.LineaId == linea.Id);
 
-                // S5-HU-19.2/#282: solo se auto-guarda el flete en SoloSicetac/
-                // PlazaVigenteMayor. ConsultaCompleta NUNCA auto-guarda, aunque haya un
-                // único candidato con valor (antes de esta issue, "valor propuesto" era
-                // el único criterio — eso aplicaba de una el caso 7 de la tabla del
-                // milestone, que debe quedar pendiente igual que el resto de consulta
-                // completa).
-                var esModoAutomatico = p?.ModoDecision is nameof(ModoDecision.SoloSicetac) or nameof(ModoDecision.PlazaVigenteMayor);
-                if (esModoAutomatico && p?.ValorPropuesto is { } valor)
+                // El flete se guarda solo cuando hay un valor propuesto y ningún motivo de pendiente, sea cual sea el camino de
+                // decisión (solo SICE-TAC, plaza que gobierna sola o proceso completo con su valor recomendado).
+                // Aprovisionamiento y retorno del contenedor salen de la propuesta (tramos vacíos de SICE-TAC), no de lo que
+                // mande el cliente.
+                if (p is { Autocosteable: true, ValorPropuesto: { } valor })
                 {
                     cotizacion.Lineas.Add(new clsCotizacionLinea
                     {
                         CotizacionId = cotizacion.Id,
                         LineaSolicitudId = linea.Id,
                         ValorFlete = valor,
-                        ValorAprovisionamiento = linea.ValorAprovisionamiento,
+                        ValorAprovisionamiento = p.AprovisionamientoContenedor?.Valor,
                         ValorRetornoContenedor = p.RetornoContenedor?.Valor,
                         Fuente = p.FuentePropuesta switch
                         {
@@ -242,26 +239,24 @@ public sealed class clsCapturarSolicitudCommandHandler(
                             _ => FuenteFlete.Manual,
                         },
                     });
+                    linea.ValorAprovisionamiento = p.AprovisionamientoContenedor?.Valor;
                     linea.EstadoLinea = EstadoLinea.AutoResuelta;
                     linea.MotivoPendiente = null;
                     fletes++;
                 }
                 else if (p is not null)
                 {
-                    // ConsultaCompleta: queda pendiente, con el recomendado visible si lo
-                    // hay (para que el Administrador de Tarifas no empiece de cero) —
-                    // sin esa parte si no hay ningún candidato (casos 9/10 de la tabla).
+                    // Pendiente: sin ningún valor propuesto, o con un motivo que impide guardarlo solo (línea de Cupo sin
+                    // vehículo, SICE-TAC no vigente, tramo vacío sin piso). Si hay un valor recomendado se deja a la vista.
                     linea.EstadoLinea = EstadoLinea.PorCostear;
-                    // S5-HU-20.5/#297: una línea de Cupo sin vehículo trae su propio motivo, literal (los
-                    // candidatos siguen visibles en la Mesa como referencia).
+                    if (linea.LevanteContenedorDiferente) linea.ValorAprovisionamiento = p.AprovisionamientoContenedor?.Valor;
                     linea.MotivoPendiente = p.MotivoPendiente ?? (p.ValorPropuesto is { } recomendado
-                        ? $"Consulta completa: el Administrador de Tarifas debe elegir la tarifa (recomendado: {clsMoneda.Pesos(recomendado)} - {p.FuentePropuesta})."
-                        : "Consulta completa: el Administrador de Tarifas debe elegir la tarifa.");
+                        ? $"El Administrador de Tarifas debe validar la tarifa (recomendado: {clsMoneda.Pesos(recomendado)} - {p.FuentePropuesta})."
+                        : "Ninguna fuente trae un valor para la línea: el Administrador de Tarifas debe ingresar la tarifa.");
                 }
                 else
                 {
-                    // No debería pasar en la práctica (toda línea de la solicitud tiene su
-                    // propuesta) — red de seguridad.
+                    // Toda línea de la solicitud tiene su propuesta; esta rama es una red de seguridad.
                     linea.EstadoLinea = EstadoLinea.PorCostear;
                     linea.MotivoPendiente = "No se pudo consultar la Biblioteca para esta línea.";
                 }

@@ -42,7 +42,10 @@ public record clsCandidatoTarifaDto(
     decimal? ValorPisoBase = null, decimal? ValorTiemposLogisticos = null,
     /// <summary>#300: configuración SICE-TAC de la fila (2L2, C2, 3S3...) cuando el candidato es SICE-TAC. Permite que el
     /// tramo vacío de retorno use el MISMO vehículo del viaje cargado aunque la línea no traiga uno (contenedor).</summary>
-    string? Configuracion = null);
+    string? Configuracion = null,
+    /// <summary>true cuando la línea pide un vehículo y la fuente no tiene filas de ese vehículo: el valor se muestra como referencia,
+    /// pero no gobierna solo ni entra al recomendado.</summary>
+    bool VehiculoRelajado = false);
 
 /// <summary>
 /// Piso SICE-TAC vigente con el desglose de horas, para Mesa de Costeo
@@ -56,12 +59,15 @@ public record clsPisoSicetacVigenteDto(
     string Configuracion, string TipoCarga, string UnidadTransporte, string CondicionCarga);
 
 /// <summary>
-/// <paramref name="ModoDecision"/> (S5-HU-19.2/#282): "SoloSicetac" | "PlazaVigenteMayor" |
-/// "ConsultaCompleta" — texto, no el número del enum de Domain (ver
-/// <see cref="Nexo.Domain.Costeo.Reglas.ModoDecision"/>). Decide si el auto-costeo guarda
-/// el flete (los dos primeros) o deja la línea pendiente de que un humano elija
-/// (ConsultaCompleta) — ver clsCapturarSolicitudCommand/clsCostearLineaCommand. Default
-/// "ConsultaCompleta": es el modo más conservador, el que nunca auto-guarda nada.
+/// Propuesta de una línea. <paramref name="ModoDecision"/> es el camino de decisión del flete principal: "SoloSicetac" |
+/// "PlazaVigenteMayor" | "ConsultaCompleta" — texto, no el número del enum de Domain (ver
+/// <see cref="Nexo.Domain.Costeo.Reglas.ModoDecision"/>).
+///
+/// <paramref name="RetornoContenedor"/> y <paramref name="AprovisionamientoContenedor"/> son los tramos vacíos de retorno y de levante
+/// del contenedor, calculados con SICE-TAC (viaje vacío, 1 h + 1 h, mismo vehículo y misma carrocería que la línea). Si la línea los
+/// pide y no se encuentra el piso, <paramref name="MotivoPendiente"/> lo dice y la línea no se guarda sola.
+///
+/// <paramref name="MotivoPendiente"/>: motivo con el que la línea no se autocostea aunque haya un valor propuesto. null = sin motivo.
 /// </summary>
 public record clsPropuestaLineaDto(
     Guid LineaId,
@@ -77,9 +83,15 @@ public record clsPropuestaLineaDto(
     clsCandidatoTarifaDto? RetornoContenedor = null,
     bool Vencida = false,
     string ModoDecision = "ConsultaCompleta",
-    /// <summary>S5-HU-20.5/#297: motivo específico con el que queda pendiente la línea cuando no es el
-    /// genérico de consulta completa (hoy: "Línea sin vehículo: requiere consulta completa"). null = el genérico.</summary>
-    string? MotivoPendiente = null);
+    string? MotivoPendiente = null,
+    clsCandidatoTarifaDto? AprovisionamientoContenedor = null)
+{
+    /// <summary>
+    /// true cuando el flete se puede guardar solo: hay un valor propuesto y ningún motivo de pendiente. Aplica a los tres caminos
+    /// de decisión; sin valor (ningún candidato) o con motivo, la línea queda para que el Administrador de Tarifas la resuelva.
+    /// </summary>
+    public bool Autocosteable => ValorPropuesto is not null && MotivoPendiente is null;
+}
 
 public record clsPropuestaSolicitudDto(
     Guid SolicitudId,

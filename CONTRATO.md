@@ -373,6 +373,7 @@ interface CandidatoTarifaDto {
   valorPisoBase: Decimal | null          // el piso de la fila de DWSice, sin horas logísticas
   valorTiemposLogisticos: Decimal | null // lo que suman las horas logísticas (valor − piso base; sirve también con el valorSiceConHora de respaldo)
   configuracion: string | null           // #300: configuración SICE-TAC de la fila (2L2, C2, 3S3...) — solo el candidato `sicetac` (y los de tramo vacío) la traen
+  vehiculoRelajado: boolean              // true = la línea pide un vehículo y la fuente no tiene tarifas de ese vehículo en la ruta: el valor es de otro vehículo. Se muestra como referencia (con `advertencia`), no entra al recomendado ni puede gobernar solo
 }
 interface AprovisionamientoDto { candidato: CandidatoTarifaDto | null }
 
@@ -400,9 +401,11 @@ interface PropuestaLineaDto {
   lineaId: UUID; ruta: string | null; vehiculo: string | null; peso: Decimal | null
   sicetac: CandidatoTarifaDto | null; plaza: CandidatoTarifaDto | null; historicoSap: CandidatoTarifaDto | null
   valorPropuesto: Decimal | null; fuentePropuesta: string | null; justificacion: string
-  retornoContenedor: CandidatoTarifaDto | null // #300: piso SICE-TAC de VIAJE VACÍO (destino → ciudad de devolución) con 1h+1h, fuente "retorno_contenedor". Ya NO es la tarifa de plaza de la línea 6
-  modoDecision: "SoloSicetac" | "PlazaVigenteMayor" | "ConsultaCompleta" // S5-HU-19.2/#282: decide si el auto-costeo guarda el flete (los dos primeros) o la línea queda pendiente de un humano (ConsultaCompleta) — esto último AUNQUE valorPropuesto no sea null
-  motivoPendiente: string | null // S5-HU-20.5/#297: motivo ESPECÍFICO con el que queda pendiente la línea; "Línea sin vehículo: requiere consulta completa" o, desde #300, "SICE-TAC no se usa: el período más reciente cargado es AAAAMM y el del mes actual es AAAAMM (sin mes de gracia). El Administrador de Tarifas debe validar el flete.". null = el motivo genérico de consulta completa
+  retornoContenedor: CandidatoTarifaDto | null // piso SICE-TAC de VIAJE VACÍO (destino → ciudad de devolución), 1h+1h, misma configuración y misma unidad de transporte (carrocería) que la línea; fuente "retorno_contenedor"
+  aprovisionamientoContenedor: CandidatoTarifaDto | null // igual, del levante (ciudad de levante → origen de la línea); fuente "aprovisionamiento_contenedor"
+  modoDecision: "SoloSicetac" | "PlazaVigenteMayor" | "ConsultaCompleta" // camino de decisión del flete principal: Solo SICE-TAC, plaza vigente mayor o proceso completo (ver FLUJO-DECISION-TARIFA.md)
+  autocosteable: boolean // true = hay valorPropuesto y ningún motivoPendiente: el flete se guarda solo (en cualquiera de los tres caminos). false = la línea queda pendiente
+  motivoPendiente: string | null // motivo con el que la línea NO se guarda sola aunque haya valor: "Línea sin vehículo: requiere consulta completa", "SICE-TAC no se usa: el período más reciente cargado es AAAAMM y el del mes actual es AAAAMM (sin mes de gracia)...", o "No se encontró piso SICE-TAC de viaje vacío para el retorno/levante del contenedor...". null = sin motivo
 }
 interface PropuestaSolicitudDto { solicitudId: UUID; lineas: PropuestaLineaDto[]; advertencias: string[] }
 
@@ -718,8 +721,25 @@ catálogo. No crea ninguna solicitud; es el paso previo a `lineas:bulk`.
 - **Errores**: `404 SOLICITUD_NO_ENCONTRADA`
 
 #### `GET /api/solicitudes/{id}/propuesta-tarifa`
-Compara plaza (SAP y propia), SICE-TAC e histórico (SAP y propio) y propone el
-valor más alto por línea. No persiste nada.
+Compara plaza (SAP y propia), SICE-TAC e histórico (SAP y propio) y propone el valor del flete por línea con el flujo de
+`docs/documentacion/FLUJO-DECISION-TARIFA.md`: Solo SICE-TAC (regla y piso), plaza vigente mayor que el piso, o proceso completo
+(recomendado = el valor más alto). No persiste nada.
+
+**Cuándo se guarda solo.** El flete se guarda solo —al capturar, al costear una línea en segundo plano y con `aplicar-propuestas`—
+cuando la línea es `autocosteable` (hay `valorPropuesto` y ningún `motivoPendiente`), sea cual sea `modoDecision`. Un proceso completo
+con un único candidato válido también se guarda. Sin ningún valor, o con un motivo de pendiente, la línea queda `porCostear`.
+
+**Vehículo relajado.** Cuando la línea pide un vehículo y una fuente no tiene tarifas de ese vehículo en la ruta, el candidato sale con
+`vehiculoRelajado = true` y una `advertencia`: se muestra pero no entra al recomendado ni puede activar Solo SICE-TAC ni plaza vigente
+mayor. Si todos los candidatos están relajados, no hay valor propuesto.
+
+**Retorno del contenedor y levante.** `retornoContenedor` y `aprovisionamientoContenedor` se calculan en el servidor para los tres caminos,
+con SICE-TAC de viaje VACÍO, 1 h + 1 h, el mismo vehículo y la misma unidad de transporte (carrocería) de la línea (sin carrocería solo en
+una línea de contenedor, unidad PORTACONTENEDORES). Si la línea los pide y no hay piso exacto, la línea completa queda pendiente
+(`motivoPendiente`) y no se guarda nada. Una línea de devolución de contenedor no los tiene. Se suman al flete en la cotización.
+
+**Devolución de contenedor.** El flete principal se busca con viaje VACÍO y 1 h + 1 h por defecto; la plaza SAP solo cuenta si coincide
+con la línea en consolidado, exclusivo y clase de contenedor.
 
 S5-HU-19.1/#281: **orden de fuentes de plaza/histórico** — SAP oficial (match
 exacto) → SAP tolerante (por zona) → propia de NEXO (`tbl_tarifas_plaza`/
@@ -819,7 +839,7 @@ tal como llegó (limpio de espacios).
 | `horasCargue`, `horasDescargue` | *opcional* | decimal | 0–240. S4-HU-15.5/#251. Hay que mandar **las dos** para que se respeten; si falta una, aplica el default. Default: **4 + 4** (o las de la solicitud); **1 + 1** si la línea ES una devolución de contenedor (`lineaNegocio` = devolución). #300 |
 | `ciudadDevolucionContenedor` | *opcional* | string | máx. 150 |
 | `ciudadLevanteContenedor` | *opcional* | string | máx. 150 |
-| `valorAprovisionamiento` | *opcional* | decimal | monetario |
+| `valorAprovisionamiento` | *opcional* | decimal | monetario. Se ignora: el aprovisionamiento lo calcula el servidor con la ciudad de levante (`ciudadLevanteContenedor`) |
 | `valorMercancia` | *opcional* | decimal | monetario |
 | `posiciones` | *opcional* | array | máx. 200 por línea |
 | `grupoRutaId` | *opcional* | UUID | S5-HU-18.3/#275. Agrupa las líneas de una misma carga heterogénea. Lo pone **quien crea las líneas del grupo** (Cotifly, o el portal al crear una línea por camión); null solo en la línea suelta |
@@ -881,14 +901,17 @@ texto libre (máx. 20 caracteres) y **no la compara con el catálogo**: los nomb
 contra el catálogo real, y esos nombres no existen en él.
 
 #### `GET /api/captura-solicitudes/aprovisionamiento`
-Piso SICE-TAC del viaje vacío (levante → origen del cargue). #300: se calcula con **1 h + 1 h** (2 h en total), no con las horas
-pactadas de DWSice, y solo con el período SICE-TAC del mes actual (si no, `candidato: null`).
+Estimación del piso SICE-TAC del viaje vacío (levante → origen del cargue), con **1 h + 1 h** (2 h en total) y solo con el período
+SICE-TAC del mes actual (si no, `candidato: null`). Con `carroceria` elige la fila de esa unidad de transporte, igual que el costeo de la
+línea; sin ella devuelve una aproximación (la menor) y lo dice en `advertencia`. Es solo para mostrar en el formulario: al costear, la
+línea calcula su propio aprovisionamiento y el `valorAprovisionamiento` que mande el cliente en la captura se ignora.
 
 | Query | | Tipo | Restricción |
 |---|---|---|---|
 | `levante` | **requerido** | string | ciudad de levante del contenedor |
 | `origen` | **requerido** | string | origen del cargue |
 | `configuracion` | *opcional* | string | configuración vehicular |
+| `carroceria` | *opcional* | string | carrocería de la línea (unidad de transporte). Sin ella, el valor es una aproximación |
 
 - **→** `200 AprovisionamientoDto` (`candidato: null` si la matriz no trae la ruta)
 - **Errores**: `400 PARAMETROS_REQUERIDOS` (falta `levante` u `origen`). Swagger
@@ -969,12 +992,12 @@ disparar el POST.
   si no, el borrador en curso. GET y POST nunca apuntan a cotizaciones distintas.
 
 #### `POST /api/cotizaciones/{id}/aplicar-propuestas`
-Precarga como fletes el valor más alto propuesto por la Biblioteca en las
-líneas pendientes. Sin body.
+Precarga como fletes el valor propuesto por la Biblioteca en las líneas sin flete, con su aprovisionamiento y su retorno del
+contenedor. Se saltan las líneas sin valor propuesto, las que traen `motivoPendiente` y las rechazadas. Sin body.
 
 | Query | | Tipo | Restricción |
 |---|---|---|---|
-| `soloAutomaticas` | *opcional* | boolean | S5-HU-19.2/#282. Default `false` (aplica todas). Con `true`, salta las líneas en modo `ConsultaCompleta` — el Administrador de Tarifas debe elegirlas a mano |
+| `soloAutomaticas` | *opcional* | boolean | Se conserva por compatibilidad: ya no cambia el resultado, porque toda línea con valor y sin motivo de pendiente se guarda sola |
 
 - **Roles**: `Comercial`, `AdminTarifas`, `Admin`.
 - **→** `200 AplicarPropuestasResultDto`

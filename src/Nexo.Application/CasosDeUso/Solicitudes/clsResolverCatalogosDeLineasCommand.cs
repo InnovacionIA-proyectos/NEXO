@@ -41,8 +41,7 @@ public sealed class clsResolverCatalogosDeLineasCommandHandler(
             .ToDictionary(g => g.Key, g => g.First());
 
         var vehiculos = await vehiculosCatalogo.ListarAsync(ct);
-        var vehiculosPorClave = vehiculos.GroupBy(v => clsResolucionDeCatalogos.ClaveVehiculo(v.TipoVehiculo, v.Carroceria))
-            .ToDictionary(g => g.Key, g => g.First());
+        var vehiculosPorClave = clsResolucionDeCatalogos.IndexarVehiculosPorClave(vehiculos);
         var aliasVehiculo = await aliasCatalogo.MapaActivoAsync(clsAliasElemento.TipoVehiculo, ct);
 
         var resultado = new List<clsCatalogoLineaResueltoDto>(command.Lineas.Count);

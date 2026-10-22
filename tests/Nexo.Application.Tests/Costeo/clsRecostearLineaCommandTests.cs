@@ -13,9 +13,9 @@ namespace Nexo.Application.Tests.Costeo;
 /// <summary>
 /// Recostear una línea que estaba esperando una tarifa.
 ///
-/// Lo que se prueba es sobre todo lo que NO debe pasar: que un recosteo que sigue en
-/// ConsultaCompleta (S5-HU-19.2/#282 — ya no "sin tarifa", el modo manda, no si hay
-/// valor) no borre el pendiente ni marque la línea como resuelta. Un recosteo optimista
+/// Lo que se prueba es sobre todo lo que NO debe pasar: que un recosteo que sigue sin poder
+/// guardarse solo (sin valor, o con un motivo de pendiente) no borre el pendiente ni marque
+/// la línea como resuelta. Un recosteo optimista
 /// que cierra el pendiente sin haber resuelto nada deja la línea invisible: ya no
 /// aparece en la cola del Administrador de Tarifas y nunca se va a costear.
 /// </summary>
@@ -79,11 +79,12 @@ public class clsRecostearLineaCommandTests
     }
 
     [Fact]
-    public async Task Si_sigue_en_ConsultaCompleta_el_pendiente_se_queda_donde_estaba_AUNQUE_tenga_valor()
+    public async Task Si_sigue_con_motivo_de_pendiente_el_pendiente_se_queda_donde_estaba_AUNQUE_tenga_valor()
     {
-        // S5-HU-19.2/#282: un solo candidato en consulta completa SÍ trae Valor, pero el
-        // modo manda — sigue pendiente.
-        CuandoLaPropuestaEs(ConsultaCompleta(2_500_000m, "sicetac", "Solo se encontró piso SICE-TAC."));
+        // Hay un valor propuesto, pero un motivo de pendiente impide guardarlo solo.
+        CuandoLaPropuestaEs(new clsDecisionDeFlujo(
+            new clsResultadoDeCosteo(2_500_000m, "sicetac", "Solo se encontró piso SICE-TAC."), ModoDecision.ConsultaCompleta,
+            "No se encontró piso SICE-TAC de viaje vacío para el retorno del contenedor."));
 
         await Handler().Handle(new clsRecostearLineaCommand(Trabajo, clsSolicitud, Linea));
 
@@ -93,6 +94,22 @@ public class clsRecostearLineaCommandTests
             It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<TipoPendienteDeCosteo>(), It.IsAny<CancellationToken>()), Times.Never);
         _lineas.Verify(l => l.MarcarAutoResueltaAsync(
             It.IsAny<Guid>(), It.IsAny<decimal>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Si_el_proceso_completo_ahora_trae_valor_la_linea_se_resuelve_con_su_aprovisionamiento()
+    {
+        CuandoLaPropuestaEs(new clsDecisionDeFlujo(
+            new clsResultadoDeCosteo(2_500_000m, "sicetac", "Solo se encontró piso SICE-TAC."), ModoDecision.ConsultaCompleta,
+            MotivoPendiente: null, ValorAprovisionamiento: 2_110_711m));
+        clsCotizacion? agregada = null;
+        _cotizaciones.Setup(c => c.Agregar(It.IsAny<clsCotizacion>())).Callback<clsCotizacion>(c => agregada = c);
+
+        await Handler().Handle(new clsRecostearLineaCommand(Trabajo, clsSolicitud, Linea));
+
+        _lineas.Verify(l => l.MarcarAutoResueltaAsync(Linea, 2_500_000m, "sicetac", It.IsAny<CancellationToken>()), Times.Once);
+        _pendientes.Verify(p => p.MarcarResueltoAsync(Trabajo, Linea, TipoPendienteDeCosteo.Manual, It.IsAny<CancellationToken>()), Times.Once);
+        Assert.Equal(2_110_711m, Assert.Single(agregada!.Lineas).ValorAprovisionamiento);
     }
 
     [Fact]

@@ -41,6 +41,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Nexo.Api.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Nexo.Domain\Nexo.Domain.csproj" />
     <ProjectReference Include="..\Nexo.Application\Nexo.Application.csproj" />
   </ItemGroup>
