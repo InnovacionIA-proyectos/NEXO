@@ -484,16 +484,25 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
         var dw = scope.ServiceProvider.GetService<clsDwSiceDbContext>();
         if (dw is null) return null;
 
-        // Es un tramo vacío (1 h + 1 h) sin una línea de solicitud detrás, así que la ruta se compara por texto. Con carrocería se
-        // elige la fila de esa unidad de transporte, igual que al costear una línea; sin carrocería no hay forma de saber
-        // cuál corresponde y se devuelve una aproximación (la menor), avisándolo.
+        // Es un tramo vacío (1 h + 1 h) sin una línea de solicitud detrás: las dos ciudades llegan escritas a mano. Cada una se
+        // resuelve a su municipio y, con los dos códigos DANE, la ruta se compara exacta, igual que al costear una línea; el texto
+        // del nombre de la ruta no sirve de entrada porque SICE-TAC escribe "BOGOTA D. C." y el catálogo "BOGOTA, D.C.". Si alguna
+        // no se resuelve a un único municipio, se busca por texto.
+        var db = scope.ServiceProvider.GetRequiredService<clsNexoDbContext>();
+        var levanteResuelto = await ResolverDaneCiudadAsync(db, ciudadLevante, ct);
+        var origenResuelto = await ResolverDaneCiudadAsync(db, origen, ct);
+        var (levanteDane, origenDane) = levanteResuelto is not null && origenResuelto is not null
+            ? (levanteResuelto, origenResuelto) : ((string?)null, (string?)null);
+
+        // Con carrocería se elige la fila de esa unidad de transporte, igual que al costear una línea; sin carrocería no hay forma
+        // de saber cuál corresponde y se devuelve una aproximación (la menor), avisándolo.
         if (!string.IsNullOrWhiteSpace(carroceria))
             return await AprovisionamientoContenedorAsync(
-                dw, Normalizar(ciudadLevante), Normalizar(origen), levanteDane: null, origenDane: null, configuracion, carroceria,
+                dw, Normalizar(ciudadLevante), Normalizar(origen), levanteDane, origenDane, configuracion, carroceria,
                 esContenedor: false, ct);
 
         var aproximado = await CandidatoSicetacAsync(
-            dw, Normalizar(ciudadLevante), Normalizar(origen), origenDane: null, destinoDane: null, configuracion,
+            dw, Normalizar(ciudadLevante), Normalizar(origen), levanteDane, origenDane, configuracion,
             "VACIO", tipologia: null, carroceria: null, clsResolucionHorasLinea.HorasTotalesTramoVacio, ct);
         return aproximado is null ? null : aproximado with
         {
