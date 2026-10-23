@@ -911,6 +911,10 @@ SICE-TAC del mes actual (si no, `candidato: null`). Con `carroceria` elige la fi
 línea; sin ella devuelve una aproximación (la menor) y lo dice en `advertencia`. Es solo para mostrar en el formulario: al costear, la
 línea calcula su propio aprovisionamiento y el `valorAprovisionamiento` que mande el cliente en la captura se ignora.
 
+`levante` y `origen` se resuelven a su municipio (`tbl_municipios`) y la ruta se compara por código DANE, igual que el costeo de la línea: sirven
+«BOGOTA, D.C.» (como lo entrega `GET /api/captura-solicitudes/ciudades`) y «Bogotá». Si alguna de las dos no se resuelve a un único
+municipio, se busca por el texto del nombre de la ruta de SICE-TAC; una ciudad que no existe devuelve `candidato: null`.
+
 | Query | | Tipo | Restricción |
 |---|---|---|---|
 | `levante` | **requerido** | string | ciudad de levante del contenedor |
