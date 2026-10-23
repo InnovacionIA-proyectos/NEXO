@@ -210,6 +210,57 @@ public class clsSicetacPeriodoYTramosVaciosTests
         Assert.Equal(candidato.ValorPisoBase, candidato.Valor);
     }
 
+    // La ciudad de levante llega escrita como la entrega el catálogo de ciudades ("BOGOTA, D.C.") o como la escribe SICE-TAC
+    // ("BOGOTA D. C."): la estimación tiene que encontrar el mismo piso en los dos casos.
+
+    [Theory]
+    [InlineData("BOGOTA, D.C.")]
+    [InlineData("BOGOTA D. C.")]
+    [InlineData("Bogotá")]
+    public async Task La_estimacion_del_levante_encuentra_el_piso_de_Bogota_se_escriba_como_se_escriba(string levante)
+    {
+        var periodo = PeriodoMasRecienteDelDw();
+        using var fabrica = ConReloj(MedioDelMes(periodo));
+        using var scope = fabrica.Services.CreateScope();
+        var propuestas = scope.ServiceProvider.GetRequiredService<IPropuestaTarifaPort>();
+
+        var referencia = await propuestas.EstimarAprovisionamientoAsync("BOGOTA D. C.", "MEDELLIN", "2S2", carroceria: "ESTACAS");
+        var candidato = await propuestas.EstimarAprovisionamientoAsync(levante, "MEDELLIN", "2S2", carroceria: "ESTACAS");
+
+        Assert.NotNull(referencia);
+        Assert.NotNull(candidato);
+        Assert.True(candidato!.Valor > 0);
+        Assert.Equal(referencia!.Valor, candidato.Valor);
+    }
+
+    [Fact]
+    public async Task La_estimacion_sin_carroceria_tambien_encuentra_el_piso_de_Bogota_escrito_con_coma()
+    {
+        var periodo = PeriodoMasRecienteDelDw();
+        using var fabrica = ConReloj(MedioDelMes(periodo));
+        using var scope = fabrica.Services.CreateScope();
+        var propuestas = scope.ServiceProvider.GetRequiredService<IPropuestaTarifaPort>();
+
+        var candidato = await propuestas.EstimarAprovisionamientoAsync("BOGOTA, D.C.", "MEDELLIN", "2S2");
+
+        Assert.NotNull(candidato);
+        Assert.True(candidato!.Valor > 0);
+    }
+
+    [Theory]
+    [InlineData("CIUDAD QUE NO EXISTE", "MEDELLIN")]
+    [InlineData("BOGOTA, D.C.", "CIUDAD QUE NO EXISTE")]
+    public async Task La_estimacion_de_una_ciudad_que_no_existe_no_devuelve_candidato(string levante, string origen)
+    {
+        var periodo = PeriodoMasRecienteDelDw();
+        using var fabrica = ConReloj(MedioDelMes(periodo));
+        using var scope = fabrica.Services.CreateScope();
+        var propuestas = scope.ServiceProvider.GetRequiredService<IPropuestaTarifaPort>();
+
+        Assert.Null(await propuestas.EstimarAprovisionamientoAsync(levante, origen, "2S2", carroceria: "ESTACAS"));
+        Assert.Null(await propuestas.EstimarAprovisionamientoAsync(levante, origen, "2S2"));
+    }
+
     [Fact]
     public async Task El_retorno_del_contenedor_es_un_viaje_vacio_con_1_mas_1_y_el_cargado_conserva_sus_horas()
     {
