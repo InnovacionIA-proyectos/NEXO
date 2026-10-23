@@ -1596,7 +1596,8 @@ La última recomendación de una línea.
 #### `GET /api/lineas-solicitud/{id}/cubicacion` — solo servicio a servicio
 - **Auth**: `Authorization: Bearer <clave de servicio>` (§1.2). No acepta la
   identidad del portal. **No es para el frontend.**
-- **→** `200 LineaParaCubicacionDto`
+- **→** `200 LineaParaCubicacionDto` — `{ lineaId, posiciones[], origen, destino }`; cada posición es la `PosicionCargaDto` de la captura, con su
+  `codigoTipoMercancia` (null si se capturó sin tipo). El Cubicador lo lee por ese nombre; renombrarlo rompe la creación del plan 3D desde la línea.
 - **Errores**: `401 NO_AUTORIZADO` · `404 LINEA_NO_ENCONTRADA`
 
 ### 3.14.1 Passthrough de catálogo del Cubicador

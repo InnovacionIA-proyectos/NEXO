@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text.Json;
 using Nexo.Api.Tests.Infra;
 using Nexo.Application.CasosDeUso.PlanDeCargue.DTOs;
 using Nexo.Domain.Catalogos.Entidades;
@@ -84,6 +85,47 @@ public class clsLineasSolicitudCubicacionControllerTests(clsApiFixture fixture)
         Assert.Equal(120, posicion.LargoCm);
         Assert.Equal(500, posicion.PesoKg);
     }
+
+    [Fact]
+    public async Task El_tipo_de_mercancia_de_cada_posicion_viaja_como_codigoTipoMercancia()
+    {
+        // El Cubicador lee el cuerpo por nombre de campo: este es el contrato que consume, no el DTO tipado.
+        var lineaId = CrearLineaConPosiciones(
+            """
+            [{"descripcion":"Pallet","cantidad":3,"largoCm":120,"anchoCm":100,"altoCm":100,"pesoKg":500,"codigoTipoMercancia":"BEBIDAS"},
+             {"descripcion":"Bobina","cantidad":1,"largoCm":150,"anchoCm":150,"altoCm":120,"pesoKg":2000}]
+            """);
+
+        try
+        {
+            using var client = ClienteConfigurado();
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", ApiKey);
+
+            var resp = await client.GetAsync($"/api/lineas-solicitud/{lineaId}/cubicacion");
+
+            Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+            using var cuerpo = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
+            var posiciones = cuerpo.RootElement.GetProperty("posiciones");
+            Assert.Equal(2, posiciones.GetArrayLength());
+            Assert.Equal("BEBIDAS", posiciones[0].GetProperty("codigoTipoMercancia").GetString());
+            Assert.Equal(JsonValueKind.Null, posiciones[1].GetProperty("codigoTipoMercancia").ValueKind);
+        }
+        finally
+        {
+            EliminarLinea(lineaId);
+        }
+    }
+
+    private void EliminarLinea(Guid lineaId) =>
+        fixture.WithDb(db =>
+        {
+            var linea = db.LineasSolicitud.FirstOrDefault(l => l.Id == lineaId);
+            if (linea is null) return 0;
+            var solicitud = db.Solicitudes.FirstOrDefault(s => s.Id == linea.SolicitudId);
+            db.LineasSolicitud.Remove(linea);
+            if (solicitud is not null) db.Solicitudes.Remove(solicitud);
+            return db.SaveChanges();
+        });
 
     [Fact]
     public async Task Sin_posiciones_devuelve_lista_vacia_no_null()

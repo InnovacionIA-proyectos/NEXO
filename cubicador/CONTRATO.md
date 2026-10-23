@@ -781,9 +781,15 @@ aparece en el catálogo de la sección 4, igual que `ERROR_INTERNO`.
 GET {NEXO_BASE_URL}/api/lineas-solicitud/{id}/cubicacion
 Authorization: Bearer <NEXO_CALLBACK_API_KEY>
 
-200 → { "lineaId": "guid", "posiciones": [{ "descripcion"?, "cantidad", "largoCm", "anchoCm", "altoCm", "pesoKg"? }], "origen"?, "destino"? }
+200 → { "lineaId": "guid", "posiciones": [{ "descripcion"?, "cantidad", "largoCm", "anchoCm", "altoCm", "pesoKg"?, "codigoTipoMercancia"? }], "origen"?, "destino"? }
 404 → este cliente solo mira el status code (ver infrastructure/clientes/nexo_client.py), no parsea el cuerpo.
 ```
+
+`posiciones[].codigoTipoMercancia` es el código del tipo de mercancía de la posición (el mismo `codigoMercancia` que devuelve
+`GET /tipos-mercancia`). Es el nombre con el que NEXO captura y devuelve la posición; el cliente lo lee de ahí. Viene `null` en las
+posiciones capturadas sin tipo, y esas se rechazan con `MERCANCIA_NO_DECLARADA` en vez de asumir uno. Lo cubren
+`tests/infrastructure/test_nexo_client.py` (este lado, con el cuerpo tal cual lo emite NEXO) y
+`clsLineasSolicitudCubicacionControllerTests` (el lado NEXO, que fija el nombre del campo).
 
 Implementado del lado Cubicador en
 `infrastructure/clientes/nexo_client.py` (timeout fijo de 10s, sin reintentos).

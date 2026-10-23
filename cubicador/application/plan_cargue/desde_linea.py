@@ -105,7 +105,8 @@ def _a_lineas_de_mercancia(posiciones: list[PosicionCarga]) -> list[LineaMercanc
             "MERCANCIA_NO_DECLARADA",
             "Estas posiciones no declaran su tipo de mercancia: "
             f"{', '.join(sin_codigo)}. Sin el tipo no se puede saber que carroceria "
-            "necesita la carga; recapturar la linea con el tipo de cada posicion.")
+            "necesita la carga; la linea se capturo sin `codigoTipoMercancia` en esas "
+            "posiciones, hay que recapturarla indicando el tipo de cada una.")
 
     sin_peso = [
         p.descripcion or "(sin descripcion)"
