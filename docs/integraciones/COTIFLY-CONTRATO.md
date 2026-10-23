@@ -103,8 +103,9 @@ en cuarentena). La lista completa: `GET /api/catalogos/alias?tipo=vehiculo`. El 
   posición** (`posiciones[].codigoTipoMercancia`, código y no uuid). Hoy Cotifly manda el tipo de
   mercancía solo al Cubicador, para pedir la recomendación.
 - Regla de peso: el peso de la línea es `peso` si viene; si no, la suma de `cantidad × pesoKg` de
-  las posiciones. Si vienen los dos, deben coincidir (tolerancia 1 %). Es `400 PESO_INCONSISTENTE`
-  si no.
+  las posiciones. Si vienen los dos, `peso` debe ser **mayor o igual** a la suma de las posiciones
+  (tolerancia 1 % por redondeos): es `400 PESO_INCONSISTENTE` solo cuando las posiciones suman **más** que
+  `peso`. Cotifly envía el peso neto, así que `peso` = suma de las posiciones sigue siendo válido.
 
 ### 3.6 Horas de cargue y descargue por línea (#300)
 
@@ -133,10 +134,9 @@ Qué peso usa cada cosa:
 | Recomendación de vehículo (`POST /recomendaciones` del Cubicador, o `POST /api/cubicacion` de Nexo) | el de cada mercancía, `pesoKg` **por unidad** × `cantidad` (**sin** tara). El Cubicador lo compara contra la capacidad del vehículo **menos su tara** — hoy la tara de los vehículos está en 0 |
 | Valor del piso SICE-TAC | no usa el peso (ruta, configuración y horas) |
 
-⚠️ **Cuidado si se mandan `posiciones[]`**: NEXO valida que `peso` coincida con la suma `cantidad × pesoKg` de las posiciones, con
-tolerancia del 1 % (`400 PESO_INCONSISTENTE`). Como las posiciones van **sin** tara y `peso` va **con** tara, una línea con tara mayor al
-1 % del peso y con posiciones se rechaza. Hoy el front de Nexo y Cotifly pueden evitarlo **no mandando `posiciones[]`** (son opcionales, §3.5).
-Está registrado como hallazgo de la revisión y se tratará en una issue aparte (ver el cierre de #308).
+Si se mandan `posiciones[]`, NEXO valida que la suma `cantidad × pesoKg` de las posiciones **no supere** el `peso` de la línea, con
+tolerancia del 1 % (`400 PESO_INCONSISTENTE`). Como las posiciones van **sin** tara y `peso` va **con** tara, un `peso` mayor que la suma
+(la tara) es válido y la línea se crea. Ejemplo: `peso` 1000 con una posición de 100 kg → `201`; posiciones que suman 1200 con `peso` 1000 → `400`.
 
 ## 4. "Línea sin vehículo": solo Cupo
 

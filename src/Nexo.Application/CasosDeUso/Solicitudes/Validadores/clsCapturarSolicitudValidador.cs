@@ -18,6 +18,9 @@ public static class clsCapturarSolicitudValidador
     /// capturar, y no al pedir la recomendación, para que el error aparezca donde se originó.</summary>
     public const int MaxUnidadesPorLinea = 10_000;
 
+    /// <summary>Margen del 1 % con el que la suma de las posiciones puede superar el peso total sin rechazar la línea.</summary>
+    private const decimal ToleranciaRedondeoPeso = 0.01m;
+
     public static void Validar(clsCapturarSolicitudCommand command)
     {
         // Sin ClienteId, el BP es obligatorio: es la otra forma de identificar al cliente.
@@ -54,11 +57,14 @@ public static class clsCapturarSolicitudValidador
             throw new clsValidationFailedException("PESO_REQUERIDO",
                 $"La línea {numeroLinea} ({lr.Origen} → {lr.Destino}) debe traer el peso total en kg (o posiciones con peso).");
 
-        // Tolerancia del 1%: los pesos vienen de fuentes con redondeos distintos.
-        if (sumaPosiciones > 0 && Math.Abs(peso.Value - sumaPosiciones) / peso.Value > 0.01m)
+        // El peso total incluye la tara (embalaje, estibas, contenedor vacío) y lo escribe quien captura, mientras que cada
+        // posición trae el peso de su mercancía sin tara. Por eso el peso total puede ser mayor que la suma de las posiciones;
+        // lo que no tiene sentido físico es que las posiciones sumen MÁS que el peso total. Tolerancia del 1 %: los pesos
+        // vienen de fuentes con redondeos distintos.
+        if (sumaPosiciones > peso.Value * (1m + ToleranciaRedondeoPeso))
             throw new clsValidationFailedException("PESO_INCONSISTENTE",
-                $"En la línea {numeroLinea} ({lr.Origen} → {lr.Destino}) el peso total ({peso:0.##} kg) " +
-                $"no coincide con la suma de las posiciones ({sumaPosiciones:0.##} kg).");
+                $"En la línea {numeroLinea} ({lr.Origen} → {lr.Destino}) las posiciones suman {sumaPosiciones:0.##} kg, " +
+                $"más que el peso total ({peso:0.##} kg). El peso total incluye la tara y debe ser mayor o igual a la suma de las posiciones.");
     }
 
     /// <summary>Peso de la línea, ya validado. El handler lo usa sin volver a comprobar.</summary>
