@@ -84,9 +84,13 @@ public class clsCapturaSolicitudesController(
 
     /// <summary>
     /// Estima el valor del aprovisionamiento del contenedor: piso SICE-TAC del viaje
-    /// VACÍO (Res. 16075) desde la ciudad de levante hasta el origen del cargue.
-    /// Devuelve candidato nulo si la matriz no trae la ruta. levante/origen son
-    /// obligatorios (400 PARAMETROS_REQUERIDOS si faltan).
+    /// VACÍO (Res. 16075) desde la ciudad de levante hasta el origen del cargue, con
+    /// 1 h + 1 h. Con <c>carroceria</c> elige la fila de esa unidad de transporte (la
+    /// misma que usa el costeo de la línea); sin ella devuelve una aproximación (la
+    /// menor) y lo avisa en <c>advertencia</c>. Devuelve candidato nulo si la matriz no
+    /// trae la ruta. levante/origen son obligatorios (400 PARAMETROS_REQUERIDOS si faltan).
+    /// Al costear, la línea calcula su propio aprovisionamiento: este endpoint es solo una
+    /// estimación para mostrar en el formulario.
     ///
     /// A propósito "string?" y no "string": con Nullable Reference Types habilitado,
     /// [ApiController] trata un parámetro [FromQuery] no-nullable como implícitamente
@@ -101,12 +105,14 @@ public class clsCapturaSolicitudesController(
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<clsAprovisionamientoDto>> Aprovisionamiento(
-        [FromQuery] string? levante, [FromQuery] string? origen, [FromQuery] string? configuracion, CancellationToken ct = default)
+        [FromQuery] string? levante, [FromQuery] string? origen, [FromQuery] string? configuracion,
+        [FromQuery] string? carroceria, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(levante) || string.IsNullOrWhiteSpace(origen))
             throw new clsValidationFailedException("PARAMETROS_REQUERIDOS", "Indica la ciudad de levante y el origen del cargue.");
 
-        var candidato = await propuestas.EstimarAprovisionamientoAsync(levante.Trim(), origen.Trim(), configuracion?.Trim(), ct);
+        var candidato = await propuestas.EstimarAprovisionamientoAsync(
+            levante.Trim(), origen.Trim(), configuracion?.Trim(), ct, carroceria?.Trim());
         return Ok(new clsAprovisionamientoDto(candidato));
     }
 

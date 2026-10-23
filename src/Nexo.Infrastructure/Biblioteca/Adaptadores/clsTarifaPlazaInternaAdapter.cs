@@ -52,7 +52,9 @@ public sealed class clsTarifaPlazaInternaAdapter(clsNexoDbContext db, TimeProvid
             top is null ? null : new clsCandidatoTarifaDto(
                 "plaza", top.Value.Valor,
                 $"vigencia {hoy:yyyy-MM-dd}" + (top.Value.Fila.DetallesTarifa is { Length: > 0 } ? $" · {top.Value.Fila.DetallesTarifa}" : ""),
-                $"tbl_tarifas_plaza (propia) · {top.Value.Criterio}", filas.Count, TablaOrigen: "NEXO"),
+                $"tbl_tarifas_plaza (propia) · {top.Value.Criterio}", filas.Count,
+                Advertencia: top.Value.VehiculoRelajado ? AdvertenciaVehiculo : null, TablaOrigen: "NEXO",
+                VehiculoRelajado: top.Value.VehiculoRelajado),
             null);
     }
 
@@ -91,7 +93,9 @@ public sealed class clsTarifaPlazaInternaAdapter(clsNexoDbContext db, TimeProvid
         return new clsCandidatoTarifaDto(
             "historico_sap", top.Value.Valor,
             $"últimos {VentanaMesesHistorico} meses" + (top.Value.Fila.DetallesTarifa is { Length: > 0 } ? $" · {top.Value.Fila.DetallesTarifa}" : ""),
-            $"tbl_tarifas_plaza_historico (propia) · {top.Value.Criterio} · último registro por tarifa", ultimos.Count, TablaOrigen: "NEXO");
+            $"tbl_tarifas_plaza_historico (propia) · {top.Value.Criterio} · último registro por tarifa", ultimos.Count,
+            Advertencia: top.Value.VehiculoRelajado ? AdvertenciaVehiculo : null, TablaOrigen: "NEXO",
+            VehiculoRelajado: top.Value.VehiculoRelajado);
     }
 
     /// <summary>
@@ -100,20 +104,24 @@ public sealed class clsTarifaPlazaInternaAdapter(clsNexoDbContext db, TimeProvid
     /// patrón que <c>clsPropuestaTarifaAdapter.CandidatoSapAsync</c>). Descarta Valor &lt;= 0
     /// y toma el de mayor valor.
     /// </summary>
-    private async Task<(clsFila Fila, decimal Valor, string Criterio)?> SeleccionarAsync(
+    private async Task<(clsFila Fila, decimal Valor, string Criterio, bool VehiculoRelajado)?> SeleccionarAsync(
         List<clsFila> filas, clsConsultaTarifaPlazaInterna c, int? pesoId, CancellationToken ct)
     {
         filas = filas.Where(f => f.Valor > 0).ToList();
         if (filas.Count == 0) return null;
 
-        var (exactas, nivel) = NivelDeMatching(filas, c, pesoId);
+        var (exactas, nivel, vehiculoRelajado) = NivelDeMatching(filas, c, pesoId);
         var top = exactas.OrderByDescending(f => f.Valor).FirstOrDefault();
         if (top is null) return null;
 
-        return (top, top.Valor, nivel);
+        return (top, top.Valor, nivel, vehiculoRelajado);
     }
 
-    private static (List<clsFila> Filas, string Criterio) NivelDeMatching(List<clsFila> filas, clsConsultaTarifaPlazaInterna c, int? pesoId)
+    private const string AdvertenciaVehiculo =
+        "No hay tarifas del vehículo de la línea en esta ruta: el valor corresponde a otro vehículo y solo sirve de referencia.";
+
+    private static (List<clsFila> Filas, string Criterio, bool VehiculoRelajado) NivelDeMatching(
+        List<clsFila> filas, clsConsultaTarifaPlazaInterna c, int? pesoId)
     {
         bool LineaNegocioOk(clsFila f) => c.LineaNegocio is null || Normalizar(f.LineaNegocio) == Normalizar(c.LineaNegocio);
         bool ClaseViajeOk(clsFila f) => c.ClaseViaje is null || Normalizar(f.ClaseViaje) == Normalizar(c.ClaseViaje);
@@ -121,8 +129,15 @@ public sealed class clsTarifaPlazaInternaAdapter(clsNexoDbContext db, TimeProvid
         bool TipoVehiculoOk(clsFila f) => c.TipoVehiculo is null || f.TipoVehiculo == c.TipoVehiculo;
         bool PesoOk(clsFila f) => pesoId is null || f.PesoId == pesoId;
 
+        // En una devolución de contenedor la clase de contenedor es obligatoria: una fila de otra clase no cuenta.
+        if (c.ClaseContenedorEstricta && c.ClaseContenedor is not null)
+        {
+            filas = filas.Where(ClaseContenedorOk).ToList();
+            if (filas.Count == 0) return (filas, "sin filas de la clase de contenedor de la línea", false);
+        }
+
         var exactas = filas.Where(f => LineaNegocioOk(f) && ClaseViajeOk(f) && ClaseContenedorOk(f) && TipoVehiculoOk(f) && PesoOk(f)).ToList();
-        if (exactas.Count > 0) return (exactas, "nivel exacto · municipios + línea de negocio + clase de viaje + clase de contenedor + vehículo + peso");
+        if (exactas.Count > 0) return (exactas, "nivel exacto · municipios + línea de negocio + clase de viaje + clase de contenedor + vehículo + peso", false);
 
         // Tolerante: cada filtro se relaja si, aplicado sobre lo que queda, no deja nada.
         var candidatos = filas;
@@ -139,7 +154,9 @@ public sealed class clsTarifaPlazaInternaAdapter(clsNexoDbContext db, TimeProvid
         Relajar(PesoOk, "peso");
 
         var criterio = aplicados.Count > 0 ? $"nivel tolerante · municipios + {string.Join(" + ", aplicados)}" : "nivel tolerante · solo municipios";
-        return (candidatos, criterio);
+        // El vehículo se pidió pero ninguna fila lo trae: el valor es de otro vehículo.
+        var vehiculoRelajado = c.TipoVehiculo is not null && !aplicados.Contains("vehículo");
+        return (candidatos, criterio, vehiculoRelajado);
     }
 
     private async Task<int?> PesoIdAsync(decimal? peso, CancellationToken ct)

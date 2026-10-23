@@ -12,10 +12,10 @@ namespace Nexo.Application.CasosDeUso.Costeo;
 public sealed record clsRecostearLineaCommand(Guid TrabajoId, Guid SolicitudId, Guid LineaId) : ICommand<Unit>;
 
 /// <summary>
-/// Le vuelve a preguntar a la regla. Si ahora resuelve en modo automático (SoloSicetac/
-/// PlazaVigenteMayor), resuelve la línea, le agrega el flete a la cotización auto-costeada
-/// y cierra el pendiente; si sigue en ConsultaCompleta (S5-HU-19.2/#282 — incluye el caso
-/// de un solo candidato, que ya no se auto-aplica), lo deja exactamente como estaba.
+/// Le vuelve a preguntar a la regla. Si ahora la línea se puede guardar sola (hay un valor
+/// propuesto y ningún motivo de pendiente), la resuelve, le agrega el flete (con su
+/// aprovisionamiento y su retorno del contenedor) a la cotización auto-costeada y cierra el
+/// pendiente; si sigue sin poder guardarse sola, la deja exactamente como estaba.
 ///
 /// Ese "si no, no toca nada" es lo importante. Cerrar el pendiente sin haber resuelto
 /// dejaría la línea invisible: desaparecería de la cola del Administrador de Tarifas y
@@ -36,17 +36,17 @@ public sealed class clsRecostearLineaCommandHandler(
 {
     public async Task<Unit> Handle(clsRecostearLineaCommand command, CancellationToken ct = default)
     {
-        // S6-HU-24.3/#320: una línea rechazada a propósito no se re-costea.
+        // Una línea rechazada a propósito no se re-costea.
         if (await lineas.EstaRechazadaAsync(command.LineaId, ct)) return Unit.Value;
 
         var decision = await propuesta.ProponerParaLineaAsync(command.LineaId, ct);
 
-        // Sigue en ConsultaCompleta: se queda esperando, sin escribir nada.
-        if (decision.Modo == ModoDecision.ConsultaCompleta) return Unit.Value;
+        // Sigue sin poder guardarse sola (sin valor o con motivo de pendiente): se queda esperando, sin escribir nada.
+        if (!decision.Autocosteable) return Unit.Value;
 
         var resultado = decision.Resultado;
         await lineas.MarcarAutoResueltaAsync(command.LineaId, resultado.Valor!.Value, resultado.Fuente!, ct);
-        await AgregarFleteAutoCosteoAsync(cotizaciones, command.SolicitudId, command.LineaId, resultado, ct);
+        await AgregarFleteAutoCosteoAsync(cotizaciones, command.SolicitudId, command.LineaId, decision, ct);
         await pendientes.MarcarResueltoAsync(command.TrabajoId, command.LineaId, TipoPendienteDeCosteo.Manual, ct);
         await uow.SaveChangesAsync(ct);
 
@@ -55,8 +55,9 @@ public sealed class clsRecostearLineaCommandHandler(
 
     /// <summary>Mismo criterio que clsCostearLineaCommand — ver su doc-comment.</summary>
     private static async Task AgregarFleteAutoCosteoAsync(
-        ICotizacionRepository cotizacionesRepo, Guid solicitudId, Guid lineaId, clsResultadoDeCosteo resultado, CancellationToken ct)
+        ICotizacionRepository cotizacionesRepo, Guid solicitudId, Guid lineaId, clsDecisionDeFlujo decision, CancellationToken ct)
     {
+        var resultado = decision.Resultado;
         var cotizacion = await cotizacionesRepo.ObtenerConLineasYConexosAsync(
             c => c.SolicitudId == solicitudId && c.EsAutoCosteo && c.Estado == EstadoCotizacion.Borrador, ct);
         if (cotizacion is null)
@@ -72,6 +73,8 @@ public sealed class clsRecostearLineaCommandHandler(
             CotizacionId = cotizacion.Id,
             LineaSolicitudId = lineaId,
             ValorFlete = resultado.Valor!.Value,
+            ValorAprovisionamiento = decision.ValorAprovisionamiento,
+            ValorRetornoContenedor = decision.ValorRetornoContenedor,
             Fuente = resultado.Fuente switch
             {
                 "sicetac" => FuenteFlete.Sicetac,

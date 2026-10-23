@@ -6,6 +6,7 @@ using Nexo.Application.CasosDeUso.Costeo.Interfaces;
 using Nexo.Application.CasosDeUso.Biblioteca.DTOs;
 using Nexo.Application.CasosDeUso.Biblioteca.Interfaces;
 using Nexo.Application.CasosDeUso.ReglasSoloSicetac.Interfaces;
+using Nexo.Application.CasosDeUso.Solicitudes;
 using Nexo.Application.Common.Dtos;
 using Nexo.Application.Common.Exceptions;
 using Nexo.Application.Common.Ports;
@@ -113,7 +114,8 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
             linea, ajustes, soloSice, horasSolicitud, ct);
         await PublicarVencidaSiAplicaAsync(dto, ct);
         return new clsDecisionDeFlujo(
-            new clsResultadoDeCosteo(dto.ValorPropuesto, dto.FuentePropuesta, dto.Justificacion), modo, dto.MotivoPendiente);
+            new clsResultadoDeCosteo(dto.ValorPropuesto, dto.FuentePropuesta, dto.Justificacion), modo, dto.MotivoPendiente,
+            dto.AprovisionamientoContenedor?.Valor, dto.RetornoContenedor?.Valor);
     }
 
     /// <summary>
@@ -170,6 +172,7 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
             l.clsRuta?.Origen, l.clsRuta?.Destino, l.clsConfiguracionVehiculo?.TipoVehiculo, l.clsConfiguracionVehiculo?.Carroceria,
             l.Tipologia, l.Peso, l.LineaNegocio, l.ClaseViaje, l.ClaseContenedor,
             l.Exclusivo, l.Consolidado, l.RetornaContenedor, l.CiudadDevolucionContenedor,
+            l.LevanteContenedorDiferente, l.CiudadLevanteContenedor,
             HorasEfectivasDeLinea(l, horasSolicitud));
 
         var grupos = lineas.GroupBy(Huella).ToList();
@@ -255,6 +258,10 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
         var origen = Normalizar(linea.clsRuta.Origen);
         var destino = Normalizar(linea.clsRuta.Destino);
         var vehiculo = linea.clsConfiguracionVehiculo?.TipoVehiculo;
+        var carroceriaLinea = linea.clsConfiguracionVehiculo?.Carroceria;
+        // Una línea de devolución de contenedor se costea como viaje VACÍO y no tiene retorno ni levante propios.
+        var esDevolucion = linea.LineaNegocio == LineaNegocio.DevolucionContenedor;
+        var esContenedor = esDevolucion || linea.ClaseViaje == ClaseViaje.Contenedor;
 
         // S5-HU-20.5/#297: Cupo (o sin clase de viaje) sin vehículo nunca se autocostea — ver
         // clsReglaDeCosteo.DecidirFlujo. Se calcula una sola vez y gobierna Solo-SICETAC, plaza que
@@ -296,9 +303,13 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
         // S5-HU-19.2/#282: movido ANTES de plaza/histórico a propósito — en modo
         // SoloSicetac (regla + piso encontrado) ninguno de los dos hace falta, así que se
         // corta acá sin gastar esas consultas.
-        var sicetac = oficial?.SicetacOficial;
+        // Devolución de contenedor: el piso es el del viaje VACÍO (con las horas de la línea, 1 h + 1 h por defecto), no el cargado.
+        var sicetac = esDevolucion ? null : oficial?.SicetacOficial;
         if (sicetac is null && dw is not null)
-            sicetac = await CandidatoSicetacAsync(dw, origen, destino, origenDane, destinoDane, vehiculo, linea.Tipologia, linea.clsConfiguracionVehiculo?.Carroceria, horasSolicitud, ct);
+            sicetac = esDevolucion
+                ? await CandidatoVacioAsync(dw, origen, destino, origenDane, destinoDane, vehiculo, carroceriaLinea, esContenedor: true,
+                    permitirVehiculoRelajado: true, horasSolicitud, ct)
+                : await CandidatoSicetacAsync(dw, origen, destino, origenDane, destinoDane, vehiculo, linea.Tipologia, carroceriaLinea, horasSolicitud, ct);
 
         // #300: si no hay piso SICE-TAC porque el período más reciente cargado no es el del mes actual, se dice
         // (justificación + motivo de pendiente) en vez de un "sin piso" mudo. Sin piso nunca hay modo automático
@@ -307,13 +318,16 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
         if (sicetac is null && dw is not null)
             motivoSice = clsPeriodoSicetac.MotivoNoVigente(await PeriodoSiceAsync(dw, ct), _clock.GetUtcNow());
 
-        if (hayReglaSoloSicetac && sicetac is not null)
+        if (hayReglaSoloSicetac && sicetac is { VehiculoRelajado: false })
         {
             var justifSolo = $"La ruta marcada como SOLO SICE-TAC por el Administrador: se propone el piso SICE-TAC ({clsMoneda.Pesos(sicetac.Valor)}) sin comparar con plaza ni histórico.";
-            return (new clsPropuestaLineaDto(
+            var dtoSolo = new clsPropuestaLineaDto(
                 linea.Id, $"{linea.clsRuta.Origen} → {linea.clsRuta.Destino}", vehiculo, linea.Peso,
                 sicetac, null, null, sicetac.Valor, "sicetac", justifSolo,
-                ModoDecision: nameof(ModoDecision.SoloSicetac)), ModoDecision.SoloSicetac);
+                ModoDecision: nameof(ModoDecision.SoloSicetac));
+            return (await ConTramosVaciosAsync(
+                dtoSolo, linea, db, dw, origen, destino, origenDane, destinoDane, vehiculo ?? sicetac.Configuracion, carroceriaLinea,
+                esDevolucion, esContenedor, ct), ModoDecision.SoloSicetac);
         }
 
         // S5-HU-19.1/#281: nombre del catálogo externo (NO el enum, NO un Id) que guardan
@@ -323,7 +337,8 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
         var consultaInterna = new clsConsultaTarifaPlazaInterna(
             linea.clsRuta.Origen, linea.clsRuta.Destino, nombreLineaNegocio, nombreClaseViaje,
             linea.ClaseContenedor, vehiculo, linea.Peso,
-            linea.clsRuta.OrigenMunicipioId, linea.clsRuta.DestinoMunicipioId);
+            linea.clsRuta.OrigenMunicipioId, linea.clsRuta.DestinoMunicipioId,
+            ClaseContenedorEstricta: esDevolucion);
 
         // El camino "oficial" (ITarifarioSapPort, ver comentario mas abajo) exige match
         // exacto de ClaseContenedor/peso/vehiculo sin fallback. Cuando no encuentra nada
@@ -344,9 +359,25 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
         clsCandidatoTarifaDto? plazaVencidaRef = oficial?.Vencida == true ? oficial.Tarifa : null;
 
         if (plazaVigente is null && dc is not null)
+        {
+            IQueryable<clsSapTarifaPlaza> tablaPlaza = dc.TarifasPlazaSap;
+            if (esDevolucion)
+            {
+                // Devolución de contenedor: una tarifa que no coincide en consolidado, exclusivo y clase de contenedor no cuenta.
+                var consolidado = linea.Consolidado;
+                var exclusivo = linea.Exclusivo;
+                tablaPlaza = tablaPlaza.Where(t => (t.Consolidado ?? false) == consolidado && (t.Exclusivo ?? false) == exclusivo);
+                if (!string.IsNullOrWhiteSpace(linea.ClaseContenedor))
+                {
+                    var claseId = await IdClaseContenedorSapAsync(dc, linea.ClaseContenedor, ct);
+                    tablaPlaza = claseId is null ? tablaPlaza.Where(_ => false) : tablaPlaza.Where(t => t.ClaseContenedor == claseId);
+                }
+            }
             plazaVigente = await CandidatoSapAsync(
-                dc, dc.TarifasPlazaSap, "plaza", linea.clsRuta.OrigenMunicipio, linea.clsRuta.DestinoMunicipio,
-                vehiculo, linea.Peso, soloVigentes: true, ajustesVigencia, ct);
+                dc, tablaPlaza, "plaza", linea.clsRuta.OrigenMunicipio, linea.clsRuta.DestinoMunicipio,
+                vehiculo, linea.Peso, soloVigentes: true, ajustesVigencia, ct,
+                criterioExtra: esDevolucion ? "devolución de contenedor: consolidado, exclusivo y clase de contenedor iguales a los de la línea" : null);
+        }
 
         if (plazaVigente is null)
         {
@@ -358,8 +389,8 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
         // S5-HU-19.2/#282, Paso 2 anticipado: si la plaza vigente ya va a ganar sola
         // (PlazaVigenteMayor), el histórico ni se consulta — DecidirFlujo no lo mira en
         // ese modo, pedirlo sería una consulta tirada a la basura.
-        var seriaPlazaVigenteMayor = !sinVehiculoQueLoExige && !hayReglaSoloSicetac && sicetac is not null &&
-            plazaVigente is not null && plazaVigente.Valor > sicetac.Valor;
+        var seriaPlazaVigenteMayor = !sinVehiculoQueLoExige && !hayReglaSoloSicetac && sicetac is { VehiculoRelajado: false } &&
+            plazaVigente is { VehiculoRelajado: false } && plazaVigente.Valor > sicetac.Valor;
 
         clsCandidatoTarifaDto? historico = null;
         if (!seriaPlazaVigenteMayor)
@@ -411,17 +442,6 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
         if (fuente == "plaza" && plaza?.Advertencia is { } advertenciaPlaza)
             justificacion += $" ⚠ {advertenciaPlaza}";
 
-        // #300: el retorno del contenedor es un tramo VACÍO: piso SICE-TAC de viaje vacío (destino -> ciudad de
-        // devolución) con 1h+1h, no la tarifa de plaza de la línea 6. Mismo vehículo que el viaje cargado.
-        clsCandidatoTarifaDto? retorno = null;
-        if (linea.RetornaContenedor && !string.IsNullOrWhiteSpace(linea.CiudadDevolucionContenedor) && dw is not null)
-            retorno = await RetornoContenedorAsync(dw, destino, Normalizar(linea.CiudadDevolucionContenedor), vehiculo ?? sicetac?.Configuracion, ct);
-
-        if (retorno is not null)
-            justificacion += $" Retorno del contenedor a {linea.CiudadDevolucionContenedor}: {clsMoneda.Pesos(retorno.Valor)} (viaje vacío SICE-TAC, {clsResolucionHorasLinea.HorasCargueTramoVacio:0.##} h + {clsResolucionHorasLinea.HorasDescargueTramoVacio:0.##} h).";
-        else if (linea.RetornaContenedor)
-            justificacion += " El viaje retorna contenedor pero no se encontró piso SICE-TAC de viaje vacío para el retorno.";
-
         var motivoPendiente = decision.MotivoPendiente;
         if (motivoSice is not null)
         {
@@ -429,17 +449,22 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
             motivoPendiente ??= $"{motivoSice} El Administrador de Tarifas debe validar el flete.";
         }
 
-        return (new clsPropuestaLineaDto(
+        var dto = new clsPropuestaLineaDto(
             linea.Id,
             $"{linea.clsRuta.Origen} → {linea.clsRuta.Destino}",
             vehiculo,
             linea.Peso,
             sicetac, plaza, historico,
             valor, fuente, justificacion,
-            retorno,
             Vencida: vencida,
             ModoDecision: decision.Modo.ToString(),
-            MotivoPendiente: motivoPendiente), decision.Modo);
+            MotivoPendiente: motivoPendiente);
+
+        // Retorno del contenedor y levante: tramos vacíos aparte del flete, con el mismo vehículo y carrocería de la línea.
+        dto = await ConTramosVaciosAsync(
+            dto, linea, db, dw, origen, destino, origenDane, destinoDane, vehiculo ?? sicetac?.Configuracion, carroceriaLinea,
+            esDevolucion, esContenedor, ct);
+        return (dto, decision.Modo);
     }
 
     // La decisión vive en Domain (Costeo/Reglas/clsReglaDeCosteo): son invariantes del
@@ -447,42 +472,134 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
     // los DTO de aplicación a los objetos de valor del dominio.
 
     private static clsCandidatoDeTarifa? ADominio(clsCandidatoTarifaDto? c) =>
-        c is null ? null : new clsCandidatoDeTarifa(c.Fuente, c.Valor);
+        c is null ? null : new clsCandidatoDeTarifa(c.Fuente, c.Valor, c.VehiculoRelajado);
 
     // ------------------------------------------------------------- SICE-TAC (DWSice)
 
     public async Task<clsCandidatoTarifaDto?> EstimarAprovisionamientoAsync(
-        string ciudadLevante, string origen, string? configuracion, CancellationToken ct = default)
+        string ciudadLevante, string origen, string? configuracion, CancellationToken ct = default, string? carroceria = null)
     {
         if (!_dwConfigurado) return null;
         using var scope = _scopes.CreateScope();
         var dw = scope.ServiceProvider.GetService<clsDwSiceDbContext>();
         if (dw is null) return null;
 
-        // Sin contexto de solicitud (es una estimación de tramo de posicionamiento, no de
-        // una línea, sin clsRuta/municipio resuelto): sigue comparando por texto (sin DANE disponible).
-        // #300: es un tramo VACÍO — 1h+1h (2 h en total, antes null = las pactadas de DWSice) y el piso se
-        // recalcula con clsPisoConHoras, igual que el retorno del contenedor.
-        return await CandidatoSicetacAsync(
+        // Es un tramo vacío (1 h + 1 h) sin una línea de solicitud detrás, así que la ruta se compara por texto. Con carrocería se
+        // elige la fila de esa unidad de transporte, igual que al costear una línea; sin carrocería no hay forma de saber
+        // cuál corresponde y se devuelve una aproximación (la menor), avisándolo.
+        if (!string.IsNullOrWhiteSpace(carroceria))
+            return await AprovisionamientoContenedorAsync(
+                dw, Normalizar(ciudadLevante), Normalizar(origen), levanteDane: null, origenDane: null, configuracion, carroceria,
+                esContenedor: false, ct);
+
+        var aproximado = await CandidatoSicetacAsync(
             dw, Normalizar(ciudadLevante), Normalizar(origen), origenDane: null, destinoDane: null, configuracion,
             "VACIO", tipologia: null, carroceria: null, clsResolucionHorasLinea.HorasTotalesTramoVacio, ct);
+        return aproximado is null ? null : aproximado with
+        {
+            Advertencia = "Sin carrocería: valor aproximado (el menor entre las unidades de transporte de la ruta).",
+        };
     }
 
     /// <summary>
-    /// #300: retorno del contenedor vacío = piso SICE-TAC de viaje VACÍO desde el destino de la línea hasta la ciudad
-    /// de devolución, con 1h+1h — en vez de la tarifa de plaza de la línea 6 (que se retiró de este cálculo). El
-    /// viaje cargado de la misma línea conserva sus propias horas (4+4 por defecto). Null si no hay piso para la ruta.
+    /// Retorno del contenedor vacío: piso SICE-TAC de viaje VACÍO desde el destino de la línea hasta la ciudad de devolución, con
+    /// 1 h + 1 h y con el mismo vehículo y la misma carrocería de la línea. Null si no hay piso exacto para esa ruta.
     /// </summary>
     private async Task<clsCandidatoTarifaDto?> RetornoContenedorAsync(
-        clsDwSiceDbContext dw, string origenRetorno, string destinoRetorno, string? configuracion, CancellationToken ct)
+        clsDwSiceDbContext dw, string origenRetorno, string destinoRetorno, string? origenDane, string? destinoDane,
+        string? configuracion, string? carroceria, bool esContenedor, CancellationToken ct)
     {
-        var c = await CandidatoSicetacAsync(
-            dw, origenRetorno, destinoRetorno, origenDane: null, destinoDane: null, configuracion,
-            "VACIO", tipologia: null, carroceria: null, clsResolucionHorasLinea.HorasTotalesTramoVacio, ct);
+        var c = await CandidatoVacioAsync(
+            dw, origenRetorno, destinoRetorno, origenDane, destinoDane, configuracion, carroceria, esContenedor,
+            permitirVehiculoRelajado: false, clsResolucionHorasLinea.HorasTotalesTramoVacio, ct);
         return c is null ? null : c with
         {
             Fuente = "retorno_contenedor",
             Criterio = $"retorno de contenedor · viaje vacío · {clsResolucionHorasLinea.HorasCargueTramoVacio:0.##} h + {clsResolucionHorasLinea.HorasDescargueTramoVacio:0.##} h · {c.Criterio}",
+        };
+    }
+
+    /// <summary>
+    /// Aprovisionamiento (levante del contenedor en una ciudad distinta al origen): piso SICE-TAC de viaje VACÍO desde la ciudad de
+    /// levante hasta el origen de la línea, con 1 h + 1 h y con el mismo vehículo y la misma carrocería de la línea.
+    /// Null si no hay piso exacto para esa ruta.
+    /// </summary>
+    private async Task<clsCandidatoTarifaDto?> AprovisionamientoContenedorAsync(
+        clsDwSiceDbContext dw, string ciudadLevante, string origenLinea, string? levanteDane, string? origenDane,
+        string? configuracion, string? carroceria, bool esContenedor, CancellationToken ct)
+    {
+        var c = await CandidatoVacioAsync(
+            dw, ciudadLevante, origenLinea, levanteDane, origenDane, configuracion, carroceria, esContenedor,
+            permitirVehiculoRelajado: false, clsResolucionHorasLinea.HorasTotalesTramoVacio, ct);
+        return c is null ? null : c with
+        {
+            Fuente = "aprovisionamiento_contenedor",
+            Criterio = $"aprovisionamiento · viaje vacío · {clsResolucionHorasLinea.HorasCargueTramoVacio:0.##} h + {clsResolucionHorasLinea.HorasDescargueTramoVacio:0.##} h · {c.Criterio}",
+        };
+    }
+
+    /// <summary>
+    /// Agrega a la propuesta los tramos vacíos que la línea pide: retorno del contenedor y levante (aprovisionamiento). Se aplica a
+    /// los tres caminos de decisión, porque son costos aparte del flete principal. Si la línea pide un tramo y no se encuentra
+    /// su piso exacto, la línea completa queda pendiente (<see cref="clsPropuestaLineaDto.MotivoPendiente"/>) y no se guarda sola.
+    /// Una línea que ES la devolución del contenedor no tiene retorno ni levante propios.
+    /// </summary>
+    private async Task<clsPropuestaLineaDto> ConTramosVaciosAsync(
+        clsPropuestaLineaDto dto, clsLineaSolicitud linea, clsNexoDbContext db, clsDwSiceDbContext? dw, string origen, string destino,
+        string? origenDane, string? destinoDane, string? vehiculo, string? carroceria, bool esDevolucion, bool esContenedor, CancellationToken ct)
+    {
+        if (esDevolucion) return dto;
+        if (!linea.RetornaContenedor && !linea.LevanteContenedorDiferente) return dto;
+
+        clsCandidatoTarifaDto? retorno = null;
+        clsCandidatoTarifaDto? aprovisionamiento = null;
+        var faltantes = new List<string>();
+        var justificacion = dto.Justificacion;
+
+        if (linea.RetornaContenedor)
+        {
+            var ciudad = linea.CiudadDevolucionContenedor;
+            if (!string.IsNullOrWhiteSpace(ciudad) && dw is not null)
+            {
+                // El extremo de la línea ya trae su código DANE; el de la ciudad de devolución se resuelve por nombre. Con los dos
+                // códigos la ruta se compara exacta; si la ciudad no se resuelve a un único municipio, por texto.
+                var devolucionDane = await ResolverDaneCiudadAsync(db, ciudad, ct);
+                var (dOrigen, dDestino) = destinoDane is not null && devolucionDane is not null ? (destinoDane, devolucionDane) : (null, null);
+                retorno = await RetornoContenedorAsync(dw, destino, Normalizar(ciudad), dOrigen, dDestino, vehiculo, carroceria, esContenedor, ct);
+            }
+            if (retorno is not null)
+                justificacion += $" Retorno del contenedor a {ciudad}: {clsMoneda.Pesos(retorno.Valor)} (viaje vacío SICE-TAC, {clsResolucionHorasLinea.HorasCargueTramoVacio:0.##} h + {clsResolucionHorasLinea.HorasDescargueTramoVacio:0.##} h).";
+            else
+                faltantes.Add(string.IsNullOrWhiteSpace(ciudad) ? "retorno del contenedor (sin ciudad de devolución)" : $"retorno del contenedor a {ciudad}");
+        }
+
+        if (linea.LevanteContenedorDiferente)
+        {
+            var ciudad = linea.CiudadLevanteContenedor;
+            if (!string.IsNullOrWhiteSpace(ciudad) && dw is not null)
+            {
+                var levanteDane = await ResolverDaneCiudadAsync(db, ciudad, ct);
+                var (dOrigen, dDestino) = levanteDane is not null && origenDane is not null ? (levanteDane, origenDane) : (null, null);
+                aprovisionamiento = await AprovisionamientoContenedorAsync(dw, Normalizar(ciudad), origen, dOrigen, dDestino, vehiculo, carroceria, esContenedor, ct);
+            }
+            if (aprovisionamiento is not null)
+                justificacion += $" Aprovisionamiento desde {ciudad}: {clsMoneda.Pesos(aprovisionamiento.Valor)} (viaje vacío SICE-TAC, {clsResolucionHorasLinea.HorasCargueTramoVacio:0.##} h + {clsResolucionHorasLinea.HorasDescargueTramoVacio:0.##} h).";
+            else
+                faltantes.Add(string.IsNullOrWhiteSpace(ciudad) ? "levante del contenedor (sin ciudad de levante)" : $"levante del contenedor desde {ciudad}");
+        }
+
+        var motivo = dto.MotivoPendiente;
+        if (faltantes.Count > 0)
+        {
+            var texto = $"No se encontró piso SICE-TAC de viaje vacío para el {string.Join(" ni para el ", faltantes)} (mismo vehículo y misma carrocería que la línea): la línea queda pendiente.";
+            justificacion += " " + texto;
+            motivo ??= texto;
+        }
+
+        return dto with
+        {
+            RetornoContenedor = retorno, AprovisionamientoContenedor = aprovisionamiento,
+            Justificacion = justificacion, MotivoPendiente = motivo,
         };
     }
 
@@ -505,7 +622,7 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
         clsDwSiceDbContext dw, string origen, string destino, string? origenDane, string? destinoDane, string? vehiculo,
         string condicionCarga, TipologiaCarga? tipologia, string? carroceria, decimal? horasSolicitud, CancellationToken ct)
     {
-        var (fila, criterio) = await ResolverFilaSiceAsync(dw, origen, destino, origenDane, destinoDane, vehiculo, condicionCarga, tipologia, carroceria, ct);
+        var (fila, criterio, vehiculoRelajado) = await ResolverFilaSiceAsync(dw, origen, destino, origenDane, destinoDane, vehiculo, condicionCarga, tipologia, carroceria, ct);
         if (fila is null) return null;
 
         // S4-HU-14.1/#221: piso recalculado con las horas reales de la solicitud en vez
@@ -515,7 +632,78 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
             "sicetac", valor,
             $"{fila.NombreRuta} · {fila.Configuracion} · {fila.NombreTipoCarga} · {fila.NombreUnidadTransporte}",
             criterio, 1,
-            ValorPisoBase: fila.Valor, ValorTiemposLogisticos: valor - fila.Valor, Configuracion: fila.Configuracion);
+            Advertencia: vehiculoRelajado ? AdvertenciaVehiculoRelajado(vehiculo) : null,
+            ValorPisoBase: fila.Valor, ValorTiemposLogisticos: valor - fila.Valor, Configuracion: fila.Configuracion,
+            VehiculoRelajado: vehiculoRelajado);
+    }
+
+    private static string AdvertenciaVehiculoRelajado(string? vehiculo) =>
+        $"No hay filas del vehículo {vehiculo?.Trim().ToUpper()} para esta ruta: el valor corresponde a otro vehículo y solo sirve de referencia.";
+
+    /// <summary>
+    /// Piso SICE-TAC de un viaje VACÍO ("Sin carga"). A diferencia del viaje cargado, cada ruta trae una fila por unidad de
+    /// transporte con valores distintos, así que la fila se elige por la carrocería de la línea (nunca la más barata): sin
+    /// carrocería solo se acepta en una línea de contenedor (PORTACONTENEDORES). Con <paramref name="permitirVehiculoRelajado"/>
+    /// en false el vehículo también tiene que coincidir exacto (retorno y levante); en true, si la ruta no tiene filas de ese
+    /// vehículo se usa otro y el candidato sale marcado como relajado (flete principal de una devolución de contenedor).
+    /// Null si no hay una fila que coincida.
+    /// </summary>
+    private async Task<clsCandidatoTarifaDto?> CandidatoVacioAsync(
+        clsDwSiceDbContext dw, string origen, string destino, string? origenDane, string? destinoDane,
+        string? vehiculo, string? carroceria, bool esContenedor, bool permitirVehiculoRelajado, decimal horas, CancellationToken ct)
+    {
+        var pidioVehiculo = !string.IsNullOrWhiteSpace(vehiculo);
+        if (!pidioVehiculo && !permitirVehiculoRelajado) return null;
+
+        var consulta = await PrepararConsultaSiceAsync(dw, origen, destino, origenDane, destinoDane, "VACIO", ct);
+        if (consulta is null) return null;
+        var (baseQ, criterio, claveBase) = consulta.Value;
+
+        clsRutaSicetacDw? fila = null;
+        var relajado = false;
+        if (pidioVehiculo)
+        {
+            var config = vehiculo!.Trim().ToUpper();
+            fila = SeleccionarSiceVacio(await FilasSiceCacheadasAsync($"{claveBase}:{config}", baseQ.Where(r => r.Configuracion == config), ct), carroceria, esContenedor);
+            if (fila is not null) criterio += $" · configuración {config}";
+        }
+        if (fila is null && permitirVehiculoRelajado)
+        {
+            fila = SeleccionarSiceVacio(await FilasSiceCacheadasAsync($"{claveBase}:*", baseQ, ct), carroceria, esContenedor);
+            relajado = pidioVehiculo && fila is not null;
+        }
+        if (fila is null) return null;
+
+        var valor = clsPisoConHoras.Calcular(fila.Valor, fila.ValorHora, fila.HorasPactadas, fila.ValorSiceConHora, horas);
+        return new clsCandidatoTarifaDto(
+            "sicetac", valor,
+            $"{fila.NombreRuta} · {fila.Configuracion} · {fila.NombreTipoCarga} · {fila.NombreUnidadTransporte}",
+            criterio + $" · unidad {fila.NombreUnidadTransporte}", 1,
+            Advertencia: relajado ? AdvertenciaVehiculoRelajado(vehiculo) : null,
+            ValorPisoBase: fila.Valor, ValorTiemposLogisticos: valor - fila.Valor, Configuracion: fila.Configuracion,
+            VehiculoRelajado: relajado);
+    }
+
+    /// <summary>
+    /// Elige entre las filas de un viaje vacío la de la unidad de transporte que corresponde a la carrocería (comparación sin
+    /// tildes ni mayúsculas, con "_" y "-" como espacio). Entre las de esa unidad prefiere la vía estándar, luego las menores
+    /// horas de recorrido y luego el menor valor. Sin carrocería solo elige en una línea de contenedor (PORTACONTENEDORES);
+    /// si la unidad no existe en las filas, devuelve null.
+    /// </summary>
+    internal static clsRutaSicetacDw? SeleccionarSiceVacio(List<clsRutaSicetacDw> filas, string? carroceria, bool esContenedor)
+    {
+        const string UnidadContenedor = "PORTACONTENEDORES";
+        var unidad = string.IsNullOrWhiteSpace(carroceria)
+            ? (esContenedor ? UnidadContenedor : null)
+            : clsResolucionDeCatalogos.Normalizar(carroceria);
+        if (unidad is null) return null;
+
+        return filas
+            .Where(r => (r.ValorSiceConHora ?? r.Valor) > 0 && clsResolucionDeCatalogos.Normalizar(r.NombreUnidadTransporte) == unidad)
+            .OrderBy(r => string.Equals(r.ViaEstandar, "SI", StringComparison.OrdinalIgnoreCase) ? 0 : 1)
+            .ThenBy(r => r.HorasRecorrido ?? decimal.MaxValue)
+            .ThenBy(r => r.Valor)
+            .FirstOrDefault();
     }
 
     /// <summary>
@@ -532,7 +720,7 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
         var dw = scope.ServiceProvider.GetService<clsDwSiceDbContext>();
         if (dw is null) return null;
 
-        var (fila, _) = await ResolverFilaSiceAsync(
+        var (fila, _, _) = await ResolverFilaSiceAsync(
             dw, Normalizar(origen), Normalizar(destino), origenDane: null, destinoDane: null, vehiculo, "CARGADO", tipologia, carroceria, ct);
         if (fila is null) return null;
 
@@ -556,14 +744,45 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
     /// La tabla tiene ~2.1 millones de filas por periodo: el filtro exacto por DANE,
     /// además de corregir el match, es muchísimo más barato que el LIKE.
     /// </summary>
-    private async Task<(clsRutaSicetacDw? Fila, string Criterio)> ResolverFilaSiceAsync(
+    private async Task<(clsRutaSicetacDw? Fila, string Criterio, bool VehiculoRelajado)> ResolverFilaSiceAsync(
         clsDwSiceDbContext dw, string origen, string destino, string? origenDane, string? destinoDane,
         string? vehiculo, string condicionCarga, TipologiaCarga? tipologia, string? carroceria, CancellationToken ct)
     {
-        // #300: solo se usa el período del mes y año actuales (sin mes de gracia): si el más reciente cargado no
-        // lo es, no hay piso. El motivo visible sale de MotivoSicetacNoUsadoAsync / ProponerLineaAsync.
+        var consulta = await PrepararConsultaSiceAsync(dw, origen, destino, origenDane, destinoDane, condicionCarga, ct);
+        if (consulta is null) return (null, string.Empty, false);
+        var (baseQ, criterio, claveBase) = consulta.Value;
+
+        clsRutaSicetacDw? fila = null;
+        var pidioVehiculo = !string.IsNullOrWhiteSpace(vehiculo);
+        if (pidioVehiculo)
+        {
+            var config = vehiculo!.Trim().ToUpper();
+            fila = SeleccionarSice(await FilasSiceCacheadasAsync($"{claveBase}:{config}", baseQ.Where(r => r.Configuracion == config), ct), tipologia, carroceria);
+            if (fila is not null) criterio += $" · configuración {config}";
+        }
+
+        // Si el vehículo pedido no tiene filas en la ruta se usa cualquier otro, pero el candidato queda marcado como relajado.
+        var relajado = false;
+        if (fila is null)
+        {
+            fila = SeleccionarSice(await FilasSiceCacheadasAsync($"{claveBase}:*", baseQ, ct), tipologia, carroceria);
+            relajado = pidioVehiculo && fila is not null;
+        }
+        return (fila, criterio, relajado);
+    }
+
+    /// <summary>
+    /// Arma la consulta de filas SICE-TAC de una ruta y una condición de carga (CARGADO o VACIO) para el período del mes actual:
+    /// por código DANE exacto cuando hay municipios resueltos, y por texto del nombre de la ruta en caso contrario. Devuelve
+    /// null si el período más reciente cargado no es el del mes actual (sin piso ese mes).
+    /// </summary>
+    private async Task<(IQueryable<clsRutaSicetacDw> Consulta, string Criterio, string ClaveBase)?> PrepararConsultaSiceAsync(
+        clsDwSiceDbContext dw, string origen, string destino, string? origenDane, string? destinoDane,
+        string condicionCarga, CancellationToken ct)
+    {
+        // Solo se usa el período del mes y año actuales (sin mes de gracia): si el más reciente cargado no lo es, no hay piso.
         var periodo = await PeriodoSiceAsync(dw, ct);
-        if (!clsPeriodoSicetac.EsElDelMesActual(periodo, _clock.GetUtcNow())) return (null, string.Empty);
+        if (!clsPeriodoSicetac.EsElDelMesActual(periodo, _clock.GetUtcNow())) return null;
 
         IQueryable<clsRutaSicetacDw> baseQ;
         string criterio;
@@ -587,17 +806,7 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
             criterio = $"periodo {periodo} · {condicionCarga} · ruta ~ '{origen} - {destino}'";
             claveRuta = $"txt:{origen}:{destino}";
         }
-        var claveBase = $"sice-filas:{periodo}:{condicionCarga}:{claveRuta}";
-
-        clsRutaSicetacDw? fila = null;
-        if (!string.IsNullOrWhiteSpace(vehiculo))
-        {
-            var config = vehiculo.Trim().ToUpper();
-            fila = SeleccionarSice(await FilasSiceCacheadasAsync($"{claveBase}:{config}", baseQ.Where(r => r.Configuracion == config), ct), tipologia, carroceria);
-            if (fila is not null) criterio += $" · configuración {config}";
-        }
-        fila ??= SeleccionarSice(await FilasSiceCacheadasAsync($"{claveBase}:*", baseQ, ct), tipologia, carroceria);
-        return (fila, criterio);
+        return (baseQ, criterio, $"sice-filas:{periodo}:{condicionCarga}:{claveRuta}");
     }
 
     internal static clsRutaSicetacDw? SeleccionarSice(
@@ -618,7 +827,10 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
 
         if (!string.IsNullOrWhiteSpace(carroceria))
         {
-            var porUnidad = cand.Where(r => string.Equals(r.NombreUnidadTransporte, carroceria.Trim(), StringComparison.OrdinalIgnoreCase)).ToList();
+            // La carrocería se compara sin tildes ni mayúsculas y con "_" y "-" como espacio ("Furgón" = "FURGON"): una
+            // comparación literal no encontraba la unidad y el piso salía de otra unidad de transporte.
+            var unidad = clsResolucionDeCatalogos.Normalizar(carroceria);
+            var porUnidad = cand.Where(r => clsResolucionDeCatalogos.Normalizar(r.NombreUnidadTransporte) == unidad).ToList();
             if (porUnidad.Count > 0) cand = porUnidad;
         }
 
@@ -706,7 +918,7 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
         clsMunicipio? origenMunicipio, clsMunicipio? destinoMunicipio,
         string? vehiculo, decimal? peso, bool soloVigentes,
         IReadOnlyDictionary<int, DateTime> ajustesVigencia, CancellationToken ct,
-        int? ventanaMeses = null) where T : clsSapTarifaBase
+        int? ventanaMeses = null, string? criterioExtra = null) where T : clsSapTarifaBase
     {
         var codigosOrigen = CodigosZonaSap(origenMunicipio);
         var codigosDestino = CodigosZonaSap(destinoMunicipio);
@@ -718,6 +930,7 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
 
         var hoy = _clock.GetUtcNow().Date;
         var criterio = $"origen zona ({string.Join(",", codigosOrigen)}) · destino zona ({string.Join(",", codigosDestino)})";
+        if (criterioExtra is not null) criterio += $" · {criterioExtra}";
         if (soloVigentes)
         {
             var idsAjustados = ajustesVigencia.Keys.ToList();
@@ -732,16 +945,19 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
             criterio += $" · últimos {meses} meses";
         }
 
-        if (!string.IsNullOrWhiteSpace(vehiculo))
+        var vehiculoPedido = !string.IsNullOrWhiteSpace(vehiculo);
+        var vehiculoAplicado = false;
+        if (vehiculoPedido)
         {
-            var idVehiculo = await IdVehiculoSapAsync(dc, vehiculo, ct);
+            var idVehiculo = await IdVehiculoSapAsync(dc, vehiculo!, ct);
             if (idVehiculo is not null)
             {
                 var conVehiculo = query.Where(t => t.TipoVehiculo == idVehiculo);
                 if (await conVehiculo.AnyAsync(ct))
                 {
                     query = conVehiculo;
-                    criterio += $" · vehículo {vehiculo.Trim().ToUpper()}";
+                    criterio += $" · vehículo {vehiculo!.Trim().ToUpper()}";
+                    vehiculoAplicado = true;
                 }
             }
         }
@@ -793,11 +1009,56 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
         var top = candidatas.OrderByDescending(x => x.Valor).First();
         var vigenciaEfectiva = Efectiva(top.Fila);
         var ajustada = ajustesVigencia.ContainsKey(top.Fila.Id) ? " (ajustada)" : "";
+        // El vehículo se pidió pero la fuente no tiene tarifas de ese vehículo en la ruta: el valor es de otro vehículo.
+        var relajado = vehiculoPedido && !vehiculoAplicado;
         return new clsCandidatoTarifaDto(
             fuente, top.Valor!.Value,
             $"{top.Fila.Origen} → {top.Fila.Destino} · vigencia {vigenciaEfectiva:yyyy-MM-dd}{ajustada}" +
                 (top.Fila is clsSapTarifaPlaza { DetallesTarifa: { Length: > 0 } det } ? $" · {det}" : ""),
-            criterio, candidatas.Count);
+            criterio, candidatas.Count,
+            Advertencia: relajado ? AdvertenciaVehiculoRelajado(vehiculo) : null,
+            VehiculoRelajado: relajado);
+    }
+
+    /// <summary>
+    /// Código DANE del municipio colombiano al que corresponde el nombre de una ciudad escrita a mano (levante o devolución del
+    /// contenedor). Primero busca el nombre exacto; si no hay, los municipios cuyo nombre contiene el texto o está contenido en él
+    /// ("Bogotá" ~ "BOGOTA, D.C."). Devuelve null si no hay ninguno o si hay más de uno distinto: una ciudad ambigua no se adivina y
+    /// el tramo vacío se busca por texto de la ruta.
+    /// </summary>
+    private async Task<string?> ResolverDaneCiudadAsync(clsNexoDbContext db, string ciudad, CancellationToken ct)
+    {
+        var municipios = await _cache.GetOrCreateAsync("prop:municipios-colombia", async e =>
+        {
+            e.AbsoluteExpirationRelativeToNow = CacheTtl;
+            var lista = await db.Municipios.AsNoTracking().Where(m => m.Pais == "CO")
+                .Select(m => new { m.CodigoDane, m.Municipio }).ToListAsync(ct);
+            return lista.Select(m => (m.CodigoDane, Nombre: clsResolucionDeCatalogos.Normalizar(m.Municipio))).ToList();
+        });
+
+        var texto = clsResolucionDeCatalogos.Normalizar(ciudad);
+        if (texto.Length == 0) return null;
+
+        var exactos = municipios!.Where(m => m.Nombre == texto).Select(m => m.CodigoDane).Distinct().ToList();
+        if (exactos.Count == 1) return exactos[0];
+        if (exactos.Count > 1) return null;
+
+        var contenidos = municipios!.Where(m => m.Nombre.Length > 0 && (m.Nombre.Contains(texto) || texto.Contains(m.Nombre)))
+            .Select(m => m.CodigoDane).Distinct().ToList();
+        return contenidos.Count == 1 ? contenidos[0] : null;
+    }
+
+    /// <summary>Id SAP de una clase de contenedor a partir de su descripción (por ejemplo CNT20.IT). Null si no se reconoce.</summary>
+    private async Task<int?> IdClaseContenedorSapAsync(clsDbSolucionesTiDbContext dc, string? claseContenedor, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(claseContenedor)) return null;
+        var mapa = await _cache.GetOrCreateAsync("prop:sap-clases-contenedor", async e =>
+        {
+            e.AbsoluteExpirationRelativeToNow = CacheTtl;
+            var lista = await dc.ClasesContenedor.Select(x => new { x.Id, x.Descripcion }).ToListAsync(ct);
+            return lista.GroupBy(x => Normalizar(x.Descripcion)).ToDictionary(g => g.Key, g => g.First().Id);
+        });
+        return mapa!.TryGetValue(Normalizar(claseContenedor), out var id) ? id : null;
     }
 
     private async Task<string?> IdVehiculoSapAsync(clsDbSolucionesTiDbContext dc, string codigoVehiculo, CancellationToken ct)

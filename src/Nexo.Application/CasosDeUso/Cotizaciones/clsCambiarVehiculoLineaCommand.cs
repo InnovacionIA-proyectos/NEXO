@@ -120,8 +120,7 @@ public sealed class clsCambiarVehiculoLineaCommandHandler(
 
         var mapa = await alias.MapaActivoAsync(clsAliasElemento.TipoVehiculo, ct);
         var todos = await vehiculos.ListarAsync(ct);
-        var porClave = todos.GroupBy(v => clsResolucionDeCatalogos.ClaveVehiculo(v.TipoVehiculo, v.Carroceria))
-            .ToDictionary(g => g.Key, g => g.OrderByDescending(v => v.EsCatalogoOficial).First());
+        var porClave = clsResolucionDeCatalogos.IndexarVehiculosPorClave(todos);
 
         // Con alias: igual que la captura (puede crear la fila oficial o promover una en cuarentena). Sin alias: tiene que ser una
         // configuración oficial que ya exista — acá no se crea nada en cuarentena.

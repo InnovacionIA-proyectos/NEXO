@@ -11,13 +11,13 @@ using Nexo.Domain.Enums;
 namespace Nexo.Application.CasosDeUso.Cotizaciones;
 
 /// <summary>
-/// Precarga como flete por defecto el valor más alto propuesto por la Biblioteca
-/// (plaza vs SICE-TAC) en cada línea de la solicitud que aún no tiene flete.
+/// Precarga como flete el valor propuesto por la Biblioteca en cada línea de la solicitud que aún no
+/// tiene flete, junto con su aprovisionamiento y su retorno del contenedor cuando la propuesta los trae.
+/// Se saltan las líneas sin valor propuesto, las que tienen un motivo de pendiente (sin vehículo, sin piso
+/// SICE-TAC del mes, tramo vacío sin piso) y las rechazadas.
 ///
-/// <paramref name="SoloAutomaticas"/> (S5-HU-19.2/#282, default false = aplica todas,
-/// el botón de siempre): con true, salta las líneas en modo ConsultaCompleta — esas
-/// necesitan que el Administrador de Tarifas elija, no se auto-aplican aunque tengan un
-/// valor recomendado.
+/// <paramref name="SoloAutomaticas"/> se conserva por compatibilidad con quien ya lo envía: ya no cambia el
+/// resultado, porque toda línea con valor y sin motivo de pendiente se guarda sola.
 /// </summary>
 public sealed record clsAplicarPropuestasCommand(Guid CotizacionId, bool SoloAutomaticas = false) : ICommand<clsAplicarPropuestasResultDto>;
 
@@ -55,19 +55,18 @@ public sealed class clsAplicarPropuestasCommandHandler(
         foreach (var p in propuesta.Lineas)
         {
             if (p.ValorPropuesto is not { } valor || conFlete.Contains(p.LineaId)) continue;
-            if (command.SoloAutomaticas && p.ModoDecision == nameof(Nexo.Domain.Costeo.Reglas.ModoDecision.ConsultaCompleta)) continue;
-            // #300: una línea con motivo propio de pendiente (sin vehículo, o sin piso SICE-TAC porque su período no es
-            // el del mes actual) nunca se aplica en bloque: queda para que el Administrador de Tarifas la valide.
-            // Sin piso contra el cual comparar, aplicar la propuesta sería guardar un flete sin validar.
-            if (p.MotivoPendiente is not null) continue;
-            // S6-HU-24.3/#320: una línea rechazada no se costea (ni en bloque): se rechazó a propósito, sin flete.
+            // Una línea con motivo de pendiente (sin vehículo, sin piso SICE-TAC del mes, tramo vacío sin piso) nunca se aplica
+            // en bloque: queda para que el Administrador de Tarifas la valide. Sin piso contra el cual comparar, aplicar la
+            // propuesta sería guardar un flete sin validar.
+            if (!p.Autocosteable) continue;
+            // Una línea rechazada no se costea (ni en bloque): se rechazó a propósito, sin flete.
             if (lineasSol.GetValueOrDefault(p.LineaId)?.EstadoLinea == Nexo.Domain.Enums.EstadoLinea.Rechazada) continue;
             var linea = new clsCotizacionLinea
             {
                 CotizacionId = c.Id,
                 LineaSolicitudId = p.LineaId,
                 ValorFlete = valor,
-                ValorAprovisionamiento = lineasSol.GetValueOrDefault(p.LineaId)?.ValorAprovisionamiento,
+                ValorAprovisionamiento = p.AprovisionamientoContenedor?.Valor,
                 ValorRetornoContenedor = p.RetornoContenedor?.Valor,
                 // ORIGENTARIFA de la regla 9: SICETAC o TARIFARIO según la fuente ganadora.
                 Fuente = p.FuentePropuesta switch

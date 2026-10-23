@@ -71,7 +71,7 @@ public class clsSicetacPeriodoYTramosVaciosTests
     /// Reusa la ruta si ya existe (Origen/Destino es único) y nunca la borra.</param>
     private (Guid SolicitudId, Guid LineaId) CrearLinea(
         bool retornaContenedor = false, string? ciudadDevolucion = null, decimal? horasCargue = null, decimal? horasDescargue = null,
-        bool rutaConNombreReal = false)
+        bool rutaConNombreReal = false, string? carroceria = null)
     {
         return _fx.WithDb(db =>
         {
@@ -89,7 +89,7 @@ public class clsSicetacPeriodoYTramosVaciosTests
                 Destino = rutaConNombreReal ? "Bogotá" : $"Bogotá (test300-{sufijo})",
                 OrigenMunicipioId = 1012, DestinoMunicipioId = 149,
             };
-            var vehiculo = new clsConfiguracionVehiculo { TipoVehiculo = "3S3" };
+            var vehiculo = new clsConfiguracionVehiculo { TipoVehiculo = "3S3", Carroceria = carroceria };
             var linea = new clsLineaSolicitud
             {
                 SolicitudId = solicitud.Id, clsRuta = ruta, RutaId = ruta.Id,
@@ -116,9 +116,13 @@ public class clsSicetacPeriodoYTramosVaciosTests
         {
             _fx.WithDb(db =>
             {
+                // Cada línea de esta clase crea su propia configuración de vehículo: se borra con la línea para no dejar huérfanas.
+                var vehiculos = db.LineasSolicitud.Where(l => l.SolicitudId == solicitudId && l.ConfigVehiculoId != null)
+                    .Select(l => l.ConfigVehiculoId!.Value).ToList();
                 db.Cotizaciones.Where(c => c.SolicitudId == solicitudId).ExecuteDelete();
                 db.LineasSolicitud.Where(l => l.SolicitudId == solicitudId).ExecuteDelete();
                 db.Solicitudes.Where(s => s.Id == solicitudId).ExecuteDelete();
+                db.ConfiguracionesVehiculo.Where(v => vehiculos.Contains(v.Id) && !db.LineasSolicitud.Any(l => l.ConfigVehiculoId == v.Id)).ExecuteDelete();
                 return 0;
             });
         }
@@ -210,7 +214,7 @@ public class clsSicetacPeriodoYTramosVaciosTests
     public async Task El_retorno_del_contenedor_es_un_viaje_vacio_con_1_mas_1_y_el_cargado_conserva_sus_horas()
     {
         var periodo = PeriodoMasRecienteDelDw();
-        var (solicitudId, lineaId) = CrearLinea(retornaContenedor: true, ciudadDevolucion: "Cartagena", horasCargue: 4, horasDescargue: 4, rutaConNombreReal: true);
+        var (solicitudId, lineaId) = CrearLinea(retornaContenedor: true, ciudadDevolucion: "Cartagena", horasCargue: 4, horasDescargue: 4, rutaConNombreReal: true, carroceria: "Furgón");
         try
         {
             using var fabrica = ConReloj(MedioDelMes(periodo));
@@ -224,12 +228,35 @@ public class clsSicetacPeriodoYTramosVaciosTests
             Assert.Equal("retorno_contenedor", retorno!.Fuente);
             Assert.Contains("viaje vacío", retorno.Criterio);
             Assert.Contains("1 h + 1 h", retorno.Criterio);
+            Assert.Contains("unidad FURGON", retorno.Criterio);   // misma carrocería que la línea
             Assert.Contains("viaje vacío SICE-TAC, 1 h + 1 h", propuesta.Justificacion);
 
             // El viaje cargado NO cambió: su piso se calculó con las horas de la línea (4+4 = las pactadas) — el valor
             // de horas es el que trae DWSice para 8 h, no el de 2.
             Assert.NotNull(propuesta.Sicetac);
             Assert.True(propuesta.Sicetac!.ValorTiemposLogisticos > 0m);
+        }
+        finally { Limpiar(solicitudId); }
+    }
+
+    [Fact]
+    public async Task Un_retorno_sin_carroceria_en_una_linea_que_no_es_de_contenedor_deja_la_linea_pendiente()
+    {
+        // Sin carrocería no hay forma de saber cuál de las unidades de transporte de la ruta corresponde: se prefiere no
+        // proponer el tramo (y dejar la línea pendiente) antes que elegir la más barata.
+        var periodo = PeriodoMasRecienteDelDw();
+        var (solicitudId, lineaId) = CrearLinea(retornaContenedor: true, ciudadDevolucion: "Cartagena", horasCargue: 4, horasDescargue: 4, rutaConNombreReal: true);
+        try
+        {
+            using var fabrica = ConReloj(MedioDelMes(periodo));
+            using var scope = fabrica.Services.CreateScope();
+            var propuestas = scope.ServiceProvider.GetRequiredService<IPropuestaTarifaPort>();
+
+            var propuesta = (await propuestas.ProponerAsync(solicitudId)).Lineas.Single(l => l.LineaId == lineaId);
+
+            Assert.Null(propuesta.RetornoContenedor);
+            Assert.False(propuesta.Autocosteable);
+            Assert.Contains("retorno del contenedor a Cartagena", propuesta.MotivoPendiente);
         }
         finally { Limpiar(solicitudId); }
     }

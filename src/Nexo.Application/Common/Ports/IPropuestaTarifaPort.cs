@@ -19,7 +19,7 @@ public interface IPropuestaTarifaPort
     /// (módulo aún no migrado —); el puerto ya queda listo.
     /// </summary>
     Task<clsCandidatoTarifaDto?> EstimarAprovisionamientoAsync(
-        string ciudadLevante, string origen, string? configuracion, CancellationToken ct = default);
+        string ciudadLevante, string origen, string? configuracion, CancellationToken ct = default, string? carroceria = null);
 
     /// <summary>
     /// Piso SICE-TAC vigente para una ruta, con el desglose de horas — la misma fuente

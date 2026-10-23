@@ -55,9 +55,9 @@ public class clsCostearLineaSinVehiculoTests
     }
 
     [Fact]
-    public async Task Una_consulta_completa_normal_sigue_usando_la_justificacion_como_motivo()
+    public async Task Un_proceso_completo_sin_ningun_valor_usa_la_justificacion_como_motivo()
     {
-        var decision = new clsDecisionDeFlujo(new clsResultadoDeCosteo(2_000_000m, "plaza", "Justificación de siempre."), ModoDecision.ConsultaCompleta);
+        var decision = new clsDecisionDeFlujo(new clsResultadoDeCosteo(null, null, "Justificación de siempre."), ModoDecision.ConsultaCompleta);
         _propuesta.Setup(p => p.ProponerParaLineaAsync(Linea, It.IsAny<CancellationToken>())).ReturnsAsync(decision);
 
         await Handler().Handle(new clsCostearLineaCommand(Trabajo, Solicitud, Linea));
