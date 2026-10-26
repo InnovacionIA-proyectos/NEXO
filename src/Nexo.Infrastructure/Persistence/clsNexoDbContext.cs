@@ -31,6 +31,7 @@ public class clsNexoDbContext : DbContext
     public DbSet<clsRuta> Rutas => Set<clsRuta>();
     public DbSet<clsConfiguracionVehiculo> ConfiguracionesVehiculo => Set<clsConfiguracionVehiculo>();
     public DbSet<clsAliasElemento> AliasElementos => Set<clsAliasElemento>();
+    public DbSet<clsTerminoCliente> TerminosCliente => Set<clsTerminoCliente>();
     public DbSet<clsTarifaHistorica> TarifasHistoricas => Set<clsTarifaHistorica>();
     public DbSet<clsServicioConexo> ServiciosConexos => Set<clsServicioConexo>();
     public DbSet<clsCotizacion> Cotizaciones => Set<clsCotizacion>();
@@ -250,6 +251,22 @@ public class clsNexoDbContext : DbContext
             e.ToTable("tbl_alias_elementos");
             e.HasIndex(x => x.AliasNormalizado).IsUnique();
             e.Property(x => x.Activo).HasDefaultValue(true);
+        });
+
+        // Términos que usa cada cliente en sus archivos. Sin migración de EF: el esquema vive en ESQUEMA_NEXO.sql.
+        b.Entity<clsTerminoCliente>(e =>
+        {
+            e.ToTable("tbl_diccionario_cliente");
+            e.Property(x => x.Termino).HasMaxLength(200).IsRequired();
+            e.Property(x => x.TerminoNormalizado).HasMaxLength(200).IsRequired();
+            e.Property(x => x.Tipo).HasMaxLength(20).IsRequired();
+            e.Property(x => x.Concepto).HasMaxLength(100).IsRequired();
+            e.Property(x => x.Contexto).HasMaxLength(50);
+            e.Property(x => x.Ejemplo).HasMaxLength(500);
+            e.Property(x => x.Activo).HasDefaultValue(true);
+            e.HasIndex(x => new { x.ClienteId, x.TerminoNormalizado, x.Tipo, x.Contexto }).IsUnique();
+            e.HasIndex(x => new { x.ClienteId, x.Tipo });
+            e.HasOne(x => x.Cliente).WithMany().HasForeignKey(x => x.ClienteId).OnDelete(DeleteBehavior.Restrict);
         });
 
         b.Entity<clsTarifaHistorica>(e =>

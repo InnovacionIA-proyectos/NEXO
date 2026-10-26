@@ -1875,6 +1875,75 @@ Las configuraciones de vehículo que la captura creó en **cuarentena** (`EsCata
   **Errores**: `400 CODIGO_NO_RECONOCIDO` · `404 VEHICULO_NO_ENCONTRADO` · `409 VEHICULO_NO_ESTA_EN_CUARENTENA` (ya es oficial) · `409 VEHICULO_YA_DESCARTADO` · `409 ALIAS_DUPLICADO` (el texto ya apunta a otro código).
 - `descartar` marca `Descartada = true` (columna nueva de `tbl_configuraciones_vehiculo`). **Errores**: `404 VEHICULO_NO_ENCONTRADO` · `409 VEHICULO_NO_ESTA_EN_CUARENTENA` · `409 VEHICULO_YA_DESCARTADO`.
 
+### 3.19.1 Diccionario de términos por cliente — `/api/diccionario-cliente`
+
+Cómo se traduce cada palabra que usa un cliente en sus archivos a lo que entiende NEXO. Complementa al diccionario global de alias
+de vehículos y contenedores (§3.19): el de alias son sinónimos de **todos** (T.MULA, TB, 40HC) que usa la captura; este guarda lo
+que es **propio de un cliente** (y las columnas y unidades de sus archivos). Tres tipos de término:
+
+| `tipo` | Qué es | `concepto` | `contexto` |
+|---|---|---|---|
+| `columna` | Un encabezado del Excel del cliente | El campo de NEXO al que corresponde (`origen`, `destino`, `peso`, `tipoVehiculo`…, o `ignorar`) | no se usa |
+| `unidad` | Una unidad que usa el cliente | La unidad canónica: `kg` o `t` | no se usa |
+| `valor` | Un valor de una columna categórica | El valor de NEXO (por ejemplo `2_7`) | **obligatorio**: el campo al que pertenece (`tipoVehiculo`, `carroceria`, `tipologia`, `lineaNegocio`, `claseViaje`, `claseContenedor`, `codigoTipoMercancia`) |
+
+`clienteId` en `null` significa que el término aplica a **todos** los clientes. El `concepto` de un `valor` **no se valida contra el
+catálogo oficial**: un cliente puede usar un valor que el catálogo no tiene (el Turbo de un cliente es `2_7`, que no está en
+`GET /api/catalogos/tipos-vehiculo`). Un término no se repite para el mismo cliente, tipo y contexto, sin distinguir mayúsculas,
+tildes ni espacios (`409 TERMINO_DUPLICADO`).
+
+```ts
+interface TerminoClienteDto {
+  id: Guid
+  clienteId: Guid | null            // null = aplica a todos los clientes
+  clienteNombre: string | null
+  termino: string                   // tal como lo escribe el cliente
+  tipo: "columna" | "unidad" | "valor"
+  concepto: string
+  contexto: string | null           // solo en tipo "valor"
+  ejemplo: string | null
+  activo: boolean
+  createdAt: DateTimeOffset
+  updatedAt: DateTimeOffset | null
+}
+```
+
+- **Roles**: leer (`GET`) lo puede cualquier rol válido (la importación lo consulta); crear, editar y borrar, `AdminBiblioteca`, `AdminTarifas` y `Admin`.
+
+#### `GET /api/diccionario-cliente`
+| Query | | Tipo | Restricción |
+|---|---|---|---|
+| `clienteId` | opcional | Guid | Trae los de ese cliente y, por defecto, también los generales; sin él, los de todos los clientes |
+| `incluirGenerales` | opcional | bool | Por defecto `true`; con `false` y `clienteId`, omite los generales |
+| `tipo` | opcional | string | `columna`, `unidad` o `valor` |
+| `q` | opcional | string | Busca en el término y en el concepto |
+| `soloActivos` | opcional | bool | Por defecto `false` |
+
+- **→** `200 [ TerminoClienteDto ]`, los generales primero y luego por cliente, tipo y término.
+- **Errores**: `400 TIPO_TERMINO_INVALIDO`
+
+#### `GET /api/diccionario-cliente/opciones`
+- **→** `200 { tipos, camposDestino, unidades, contextos }` — los valores que acepta el diccionario, para armar los formularios.
+
+#### `POST /api/diccionario-cliente` y `PUT /api/diccionario-cliente/{id}`
+| Campo | | Tipo | Restricción |
+|---|---|---|---|
+| `clienteId` | solo en `POST`, opcional | Guid | `null` = todos los clientes. No cambia al editar (para pasar un término a otro cliente se borra y se crea) |
+| `termino` | **requerido** | string | máx. 200 |
+| `tipo` | **requerido** | string | `columna` \| `unidad` \| `valor` |
+| `concepto` | **requerido** | string | máx. 100; según el tipo (tabla de arriba) |
+| `contexto` | según tipo | string | obligatorio en `valor`, no se acepta en los otros |
+| `ejemplo` | opcional | string | máx. 500 |
+| `activo` | opcional | bool | Por defecto `true` |
+
+- **→** `201 TerminoClienteDto` (`POST`) · `200 TerminoClienteDto` (`PUT`, reemplaza los campos editables)
+- **Errores**: `400 TERMINO_REQUERIDO` · `400 TIPO_TERMINO_INVALIDO` · `400 CONCEPTO_REQUERIDO` · `400 CAMPO_DESTINO_INVALIDO` · `400 UNIDAD_INVALIDA` ·
+  `400 CONTEXTO_INVALIDO` · `400 CONTEXTO_NO_APLICA` · `400 EJEMPLO_MUY_LARGO` · `400 CLIENTE_NO_ENCONTRADO` · `409 TERMINO_DUPLICADO` · `404 TERMINO_NO_ENCONTRADO` (`PUT`)
+
+#### `DELETE /api/diccionario-cliente/{id}`
+- **→** `204`
+- **Errores**: `404 TERMINO_NO_ENCONTRADO`
+
 ### 3.20 Rangos de peso — `/api/pesos`
 
 Bandas de peso (kg) propias de Nexo para Tarifas de Plaza (S4-HU-10.1) — **no

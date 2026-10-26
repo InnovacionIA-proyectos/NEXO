@@ -2,6 +2,7 @@ using Nexo.Application.CasosDeUso.AjustesVigenciaPlaza.Interfaces;
 using Nexo.Application.CasosDeUso.Biblioteca.Interfaces;
 using Nexo.Application.CasosDeUso.BibliotecaSapHistorico.Interfaces;
 using Nexo.Application.CasosDeUso.Catalogos.Interfaces;
+using Nexo.Application.CasosDeUso.DiccionarioCliente.Interfaces;
 using Nexo.Application.CasosDeUso.Costeo.Interfaces;
 using Nexo.Application.CasosDeUso.Cotizaciones.Interfaces;
 using Nexo.Application.CasosDeUso.Cubicacion.Interfaces;
@@ -248,6 +249,7 @@ public static class clsDependencyInjection
         services.AddScoped<IRutasCatalogoPort, clsEfRutasCatalogoRepository>();
         services.AddScoped<IConfiguracionesVehiculoPort, clsEfConfiguracionesVehiculoRepository>();
         services.AddScoped<IAliasCatalogoPort, clsEfAliasCatalogoRepository>();
+        services.AddScoped<IDiccionarioClienteRepository, clsEfDiccionarioClienteRepository>();
         services.AddScoped<IClientesPort, clsEfClientesRepository>();
         services.AddScoped<IClientesDwPort, clsClientesDwAdapter>();
         services.AddScoped<IProspectosDwPort, clsProspectosDwAdapter>();

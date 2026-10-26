@@ -51,6 +51,7 @@ Antes de #307 este rol operaba el flujo de solicitudes y cotizaciones; ahora es 
 - Consultar la Biblioteca (SICE-TAC, histórico y plaza de SAP, propuesta)
 - Tarifas Plaza completas (listar, crear, editar, eliminar, importar y exportar Excel) y rangos de peso (`/api/pesos`)
 - Reglas Solo-SICETAC (ver, crear, eliminar, importar y exportar)
+- Diccionario de términos por cliente: crear, editar y borrar (`/api/diccionario-cliente`)
 - Ajustar vigencia de tarifas de plaza (individual y masivo)
 - Cubicación rápida (`POST` y `GET /api/cubicacion`) — conserva este permiso en el backend; el front no le muestra el Cubicador
 - Consultar servicios conexos
@@ -69,6 +70,7 @@ Antes de #307 este rol operaba el flujo de solicitudes y cotizaciones; ahora es 
 - Recibe la alerta de "línea que no pudo costearse" (#307) y la de tarifa de plaza vencida
 - **Rechazar una línea con motivo** y deshacerlo (`POST`/`DELETE /api/cotizaciones/{id}/lineas/{lineaSolicitudId}/rechazo`) — S6-HU-24.3/#320
 - **Cambiar el vehículo de una línea** (`PUT /api/cotizaciones/{id}/lineas/{lineaSolicitudId}/vehiculo`) — S6-HU-27.3/#322
+- **Diccionario de términos por cliente**: crear, editar y borrar (`/api/diccionario-cliente`; leerlo lo puede cualquier rol)
 - **Agregar alias** al diccionario (`POST /api/catalogos/alias`) y trabajar la **bandeja de normalización** de vehículos en cuarentena (`/api/catalogos/vehiculos-cuarentena`: listar, mapear, descartar) — S6-HU-27.2/#321 y S6-HU-27.3/#322. Leer el diccionario y "resolver" un texto lo puede cualquier rol
 
 ### ServiciosLogisticos
