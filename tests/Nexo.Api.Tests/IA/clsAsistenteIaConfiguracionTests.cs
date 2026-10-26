@@ -108,8 +108,8 @@ public class clsAsistenteIaConfiguracionTests(clsApiFixture fx)
     {
         var o = new clsOpcionesAnthropic();
 
-        Assert.Equal("claude-sonnet-4-6", o.ModeloEfectivo);
-        Assert.Equal("medium", o.Effort);
+        Assert.Equal("claude-sonnet-5-5", o.ModeloEfectivo);
+        Assert.Equal("high", o.Effort);
         Assert.False(o.Configurada);
         Assert.All(Enum.GetValues<clsFuncionIa>(), f => Assert.False(o.FuncionEncendida(f)));
     }
@@ -130,6 +130,6 @@ public class clsAsistenteIaConfiguracionTests(clsApiFixture fx)
 
         Assert.Equal(5, o.ReintentosEfectivos);
         Assert.Equal(256, o.MaxTokensEfectivo);
-        Assert.Equal("claude-sonnet-4-6", new clsOpcionesAnthropic { Model = "  " }.ModeloEfectivo);
+        Assert.Equal("claude-sonnet-5-5", new clsOpcionesAnthropic { Model = "  " }.ModeloEfectivo);
     }
 }

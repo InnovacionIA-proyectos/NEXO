@@ -23,12 +23,14 @@ public class clsAnthropicAdapterTests
         private int _llamadas;
         public List<string> Cuerpos { get; } = [];
         public List<string?> Autorizaciones { get; } = [];
+        public List<string?> Workspaces { get; } = [];
         public int Llamadas => _llamadas;
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
         {
             Cuerpos.Add(request.Content is null ? string.Empty : await request.Content.ReadAsStringAsync(ct));
             Autorizaciones.Add(request.Headers.Authorization?.ToString());
+            Workspaces.Add(request.Headers.TryGetValues("anthropic-workspace-id", out var w) ? w.FirstOrDefault() : null);
             return responder(Interlocked.Increment(ref _llamadas));
         }
     }
@@ -36,7 +38,7 @@ public class clsAnthropicAdapterTests
     private static HttpResponseMessage Json(HttpStatusCode estado, string json) =>
         new(estado) { Content = new StringContent(json, Encoding.UTF8, "application/json") };
 
-    private static HttpResponseMessage Mensaje(string texto, string motivo = "end_turn", int entrada = 12, int salida = 5, string modelo = "claude-sonnet-4-6") =>
+    private static HttpResponseMessage Mensaje(string texto, string motivo = "end_turn", int entrada = 12, int salida = 5, string modelo = "claude-sonnet-5-5") =>
         Json(HttpStatusCode.OK, JsonSerializer.Serialize(new
         {
             id = "msg_prueba", type = "message", role = "assistant", model = modelo,
@@ -80,8 +82,8 @@ public class clsAnthropicAdapterTests
 
         using var cuerpo = JsonDocument.Parse(Assert.Single(proveedor.Cuerpos));
         var raiz = cuerpo.RootElement;
-        Assert.Equal("claude-sonnet-4-6", raiz.GetProperty("model").GetString());
-        Assert.Equal("medium", raiz.GetProperty("output_config").GetProperty("effort").GetString());
+        Assert.Equal("claude-sonnet-5-5", raiz.GetProperty("model").GetString());
+        Assert.Equal("high", raiz.GetProperty("output_config").GetProperty("effort").GetString());
         Assert.Equal("adaptive", raiz.GetProperty("thinking").GetProperty("type").GetString());
         Assert.Equal(4096, raiz.GetProperty("max_tokens").GetInt32());
         Assert.Contains("Eres un asistente de prueba.", raiz.GetProperty("system").ToString());
@@ -92,9 +94,21 @@ public class clsAnthropicAdapterTests
         Assert.Null(r.JsonEstructurado);
         Assert.Equal(12, r.TokensEntrada);
         Assert.Equal(5, r.TokensSalida);
-        Assert.Equal("claude-sonnet-4-6", r.Modelo);
+        Assert.Equal("claude-sonnet-5-5", r.Modelo);
         // El SDK envía la llave como Authorization: Bearer (la API la acepta igual que en X-Api-Key).
         Assert.Equal($"Bearer {Llave}", Assert.Single(proveedor.Autorizaciones));
+    }
+
+    [Fact]
+    public async Task Con_workspace_configurada_la_envia_en_la_cabecera_y_sin_ella_no_envia_nada()
+    {
+        var con = new clsProveedorFalso(_ => Mensaje("ok"));
+        await Adaptador(con, o => o.WorkspaceId = "  wrkspc_prueba123 ").CompletarAsync(Peticion());
+        Assert.Equal("wrkspc_prueba123", Assert.Single(con.Workspaces));
+
+        var sin = new clsProveedorFalso(_ => Mensaje("ok"));
+        await Adaptador(sin).CompletarAsync(Peticion());
+        Assert.Null(Assert.Single(sin.Workspaces));
     }
 
     [Fact]
@@ -112,26 +126,26 @@ public class clsAnthropicAdapterTests
     [Fact]
     public async Task El_modelo_y_el_esfuerzo_salen_de_la_configuracion()
     {
-        var proveedor = new clsProveedorFalso(_ => Mensaje("ok", modelo: "claude-sonnet-5-5"));
+        var proveedor = new clsProveedorFalso(_ => Mensaje("ok", modelo: "claude-sonnet-4-6"));
 
-        await Adaptador(proveedor, o => { o.Model = "claude-sonnet-5-5"; o.Effort = "HIGH"; o.MaxTokensSalida = 2000; })
+        await Adaptador(proveedor, o => { o.Model = "claude-sonnet-4-6"; o.Effort = "MEDIUM"; o.MaxTokensSalida = 2000; })
             .CompletarAsync(Peticion());
 
         using var cuerpo = JsonDocument.Parse(Assert.Single(proveedor.Cuerpos));
-        Assert.Equal("claude-sonnet-5-5", cuerpo.RootElement.GetProperty("model").GetString());
-        Assert.Equal("high", cuerpo.RootElement.GetProperty("output_config").GetProperty("effort").GetString());
+        Assert.Equal("claude-sonnet-4-6", cuerpo.RootElement.GetProperty("model").GetString());
+        Assert.Equal("medium", cuerpo.RootElement.GetProperty("output_config").GetProperty("effort").GetString());
         Assert.Equal(2000, cuerpo.RootElement.GetProperty("max_tokens").GetInt32());
     }
 
     [Fact]
-    public async Task Un_esfuerzo_desconocido_cae_a_medium()
+    public async Task Un_esfuerzo_desconocido_cae_al_esfuerzo_por_defecto()
     {
         var proveedor = new clsProveedorFalso(_ => Mensaje("ok"));
 
         await Adaptador(proveedor, o => o.Effort = "muchisimo").CompletarAsync(Peticion());
 
         using var cuerpo = JsonDocument.Parse(Assert.Single(proveedor.Cuerpos));
-        Assert.Equal("medium", cuerpo.RootElement.GetProperty("output_config").GetProperty("effort").GetString());
+        Assert.Equal("high", cuerpo.RootElement.GetProperty("output_config").GetProperty("effort").GetString());
     }
 
     [Fact]
@@ -212,6 +226,7 @@ public class clsAnthropicAdapterTests
     [InlineData(HttpStatusCode.InternalServerError, "api_error", "IA_NO_DISPONIBLE")]
     [InlineData(HttpStatusCode.ServiceUnavailable, "overloaded_error", "IA_NO_DISPONIBLE")]
     [InlineData(HttpStatusCode.BadRequest, "invalid_request_error", "IA_PETICION_RECHAZADA")]
+    [InlineData(HttpStatusCode.NotFound, "not_found_error", "IA_PETICION_RECHAZADA")]
     public async Task Un_error_del_proveedor_se_traduce_a_un_503_con_codigo_estable(HttpStatusCode estado, string tipo, string codigo)
     {
         var proveedor = new clsProveedorFalso(_ => Error(estado, tipo));
