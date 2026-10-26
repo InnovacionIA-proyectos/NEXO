@@ -46,7 +46,7 @@ public sealed class clsAplicarMapeoExcelQueryHandler(IDiccionarioClienteReposito
             throw new clsValidationFailedException("DEMASIADAS_FILAS", $"El archivo trae más de {MaxFilas:N0} filas; divídelo y súbelo por partes.");
 
         var columnas = ValidarColumnas(query.Columnas);
-        var valores = await ValoresDelClienteAsync(query.ClienteId, ct);
+        var valores = await clsValoresDelCliente.CargarAsync(diccionario, query.ClienteId, ct);
 
         var lineas = new List<clsLineaImportadaDto>();
         var errores = new List<clsErrorDeFilaDto>();
@@ -121,19 +121,6 @@ public sealed class clsAplicarMapeoExcelQueryHandler(IDiccionarioClienteReposito
             if (!ocupados.Contains(obligatorio))
                 throw new clsValidationFailedException("CAMPO_REQUERIDO", $"Falta la columna de «{obligatorio}», que es obligatoria.");
 
-        return resultado;
-    }
-
-    /// <summary>Lo que el cliente escribe distinto a NEXO, por campo y término normalizado. Lo propio del cliente manda sobre lo general.</summary>
-    private async Task<Dictionary<(string Campo, string Termino), string>> ValoresDelClienteAsync(Guid? clienteId, CancellationToken ct)
-    {
-        var terminos = await diccionario.ListarAsync(clienteId, incluirGenerales: true, tipo: clsTerminoCliente.TipoValor, buscar: null, soloActivos: true, ct);
-        var validos = terminos.Where(t => t.Contexto is not null).ToList();
-
-        var resultado = new Dictionary<(string, string), string>();
-        // Los generales primero, para que los del cliente los reemplacen. Sin cliente, "todos" son los de todos los clientes: solo valen los generales.
-        foreach (var t in validos.Where(t => t.ClienteId is null).Concat(validos.Where(t => clienteId is not null && t.ClienteId == clienteId)))
-            resultado[(t.Contexto!, t.TerminoNormalizado)] = t.Concepto;
         return resultado;
     }
 

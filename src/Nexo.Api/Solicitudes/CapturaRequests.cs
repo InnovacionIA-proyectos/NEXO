@@ -212,6 +212,27 @@ public class clsSugerirMapeoRequest
     public List<List<string>?>? Filas { get; set; }
 }
 
+/// <summary>Un texto libre de una columna del Excel.</summary>
+public class clsValorANormalizarRequest
+{
+    /// <summary><c>tipoVehiculo</c>, <c>carroceria</c> o <c>ciudad</c> (origen, destino y demás ciudades).</summary>
+    [Required, MaxLength(20)]
+    public string Campo { get; set; } = null!;
+
+    [MaxLength(150)]
+    public string? Valor { get; set; }
+}
+
+/// <summary>Los textos libres distintos de un Excel (vehículo, carrocería, ciudad) para llevarlos a los valores oficiales de NEXO.</summary>
+public class clsNormalizarValoresRequest
+{
+    /// <summary>El cliente dueño del archivo; su diccionario manda. Sin él solo se usa el diccionario general.</summary>
+    public Guid? ClienteId { get; set; }
+
+    [Required, MinLength(1), MaxLength(1000)]
+    public List<clsValorANormalizarRequest> Valores { get; set; } = null!;
+}
+
 /// <summary>Una columna del archivo y lo que se hace con ella, tal como la confirmó el usuario.</summary>
 public class clsColumnaAplicarRequest
 {
