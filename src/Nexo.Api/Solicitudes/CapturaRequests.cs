@@ -195,3 +195,19 @@ public class clsCapturaPosicionRequest
     [MaxLength(40)]
     public string? CodigoTipoMercancia { get; set; }
 }
+
+/// <summary>
+/// Pide una propuesta de mapeo de columnas para UNA hoja de un Excel ya analizado: los encabezados y las filas que devolvió
+/// <c>analizar-excel</c>. Solo se usan las primeras 20 filas.
+/// </summary>
+public class clsSugerirMapeoRequest
+{
+    /// <summary>El cliente dueño del archivo; su diccionario es la mejor pista. Sin él solo se usa el diccionario general.</summary>
+    public Guid? ClienteId { get; set; }
+
+    [Required, MinLength(1), MaxLength(100)]
+    public List<string> Encabezados { get; set; } = null!;
+
+    [MaxLength(1000)]
+    public List<List<string>?>? Filas { get; set; }
+}

@@ -39,7 +39,7 @@ Biblioteca que no son de Comercial. Capturar y analizar un Excel siguen siendo s
 **#307 — AdminBiblioteca queda fuera de Bandeja, Mesa y cotizaciones, también de sus lecturas.** `GET /api/solicitudes`, `GET /api/solicitudes/{id}`, `GET .../propuesta-tarifa`, el canal `/hubs/bandeja` y todo `/api/cotizaciones` exigen uno de `Comercial`, `AdminTarifas`, `ServiciosLogisticos`, `LiderProceso` o `Admin`: un `[Authorize(Roles)]` de clase se SUMA (AND) al de cada método.
 
 ### Comercial
-- Analizar y capturar solicitudes desde Excel, buscar clientes y estimar aprovisionamiento (`/api/captura-solicitudes*`)
+- Analizar y capturar solicitudes desde Excel, pedir la sugerencia de mapeo de columnas con IA, buscar clientes y estimar aprovisionamiento (`/api/captura-solicitudes*`)
 - Resolver catálogos de líneas (`POST /api/solicitudes/resolver-catalogos`)
 - Crear cotización, aplicar propuestas de tarifa, agregar conexos y marcar resultado (ganada/perdida)
 - Rechazar una solicitud
