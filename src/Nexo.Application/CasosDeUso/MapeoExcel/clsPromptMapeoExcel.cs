@@ -15,7 +15,7 @@ namespace Nexo.Application.CasosDeUso.MapeoExcel;
 public static class clsPromptMapeoExcel
 {
     /// <summary>Se sube cada vez que cambia el texto o el esquema, para poder comparar resultados entre versiones.</summary>
-    public const string Version = "1";
+    public const string Version = "2";
 
     // Sin escapar tildes ni los símbolos < y > de los marcadores (<NIT>…): el mensaje no se incrusta en HTML, y escaparlos gasta tokens y
     // le llega al modelo como \u00E9 o \u003C en vez del texto.
@@ -49,6 +49,7 @@ public static class clsPromptMapeoExcel
         ["altoCm"] = "alto de una pieza en centímetros",
         ["pesoKg"] = "peso de UNA pieza en kilos",
         ["codigoTipoMercancia"] = "tipo de mercancía de una pieza",
+        ["deadline"] = "fecha límite de la solicitud (cuándo hay que entregar la cotización)",
         ["ignorar"] = "la columna no corresponde a ningún campo de NEXO o no se sabe cuál es",
     };
 

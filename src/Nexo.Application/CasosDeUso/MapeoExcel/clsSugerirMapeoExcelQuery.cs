@@ -168,8 +168,8 @@ public sealed class clsSugerirMapeoExcelQueryHandler(
 
                 var campo = clsTerminoCliente.Canonico(clsTerminoCliente.CamposDestino, Texto(c, "campo")) ?? Ignorar;
                 var transformacion = clsTerminoCliente.Canonico(clsTransformacionesMapeo.Todas, Texto(c, "transformacion")) ?? clsTransformacionesMapeo.Ninguna;
-                // Una columna que no se usa no se convierte: una transformación sin campo no tiene sentido.
-                if (campo == Ignorar) transformacion = clsTransformacionesMapeo.Ninguna;
+                // Una conversión que no corresponde al campo (o una columna que no se usa) no tiene sentido: se descarta.
+                if (!clsTransformacionesMapeo.Aplica(campo, transformacion)) transformacion = clsTransformacionesMapeo.Ninguna;
                 var confianza = c.TryGetProperty("confianza", out var cEl) && cEl.TryGetDouble(out var cd) ? Math.Round(Math.Clamp(cd, 0, 1), 2) : 0;
                 var nota = clsTexto.Limpiar(Texto(c, "nota"));
                 columnas[indice] = new(indice, encabezados[indice], campo, transformacion, confianza, "ia",
@@ -206,5 +206,6 @@ public sealed class clsSugerirMapeoExcelQueryHandler(
 public static class clsDependencyInjection
 {
     public static IServiceCollection AddMapeoExcelUseCases(this IServiceCollection services) => services
-        .AddScoped<IQueryHandler<clsSugerirMapeoExcelQuery, clsSugerenciaMapeoDto>, clsSugerirMapeoExcelQueryHandler>();
+        .AddScoped<IQueryHandler<clsSugerirMapeoExcelQuery, clsSugerenciaMapeoDto>, clsSugerirMapeoExcelQueryHandler>()
+        .AddScoped<IQueryHandler<clsAplicarMapeoExcelQuery, clsResultadoAplicarMapeoDto>, clsAplicarMapeoExcelQueryHandler>();
 }

@@ -779,7 +779,7 @@ Biblioteca) y el campo se quedaba sin sugerencias. Ahora:
 
 | Endpoint | Roles |
 |---|---|
-| `POST analizar-excel`, `POST sugerir-mapeo`, `POST /` (capturar) | `Comercial`, `Admin` |
+| `POST analizar-excel`, `POST sugerir-mapeo`, `POST aplicar-mapeo`, `POST /` (capturar) | `Comercial`, `Admin` |
 | `GET aprovisionamiento`, `GET clientes` | `Comercial`, `Admin` (revisado caso por caso: se mantienen) |
 | `GET departamentos`, `GET ciudades`, `GET municipios` | **cualquier rol válido de Nexo** (hay que estar autenticado; sin sesión → `401`) |
 
@@ -834,11 +834,68 @@ interface ColumnaMapeadaDto {
 - `campo`: los campos de la captura de una línea (`origen`, `destino`, `tipoVehiculo`, `carroceria`, `tipologia`, `lineaNegocio`, `claseViaje`,
   `claseContenedor`, `exclusivo`, `consolidado`, `retornaContenedor`, `ciudadDevolucionContenedor`, `levanteContenedorDiferente`,
   `ciudadLevanteContenedor`, `horasCargue`, `horasDescargue`, `peso`, `valorMercancia`, `referencia`, `descripcion`, `cantidad`, `largoCm`,
-  `anchoCm`, `altoCm`, `pesoKg`, `codigoTipoMercancia`) o `ignorar`. La lista vigente también la da `GET /api/diccionario-cliente/opciones`.
+  `anchoCm`, `altoCm`, `pesoKg`, `codigoTipoMercancia`, `deadline` — la fecha límite de la solicitud) o `ignorar`. La lista vigente también la da `GET /api/diccionario-cliente/opciones`.
 - `transformacion` (lista cerrada, el código la aplica): `ninguna` · `peso_toneladas_a_kg` · `dividir_origen_destino` (una celda «ORIGEN - DESTINO») ·
-  `numero_coma_decimal` · `fecha`. Una columna `ignorar` siempre lleva `ninguna`.
+  `numero_coma_decimal` · `fecha`. Una conversión que no corresponde al campo se descarta (`ninguna`): `peso_toneladas_a_kg` solo con `peso`/`pesoKg`,
+  `dividir_origen_destino` con `origen`/`destino`, `numero_coma_decimal` con un campo numérico, `fecha` con `deadline`; una columna `ignorar` siempre lleva `ninguna`.
 - **→** `200 SugerenciaMapeoDto`
 - **Errores**: `400 VALIDATION_ERROR` (sin encabezados, o más de 100) · `400 ENCABEZADOS_REQUERIDOS` · `400 DEMASIADAS_COLUMNAS` · `429 IA_TOPE_DIARIO`
+
+#### `POST /api/captura-solicitudes/aplicar-mapeo`
+Aplica el mapeo que el usuario **confirmó** a **todas** las filas del Excel y devuelve las líneas listas para `POST /api/captura-solicitudes`, más los
+errores por fila. No usa la IA, no lee el archivo y **no persiste nada**. Recibe las columnas con su campo y conversión (lo que dejó el usuario tras
+`sugerir-mapeo`) y las filas de `analizar-excel` (**sin** el encabezado).
+
+Qué hace con cada celda (todo determinista; lo que no se entiende se reporta, nunca se adivina):
+- `peso_toneladas_a_kg`: una sola coma o punto es el decimal (`4,5` y `4.5` son 4,5 t); con los dos, el último es el decimal (`1.234,5`). El resultado se multiplica por 1000.
+- `dividir_origen_destino`: parte «ORIGEN - DESTINO» por un separador con espacios (` - `, ` – `, ` / `, ` > `, ` → `, ` | `) o por un único guion sin espacios. Con más de un separador o una parte vacía, error.
+- `numero_coma_decimal`: `1.234,56` → 1234,56. Sin esta conversión un número se lee con punto decimal (`1234.56` o `1,234.56`); un `$` o `COP` delante se ignora.
+- `fecha` (campo `deadline`): día primero (`31/10/2026`, `31/10/2026 14:30`) o ISO (`2026-10-31`). Una fecha sin hora vale hasta las 23:59:59 de ese día en Colombia (UTC-5).
+- `exclusivo`, `consolidado`, `retornaContenedor`, `levanteContenedorDiferente`: `sí/si/s/x/1/true/verdadero/yes` o `no/n/0/false/falso`.
+- Los valores categóricos (`tipoVehiculo`, `carroceria`, `tipologia`, `lineaNegocio`, `claseViaje`, `claseContenedor`, `codigoTipoMercancia`) se traducen con los términos de tipo `valor` del diccionario (§3.19.1): lo del cliente manda sobre lo general; sin `clienteId` solo valen los generales. Lo que no está en el diccionario pasa tal cual.
+- Una fila con **datos de carga** (`largoCm`, `anchoCm`, `altoCm`, `pesoKg`, `cantidad`, `descripcion`, `codigoTipoMercancia`) trae una posición: `cantidad` vale 1 si no se indica y largo, ancho, alto y peso por unidad son obligatorios.
+- Una fila sin dato alguno en las columnas usadas se salta sin error (`filasVacias`).
+
+Cada fila convertida pasa por los **mismos límites** del cuerpo de la captura (longitudes y rangos) y por sus **mismas reglas**: origen y destino, tope de 10.000 unidades,
+peso requerido y coherente con la carga. Lo que sale en `lineas` la captura lo acepta. Una fila con errores **no** sale como línea: se reportan todos sus errores.
+
+| Body | | Tipo | Restricción |
+|---|---|---|---|
+| `clienteId` | *opcional* | UUID | El cliente dueño del archivo; su diccionario traduce los valores |
+| `columnas` | **requerido** | `{ indice, campo, transformacion? }[]` | 1 a 100. `campo` es uno de `sugerir-mapeo` o `ignorar`; `transformacion` una de su lista (vacía = `ninguna`). Debe haber una columna de `origen` y una de `destino` (o una `dividir_origen_destino`); dos columnas no pueden apuntar al mismo campo |
+| `filas` | **requerido** | string[][] | Hasta 5000 filas, sin el encabezado |
+| `primeraFila` | *opcional* | int | El número que tiene en el archivo la primera fila enviada (2 por defecto: un solo encabezado), para que los errores digan la fila de Excel |
+
+```ts
+interface ResultadoAplicarMapeoDto {
+  totalFilas: number
+  filasVacias: number
+  filasConErrores: number
+  lineas: LineaImportadaDto[]       // las filas convertidas y válidas, en el orden del archivo
+  errores: ErrorDeFilaDto[]         // máx. 100; totalErrores trae la cuenta completa
+  totalErrores: number
+}
+interface LineaImportadaDto {       // la forma de una línea de POST /api/captura-solicitudes, más fila, referencia y deadline
+  fila: number
+  origen: string; destino: string
+  tipoVehiculo, carroceria, tipologia, lineaNegocio, claseViaje, claseContenedor: string | null
+  exclusivo, consolidado, retornaContenedor, levanteContenedorDiferente: boolean | null
+  ciudadDevolucionContenedor, ciudadLevanteContenedor: string | null
+  horasCargue, horasDescargue, peso, valorMercancia: number | null
+  posiciones: PosicionCargaDto[] | null
+  referencia: string | null         // datos de la solicitud, no de la línea: el front decide cuál usar
+  deadline: string | null           // ISO 8601 con zona
+}
+interface ErrorDeFilaDto {
+  fila: number                      // la del archivo
+  campo: string | null              // el campo de NEXO, si el error es de uno solo
+  codigo: string                    // NUMERO_INVALIDO | CANTIDAD_INVALIDA | FUERA_DE_RANGO | TEXTO_DEMASIADO_LARGO | SI_NO_INVALIDO | FECHA_INVALIDA |
+                                    // ORIGEN_DESTINO_NO_SEPARABLE | POSICION_INCOMPLETA | LINEA_INCOMPLETA | PESO_REQUERIDO | PESO_INCONSISTENTE | CUBICACION_DEMASIADO_GRANDE
+  mensaje: string
+}
+```
+- **→** `200 ResultadoAplicarMapeoDto` (también cuando hay filas con errores: están en `errores`)
+- **Errores** (el mapeo mismo es inválido): `400 VALIDATION_ERROR` · `400 MAPEO_REQUERIDO` · `400 DEMASIADAS_COLUMNAS` · `400 DEMASIADAS_FILAS` · `400 COLUMNA_INVALIDA` · `400 CAMPO_INVALIDO` · `400 TRANSFORMACION_INVALIDA` · `400 TRANSFORMACION_NO_APLICA` · `400 CAMPO_DUPLICADO` · `400 CAMPO_REQUERIDO`
 
 #### `POST /api/captura-solicitudes` — crear solicitud completa
 Resuelve o crea rutas y vehículos a partir del texto libre de las líneas.
@@ -2172,7 +2229,7 @@ abiertos a los 6 roles.
 
 | Operación | Com | AdmBib | AdmTar | ServLog | Líder | Admin |
 |---|:-:|:-:|:-:|:-:|:-:|:-:|
-| `POST /api/captura-solicitudes/analizar-excel` · `POST .../sugerir-mapeo` · `POST /api/captura-solicitudes` · `GET aprovisionamiento` · `GET clientes` | ✅ | | | | | ✅ |
+| `POST /api/captura-solicitudes/analizar-excel` · `POST .../sugerir-mapeo` · `POST .../aplicar-mapeo` · `POST /api/captura-solicitudes` · `GET aprovisionamiento` · `GET clientes` | ✅ | | | | | ✅ |
 | `GET /api/captura-solicitudes/ciudades` · `departamentos` · `municipios` (S5-HU-22.1: cualquier rol válido) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | **Bandeja y Mesa**: `GET /api/solicitudes` · `GET /api/solicitudes/{id}` · `GET .../propuesta-tarifa` · `/hubs/bandeja` (#307) | ✅ | | ✅ | ✅ | ✅ | ✅ |
 | `POST /api/solicitudes` (#307, D5: solo Admin) | | | | | | ✅ |

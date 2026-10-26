@@ -218,6 +218,20 @@ public class clsSugerirMapeoExcelTests
     }
 
     [Fact]
+    public async Task Una_conversion_que_no_corresponde_al_campo_se_descarta_y_la_fecha_limite_es_un_campo()
+    {
+        IaResponde(Json(
+            Col(0, "origen", "peso_toneladas_a_kg"), Col(1, "referencia", "numero_coma_decimal"), Col(2, "peso", "dividir_origen_destino"),
+            Col(3, "peso", "peso_toneladas_a_kg"), Col(4, "deadline", "fecha"), Col(5, "origen", "dividir_origen_destino")));
+
+        var r = await Manejador().Handle(Consulta(["A", "B", "C", "D", "E", "F"]));
+
+        Assert.Equal(
+            [("origen", "ninguna"), ("referencia", "ninguna"), ("peso", "ninguna"), ("peso", "peso_toneladas_a_kg"), ("deadline", "fecha"), ("origen", "dividir_origen_destino")],
+            r.Columnas.Select(c => (c.Campo, c.Transformacion)));
+    }
+
+    [Fact]
     public async Task Una_respuesta_que_no_es_JSON_deja_el_flujo_manual_con_su_motivo()
     {
         ConDiccionario(Termino("A", "origen", Cliente));
