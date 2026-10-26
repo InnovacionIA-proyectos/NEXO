@@ -3,6 +3,7 @@ using Nexo.Application.CasosDeUso.Bandeja.Interfaces;
 using Nexo.Application.CasosDeUso.Trabajos.Interfaces;
 using Nexo.Application.CasosDeUso.Costeo;
 using Nexo.Application.CasosDeUso.IA;
+using Nexo.Application.CasosDeUso.DiccionarioCliente;
 using Nexo.Application.CasosDeUso.Trabajos;
 using Nexo.Infrastructure.Common.Mensajeria;
 using System.Text.Json.Serialization;
@@ -85,6 +86,7 @@ builder.Services.AddScoped<INotificadorDeBandeja, clsNotificadorDeBandejaSignalR
 builder.Services.AddScoped<INotificadorDePlanCargue, clsNotificadorPlanCargueSignalR>();
 builder.Services.AddPlanDeCargueUseCases();
 builder.Services.AddIaUseCases();
+builder.Services.AddDiccionarioClienteUseCases();
 builder.Services.AddCubicacionUseCases();
 builder.Services.AddCotizacionesUseCases();
 builder.Services.AddNotificacionesUseCases();
