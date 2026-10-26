@@ -288,7 +288,7 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
                 linea.LineaNegocio, linea.ClaseViaje, linea.ClaseContenedor,
                 vehiculo, linea.clsConfiguracionVehiculo?.Carroceria,
                 linea.Peso, linea.Exclusivo, linea.Consolidado,
-                linea.RetornaContenedor, linea.CiudadDevolucionContenedor, horasSolicitud), ct);
+                linea.RetornaContenedor, linea.CiudadDevolucionContenedor, horasSolicitud, origenDane, destinoDane), ct);
         }
 
         // clsTarifarioSapAdapter.SicetacOficialAsync (réplica 1:1 de la lógica SAP

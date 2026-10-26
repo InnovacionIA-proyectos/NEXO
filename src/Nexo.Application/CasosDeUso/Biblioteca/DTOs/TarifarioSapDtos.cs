@@ -20,7 +20,12 @@ public record clsConsultaTarifarioSap(
     /// <summary>Horas de cargue+descargue REALES de la solicitud (S4-HU-14.1/#221) — para
     /// recalcular el piso SICE-TAC oficial en vez de asumir las horas pactadas. Null cuando
     /// no hay contexto de solicitud.</summary>
-    decimal? HorasSolicitud = null);
+    decimal? HorasSolicitud = null,
+    /// <summary>Código DANE del origen y del destino (tbl_municipios.CodigoDane) cuando la ruta de la línea ya resolvió
+    /// contra el catálogo de municipios. Con los dos, el piso SICE-TAC oficial compara la ruta exacta por código; si falta
+    /// alguno, por el texto del nombre de la ruta.</summary>
+    string? OrigenDane = null,
+    string? DestinoDane = null);
 
 /// <summary>
 /// Resultado del motor: la tarifa de plaza seleccionada por las reglas (si está
