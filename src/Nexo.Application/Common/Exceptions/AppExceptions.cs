@@ -16,7 +16,7 @@ public abstract class clsAppException : Exception
     }
 }
 
-// Las cuatro NO son sealed a propósito. El middleware de Api traduce por TIPO, así que
+// Las cinco NO son sealed a propósito. El middleware de Api traduce por TIPO, así que
 // una excepción propia de un contexto tiene que heredar de una de estas cuatro para
 // seguir saliendo con su código HTTP correcto. Heredar de clsAppException directamente la
 // dejaría caer en el catch genérico y respondería 500 en vez de 400.
@@ -34,6 +34,9 @@ public class clsConflictException(string code, string message) : clsAppException
 
 /// <summary>Una dependencia externa no está configurada o no responde (Api la traduce a 503).</summary>
 public class clsServiceUnavailableException(string code, string message) : clsAppException(code, message);
+
+/// <summary>Se superó un tope de uso configurado; reintentar después sí funciona (Api la traduce a 429).</summary>
+public class clsLimiteExcedidoException(string code, string message, object? details = null) : clsAppException(code, message, details);
 
 /// <summary>El usuario autenticado no es dueño del recurso (Api la traduce a 403).</summary>
 public class clsForbiddenException(string code, string message) : clsAppException(code, message);

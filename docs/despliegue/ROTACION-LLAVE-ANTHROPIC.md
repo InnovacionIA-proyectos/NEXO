@@ -32,6 +32,8 @@ Los hace quien administra la cuenta; no se pueden hacer desde el repositorio.
 |---|---|---|
 | `Anthropic__ApiKey` | la llave de la *workspace* de `nexo-api` | Secreto. Vacía = la IA queda apagada y la aplicación arranca igual. |
 | `Anthropic__WorkspaceId` | `wrkspc_…` | Solo si la llave es de organización. |
+| `Anthropic__Habilitada` | `true` | Interruptor general: `false` apaga toda la IA aunque haya llave y funciones encendidas. |
+| `Anthropic__LimiteTokensPorUsuarioDia` | `500000` | Tope de tokens por persona y por día (hora de Colombia). `0` lo desactiva. Al superarlo, `429 IA_TOPE_DIARIO`. |
 | `Anthropic__Model` | `claude-sonnet-5-5` | Configuración, no código. `claude-sonnet-5` y `claude-sonnet-4-6` también funcionan con esta cuenta. |
 | `Anthropic__Effort` | `high` | `low`, `medium`, `high`, `xhigh` o `max`. |
 | `Anthropic__Funciones__ImportacionExcel` / `AsistenteCotizacion` / `ApoyoCubicador` | `false` | Cada función se enciende por separado, solo cuando esté aprobada en el ADR. |
@@ -80,7 +82,7 @@ Rutinaria (sugerido cada 90 días) y de inmediato si la llave pudo exponerse.
 ## 7. Si la llave se filtró o el gasto se dispara
 
 1. **Revocar la llave** en la consola (es lo que corta el uso de inmediato).
-2. **Apagar las funciones** en Dokploy (`Anthropic__Funciones__*=false`) y redesplegar, o dejar `Anthropic__ApiKey` vacía.
+2. **Apagar la IA** en Dokploy: `Anthropic__Habilitada=false` y redesplegar (corta todo sin tocar la llave ni las funciones); o `Anthropic__Funciones__*=false`, o dejar `Anthropic__ApiKey` vacía.
 3. Crear y configurar la llave nueva (§3 y §4).
-4. Revisar el uso del período en la consola y el registro de NEXO para ver qué función y qué usuario la consumieron.
+4. Revisar el uso del período en la consola y en NEXO (`GET /api/ia/uso/gasto`, solo Admin, y la tabla `tbl_ia_uso` por usuario y función) para ver qué función y qué usuario la consumieron.
 5. Si la llave estuvo en un archivo versionado, retirarla del historial y tratarla como comprometida aunque ya se haya revocado.

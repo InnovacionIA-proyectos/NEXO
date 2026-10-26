@@ -48,6 +48,11 @@ public class clsErrorHandlingMiddleware
             _logger.LogWarning(ex, "{Code} en {Method} {Path}", ex.Code, context.Request.Method, context.Request.Path);
             await WriteAsync(context, StatusCodes.Status403Forbidden, ex.Code, ex.Message, ex.Details);
         }
+        catch (clsLimiteExcedidoException ex)
+        {
+            _logger.LogWarning(ex, "{Code} en {Method} {Path}", ex.Code, context.Request.Method, context.Request.Path);
+            await WriteAsync(context, StatusCodes.Status429TooManyRequests, ex.Code, ex.Message, ex.Details);
+        }
         catch (clsServiceUnavailableException ex)
         {
             _logger.LogWarning(ex, "{Code} en {Method} {Path}", ex.Code, context.Request.Method, context.Request.Path);
