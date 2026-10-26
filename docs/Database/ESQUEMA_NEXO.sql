@@ -684,6 +684,29 @@ CREATE TABLE [db_NEXO].[tbl_audit_log] (
     , CONSTRAINT [PK_audit_log] PRIMARY KEY ([Id])
 );
 
+-- Una fila por cada llamada a un modelo de lenguaje (Claude), con éxito o con error: función, usuario, modelo, tokens,
+-- costo estimado al momento de la llamada, latencia y resultado. Sirve para el gasto por función y por mes, para el tope
+-- por usuario y por día, y para auditar. NO guarda el contenido enviado ni la respuesta (regla de seguridad de la IA).
+-- Script para aplicarla a una base existente: docs/Database/352_ia_uso.sql.
+CREATE TABLE [db_NEXO].[tbl_ia_uso] (
+    [Id] uniqueidentifier NOT NULL,
+    [Funcion] nvarchar(40) NOT NULL,
+    [UsuarioId] uniqueidentifier NULL,
+    [Modelo] nvarchar(80) NOT NULL,
+    [TokensEntrada] int NOT NULL CONSTRAINT [DF_ia_uso_TokensEntrada] DEFAULT (0),
+    [TokensSalida] int NOT NULL CONSTRAINT [DF_ia_uso_TokensSalida] DEFAULT (0),
+    [TokensCacheLectura] int NOT NULL CONSTRAINT [DF_ia_uso_TokensCacheLectura] DEFAULT (0),
+    [TokensCacheEscritura] int NOT NULL CONSTRAINT [DF_ia_uso_TokensCacheEscritura] DEFAULT (0),
+    [CostoEstimadoUsd] decimal(12, 6) NULL,
+    [LatenciaMs] int NOT NULL CONSTRAINT [DF_ia_uso_LatenciaMs] DEFAULT (0),
+    [Resultado] nvarchar(40) NOT NULL,
+    [CreatedAt] datetimeoffset NOT NULL CONSTRAINT [DF_ia_uso_CreatedAt] DEFAULT (sysdatetimeoffset())
+    , CONSTRAINT [PK_ia_uso] PRIMARY KEY ([Id])
+    , CONSTRAINT [CK_ia_uso_cifras_no_negativas] CHECK (
+        [TokensEntrada] >= 0 AND [TokensSalida] >= 0 AND [TokensCacheLectura] >= 0 AND [TokensCacheEscritura] >= 0
+        AND [LatenciaMs] >= 0 AND ([CostoEstimadoUsd] IS NULL OR [CostoEstimadoUsd] >= 0))
+);
+
 -- --- Mensajería (MassTransit — Transactional Outbox/Inbox) ---------------------------
 -- Viven en ESTA base a propósito: la garantía de atomicidad depende de que el
 -- mensaje y los datos del caso de uso se guarden en la misma transacción.
@@ -760,6 +783,7 @@ CREATE TABLE [db_NEXO].[__EFMigrationsHistory] (
 -- creación (hay referencias cruzadas, p. ej. tbl_cotizaciones <-> tbl_tarifas_historicas).
 
 ALTER TABLE [db_NEXO].[tbl_audit_log] ADD CONSTRAINT [FK_audit_log_usuarios_UsuarioId] FOREIGN KEY ([UsuarioId]) REFERENCES [db_NEXO].[tbl_usuarios] ([Id]);
+ALTER TABLE [db_NEXO].[tbl_ia_uso] ADD CONSTRAINT [FK_ia_uso_usuarios_UsuarioId] FOREIGN KEY ([UsuarioId]) REFERENCES [db_NEXO].[tbl_usuarios] ([Id]);
 ALTER TABLE [db_NEXO].[tbl_colocaciones_cargue] ADD CONSTRAINT [FK_colocaciones_cargue_items_plan_cargue_ItemPlanCargueId] FOREIGN KEY ([ItemPlanCargueId]) REFERENCES [db_NEXO].[tbl_items_plan_cargue] ([Id]);
 ALTER TABLE [db_NEXO].[tbl_colocaciones_cargue] ADD CONSTRAINT [FK_colocaciones_cargue_planes_cargue_PlanCargueId] FOREIGN KEY ([PlanCargueId]) REFERENCES [db_NEXO].[tbl_planes_cargue] ([Id]) ON DELETE CASCADE;
 ALTER TABLE [db_NEXO].[tbl_cotizacion_conexos] ADD CONSTRAINT [FK_cotizacion_conexos_cotizaciones_CotizacionId] FOREIGN KEY ([CotizacionId]) REFERENCES [db_NEXO].[tbl_cotizaciones] ([Id]) ON DELETE CASCADE;
@@ -813,6 +837,8 @@ CREATE INDEX [IX_cotizacion_lineas_LineaSolicitudId] ON [db_NEXO].[tbl_cotizacio
 CREATE INDEX [IX_cotizaciones_EntregadaPor] ON [db_NEXO].[tbl_cotizaciones] ([EntregadaPor]);
 CREATE INDEX [IX_cotizaciones_SolicitudId] ON [db_NEXO].[tbl_cotizaciones] ([SolicitudId]);
 CREATE UNIQUE INDEX [AK_InboxState_MessageId_ConsumerId] ON [db_NEXO].[InboxState] ([MessageId], [ConsumerId]);
+CREATE INDEX [IX_ia_uso_Funcion_CreatedAt] ON [db_NEXO].[tbl_ia_uso] ([Funcion], [CreatedAt]) INCLUDE ([Modelo], [TokensEntrada], [TokensSalida], [CostoEstimadoUsd], [Resultado]);
+CREATE INDEX [IX_ia_uso_UsuarioId_CreatedAt] ON [db_NEXO].[tbl_ia_uso] ([UsuarioId], [CreatedAt]) INCLUDE ([Funcion], [TokensEntrada], [TokensSalida], [CostoEstimadoUsd]);
 CREATE INDEX [IX_InboxState_Delivered] ON [db_NEXO].[InboxState] ([Delivered]);
 CREATE INDEX [IX_items_plan_cargue_PlanCargueId] ON [db_NEXO].[tbl_items_plan_cargue] ([PlanCargueId]);
 -- Filtrado a las pendientes: indexar las ya resueltas no aporta y la tabla crece.
