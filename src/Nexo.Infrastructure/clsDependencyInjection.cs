@@ -27,6 +27,7 @@ using Nexo.Infrastructure.Catalogos.Adaptadores;
 using Nexo.Infrastructure.Cubicacion.Adaptadores;
 using Nexo.Infrastructure.External;
 using Nexo.Infrastructure.Identidad.Adaptadores;
+using Nexo.Infrastructure.IA;
 using Nexo.Infrastructure.Metricas.Adaptadores;
 using Nexo.Infrastructure.Persistence;
 using Nexo.Infrastructure.RangosPeso.Repositorios;
@@ -47,6 +48,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using System.Net.Http.Headers;
 
 namespace Nexo.Infrastructure;
@@ -185,6 +188,14 @@ public static class clsDependencyInjection
             services.AddScoped<ICorreoPort, clsSmtpCorreoAdapter>();
         }
         services.AddSingleton<IExportadorCotizacionExcelPort, clsExportadorCotizacionExcelClosedXml>(); // sin estado
+
+        // MODELO DE LENGUAJE (Anthropic): la llave llega solo por entorno (Anthropic__ApiKey). Sin llave, o con la función
+        // apagada, la aplicación arranca igual y el puerto responde 503 con un código estable. Se registra con fábrica y no por
+        // tipo para que el contenedor no le inyecte un HttpClient genérico: el SDK crea el suyo con el tiempo de espera y los
+        // reintentos de la configuración. Un solo cliente para todo el proceso (es seguro entre hilos).
+        services.Configure<clsOpcionesAnthropic>(config.GetSection(clsOpcionesAnthropic.Seccion));
+        services.AddSingleton<IAsistenteIaPort>(sp => new clsAnthropicAdapter(
+            sp.GetRequiredService<IOptions<clsOpcionesAnthropic>>(), sp.GetRequiredService<ILogger<clsAnthropicAdapter>>()));
         services.AddScoped<IDestinatariosDeAlertaPort, clsDestinatariosDeAlertaAdapter>();
 
         // Reglas "solo SICE-TAC" (el mismo repositorio implementa el puerto de lectura
