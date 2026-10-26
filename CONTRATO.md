@@ -106,6 +106,7 @@ interface ApiError {
 | `404` | específico del recurso | No existe |
 | `409` | específico, o `CONFLICTO_CONCURRENCIA` | Conflicto de estado o edición simultánea (RowVersion) |
 | `429` | `DEMASIADAS_SOLICITUDES` | Rate limit (§1.8), con header `Retry-After: 30` |
+| `429` | `IA_TOPE_DIARIO` | La persona ya consumió su tope diario de IA (§3.22) |
 | `503` | específico | Fuente externa no configurada o no responde |
 | `500` | `INTERNAL_ERROR` | Error no controlado (en Production el mensaje es genérico) |
 
@@ -1982,6 +1983,48 @@ S5-HU-22.1/#288, `DEPARTAMENTO ORIGEN` y `DEPARTAMENTO DESTINO` (al final).
 - **→** `200`, archivo `.xlsx` (`Content-Type` de Excel)
 
 ---
+
+### 3.22 Uso y gasto de la IA — `/api/ia/uso`
+
+Cada llamada de NEXO a un modelo de lenguaje (Claude) queda registrada en `tbl_ia_uso` —función, usuario, modelo, tokens de
+entrada, salida y caché, costo estimado, latencia y resultado— **sin guardar el contenido enviado ni la respuesta**. Las funciones
+de IA que se construyan sobre esto no exponen la llave ni llaman al proveedor desde el front: llama NEXO.
+
+**Tope diario por persona.** Cada persona puede consumir un máximo de tokens por día (`Anthropic__LimiteTokensPorUsuarioDia`, por
+defecto 500 000; `0` lo desactiva). El día es el de Colombia (medianoche en UTC-5) y el tope es blando: se verifica antes de llamar
+con lo ya registrado. Al superarlo, la función responde `429 IA_TOPE_DIARIO` con
+`details: { limiteTokensPorDia, tokensConsumidosHoy, reiniciaEn }`.
+
+**Interruptores.** `Anthropic__Habilitada=false` apaga toda la IA (`503 IA_APAGADA`); sin llave responde `503 IA_NO_CONFIGURADA`; y cada
+función se enciende por separado (`503 IA_FUNCION_DESHABILITADA` si está apagada). Los demás `503` del proveedor son
+`IA_TIEMPO_AGOTADO`, `IA_LIMITE_PROVEEDOR`, `IA_NO_DISPONIBLE`, `IA_CREDENCIAL_INVALIDA`, `IA_PETICION_RECHAZADA`, `IA_RECHAZADA`,
+`IA_RESPUESTA_TRUNCADA` e `IA_RESPUESTA_INVALIDA`.
+
+#### `GET /api/ia/uso/gasto`
+Gasto por mes y por función, del mes más reciente al más antiguo.
+- **Roles**: Admin.
+
+| Query | | Tipo | Restricción |
+|---|---|---|---|
+| `desde` | opcional | fecha-hora | Por defecto, el primer día del mes de hace cinco meses (seis meses con el actual) |
+| `hasta` | opcional | fecha-hora | Por defecto, ahora. Debe ser posterior a `desde` |
+| `funcion` | opcional | string | `ImportacionExcel`, `AsistenteCotizacion` o `ApoyoCubicador` |
+
+- **→** `200 [ GastoIaDto ]`
+```ts
+interface GastoIaDto {
+  mes: string                       // AAAA-MM, mes calendario en hora de Colombia
+  funcion: string
+  llamadas: number
+  errores: number                   // llamadas cuyo resultado no fue "ok"
+  tokensEntrada: number; tokensSalida: number
+  tokensCacheLectura: number; tokensCacheEscritura: number
+  costoEstimadoUsd: Decimal         // precios de lista; suma solo las llamadas con precio conocido
+  llamadasSinCosto: number          // llamadas de un modelo sin precio conocido (no están en el costo)
+  latenciaPromedioMs: number
+}
+```
+- **Errores**: `400 RANGO_INVALIDO` · `400 FUNCION_IA_INVALIDA`
 
 ## 4. Hubs de SignalR — conexión
 

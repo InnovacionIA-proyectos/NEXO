@@ -38,13 +38,19 @@ public class clsAnthropicAdapterTests
     private static HttpResponseMessage Json(HttpStatusCode estado, string json) =>
         new(estado) { Content = new StringContent(json, Encoding.UTF8, "application/json") };
 
-    private static HttpResponseMessage Mensaje(string texto, string motivo = "end_turn", int entrada = 12, int salida = 5, string modelo = "claude-sonnet-5-5") =>
+    private static HttpResponseMessage Mensaje(
+        string texto, string motivo = "end_turn", int entrada = 12, int salida = 5, string modelo = "claude-sonnet-5-5",
+        int cacheLectura = 0, int cacheEscritura = 0) =>
         Json(HttpStatusCode.OK, JsonSerializer.Serialize(new
         {
             id = "msg_prueba", type = "message", role = "assistant", model = modelo,
             content = new[] { new { type = "text", text = texto } },
             stop_reason = motivo, stop_sequence = (string?)null,
-            usage = new { input_tokens = entrada, output_tokens = salida },
+            usage = new
+            {
+                input_tokens = entrada, output_tokens = salida,
+                cache_read_input_tokens = cacheLectura, cache_creation_input_tokens = cacheEscritura,
+            },
         }));
 
     private static HttpResponseMessage Error(HttpStatusCode estado, string tipo) =>
@@ -180,7 +186,7 @@ public class clsAnthropicAdapterTests
     {
         var proveedor = new clsProveedorFalso(_ => Mensaje("esto no es json"));
 
-        var ex = await Assert.ThrowsAsync<clsServiceUnavailableException>(() => Adaptador(proveedor).CompletarAsync(Peticion(EsquemaDePrueba)));
+        var ex = await Assert.ThrowsAnyAsync<clsServiceUnavailableException>(() => Adaptador(proveedor).CompletarAsync(Peticion(EsquemaDePrueba)));
 
         Assert.Equal("IA_RESPUESTA_INVALIDA", ex.Code);
     }
@@ -202,7 +208,7 @@ public class clsAnthropicAdapterTests
     {
         var proveedor = new clsProveedorFalso(_ => Mensaje("", motivo: "refusal"));
 
-        var ex = await Assert.ThrowsAsync<clsServiceUnavailableException>(() => Adaptador(proveedor).CompletarAsync(Peticion()));
+        var ex = await Assert.ThrowsAnyAsync<clsServiceUnavailableException>(() => Adaptador(proveedor).CompletarAsync(Peticion()));
 
         Assert.Equal("IA_RECHAZADA", ex.Code);
     }
@@ -212,7 +218,7 @@ public class clsAnthropicAdapterTests
     {
         var proveedor = new clsProveedorFalso(_ => Mensaje("{\"campo\":\"cort", motivo: "max_tokens"));
 
-        var ex = await Assert.ThrowsAsync<clsServiceUnavailableException>(() => Adaptador(proveedor).CompletarAsync(Peticion(EsquemaDePrueba)));
+        var ex = await Assert.ThrowsAnyAsync<clsServiceUnavailableException>(() => Adaptador(proveedor).CompletarAsync(Peticion(EsquemaDePrueba)));
 
         Assert.Equal("IA_RESPUESTA_TRUNCADA", ex.Code);
     }
@@ -268,7 +274,42 @@ public class clsAnthropicAdapterTests
         Assert.Equal(2, proveedor.Llamadas);
     }
 
+    [Fact]
+    public async Task Los_tokens_de_cache_de_la_respuesta_se_leen()
+    {
+        var proveedor = new clsProveedorFalso(_ => Mensaje("ok", entrada: 100, salida: 20, cacheLectura: 1500, cacheEscritura: 300));
+
+        var r = await Adaptador(proveedor).CompletarAsync(Peticion());
+
+        Assert.Equal((100, 20, 1500, 300), (r.TokensEntrada, r.TokensSalida, r.TokensCacheLectura, r.TokensCacheEscritura));
+    }
+
+    [Fact]
+    public async Task Una_respuesta_que_no_sirve_lleva_los_tokens_gastados_para_poder_registrarlos()
+    {
+        var proveedor = new clsProveedorFalso(_ => Mensaje("esto no es json", entrada: 321, salida: 45));
+
+        var ex = await Assert.ThrowsAsync<clsIaRespuestaNoUtilException>(() => Adaptador(proveedor).CompletarAsync(Peticion(EsquemaDePrueba)));
+
+        Assert.Equal("IA_RESPUESTA_INVALIDA", ex.Code);
+        Assert.Equal((321, 45), (ex.Uso.Entrada, ex.Uso.Salida));
+        Assert.Equal("claude-sonnet-5-5", ex.Uso.Modelo);
+    }
+
     // ------------------------------------------------------------ sin llave / función apagada
+
+    [Fact]
+    public async Task Con_el_interruptor_general_apagado_ninguna_funcion_esta_habilitada_y_responde_IA_APAGADA()
+    {
+        var proveedor = new clsProveedorFalso(_ => Mensaje("ok"));
+        var adaptador = Adaptador(proveedor, o => o.Habilitada = false);
+
+        Assert.All(Enum.GetValues<clsFuncionIa>(), f => Assert.False(adaptador.Habilitada(f)));
+        var ex = await Assert.ThrowsAsync<clsServiceUnavailableException>(() => adaptador.CompletarAsync(Peticion()));
+
+        Assert.Equal("IA_APAGADA", ex.Code);
+        Assert.Equal(0, proveedor.Llamadas);
+    }
 
     [Fact]
     public async Task Sin_llave_no_esta_habilitada_y_responde_IA_NO_CONFIGURADA_sin_llamar_al_proveedor()

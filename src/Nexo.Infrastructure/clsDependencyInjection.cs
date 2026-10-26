@@ -28,6 +28,8 @@ using Nexo.Infrastructure.Cubicacion.Adaptadores;
 using Nexo.Infrastructure.External;
 using Nexo.Infrastructure.Identidad.Adaptadores;
 using Nexo.Infrastructure.IA;
+using Nexo.Infrastructure.IA.Repositorios;
+using Nexo.Application.CasosDeUso.IA.Interfaces;
 using Nexo.Infrastructure.Metricas.Adaptadores;
 using Nexo.Infrastructure.Persistence;
 using Nexo.Infrastructure.RangosPeso.Repositorios;
@@ -194,8 +196,14 @@ public static class clsDependencyInjection
         // tipo para que el contenedor no le inyecte un HttpClient genérico: el SDK crea el suyo con el tiempo de espera y los
         // reintentos de la configuración. Un solo cliente para todo el proceso (es seguro entre hilos).
         services.Configure<clsOpcionesAnthropic>(config.GetSection(clsOpcionesAnthropic.Seccion));
-        services.AddSingleton<IAsistenteIaPort>(sp => new clsAnthropicAdapter(
+        services.AddSingleton(sp => new clsAnthropicAdapter(
             sp.GetRequiredService<IOptions<clsOpcionesAnthropic>>(), sp.GetRequiredService<ILogger<clsAnthropicAdapter>>()));
+        // Lo que ven las funciones es el adaptador envuelto: aplica el tope diario y registra cada llamada (necesita la base).
+        services.AddScoped<IUsoIaRepository, clsEfUsoIaRepository>();
+        services.AddScoped<IAsistenteIaPort>(sp => new clsAsistenteIaConRegistro(
+            sp.GetRequiredService<clsAnthropicAdapter>(), sp.GetRequiredService<IUsoIaRepository>(),
+            sp.GetRequiredService<IOptions<clsOpcionesAnthropic>>(), sp.GetRequiredService<TimeProvider>(),
+            sp.GetRequiredService<ILogger<clsAsistenteIaConRegistro>>()));
         services.AddScoped<IDestinatariosDeAlertaPort, clsDestinatariosDeAlertaAdapter>();
 
         // Reglas "solo SICE-TAC" (el mismo repositorio implementa el puerto de lectura

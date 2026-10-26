@@ -20,6 +20,14 @@ public sealed class clsOpcionesAnthropic
 
     public string? ApiKey { get; set; }
 
+    /// <summary>Interruptor general: con false todas las funciones de IA quedan apagadas aunque haya llave y funciones encendidas.</summary>
+    public bool Habilitada { get; set; } = true;
+
+    /// <summary>
+    /// Tope de tokens (entrada, salida y caché) que una persona puede consumir por día (hora de Colombia). 0 lo desactiva.
+    /// </summary>
+    public long LimiteTokensPorUsuarioDia { get; set; } = 500_000;
+
     /// <summary>
     /// Identificador de la workspace (<c>wrkspc_…</c>). Una llave atada a una workspace no lo necesita; una llave de toda la
     /// organización sí, o el proveedor rechaza cada petición. No es un secreto, pero sí es lo que acota el gasto: el límite
@@ -42,6 +50,8 @@ public sealed class clsOpcionesAnthropic
     public Dictionary<string, bool> Funciones { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
     public bool Configurada => !string.IsNullOrWhiteSpace(ApiKey);
+
+    public long LimiteTokensPorUsuarioDiaEfectivo => Math.Max(0, LimiteTokensPorUsuarioDia);
 
     public bool FuncionEncendida(clsFuncionIa funcion) =>
         Funciones.Any(f => string.Equals(f.Key, funcion.ToString(), StringComparison.OrdinalIgnoreCase) && f.Value);

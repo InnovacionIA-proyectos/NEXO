@@ -50,12 +50,14 @@ public sealed class clsAnthropicAdapter : IAsistenteIaPort
             };
     }
 
-    public bool Habilitada(clsFuncionIa funcion) => _opciones.Configurada && _opciones.FuncionEncendida(funcion);
+    public bool Habilitada(clsFuncionIa funcion) => _opciones.Configurada && _opciones.Habilitada && _opciones.FuncionEncendida(funcion);
 
     public async Task<clsRespuestaIa> CompletarAsync(clsPeticionIa peticion, CancellationToken ct = default)
     {
         if (!_opciones.Configurada || _cliente is null)
             throw new clsServiceUnavailableException("IA_NO_CONFIGURADA", "La función de IA no está configurada en este ambiente.");
+        if (!_opciones.Habilitada)
+            throw new clsServiceUnavailableException("IA_APAGADA", "La IA está apagada en este ambiente.");
         if (!_opciones.FuncionEncendida(peticion.Funcion))
             throw new clsServiceUnavailableException("IA_FUNCION_DESHABILITADA", "La función de IA está apagada en este ambiente.");
 
@@ -79,6 +81,8 @@ public sealed class clsAnthropicAdapter : IAsistenteIaPort
         var texto = string.Concat(respuesta.Content.Select(b => b.Value).OfType<TextBlock>().Select(t => t.Text));
         var tokensEntrada = respuesta.Usage.InputTokens;
         var tokensSalida = respuesta.Usage.OutputTokens;
+        var cacheLectura = respuesta.Usage.CacheReadInputTokens ?? 0;
+        var cacheEscritura = respuesta.Usage.CacheCreationInputTokens ?? 0;
 
         string? json = null;
         string? falla = null;
@@ -97,9 +101,11 @@ public sealed class clsAnthropicAdapter : IAsistenteIaPort
             peticion.Funcion, respuesta.Model, tokensEntrada, tokensSalida, reloj.ElapsedMilliseconds, falla ?? "ok");
 
         if (falla is not null)
-            throw new clsServiceUnavailableException(falla, MensajeDe(falla));
+            throw new clsIaRespuestaNoUtilException(
+                falla, MensajeDe(falla), new clsUsoDeTokens(respuesta.Model.Raw(), tokensEntrada, tokensSalida, cacheLectura, cacheEscritura));
 
-        return new clsRespuestaIa(texto, json, respuesta.Model.Raw(), tokensEntrada, tokensSalida, reloj.Elapsed);
+        return new clsRespuestaIa(
+            texto, json, respuesta.Model.Raw(), tokensEntrada, tokensSalida, reloj.Elapsed, cacheLectura, cacheEscritura);
     }
 
     private MessageCreateParams Armar(clsPeticionIa p)
