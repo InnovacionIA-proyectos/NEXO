@@ -24,6 +24,7 @@ Puntos clave:
 - `ConnectionStrings__Nexo` y las demás cadenas de conexión SQL Server son las únicas rutas a bases de datos: no hay nada hardcodeado en el código, todo llega por variables de entorno.
 - `Cubicador3D__InboundApiKey` (`nexo-api`) y `NEXO_CALLBACK_API_KEY` (`cubicador-api`/`cubicador-worker`) deben tener el **mismo valor** — es la llamada de Cubicador de vuelta hacia NEXO. Igual para `Cubicador3D__OutboundApiKey` (`nexo-api`) y `CUBICADOR_API_KEY` (`cubicador-api`).
 - `NEXO_BASE_URL` (`cubicador-api`/`cubicador-worker`) y `ConnectionStrings__RabbitMq` / `CUBICADOR_RABBITMQ_URL` / `DATABASE_URL` necesitan el **hostname interno que Dokploy le asigna a cada app** (ver punto 2) — no `localhost` ni el nombre de servicio de un `docker-compose.yml`.
+- **`Anthropic__*` (`nexo-api`) es opcional**: sin `Anthropic__ApiKey` la app arranca y las funciones de IA responden 503; cada función nace apagada (`Anthropic__Funciones__<Nombre>`). La llave se escribe solo en Dokploy, nunca en el repo; configuración, verificación de salida a internet y rotación en [`docs/despliegue/ROTACION-LLAVE-ANTHROPIC.md`](docs/despliegue/ROTACION-LLAVE-ANTHROPIC.md).
 - **Cubicador no tiene validación de arranque** (`cubicador/api/dependencias.py`, `cubicador/infrastructure/persistence/db.py` leen las variables con `os.environ.get(...)` y un valor por defecto silencioso): si `DATABASE_URL` o `CUBICADOR_RABBITMQ_URL` quedan sin definir, el contenedor **arranca igual** contra un SQLite local (se pierde en cada redeploy) o intenta `amqp://guest:guest@localhost:5672/` sin avisar. Que el contenedor no truene no significa que quedó bien configurado — verificar siempre `/health` y logs tras el primer despliegue.
 
 ## 2. Hostnames internos entre apps
@@ -54,6 +55,7 @@ Un desfase breve de arranque no es crítico: `cubicador-worker` reintenta la con
 
 - `nexo-api`: `GET /health` → 200.
 - `cubicador-api`: `GET /health` → 200. **No basta con que el contenedor siga arriba** — revisar logs para confirmar que sí conectó a Postgres/RabbitMQ reales y no a los defaults silenciosos de SQLite/`guest:guest` (ver punto 1).
+- Si se configuró `Anthropic__ApiKey`: verificar la salida a `api.anthropic.com` desde el contenedor de `nexo-api` (comando en `docs/despliegue/ROTACION-LLAVE-ANTHROPIC.md` §5).
 - `nexo-rabbit`: consola de administración en el puerto 15672 (usuario/clave = `RABBITMQ_DEFAULT_USER`/`RABBITMQ_DEFAULT_PASS` de `.env.dokploy`).
 - Logs de `cubicador-worker`: debe conectar a RabbitMQ sin quedarse reintentando indefinidamente.
 

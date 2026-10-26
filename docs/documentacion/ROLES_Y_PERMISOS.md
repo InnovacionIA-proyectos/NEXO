@@ -83,6 +83,7 @@ Antes de #307 este rol operaba el flujo de solicitudes y cotizaciones; ahora es 
 - Todo lo anterior, sin excepción
 - Único rol con acceso a Priorización (`GET`/`PUT /api/priorizacion/parametros`)
 - Único rol que puede eliminar vehículos del catálogo (`DELETE /api/vehiculos/{id}`)
+- Único rol que consulta el uso y el gasto de la IA (`GET /api/ia/uso/gasto`)
 - Único rol (con el `*`) que crea solicitudes (`POST /api/solicitudes`), carga líneas en bloque (`/lineas:bulk`) y recalcula el puntaje (`/recalcular-score`) — #307, decisión D5
 
 ## Referencia rápida por endpoint

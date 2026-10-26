@@ -6,6 +6,7 @@ using Nexo.Domain.Costeo.Entidades;
 using Nexo.Domain.Cotizaciones.Entidades;
 using Nexo.Domain.Cubicacion.Entidades;
 using Nexo.Domain.Enums;
+using Nexo.Domain.IA.Entidades;
 using Nexo.Domain.PlanDeCargue.Entidades;
 using Nexo.Domain.Priorizacion.Entidades;
 using Nexo.Domain.Solicitudes.Entidades;
@@ -46,6 +47,7 @@ public class clsNexoDbContext : DbContext
     public DbSet<clsTipoCarroceriaCatalogo> TiposCarroceriaCatalogo => Set<clsTipoCarroceriaCatalogo>();
     public DbSet<clsPlanCargue> PlanesCargue => Set<clsPlanCargue>();
     public DbSet<clsRechazoCubicacionLinea> RechazosCubicacionLinea => Set<clsRechazoCubicacionLinea>();
+    public DbSet<clsUsoIa> UsosIa => Set<clsUsoIa>();
     public DbSet<clsItemPlanCargue> ItemsPlanCargue => Set<clsItemPlanCargue>();
     public DbSet<clsColocacionCargue> ColocacionesCargue => Set<clsColocacionCargue>();
     public DbSet<clsMunicipio> Municipios => Set<clsMunicipio>();
@@ -367,6 +369,19 @@ public class clsNexoDbContext : DbContext
              .WithMany()
              .HasForeignKey(x => x.UsuarioId)
              .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // Uso de los modelos de lenguaje: una fila por llamada, sin contenido. El esquema vive en ESQUEMA_NEXO.sql (sin migración de EF).
+        b.Entity<clsUsoIa>(e =>
+        {
+            e.ToTable("tbl_ia_uso");
+            e.Property(x => x.Funcion).HasMaxLength(40).IsRequired();
+            e.Property(x => x.Modelo).HasMaxLength(80).IsRequired();
+            e.Property(x => x.Resultado).HasMaxLength(40).IsRequired();
+            e.Property(x => x.CostoEstimadoUsd).HasColumnType("decimal(12,6)");
+            e.HasIndex(x => new { x.UsuarioId, x.CreatedAt });
+            e.HasIndex(x => new { x.Funcion, x.CreatedAt });
+            e.HasOne<clsUsuario>().WithMany().HasForeignKey(x => x.UsuarioId).OnDelete(DeleteBehavior.Restrict);
         });
 
         // ------------------------------------------------------------- Cubicador 3D
