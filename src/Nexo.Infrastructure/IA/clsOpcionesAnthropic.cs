@@ -15,13 +15,20 @@ public sealed class clsOpcionesAnthropic
 {
     public const string Seccion = "Anthropic";
 
-    public const string ModeloPorDefecto = "claude-sonnet-4-6";
-    public const string EsfuerzoPorDefecto = "medium";
+    public const string ModeloPorDefecto = "claude-sonnet-5-5";
+    public const string EsfuerzoPorDefecto = "high";
 
     public string? ApiKey { get; set; }
+
+    /// <summary>
+    /// Identificador de la workspace (<c>wrkspc_…</c>). Una llave atada a una workspace no lo necesita; una llave de toda la
+    /// organización sí, o el proveedor rechaza cada petición. No es un secreto, pero sí es lo que acota el gasto: el límite
+    /// mensual se fija por workspace.
+    /// </summary>
+    public string? WorkspaceId { get; set; }
     public string Model { get; set; } = ModeloPorDefecto;
 
-    /// <summary>low, medium, high, xhigh o max. Cualquier otro valor cae a medium.</summary>
+    /// <summary>low, medium, high, xhigh o max. Cualquier otro valor cae a high, el esfuerzo por defecto.</summary>
     public string Effort { get; set; } = EsfuerzoPorDefecto;
 
     /// <summary>Con true el modelo decide cuánto razonar según el esfuerzo; con false no razona.</summary>
@@ -42,5 +49,6 @@ public sealed class clsOpcionesAnthropic
     public TimeSpan TimeoutEfectivo => TimeSpan.FromSeconds(Math.Clamp(TimeoutSegundos, 5, 300));
     public int ReintentosEfectivos => Math.Clamp(MaxReintentos, 0, 5);
     public int MaxTokensEfectivo => Math.Clamp(MaxTokensSalida, 256, 32_000);
+    public string? WorkspaceIdEfectivo => string.IsNullOrWhiteSpace(WorkspaceId) ? null : WorkspaceId.Trim();
     public string ModeloEfectivo => string.IsNullOrWhiteSpace(Model) ? ModeloPorDefecto : Model.Trim();
 }

@@ -69,8 +69,9 @@ public sealed class clsAnthropicAdapter : IAsistenteIaPort
         catch (Exception ex) when (!ct.IsCancellationRequested)
         {
             var (codigo, mensaje) = Traducir(ex);
-            _log.LogWarning("IA {Funcion} falló: {Codigo} ({Tipo}, {Estado}) tras {Ms} ms",
-                peticion.Funcion, codigo, ex.GetType().Name, (ex as AnthropicApiException)?.StatusCode, reloj.ElapsedMilliseconds);
+            _log.LogWarning("IA {Funcion} falló: {Codigo} ({Tipo}, {Estado}) tras {Ms} ms. Proveedor: {Detalle}",
+                peticion.Funcion, codigo, ex.GetType().Name, (ex as AnthropicApiException)?.StatusCode, reloj.ElapsedMilliseconds,
+                DetalleDelProveedor(ex));
             throw new clsServiceUnavailableException(codigo, mensaje);
         }
         reloj.Stop();
@@ -120,27 +121,42 @@ public sealed class clsAnthropicAdapter : IAsistenteIaPort
             {
                 Model = _opciones.ModeloEfectivo, MaxTokens = p.MaxTokensSalida ?? _opciones.MaxTokensEfectivo,
                 System = p.Instrucciones, Messages = mensajes, OutputConfig = salida, Thinking = new ThinkingConfigAdaptive(),
+                WorkspaceID = _opciones.WorkspaceIdEfectivo,
             }
             : new MessageCreateParams
             {
                 Model = _opciones.ModeloEfectivo, MaxTokens = p.MaxTokensSalida ?? _opciones.MaxTokensEfectivo,
                 System = p.Instrucciones, Messages = mensajes, OutputConfig = salida,
+                WorkspaceID = _opciones.WorkspaceIdEfectivo,
             };
     }
 
     private static Effort EsfuerzoDe(string? valor) => valor?.Trim().ToLowerInvariant() switch
     {
         "low" => Effort.Low,
-        "high" => Effort.High,
+        "medium" => Effort.Medium,
         "xhigh" => Effort.Xhigh,
         "max" => Effort.Max,
-        _ => Effort.Medium,
+        _ => Effort.High,
     };
 
     private static bool EsJsonValido(string texto)
     {
         try { using var _ = JsonDocument.Parse(texto); return true; }
         catch (JsonException) { return false; }
+    }
+
+    /// <summary>
+    /// Lo que respondió el proveedor ante un error (tipo, mensaje e id de la petición), para poder diagnosticar un rechazo sin
+    /// reproducirlo. Es el texto de diagnóstico del proveedor, no la petición: no incluye los mensajes enviados. Se recorta y,
+    /// por si acaso, se borra la llave.
+    /// </summary>
+    private string DetalleDelProveedor(Exception ex)
+    {
+        if (ex is not AnthropicApiException) return ex.GetType().Name;
+        var texto = ex.Message.ReplaceLineEndings(" ");
+        if (_opciones.Configurada) texto = texto.Replace(_opciones.ApiKey!.Trim(), "<llave>");
+        return texto.Length <= 500 ? texto : texto[..500];
     }
 
     /// <summary>Un tiempo agotado puede llegar envuelto (error de red del SDK con una cancelación por dentro).</summary>
@@ -161,6 +177,8 @@ public sealed class clsAnthropicAdapter : IAsistenteIaPort
             ("IA_NO_DISPONIBLE", "El proveedor de IA no está disponible en este momento."),
         AnthropicBadRequestException or AnthropicUnprocessableEntityException =>
             ("IA_PETICION_RECHAZADA", "El proveedor de IA rechazó la petición."),
+        AnthropicNotFoundException =>
+            ("IA_PETICION_RECHAZADA", "El proveedor de IA no encontró lo pedido; revisa el modelo configurado."),
         _ => ("IA_NO_DISPONIBLE", "El proveedor de IA no pudo atender la petición."),
     };
 
