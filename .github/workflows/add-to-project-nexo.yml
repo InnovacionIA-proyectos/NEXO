@@ -2,6 +2,22 @@ name: Agregar issues al tablero Seguimiento Nexo
 on:
   issues:
     types: [opened, labeled]
+
+# Una issue dispara este workflow varias veces: una al crearse y otra por cada
+# etiqueta que se le pone. Cuando se puebla una milestone nueva, eso son decenas
+# de ejecuciones simultaneas: la primera agrega la issue al tablero y las demas
+# fallan con "Content already exists in this project". La issue SI queda en el
+# tablero -el resultado nunca estuvo mal-, pero cada carrera perdida manda un
+# correo de fallo. Medido el 2026-10-26: 34 issues -> 100 ejecuciones en dos
+# minutos -> 12 fallos, con las 34 issues correctamente en el tablero.
+#
+# Agrupando por numero de issue, las ejecuciones de una misma issue se serializan
+# y la nueva cancela a la anterior: queda una sola que hace el trabajo, y las
+# demas se reportan como canceladas (sin correo de fallo) en vez de fallidas.
+concurrency:
+  group: add-to-project-${{ github.event.issue.number }}
+  cancel-in-progress: true
+
 jobs:
   add-to-project:
     runs-on: ubuntu-latest
