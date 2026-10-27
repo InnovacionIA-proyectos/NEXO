@@ -1,10 +1,12 @@
 using System.Text.Json;
+using Nexo.Application.CasosDeUso.Asistente.Conversacion;
 using Nexo.Application.CasosDeUso.Asistente.Herramientas;
 using Nexo.Application.Common;
 using Nexo.Application.Common.Abstractions;
 using Nexo.Application.Common.Exceptions;
 using Nexo.Domain.Enums;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Nexo.Application.CasosDeUso.Asistente;
 
@@ -73,6 +75,10 @@ public static class clsDependencyInjection
         services.AddScoped<clsHerramientasDelAsistente>();
         services.AddScoped<IQueryHandler<clsListarHerramientasAsistenteQuery, IReadOnlyList<clsDefinicionHerramientaDto>>, clsListarHerramientasAsistenteQueryHandler>();
         services.AddScoped<IQueryHandler<clsEjecutarHerramientaAsistenteQuery, clsResultadoHerramienta>, clsEjecutarHerramientaAsistenteQueryHandler>();
+        services.TryAddSingleton<clsLimitesAsistente>();
+        services.AddScoped<ICommandHandler<clsConversarAsistenteCommand, IAsyncEnumerable<clsEventoAsistente>>, clsConversarAsistenteCommandHandler>();
+        services.AddScoped<IQueryHandler<clsListarConversacionesAsistenteQuery, IReadOnlyList<clsConversacionResumenDto>>, clsListarConversacionesAsistenteQueryHandler>();
+        services.AddScoped<IQueryHandler<clsObtenerConversacionAsistenteQuery, clsConversacionDetalleDto>, clsObtenerConversacionAsistenteQueryHandler>();
         return services;
     }
 }

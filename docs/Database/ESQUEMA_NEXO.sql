@@ -730,6 +730,50 @@ CREATE TABLE [db_NEXO].[tbl_ia_uso] (
         AND [LatenciaMs] >= 0 AND ([CostoEstimadoUsd] IS NULL OR [CostoEstimadoUsd] >= 0))
 );
 
+-- Conversaciones del asistente de cotización (una por conversación, de quien la inicia), sus mensajes en orden y una fila por cada
+-- herramienta que el asistente usó (entrada, salida, fuente y resultado: la prueba de dónde salió cada valor mostrado).
+-- Script para aplicarlas a una base existente: docs/Database/372_asistente_conversaciones.sql.
+CREATE TABLE [db_NEXO].[tbl_asistente_conversaciones] (
+    [Id] uniqueidentifier NOT NULL,
+    [UsuarioId] uniqueidentifier NOT NULL,
+    [Titulo] nvarchar(120) NOT NULL,
+    [Turnos] int NOT NULL CONSTRAINT [DF_asistente_conversaciones_Turnos] DEFAULT (0),
+    [CreatedAt] datetimeoffset NOT NULL CONSTRAINT [DF_asistente_conversaciones_CreatedAt] DEFAULT (sysdatetimeoffset()),
+    [UpdatedAt] datetimeoffset NOT NULL CONSTRAINT [DF_asistente_conversaciones_UpdatedAt] DEFAULT (sysdatetimeoffset())
+    , CONSTRAINT [PK_asistente_conversaciones] PRIMARY KEY ([Id])
+    , CONSTRAINT [CK_asistente_conversaciones_turnos] CHECK ([Turnos] >= 0)
+);
+
+CREATE TABLE [db_NEXO].[tbl_asistente_mensajes] (
+    [Id] uniqueidentifier NOT NULL,
+    [ConversacionId] uniqueidentifier NOT NULL,
+    [Orden] int NOT NULL,
+    [Rol] nvarchar(10) NOT NULL,
+    [Contenido] nvarchar(max) NOT NULL CONSTRAINT [DF_asistente_mensajes_Contenido] DEFAULT (N''),
+    [Estado] nvarchar(20) NOT NULL,
+    [CreatedAt] datetimeoffset NOT NULL CONSTRAINT [DF_asistente_mensajes_CreatedAt] DEFAULT (sysdatetimeoffset())
+    , CONSTRAINT [PK_asistente_mensajes] PRIMARY KEY ([Id])
+    , CONSTRAINT [CK_asistente_mensajes_rol] CHECK ([Rol] IN (N'user', N'assistant'))
+    , CONSTRAINT [CK_asistente_mensajes_estado] CHECK ([Estado] IN (N'en_curso', N'completo', N'incompleto', N'descartado'))
+);
+
+CREATE TABLE [db_NEXO].[tbl_asistente_herramientas_uso] (
+    [Id] uniqueidentifier NOT NULL,
+    [ConversacionId] uniqueidentifier NOT NULL,
+    [MensajeId] uniqueidentifier NOT NULL,
+    [Herramienta] nvarchar(60) NOT NULL,
+    [Entrada] nvarchar(max) NOT NULL,
+    [Salida] nvarchar(max) NULL,
+    [Encontrado] bit NULL,
+    [Fuente] nvarchar(200) NULL,
+    [Resultado] nvarchar(40) NOT NULL,
+    [LatenciaMs] int NOT NULL CONSTRAINT [DF_asistente_herramientas_uso_LatenciaMs] DEFAULT (0),
+    [CreatedAt] datetimeoffset NOT NULL CONSTRAINT [DF_asistente_herramientas_uso_CreatedAt] DEFAULT (sysdatetimeoffset())
+    , CONSTRAINT [PK_asistente_herramientas_uso] PRIMARY KEY ([Id])
+    , CONSTRAINT [CK_asistente_herramientas_uso_entrada_json] CHECK (ISJSON([Entrada]) = 1)
+    , CONSTRAINT [CK_asistente_herramientas_uso_salida_json] CHECK ([Salida] IS NULL OR ISJSON([Salida]) = 1)
+);
+
 -- --- Mensajería (MassTransit — Transactional Outbox/Inbox) ---------------------------
 -- Viven en ESTA base a propósito: la garantía de atomicidad depende de que el
 -- mensaje y los datos del caso de uso se guarden en la misma transacción.
@@ -807,6 +851,10 @@ CREATE TABLE [db_NEXO].[__EFMigrationsHistory] (
 
 ALTER TABLE [db_NEXO].[tbl_audit_log] ADD CONSTRAINT [FK_audit_log_usuarios_UsuarioId] FOREIGN KEY ([UsuarioId]) REFERENCES [db_NEXO].[tbl_usuarios] ([Id]);
 ALTER TABLE [db_NEXO].[tbl_ia_uso] ADD CONSTRAINT [FK_ia_uso_usuarios_UsuarioId] FOREIGN KEY ([UsuarioId]) REFERENCES [db_NEXO].[tbl_usuarios] ([Id]);
+ALTER TABLE [db_NEXO].[tbl_asistente_conversaciones] ADD CONSTRAINT [FK_asistente_conversaciones_usuarios_UsuarioId] FOREIGN KEY ([UsuarioId]) REFERENCES [db_NEXO].[tbl_usuarios] ([Id]);
+ALTER TABLE [db_NEXO].[tbl_asistente_mensajes] ADD CONSTRAINT [FK_asistente_mensajes_conversaciones_ConversacionId] FOREIGN KEY ([ConversacionId]) REFERENCES [db_NEXO].[tbl_asistente_conversaciones] ([Id]);
+ALTER TABLE [db_NEXO].[tbl_asistente_herramientas_uso] ADD CONSTRAINT [FK_asistente_herramientas_uso_conversaciones_ConversacionId] FOREIGN KEY ([ConversacionId]) REFERENCES [db_NEXO].[tbl_asistente_conversaciones] ([Id]);
+ALTER TABLE [db_NEXO].[tbl_asistente_herramientas_uso] ADD CONSTRAINT [FK_asistente_herramientas_uso_mensajes_MensajeId] FOREIGN KEY ([MensajeId]) REFERENCES [db_NEXO].[tbl_asistente_mensajes] ([Id]);
 ALTER TABLE [db_NEXO].[tbl_colocaciones_cargue] ADD CONSTRAINT [FK_colocaciones_cargue_items_plan_cargue_ItemPlanCargueId] FOREIGN KEY ([ItemPlanCargueId]) REFERENCES [db_NEXO].[tbl_items_plan_cargue] ([Id]);
 ALTER TABLE [db_NEXO].[tbl_colocaciones_cargue] ADD CONSTRAINT [FK_colocaciones_cargue_planes_cargue_PlanCargueId] FOREIGN KEY ([PlanCargueId]) REFERENCES [db_NEXO].[tbl_planes_cargue] ([Id]) ON DELETE CASCADE;
 ALTER TABLE [db_NEXO].[tbl_cotizacion_conexos] ADD CONSTRAINT [FK_cotizacion_conexos_cotizaciones_CotizacionId] FOREIGN KEY ([CotizacionId]) REFERENCES [db_NEXO].[tbl_cotizaciones] ([Id]) ON DELETE CASCADE;
@@ -865,6 +913,10 @@ CREATE INDEX [IX_cotizaciones_SolicitudId] ON [db_NEXO].[tbl_cotizaciones] ([Sol
 CREATE UNIQUE INDEX [AK_InboxState_MessageId_ConsumerId] ON [db_NEXO].[InboxState] ([MessageId], [ConsumerId]);
 CREATE INDEX [IX_ia_uso_Funcion_CreatedAt] ON [db_NEXO].[tbl_ia_uso] ([Funcion], [CreatedAt]) INCLUDE ([Modelo], [TokensEntrada], [TokensSalida], [CostoEstimadoUsd], [Resultado]);
 CREATE INDEX [IX_ia_uso_UsuarioId_CreatedAt] ON [db_NEXO].[tbl_ia_uso] ([UsuarioId], [CreatedAt]) INCLUDE ([Funcion], [TokensEntrada], [TokensSalida], [CostoEstimadoUsd]);
+CREATE INDEX [IX_asistente_conversaciones_UsuarioId_UpdatedAt] ON [db_NEXO].[tbl_asistente_conversaciones] ([UsuarioId], [UpdatedAt]);
+CREATE UNIQUE INDEX [IX_asistente_mensajes_ConversacionId_Orden] ON [db_NEXO].[tbl_asistente_mensajes] ([ConversacionId], [Orden]);
+CREATE INDEX [IX_asistente_herramientas_uso_ConversacionId_CreatedAt] ON [db_NEXO].[tbl_asistente_herramientas_uso] ([ConversacionId], [CreatedAt]);
+CREATE INDEX [IX_asistente_herramientas_uso_MensajeId] ON [db_NEXO].[tbl_asistente_herramientas_uso] ([MensajeId]);
 CREATE INDEX [IX_InboxState_Delivered] ON [db_NEXO].[InboxState] ([Delivered]);
 CREATE INDEX [IX_items_plan_cargue_PlanCargueId] ON [db_NEXO].[tbl_items_plan_cargue] ([PlanCargueId]);
 -- Filtrado a las pendientes: indexar las ya resueltas no aporta y la tabla crece.
