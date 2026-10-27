@@ -66,3 +66,26 @@ Agregar la sección de `mapeo_vehiculos.csv` en `docs/Database/seeder/README.md`
 ## 5. Cerrar
 
 Commit, push y PR a QA (script, CSV, `ESQUEMA_NEXO.sql`, `.gitignore` y este archivo). El `.gitignore` va a chocar con la PR #395; es el mismo bloque y se resuelve fácil.
+
+---
+
+# Otros pendientes (no son del #377)
+
+## 6. `ESQUEMA_NEXO.sql` se detiene a mitad de camino en una base nueva
+
+`ESQUEMA_NEXO.sql` es el archivo que construye toda la base de NEXO desde cero. Ismael lo corrió en una base vacía (2026-10-27, al probar el #365) y se detuvo por un error en la llave foránea de `OutboxMessage`. Lo que venía después en ese lote no se creó: índices y algunas llaves foráneas. En la base de pruebas no se nota porque las tablas ya existían; el problema aparece al montar un ambiente nuevo.
+
+**Causa probable (sin probar todavía):** un problema de orden.
+- Línea 845: `FK_OutboxMessage_InboxState_InboxMessageId_InboxConsumerId` apunta a `InboxState (MessageId, ConsumerId)`.
+- Línea 883: el índice único `AK_InboxState_MessageId_ConsumerId` sobre esas mismas columnas se crea después, en la sección de índices.
+
+SQL Server no permite crear una llave foránea hacia columnas que todavía no tienen una llave primaria o un índice único.
+
+**Qué hacer:** mover la creación de `AK_InboxState_MessageId_ConsumerId` antes de la sección de llaves foráneas, y probar el archivo completo en una base vacía para confirmar que ya no se detiene.
+
+## 7. Decisiones de Ismael sobre las plantillas (#365)
+
+Pendiente responderle:
+1. **Orden de columnas:** sí, si el cliente cambia el orden se vuelve a sugerir.
+2. **Diccionario:** sí a las tres (con plantilla manda la plantilla; confirmar no agrega términos al diccionario; editar el diccionario no invalida plantillas). Consecuencia: el diccionario solo se llena a mano y arranca casi vacío, porque la carga inicial (#357) todavía no tiene fuente.
+3. **`clienteId` desde la solicitud:** no hace falta por ahora. NEXO no asigna clientes por usuario, así que no cambiaría los permisos, y `tbl_audit_log` ya registra quién crea, reemplaza o borra cada plantilla.
