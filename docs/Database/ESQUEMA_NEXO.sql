@@ -129,6 +129,29 @@ CREATE TABLE [db_NEXO].[tbl_alias_elementos] (
     , CONSTRAINT [UQ_alias_elementos_AliasNormalizado] UNIQUE ([AliasNormalizado])
 );
 
+-- Términos y conceptos que usa cada cliente en sus archivos: cómo se traduce cada palabra suya a lo que entiende NEXO.
+-- Tipo = columna (encabezado -> campo de NEXO), unidad (kg o t) o valor (valor de una columna categórica; Contexto dice de qué
+-- campo). ClienteId NULL = aplica a todos los clientes. Complementa a tbl_alias_elementos (sinónimos GLOBALES de vehículos y
+-- contenedores): lo propio de un cliente vive aquí, y Concepto no se valida contra el catálogo oficial (el Turbo de un cliente
+-- puede ser 2_7, que el catálogo no tiene). Script para una base existente: docs/Database/356_diccionario_cliente.sql.
+CREATE TABLE [db_NEXO].[tbl_diccionario_cliente] (
+    [Id] uniqueidentifier NOT NULL,
+    [ClienteId] uniqueidentifier NULL,
+    [Termino] nvarchar(200) NOT NULL,
+    [TerminoNormalizado] nvarchar(200) NOT NULL,
+    [Tipo] nvarchar(20) NOT NULL,
+    [Concepto] nvarchar(100) NOT NULL,
+    [Contexto] nvarchar(50) NULL,
+    [Ejemplo] nvarchar(500) NULL,
+    [Activo] bit NOT NULL CONSTRAINT [DF_diccionario_cliente_Activo] DEFAULT (1),
+    [CreatedAt] datetimeoffset NOT NULL CONSTRAINT [DF_diccionario_cliente_CreatedAt] DEFAULT (sysdatetimeoffset()),
+    [UpdatedAt] datetimeoffset NULL
+    , CONSTRAINT [PK_diccionario_cliente] PRIMARY KEY ([Id])
+    , CONSTRAINT [CK_diccionario_cliente_Tipo] CHECK ([Tipo] IN (N'columna', N'unidad', N'valor'))
+    , CONSTRAINT [CK_diccionario_cliente_Contexto] CHECK (
+        ([Tipo] = N'valor' AND [Contexto] IS NOT NULL) OR ([Tipo] <> N'valor' AND [Contexto] IS NULL))
+);
+
 -- Catálogo propio de municipios (Colombia/Venezuela/Ecuador) para el
 -- desplegable de Origen/Destino en Captura de Solicitudes (S4-HU-09.1).
 -- Poblada UNA SOLA VEZ desde tblSAPDANE/tblZonasTarificacionRelacion/
@@ -807,6 +830,7 @@ ALTER TABLE [db_NEXO].[OutboxMessage] ADD CONSTRAINT [FK_OutboxMessage_OutboxSta
 ALTER TABLE [db_NEXO].[tbl_planes_cargue] ADD CONSTRAINT [FK_planes_cargue_vehiculos_cubicacion_VehiculoId] FOREIGN KEY ([VehiculoId]) REFERENCES [db_NEXO].[tbl_vehiculos_cubicacion] ([Id]);
 ALTER TABLE [db_NEXO].[tbl_servicios_conexos] ADD CONSTRAINT [FK_servicios_conexos_usuarios_ActualizadoPor] FOREIGN KEY ([ActualizadoPor]) REFERENCES [db_NEXO].[tbl_usuarios] ([Id]);
 ALTER TABLE [db_NEXO].[tbl_solicitudes] ADD CONSTRAINT [FK_solicitudes_clientes_ClienteId] FOREIGN KEY ([ClienteId]) REFERENCES [db_NEXO].[tbl_clientes] ([Id]);
+ALTER TABLE [db_NEXO].[tbl_diccionario_cliente] ADD CONSTRAINT [FK_diccionario_cliente_clientes_ClienteId] FOREIGN KEY ([ClienteId]) REFERENCES [db_NEXO].[tbl_clientes] ([Id]);
 ALTER TABLE [db_NEXO].[tbl_solicitudes] ADD CONSTRAINT [FK_solicitudes_usuarios_CreadoPor] FOREIGN KEY ([CreadoPor]) REFERENCES [db_NEXO].[tbl_usuarios] ([Id]);
 ALTER TABLE [db_NEXO].[tbl_tarifas_historicas] ADD CONSTRAINT [FK_tarifas_historicas_configuraciones_vehiculo_ConfigVehiculoId] FOREIGN KEY ([ConfigVehiculoId]) REFERENCES [db_NEXO].[tbl_configuraciones_vehiculo] ([Id]);
 ALTER TABLE [db_NEXO].[tbl_tarifas_historicas] ADD CONSTRAINT [FK_tarifas_historicas_cotizaciones_CotizacionId] FOREIGN KEY ([CotizacionId]) REFERENCES [db_NEXO].[tbl_cotizaciones] ([Id]);
@@ -827,6 +851,8 @@ CREATE UNIQUE INDEX [IX_ajustes_vigencia_plaza_TarifaPlazaId] ON [db_NEXO].[tbl_
 CREATE INDEX [IX_audit_log_Entidad_EntidadId] ON [db_NEXO].[tbl_audit_log] ([Entidad], [EntidadId]);
 CREATE INDEX [IX_audit_log_UsuarioId] ON [db_NEXO].[tbl_audit_log] ([UsuarioId]);
 CREATE UNIQUE INDEX [IX_clientes_Nit] ON [db_NEXO].[tbl_clientes] ([Nit]);
+CREATE UNIQUE INDEX [IX_diccionario_cliente_Unico] ON [db_NEXO].[tbl_diccionario_cliente] ([ClienteId], [TerminoNormalizado], [Tipo], [Contexto]);
+CREATE INDEX [IX_diccionario_cliente_ClienteId_Tipo] ON [db_NEXO].[tbl_diccionario_cliente] ([ClienteId], [Tipo]);
 CREATE INDEX [IX_colocaciones_cargue_ItemPlanCargueId] ON [db_NEXO].[tbl_colocaciones_cargue] ([ItemPlanCargueId]);
 CREATE INDEX [IX_colocaciones_cargue_PlanCargueId_Cargada] ON [db_NEXO].[tbl_colocaciones_cargue] ([PlanCargueId], [Cargada]);
 CREATE INDEX [IX_cotizacion_conexos_CotizacionId] ON [db_NEXO].[tbl_cotizacion_conexos] ([CotizacionId]);
