@@ -35,3 +35,62 @@ public sealed record clsSugerenciaMapeoDto(
     string? MotivoSinIa,
     IReadOnlyList<clsColumnaMapeadaDto> Columnas,
     IReadOnlyList<string> Dudas);
+
+// ---------------------------------------------------------------- aplicar el mapeo
+
+/// <summary>Una columna del archivo y lo que se hace con ella, tal como la confirmó el usuario.</summary>
+/// <param name="Indice">Posición de la columna en las filas (base 0).</param>
+/// <param name="Campo">Campo de NEXO al que va, o <c>ignorar</c>.</param>
+/// <param name="Transformacion">Una de <see cref="clsTransformacionesMapeo.Todas"/>; vacía equivale a <c>ninguna</c>.</param>
+public sealed record clsColumnaAAplicar(int Indice, string? Campo, string? Transformacion);
+
+/// <summary>
+/// Una fila del Excel ya convertida a la forma de una línea de captura: el mismo cuerpo que <c>POST /api/captura-solicitudes</c> recibe en
+/// <c>lineas</c>. <paramref name="Referencia"/> y <paramref name="Deadline"/> son datos de la solicitud completa, no de la línea: llegan por fila
+/// porque así vienen en el archivo, y quien captura decide cuál usar.
+/// </summary>
+/// <param name="Fila">El número de fila en el archivo (el de Excel).</param>
+public sealed record clsLineaImportadaDto(
+    int Fila,
+    string Origen,
+    string Destino,
+    string? TipoVehiculo,
+    string? Carroceria,
+    string? Tipologia,
+    string? LineaNegocio,
+    string? ClaseViaje,
+    string? ClaseContenedor,
+    bool? Exclusivo,
+    bool? Consolidado,
+    bool? RetornaContenedor,
+    string? CiudadDevolucionContenedor,
+    bool? LevanteContenedorDiferente,
+    string? CiudadLevanteContenedor,
+    decimal? HorasCargue,
+    decimal? HorasDescargue,
+    decimal? Peso,
+    decimal? ValorMercancia,
+    IReadOnlyList<Nexo.Application.CasosDeUso.Solicitudes.DTOs.clsPosicionCargaDto>? Posiciones,
+    string? Referencia,
+    DateTimeOffset? Deadline);
+
+/// <param name="Fila">El número de fila en el archivo.</param>
+/// <param name="Campo">El campo de NEXO al que se refiere el error, si es de uno solo.</param>
+/// <param name="Codigo">Estable, para que el front pueda reaccionar (<c>NUMERO_INVALIDO</c>, <c>PESO_REQUERIDO</c>…).</param>
+public sealed record clsErrorDeFilaDto(int Fila, string? Campo, string Codigo, string Mensaje);
+
+/// <summary>
+/// El resultado de aplicar un mapeo a las filas de un Excel. Una fila con algún error no entra en <paramref name="Lineas"/>: se reporta en
+/// <paramref name="Errores"/> (todos los de la fila) para que el usuario la corrija y repita. Nada se guarda.
+/// </summary>
+/// <param name="TotalFilas">Las filas recibidas.</param>
+/// <param name="FilasVacias">Filas sin ningún dato en las columnas usadas; se saltan sin error.</param>
+/// <param name="FilasConErrores">Filas que no pudieron convertirse.</param>
+/// <param name="TotalErrores">Cuántos errores hay en total; <paramref name="Errores"/> trae solo los primeros si son demasiados.</param>
+public sealed record clsResultadoAplicarMapeoDto(
+    int TotalFilas,
+    int FilasVacias,
+    int FilasConErrores,
+    IReadOnlyList<clsLineaImportadaDto> Lineas,
+    IReadOnlyList<clsErrorDeFilaDto> Errores,
+    int TotalErrores);

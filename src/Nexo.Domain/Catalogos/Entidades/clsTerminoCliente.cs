@@ -27,7 +27,7 @@ public class clsTerminoCliente
         "origen", "destino", "tipoVehiculo", "carroceria", "tipologia", "lineaNegocio", "claseViaje", "claseContenedor",
         "exclusivo", "consolidado", "retornaContenedor", "ciudadDevolucionContenedor", "levanteContenedorDiferente",
         "ciudadLevanteContenedor", "horasCargue", "horasDescargue", "peso", "valorMercancia", "referencia",
-        "descripcion", "cantidad", "largoCm", "anchoCm", "altoCm", "pesoKg", "codigoTipoMercancia", "ignorar",
+        "descripcion", "cantidad", "largoCm", "anchoCm", "altoCm", "pesoKg", "codigoTipoMercancia", "deadline", "ignorar",
     ];
 
     /// <summary>Unidades de peso canónicas a las que se traduce la del cliente.</summary>

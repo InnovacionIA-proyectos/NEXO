@@ -89,7 +89,6 @@ builder.Services.AddScoped<INotificadorDePlanCargue, clsNotificadorPlanCargueSig
 builder.Services.AddPlanDeCargueUseCases();
 builder.Services.AddDiccionarioClienteUseCases();
 builder.Services.AddIaUseCases();
-builder.Services.AddDiccionarioClienteUseCases();
 builder.Services.AddMapeoExcelUseCases();
 builder.Services.AddCubicacionUseCases();
 builder.Services.AddCotizacionesUseCases();

@@ -32,6 +32,7 @@ namespace Nexo.Api.Solicitudes;
 public class clsCapturaSolicitudesController(
     IQueryHandler<clsAnalizarExcelQuery, clsAnalisisExcelDto> analizarExcel,
     IQueryHandler<clsSugerirMapeoExcelQuery, clsSugerenciaMapeoDto> sugerirMapeo,
+    IQueryHandler<clsAplicarMapeoExcelQuery, clsResultadoAplicarMapeoDto> aplicarMapeo,
     ICommandHandler<clsCapturarSolicitudCommand, clsCapturaResultDto> capturar,
     IQueryHandler<clsBuscarClientesQuery, IReadOnlyList<clsClienteBusquedaDto>> buscarClientes,
     IQueryHandler<clsListarDepartamentosQuery, IReadOnlyList<string>> listarDepartamentos,
@@ -73,6 +74,23 @@ public class clsCapturaSolicitudesController(
     public async Task<ActionResult<clsSugerenciaMapeoDto>> SugerirMapeo([FromBody] clsSugerirMapeoRequest req, CancellationToken ct = default)
         => Ok(await sugerirMapeo.Handle(new clsSugerirMapeoExcelQuery(
             req.ClienteId, req.Encabezados, req.Filas?.Select(f => (IReadOnlyList<string>)(f ?? [])).ToList()), ct));
+
+    /// <summary>
+    /// Aplica el mapeo que el usuario confirmó a TODAS las filas del Excel (las que devolvió <c>analizar-excel</c>, sin el encabezado) y devuelve
+    /// las líneas listas para <c>POST /api/captura-solicitudes</c> más los errores por fila. Convierte toneladas a kilos, separa «ORIGEN - DESTINO»,
+    /// lee números con coma decimal y fechas, y traduce los valores con el diccionario del cliente. Las filas se validan con los mismos límites y
+    /// reglas de la captura; una fila con errores no sale como línea. No usa la IA ni persiste nada.
+    /// </summary>
+    [HttpPost("aplicar-mapeo")]
+    [Authorize(Roles = "Comercial,Admin")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<clsResultadoAplicarMapeoDto>> AplicarMapeo([FromBody] clsAplicarMapeoRequest req, CancellationToken ct = default)
+        => Ok(await aplicarMapeo.Handle(new clsAplicarMapeoExcelQuery(
+            req.ClienteId,
+            req.Columnas.Select(c => new clsColumnaAAplicar(c.Indice, c.Campo, c.Transformacion)).ToList(),
+            req.Filas.Select(f => (IReadOnlyList<string>)(f ?? [])).ToList(),
+            req.PrimeraFila), ct));
 
     /// <summary>
     /// Crea la solicitud (cabecera + líneas) resolviendo o creando rutas y
