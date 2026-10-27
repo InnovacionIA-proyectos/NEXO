@@ -798,8 +798,12 @@ Cómo se arma, en este orden:
 1. **El diccionario del cliente manda** (§3.19.1): una columna cuyo encabezado está en su diccionario (o en el general) se resuelve sin IA, con
    `confianza = 1` y `origen = "diccionario"`. Si el diccionario resuelve todas las columnas, no se llama a la IA (`DICCIONARIO_COMPLETO`).
 2. **La IA completa lo pendiente**, con datos mínimos: los encabezados, **hasta 20 filas** de muestra y las pistas del diccionario. Antes de salir,
-   NEXO **oculta** NIT, nombres de personas, correos, teléfonos y valores comerciales (por el encabezado de la columna y por el contenido de la
-   celda: `<NIT>`, `<CORREO>`, `<TELEFONO>`, `<NOMBRE>`, `<VALOR>`, `<NUMERO>`) y recorta cada celda a 200 caracteres. El contenido del archivo se trata
+   NEXO **oculta** NIT, nombres de personas, correos, teléfonos y valores comerciales (`<NIT>`, `<CORREO>`, `<TELEFONO>`, `<NOMBRE>`, `<VALOR>`, `<NUMERO>`)
+   y recorta cada celda a 200 caracteres. Tres vías: **(a)** por el encabezado (también pegado, `NombreContacto`, y con sinónimos como «Quien recibe» o «A cargo de»), que oculta
+   toda la columna; **(b)** por lo que traen las celdas de la columna (se miran hasta 200 filas): si traen correos, NIT con dígito de verificación, teléfonos o nombres de personas,
+   se oculta **toda** la columna aunque el encabezado no diga nada; **(c)** celda por celda (un correo, un teléfono o un nombre escrito en una celda cualquiera). Los nombres se
+   reconocen con una lista de nombres y apellidos comunes, así que un nombre poco común en una columna que no se reconoce como de personas puede no ocultarse: la defensa es la
+   columna entera, no la celda. Las ciudades y los vehículos de dos palabras («Santa Marta», «Camión Sencillo») no se ocultan. El contenido del archivo se trata
    siempre como **dato**, no como instrucciones.
 3. **Lo que responde el modelo se valida**: solo cuentan índices que existen, campos y transformaciones de las listas de abajo y confianzas entre 0 y 1;
    lo demás se descarta y esa columna queda sin propuesta. La respuesta siempre trae **una entrada por columna**, en el orden del archivo.
@@ -1030,8 +1034,10 @@ tal como llegó (limpio de espacios).
 | `codigoTipoMercancia` | *opcional* | string | máx. 40. S5-HU-18.2/#274. Código (no uuid) de `tbl_tipos_mercancia` — null = tipo desconocido, sin default asignado |
 
 Regla de peso: el peso de la línea es `peso` si viene; si no, la suma de
-`cantidad × pesoKg` de las posiciones. Debe ser > 0. Si vienen ambos, deben
-coincidir con tolerancia del 1 %.
+`cantidad × pesoKg` de las posiciones. Debe ser > 0. Si vienen ambos, el `peso`
+total debe ser **mayor o igual** a la suma de las posiciones (la diferencia es la
+tara); solo se rechaza (`400 PESO_INCONSISTENTE`) cuando las posiciones suman **más**
+que el peso total, con una tolerancia del 1 % por redondeos.
 
 **Peso con tara (S6-HU-28.1/#308).** El `peso` de la línea es el peso **total que se transporta, INCLUYENDO la tara** (embalaje,
 estibas, contenedor vacío...). **Nexo no la suma ni la resta**: la escribe quien captura (el Comercial, o Cotifly) dentro de `peso`, y
@@ -1045,8 +1051,11 @@ siempre en **kilogramos** (el backend nunca recibe toneladas; la conversión de 
 | El piso SICE-TAC (valor) | no usa el peso: usa la configuración, la ruta y las horas | |
 
 Lo que hay que saber: la suma de las posiciones (`cantidad × pesoKg`, sin tara) y el `peso` de la línea (con tara) **no coinciden por
-la tara**, y la regla `PESO_INCONSISTENTE` (tolerancia 1 %) compara justo esas dos cantidades: una línea con posiciones y con una tara mayor al
-1 % del peso se rechaza con `400 PESO_INCONSISTENTE`. Hallazgo registrado (issue aparte); mientras tanto, no mandar `posiciones` cuando el `peso` incluya tara.
+la tara**, y la regla `PESO_INCONSISTENTE` lo respeta: el `peso` total puede ser mayor que la suma de las posiciones (la tara) y la línea se
+crea (`201`); solo se rechaza cuando las posiciones **suman más** que el `peso` total (más de un 1 %), porque eso no tiene sentido físico.
+Ejemplo: `peso` 1000 con una posición de 100 kg → `201`; posiciones que suman 1200 con `peso` 1000 → `400 PESO_INCONSISTENTE`. Una línea sin
+`posiciones` no se ve afectada. La regla vale igual para lo que llega desde la importación de una licitación, que captura por este mismo endpoint;
+`POST /api/solicitudes/{id}/lineas:bulk` no valida la suma.
 
 - **→** `201 CapturaResultDto`, header `Location: /api/solicitudes/{id}`
 - **Errores**: `400 CLIENTE_REQUERIDO` · `400 CLIENTE_INVALIDO` · `400 CLIENTE_BP_INVALIDO` · `400 DWCUBOS_NO_CONFIGURADO` (se usó `clienteBp` y el DW no está configurado en el ambiente) · `400 ENUM_INVALIDO` · `400 LINEA_INCOMPLETA` · `400 PESO_REQUERIDO` · `400 PESO_INCONSISTENTE` · `400 CUBICACION_DEMASIADO_GRANDE` (#304: más de 10.000 unidades en las posiciones de una línea). Una posición sin `pesoKg`, con `pesoKg` 0 o con `cantidad` > 10000 sale como `400 VALIDATION_ERROR` (validación de campos)

@@ -32,6 +32,14 @@ misma función `Normalizar` — el texto de la ruta en sí casi nunca es el prob
 problema son los 5 filtros adicionales exclusivos del camino "oficial", cualquiera de
 los cuales puede descartar una fila que en realidad existe y tiene tarifa vigente.
 
+**Actualización — la ruta se compara por código DANE.** Con los dos municipios de la línea resueltos, el camino oficial
+compara la ruta exacta por código (`ORIGEN`/`DESTINO` de `tblRutasSicetac`, sin el cero a la izquierda), igual que el
+camino «Solo SICE-TAC»; el patrón `LIKE` queda solo como respaldo cuando falta alguno de los dos códigos. Con texto,
+`%YUMBO%-%CALI%` también coincide con `YUMBO - CALIMA` y, al tomar el valor más alto, el camino oficial elegía la ciudad
+equivocada (`CARTAGENA - CIENAGA DE ORO`, de Córdoba, en vez de `CIENAGA`, del Magdalena). El criterio del candidato lo deja
+a la vista: termina en `ruta DANE <origen>-<destino>`. Con los dos códigos y sin fila para esa ruta no hay piso oficial, y
+decide el selector de respaldo, que también compara por DANE.
+
 Medellín-Guarne es un corredor corto e intrarregional — el perfil típico de una ruta
 sin fila `VIAESTANDAR='SI'` en SICE-TAC (verificación con datos reales pendiente, ver
 `tests/QA/s4-hu-07-matching-sicetac-oficial/verify-medellin-guarne.sql`).
