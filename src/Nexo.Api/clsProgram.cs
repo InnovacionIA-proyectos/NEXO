@@ -3,7 +3,6 @@ using Nexo.Application.CasosDeUso.Bandeja.Interfaces;
 using Nexo.Application.CasosDeUso.Trabajos.Interfaces;
 using Nexo.Application.CasosDeUso.Costeo;
 using Nexo.Application.CasosDeUso.IA;
-using Nexo.Application.CasosDeUso.DiccionarioCliente;
 using Nexo.Application.CasosDeUso.MapeoExcel;
 using Nexo.Application.CasosDeUso.PlantillasMapeo;
 using Nexo.Application.CasosDeUso.Trabajos;
@@ -88,7 +87,6 @@ builder.Services.AddScoped<INotificadorDeBandeja, clsNotificadorDeBandejaSignalR
 builder.Services.AddScoped<INotificadorDePlanCargue, clsNotificadorPlanCargueSignalR>();
 builder.Services.AddPlanDeCargueUseCases();
 builder.Services.AddIaUseCases();
-builder.Services.AddDiccionarioClienteUseCases();
 builder.Services.AddMapeoExcelUseCases();
 builder.Services.AddPlantillasMapeoUseCases();
 builder.Services.AddCubicacionUseCases();

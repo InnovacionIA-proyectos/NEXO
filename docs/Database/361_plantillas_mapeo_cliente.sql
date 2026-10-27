@@ -1,21 +1,24 @@
 -- =============================================================================
--- tbl_plantillas_mapeo_cliente — el mapeo de columnas que un cliente ya confirmó para sus archivos de Excel
+-- tbl_plantillas_mapeo_cliente — mapeo de columnas ya confirmado para un formato de Excel de un cliente
 -- =============================================================================
 -- Qué es: una tabla NUEVA y ADITIVA. No toca ninguna tabla existente, así que el código actual sigue funcionando sin ella.
--- Sin esta tabla fallan los endpoints /api/captura-solicitudes/plantillas-mapeo y también sugerir-mapeo cuando recibe un clienteId
--- (busca ahí la plantilla del cliente); el resto de la API no se ve afectado. Por eso se aplica ANTES de desplegar.
 --
--- Para qué sirve: cuando un cliente manda otro Excel con LOS MISMOS encabezados que uno anterior, NEXO usa el mapeo que el usuario ya
--- confirmó en vez de volver a llamar a la IA. Si un encabezado cambia, se agrega, se quita o se reordena una columna, la firma cambia y
--- el archivo se vuelve a analizar como uno nuevo.
+-- Para qué sirve: cuando un comercial confirma cómo se lee un Excel de un cliente (qué columna es origen, destino, peso,
+-- unidad…), ese mapeo se guarda aquí. Si el mismo cliente vuelve a mandar un Excel con los mismos encabezados, el backend
+-- aplica la plantilla guardada y no llama a la IA. Si los encabezados cambian, se vuelve a sugerir el mapeo.
+--   FirmaEncabezados : SHA-256 (64 caracteres hex) de los encabezados normalizados y en orden. Es lo que se busca.
+--   Encabezados      : JSON con los encabezados tal como venían, para mostrar y auditar.
+--   Columnas         : JSON con el mapeo confirmado de cada columna al campo de NEXO.
+--   Nombre           : etiqueta opcional para reconocer la plantilla (ej. "Formato licitación 2026").
+-- Una sola plantilla por cliente y firma (índice único).
 --
--- Columnas:
---   FirmaEncabezados : SHA-256 en hexadecimal (64 caracteres) de los encabezados normalizados (sin tildes ni mayúsculas) y en orden.
---                      Con ClienteId es única: un cliente tiene como máximo una plantilla por conjunto de encabezados.
---   Encabezados      : los encabezados tal como llegaron, arreglo JSON de textos (solo para mostrarlos).
---   Columnas         : el mapeo, arreglo JSON de { indice, campo, transformacion }, una entrada por columna.
+-- RELACIÓN CON tbl_diccionario_cliente. Son complementarias:
+--   * tbl_diccionario_cliente es el vocabulario del cliente, término por término. Sirve de pista a la IA cuando llega un
+--     formato que no tiene plantilla, y sigue sirviendo aunque el cliente cambie de formato.
+--   * tbl_plantillas_mapeo_cliente es la foto completa de UN formato ya confirmado. Si la firma coincide, manda la plantilla
+--     y no se consulta el diccionario ni la IA.
 --
--- ORDEN: aplicar ESTE script antes de desplegar el código nuevo. Es idempotente (se puede correr dos veces).
+-- ORDEN: aplicar ESTE script antes de desplegar el código que use las plantillas. Es idempotente (se puede correr dos veces).
 -- Reemplazar db_NEXO por el valor de Database__Esquema del ambiente si es otro.
 --
 -- Deshacer (solo si hiciera falta): DROP TABLE [db_NEXO].[tbl_plantillas_mapeo_cliente];
@@ -39,7 +42,7 @@ BEGIN
     );
 END;
 
--- Un cliente tiene como máximo una plantilla por conjunto de encabezados (guardar otra vez la reemplaza).
+-- Búsqueda de la plantilla de un cliente por la firma de sus encabezados; también impide duplicarla.
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_plantillas_mapeo_cliente_Firma' AND object_id = OBJECT_ID(N'[db_NEXO].[tbl_plantillas_mapeo_cliente]'))
     CREATE UNIQUE INDEX [IX_plantillas_mapeo_cliente_Firma]
         ON [db_NEXO].[tbl_plantillas_mapeo_cliente] ([ClienteId], [FirmaEncabezados]);
