@@ -2154,6 +2154,53 @@ interface GastoIaDto {
 ```
 - **Errores**: `400 RANGO_INVALIDO` · `400 FUNCION_IA_INVALIDA`
 
+### 3.23 Herramientas de lectura del asistente — `/api/asistente/herramientas`
+
+Las consultas que el asistente de cotización puede pedir para responder con datos de NEXO. Son **envoltorios de lectura** sobre lo que ya
+existe (piso SICE-TAC, plaza, histórico, aprovisionamiento, propuesta de una línea, servicios conexos, ciudades DANE) y se ejecutan **con la
+identidad de quien llama**: el rol decide qué herramientas hay disponibles y las reglas de acceso de cada consulta se mantienen (un
+`Comercial` solo ve propuestas de solicitudes que él creó). Ninguna escribe. El valor de una tarifa solo sale de una herramienta, y siempre
+con su `fuente`; si no hay dato, `encontrado` es `false` y `nota` dice por qué.
+
+El asistente (HU-36.2) usa estas mismas herramientas en el servidor; estos endpoints existen para listarlas y para probarlas sin pasar por
+el modelo. Quien llama necesita sesión; no requieren que la función de IA esté encendida porque no llaman al modelo.
+
+#### `GET /api/asistente/herramientas`
+Las herramientas disponibles para el rol del usuario.
+- **→** `200 [ HerramientaDto ]`
+```ts
+interface HerramientaDto {
+  nombre: string                    // identificador estable, p. ej. "consultar_piso_sicetac"
+  descripcion: string
+  esquemaEntrada: object            // JSON Schema de la entrada
+}
+```
+
+#### `POST /api/asistente/herramientas/{nombre}`
+Ejecuta una herramienta. El cuerpo es su entrada (un objeto JSON según `esquemaEntrada`).
+- **→** `200 ResultadoHerramientaDto`
+```ts
+interface ResultadoHerramientaDto {
+  encontrado: boolean               // false = no hay dato (o la fuente no responde); no se debe estimar uno
+  valor: object | null              // lo que devuelve la consulta; null si no hay dato
+  fuente: string                    // de dónde salió, p. ej. "SICE-TAC (DWSice), periodo 202610"
+  nota: string | null               // por qué no hay dato, o que el resultado es una muestra ("Se muestran 10 de 87")
+}
+```
+- **Errores**: `400 HERRAMIENTA_DESCONOCIDA` · `400 HERRAMIENTA_ENTRADA_INVALIDA` · `403 HERRAMIENTA_NO_PERMITIDA` (el rol no puede usarla) ·
+  `403 SOLICITUD_AJENA` · `404 SOLICITUD_NO_ENCONTRADA` · `404 LINEA_NO_ENCONTRADA`
+
+| Herramienta | Envuelve | Roles | Entrada |
+|---|---|---|---|
+| `consultar_piso_sicetac` | piso SICE-TAC vigente (Mesa de Costeo) | todos | `origen`, `destino`; opcional `vehiculo`, `carroceria`, `tipologia` |
+| `consultar_tarifa_plaza_sap` | `GET /api/biblioteca-sap-plaza` | todos | al menos uno de `q`, `lineaNegocio`, `tipoVehiculo`, `tipoCarroceria`, `claseViaje`; `top` (1–25, def. 10) |
+| `consultar_historico_sap` | `GET /api/biblioteca-sap-historico` | todos | igual que la anterior |
+| `consultar_tarifa_plaza_nexo` | `GET /api/tarifas-plaza` | AdminBiblioteca, AdminTarifas, Admin | al menos uno de `q`, `lineaNegocio`, `tipoVehiculo`; `top` |
+| `consultar_aprovisionamiento` | `GET /api/captura-solicitudes/aprovisionamiento` | Comercial, Admin | `ciudadLevante`, `origen`; opcional `configuracion`, `carroceria` |
+| `consultar_propuesta_linea` | `GET /api/solicitudes/{id}/propuesta-tarifa`, una línea | Comercial (solo las suyas), AdminTarifas, ServiciosLogisticos, LiderProceso, Admin | `solicitudId`, `lineaId` |
+| `consultar_servicios_conexos` | `GET /api/servicios-conexos` (solo activos) | todos | opcional `q`, `categoria`, `top` |
+| `buscar_ciudades_dane` | `GET /api/captura-solicitudes/ciudades` | todos | al menos uno de `q`, `departamento`; `top` |
+
 ## 4. Hubs de SignalR — conexión
 
 ```js
@@ -2210,6 +2257,7 @@ abiertos a los 6 roles.
 | `/api/pesos` (todo, incluido `GET`) (#307: + AdminBiblioteca) | | ✅ | ✅ | | | ✅ |
 | `/api/tarifas-plaza` (todo, incluido `GET`) (#307: + AdminBiblioteca) | | ✅ | ✅ | | | ✅ |
 | Escrituras de los 6 passthrough de catálogo (§3.14.1) | | | ✅ | | | ✅ |
+| `/api/asistente/herramientas`: el endpoint es de cualquier rol; cada herramienta repite los roles de la consulta que envuelve (§3.23) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 
 ---
 
