@@ -2,6 +2,8 @@ using System.Text.Json;
 using Nexo.Application.CasosDeUso.DiccionarioCliente.Interfaces;
 using Nexo.Application.CasosDeUso.MapeoExcel.DTOs;
 using Nexo.Application.CasosDeUso.MapeoExcel.Normalizacion;
+using Nexo.Application.CasosDeUso.PlantillasMapeo;
+using Nexo.Application.CasosDeUso.PlantillasMapeo.Interfaces;
 using Nexo.Application.CasosDeUso.Solicitudes;
 using Nexo.Application.Common;
 using Nexo.Application.Common.Abstractions;
@@ -23,6 +25,8 @@ public sealed record clsSugerirMapeoExcelQuery(Guid? ClienteId, IReadOnlyList<st
 
 /// <summary>
 /// El orden de las cosas:
+/// 0) Si el cliente ya confirmó un mapeo para EXACTAMENTE estos encabezados (su plantilla guardada), se devuelve ese y no se llama a la IA. Si
+///    cambia un encabezado, se agrega, se quita o se reordena una columna, no hay plantilla y se sugiere de nuevo.
 /// 1) Lo que el diccionario del cliente ya sabe se resuelve sin la IA y manda siempre sobre ella.
 /// 2) Si quedan columnas sin resolver y la IA está disponible, se le piden SOLO con datos mínimos: encabezados, hasta 20 filas, enmascaradas
 ///    (NIT, nombres, correos, teléfonos y valores nunca salen) y recortadas. Sin ninguna columna pendiente no se llama.
@@ -32,7 +36,7 @@ public sealed record clsSugerirMapeoExcelQuery(Guid? ClienteId, IReadOnlyList<st
 /// (429) sí se informa, no se esconde.
 /// </summary>
 public sealed class clsSugerirMapeoExcelQueryHandler(
-    IAsistenteIaPort ia, IDiccionarioClienteRepository diccionario, ICurrentUserPort usuarioActual)
+    IAsistenteIaPort ia, IDiccionarioClienteRepository diccionario, ICurrentUserPort usuarioActual, IPlantillasMapeoRepository plantillas)
     : IQueryHandler<clsSugerirMapeoExcelQuery, clsSugerenciaMapeoDto>
 {
     public const int MaxFilasDeMuestra = 20;
@@ -45,6 +49,13 @@ public sealed class clsSugerirMapeoExcelQueryHandler(
     public async Task<clsSugerenciaMapeoDto> Handle(clsSugerirMapeoExcelQuery query, CancellationToken ct = default)
     {
         var encabezados = LimpiarEncabezados(query.Encabezados);
+
+        // 0) La plantilla guardada de estos encabezados.
+        if (query.ClienteId is { } clienteId
+            && await plantillas.BuscarPorFirmaAsync(clienteId, clsFirmaDeEncabezados.Calcular(query.Encabezados!), ct) is { } plantilla
+            && DesdePlantilla(plantilla, encabezados) is { } deLaPlantilla)
+            return deLaPlantilla;
+
         var terminos = await TerminosDeColumnaAsync(query.ClienteId, ct);
 
         // 1) Lo que ya sabe el diccionario.
@@ -110,7 +121,39 @@ public sealed class clsSugerirMapeoExcelQueryHandler(
         return new clsSugerenciaMapeoDto(iaUsada, motivoSinIa, columnas, dudas.Take(MaxDudas).ToList());
     }
 
+
+    // ---------------------------------------------------------------- plantilla guardada
+
+    /// <summary>
+    /// La propuesta que sale de una plantilla: una entrada por columna, con confianza 1 y <c>origen = "plantilla"</c>. Lo guardado se vuelve a
+    /// validar contra las listas vigentes (un campo o una conversión que ya no existan se tratan como <c>ignorar</c> / <c>ninguna</c>). Null
+    /// si lo guardado no se puede leer o no corresponde al archivo: entonces se sugiere de nuevo como si no hubiera plantilla.
+    /// </summary>
+    private static clsSugerenciaMapeoDto? DesdePlantilla(clsPlantillaMapeoCliente plantilla, IReadOnlyList<string> encabezados)
+    {
+        var guardadas = clsPlantillasMapeoReglas.LeerColumnas(plantilla.Columnas);
+        var guardados = clsPlantillasMapeoReglas.LeerEncabezados(plantilla.Encabezados);
+        if (guardadas is null || guardados is null || guardados.Count != encabezados.Count) return null;
+
+        var porIndice = guardadas.GroupBy(c => c.Indice).ToDictionary(g => g.Key, g => g.First());
+        var columnas = new List<clsColumnaMapeadaDto>(encabezados.Count);
+        for (var i = 0; i < encabezados.Count; i++)
+        {
+            var campo = Ignorar;
+            var transformacion = clsTransformacionesMapeo.Ninguna;
+            if (porIndice.TryGetValue(i, out var c))
+            {
+                campo = clsTerminoCliente.Canonico(clsTerminoCliente.CamposDestino, c.Campo) ?? Ignorar;
+                transformacion = clsTerminoCliente.Canonico(clsTransformacionesMapeo.Todas, c.Transformacion) ?? clsTransformacionesMapeo.Ninguna;
+                if (!clsTransformacionesMapeo.Aplica(campo, transformacion)) transformacion = clsTransformacionesMapeo.Ninguna;
+            }
+            columnas.Add(new(i, encabezados[i], campo, transformacion, 1.0, "plantilla", null));
+        }
+        return new clsSugerenciaMapeoDto(false, "PLANTILLA_RECONOCIDA", columnas, [], plantilla.Id);
+    }
+
     // ---------------------------------------------------------------- entrada
+
 
     private static IReadOnlyList<string> LimpiarEncabezados(IReadOnlyList<string>? encabezados)
     {
