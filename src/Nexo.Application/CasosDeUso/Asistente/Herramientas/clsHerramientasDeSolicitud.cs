@@ -81,7 +81,7 @@ public sealed class clsConsultarPropuestaLineaHerramienta(
         var solicitud = await solicitudes.ObtenerBasicoAsync(solicitudId, ct)
             ?? throw new clsNotFoundException("SOLICITUD_NO_ENCONTRADA", "Solicitud no encontrada.");
 
-        // Aislamiento por comercial (issue #199): un Comercial solo ve lo que él mismo creó, también a través del asistente.
+        // Aislamiento por comercial: un Comercial solo ve lo que él mismo creó, también a través del asistente.
         if (usuario.Rol == RolUsuario.Comercial && solicitud.CreadoPor != usuario.Id)
             throw new clsForbiddenException("SOLICITUD_AJENA", "No tiene acceso a esta solicitud.");
 
