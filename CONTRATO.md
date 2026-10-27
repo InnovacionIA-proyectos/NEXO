@@ -2201,12 +2201,22 @@ interface ResultadoHerramientaDto {
 | `consultar_servicios_conexos` | `GET /api/servicios-conexos` (solo activos) | todos | opcional `q`, `categoria`, `top` |
 | `buscar_ciudades_dane` | `GET /api/captura-solicitudes/ciudades` | todos | al menos uno de `q`, `departamento`; `top` |
 
+**Herramientas que proponen cambios** (solo AdminTarifas y Admin; ver §3.24.1). Ninguna escribe: dejan una acción pendiente que la persona confirma.
+
+| Herramienta | Propone | Entrada |
+|---|---|---|
+| `proponer_agregar_flete` | `POST /api/cotizaciones/{id}/lineas` | `cotizacionId`, `lineaSolicitudId`, `valorFlete`, `fuente` (`Sicetac`, `Historica`, `Manual`, `Tarifario`); opcional `valorRetornoContenedor` |
+| `proponer_editar_flete` | `PUT /api/cotizaciones/{id}/lineas/{lineaId}` | `cotizacionId`, `lineaSolicitudId`, `valorFlete`; opcional `valorRetornoContenedor` |
+| `proponer_agregar_conexos` | `POST /api/cotizaciones/{id}/conexos` | `cotizacionId`, `items[]` (`lineaId`, `servicioConexoId`, `cantidad`; opcional `valorAplicado`) |
+| `proponer_rechazar_linea` | `POST /api/cotizaciones/{id}/lineas/{lineaId}/rechazo` | `cotizacionId`, `lineaSolicitudId`, `motivo` |
+| `proponer_cambiar_vehiculo` | `PUT /api/cotizaciones/{id}/lineas/{lineaId}/vehiculo` | `cotizacionId`, `lineaSolicitudId`, `tipoVehiculo` o `configVehiculoId`; opcional `carroceria` |
+
 ### 3.24 Conversación con el asistente de cotización — `/api/asistente/conversaciones`
 
 El AdminTarifas conversa con el asistente y este responde en tiempo real, apoyándose en las herramientas de lectura de §3.23 (con los
 permisos de quien pregunta). **No inventa precios:** todo valor que cita viene de una herramienta y lleva su fuente; si en la respuesta
 aparece una cifra de dinero que no salió de ninguna consulta (ni de lo que escribió la persona), la respuesta se descarta y se reemplaza
-por un aviso, y eso es lo que queda guardado. El asistente **no escribe** nada en NEXO.
+por un aviso, y eso es lo que queda guardado. El asistente **no escribe** nada en NEXO por su cuenta: solo propone cambios que la persona confirma (§3.24.1).
 
 Cada conversación es de quien la inicia y queda guardada con sus mensajes y las herramientas que usó (entrada, fuente y resultado), para
 auditarla. Límites por configuración (`Asistente__MaxTurnos`, 20 mensajes por conversación; `Asistente__MaxCaracteresMensaje`, 2 000;
@@ -2224,6 +2234,7 @@ tokens por persona de §3.22. La función se apaga con `Anthropic__Funciones__As
 | `conversacion` | `{ conversacionId, mensajeId }` | Primero. `mensajeId` es el de la respuesta que se está generando |
 | `texto` | `{ delta }` | Cada trozo de la respuesta, a medida que se genera; se concatenan |
 | `herramienta` | `{ nombre, estado, fuente? }` | `estado`: `ejecutando`, `ok` o `error`. Muestra qué está consultando el asistente |
+| `accion` | `AccionAsistenteDto` | El asistente propuso un cambio (§3.24.1). Nada se ha modificado: la persona debe confirmarlo o cancelarlo |
 | `reemplazo` | `{ texto, cifrasSinOrigen[] }` | La respuesta traía cifras de dinero sin origen: lo mostrado debe sustituirse por `texto` (es lo que queda guardado) |
 | `fin` | `{ conversacionId, mensajeId, estado }` | Último en el caso normal. `estado`: `completo` o `descartado` |
 | `error` | `{ codigo, mensaje }` | Último si la respuesta se cortó a mitad (lo ya mostrado queda como `incompleto`): `IA_NO_DISPONIBLE`, `IA_TIEMPO_AGOTADO`, `IA_LIMITE_PROVEEDOR`, `IA_RECHAZADA`, `IA_RESPUESTA_TRUNCADA`, `ASISTENTE_DEMASIADAS_CONSULTAS`, `ASISTENTE_ERROR` |
@@ -2253,9 +2264,50 @@ interface ConversacionDetalleDto {
                   encontrado: boolean | null; fuente: string | null
                   resultado: string                                            // "ok" o el código del error
                   latenciaMs: number; createdAt: string }[]
+  acciones: AccionAsistenteDto[]                                               // §3.24.1
 }
 ```
 - **Errores**: `403 CONVERSACION_AJENA` · `404 CONVERSACION_NO_ENCONTRADA`
+
+### 3.24.1 Cambios que propone el asistente — `/api/asistente/acciones`
+
+**El asistente nunca escribe.** Cuando la persona le pide cambiar algo (agregar o editar un flete, agregar conexos, rechazar una línea,
+cambiar el vehículo) el modelo solo *propone*: queda una acción `pendiente` con parámetros fijos (los valida el servidor; el valor de un flete
+debe salir de una consulta de la conversación o de lo que escribió la persona, si no se rechaza con `VALOR_SIN_ORIGEN`) y el cliente recibe el
+evento `accion`. La persona la confirma o la cancela aquí. Al confirmar se aplica con los mismos casos de uso de siempre, con su identidad y su
+rol, así que **las reglas del dominio mandan**: `409 FLETE_SOLO_SICETAC`, `400 FLETE_BAJO_PISO_SICETAC`, `409 COTIZACION_NO_EDITABLE`… El asistente
+nunca confirma sin piso (`confirmarSinPiso` no se usa). Si el dominio rechaza el cambio, la acción queda `fallida` con el código y el motivo, no
+se modifica nada, la respuesta es ese mismo error y la conversación agrega un mensaje del asistente que lo explica.
+
+Una acción vence a los 30 minutos (`Asistente__VigenciaAccionMinutos`), se confirma una sola vez (también con confirmaciones simultáneas) y solo
+la confirma o cancela quien tiene la conversación (ni siquiera el Admin). Cada acción queda guardada con sus parámetros, quién, cuándo y cómo
+terminó: es la auditoría de la escritura.
+
+```ts
+interface AccionAsistenteDto {
+  id: Guid; conversacionId: Guid; mensajeId: Guid
+  tipo: "agregar_flete" | "editar_flete" | "agregar_conexos" | "rechazar_linea" | "cambiar_vehiculo"
+  resumen: string                       // lo que se le muestra a la persona para decidir
+  parametros: object                    // exactamente lo que se aplicaría
+  estado: "pendiente" | "ejecutando" | "ejecutada" | "fallida" | "cancelada" | "vencida"
+  venceAt: string; resueltaAt: string | null
+  resultadoCodigo: string | null        // "ok" o el código del rechazo del dominio
+  resultadoMensaje: string | null; createdAt: string
+}
+```
+
+#### `POST /api/asistente/acciones/{id}/confirmar`
+Aplica el cambio propuesto.
+- **Roles**: AdminTarifas, Admin (y solo quien tiene la conversación).
+- **→** `200 AccionAsistenteDto` (`estado: "ejecutada"`)
+- **Errores**: `403 ACCION_AJENA` · `404 ACCION_NO_ENCONTRADA` · `409 ACCION_YA_RESUELTA` · `409 ACCION_VENCIDA` · y el error del dominio que rechace el cambio
+  (se conserva su código y su estado HTTP).
+
+#### `POST /api/asistente/acciones/{id}/cancelar`
+Descarta el cambio propuesto sin aplicarlo.
+- **Roles**: AdminTarifas, Admin (y solo quien tiene la conversación).
+- **→** `200 AccionAsistenteDto` (`estado: "cancelada"`)
+- **Errores**: `403 ACCION_AJENA` · `404 ACCION_NO_ENCONTRADA` · `409 ACCION_YA_RESUELTA`
 
 ## 4. Hubs de SignalR — conexión
 
@@ -2315,6 +2367,7 @@ abiertos a los 6 roles.
 | Escrituras de los 6 passthrough de catálogo (§3.14.1) | | | ✅ | | | ✅ |
 | `/api/asistente/herramientas`: el endpoint es de cualquier rol; cada herramienta repite los roles de la consulta que envuelve (§3.23) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `/api/asistente/conversaciones` (conversar y leer las propias; el Admin además lee cualquiera) (§3.24) | | | ✅ | | | ✅ |
+| `/api/asistente/acciones/{id}/confirmar` y `/cancelar` (solo quien tiene la conversación) (§3.24.1) | | | ✅ | | | ✅ |
 
 ---
 

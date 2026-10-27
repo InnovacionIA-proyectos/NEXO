@@ -36,11 +36,13 @@ public sealed class clsObtenerConversacionAsistenteQueryHandler(IConversacionesA
 
         var mensajes = await conversaciones.MensajesAsync(c.Id, ct);
         var herramientas = await conversaciones.HerramientasAsync(c.Id, ct);
+        var acciones = await conversaciones.AccionesAsync(c.Id, ct);
 
         return new clsConversacionDetalleDto(
             c.Id, c.Titulo, c.Turnos, c.UsuarioId, c.CreatedAt, c.UpdatedAt,
             mensajes.Select(m => new clsMensajeAsistenteDto(m.Id, m.Orden, m.Rol, m.Contenido, m.Estado, m.CreatedAt)).ToList(),
             herramientas.Select(h => new clsUsoHerramientaDto(
-                h.MensajeId, h.Herramienta, h.Entrada, h.Encontrado, h.Fuente, h.Resultado, h.LatenciaMs, h.CreatedAt)).ToList());
+                h.MensajeId, h.Herramienta, h.Entrada, h.Encontrado, h.Fuente, h.Resultado, h.LatenciaMs, h.CreatedAt)).ToList(),
+            acciones.Select(clsAccionAsistenteDto.De).ToList());
     }
 }

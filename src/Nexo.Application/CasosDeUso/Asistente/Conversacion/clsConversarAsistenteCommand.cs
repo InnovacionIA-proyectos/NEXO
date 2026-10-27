@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
+using Nexo.Application.CasosDeUso.Asistente.Herramientas;
 using Nexo.Application.Common;
 using Nexo.Application.Common.Abstractions;
 using Nexo.Application.Common.Exceptions;
@@ -23,10 +24,14 @@ public sealed class clsConversarAsistenteCommandHandler(
     IConversacionesAsistenteRepository conversaciones,
     clsHerramientasDelAsistente herramientas,
     ICurrentUserPort usuario,
-    clsLimitesAsistente limites)
+    clsLimitesAsistente limites,
+    clsContextoConversacionAsistente contexto)
     : ICommandHandler<clsConversarAsistenteCommand, IAsyncEnumerable<clsEventoAsistente>>
 {
     private const int LargoDelTitulo = 60;
+
+    /// <summary>Acciones propuestas durante la respuesta que aún no se le han avisado al cliente.</summary>
+    private readonly Queue<Guid> _accionesPropuestas = new();
 
     public async Task<IAsyncEnumerable<clsEventoAsistente>> Handle(clsConversarAsistenteCommand command, CancellationToken ct = default)
     {
@@ -55,6 +60,8 @@ public sealed class clsConversarAsistenteCommandHandler(
         var previos = conversacion is null ? [] : await conversaciones.MensajesAsync(conversacion.Id, ct);
         conversacion ??= await conversaciones.CrearAsync(usuario.Id, Titulo(pregunta), ct);
         var respuestaId = await conversaciones.IniciarTurnoAsync(conversacion.Id, pregunta, ct);
+        contexto.ConversacionId = conversacion.Id;
+        contexto.MensajeId = respuestaId;
 
         return Transmitir(conversacion.Id, respuestaId, pregunta, previos, ct);
     }
@@ -130,6 +137,9 @@ public sealed class clsConversarAsistenteCommandHandler(
                         case clsEventoConversacionIa.HerramientaTerminada f:
                             yield return new clsEventoAsistente.Herramienta(
                                 f.Llamada.Nombre, f.Resultado.EsError ? "error" : "ok", f.Resultado.Fuente);
+                            while (_accionesPropuestas.TryDequeue(out var accionId))
+                                if (await conversaciones.ObtenerAccionAsync(accionId, CancellationToken.None) is { } propuesta)
+                                    yield return new clsEventoAsistente.Accion(clsAccionAsistenteDto.De(propuesta));
                             break;
                         case clsEventoConversacionIa.Fin f:
                             motivo = f.Motivo;
@@ -205,6 +215,7 @@ public sealed class clsConversarAsistenteCommandHandler(
         try
         {
             leido = await herramientas.EjecutarAsync(llamada.Nombre, llamada.Entrada, ct);
+            if (leido.Valor is clsAccionPropuestaDto propuesta) _accionesPropuestas.Enqueue(propuesta.AccionId);
             salida = contenido = JsonSerializer.Serialize(leido, JsonSerializerOptions.Web);
             resultado = clsUsoHerramientaAsistente.ResultadoOk;
         }

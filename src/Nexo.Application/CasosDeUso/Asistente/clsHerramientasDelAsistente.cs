@@ -72,6 +72,14 @@ public static class clsDependencyInjection
         services.AddScoped<IHerramientaAsistente, clsConsultarPropuestaLineaHerramienta>();
         services.AddScoped<IHerramientaAsistente, clsConsultarServiciosConexosHerramienta>();
         services.AddScoped<IHerramientaAsistente, clsBuscarCiudadesDaneHerramienta>();
+        services.AddScoped<IHerramientaAsistente, clsProponerAgregarFleteHerramienta>();
+        services.AddScoped<IHerramientaAsistente, clsProponerEditarFleteHerramienta>();
+        services.AddScoped<IHerramientaAsistente, clsProponerAgregarConexosHerramienta>();
+        services.AddScoped<IHerramientaAsistente, clsProponerRechazarLineaHerramienta>();
+        services.AddScoped<IHerramientaAsistente, clsProponerCambiarVehiculoHerramienta>();
+        services.AddScoped<clsContextoConversacionAsistente>();
+        services.AddScoped<ICommandHandler<clsConfirmarAccionAsistenteCommand, clsAccionAsistenteDto>, clsConfirmarAccionAsistenteCommandHandler>();
+        services.AddScoped<ICommandHandler<clsCancelarAccionAsistenteCommand, clsAccionAsistenteDto>, clsCancelarAccionAsistenteCommandHandler>();
         services.AddScoped<clsHerramientasDelAsistente>();
         services.AddScoped<IQueryHandler<clsListarHerramientasAsistenteQuery, IReadOnlyList<clsDefinicionHerramientaDto>>, clsListarHerramientasAsistenteQueryHandler>();
         services.AddScoped<IQueryHandler<clsEjecutarHerramientaAsistenteQuery, clsResultadoHerramienta>, clsEjecutarHerramientaAsistenteQueryHandler>();
