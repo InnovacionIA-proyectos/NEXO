@@ -152,6 +152,23 @@ CREATE TABLE [db_NEXO].[tbl_diccionario_cliente] (
         ([Tipo] = N'valor' AND [Contexto] IS NOT NULL) OR ([Tipo] <> N'valor' AND [Contexto] IS NULL))
 );
 
+-- Código de cada tipo de vehículo en SICE-TAC (CONFIGURACION de tblRutasSicetac) y en Plaza/SAP (el mismo para tblSAPTarifas
+-- y tbl_tarifas_plaza). Global, no por cliente. Parte del TipoVehiculo ya resuelto por tbl_alias_elementos. CodigoPlazaSap NULL
+-- = sin tarifa de plaza. Script con la carga inicial: docs/Database/377_mapeo_vehiculo_tarifario.sql.
+CREATE TABLE [db_NEXO].[tbl_mapeo_vehiculo_tarifario] (
+    [Id] uniqueidentifier NOT NULL,
+    [TipoVehiculo] nvarchar(20) NOT NULL,
+    [CodigoSicetac] nvarchar(20) NOT NULL,
+    [NombreSicetac] nvarchar(200) NULL,
+    [CodigoPlazaSap] nvarchar(20) NULL,
+    [NombreTarifasPlaza] nvarchar(100) NULL,
+    [Verificacion] nvarchar(500) NULL,
+    [Activo] bit NOT NULL CONSTRAINT [DF_mapeo_vehiculo_tarifario_Activo] DEFAULT (1),
+    [CreatedAt] datetimeoffset NOT NULL CONSTRAINT [DF_mapeo_vehiculo_tarifario_CreatedAt] DEFAULT (sysdatetimeoffset()),
+    [UpdatedAt] datetimeoffset NULL
+    , CONSTRAINT [PK_mapeo_vehiculo_tarifario] PRIMARY KEY ([Id])
+);
+
 -- Catálogo propio de municipios (Colombia/Venezuela/Ecuador) para el
 -- desplegable de Origen/Destino en Captura de Solicitudes (S4-HU-09.1).
 -- Poblada UNA SOLA VEZ desde tblSAPDANE/tblZonasTarificacionRelacion/
@@ -853,6 +870,7 @@ CREATE INDEX [IX_audit_log_UsuarioId] ON [db_NEXO].[tbl_audit_log] ([UsuarioId])
 CREATE UNIQUE INDEX [IX_clientes_Nit] ON [db_NEXO].[tbl_clientes] ([Nit]);
 CREATE UNIQUE INDEX [IX_diccionario_cliente_Unico] ON [db_NEXO].[tbl_diccionario_cliente] ([ClienteId], [TerminoNormalizado], [Tipo], [Contexto]);
 CREATE INDEX [IX_diccionario_cliente_ClienteId_Tipo] ON [db_NEXO].[tbl_diccionario_cliente] ([ClienteId], [Tipo]);
+CREATE UNIQUE INDEX [IX_mapeo_vehiculo_tarifario_TipoVehiculo] ON [db_NEXO].[tbl_mapeo_vehiculo_tarifario] ([TipoVehiculo]);
 CREATE INDEX [IX_colocaciones_cargue_ItemPlanCargueId] ON [db_NEXO].[tbl_colocaciones_cargue] ([ItemPlanCargueId]);
 CREATE INDEX [IX_colocaciones_cargue_PlanCargueId_Cargada] ON [db_NEXO].[tbl_colocaciones_cargue] ([PlanCargueId], [Cargada]);
 CREATE INDEX [IX_cotizacion_conexos_CotizacionId] ON [db_NEXO].[tbl_cotizacion_conexos] ([CotizacionId]);
