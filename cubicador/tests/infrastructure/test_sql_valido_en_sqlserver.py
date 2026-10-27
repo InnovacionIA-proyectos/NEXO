@@ -16,6 +16,7 @@ el dialecto de SQL Server y revisan la forma del SQL. Corren en milisegundos.
 
 from __future__ import annotations
 
+import ast
 import pathlib
 import re
 
@@ -27,10 +28,6 @@ from infrastructure.persistence.repositorios.plan_cargue_repo import SqlPlanCarg
 # `IS <literal>` solo es valido en SQL Server con NULL: `IS NULL` e `IS NOT
 # NULL`. Con 0, 1, true o false es el error 102.
 _IS_CON_LITERAL = re.compile(r"\bIS\s+(?!NULL\b|NOT\s+NULL\b)\S", re.IGNORECASE)
-
-# Un uso REAL sobre una columna, no la palabra suelta en un comentario: si no,
-# el barrido se tropieza con la explicacion de por que no se usa.
-_USO_REAL = re.compile(r"\w+Model\.\w+\.is_\((?:True|False)\)")
 
 
 class _SesionQueSoloCompila:
@@ -48,7 +45,7 @@ class _SesionQueSoloCompila:
         self.sentencias.append(
             str(sentencia.compile(dialect=mssql.dialect(),
                                   compile_kwargs={"literal_binds": True})))
-        return _ResultadoVacio()
+        return _ResultadoConUnaFila()
 
     async def get(self, *_args, **_kwargs):
         # `flota` exige un plan cargado antes de llegar a sus consultas.
@@ -64,15 +61,35 @@ class _PlanDeMentira:
     numero_vehiculo = 1
 
 
-class _ResultadoVacio:
+class _ResultadoConUnaFila:
+    """Devuelve UNA fila, no cero.
+
+    Con cero, `flota` y `listar_por_linea` se cortaban en su
+    `... if ids else {}` y nunca llegaban a armar la consulta booleana: la
+    prueba pasaba aunque el codigo estuviera roto. Se detecto revirtiendo el
+    arreglo y mirando CUALES casos fallaban - fallaban 5 de 7, no 7 de 7.
+    """
+
     def scalars(self):
-        return self
+        # `scalars().all()` devuelve ENTIDADES, y los metodos que lo usan las
+        # mapean a dominio: una tupla ahi revienta. Vacio es suficiente para
+        # ellos, porque su consulta booleana ya se compilo al llamar.
+        return _SinFilas()
 
     def all(self):
-        return []
+        # `.all()` sin `scalars` devuelve filas crudas, y `flota` /
+        # `listar_por_linea` las usan para armar la lista de ids del SEGUNDO
+        # query, que es el que filtra por booleano. Con cero filas ese query
+        # no se arma y la prueba pasaba en vacio.
+        return [("plan-1", 1)]
 
     def first(self):
         return None
+
+
+class _SinFilas:
+    def all(self):
+        return []
 
 
 async def _sql_de(metodo, *args) -> list[str]:
@@ -119,18 +136,52 @@ async def test_los_booleanos_se_comparan_con_igual():
     assert "cargada = 0" in sql, sql
 
 
-def test_ningun_repositorio_usa_is_sobre_booleanos():
-    """Barrido estatico, por si aparece en un metodo que estas pruebas no llaman.
+def _llamadas_is_con_booleano(ruta: pathlib.Path) -> list[int]:
+    """Lineas con `algo.is_(<booleano>)`, leyendo el ARBOL y no el texto.
 
-    Es mas debil que compilar -no ve una consulta armada de otra forma- pero
-    cubre los metodos que necesitan datos para avanzar.
+    Buscarlo con una expresion regular tenia dos agujeros, los dos reales:
+
+    - se tropezaba con los comentarios que explican por que no se usa, asi que
+      hubo que exigir un prefijo `...Model.`; y con eso dejaba fuera los
+      modelos del catalogo, que se llaman `Vehiculo`, `TipoMercancia`,
+      `ReglaIncompatibilidad`... y tienen trece columnas booleanas entre ellos
+    - no veia `.is_(sa.false())`, que compila al mismo `IS 0`
+
+    El arbol no tiene esos problemas: un comentario no es una llamada, y el
+    nombre del modelo da igual.
+    """
+    arbol = ast.parse(ruta.read_text(encoding="utf-8"), filename=str(ruta))
+    lineas = []
+    for nodo in ast.walk(arbol):
+        if not (isinstance(nodo, ast.Call)
+                and isinstance(nodo.func, ast.Attribute)
+                and nodo.func.attr == "is_"
+                and len(nodo.args) == 1):
+            continue
+        arg = nodo.args[0]
+        es_literal = isinstance(arg, ast.Constant) and isinstance(arg.value, bool)
+        # `sa.true()` / `false()` compilan igual que el literal.
+        es_helper = (isinstance(arg, ast.Call) and isinstance(arg.func, (ast.Name, ast.Attribute))
+                     and (arg.func.id if isinstance(arg.func, ast.Name) else arg.func.attr)
+                     in ("true", "false"))
+        if es_literal or es_helper:
+            lineas.append(nodo.lineno)
+    return lineas
+
+
+def test_ningun_repositorio_usa_is_sobre_booleanos():
+    """Barrido por si aparece donde las pruebas de arriba no llegan.
+
+    Las de compilacion solo recorren `SqlPlanCargueRepository`; los otros cinco
+    repositorios no pasan por ningun compilador. Y `actualizar_tras_ajuste`
+    necesita un plan cargado para avanzar, asi que tampoco esta ahi. Este
+    barrido es lo unico que los cubre.
     """
     raiz = pathlib.Path(__file__).resolve().parents[2] / "infrastructure"
     ofensores = [
         f"{ruta.relative_to(raiz.parent)}:{n}"
-        for ruta in raiz.rglob("*.py")
-        for n, linea in enumerate(ruta.read_text(encoding="utf-8").splitlines(), 1)
-        if _USO_REAL.search(linea)
+        for ruta in sorted(raiz.rglob("*.py"))
+        for n in _llamadas_is_con_booleano(ruta)
     ]
     assert not ofensores, (
         "`.is_(True)` / `.is_(False)` compilan a `IS 1` / `IS 0`, que SQL Server "

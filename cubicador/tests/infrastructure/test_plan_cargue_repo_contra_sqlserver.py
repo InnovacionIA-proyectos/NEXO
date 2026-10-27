@@ -89,6 +89,11 @@ async def sesion():
     finally:
         async with motor.begin() as c:
             await c.run_sync(Base.metadata.drop_all, tables=tablas)
+            # Y el esquema: si no, queda vacio para siempre. Da igual en el
+            # compose local, pero `CUBICADOR_TEST_MSSQL_URL` puede apuntar a
+            # otra instancia y ahi seria basura ajena.
+            await c.execute(text(
+                f"IF SCHEMA_ID('{_ESQUEMA}') IS NOT NULL DROP SCHEMA {_ESQUEMA}"))
         for t in tablas:
             t.schema = esquemas_originales[t.name]
         await motor.dispose()
@@ -115,10 +120,12 @@ async def _sembrar(sesion) -> str:
         largo_mm=600, ancho_mm=400, alto_mm=400, peso_kg=10, cantidad=2,
         created_at=ahora, updated_at=ahora))
     await sesion.flush()
-    for indice, cargada in ((0, True), (1, False)):
+    # Una cargada y bloqueada, otra ni lo uno ni lo otro: asi los tres filtros
+    # -cargada, no cargada, y cargada+bloqueada- tienen algo que descartar.
+    for indice, cargada, bloqueada in ((0, True, True), (1, False, False)):
         sesion.add(ColocacionCargueModel(
             id=str(uuid.uuid4()), plan_cargue_id=plan_id, item_plan_cargue_id=item_id,
-            indice_unidad=indice, cargada=cargada))
+            indice_unidad=indice, cargada=cargada, bloqueada=bloqueada))
     await sesion.commit()
     return plan_id
 
@@ -138,8 +145,12 @@ async def test_el_recorrido_del_plan_no_revienta_contra_sqlserver(sesion):
 
     assert await repo.cargo_algo(plan_id) is True
 
+    # Con una bloqueada y una que no, el filtro tiene algo que descartar: si
+    # alguien quitara el `AND bloqueada`, esto lo nota. Con las dos sin
+    # bloquear, esperar `[]` pasaba aunque el filtro no existiera.
     bloqueadas = await repo.obtener_colocaciones_bloqueadas(plan_id)
-    assert bloqueadas == [], "ninguna se marco como bloqueada"
+    assert [c.indice_unidad for c in bloqueadas] == [0], (
+        "solo la unidad 0 esta cargada Y bloqueada")
 
     flota = await repo.flota(plan_id)
     assert len(flota) == 1
