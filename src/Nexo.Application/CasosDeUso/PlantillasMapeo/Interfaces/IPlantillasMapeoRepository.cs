@@ -21,4 +21,10 @@ public interface IPlantillasMapeoRepository
 
     void Agregar(clsPlantillaMapeoCliente plantilla);
     void Eliminar(clsPlantillaMapeoCliente plantilla);
+
+    /// <summary>¿El error de guardar es el índice único (cliente + firma)? Otra confirmación del mismo formato se adelantó.</summary>
+    bool EsChoqueDeFirma(Exception error);
+
+    /// <summary>Descarta lo que quedó pendiente de guardar (la plantilla nueva y su auditoría) para volver a empezar tras un choque de firma.</summary>
+    void DescartarCambiosPendientes();
 }

@@ -153,8 +153,9 @@ CREATE TABLE [db_NEXO].[tbl_diccionario_cliente] (
 );
 
 -- El mapeo de columnas que un cliente ya confirmó para sus Excel. Al llegar otro archivo con los mismos encabezados se reusa en vez de
--- llamar a la IA. FirmaEncabezados = SHA-256 (hex) de los encabezados normalizados y en orden; con ClienteId es única. Encabezados y
--- Columnas son JSON. Script para una base existente: docs/Database/361_plantillas_mapeo_cliente.sql.
+-- llamar a la IA. FirmaEncabezados = SHA-256 (hex) de los encabezados normalizados y en orden; con ClienteId es única. Encabezados es un
+-- arreglo JSON de textos; Columnas un objeto JSON { "version": 1, "columnas": [{ indice, campo, transformacion }] }. Script para una base
+-- existente: docs/Database/361_plantillas_mapeo_cliente.sql.
 CREATE TABLE [db_NEXO].[tbl_plantillas_mapeo_cliente] (
     [Id] uniqueidentifier NOT NULL,
     [ClienteId] uniqueidentifier NOT NULL,

@@ -24,7 +24,16 @@ internal static class clsPlantillasMapeoReglas
 
     public static string SerializarEncabezados(IReadOnlyList<string> encabezados) => JsonSerializer.Serialize(encabezados, Json);
 
-    public static string SerializarColumnas(IReadOnlyList<clsColumnaPlantillaDto> columnas) => JsonSerializer.Serialize(columnas, Json);
+    /// <summary>
+    /// La forma con la que se guardan las columnas: <c>{ "version": 1, "columnas": [...] }</c>. La versión permite cambiar esa forma más adelante
+    /// sin que las plantillas ya guardadas se lean mal: una versión que este código no conoce se trata como plantilla vieja (se vuelve a sugerir).
+    /// </summary>
+    public const int VersionDeColumnas = 1;
+
+    private sealed record ColumnasGuardadas(int Version, List<clsColumnaPlantillaDto>? Columnas);
+
+    public static string SerializarColumnas(IReadOnlyList<clsColumnaPlantillaDto> columnas) =>
+        JsonSerializer.Serialize(new ColumnasGuardadas(VersionDeColumnas, [.. columnas]), Json);
 
     /// <summary>Los encabezados guardados, o null si el JSON no se puede leer.</summary>
     public static IReadOnlyList<string>? LeerEncabezados(string json)
@@ -33,10 +42,14 @@ internal static class clsPlantillasMapeoReglas
         catch (JsonException) { return null; }
     }
 
-    /// <summary>Las columnas guardadas, o null si el JSON no se puede leer.</summary>
+    /// <summary>Las columnas guardadas, o null si el JSON no se puede leer, no es de la versión que se conoce o no trae las columnas.</summary>
     public static IReadOnlyList<clsColumnaPlantillaDto>? LeerColumnas(string json)
     {
-        try { return JsonSerializer.Deserialize<List<clsColumnaPlantillaDto>>(json, Json); }
+        try
+        {
+            var guardadas = JsonSerializer.Deserialize<ColumnasGuardadas>(json, Json);
+            return guardadas is { Version: VersionDeColumnas, Columnas: { } columnas } && columnas.All(c => c is not null) ? columnas : null;
+        }
         catch (JsonException) { return null; }
     }
 
@@ -60,7 +73,10 @@ public sealed class clsGuardarPlantillaMapeoCommandHandler(
     IPlantillasMapeoRepository repositorio, IAuditoriaPort auditoria, ICurrentUserPort usuarioActual, IUnitOfWork uow, TimeProvider reloj)
     : ICommandHandler<clsGuardarPlantillaMapeoCommand, clsPlantillaGuardadaDto>
 {
-    public async Task<clsPlantillaGuardadaDto> Handle(clsGuardarPlantillaMapeoCommand command, CancellationToken ct = default)
+    public Task<clsPlantillaGuardadaDto> Handle(clsGuardarPlantillaMapeoCommand command, CancellationToken ct = default) =>
+        Guardar(command, reintento: false, ct);
+
+    private async Task<clsPlantillaGuardadaDto> Guardar(clsGuardarPlantillaMapeoCommand command, bool reintento, CancellationToken ct)
     {
         if (command.ClienteId is not { } clienteId)
             throw new clsValidationFailedException("CLIENTE_REQUERIDO", "Indica el cliente dueño de la plantilla.");
@@ -97,7 +113,17 @@ public sealed class clsGuardarPlantillaMapeoCommandHandler(
 
         auditoria.Registrar(usuarioActual.Id, "plantilla_mapeo_cliente", plantilla.Id, creada ? "crear_plantilla" : "reemplazar_plantilla",
             JsonSerializer.Serialize(new { clienteId, nombre, columnas = columnas.Count, encabezados = encabezados.Count }));
-        await uow.SaveChangesAsync(ct);
+        try
+        {
+            await uow.SaveChangesAsync(ct);
+        }
+        catch (Exception ex) when (creada && !reintento && repositorio.EsChoqueDeFirma(ex))
+        {
+            // Dos confirmaciones del mismo formato a la vez (un doble clic): la otra insertó entre mi búsqueda y mi inserción. No es un error del
+            // usuario; se vuelve a empezar, y ahora la plantilla ya existe, así que esta vez se reemplaza.
+            repositorio.DescartarCambiosPendientes();
+            return await Guardar(command, reintento: true, ct);
+        }
 
         var guardada = await repositorio.BuscarPorFirmaAsync(clienteId, firma, ct) ?? plantilla;
         return new clsPlantillaGuardadaDto(clsPlantillasMapeoReglas.ADto(guardada), creada);
@@ -118,6 +144,9 @@ public sealed class clsGuardarPlantillaMapeoCommandHandler(
                 throw new clsValidationFailedException("ENCABEZADO_DEMASIADO_LARGO", $"Un encabezado admite máximo {clsPlantillasMapeoReglas.MaxCaracteresEncabezado} caracteres.");
             limpios.Add(texto);
         }
+        // Un archivo sin ningún encabezado no tiene nada con qué reconocerse: todos los archivos "vacíos" compartirían la misma plantilla.
+        if (clsFirmaDeEncabezados.Cantidad(limpios) == 0)
+            throw new clsValidationFailedException("ENCABEZADOS_REQUERIDOS", "Envía al menos un encabezado con texto.");
         return limpios;
     }
 }

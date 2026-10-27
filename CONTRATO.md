@@ -797,7 +797,9 @@ revisa y la confirma en la pantalla de mapeo. Recibe lo que ya devolvió `analiz
 Cómo se arma, en este orden:
 0. **La plantilla guardada del cliente** (ver `plantillas-mapeo`, abajo): si el cliente ya confirmó un mapeo para **exactamente** estos encabezados (sin importar mayúsculas ni
    tildes, pero sí el orden y la cantidad), se devuelve ese mapeo con `origen = "plantilla"`, `confianza = 1`, `plantillaId` y `motivoSinIa = "PLANTILLA_RECONOCIDA"`, y **no se
-   llama a la IA**. Si cambia un encabezado, se agrega, se quita o se reordena una columna, no hay plantilla y se sugiere como siempre (pasos 1 a 3). Requiere `clienteId`.
+   llama a la IA ni se consulta el diccionario**. Si cambia un encabezado, se agrega, se quita o se reordena una columna, no hay plantilla y se sugiere como siempre (pasos 1 a 3).
+   Requiere `clienteId`. **Si la plantilla ya no sirve** (apunta a un campo o a una conversión que ya no existe en NEXO, ya no cumple las reglas del mapeo o no se puede leer),
+   no se usa: se sugiere como si no existiera y `dudas` trae el aviso «La plantilla guardada para estos encabezados ya no sirve…» para que el usuario la confirme de nuevo.
 1. **El diccionario del cliente manda** (§3.19.1): una columna cuyo encabezado está en su diccionario (o en el general) se resuelve sin IA, con
    `confianza = 1` y `origen = "diccionario"`. Si el diccionario resuelve todas las columnas, no se llama a la IA (`DICCIONARIO_COMPLETO`).
 2. **La IA completa lo pendiente**, con datos mínimos: los encabezados, **hasta 20 filas** de muestra y las pistas del diccionario. Antes de salir,
@@ -849,9 +851,29 @@ interface ColumnaMapeadaDto {
 El mapeo que el usuario **confirmó** para el Excel de un cliente se guarda como su plantilla (`tbl_plantillas_mapeo_cliente`). Cuando llega otro archivo del cliente con
 **los mismos encabezados**, `sugerir-mapeo` devuelve ese mapeo en vez de llamar a la IA. Roles: `Comercial`, `Admin`.
 
-La plantilla se reconoce por la **firma de los encabezados**: el SHA-256 de los encabezados normalizados (sin tildes ni mayúsculas, espacios y puntuación colapsados) **y en orden**.
-`Peso (TON)` y `PESO (ton)` dan la misma firma; cambiar una palabra, agregar, quitar o reordenar una columna da otra, y el archivo se sugiere de nuevo. Un cliente tiene una sola
-plantilla por conjunto de encabezados.
+La plantilla se reconoce por la **firma de los encabezados**: el SHA-256 de los encabezados normalizados **y en orden**, más su cantidad. Guardar y buscar usan siempre el mismo cálculo.
+La regla, exacta, para cada encabezado:
+
+1. Se quitan los caracteres invisibles (ancho cero, marca de orden de bytes).
+2. Cualquier espacio en blanco (espacio, tabulador, salto de línea, espacio de no separación) pasa a un espacio; los repetidos y los de los extremos se quitan.
+3. `_` y `-` cuentan como espacio, y un espacio antes de una coma o un punto se quita.
+4. Se quitan las tildes y todo pasa a mayúsculas.
+
+`Peso (TON)`, `peso (ton)`, `PESO  (TON)` y `Peso\n(ton)` dan la misma firma. **Distinguen**: otra palabra, otra puntuación (`Peso(kg)` ≠ `Peso (kg)`), **otro orden** y otra cantidad de
+columnas (el mapeo es por posición: el mismo archivo con las columnas reordenadas se sugiere de nuevo, a propósito). Columnas sin encabezado: una **en el medio** cuenta (ocupa su
+posición); las vacías **al final no** cuentan (Excel suele reportar columnas de más que nadie vio). **Qué fila trae los encabezados y qué pasa con las celdas combinadas lo resuelve quien lee el
+archivo** (el front): aquí llega la lista ya resuelta, una por columna, y es su responsabilidad mandar la misma fila en cada carga del mismo formato.
+
+Un cliente tiene una sola plantilla por conjunto de encabezados: guardar otra vez **reemplaza** (y actualiza `updatedAt`). Dos confirmaciones a la vez (un doble clic) no fallan: una crea y la otra reemplaza.
+Las columnas se guardan con una **versión** (`{ "version": 1, "columnas": [...] }`): una versión que el código no conoce se trata como plantilla vieja.
+
+**Decisiones**
+- **Con plantilla manda la plantilla**: no se consulta el diccionario. Confirmar un mapeo **no agrega** los encabezados al diccionario del cliente (el diccionario lo mantienen Datos y Comercial con su propio CRUD;
+  una sola confirmación podría contaminarlo con un término ambiguo). Editar el diccionario **no invalida** las plantillas: son lo que el usuario confirmó para ese formato exacto.
+- **Que haya plantilla solo evita llamar a la IA.** `aplicar-mapeo` corre igual, con todas sus validaciones (peso, ciudades, catálogos) y los errores por fila.
+- **Quién la confirmó**: crear, reemplazar y borrar quedan en `tbl_audit_log` (entidad `plantilla_mapeo_cliente`) con el usuario que lo hizo.
+- **Roles**: `Comercial` y `Admin` crean, reemplazan, listan y borran. El `clienteId` lo manda el front (el cliente que el usuario eligió) y el backend verifica que exista; NEXO no
+  tiene hoy clientes asignados por usuario, así que cualquier `Comercial` puede ver o reemplazar la plantilla de cualquier cliente.
 
 **`PUT /api/captura-solicitudes/plantillas-mapeo`** — guarda o reemplaza la plantilla (la que ya tenga esos encabezados). `201` la primera vez, `200` si reemplazó.
 

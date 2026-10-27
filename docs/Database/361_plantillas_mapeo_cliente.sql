@@ -13,7 +13,7 @@
 --   FirmaEncabezados : SHA-256 en hexadecimal (64 caracteres) de los encabezados normalizados (sin tildes ni mayúsculas) y en orden.
 --                      Con ClienteId es única: un cliente tiene como máximo una plantilla por conjunto de encabezados.
 --   Encabezados      : los encabezados tal como llegaron, arreglo JSON de textos (solo para mostrarlos).
---   Columnas         : el mapeo, arreglo JSON de { indice, campo, transformacion }, una entrada por columna.
+--   Columnas         : el mapeo, objeto JSON { "version": 1, "columnas": [{ indice, campo, transformacion }] }; la versión permite cambiar la forma sin leer mal las ya guardadas.
 --
 -- ORDEN: aplicar ESTE script antes de desplegar el código nuevo. Es idempotente (se puede correr dos veces).
 -- Reemplazar db_NEXO por el valor de Database__Esquema del ambiente si es otro.
