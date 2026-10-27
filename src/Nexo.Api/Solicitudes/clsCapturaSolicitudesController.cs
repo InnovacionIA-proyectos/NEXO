@@ -1,6 +1,7 @@
 using Nexo.Api.Common.Errors;
 using Nexo.Application.CasosDeUso.MapeoExcel;
 using Nexo.Application.CasosDeUso.MapeoExcel.DTOs;
+using Nexo.Application.CasosDeUso.MapeoExcel.Normalizacion;
 using Nexo.Application.CasosDeUso.Solicitudes;
 using Nexo.Application.CasosDeUso.Solicitudes.DTOs;
 using Nexo.Application.Common.Abstractions;
@@ -33,6 +34,7 @@ public class clsCapturaSolicitudesController(
     IQueryHandler<clsAnalizarExcelQuery, clsAnalisisExcelDto> analizarExcel,
     IQueryHandler<clsSugerirMapeoExcelQuery, clsSugerenciaMapeoDto> sugerirMapeo,
     IQueryHandler<clsAplicarMapeoExcelQuery, clsResultadoAplicarMapeoDto> aplicarMapeo,
+    IQueryHandler<clsNormalizarValoresQuery, clsResultadoNormalizacionDto> normalizarValores,
     ICommandHandler<clsCapturarSolicitudCommand, clsCapturaResultDto> capturar,
     IQueryHandler<clsBuscarClientesQuery, IReadOnlyList<clsClienteBusquedaDto>> buscarClientes,
     IQueryHandler<clsListarDepartamentosQuery, IReadOnlyList<string>> listarDepartamentos,
@@ -91,6 +93,22 @@ public class clsCapturaSolicitudesController(
             req.Columnas.Select(c => new clsColumnaAAplicar(c.Indice, c.Campo, c.Transformacion)).ToList(),
             req.Filas.Select(f => (IReadOnlyList<string>)(f ?? [])).ToList(),
             req.PrimeraFila), ct));
+
+    /// <summary>
+    /// Lleva los textos libres distintos de un Excel (tipo de vehículo, carrocería y ciudad) a los valores oficiales de NEXO. Primero reglas exactas
+    /// (diccionario del cliente, alias, catálogo oficial, código DANE o nombre de municipio); con lo que no resuelven, UNA sola llamada a la IA por
+    /// todos los textos distintos, con listas cerradas: lo que el modelo elige solo vale si la regla lo valida. No persiste nada; lo que siga sin
+    /// resolverse se envía tal cual al capturar y la captura lo manda a la cuarentena de vehículos. Si la IA está apagada o falla responde igual
+    /// con lo que resolvieron las reglas (<c>iaUsada=false</c> y <c>motivoSinIa</c>). 429 <c>IA_TOPE_DIARIO</c> si la persona ya consumió su tope.
+    /// </summary>
+    [HttpPost("normalizar-valores")]
+    [Authorize(Roles = "Comercial,Admin")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
+    public async Task<ActionResult<clsResultadoNormalizacionDto>> NormalizarValores([FromBody] clsNormalizarValoresRequest req, CancellationToken ct = default)
+        => Ok(await normalizarValores.Handle(new clsNormalizarValoresQuery(
+            req.ClienteId, req.Valores.Select(v => new clsValorANormalizar(v.Campo, v.Valor)).ToList()), ct));
 
     /// <summary>
     /// Crea la solicitud (cabecera + líneas) resolviendo o creando rutas y

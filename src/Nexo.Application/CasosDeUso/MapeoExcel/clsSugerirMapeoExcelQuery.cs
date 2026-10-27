@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Nexo.Application.CasosDeUso.DiccionarioCliente.Interfaces;
 using Nexo.Application.CasosDeUso.MapeoExcel.DTOs;
+using Nexo.Application.CasosDeUso.MapeoExcel.Normalizacion;
 using Nexo.Application.CasosDeUso.Solicitudes;
 using Nexo.Application.Common;
 using Nexo.Application.Common.Abstractions;
@@ -207,5 +208,6 @@ public static class clsDependencyInjection
 {
     public static IServiceCollection AddMapeoExcelUseCases(this IServiceCollection services) => services
         .AddScoped<IQueryHandler<clsSugerirMapeoExcelQuery, clsSugerenciaMapeoDto>, clsSugerirMapeoExcelQueryHandler>()
-        .AddScoped<IQueryHandler<clsAplicarMapeoExcelQuery, clsResultadoAplicarMapeoDto>, clsAplicarMapeoExcelQueryHandler>();
+        .AddScoped<IQueryHandler<clsAplicarMapeoExcelQuery, clsResultadoAplicarMapeoDto>, clsAplicarMapeoExcelQueryHandler>()
+        .AddScoped<IQueryHandler<clsNormalizarValoresQuery, clsResultadoNormalizacionDto>, clsNormalizarValoresQueryHandler>();
 }
