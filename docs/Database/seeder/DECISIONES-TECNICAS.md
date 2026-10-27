@@ -313,3 +313,74 @@ carrocería — eso no cambia con esta tabla. Conectar este diccionario con la
 Captura real (código C#) es trabajo de otra issue, no de esta.
 
 **Valor único (los 10 preexistentes, fuera del seeder pero documentado por si se vuelven a necesitar):** `Nombre` → `CodigoServicio`+`TipoServicio` · `ValorBase` → `CostoUnitario` · `VigenteHasta` → `Vigencia` · `Categoria`/`Activo` se conservan · `ReglaCobro` eliminado · todas las columnas de dimensión = `'NO APLICA'`.
+
+
+## `mapeo_vehiculos.csv`
+
+**Decisión (S6-HU-37.1/#377): una tabla explícita de traducción, en vez de
+asumir que NEXO, SICE-TAC y Plaza/SAP usan el mismo código de vehículo.** Hasta
+ahora NEXO consultaba SICE-TAC (`CONFIGURACION` de `tblRutasSicetac`) y Plaza/SAP
+con el mismo código de `TipoVehiculo`. Cuando la fuente usaba otro código, no
+encontraba filas y el camino tolerante tomaba la ruta con cualquier vehículo y
+se quedaba con la más barata, sin avisar. Así salió el Sencillo cotizado con
+precio de camioneta (`CA_`) en el análisis del Excel de un cliente
+(2026-10-26).
+
+**Decisión: `TipoVehiculo` es la llave y es el código de NEXO**, el que queda
+después de resolver los alias (`tbl_alias_elementos`). La tabla parte de ahí y
+dice con qué código buscar en cada fuente. Es global, no por cliente: lo propio
+de un cliente vive en `tbl_diccionario_cliente`.
+
+**Decisión: una sola columna para Plaza/SAP (`CodigoPlazaSap`)**, porque
+`tblSAPTarifas` y `tbl_tarifas_plaza` usan el mismo vocabulario. Se guarda el
+código en texto y no el ID numérico de SAP: `tbl_tarifas_plaza` compara por
+texto, y para `tblSAPTarifas` el backend ya convierte el código en ID con el
+catálogo de tipos de vehículo.
+
+**Decisiones de datos (2026-10-27):**
+- **Sencillo (`C2`) → `2`** en SICE-TAC y en Plaza/SAP. En las tarifas de plaza
+  hay unas 5.000 filas con `2` y solo 14, todas vencidas, con `C2`.
+- **Turbo:** en Plaza/SAP, `2L1`, `2L2` y `2L3` se tarifan como `2L2`; en
+  SICE-TAC cada uno conserva su código. El `2_7` del análisis del 2026-10-26 fue
+  una excepción puntual, confirmada con el Administrador de Tarifas.
+- **Dobletroque (`C3`) → `3`** en SICE-TAC y `C3` en Plaza/SAP.
+- Las configuraciones que solo existen en SICE-TAC (`2_5`, `2_7`, `3S2`, `CA_`,
+  `V2`, `V3`, `V4`) quedan con `CodigoPlazaSap` vacío.
+
+**Pendiente:** `tarifas_plaza.csv` usa `3S2` y `2L3`, que no coinciden con el
+código de plaza del mapeo (vacío y `2L2`). Hay que decidir si se corrige
+`tbl_tarifas_plaza` o si se separa la columna en dos (ver
+`docs/backlog/2026-10-27_PENDIENTES-MAPEO-VEHICULO.md`).
+
+**Decisión: se carga con script (`MERGE`) y no con `BULK INSERT`**, para que el
+mismo archivo cree la tabla, cargue los datos y se pueda volver a correr sin
+duplicar si cambia algún código.
+
+## `rangos_peso_contenedor.csv`
+
+**Decisión (S6-HU-37.3/#379): `TipoVehiculo` usa el código de NEXO, el mismo
+de `tbl_mapeo_vehiculo_tarifario`, con llave foránea hacia el índice único del
+mapeo.** El documento de negocio trae el camión de dos ejes como `"2"`, que es
+el código de SICE-TAC; en el seeder quedó como `C2`, y el mapeo hace la
+traducción (`C2` → `2`). La llave foránea impide guardar un vehículo que no esté
+mapeado.
+
+**Decisión: se descartó la fila del camión de dos ejes en contenedor de 40
+pies**, porque el documento original no le pone tope de peso. Quedan 10 filas
+(5 de 40 pies y 5 de 20 pies).
+
+**Decisión: solo peso máximo, sin peso mínimo.** La regla es tomar, entre las
+filas del tamaño de contenedor, la de menor `PesoMaximo` que alcance para el
+peso. En cada tamaño los topes van subiendo sin repetirse, así que no hace falta
+un mínimo. Por encima del tope más alto (34.000 kg en 40 pies, 30.000 kg en 20
+pies) ningún vehículo aplica.
+
+**Decisión: el seeder solo trae `Contenedor`, `TipoVehiculo` y `PesoMaximo`.**
+El nombre del vehículo ya está en el mapeo, y las notas del documento original
+explicaban justo la fila descartada.
+
+**Contexto para el backend (#381):** hoy NEXO lee los rangos de las tablas de SAP
+`tblRangoPeso` y `tblContenedorRangoPeso` (`ConfigPorRangoPesoAsync` en
+`clsTarifarioSapAdapter.cs`) y usa el código resultante directo como
+`CONFIGURACION` de SICE-TAC. Con esta tabla, el vehículo que sale del rango
+tiene que pasar por el mapeo antes de buscar en SICE-TAC o en plaza.
