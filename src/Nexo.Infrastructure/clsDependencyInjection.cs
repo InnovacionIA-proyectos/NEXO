@@ -28,6 +28,8 @@ using Nexo.Infrastructure.Catalogos.Adaptadores;
 using Nexo.Infrastructure.Cubicacion.Adaptadores;
 using Nexo.Infrastructure.External;
 using Nexo.Infrastructure.Identidad.Adaptadores;
+using Nexo.Application.CasosDeUso.Asistente.Conversacion;
+using Nexo.Infrastructure.Asistente;
 using Nexo.Infrastructure.IA;
 using Nexo.Infrastructure.IA.Repositorios;
 using Nexo.Application.CasosDeUso.IA.Interfaces;
@@ -205,6 +207,12 @@ public static class clsDependencyInjection
             sp.GetRequiredService<clsAnthropicAdapter>(), sp.GetRequiredService<IUsoIaRepository>(),
             sp.GetRequiredService<IOptions<clsOpcionesAnthropic>>(), sp.GetRequiredService<TimeProvider>(),
             sp.GetRequiredService<ILogger<clsAsistenteIaConRegistro>>()));
+        services.AddScoped<IConversacionIaPort>(sp => new clsConversacionIaConRegistro(
+            sp.GetRequiredService<clsAnthropicAdapter>(), sp.GetRequiredService<IUsoIaRepository>(),
+            sp.GetRequiredService<IOptions<clsOpcionesAnthropic>>(), sp.GetRequiredService<TimeProvider>(),
+            sp.GetRequiredService<ILogger<clsConversacionIaConRegistro>>()));
+        services.AddScoped<IConversacionesAsistenteRepository, clsEfConversacionesAsistenteRepository>();
+        services.AddScoped<IPreferenciasAsistenteRepository, clsEfPreferenciasAsistenteRepository>();
         services.AddScoped<IDestinatariosDeAlertaPort, clsDestinatariosDeAlertaAdapter>();
 
         // Reglas "solo SICE-TAC" (el mismo repositorio implementa el puerto de lectura

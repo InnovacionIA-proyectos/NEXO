@@ -25,7 +25,7 @@ namespace Nexo.Infrastructure.IA;
 /// función, modelo, tokens, latencia y resultado. Los reintentos de 429, 5xx y errores de red los hace el SDK
 /// (<see cref="clsOpcionesAnthropic.MaxReintentos"/>).
 /// </summary>
-public sealed class clsAnthropicAdapter : IAsistenteIaPort
+public sealed partial class clsAnthropicAdapter : IAsistenteIaPort
 {
     private readonly clsOpcionesAnthropic _opciones;
     private readonly ILogger<clsAnthropicAdapter> _log;
@@ -54,19 +54,14 @@ public sealed class clsAnthropicAdapter : IAsistenteIaPort
 
     public async Task<clsRespuestaIa> CompletarAsync(clsPeticionIa peticion, CancellationToken ct = default)
     {
-        if (!_opciones.Configurada || _cliente is null)
-            throw new clsServiceUnavailableException("IA_NO_CONFIGURADA", "La función de IA no está configurada en este ambiente.");
-        if (!_opciones.Habilitada)
-            throw new clsServiceUnavailableException("IA_APAGADA", "La IA está apagada en este ambiente.");
-        if (!_opciones.FuncionEncendida(peticion.Funcion))
-            throw new clsServiceUnavailableException("IA_FUNCION_DESHABILITADA", "La función de IA está apagada en este ambiente.");
+        var cliente = ExigirDisponible(peticion.Funcion);
 
         var parametros = Armar(peticion);
         var reloj = Stopwatch.StartNew();
         Message respuesta;
         try
         {
-            respuesta = await _cliente.Messages.Create(parametros, ct);
+            respuesta = await cliente.Messages.Create(parametros, ct);
         }
         catch (Exception ex) when (!ct.IsCancellationRequested)
         {
@@ -106,6 +101,18 @@ public sealed class clsAnthropicAdapter : IAsistenteIaPort
 
         return new clsRespuestaIa(
             texto, json, respuesta.Model.Raw(), tokensEntrada, tokensSalida, reloj.Elapsed, cacheLectura, cacheEscritura);
+    }
+
+    /// <summary>El cliente del proveedor, o el 503 con código estable si la función no se puede usar en este ambiente.</summary>
+    private AnthropicClient ExigirDisponible(clsFuncionIa funcion)
+    {
+        if (!_opciones.Configurada || _cliente is null)
+            throw new clsServiceUnavailableException("IA_NO_CONFIGURADA", "La función de IA no está configurada en este ambiente.");
+        if (!_opciones.Habilitada)
+            throw new clsServiceUnavailableException("IA_APAGADA", "La IA está apagada en este ambiente.");
+        if (!_opciones.FuncionEncendida(funcion))
+            throw new clsServiceUnavailableException("IA_FUNCION_DESHABILITADA", "La función de IA está apagada en este ambiente.");
+        return _cliente;
     }
 
     private MessageCreateParams Armar(clsPeticionIa p)

@@ -1,6 +1,8 @@
 using Nexo.Api.Trabajos;
 using Nexo.Application.CasosDeUso.Bandeja.Interfaces;
 using Nexo.Application.CasosDeUso.Trabajos.Interfaces;
+using Nexo.Application.CasosDeUso.Asistente;
+using Nexo.Application.CasosDeUso.Asistente.Conversacion;
 using Nexo.Application.CasosDeUso.Costeo;
 using Nexo.Application.CasosDeUso.DiccionarioCliente;
 using Nexo.Application.CasosDeUso.IA;
@@ -106,6 +108,8 @@ builder.Services.AddMetricasUseCases();
 builder.Services.AddCatalogosUseCases();
 builder.Services.AddRangosPesoUseCases();
 builder.Services.AddTarifasPlazaUseCases();
+builder.Services.AddSingleton(builder.Configuration.GetSection("Asistente").Get<clsLimitesAsistente>() ?? new clsLimitesAsistente());
+builder.Services.AddAsistenteUseCases();
 // Arma la cadena de priorización al arrancar y se va. NO tiene reloj: el reloj vive en
 // la saga, dentro del broker. Reemplaza al RecalculoScoreHostedService, que llevaba un
 // PeriodicTimer adentro y por lo tanto se duplicaba con cada réplica del API.

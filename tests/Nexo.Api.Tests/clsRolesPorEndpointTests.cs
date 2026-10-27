@@ -65,6 +65,21 @@ public class clsRolesPorEndpointTests(clsApiFixture fx)
             new("Bandeja mapear POST", HttpMethod.Post, $"/api/catalogos/vehiculos-cuarentena/{Inexistente}/mapear", ["AdminTarifas", "Admin"], new { codigo = "2L2" }),
             new("Bandeja descartar POST", HttpMethod.Post, $"/api/catalogos/vehiculos-cuarentena/{Inexistente}/descartar", ["AdminTarifas", "Admin"]),
 
+            // ---- herramientas de lectura del asistente (#371): el endpoint deja pasar a todo usuario autenticado; el rol limita CADA herramienta
+            new("Asistente GET herramientas", HttpMethod.Get, "/api/asistente/herramientas", Todos),
+            new("Asistente POST herramienta (todos los roles)", HttpMethod.Post, "/api/asistente/herramientas/consultar_piso_sicetac", Todos, new { }),
+            new("Asistente POST consultar_tarifa_plaza_nexo", HttpMethod.Post, "/api/asistente/herramientas/consultar_tarifa_plaza_nexo", Biblioteca, new { }),
+            new("Asistente POST consultar_propuesta_linea", HttpMethod.Post, "/api/asistente/herramientas/consultar_propuesta_linea", Mesa, new { }),
+            new("Asistente conversaciones POST mensajes", HttpMethod.Post, "/api/asistente/conversaciones/mensajes", ["AdminTarifas", "Admin"], new { }),
+            new("Asistente conversaciones GET", HttpMethod.Get, "/api/asistente/conversaciones", ["AdminTarifas", "Admin"]),
+            new("Asistente conversaciones GET /{id}", HttpMethod.Get, $"/api/asistente/conversaciones/{Inexistente}", ["AdminTarifas", "Admin"]),
+            new("Asistente acciones POST confirmar", HttpMethod.Post, $"/api/asistente/acciones/{Inexistente}/confirmar", ["AdminTarifas", "Admin"]),
+            new("Asistente acciones POST cancelar", HttpMethod.Post, $"/api/asistente/acciones/{Inexistente}/cancelar", ["AdminTarifas", "Admin"]),
+            new("Asistente POST proponer_agregar_flete", HttpMethod.Post, "/api/asistente/herramientas/proponer_agregar_flete", ["AdminTarifas", "Admin"], new { }),
+            new("Asistente preferencias GET", HttpMethod.Get, "/api/asistente/preferencias", ["AdminTarifas", "Admin"]),
+            new("Asistente preferencias DELETE", HttpMethod.Delete, $"/api/asistente/preferencias/{Inexistente}", ["AdminTarifas", "Admin"]),
+            new("Asistente POST consultar_aprovisionamiento", HttpMethod.Post, "/api/asistente/herramientas/consultar_aprovisionamiento", ["Comercial", "Admin"], new { }),
+
             // ---- Cubicador completo para AdminTarifas (#310); AdminBiblioteca no
             new("planes-cargue POST", HttpMethod.Post, "/api/planes-cargue", CosteoYCubicador, new { }),
             new("planes-cargue POST /demo", HttpMethod.Post, "/api/planes-cargue/demo", CosteoYCubicador, Sondeable: false),
