@@ -120,6 +120,45 @@ public class clsSugerirMapeoExcelTests
     // ---------------------------------------------------------------- lo que sale hacia el modelo
 
     [Fact]
+    public async Task Los_nombres_de_personas_no_salen_hacia_el_modelo_con_el_encabezado_que_tenga_la_columna()
+    {
+        IaResponde(Json(Col(0, "origen"), Col(1, "ignorar"), Col(2, "ignorar"), Col(3, "ignorar"), Col(4, "ignorar")));
+        string[] nombres = ["Juan Pérez", "María Gómez", "Carlos Ruiz", "Yeimy Ortega", "Brayan Yeimy"];
+        var filas = nombres.Select((n, i) => new[]
+        {
+            "BOGOTA", n, n.ToUpperInvariant(), $"Entregar a {n} en bodega", "300 123 456" + i,
+        }).ToArray();
+
+        // "Quien recibe" y "Col 3" no están en ninguna lista; "NombreContacto" va pegado.
+        await Manejador().Handle(Consulta(["Origen", "NombreContacto", "Col 3", "Quien recibe", "TelefonoCelular"], filas, Cliente));
+
+        var mensaje = _enviada!.Mensajes.Single().Contenido;
+        foreach (var apellido in new[] { "Pérez", "Gómez", "Ruiz", "Ortega", "Yeimy", "PEREZ", "300 123" })
+            Assert.DoesNotContain(apellido, mensaje);
+        Assert.Contains("BOGOTA", mensaje);
+        Assert.Contains("<NOMBRE>", mensaje);
+        Assert.Contains("<TELEFONO>", mensaje);
+    }
+
+    [Fact]
+    public async Task Las_ciudades_y_los_vehiculos_de_dos_palabras_siguen_llegando_al_modelo_para_poder_mapear_la_columna()
+    {
+        IaResponde(Json(Col(0, "origen"), Col(1, "destino"), Col(2, "ignorar")));
+        var filas = new[]
+        {
+            new[] { "Santa Marta", "Puerto Colombia", "Camión Sencillo" },
+            new[] { "San Juan", "Barranquilla Atlántico", "Furgón Refrigerado" },
+        };
+
+        await Manejador().Handle(Consulta(["Col A", "Col B", "Col C"], filas, Cliente));
+
+        var mensaje = _enviada!.Mensajes.Single().Contenido;
+        foreach (var valor in new[] { "Santa Marta", "Puerto Colombia", "Camión Sencillo", "San Juan", "Barranquilla Atlántico", "Furgón Refrigerado" })
+            Assert.Contains(valor, mensaje);
+        Assert.DoesNotContain("<NOMBRE>", mensaje);
+    }
+
+    [Fact]
     public async Task La_IA_recibe_solo_datos_minimos_y_enmascarados_a_nombre_de_quien_la_pide()
     {
         IaResponde(Json(Col(0, "origen"), Col(1, "destino"), Col(2, "ignorar"), Col(3, "ignorar"), Col(4, "ignorar")));
