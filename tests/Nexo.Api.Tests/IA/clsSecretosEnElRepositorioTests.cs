@@ -6,7 +6,7 @@ namespace Nexo.Api.Tests.IA;
 /// <summary>
 /// La llave del proveedor de IA vive solo en el servidor (variables de entorno de Dokploy) y nunca en un archivo versionado.
 /// Estas pruebas revisan los archivos que Git rastrea —no el <c>.env</c> local, que está ignorado— y fallan si aparece una
-/// llave con la forma de una real o un valor asignado a <c>Anthropic__ApiKey</c> en las plantillas de configuración.
+/// llave con la forma de una real o un valor asignado a <c>Anthropic__ApiKey</c> o <c>ANTHROPIC_API_KEY</c> en las plantillas de configuración.
 /// </summary>
 public class clsSecretosEnElRepositorioTests
 {
@@ -14,8 +14,8 @@ public class clsSecretosEnElRepositorioTests
     // coinciden; el propio patrón tampoco, porque tras "sk-ant-" lleva un paréntesis y no letras.
     private static readonly Regex LlaveReal = new(@"sk-ant-(api|admin)\d{2}-[A-Za-z0-9_-]{40,}", RegexOptions.Compiled);
 
-    // Anthropic__ApiKey= seguido de un valor que no es vacío ni un marcador <como-este>.
-    private static readonly Regex LlaveAsignada = new(@"^[ \t]*Anthropic__ApiKey[ \t]*=[ \t]*(?!<|\s*$)\S+", RegexOptions.Compiled | RegexOptions.Multiline);
+    // Anthropic__ApiKey= (NEXO) o ANTHROPIC_API_KEY= (Cubicador) seguido de un valor que no es vacío ni un marcador <como-este>.
+    private static readonly Regex LlaveAsignada = new(@"^[ \t]*(Anthropic__ApiKey|ANTHROPIC_API_KEY)[ \t]*=[ \t]*(?!<|\s*$)\S+", RegexOptions.Compiled | RegexOptions.Multiline);
 
     private static readonly HashSet<string> Binarios = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -73,11 +73,11 @@ public class clsSecretosEnElRepositorioTests
     }
 
     [Fact]
-    public void Las_plantillas_de_configuracion_no_traen_valor_para_Anthropic__ApiKey()
+    public void Las_plantillas_de_configuracion_no_traen_valor_para_la_llave_de_Anthropic()
     {
         var con = TextosVersionados().Where(t => LlaveAsignada.IsMatch(t.Texto)).Select(t => t.Ruta).ToList();
 
-        Assert.True(con.Count == 0, $"Anthropic__ApiKey tiene un valor en: {string.Join(", ", con)}");
+        Assert.True(con.Count == 0, $"La llave de Anthropic tiene un valor en: {string.Join(", ", con)}");
     }
 
     [Theory]
@@ -87,6 +87,10 @@ public class clsSecretosEnElRepositorioTests
     [InlineData("Anthropic__ApiKey=\nAnthropic__Model=claude-sonnet-4-6", false)]
     [InlineData("Anthropic__ApiKey=<secreto>", false)]
     [InlineData("Anthropic__ApiKey=algo-con-valor", true)]
+    [InlineData("ANTHROPIC_API_KEY=", false)]
+    [InlineData("ANTHROPIC_API_KEY=<secreto>", false)]
+    [InlineData("ANTHROPIC_API_KEY=\nANTHROPIC_MODEL=claude-sonnet-5-5", false)]
+    [InlineData("ANTHROPIC_API_KEY=algo-con-valor", true)]
     public void Los_patrones_distinguen_una_llave_real_de_las_falsas_y_de_las_plantillas(string texto, bool debeDetectar)
     {
         Assert.Equal(debeDetectar, LlaveReal.IsMatch(texto) || LlaveAsignada.IsMatch(texto));
