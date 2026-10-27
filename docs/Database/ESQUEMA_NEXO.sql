@@ -152,9 +152,10 @@ CREATE TABLE [db_NEXO].[tbl_diccionario_cliente] (
         ([Tipo] = N'valor' AND [Contexto] IS NOT NULL) OR ([Tipo] <> N'valor' AND [Contexto] IS NULL))
 );
 
--- El mapeo de columnas que un cliente ya confirmó para sus Excel. Al llegar otro archivo con los mismos encabezados se reusa en vez de
--- llamar a la IA. FirmaEncabezados = SHA-256 (hex) de los encabezados normalizados y en orden; con ClienteId es única. Encabezados y
--- Columnas son JSON. Script para una base existente: docs/Database/361_plantillas_mapeo_cliente.sql.
+-- Mapeo de columnas ya confirmado para un formato de Excel de un cliente. Se reconoce por FirmaEncabezados (SHA-256 de los
+-- encabezados normalizados y en orden); si llega un Excel con la misma firma se aplica la plantilla sin llamar a la IA.
+-- Encabezados y Columnas son JSON. Complementa a tbl_diccionario_cliente (vocabulario término por término, pista para la IA
+-- cuando no hay plantilla). Script para una base existente: docs/Database/361_plantillas_mapeo_cliente.sql.
 CREATE TABLE [db_NEXO].[tbl_plantillas_mapeo_cliente] (
     [Id] uniqueidentifier NOT NULL,
     [ClienteId] uniqueidentifier NOT NULL,
