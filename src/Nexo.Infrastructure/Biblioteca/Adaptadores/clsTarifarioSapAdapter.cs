@@ -391,16 +391,24 @@ public sealed class clsTarifarioSapAdapter : ITarifarioSapPort
         });
         if (!clsPeriodoSicetac.EsElDelMesActual(periodo, ahora)) return null;
 
-        var top = await _dw.RutasSicetac
+        // La ruta se compara exacta por código DANE cuando la línea trae los dos municipios resueltos: tblRutasSicetac guarda el
+        // mismo código pero SIN el cero a la izquierda del departamento (tbl_municipios "05001000" ~ DWSice "5001000"). El
+        // texto del nombre de la ruta es solo el respaldo (línea sin municipios): como "%YUMBO%-%CALI%" también coincide con
+        // "YUMBO - CALIMA" y se toma el valor más alto, elegía la ciudad equivocada.
+        var porDane = c.OrigenDane is not null && c.DestinoDane is not null;
+        var origenSinCeros = c.OrigenDane?.TrimStart('0');
+        var destinoSinCeros = c.DestinoDane?.TrimStart('0');
+        var rutas = _dw.RutasSicetac
             .Where(r => r.Periodo == periodo &&
                         r.CondicionCarga == "CARGADO" &&
                         r.NombreTipoCarga == tipoCarga &&
                         r.NombreUnidadTransporte == unidad &&
                         r.Configuracion == config &&
-                        r.ViaEstandar == "SI" &&
-                        EF.Functions.Like(r.NombreRuta, $"%{origen}%-%{destino}%"))
-            .OrderByDescending(r => r.ValorSiceConHora)
-            .FirstOrDefaultAsync(ct);
+                        r.ViaEstandar == "SI");
+        rutas = porDane
+            ? rutas.Where(r => r.Origen == origenSinCeros && r.Destino == destinoSinCeros)
+            : rutas.Where(r => EF.Functions.Like(r.NombreRuta, $"%{origen}%-%{destino}%"));
+        var top = await rutas.OrderByDescending(r => r.ValorSiceConHora).FirstOrDefaultAsync(ct);
         if (top is null) return null;
 
         // S4-HU-14.1/#221: bug gemelo del fallback tolerante de PropuestaTarifaAdapter —
@@ -412,7 +420,8 @@ public sealed class clsTarifarioSapAdapter : ITarifarioSapPort
         return new clsCandidatoTarifaDto(
             "sicetac", valor,
             $"{top.NombreRuta} · {top.Configuracion} · {top.NombreTipoCarga} · {top.NombreUnidadTransporte} · vía estándar",
-            $"oficial · periodo {periodo} · CARGADO · carga '{tipoCarga}' · unidad '{unidad}' · configuración {config}", 1,
+            $"oficial · periodo {periodo} · CARGADO · carga '{tipoCarga}' · unidad '{unidad}' · configuración {config}" +
+                (porDane ? $" · ruta DANE {c.OrigenDane}-{c.DestinoDane}" : string.Empty), 1,
             ValorPisoBase: top.Valor, ValorTiemposLogisticos: valor - top.Valor, Configuracion: top.Configuracion);
     }
 
