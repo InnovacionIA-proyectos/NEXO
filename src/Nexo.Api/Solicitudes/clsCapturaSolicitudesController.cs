@@ -1,4 +1,6 @@
 using Nexo.Api.Common.Errors;
+using Nexo.Application.CasosDeUso.MapeoExcel;
+using Nexo.Application.CasosDeUso.MapeoExcel.DTOs;
 using Nexo.Application.CasosDeUso.Solicitudes;
 using Nexo.Application.CasosDeUso.Solicitudes.DTOs;
 using Nexo.Application.Common.Abstractions;
@@ -29,6 +31,7 @@ namespace Nexo.Api.Solicitudes;
 [Route("api/captura-solicitudes")]
 public class clsCapturaSolicitudesController(
     IQueryHandler<clsAnalizarExcelQuery, clsAnalisisExcelDto> analizarExcel,
+    IQueryHandler<clsSugerirMapeoExcelQuery, clsSugerenciaMapeoDto> sugerirMapeo,
     ICommandHandler<clsCapturarSolicitudCommand, clsCapturaResultDto> capturar,
     IQueryHandler<clsBuscarClientesQuery, IReadOnlyList<clsClienteBusquedaDto>> buscarClientes,
     IQueryHandler<clsListarDepartamentosQuery, IReadOnlyList<string>> listarDepartamentos,
@@ -54,6 +57,22 @@ public class clsCapturaSolicitudesController(
         await using var stream = clsExcelUpload.AbrirValidado(archivo);
         return Ok(await analizarExcel.Handle(new clsAnalizarExcelQuery(stream, archivo!.FileName), ct));
     }
+
+    /// <summary>
+    /// Propone a qué campo de NEXO corresponde cada columna del Excel de un cliente. Recibe los encabezados y las filas que ya devolvió
+    /// <c>analizar-excel</c> (para una sola hoja); solo cuentan las primeras 20 filas y los datos sensibles (NIT, nombres, correos, teléfonos y
+    /// valores) se ocultan antes de salir. Es una SUGERENCIA, no persiste nada: el usuario la revisa y la confirma. Con <c>clienteId</c> usa
+    /// el diccionario de ese cliente, que manda sobre la IA. Si la IA está apagada o falla responde igual con lo que resolvió el diccionario
+    /// (<c>iaUsada=false</c> y <c>motivoSinIa</c>) y el resto se mapea a mano. 429 <c>IA_TOPE_DIARIO</c> si la persona ya consumió su tope.
+    /// </summary>
+    [HttpPost("sugerir-mapeo")]
+    [Authorize(Roles = "Comercial,Admin")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
+    public async Task<ActionResult<clsSugerenciaMapeoDto>> SugerirMapeo([FromBody] clsSugerirMapeoRequest req, CancellationToken ct = default)
+        => Ok(await sugerirMapeo.Handle(new clsSugerirMapeoExcelQuery(
+            req.ClienteId, req.Encabezados, req.Filas?.Select(f => (IReadOnlyList<string>)(f ?? [])).ToList()), ct));
 
     /// <summary>
     /// Crea la solicitud (cabecera + líneas) resolviendo o creando rutas y

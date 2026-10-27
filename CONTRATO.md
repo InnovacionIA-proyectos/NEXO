@@ -779,7 +779,7 @@ Biblioteca) y el campo se quedaba sin sugerencias. Ahora:
 
 | Endpoint | Roles |
 |---|---|
-| `POST analizar-excel`, `POST /` (capturar) | `Comercial`, `Admin` |
+| `POST analizar-excel`, `POST sugerir-mapeo`, `POST /` (capturar) | `Comercial`, `Admin` |
 | `GET aprovisionamiento`, `GET clientes` | `Comercial`, `Admin` (revisado caso por caso: se mantienen) |
 | `GET departamentos`, `GET ciudades`, `GET municipios` | **cualquier rol válido de Nexo** (hay que estar autenticado; sin sesión → `401`) |
 
@@ -789,6 +789,60 @@ No persiste; lee el Excel para que el usuario mapee columnas.
 - **Body**: `multipart/form-data`, campo `archivo` (§1.9).
 - **→** `200 AnalisisExcelDto`
 - **Errores**: `400 ARCHIVO_REQUERIDO` · `400 FORMATO_NO_SOPORTADO` · `400 EXCEL_INVALIDO` · `400 EXCEL_SIN_DATOS`
+
+#### `POST /api/captura-solicitudes/sugerir-mapeo`
+Propone a qué campo de NEXO corresponde cada columna del Excel de un cliente. Es una **sugerencia**: no persiste nada y el usuario la
+revisa y la confirma en la pantalla de mapeo. Recibe lo que ya devolvió `analizar-excel` para **una** hoja (no vuelve a leer el archivo).
+
+Cómo se arma, en este orden:
+1. **El diccionario del cliente manda** (§3.19.1): una columna cuyo encabezado está en su diccionario (o en el general) se resuelve sin IA, con
+   `confianza = 1` y `origen = "diccionario"`. Si el diccionario resuelve todas las columnas, no se llama a la IA (`DICCIONARIO_COMPLETO`).
+2. **La IA completa lo pendiente**, con datos mínimos: los encabezados, **hasta 20 filas** de muestra y las pistas del diccionario. Antes de salir,
+   NEXO **oculta** NIT, nombres de personas, correos, teléfonos y valores comerciales (`<NIT>`, `<CORREO>`, `<TELEFONO>`, `<NOMBRE>`, `<VALOR>`, `<NUMERO>`)
+   y recorta cada celda a 200 caracteres. Tres vías: **(a)** por el encabezado (también pegado, `NombreContacto`, y con sinónimos como «Quien recibe» o «A cargo de»), que oculta
+   toda la columna; **(b)** por lo que traen las celdas de la columna (se miran hasta 200 filas): si traen correos, NIT con dígito de verificación, teléfonos o nombres de personas,
+   se oculta **toda** la columna aunque el encabezado no diga nada; **(c)** celda por celda (un correo, un teléfono o un nombre escrito en una celda cualquiera). Los nombres se
+   reconocen con una lista de nombres y apellidos comunes, así que un nombre poco común en una columna que no se reconoce como de personas puede no ocultarse: la defensa es la
+   columna entera, no la celda. Las ciudades y los vehículos de dos palabras («Santa Marta», «Camión Sencillo») no se ocultan. El contenido del archivo se trata
+   siempre como **dato**, no como instrucciones.
+3. **Lo que responde el modelo se valida**: solo cuentan índices que existen, campos y transformaciones de las listas de abajo y confianzas entre 0 y 1;
+   lo demás se descarta y esa columna queda sin propuesta. La respuesta siempre trae **una entrada por columna**, en el orden del archivo.
+
+**Si la IA no está disponible el flujo manual sigue**: responde `200` igual, con lo que resolvió el diccionario, `iaUsada = false` y el motivo en
+`motivoSinIa` (`IA_NO_DISPONIBLE` si no hay llave o la función está apagada, o el código `IA_*` del error del proveedor). Un **tope diario superado
+no se esconde**: responde `429 IA_TOPE_DIARIO` (§3.22 si el módulo de IA está desplegado). Cada llamada a la IA queda registrada en `tbl_ia_uso`.
+
+| Body | | Tipo | Restricción |
+|---|---|---|---|
+| `clienteId` | *opcional* | UUID | El cliente dueño del archivo. Sin él solo se usa el diccionario general |
+| `encabezados` | **requerido** | string[] | 1 a 100 columnas, en el orden del archivo |
+| `filas` | *opcional* | string[][] | Las filas de la misma hoja (máx. 1000; solo se usan las primeras 20) |
+
+```ts
+interface SugerenciaMapeoDto {
+  iaUsada: boolean
+  motivoSinIa: string | null        // DICCIONARIO_COMPLETO | IA_NO_DISPONIBLE | IA_* ; null si la IA participó
+  columnas: ColumnaMapeadaDto[]     // una por columna, en el orden del archivo
+  dudas: string[]                   // lo que el usuario debería mirar (máx. 10)
+}
+interface ColumnaMapeadaDto {
+  indice: number                    // base 0
+  columna: string                   // el encabezado tal como llegó
+  campo: string                     // campo de NEXO, o "ignorar"
+  transformacion: string            // ver la lista de abajo
+  confianza: number                 // 0..1 (1 con diccionario, 0 sin propuesta)
+  origen: "diccionario" | "ia" | "ninguno"
+  nota: string | null
+}
+```
+- `campo`: los campos de la captura de una línea (`origen`, `destino`, `tipoVehiculo`, `carroceria`, `tipologia`, `lineaNegocio`, `claseViaje`,
+  `claseContenedor`, `exclusivo`, `consolidado`, `retornaContenedor`, `ciudadDevolucionContenedor`, `levanteContenedorDiferente`,
+  `ciudadLevanteContenedor`, `horasCargue`, `horasDescargue`, `peso`, `valorMercancia`, `referencia`, `descripcion`, `cantidad`, `largoCm`,
+  `anchoCm`, `altoCm`, `pesoKg`, `codigoTipoMercancia`) o `ignorar`. La lista vigente también la da `GET /api/diccionario-cliente/opciones`.
+- `transformacion` (lista cerrada, el código la aplica): `ninguna` · `peso_toneladas_a_kg` · `dividir_origen_destino` (una celda «ORIGEN - DESTINO») ·
+  `numero_coma_decimal` · `fecha`. Una columna `ignorar` siempre lleva `ninguna`.
+- **→** `200 SugerenciaMapeoDto`
+- **Errores**: `400 VALIDATION_ERROR` (sin encabezados, o más de 100) · `400 ENCABEZADOS_REQUERIDOS` · `400 DEMASIADAS_COLUMNAS` · `429 IA_TOPE_DIARIO`
 
 #### `POST /api/captura-solicitudes` — crear solicitud completa
 Resuelve o crea rutas y vehículos a partir del texto libre de las líneas.
@@ -2127,7 +2181,7 @@ abiertos a los 6 roles.
 
 | Operación | Com | AdmBib | AdmTar | ServLog | Líder | Admin |
 |---|:-:|:-:|:-:|:-:|:-:|:-:|
-| `POST /api/captura-solicitudes/analizar-excel` · `POST /api/captura-solicitudes` · `GET aprovisionamiento` · `GET clientes` | ✅ | | | | | ✅ |
+| `POST /api/captura-solicitudes/analizar-excel` · `POST .../sugerir-mapeo` · `POST /api/captura-solicitudes` · `GET aprovisionamiento` · `GET clientes` | ✅ | | | | | ✅ |
 | `GET /api/captura-solicitudes/ciudades` · `departamentos` · `municipios` (S5-HU-22.1: cualquier rol válido) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | **Bandeja y Mesa**: `GET /api/solicitudes` · `GET /api/solicitudes/{id}` · `GET .../propuesta-tarifa` · `/hubs/bandeja` (#307) | ✅ | | ✅ | ✅ | ✅ | ✅ |
 | `POST /api/solicitudes` (#307, D5: solo Admin) | | | | | | ✅ |

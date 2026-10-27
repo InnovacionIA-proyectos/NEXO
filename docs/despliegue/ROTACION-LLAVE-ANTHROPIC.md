@@ -36,7 +36,7 @@ Los hace quien administra la cuenta; no se pueden hacer desde el repositorio.
 | `Anthropic__LimiteTokensPorUsuarioDia` | `500000` | Tope de tokens por persona y por día (hora de Colombia). `0` lo desactiva. Al superarlo, `429 IA_TOPE_DIARIO`. |
 | `Anthropic__Model` | `claude-sonnet-5-5` | Configuración, no código. `claude-sonnet-5` y `claude-sonnet-4-6` también funcionan con esta cuenta. |
 | `Anthropic__Effort` | `high` | `low`, `medium`, `high`, `xhigh` o `max`. |
-| `Anthropic__Funciones__ImportacionExcel` / `AsistenteCotizacion` / `ApoyoCubicador` | `false` | Cada función se enciende por separado, solo cuando esté aprobada en el ADR. |
+| `Anthropic__Funciones__ImportacionExcel` / `AsistenteCotizacion` / `ApoyoCubicador` | `false` | Cada función se enciende por separado, solo cuando esté aprobada en el ADR. `ImportacionExcel` habilita la sugerencia de mapeo de columnas (`POST /api/captura-solicitudes/sugerir-mapeo`); con ella apagada ese endpoint sigue respondiendo con lo del diccionario del cliente. |
 
 Las demás (`RazonamientoAdaptativo`, `TimeoutSegundos`, `MaxReintentos`, `MaxTokensSalida`) tienen valores por defecto y solo se agregan para cambiarlos. Un cambio de variables exige redesplegar la app.
 
