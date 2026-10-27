@@ -241,3 +241,37 @@ código oficial de su columna.
   cargar `alias_elementos.csv` con `BULK INSERT` (columnas `Alias`,
   `AliasNormalizado`, `TipoElemento`, `Codigo`, `Activo` únicamente) contra
   `db_NEXO.tbl_alias_elementos`.
+
+## `rangos_peso_contenedor.csv`
+
+**Poblado UNA SOLA VEZ, sobre la tabla nueva `tbl_rangos_peso_contenedor`
+(S6-HU-37.3/#379) — sin sincronización periódica.** Dice qué tipo de vehículo
+corresponde a un contenedor de 20 o 40 pies según su peso.
+
+- **Tabla destino:** `db_NEXO.tbl_rangos_peso_contenedor`. Columnas del CSV:
+  `Contenedor` (`20` o `40`, en pies), `TipoVehiculo` y `PesoMaximo` (kg). El
+  nombre del vehículo no se repite aquí: está en el mapeo.
+- ⚠️ **`TipoVehiculo` es el código de vehículo de NEXO, el mismo de la columna
+  `TipoVehiculo` de `tbl_mapeo_vehiculo_tarifario` (#377)** — no el código de
+  SICE-TAC ni el de Plaza/SAP. Para buscar en SICE-TAC o en plaza se traduce
+  con el mapeo. Por eso el camión de dos ejes aparece como `C2` y no como `2`:
+  `2` es como lo llama SICE-TAC, y el mapeo hace esa traducción (`C2` → `2`).
+  Los 6 códigos del CSV (`2S2`, `2S3`, `3S2`, `3S3`, `2L3`, `C2`) existen en
+  `mapeo_vehiculos.csv`.
+- **De dónde salió:** `docs/documentacion/RANGOS-PESO-CONTENEDORES-NORMALIZADO.xlsx`
+  (no se versiona), que normaliza la hoja "Fletes puertos" de
+  `docs/docs_raw/rangos de peso contenedores.xlsx`. Confirmado como correcto por
+  Sara Calderón (2026-10-27).
+- **Fila descartada:** el camión de dos ejes en 40 pies no se carga, porque el
+  documento original no le pone tope de peso.
+- **Cómo se escoge el vehículo:** entre las filas del tamaño de contenedor, la de
+  menor `PesoMaximo` que alcance para el peso. En cada tamaño los topes van
+  subiendo sin repetirse, así que no hace falta peso mínimo. Si el peso supera
+  el tope más alto (34.000 kg en 40 pies, 30.000 kg en 20 pies), ningún vehículo
+  aplica.
+- **Filas:** 10 (5 de 40 pies y 5 de 20 pies).
+- **Cómo cargarlo:** no se carga con `BULK INSERT`. El script
+  `docs/Database/379_rangos_peso_contenedor.sql` crea la tabla y la carga con
+  `MERGE` (idempotente). Hay que correrlo después de
+  `377_mapeo_vehiculo_tarifario.sql`, porque `TipoVehiculo` tiene llave foránea
+  hacia el mapeo.

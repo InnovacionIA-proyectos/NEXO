@@ -169,6 +169,22 @@ CREATE TABLE [db_NEXO].[tbl_mapeo_vehiculo_tarifario] (
     , CONSTRAINT [PK_mapeo_vehiculo_tarifario] PRIMARY KEY ([Id])
 );
 
+-- Qué vehículo lleva un contenedor de 20 o 40 pies según su peso. TipoVehiculo es el código de NEXO, el mismo de
+-- tbl_mapeo_vehiculo_tarifario (llave foránea en la sección de índices, porque necesita el índice único del mapeo). Se escoge
+-- la fila de menor PesoMaximo que alcance para el peso. Script con la carga inicial: docs/Database/379_rangos_peso_contenedor.sql.
+CREATE TABLE [db_NEXO].[tbl_rangos_peso_contenedor] (
+    [Id] uniqueidentifier NOT NULL,
+    [Contenedor] int NOT NULL,
+    [TipoVehiculo] nvarchar(20) NOT NULL,
+    [PesoMaximo] int NOT NULL,
+    [Activo] bit NOT NULL CONSTRAINT [DF_rangos_peso_contenedor_Activo] DEFAULT (1),
+    [CreatedAt] datetimeoffset NOT NULL CONSTRAINT [DF_rangos_peso_contenedor_CreatedAt] DEFAULT (sysdatetimeoffset()),
+    [UpdatedAt] datetimeoffset NULL
+    , CONSTRAINT [PK_rangos_peso_contenedor] PRIMARY KEY ([Id])
+    , CONSTRAINT [CK_rangos_peso_contenedor_Contenedor] CHECK ([Contenedor] IN (20, 40))
+    , CONSTRAINT [CK_rangos_peso_contenedor_PesoMaximo] CHECK ([PesoMaximo] > 0)
+);
+
 -- Catálogo propio de municipios (Colombia/Venezuela/Ecuador) para el
 -- desplegable de Origen/Destino en Captura de Solicitudes (S4-HU-09.1).
 -- Poblada UNA SOLA VEZ desde tblSAPDANE/tblZonasTarificacionRelacion/
@@ -871,6 +887,9 @@ CREATE UNIQUE INDEX [IX_clientes_Nit] ON [db_NEXO].[tbl_clientes] ([Nit]);
 CREATE UNIQUE INDEX [IX_diccionario_cliente_Unico] ON [db_NEXO].[tbl_diccionario_cliente] ([ClienteId], [TerminoNormalizado], [Tipo], [Contexto]);
 CREATE INDEX [IX_diccionario_cliente_ClienteId_Tipo] ON [db_NEXO].[tbl_diccionario_cliente] ([ClienteId], [Tipo]);
 CREATE UNIQUE INDEX [IX_mapeo_vehiculo_tarifario_TipoVehiculo] ON [db_NEXO].[tbl_mapeo_vehiculo_tarifario] ([TipoVehiculo]);
+-- Va aquí y no en la sección de llaves foráneas: apunta al índice único de la línea anterior, que tiene que existir primero.
+ALTER TABLE [db_NEXO].[tbl_rangos_peso_contenedor] ADD CONSTRAINT [FK_rangos_peso_contenedor_mapeo_vehiculo_tarifario_TipoVehiculo] FOREIGN KEY ([TipoVehiculo]) REFERENCES [db_NEXO].[tbl_mapeo_vehiculo_tarifario] ([TipoVehiculo]);
+CREATE UNIQUE INDEX [IX_rangos_peso_contenedor_Contenedor_TipoVehiculo] ON [db_NEXO].[tbl_rangos_peso_contenedor] ([Contenedor], [TipoVehiculo]);
 CREATE INDEX [IX_colocaciones_cargue_ItemPlanCargueId] ON [db_NEXO].[tbl_colocaciones_cargue] ([ItemPlanCargueId]);
 CREATE INDEX [IX_colocaciones_cargue_PlanCargueId_Cargada] ON [db_NEXO].[tbl_colocaciones_cargue] ([PlanCargueId], [Cargada]);
 CREATE INDEX [IX_cotizacion_conexos_CotizacionId] ON [db_NEXO].[tbl_cotizacion_conexos] ([CotizacionId]);
