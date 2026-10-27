@@ -229,6 +229,8 @@ public static class clsDependencyInjection
 
         // Biblioteca: tarifario SAP TM + propuesta de tarifa (cierra el bloqueo de
         // "Aplicar propuestas" en Cotizaciones) + matriz SICE-TAC de solo lectura.
+        // El mapeo de vehículos se lee con su propio alcance de base de datos: lo consultan costeos en paralelo.
+        services.AddSingleton<IMapeoVehiculoTarifarioPort, clsMapeoVehiculoTarifarioAdapter>();
         services.AddScoped<ITarifarioSapPort, clsTarifarioSapAdapter>();
         services.AddScoped<IPropuestaTarifaPort, clsPropuestaTarifaAdapter>();
 

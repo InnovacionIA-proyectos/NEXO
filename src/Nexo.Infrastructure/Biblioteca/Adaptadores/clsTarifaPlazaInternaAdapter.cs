@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using Nexo.Application.CasosDeUso.Biblioteca.Interfaces;
 using Nexo.Application.CasosDeUso.Costeo.Interfaces;
 using Nexo.Application.Common.Dtos;
 using Nexo.Domain.Costeo.Entidades;
@@ -23,12 +24,12 @@ namespace Nexo.Infrastructure.Biblioteca.Adaptadores;
 /// <see cref="clsTarifaPlazaHistorico"/> (el de dedup es <see cref="clsTarifaPlazaHistorico.TarifaPlazaId"/>,
 /// el de vigencia/ventana es <see cref="clsTarifaPlazaHistorico.ReemplazadoAt"/>).
 /// </summary>
-public sealed class clsTarifaPlazaInternaAdapter(clsNexoDbContext db, TimeProvider clock, IMemoryCache cache)
+public sealed class clsTarifaPlazaInternaAdapter(clsNexoDbContext db, TimeProvider clock, IMemoryCache cache, IMapeoVehiculoTarifarioPort mapeo)
     : ITarifaPlazaInternaPort, IHistoricoPlazaInternoPort
 {
     private const int VentanaMesesHistorico = 3;
 
-    private sealed record clsFila(
+    internal sealed record clsFila(
         Guid? TarifaPlazaId, decimal Valor, string DetallesTarifa,
         string LineaNegocio, string ClaseViaje, string? ClaseContenedor, int? PesoId, string? TipoVehiculo);
 
@@ -110,23 +111,39 @@ public sealed class clsTarifaPlazaInternaAdapter(clsNexoDbContext db, TimeProvid
         filas = filas.Where(f => f.Valor > 0).ToList();
         if (filas.Count == 0) return null;
 
-        var (exactas, nivel, vehiculoRelajado) = NivelDeMatching(filas, c, pesoId);
+        var (exactas, nivel, vehiculoRelajado) = NivelDeMatching(filas, c, pesoId, await TiposDeVehiculoAceptadosAsync(c.TipoVehiculo, ct));
         var top = exactas.OrderByDescending(f => f.Valor).FirstOrDefault();
         if (top is null) return null;
 
         return (top, top.Valor, nivel, vehiculoRelajado);
     }
 
+    /// <summary>
+    /// Los códigos con los que una fila de <c>tbl_tarifas_plaza</c> puede nombrar el vehículo de la línea: el de Plaza/SAP según el mapeo (el
+    /// Sencillo C2 es 2; el Turbo 2L1/2L3 se tarifa como 2L2) y también el propio del vehículo, porque la carga inicial de esta tabla sacó el
+    /// vehículo con códigos de SICE-TAC (3S2, 2L3) y todavía no se decidió unificarla. Es una ampliación: lo que antes coincidía sigue coincidiendo.
+    /// </summary>
+    private async Task<HashSet<string>?> TiposDeVehiculoAceptadosAsync(string? tipoVehiculo, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(tipoVehiculo)) return null;
+
+        var aceptados = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { tipoVehiculo.Trim() };
+        var plaza = await mapeo.PlazaAsync(tipoVehiculo, ct);
+        if (plaza.Codigo is not null) aceptados.Add(plaza.Codigo);
+        return aceptados;
+    }
+
     private const string AdvertenciaVehiculo =
         "No hay tarifas del vehículo de la línea en esta ruta: el valor corresponde a otro vehículo y solo sirve de referencia.";
 
-    private static (List<clsFila> Filas, string Criterio, bool VehiculoRelajado) NivelDeMatching(
-        List<clsFila> filas, clsConsultaTarifaPlazaInterna c, int? pesoId)
+    internal static (List<clsFila> Filas, string Criterio, bool VehiculoRelajado) NivelDeMatching(
+        List<clsFila> filas, clsConsultaTarifaPlazaInterna c, int? pesoId, IReadOnlySet<string>? tiposDeVehiculo = null)
     {
         bool LineaNegocioOk(clsFila f) => c.LineaNegocio is null || Normalizar(f.LineaNegocio) == Normalizar(c.LineaNegocio);
         bool ClaseViajeOk(clsFila f) => c.ClaseViaje is null || Normalizar(f.ClaseViaje) == Normalizar(c.ClaseViaje);
         bool ClaseContenedorOk(clsFila f) => c.ClaseContenedor is null || Normalizar(f.ClaseContenedor ?? "") == Normalizar(c.ClaseContenedor);
-        bool TipoVehiculoOk(clsFila f) => c.TipoVehiculo is null || f.TipoVehiculo == c.TipoVehiculo;
+        bool TipoVehiculoOk(clsFila f) => c.TipoVehiculo is null
+            || (tiposDeVehiculo is null ? f.TipoVehiculo == c.TipoVehiculo : f.TipoVehiculo is not null && tiposDeVehiculo.Contains(f.TipoVehiculo));
         bool PesoOk(clsFila f) => pesoId is null || f.PesoId == pesoId;
 
         // En una devolución de contenedor la clase de contenedor es obligatoria: una fila de otra clase no cuenta.
