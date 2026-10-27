@@ -333,6 +333,9 @@ corresponde a un contenedor de 20 o 40 pies según su peso.
   el tope más alto (34.000 kg en 40 pies, 30.000 kg en 20 pies), ningún vehículo
   aplica.
 - **Filas:** 10 (5 de 40 pies y 5 de 20 pies).
+- **No son los rangos de SAP** (`tblRangoPeso`/`tblContenedorRangoPeso`, que NEXO usa hoy): se
+  compararon el 2026-10-27 y se decidió mantener estos. La comparación y su efecto
+  están en `DECISIONES-TECNICAS.md`.
 - **Cómo cargarlo:** no se carga con `BULK INSERT`. El script
   `docs/Database/379_rangos_peso_contenedor.sql` crea la tabla y la carga con
   `MERGE` (idempotente). Hay que correrlo después de

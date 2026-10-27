@@ -384,3 +384,25 @@ explicaban justo la fila descartada.
 `clsTarifarioSapAdapter.cs`) y usa el código resultante directo como
 `CONFIGURACION` de SICE-TAC. Con esta tabla, el vehículo que sale del rango
 tiene que pasar por el mapeo antes de buscar en SICE-TAC o en plaza.
+
+**Decisión (2026-10-27): se mantienen estos rangos y no los de SAP.** Hoy NEXO lee los rangos de las tablas de SAP
+`tblRangoPeso` y `tblContenedorRangoPeso` (dbSolucionesTI). Se compararon y no coinciden:
+
+| Contenedor | Vehículo | SAP | Esta tabla |
+|---|---|---|---|
+| 20 | Camión dos ejes (`2` / `C2`) | 0 a 8.500 | 0 a 8.000 |
+| 20 | 2S2 | 8.501 a 14.000 | 8.001 a 14.000 |
+| 20 | 2S3 | 14.001 a 20.000 | 14.001 a 18.000 |
+| 20 | 3S2 | no existe | 18.001 a 25.000 |
+| 20 | 3S3 | 20.001 a 30.000 | 25.001 a 30.000 |
+| 40 | 2L3 | no existe | 0 a 8.000 |
+| 40 | 2S2 | 0 a 18.000 | 8.001 a 18.000 |
+| 40 | 2S3 | 18.001 a 22.000 | 18.001 a 23.000 |
+| 40 | 3S2 | no existe | 23.001 a 30.000 |
+| 40 | 3S3 | 22.001 a 34.000 | 30.001 a 34.000 |
+
+En SAP los rangos solo dependen del tamaño (todas las clases de 20 pies, y todas las de 40, tienen los mismos). Se mantiene
+esta tabla porque sale del documento de negocio y cuadra con las bandas de `tbl_pesos` y con las tarifas de plaza de NEXO,
+que usan los mismos cortes (incluidos 3S2 y 2L3). **Efecto:** cuando el backend pase a usar esta tabla (#381), algunos pesos
+van a dar otro vehículo. Por ejemplo, en 40 pies: 25.000 kg pasa de 3S3 a 3S2; 22.500 kg, de 3S3 a 2S3; 5.000 kg, de 2S2 a
+2L3. En 20 pies, 8.200 kg pasa de camión de dos ejes a 2S2.
