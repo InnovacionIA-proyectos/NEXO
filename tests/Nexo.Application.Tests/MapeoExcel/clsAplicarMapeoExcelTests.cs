@@ -273,14 +273,18 @@ public class clsAplicarMapeoExcelTests
     }
 
     [Fact]
-    public async Task El_peso_total_debe_coincidir_con_la_suma_de_la_carga()
+    public async Task El_peso_total_puede_superar_la_suma_de_la_carga_por_la_tara_pero_no_al_reves()
     {
         clsColumnaAAplicar[] columnas = [.. Basico, Col(3, "cantidad"), Col(4, "largoCm"), Col(5, "anchoCm"), Col(6, "altoCm"), Col(7, "pesoKg")];
 
-        var r = await Manejador().Handle(Consulta(columnas, [["A", "B", "1000", "10", "100", "50", "40", "20"], ["A", "B", "200", "10", "100", "50", "40", "20"]]));
+        // Cada fila lleva 10 bultos de 20 kg = 200 kg de carga.
+        var r = await Manejador().Handle(Consulta(columnas, [
+            ["A", "B", "100", "10", "100", "50", "40", "20"],   // fila 2: total 100 < 200, la carga pesa más que el total
+            ["A", "B", "1000", "10", "100", "50", "40", "20"],  // fila 3: total 1000 > 200, la diferencia es la tara
+            ["A", "B", "200", "10", "100", "50", "40", "20"]]));// fila 4: total = carga
 
         Assert.Equal([(2, "PESO_INCONSISTENTE")], r.Errores.Select(e => (e.Fila, e.Codigo)));
-        Assert.Equal(3, Assert.Single(r.Lineas).Fila);
+        Assert.Equal([3, 4], r.Lineas.Select(l => l.Fila));
     }
 
     [Fact]
