@@ -178,10 +178,10 @@ public sealed class clsSugerirMapeoExcelQueryHandler(
 
     private clsPeticionIa Peticion(clsSugerirMapeoExcelQuery query, IReadOnlyList<string> encabezados, IReadOnlyList<clsTerminoCliente> terminos)
     {
-        var marcadores = encabezados.Select(clsEnmascaradorDeCeldas.MarcadorDeColumna).ToList();
         var filas = query.Filas ?? [];
+        var marcadores = clsEnmascaradorDeCeldas.MarcadoresDeColumnas(encabezados, filas);
         var muestra = filas.Take(MaxFilasDeMuestra)
-            .Select(fila => (IReadOnlyList<string>)encabezados.Select((_, i) => clsEnmascaradorDeCeldas.Celda(i < fila?.Count ? fila[i] : null, marcadores[i])).ToList())
+            .Select(fila => (IReadOnlyList<string>)encabezados.Select((_, i) => clsEnmascaradorDeCeldas.Celda(i < fila?.Count ? fila[i] : null, marcadores[i], detectarNombres: true)).ToList())
             .ToList();
 
         // Las pistas del cliente son su vocabulario (columnas, unidades y valores), no datos de sus solicitudes.
