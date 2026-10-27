@@ -8,8 +8,7 @@
 -- aplica la plantilla guardada y no llama a la IA. Si los encabezados cambian, se vuelve a sugerir el mapeo.
 --   FirmaEncabezados : SHA-256 (64 caracteres hex) de los encabezados normalizados y en orden. Es lo que se busca.
 --   Encabezados      : JSON con los encabezados tal como venían, para mostrar y auditar.
---   Columnas         : JSON con el mapeo confirmado de cada columna al campo de NEXO, con la forma { "version": 1, "columnas": [{ indice, campo, transformacion }] };
---                      la versión permite cambiar la forma sin leer mal las plantillas ya guardadas.
+--   Columnas         : JSON con el mapeo confirmado de cada columna al campo de NEXO.
 --   Nombre           : etiqueta opcional para reconocer la plantilla (ej. "Formato licitación 2026").
 -- Una sola plantilla por cliente y firma (índice único).
 --
