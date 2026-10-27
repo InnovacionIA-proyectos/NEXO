@@ -43,6 +43,13 @@ public sealed class clsTeoriaConBaseDePruebaPropiaAttribute : TheoryAttribute
     public clsTeoriaConBaseDePruebaPropiaAttribute() => Skip = clsBaseDePruebaPropia.MotivoParaOmitir();
 }
 
+/// <summary>Una fila del DWSice de mentira. La unidad de transporte es ESTACAS salvo que la prueba diga otra.</summary>
+public sealed record clsFilaSicetacDePrueba(string Configuracion, decimal Valor, string Ruta, string Condicion, string Unidad = "ESTACAS")
+{
+    public static implicit operator clsFilaSicetacDePrueba((string Configuracion, decimal Valor, string Ruta, string Condicion) t) =>
+        new(t.Configuracion, t.Valor, t.Ruta, t.Condicion);
+}
+
 /// <summary>Un DWSice de mentira: una base temporal con la tabla <c>tblRutasSicetac</c> y unas filas, que se borra al terminar.</summary>
 public sealed class clsBaseDeSicetacDePrueba : IDisposable
 {
@@ -51,7 +58,7 @@ public sealed class clsBaseDeSicetacDePrueba : IDisposable
 
     public string Cadena { get; }
 
-    public clsBaseDeSicetacDePrueba(IEnumerable<(string Configuracion, decimal Valor, string Ruta, string Condicion)> filas)
+    public clsBaseDeSicetacDePrueba(IEnumerable<clsFilaSicetacDePrueba> filas)
     {
         var origen = Environment.GetEnvironmentVariable("TEST_DB_CONNECTION")!;
         _administracion = ConBase(origen, "master");
@@ -68,10 +75,10 @@ public sealed class clsBaseDeSicetacDePrueba : IDisposable
             """);
 
         var periodo = clsPeriodoSicetac.Actual(DateTimeOffset.UtcNow);
-        foreach (var (configuracion, valor, ruta, condicion) in filas)
+        foreach (var (configuracion, valor, ruta, condicion, unidad) in filas)
             Ejecutar(Cadena, "INSERT INTO dbo.tblRutasSicetac (PERIODO, CONFIGURACION, VALOR, NOMBRERUTA, NOMBRETIPOCARGA, NOMBREUNIDADTRANSPORTE, " +
                 "FECHACREACION, FECHAMODIFICACION, HORASRECORRIDO, CONDICIONCARGA, VIAESTANDAR) " +
-                $"VALUES ({periodo}, N'{configuracion}', {valor}, N'{ruta}', N'General', N'ESTACAS', SYSDATETIME(), SYSDATETIME(), 10, N'{condicion}', N'SI')");
+                $"VALUES ({periodo}, N'{configuracion}', {valor}, N'{ruta}', N'General', N'{unidad}', SYSDATETIME(), SYSDATETIME(), 10, N'{condicion}', N'SI')");
     }
 
     public static string ConBase(string cadena, string baseDeDatos) =>
