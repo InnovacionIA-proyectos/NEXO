@@ -232,6 +232,7 @@ public static class clsDependencyInjection
         // "Aplicar propuestas" en Cotizaciones) + matriz SICE-TAC de solo lectura.
         // El mapeo de vehículos se lee con su propio alcance de base de datos: lo consultan costeos en paralelo.
         services.AddSingleton<IMapeoVehiculoTarifarioPort, clsMapeoVehiculoTarifarioAdapter>();
+        services.AddSingleton<IRangosPesoContenedorPort, clsRangosPesoContenedorAdapter>();
         services.AddScoped<ITarifarioSapPort, clsTarifarioSapAdapter>();
         services.AddScoped<IPropuestaTarifaPort, clsPropuestaTarifaAdapter>();
 
