@@ -76,6 +76,8 @@ public class clsRolesPorEndpointTests(clsApiFixture fx)
             new("Asistente acciones POST confirmar", HttpMethod.Post, $"/api/asistente/acciones/{Inexistente}/confirmar", ["AdminTarifas", "Admin"]),
             new("Asistente acciones POST cancelar", HttpMethod.Post, $"/api/asistente/acciones/{Inexistente}/cancelar", ["AdminTarifas", "Admin"]),
             new("Asistente POST proponer_agregar_flete", HttpMethod.Post, "/api/asistente/herramientas/proponer_agregar_flete", ["AdminTarifas", "Admin"], new { }),
+            new("Asistente preferencias GET", HttpMethod.Get, "/api/asistente/preferencias", ["AdminTarifas", "Admin"]),
+            new("Asistente preferencias DELETE", HttpMethod.Delete, $"/api/asistente/preferencias/{Inexistente}", ["AdminTarifas", "Admin"]),
             new("Asistente POST consultar_aprovisionamiento", HttpMethod.Post, "/api/asistente/herramientas/consultar_aprovisionamiento", ["Comercial", "Admin"], new { }),
 
             // ---- Cubicador completo para AdminTarifas (#310); AdminBiblioteca no

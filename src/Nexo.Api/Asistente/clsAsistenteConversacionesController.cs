@@ -71,6 +71,7 @@ public class clsAsistenteConversacionesController(
     private static (string Nombre, object Datos) Describir(clsEventoAsistente evento) => evento switch
     {
         clsEventoAsistente.Conversacion e => ("conversacion", e),
+        clsEventoAsistente.Preferencias e => ("preferencias", e.Aplicadas),
         clsEventoAsistente.Fragmento e => ("texto", e),
         clsEventoAsistente.Herramienta e => ("herramienta", e),
         clsEventoAsistente.Reemplazo e => ("reemplazo", e),

@@ -19,6 +19,9 @@ public sealed class clsLimitesAsistente
     /// <summary>Minutos que una acción propuesta espera la confirmación antes de vencer.</summary>
     public int VigenciaAccionMinutos { get; set; } = 30;
 
+    /// <summary>Preferencias que una persona puede tener guardadas para el asistente.</summary>
+    public int MaxPreferencias { get; set; } = 20;
+
     /// <summary>Acciones que el asistente puede proponer en una misma respuesta.</summary>
     public int MaxAccionesPorRespuesta { get; set; } = 3;
 
@@ -27,5 +30,6 @@ public sealed class clsLimitesAsistente
     public int MaxIteracionesEfectivo => Math.Clamp(MaxIteracionesHerramientas, 1, 12);
     public int MaxTokensRespuestaEfectivo => Math.Clamp(MaxTokensRespuesta, 256, 8192);
     public TimeSpan VigenciaAccionEfectiva => TimeSpan.FromMinutes(Math.Clamp(VigenciaAccionMinutos, 1, 1440));
+    public int MaxPreferenciasEfectivo => Math.Clamp(MaxPreferencias, 1, 100);
     public int MaxAccionesPorRespuestaEfectivo => Math.Clamp(MaxAccionesPorRespuesta, 1, 10);
 }

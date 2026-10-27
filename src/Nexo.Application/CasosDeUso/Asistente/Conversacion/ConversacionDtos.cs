@@ -6,6 +6,9 @@ public abstract record clsEventoAsistente
     /// <summary>Primer evento: a qué conversación y respuesta pertenece lo que sigue (la conversación se crea con el primer mensaje).</summary>
     public sealed record Conversacion(Guid ConversacionId, Guid MensajeId) : clsEventoAsistente;
 
+    /// <summary>Las preferencias de la persona que el asistente tiene presentes en esta respuesta, para que se vea que se están aplicando.</summary>
+    public sealed record Preferencias(IReadOnlyList<clsPreferenciaAsistenteDto> Aplicadas) : clsEventoAsistente;
+
     public sealed record Fragmento(string Delta) : clsEventoAsistente;
 
     /// <summary><paramref name="Estado"/>: <c>ejecutando</c>, <c>ok</c> o <c>error</c>.</summary>

@@ -53,6 +53,7 @@ public class clsNexoDbContext : DbContext
     public DbSet<clsMensajeAsistente> MensajesAsistente => Set<clsMensajeAsistente>();
     public DbSet<clsUsoHerramientaAsistente> UsosHerramientaAsistente => Set<clsUsoHerramientaAsistente>();
     public DbSet<clsAccionAsistente> AccionesAsistente => Set<clsAccionAsistente>();
+    public DbSet<clsPreferenciaAsistente> PreferenciasAsistente => Set<clsPreferenciaAsistente>();
     public DbSet<clsItemPlanCargue> ItemsPlanCargue => Set<clsItemPlanCargue>();
     public DbSet<clsColocacionCargue> ColocacionesCargue => Set<clsColocacionCargue>();
     public DbSet<clsMunicipio> Municipios => Set<clsMunicipio>();
@@ -432,6 +433,16 @@ public class clsNexoDbContext : DbContext
             e.HasOne<clsConversacionAsistente>().WithMany().HasForeignKey(x => x.ConversacionId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne<clsMensajeAsistente>().WithMany().HasForeignKey(x => x.MensajeId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne<clsUsuario>().WithMany().HasForeignKey(x => x.UsuarioId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // Reglas y preferencias propias de cada persona para el asistente de cotización.
+        b.Entity<clsPreferenciaAsistente>(e =>
+        {
+            e.ToTable("tbl_asistente_preferencias");
+            e.Property(x => x.Texto).HasMaxLength(300).IsRequired();
+            e.HasIndex(x => new { x.UsuarioId, x.CreatedAt });
+            e.HasOne<clsUsuario>().WithMany().HasForeignKey(x => x.UsuarioId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<clsConversacionAsistente>().WithMany().HasForeignKey(x => x.ConversacionId).OnDelete(DeleteBehavior.Restrict);
         });
 
         // ------------------------------------------------------------- Cubicador 3D

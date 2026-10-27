@@ -25,7 +25,8 @@ public sealed class clsConversarAsistenteCommandHandler(
     clsHerramientasDelAsistente herramientas,
     ICurrentUserPort usuario,
     clsLimitesAsistente limites,
-    clsContextoConversacionAsistente contexto)
+    clsContextoConversacionAsistente contexto,
+    IPreferenciasAsistenteRepository preferencias)
     : ICommandHandler<clsConversarAsistenteCommand, IAsyncEnumerable<clsEventoAsistente>>
 {
     private const int LargoDelTitulo = 60;
@@ -82,6 +83,11 @@ public sealed class clsConversarAsistenteCommandHandler(
         {
             yield return new clsEventoAsistente.Conversacion(conversacionId, respuestaId);
 
+            // Las preferencias de la persona viajan con las instrucciones, después de las reglas, y se le muestran para que vea que se aplican.
+            var guardadas = await preferencias.ListarAsync(usuario.Id, ct);
+            if (guardadas.Count > 0)
+                yield return new clsEventoAsistente.Preferencias(guardadas.Select(clsPreferenciaAsistenteDto.De).ToList());
+
             // Solo lo que se entregó completo entra al contexto: una respuesta cortada o descartada no se le repite al modelo.
             var historial = previos
                 .Where(m => m.Estado == clsMensajeAsistente.EstadoCompleto)
@@ -94,7 +100,7 @@ public sealed class clsConversarAsistenteCommandHandler(
                 .ToList();
 
             var peticion = new clsPeticionConversacionIa(
-                clsFuncionIa.AsistenteCotizacion, clsInstruccionesAsistente.Texto, historial, definiciones,
+                clsFuncionIa.AsistenteCotizacion, clsInstruccionesAsistente.ConPreferencias(guardadas.Select(p => p.Texto).ToList()), historial, definiciones,
                 limites.MaxIteracionesEfectivo, limites.MaxTokensRespuestaEfectivo, usuario.Id);
 
             string? motivo = null;
