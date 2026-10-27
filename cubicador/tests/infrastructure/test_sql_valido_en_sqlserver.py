@@ -153,18 +153,31 @@ def _llamadas_is_con_booleano(ruta: pathlib.Path) -> list[int]:
     arbol = ast.parse(ruta.read_text(encoding="utf-8"), filename=str(ruta))
     lineas = []
     for nodo in ast.walk(arbol):
+        # `is_not` / `isnot` compilan a `IS NOT 1`, que es el mismo error 102.
         if not (isinstance(nodo, ast.Call)
                 and isinstance(nodo.func, ast.Attribute)
-                and nodo.func.attr == "is_"
+                and nodo.func.attr in ("is_", "is_not", "isnot")
                 and len(nodo.args) == 1):
             continue
         arg = nodo.args[0]
-        es_literal = isinstance(arg, ast.Constant) and isinstance(arg.value, bool)
+
+        # Lo UNICO valido detras de `IS` en SQL Server es NULL. Cualquier otra
+        # constante -True, False, 1, 0- da el error 102, asi que se marca todo
+        # lo que no sea None en vez de listar las formas malas: la lista se
+        # queda corta sola. `.is_(1)` ya se colo una vez por eso.
+        es_constante_no_nula = isinstance(arg, ast.Constant) and arg.value is not None
+
         # `sa.true()` / `false()` compilan igual que el literal.
         es_helper = (isinstance(arg, ast.Call) and isinstance(arg.func, (ast.Name, ast.Attribute))
                      and (arg.func.id if isinstance(arg.func, ast.Name) else arg.func.attr)
                      in ("true", "false"))
-        if es_literal or es_helper:
+
+        # Un nombre no se puede resolver leyendo el arbol: `.is_(_VERDADERO)`
+        # con `_VERDADERO = True` arriba compila a `IS 1` y parecia inofensivo.
+        # Se marca y quien lo escriba que justifique por que no es un booleano.
+        es_nombre = isinstance(arg, (ast.Name, ast.Attribute))
+
+        if es_constante_no_nula or es_helper or es_nombre:
             lineas.append(nodo.lineno)
     return lineas
 

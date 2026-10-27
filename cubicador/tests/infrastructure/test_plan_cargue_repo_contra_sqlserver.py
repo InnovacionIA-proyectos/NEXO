@@ -52,8 +52,23 @@ def _url() -> str | None:
 @pytest_asyncio.fixture
 async def sesion():
     url = _url()
+    # En CI se exige: `CUBICADOR_EXIGIR_MSSQL=1` convierte el salto en FALLO.
+    #
+    # Sin eso, un typo en el nombre del servicio, una clave cambiada o un `db`
+    # lento hacen que esta prueba -la unica que toca el motor de produccion-
+    # desaparezca sola y el job quede en verde. Es la misma forma de fallo que
+    # origino esta issue: algo roto con las pruebas pasando.
+    exigida = os.environ.get("CUBICADOR_EXIGIR_MSSQL") == "1"
+
+    def _falta(motivo: str):
+        if exigida:
+            pytest.fail(
+                f"CUBICADOR_EXIGIR_MSSQL=1 pero no hay SQL Server: {motivo}. "
+                "En CI esta prueba no se puede saltar.")
+        pytest.skip(motivo)
+
     if url is None:
-        pytest.skip("sin SQL Server: definir MSSQL_SA_PASSWORD o CUBICADOR_TEST_MSSQL_URL")
+        _falta("sin SQL Server: definir MSSQL_SA_PASSWORD o CUBICADOR_TEST_MSSQL_URL")
 
     motor = create_async_engine(url)
     try:
@@ -61,7 +76,7 @@ async def sesion():
             await c.execute(text("SELECT 1"))
     except Exception as exc:  # noqa: BLE001 - driver ausente o servidor caido
         await motor.dispose()
-        pytest.skip(f"SQL Server no alcanzable: {type(exc).__name__}")
+        _falta(f"SQL Server no alcanzable: {type(exc).__name__}: {exc}")
 
     # Esquema propio y desechable: no toca nada de dbo_cubicador.
     async with motor.begin() as c:
