@@ -50,11 +50,16 @@ public sealed class clsSugerirMapeoExcelQueryHandler(
     {
         var encabezados = LimpiarEncabezados(query.Encabezados);
 
-        // 0) La plantilla guardada de estos encabezados.
+        // 0) La plantilla guardada de estos encabezados. Si ya no sirve (cambiaron los campos de NEXO, o lo guardado no se puede leer), no se
+        // importa con ella: se sugiere como si no existiera y se avisa, para que el usuario la confirme de nuevo.
+        var plantillaObsoleta = false;
         if (query.ClienteId is { } clienteId
-            && await plantillas.BuscarPorFirmaAsync(clienteId, clsFirmaDeEncabezados.Calcular(query.Encabezados!), ct) is { } plantilla
-            && DesdePlantilla(plantilla, encabezados) is { } deLaPlantilla)
-            return deLaPlantilla;
+            && await plantillas.BuscarPorFirmaAsync(clienteId, clsFirmaDeEncabezados.Calcular(query.Encabezados!), ct) is { } plantilla)
+        {
+            var (deLaPlantilla, obsoleta) = DesdePlantilla(plantilla, encabezados, clsFirmaDeEncabezados.Cantidad(query.Encabezados!));
+            if (deLaPlantilla is not null) return deLaPlantilla;
+            plantillaObsoleta = obsoleta;
+        }
 
         var terminos = await TerminosDeColumnaAsync(query.ClienteId, ct);
 
@@ -116,6 +121,7 @@ public sealed class clsSugerirMapeoExcelQueryHandler(
                 columnas.Add(delModelo ?? new(i, encabezados[i], Ignorar, clsTransformacionesMapeo.Ninguna, 0, "ninguno", "Sin propuesta: revisa esta columna."));
         }
 
+        if (plantillaObsoleta) dudas.Add(DudaPlantillaObsoleta);
         dudas.AddRange(DudasDelMapeo(columnas));
         dudas.AddRange(dudasIa);
         return new clsSugerenciaMapeoDto(iaUsada, motivoSinIa, columnas, dudas.Take(MaxDudas).ToList());
@@ -129,27 +135,45 @@ public sealed class clsSugerirMapeoExcelQueryHandler(
     /// validar contra las listas vigentes (un campo o una conversión que ya no existan se tratan como <c>ignorar</c> / <c>ninguna</c>). Null
     /// si lo guardado no se puede leer o no corresponde al archivo: entonces se sugiere de nuevo como si no hubiera plantilla.
     /// </summary>
-    private static clsSugerenciaMapeoDto? DesdePlantilla(clsPlantillaMapeoCliente plantilla, IReadOnlyList<string> encabezados)
+    public const string DudaPlantillaObsoleta =
+        "La plantilla guardada para estos encabezados ya no sirve (cambiaron los campos de NEXO): se sugirió el mapeo de nuevo. Revísalo y confírmalo otra vez.";
+
+    /// <summary>
+    /// La propuesta que sale de la plantilla guardada, o null si no se puede usar. <c>Obsoleta</c> distingue «no sirve ya» (lo guardado apunta a un campo
+    /// o a una conversión que ya no existe, ya no cumple las reglas del mapeo, o no se puede leer) de «no hay plantilla»: la primera se avisa.
+    /// Lo guardado se vuelve a validar contra las listas y las reglas VIGENTES; nunca se importa con un mapeo a medias.
+    /// </summary>
+    private static (clsSugerenciaMapeoDto? Sugerencia, bool Obsoleta) DesdePlantilla(clsPlantillaMapeoCliente plantilla, IReadOnlyList<string> encabezados, int cantidadConEncabezado)
     {
         var guardadas = clsPlantillasMapeoReglas.LeerColumnas(plantilla.Columnas);
         var guardados = clsPlantillasMapeoReglas.LeerEncabezados(plantilla.Encabezados);
-        if (guardadas is null || guardados is null || guardados.Count != encabezados.Count) return null;
+        if (guardadas is null || guardados is null || clsFirmaDeEncabezados.Cantidad(guardados) != cantidadConEncabezado) return (null, true);
 
-        var porIndice = guardadas.GroupBy(c => c.Indice).ToDictionary(g => g.Key, g => g.First());
-        var columnas = new List<clsColumnaMapeadaDto>(encabezados.Count);
-        for (var i = 0; i < encabezados.Count; i++)
+        var porIndice = new Dictionary<int, clsColumnaMapeadaDto>();
+        var aAplicar = new List<clsColumnaAAplicar>();
+        foreach (var c in guardadas)
         {
-            var campo = Ignorar;
-            var transformacion = clsTransformacionesMapeo.Ninguna;
-            if (porIndice.TryGetValue(i, out var c))
-            {
-                campo = clsTerminoCliente.Canonico(clsTerminoCliente.CamposDestino, c.Campo) ?? Ignorar;
-                transformacion = clsTerminoCliente.Canonico(clsTransformacionesMapeo.Todas, c.Transformacion) ?? clsTransformacionesMapeo.Ninguna;
-                if (!clsTransformacionesMapeo.Aplica(campo, transformacion)) transformacion = clsTransformacionesMapeo.Ninguna;
-            }
-            columnas.Add(new(i, encabezados[i], campo, transformacion, 1.0, "plantilla", null));
+            var campo = clsTerminoCliente.Canonico(clsTerminoCliente.CamposDestino, c.Campo);
+            var transformacion = string.IsNullOrWhiteSpace(c.Transformacion)
+                ? clsTransformacionesMapeo.Ninguna
+                : clsTerminoCliente.Canonico(clsTransformacionesMapeo.Todas, c.Transformacion);
+            if (campo is null || transformacion is null || !clsTransformacionesMapeo.Aplica(campo, transformacion)) return (null, true);
+            // Una columna que se usa y ya no existe en el archivo: el mapeo quedaría incompleto.
+            if (c.Indice < 0 || (c.Indice >= encabezados.Count && campo != Ignorar)) return (null, true);
+            if (c.Indice >= encabezados.Count) continue;
+
+            aAplicar.Add(new clsColumnaAAplicar(c.Indice, campo, transformacion));
+            porIndice[c.Indice] = new(c.Indice, encabezados[c.Indice], campo, transformacion, 1.0, "plantilla", null);
         }
-        return new clsSugerenciaMapeoDto(false, "PLANTILLA_RECONOCIDA", columnas, [], plantilla.Id);
+
+        try { clsAplicarMapeoExcelQueryHandler.ValidarColumnas(aAplicar); }
+        catch (clsValidationFailedException) { return (null, true); }
+
+        // Las columnas que la plantilla no menciona (las que el usuario no usó) se ignoran.
+        var columnas = Enumerable.Range(0, encabezados.Count)
+            .Select(i => porIndice.TryGetValue(i, out var col) ? col : new clsColumnaMapeadaDto(i, encabezados[i], Ignorar, clsTransformacionesMapeo.Ninguna, 1.0, "plantilla", null))
+            .ToList();
+        return (new clsSugerenciaMapeoDto(false, "PLANTILLA_RECONOCIDA", columnas, [], plantilla.Id), false);
     }
 
     // ---------------------------------------------------------------- entrada

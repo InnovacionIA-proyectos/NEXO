@@ -1,3 +1,4 @@
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Nexo.Application.CasosDeUso.PlantillasMapeo.Interfaces;
 using Nexo.Domain.Catalogos.Entidades;
@@ -31,4 +32,10 @@ public sealed class clsEfPlantillasMapeoRepository(clsNexoDbContext db) : IPlant
     public void Agregar(clsPlantillaMapeoCliente plantilla) => db.PlantillasMapeo.Add(plantilla);
 
     public void Eliminar(clsPlantillaMapeoCliente plantilla) => db.PlantillasMapeo.Remove(plantilla);
+
+    // 2601 y 2627: violación de un índice único / de una restricción única.
+    public bool EsChoqueDeFirma(Exception error) =>
+        error is DbUpdateException { InnerException: SqlException { Number: 2601 or 2627 } };
+
+    public void DescartarCambiosPendientes() => db.ChangeTracker.Clear();
 }

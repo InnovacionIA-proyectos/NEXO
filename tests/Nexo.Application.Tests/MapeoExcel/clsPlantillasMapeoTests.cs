@@ -81,7 +81,35 @@ public class clsPlantillasMapeoTests
         Assert.NotEqual(original, clsFirmaDeEncabezados.Calcular(["Origen", "Destino"]));
         Assert.NotEqual(original, clsFirmaDeEncabezados.Calcular(["Destino", "Origen", "Peso"]));
         Assert.NotEqual(clsFirmaDeEncabezados.Calcular(["A", "B"]), clsFirmaDeEncabezados.Calcular(["A|B"])); // el separador no confunde
-        Assert.NotEqual(clsFirmaDeEncabezados.Calcular(["A", ""]), clsFirmaDeEncabezados.Calcular(["A"]));     // una columna sin encabezado cuenta
+        Assert.NotEqual(clsFirmaDeEncabezados.Calcular(["A", "", "B"]), clsFirmaDeEncabezados.Calcular(["A", "B"])); // una columna sin encabezado en el medio cuenta
+        Assert.NotEqual(clsFirmaDeEncabezados.Calcular(["Peso(kg)"]), clsFirmaDeEncabezados.Calcular(["Peso (kg)"])); // la puntuación distingue
+    }
+
+    [Fact]
+    public void Los_espacios_raros_los_invisibles_y_las_columnas_vacias_del_final_no_cambian_la_firma()
+    {
+        var limpia = clsFirmaDeEncabezados.Calcular(["Peso (kg)", "Ciudad origen"]);
+
+        Assert.Equal(limpia, clsFirmaDeEncabezados.Calcular(["Peso\u00A0(kg)", "Ciudad\torigen"]));              // espacio de no separación y tabulador
+        Assert.Equal(limpia, clsFirmaDeEncabezados.Calcular(["Peso\n(kg)", "Ciudad \r\n origen"]));            // saltos de línea dentro de la celda
+        Assert.Equal(limpia, clsFirmaDeEncabezados.Calcular(["\uFEFFPeso (kg)", "Ciudad\u200B origen"]));       // marca de orden de bytes y ancho cero
+        Assert.Equal(limpia, clsFirmaDeEncabezados.Calcular(["Peso (kg)", "Ciudad origen", "", null, "   "]));   // columnas de más al final
+        Assert.Equal(limpia, clsFirmaDeEncabezados.Calcular(["peso_(KG)", "CIUDAD-ORIGEN"]));                    // _ y - cuentan como espacio
+        Assert.Equal(2, clsFirmaDeEncabezados.Cantidad(["Peso (kg)", "Ciudad origen", "", null]));
+        Assert.Equal(3, clsFirmaDeEncabezados.Cantidad(["Peso (kg)", "", "Ciudad origen"]));
+    }
+
+    [Fact]
+    public async Task Guardar_y_buscar_calculan_la_misma_firma_aunque_el_archivo_traiga_columnas_vacias_de_mas()
+    {
+        var guardada = PlantillaGuardada(Encabezados, ColumnasGuardadas);
+        ConPlantilla(guardada);
+
+        var r = await Sugeridor().Handle(new clsSugerirMapeoExcelQuery(Cliente, [.. Encabezados, "", " ", ""], null));
+
+        Assert.Equal(guardada.Id, r.PlantillaId);
+        Assert.Equal(7, r.Columnas.Count);
+        Assert.All(r.Columnas.Skip(4), c => Assert.Equal("ignorar", c.Campo));
     }
 
     // ---------------------------------------------------------------- guardar
@@ -105,7 +133,7 @@ public class clsPlantillasMapeoTests
     [Fact]
     public async Task Guardar_con_los_mismos_encabezados_reemplaza_la_plantilla_y_no_crea_otra()
     {
-        var existente = new clsPlantillaMapeoCliente { ClienteId = Cliente, FirmaEncabezados = clsFirmaDeEncabezados.Calcular(Encabezados), Encabezados = "[]", Columnas = "[]" };
+        var existente = new clsPlantillaMapeoCliente { ClienteId = Cliente, FirmaEncabezados = clsFirmaDeEncabezados.Calcular(Encabezados), Encabezados = "[]", Columnas = """{"version":1,"columnas":[]}""" };
         _repo.Setup(r => r.ObtenerParaActualizarAsync(Cliente, existente.FirmaEncabezados, It.IsAny<CancellationToken>())).ReturnsAsync(existente);
 
         var r = await Guardador().Handle(Guardar(columnas: [Col(0, "origen"), Col(1, "destino"), Col(2, "peso")]));
@@ -161,7 +189,7 @@ public class clsPlantillasMapeoTests
         var p = new clsPlantillaMapeoCliente
         {
             ClienteId = Cliente, Nombre = "BASF", FirmaEncabezados = "f", Cliente = new clsCliente { Nombre = "BASF SA" },
-            Encabezados = """["A","B"]""", Columnas = """[{"indice":0,"campo":"origen","transformacion":"ninguna"}]""",
+            Encabezados = """["A","B"]""", Columnas = """{"version":1,"columnas":[{"indice":0,"campo":"origen","transformacion":"ninguna"}]}""",
         };
         _repo.Setup(r => r.ListarAsync(Cliente, It.IsAny<CancellationToken>())).ReturnsAsync([p]);
 
@@ -176,7 +204,7 @@ public class clsPlantillasMapeoTests
     [Fact]
     public async Task Eliminar_borra_la_plantilla_y_si_no_existe_es_404()
     {
-        var p = new clsPlantillaMapeoCliente { ClienteId = Cliente, FirmaEncabezados = "f", Encabezados = "[]", Columnas = "[]" };
+        var p = new clsPlantillaMapeoCliente { ClienteId = Cliente, FirmaEncabezados = "f", Encabezados = "[]", Columnas = """{"version":1,"columnas":[]}""" };
         _repo.Setup(r => r.ObtenerAsync(p.Id, It.IsAny<CancellationToken>())).ReturnsAsync(p);
         var manejador = new clsEliminarPlantillaMapeoCommandHandler(_repo.Object, _auditoria.Object, _usuario.Object, _uow.Object);
 
@@ -199,8 +227,8 @@ public class clsPlantillasMapeoTests
     };
 
     private const string ColumnasGuardadas = """
-        [{"indice":0,"campo":"origen","transformacion":"ninguna"},{"indice":1,"campo":"destino","transformacion":"ninguna"},
-         {"indice":2,"campo":"peso","transformacion":"peso_toneladas_a_kg"},{"indice":3,"campo":"ignorar","transformacion":"ninguna"}]
+        {"version":1,"columnas":[{"indice":0,"campo":"origen","transformacion":"ninguna"},{"indice":1,"campo":"destino","transformacion":"ninguna"},
+         {"indice":2,"campo":"peso","transformacion":"peso_toneladas_a_kg"},{"indice":3,"campo":"ignorar","transformacion":"ninguna"}]}
         """;
 
     private void ConPlantilla(clsPlantillaMapeoCliente p) =>
@@ -279,17 +307,149 @@ public class clsPlantillasMapeoTests
         Assert.Null(r.PlantillaId);
     }
 
-    [Fact]
-    public async Task Lo_guardado_se_revalida_contra_las_listas_vigentes_y_las_columnas_sin_entrada_se_ignoran()
+    private async Task<clsSugerenciaMapeoDto> SugerirConIaVacia(string[] encabezados)
     {
-        // Un campo que ya no existe, una conversión que no corresponde al campo y una columna sin entrada.
+        _ia.Setup(x => x.CompletarAsync(It.IsAny<clsPeticionIa>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new clsRespuestaIa("{}", """{"columnas":[],"dudas":[]}""", "modelo", 1, 1, TimeSpan.Zero));
+        return await Sugeridor().Handle(new clsSugerirMapeoExcelQuery(Cliente, encabezados, null));
+    }
+
+    [Fact]
+    public async Task Las_columnas_que_la_plantilla_no_menciona_se_ignoran()
+    {
         ConPlantilla(PlantillaGuardada(Encabezados, """
-            [{"indice":0,"campo":"origen","transformacion":"ninguna"},{"indice":1,"campo":"campo_retirado","transformacion":"ninguna"},
-             {"indice":2,"campo":"peso","transformacion":"dividir_origen_destino"}]
+            {"version":1,"columnas":[{"indice":0,"campo":"origen","transformacion":"ninguna"},{"indice":1,"campo":"destino","transformacion":"ninguna"}]}
             """));
 
         var r = await Sugeridor().Handle(new clsSugerirMapeoExcelQuery(Cliente, Encabezados, null));
 
-        Assert.Equal([("origen", "ninguna"), ("ignorar", "ninguna"), ("peso", "ninguna"), ("ignorar", "ninguna")], r.Columnas.Select(c => (c.Campo, c.Transformacion)));
+        Assert.Equal("PLANTILLA_RECONOCIDA", r.MotivoSinIa);
+        Assert.Equal(["origen", "destino", "ignorar", "ignorar"], r.Columnas.Select(c => c.Campo));
+    }
+
+    [Theory]
+    // Un campo que ya no existe en NEXO.
+    [InlineData("""{"version":1,"columnas":[{"indice":0,"campo":"origen"},{"indice":1,"campo":"campo_retirado"},{"indice":2,"campo":"destino"}]}""")]
+    // Una conversión que ya no existe, o que no corresponde al campo.
+    [InlineData("""{"version":1,"columnas":[{"indice":0,"campo":"origen"},{"indice":1,"campo":"destino","transformacion":"conversion_retirada"}]}""")]
+    [InlineData("""{"version":1,"columnas":[{"indice":0,"campo":"origen"},{"indice":1,"campo":"destino"},{"indice":2,"campo":"peso","transformacion":"dividir_origen_destino"}]}""")]
+    // Ya no cumple las reglas del mapeo: sin destino, o dos columnas en el mismo campo.
+    [InlineData("""{"version":1,"columnas":[{"indice":0,"campo":"origen"}]}""")]
+    [InlineData("""{"version":1,"columnas":[{"indice":0,"campo":"origen"},{"indice":1,"campo":"origen"},{"indice":2,"campo":"destino"}]}""")]
+    // Una columna que se usa y ya no cabe en el archivo.
+    [InlineData("""{"version":1,"columnas":[{"indice":0,"campo":"origen"},{"indice":1,"campo":"destino"},{"indice":9,"campo":"peso"}]}""")]
+    // Una forma que este código no conoce: otra versión, sin versión, o que no es el objeto esperado.
+    [InlineData("""{"version":2,"columnas":[{"indice":0,"campo":"origen"},{"indice":1,"campo":"destino"}]}""")]
+    [InlineData("""[{"indice":0,"campo":"origen"},{"indice":1,"campo":"destino"}]""")]
+    [InlineData("""{"columnas":[{"indice":0,"campo":"origen"},{"indice":1,"campo":"destino"}]}""")]
+    [InlineData("""{"version":1}""")]
+    [InlineData("""{"version":1,"columnas":[null]}""")]
+    [InlineData("""{"version":1,"columnas":"x"}""")]
+    [InlineData("esto no es json")]
+    public async Task Una_plantilla_que_ya_no_sirve_no_se_usa_se_sugiere_de_nuevo_y_se_avisa(string columnas)
+    {
+        ConPlantilla(PlantillaGuardada(Encabezados, columnas));
+
+        var r = await SugerirConIaVacia(Encabezados);
+
+        Assert.True(r.IaUsada);
+        Assert.Null(r.PlantillaId);
+        Assert.NotEqual("PLANTILLA_RECONOCIDA", r.MotivoSinIa);
+        Assert.Contains(clsSugerirMapeoExcelQueryHandler.DudaPlantillaObsoleta, r.Dudas);
+        _ia.Verify(x => x.CompletarAsync(It.IsAny<clsPeticionIa>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Una_plantilla_con_los_encabezados_guardados_danados_tambien_se_trata_como_vieja()
+    {
+        var p = PlantillaGuardada(Encabezados, ColumnasGuardadas);
+        p.Encabezados = "no es json";
+        ConPlantilla(p);
+
+        var r = await SugerirConIaVacia(Encabezados);
+
+        Assert.Null(r.PlantillaId);
+        Assert.Contains(clsSugerirMapeoExcelQueryHandler.DudaPlantillaObsoleta, r.Dudas);
+    }
+
+    [Fact]
+    public async Task Si_no_hay_plantilla_no_se_avisa_nada()
+    {
+        var r = await SugerirConIaVacia(Encabezados);
+
+        Assert.DoesNotContain(clsSugerirMapeoExcelQueryHandler.DudaPlantillaObsoleta, r.Dudas);
+    }
+
+    [Fact]
+    public async Task Las_columnas_se_guardan_con_su_version()
+    {
+        var r = await Guardador().Handle(Guardar());
+
+        Assert.StartsWith("""{"version":1,"columnas":[""", _agregadas.Single().Columnas);
+        Assert.Equal(4, r.Plantilla.Columnas.Count);
+    }
+
+    // ---------------------------------------------------------------- guardar sin duplicar ni romper
+
+    [Fact]
+    public async Task Un_archivo_sin_ningun_encabezado_con_texto_no_se_guarda()
+    {
+        var ex = await Assert.ThrowsAsync<clsValidationFailedException>(() => Guardador().Handle(Guardar(encabezados: ["", " ", ""], columnas: [Col(0, "origen"), Col(1, "destino")])));
+        Assert.Equal("ENCABEZADOS_REQUERIDOS", ex.Code);
+    }
+
+    [Fact]
+    public async Task Guardar_con_columnas_vacias_de_mas_al_final_reemplaza_la_plantilla_y_no_crea_otra()
+    {
+        var existente = new clsPlantillaMapeoCliente { ClienteId = Cliente, FirmaEncabezados = clsFirmaDeEncabezados.Calcular(Encabezados), Encabezados = "[]", Columnas = "{}" };
+        _repo.Setup(r => r.ObtenerParaActualizarAsync(Cliente, existente.FirmaEncabezados, It.IsAny<CancellationToken>())).ReturnsAsync(existente);
+
+        var r = await Guardador().Handle(Guardar(encabezados: [.. Encabezados, "", ""]));
+
+        Assert.False(r.Creada);
+        Assert.Empty(_agregadas);
+    }
+
+    [Fact]
+    public async Task Dos_confirmaciones_a_la_vez_la_segunda_reemplaza_y_no_falla()
+    {
+        // La otra confirmación insertó entre mi búsqueda y mi inserción: el primer intento choca con el índice único.
+        var existente = new clsPlantillaMapeoCliente { ClienteId = Cliente, FirmaEncabezados = clsFirmaDeEncabezados.Calcular(Encabezados), Encabezados = "[]", Columnas = "{}" };
+        var busquedas = 0;
+        _repo.Setup(r => r.ObtenerParaActualizarAsync(Cliente, existente.FirmaEncabezados, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() => ++busquedas == 1 ? null : existente);
+        _repo.Setup(r => r.EsChoqueDeFirma(It.IsAny<Exception>())).Returns(true);
+        _uow.SetupSequence(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).ThrowsAsync(new InvalidOperationException("choque")).ReturnsAsync(1);
+
+        var r = await Guardador().Handle(Guardar());
+
+        Assert.False(r.Creada);
+        Assert.Equal(2, busquedas);
+        _repo.Verify(x => x.DescartarCambiosPendientes(), Times.Once);
+        _auditoria.Verify(a => a.Registrar(Usuario, "plantilla_mapeo_cliente", existente.Id, "reemplazar_plantilla", It.IsAny<string>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Un_error_que_no_es_el_choque_de_firma_no_se_reintenta()
+    {
+        _repo.Setup(r => r.EsChoqueDeFirma(It.IsAny<Exception>())).Returns(false);
+        _uow.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).ThrowsAsync(new InvalidOperationException("otro error"));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => Guardador().Handle(Guardar()));
+
+        _uow.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    // ---------------------------------------------------------------- quién la confirmó
+
+    [Fact]
+    public async Task Borrar_queda_auditado_con_el_usuario_que_lo_hizo()
+    {
+        var p = new clsPlantillaMapeoCliente { ClienteId = Cliente, FirmaEncabezados = "f", Encabezados = "[]", Columnas = "{}" };
+        _repo.Setup(r => r.ObtenerAsync(p.Id, It.IsAny<CancellationToken>())).ReturnsAsync(p);
+
+        await new clsEliminarPlantillaMapeoCommandHandler(_repo.Object, _auditoria.Object, _usuario.Object, _uow.Object).Handle(new(p.Id));
+
+        _auditoria.Verify(a => a.Registrar(Usuario, "plantilla_mapeo_cliente", p.Id, "eliminar_plantilla", It.IsAny<string>()), Times.Once);
     }
 }

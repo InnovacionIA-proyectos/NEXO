@@ -205,5 +205,111 @@ public class clsPlantillasMapeoApiTests(clsApiFixture fx)
         finally { Limpiar(cliente, marca); }
     }
 
+    // ---------------------------------------------------------------- guardar sin duplicar, ni romper
+
+    [Fact]
+    public async Task Varias_confirmaciones_simultaneas_del_mismo_formato_dejan_una_sola_plantilla_y_ninguna_falla()
+    {
+        var cliente = Cliente();
+        var marca = Marca();
+        using var fabrica = FabricaConIa(clsAsistenteIaFalso.SinConfigurar());
+        using var c = ClienteCon(fabrica, "Comercial");
+        try
+        {
+            // Un doble clic en «Confirmar»: todas buscan, ninguna la encuentra, todas intentan insertar; el índice único deja pasar una.
+            var respuestas = await Task.WhenAll(Enumerable.Range(0, 8).Select(_ => c.PutAsJsonAsync(Ruta, Cuerpo(cliente, EncabezadosUnicos(marca)))));
+
+            Assert.All(respuestas, r => Assert.True(r.StatusCode is HttpStatusCode.Created or HttpStatusCode.OK, $"respondió {(int)r.StatusCode}"));
+            Assert.Equal(1, respuestas.Count(r => r.StatusCode == HttpStatusCode.Created));
+            Assert.Equal(1, fx.WithDb(db => db.PlantillasMapeo.Count(p => p.ClienteId == cliente && p.Encabezados.Contains(marca))));
+        }
+        finally { Limpiar(cliente, marca); }
+    }
+
+    [Fact]
+    public async Task Las_columnas_se_guardan_con_su_version_y_los_encabezados_con_columnas_vacias_de_mas_son_la_misma_plantilla()
+    {
+        var cliente = Cliente();
+        var marca = Marca();
+        using var fabrica = FabricaConIa(clsAsistenteIaFalso.SinConfigurar());
+        using var c = ClienteCon(fabrica, "Comercial");
+        try
+        {
+            var primera = await c.PutAsJsonAsync(Ruta, Cuerpo(cliente, EncabezadosUnicos(marca)));
+            Assert.Equal(HttpStatusCode.Created, primera.StatusCode);
+            Assert.StartsWith("""{"version":1,"columnas":[""", fx.WithDb(db => db.PlantillasMapeo.Single(p => p.ClienteId == cliente && p.Encabezados.Contains(marca)).Columnas));
+
+            // Excel reporta tres columnas vacías de más al final: es el mismo formato.
+            var conVacias = await c.PutAsJsonAsync(Ruta, Cuerpo(cliente, [.. EncabezadosUnicos(marca), "", " ", ""]));
+            Assert.Equal(HttpStatusCode.OK, conVacias.StatusCode);
+            Assert.Equal(1, fx.WithDb(db => db.PlantillasMapeo.Count(p => p.ClienteId == cliente && p.Encabezados.Contains(marca))));
+        }
+        finally { Limpiar(cliente, marca); }
+    }
+
+    // ---------------------------------------------------------------- una plantilla vieja no se usa
+
+    [Theory]
+    [InlineData("""{"version":2,"columnas":[{"indice":0,"campo":"origen"},{"indice":1,"campo":"destino"}]}""")]    // una forma que este código no conoce
+    [InlineData("""{"version":1,"columnas":[{"indice":0,"campo":"origen"},{"indice":1,"campo":"campo_retirado"}]}""")] // un campo que ya no existe
+    [InlineData("""[{"indice":0,"campo":"origen"},{"indice":1,"campo":"destino"}]""")]                             // sin versión
+    public async Task Una_plantilla_guardada_que_ya_no_sirve_se_ignora_y_se_vuelve_a_sugerir_con_aviso(string columnasGuardadas)
+    {
+        var cliente = Cliente();
+        var marca = Marca();
+        var ia = clsAsistenteIaFalso.Responde(RespuestaDeLaIa);
+        using var fabrica = FabricaConIa(ia);
+        using var c = ClienteCon(fabrica, "Comercial");
+        try
+        {
+            await c.PutAsJsonAsync(Ruta, Cuerpo(cliente, EncabezadosUnicos(marca)));
+            fx.WithDb(db => db.PlantillasMapeo.Where(p => p.ClienteId == cliente && p.Encabezados.Contains(marca)).ExecuteUpdate(s => s.SetProperty(p => p.Columnas, columnasGuardadas)));
+
+            var dto = await (await c.PostAsJsonAsync(RutaSugerir, new { clienteId = cliente, encabezados = EncabezadosUnicos(marca), filas = new[] { new[] { "BOGOTA", "CALI", "8", "x" } } })).Json();
+
+            Assert.True(dto.GetProperty("iaUsada").GetBoolean());
+            Assert.Equal(JsonKindNull, dto.GetProperty("plantillaId").ValueKind);
+            Assert.Contains(dto.GetProperty("dudas").EnumerateArray(), d => d.GetString()!.Contains("ya no sirve"));
+            Assert.Single(ia.Peticiones);
+        }
+        finally { Limpiar(cliente, marca); }
+    }
+
+    // ---------------------------------------------------------------- que haya plantilla no salta las validaciones
+
+    [Fact]
+    public async Task Con_plantilla_las_validaciones_del_mapeo_siguen_corriendo_y_reportan_el_error_de_cada_fila()
+    {
+        var cliente = Cliente();
+        var marca = Marca();
+        var ia = clsAsistenteIaFalso.Responde(RespuestaDeLaIa);
+        using var fabrica = FabricaConIa(ia);
+        using var c = ClienteCon(fabrica, "Comercial");
+        try
+        {
+            await c.PutAsJsonAsync(Ruta, Cuerpo(cliente, EncabezadosUnicos(marca)));
+            var filas = new[]
+            {
+                new[] { "BOGOTA", "CALI", "8", "x" },          // fila 2: válida (8 t = 8.000 kg)
+                new[] { "BOGOTA", "CALI", "no es un peso", "x" }, // fila 3: peso ilegible
+                new[] { "BOGOTA", "CALI", "-5", "x" },         // fila 4: peso negativo
+            };
+
+            var sugerida = await (await c.PostAsJsonAsync(RutaSugerir, new { clienteId = cliente, encabezados = EncabezadosUnicos(marca), filas })).Json();
+            Assert.Equal("PLANTILLA_RECONOCIDA", sugerida.GetProperty("motivoSinIa").GetString());
+            var columnas = sugerida.GetProperty("columnas").EnumerateArray()
+                .Select(x => new { indice = x.GetProperty("indice").GetInt32(), campo = x.GetProperty("campo").GetString(), transformacion = x.GetProperty("transformacion").GetString() }).ToArray();
+
+            var aplicado = await (await c.PostAsJsonAsync("/api/captura-solicitudes/aplicar-mapeo", new { clienteId = cliente, columnas, filas, primeraFila = 2 })).Json();
+
+            Assert.Equal(3, aplicado.GetProperty("totalFilas").GetInt32());
+            Assert.Equal(2, aplicado.GetProperty("filasConErrores").GetInt32());
+            Assert.Equal([2], aplicado.GetProperty("lineas").EnumerateArray().Select(l => l.GetProperty("fila").GetInt32()));
+            Assert.Equal(8000m, aplicado.GetProperty("lineas")[0].GetProperty("peso").GetDecimal());
+            Assert.Equal([3, 4], aplicado.GetProperty("errores").EnumerateArray().Select(e => e.GetProperty("fila").GetInt32()).Distinct().Order());
+        }
+        finally { Limpiar(cliente, marca); }
+    }
+
     private const System.Text.Json.JsonValueKind JsonKindNull = System.Text.Json.JsonValueKind.Null;
 }
