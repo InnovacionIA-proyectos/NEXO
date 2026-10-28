@@ -3,12 +3,38 @@
 Esta carpeta guarda los datos ya calculados para poblar catálogos que **no se crean
 ni se pueblan por migración de EF Core** (este proyecto no usa migraciones — ver
 `docs/Database/ESQUEMA_NEXO.sql` y `DOKPLOY.md`, sección "Esquema de base de datos").
-El flujo para cualquier catálogo de esta carpeta es siempre el mismo, en dos pasos
-manuales:
+## Orden completo para montar una base nueva
 
-1. Crear la tabla corriendo `docs/Database/ESQUEMA_NEXO.sql` contra la base.
-2. Poblarla con el CSV correspondiente de esta carpeta (`BULK INSERT` u otra forma
-   de carga masiva).
+1. **Esquema:** correr `docs/Database/ESQUEMA_NEXO.sql` completo, de una sola
+   pasada, contra la base vacía. Crea el esquema `db_NEXO` si no existe y todas
+   las tablas, índices, llaves foráneas y el trigger.
+2. **Datos base:** correr `docs/Database/datos_base_nexo.sql`. Inserta las filas
+   que el modelo declara con `HasData` y que sin migraciones nunca se crean
+   solas: el usuario de sistema, los 9 mapeos de rol del portal (sin ellos, quien
+   entra desde el portal queda sin rol) y la fila de parámetros del score.
+3. **Catálogos por CSV** (`BULK INSERT` u otra carga masiva), en este orden:
+   1. `municipios.csv`
+   2. `pesos.csv`
+   3. `reglas_solo_sicetac.csv`
+   4. `tarifas_plaza.csv` (necesita los dos primeros: sus `OrigenMunicipioId`,
+      `DestinoMunicipioId` y `PesoId` apuntan a esas tablas)
+   5. `servicios_conexos.csv`
+   6. `alias_elementos.csv`
+4. **Catálogos por script** (cada uno crea la tabla si no existe y la carga con
+   `MERGE`, sin duplicar):
+   1. `docs/Database/377_mapeo_vehiculo_tarifario.sql` (`mapeo_vehiculos.csv`)
+   2. `docs/Database/379_rangos_peso_contenedor.sql` (`rangos_peso_contenedor.csv`),
+      siempre después del 377, porque tiene llave foránea hacia el mapeo.
+
+Los demás scripts de `docs/Database/` (`304_*`, `352_*`, `356_*`, `361_*`) son
+para bases que ya existían antes de esas tablas. En una base nueva no hacen
+falta, porque `ESQUEMA_NEXO.sql` ya las crea; si se corren igual, no hacen nada
+porque son idempotentes. `307_*` es un cambio de datos de roles que no aplica a
+una base nueva.
+
+Verificado el 2026-10-27 en un SQL Server 2019 vacío (mismo nivel de
+compatibilidad 130 y collation `Modern_Spanish_CI_AS` que la base de pruebas):
+los pasos 1, 2 y 4 corren sin errores, y el 2 se puede repetir sin duplicar.
 
 Ninguno de estos catálogos tiene un comando ni un endpoint que los vuelva a poblar
 en la aplicación — el cálculo/cruce que produjo los datos se hizo una vez, con
@@ -241,3 +267,77 @@ código oficial de su columna.
   cargar `alias_elementos.csv` con `BULK INSERT` (columnas `Alias`,
   `AliasNormalizado`, `TipoElemento`, `Codigo`, `Activo` únicamente) contra
   `db_NEXO.tbl_alias_elementos`.
+
+## `mapeo_vehiculos.csv`
+
+**Poblado UNA SOLA VEZ, sobre la tabla nueva `tbl_mapeo_vehiculo_tarifario`
+(S6-HU-37.1/#377) — sin sincronización periódica.** SICE-TAC y Plaza/SAP
+nombran el mismo vehículo con códigos distintos; esta tabla dice, por cada
+tipo de vehículo de NEXO, con qué código se busca en cada fuente.
+
+- **Tabla destino:** `db_NEXO.tbl_mapeo_vehiculo_tarifario`. Columnas del CSV:
+  - `TipoVehiculo`: código del vehículo en NEXO, el que queda después de
+    resolver los alias (`tbl_alias_elementos`). Es la llave y no se repite.
+  - `CodigoSicetac` y `NombreSicetac`: valor de `CONFIGURACION` en
+    `DWSice.dbo.tblRutasSicetac` y cómo lo describe SICE-TAC (incluye el rango
+    de peso bruto vehicular).
+  - `CodigoPlazaSap` y `NombreTarifasPlaza`: código y nombre del vehículo en
+    Plaza/SAP, el mismo para `tblSAPTarifas` y `tbl_tarifas_plaza`. Vacío = el
+    vehículo no tiene tarifa de plaza (solo existe en SICE-TAC).
+- **Decisiones confirmadas (2026-10-27):**
+  - Sencillo (`C2`): en SICE-TAC y en Plaza/SAP se busca como `2`. En las
+    tarifas de plaza hay unas 5.000 filas con `2` y solo 14, todas vencidas,
+    con `C2`.
+  - Turbo: en Plaza/SAP, `2L1`, `2L2` y `2L3` se buscan como `2L2`; en
+    SICE-TAC cada uno conserva su código. El `2_7` del análisis del Excel de un
+    cliente (2026-10-26) fue una excepción puntual, confirmada con el
+    Administrador de Tarifas.
+  - Dobletroque (`C3`): `3` en SICE-TAC, `C3` en Plaza/SAP.
+- ⚠️ **Pendiente:** el seeder de `tbl_tarifas_plaza` (`tarifas_plaza.csv`) usa
+  `3S2` y `2L3`, que no coinciden con `CodigoPlazaSap` de esos dos vehículos
+  (vacío y `2L2`). Puede cambiar el código de plaza de esos dos; ver
+  `docs/backlog/2026-10-27_PENDIENTES-MAPEO-VEHICULO.md`.
+- **De dónde salió:** construido por Sara Calderón (2026-10-27) revisando cada
+  tipo de vehículo contra SICE-TAC y Plaza/SAP.
+- **Filas:** 15 (8 con código de plaza).
+- **Cómo cargarlo:** no se carga con `BULK INSERT`. El script
+  `docs/Database/377_mapeo_vehiculo_tarifario.sql` crea la tabla y la carga con
+  `MERGE` (idempotente). Hay que correrlo antes de
+  `379_rangos_peso_contenedor.sql`, que tiene llave foránea hacia esta tabla.
+
+## `rangos_peso_contenedor.csv`
+
+**Poblado UNA SOLA VEZ, sobre la tabla nueva `tbl_rangos_peso_contenedor`
+(S6-HU-37.3/#379) — sin sincronización periódica.** Dice qué tipo de vehículo
+corresponde a un contenedor de 20 o 40 pies según su peso.
+
+- **Tabla destino:** `db_NEXO.tbl_rangos_peso_contenedor`. Columnas del CSV:
+  `Contenedor` (`20` o `40`, en pies), `TipoVehiculo` y `PesoMaximo` (kg). El
+  nombre del vehículo no se repite aquí: está en el mapeo.
+- ⚠️ **`TipoVehiculo` es el código de vehículo de NEXO, el mismo de la columna
+  `TipoVehiculo` de `tbl_mapeo_vehiculo_tarifario` (#377)** — no el código de
+  SICE-TAC ni el de Plaza/SAP. Para buscar en SICE-TAC o en plaza se traduce
+  con el mapeo. Por eso el camión de dos ejes aparece como `C2` y no como `2`:
+  `2` es como lo llama SICE-TAC, y el mapeo hace esa traducción (`C2` → `2`).
+  Los 6 códigos del CSV (`2S2`, `2S3`, `3S2`, `3S3`, `2L3`, `C2`) existen en
+  `mapeo_vehiculos.csv`.
+- **De dónde salió:** `docs/documentacion/RANGOS-PESO-CONTENEDORES-NORMALIZADO.xlsx`
+  (no se versiona), que normaliza la hoja "Fletes puertos" de
+  `docs/docs_raw/rangos de peso contenedores.xlsx`. Confirmado como correcto por
+  Sara Calderón (2026-10-27).
+- **Fila descartada:** el camión de dos ejes en 40 pies no se carga, porque el
+  documento original no le pone tope de peso.
+- **Cómo se escoge el vehículo:** entre las filas del tamaño de contenedor, la de
+  menor `PesoMaximo` que alcance para el peso. En cada tamaño los topes van
+  subiendo sin repetirse, así que no hace falta peso mínimo. Si el peso supera
+  el tope más alto (34.000 kg en 40 pies, 30.000 kg en 20 pies), ningún vehículo
+  aplica.
+- **Filas:** 10 (5 de 40 pies y 5 de 20 pies).
+- **No son los rangos de SAP** (`tblRangoPeso`/`tblContenedorRangoPeso`, que NEXO usa hoy): se
+  compararon el 2026-10-27 y se decidió mantener estos. La comparación y su efecto
+  están en `DECISIONES-TECNICAS.md`.
+- **Cómo cargarlo:** no se carga con `BULK INSERT`. El script
+  `docs/Database/379_rangos_peso_contenedor.sql` crea la tabla y la carga con
+  `MERGE` (idempotente). Hay que correrlo después de
+  `377_mapeo_vehiculo_tarifario.sql`, porque `TipoVehiculo` tiene llave foránea
+  hacia el mapeo.

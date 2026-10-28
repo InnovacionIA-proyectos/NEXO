@@ -71,7 +71,12 @@ Commit, push y PR a QA (script, CSV, `ESQUEMA_NEXO.sql`, `.gitignore` y este arc
 
 # Otros pendientes (no son del #377)
 
-## 6. `ESQUEMA_NEXO.sql` se detiene a mitad de camino en una base nueva
+## 6. `ESQUEMA_NEXO.sql` se detiene a mitad de camino en una base nueva — ✅ RESUELTO (2026-10-27)
+
+Se confirmó la causa (el orden) y se corrigió: ahora los índices van antes que las llaves foráneas. El archivo también crea el
+esquema `db_NEXO` si no existe y fija `QUOTED_IDENTIFIER`/`ANSI_NULLS` (sin eso, `sqlcmd` fallaba en los índices filtrados).
+Probado completo en un SQL Server 2019 vacío y comparado objeto por objeto contra la base de pruebas: coincide en todo salvo
+las 8 llaves foráneas del punto 8. Lo de abajo queda como historia.
 
 `ESQUEMA_NEXO.sql` es el archivo que construye toda la base de NEXO desde cero. Ismael lo corrió en una base vacía (2026-10-27, al probar el #365) y se detuvo por un error en la llave foránea de `OutboxMessage`. Lo que venía después en ese lote no se creó: índices y algunas llaves foráneas. En la base de pruebas no se nota porque las tablas ya existían; el problema aparece al montar un ambiente nuevo.
 
@@ -89,3 +94,55 @@ Pendiente responderle:
 1. **Orden de columnas:** sí, si el cliente cambia el orden se vuelve a sugerir.
 2. **Diccionario:** sí a las tres (con plantilla manda la plantilla; confirmar no agrega términos al diccionario; editar el diccionario no invalida plantillas). Consecuencia: el diccionario solo se llena a mano y arranca casi vacío, porque la carga inicial (#357) todavía no tiene fuente.
 3. **`clienteId` desde la solicitud:** no hace falta por ahora. NEXO no asigna clientes por usuario, así que no cambiaría los permisos, y `tbl_audit_log` ya registra quién crea, reemplaza o borra cada plantilla.
+
+## 8. A la base de pruebas le faltan 8 llaves foráneas
+
+Al comparar `ESQUEMA_NEXO.sql` contra `dbInformesAutomatizados_Pruebas.db_NEXO` (2026-10-27), la base no tiene estas 8 llaves
+foráneas, que sí están en el esquema y en el modelo del backend (`clsNexoDbContext`):
+
+| Llave foránea | Filas que hoy la incumplen |
+|---|---|
+| `FK_OutboxMessage_InboxState_InboxMessageId_InboxConsumerId` | 0 |
+| `FK_OutboxMessage_OutboxState_OutboxId` | 0 |
+| `FK_planes_cargue_vehiculos_cubicacion_VehiculoId` | 0 |
+| `FK_solicitudes_clientes_ClienteId` | 0 |
+| `FK_solicitudes_usuarios_CreadoPor` | **2** (solicitudes cuyo `CreadoPor` ya no existe en `tbl_usuarios`) |
+| `FK_tarifas_historicas_configuraciones_vehiculo_ConfigVehiculoId` | 0 |
+| `FK_tarifas_historicas_cotizaciones_CotizacionId` | 0 |
+| `FK_tarifas_historicas_rutas_RutaId` | 0 |
+
+**Qué hacer:**
+1. Decidir qué hacer con las 2 solicitudes huérfanas (asignarles un `CreadoPor` válido o borrarlas, si son de prueba):
+   ```sql
+   SELECT s.Id, s.CreadoPor, s.CreatedAt
+   FROM db_NEXO.tbl_solicitudes s
+   WHERE NOT EXISTS (SELECT 1 FROM db_NEXO.tbl_usuarios u WHERE u.Id = s.CreadoPor);
+   ```
+2. Crear las 8 llaves foráneas en la base de pruebas (`WITH CHECK` valida los datos existentes; si algo falla, no se crea):
+   ```sql
+   ALTER TABLE [db_NEXO].[OutboxMessage] WITH CHECK ADD CONSTRAINT [FK_OutboxMessage_InboxState_InboxMessageId_InboxConsumerId] FOREIGN KEY ([InboxMessageId], [InboxConsumerId]) REFERENCES [db_NEXO].[InboxState] ([MessageId], [ConsumerId]);
+   ALTER TABLE [db_NEXO].[OutboxMessage] WITH CHECK ADD CONSTRAINT [FK_OutboxMessage_OutboxState_OutboxId] FOREIGN KEY ([OutboxId]) REFERENCES [db_NEXO].[OutboxState] ([OutboxId]);
+   ALTER TABLE [db_NEXO].[tbl_planes_cargue] WITH CHECK ADD CONSTRAINT [FK_planes_cargue_vehiculos_cubicacion_VehiculoId] FOREIGN KEY ([VehiculoId]) REFERENCES [db_NEXO].[tbl_vehiculos_cubicacion] ([Id]);
+   ALTER TABLE [db_NEXO].[tbl_solicitudes] WITH CHECK ADD CONSTRAINT [FK_solicitudes_clientes_ClienteId] FOREIGN KEY ([ClienteId]) REFERENCES [db_NEXO].[tbl_clientes] ([Id]);
+   ALTER TABLE [db_NEXO].[tbl_solicitudes] WITH CHECK ADD CONSTRAINT [FK_solicitudes_usuarios_CreadoPor] FOREIGN KEY ([CreadoPor]) REFERENCES [db_NEXO].[tbl_usuarios] ([Id]);
+   ALTER TABLE [db_NEXO].[tbl_tarifas_historicas] WITH CHECK ADD CONSTRAINT [FK_tarifas_historicas_configuraciones_vehiculo_ConfigVehiculoId] FOREIGN KEY ([ConfigVehiculoId]) REFERENCES [db_NEXO].[tbl_configuraciones_vehiculo] ([Id]);
+   ALTER TABLE [db_NEXO].[tbl_tarifas_historicas] WITH CHECK ADD CONSTRAINT [FK_tarifas_historicas_cotizaciones_CotizacionId] FOREIGN KEY ([CotizacionId]) REFERENCES [db_NEXO].[tbl_cotizaciones] ([Id]);
+   ALTER TABLE [db_NEXO].[tbl_tarifas_historicas] WITH CHECK ADD CONSTRAINT [FK_tarifas_historicas_rutas_RutaId] FOREIGN KEY ([RutaId]) REFERENCES [db_NEXO].[tbl_rutas] ([Id]);
+   ```
+   Conviene avisarle a Ismael antes: con estas llaves, el código que hoy guarda datos inconsistentes empezaría a fallar en vez
+   de guardarlos.
+
+## 9. Restos en la base de pruebas que no están en el esquema
+
+Existen en `db_NEXO` pero no se recrean en una base nueva (no forman parte de `ESQUEMA_NEXO.sql`):
+
+| Tabla | Qué es | Creada |
+|---|---|---|
+| `tbl_tarifas_sicetac` | Caché manual de SICE-TAC, retirada (el código ya no la usa; 13 filas) | 2026-09-20 |
+| `__EFMigrationsHistory_backup_20260926` | Respaldo del historial de migraciones | 2026-09-26 |
+| `tbl_lineas_solicitud_bak_20261019` | Respaldo | 2026-10-19 |
+| `tbl_usuarios_bak_20261019` | Respaldo del cambio de rol (#307) | 2026-10-19 |
+| `tbl_mapeo_rol_portal_bak_20261019` | Respaldo del cambio de rol (#307) | 2026-10-19 |
+
+**Qué hacer:** decidir con el equipo si se borran. Los dos respaldos del rol tienen su condición en
+`docs/Database/PENDIENTE-ROLES-COORDINADORFLETES-ADMINBIBLIOTECA.md`.
