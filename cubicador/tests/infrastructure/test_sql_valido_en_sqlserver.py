@@ -12,6 +12,8 @@ en QA con ERROR_INTERNO por ese motivo, con las 275 pruebas en verde.
 
 Estas pruebas no necesitan base de datos: compilan las consultas reales contra
 el dialecto de SQL Server y revisan la forma del SQL. Corren en milisegundos.
+De ahi el `sin_base` de abajo: sin el, el fixture autouse de `tests/conftest.py`
+les abriria una conexion igual.
 """
 
 from __future__ import annotations
@@ -24,6 +26,9 @@ import pytest
 from sqlalchemy.dialects import mssql
 
 from infrastructure.persistence.repositorios.plan_cargue_repo import SqlPlanCargueRepository
+
+# Ninguna prueba de este archivo toca la base: todas compilan y listo.
+pytestmark = pytest.mark.sin_base
 
 # `IS <literal>` solo es valido en SQL Server con NULL: `IS NULL` e `IS NOT
 # NULL`. Con 0, 1, true o false es el error 102.

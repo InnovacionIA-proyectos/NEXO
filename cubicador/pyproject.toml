@@ -24,6 +24,9 @@ dev = [
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+markers = [
+  "sin_base: la prueba no toca ninguna base; exime del fixture autouse `base_limpia`",
+]
 
 [build-system]
 requires = ["setuptools>=68"]
