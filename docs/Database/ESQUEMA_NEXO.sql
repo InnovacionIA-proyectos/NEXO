@@ -169,6 +169,24 @@ CREATE TABLE [db_NEXO].[tbl_mapeo_vehiculo_tarifario] (
     , CONSTRAINT [PK_mapeo_vehiculo_tarifario] PRIMARY KEY ([Id])
 );
 
+-- Mapeo de columnas ya confirmado para un formato de Excel de un cliente. Se reconoce por FirmaEncabezados (SHA-256 de los
+-- encabezados normalizados y en orden); si llega un Excel con la misma firma se aplica la plantilla sin llamar a la IA.
+-- Encabezados y Columnas son JSON. Complementa a tbl_diccionario_cliente (vocabulario término por término, pista para la IA
+-- cuando no hay plantilla). Script para una base existente: docs/Database/361_plantillas_mapeo_cliente.sql.
+CREATE TABLE [db_NEXO].[tbl_plantillas_mapeo_cliente] (
+    [Id] uniqueidentifier NOT NULL,
+    [ClienteId] uniqueidentifier NOT NULL,
+    [Nombre] nvarchar(100) NULL,
+    [FirmaEncabezados] nvarchar(64) NOT NULL,
+    [Encabezados] nvarchar(max) NOT NULL,
+    [Columnas] nvarchar(max) NOT NULL,
+    [CreatedAt] datetimeoffset NOT NULL CONSTRAINT [DF_plantillas_mapeo_cliente_CreatedAt] DEFAULT (sysdatetimeoffset()),
+    [UpdatedAt] datetimeoffset NULL
+    , CONSTRAINT [PK_plantillas_mapeo_cliente] PRIMARY KEY ([Id])
+    , CONSTRAINT [CK_plantillas_mapeo_cliente_Encabezados] CHECK (ISJSON([Encabezados]) = 1)
+    , CONSTRAINT [CK_plantillas_mapeo_cliente_Columnas] CHECK (ISJSON([Columnas]) = 1)
+);
+
 -- Catálogo propio de municipios (Colombia/Venezuela/Ecuador) para el
 -- desplegable de Origen/Destino en Captura de Solicitudes (S4-HU-09.1).
 -- Poblada UNA SOLA VEZ desde tblSAPDANE/tblZonasTarificacionRelacion/
@@ -848,6 +866,7 @@ ALTER TABLE [db_NEXO].[tbl_planes_cargue] ADD CONSTRAINT [FK_planes_cargue_vehic
 ALTER TABLE [db_NEXO].[tbl_servicios_conexos] ADD CONSTRAINT [FK_servicios_conexos_usuarios_ActualizadoPor] FOREIGN KEY ([ActualizadoPor]) REFERENCES [db_NEXO].[tbl_usuarios] ([Id]);
 ALTER TABLE [db_NEXO].[tbl_solicitudes] ADD CONSTRAINT [FK_solicitudes_clientes_ClienteId] FOREIGN KEY ([ClienteId]) REFERENCES [db_NEXO].[tbl_clientes] ([Id]);
 ALTER TABLE [db_NEXO].[tbl_diccionario_cliente] ADD CONSTRAINT [FK_diccionario_cliente_clientes_ClienteId] FOREIGN KEY ([ClienteId]) REFERENCES [db_NEXO].[tbl_clientes] ([Id]);
+ALTER TABLE [db_NEXO].[tbl_plantillas_mapeo_cliente] ADD CONSTRAINT [FK_plantillas_mapeo_cliente_clientes_ClienteId] FOREIGN KEY ([ClienteId]) REFERENCES [db_NEXO].[tbl_clientes] ([Id]);
 ALTER TABLE [db_NEXO].[tbl_solicitudes] ADD CONSTRAINT [FK_solicitudes_usuarios_CreadoPor] FOREIGN KEY ([CreadoPor]) REFERENCES [db_NEXO].[tbl_usuarios] ([Id]);
 ALTER TABLE [db_NEXO].[tbl_tarifas_historicas] ADD CONSTRAINT [FK_tarifas_historicas_configuraciones_vehiculo_ConfigVehiculoId] FOREIGN KEY ([ConfigVehiculoId]) REFERENCES [db_NEXO].[tbl_configuraciones_vehiculo] ([Id]);
 ALTER TABLE [db_NEXO].[tbl_tarifas_historicas] ADD CONSTRAINT [FK_tarifas_historicas_cotizaciones_CotizacionId] FOREIGN KEY ([CotizacionId]) REFERENCES [db_NEXO].[tbl_cotizaciones] ([Id]);
@@ -871,6 +890,7 @@ CREATE UNIQUE INDEX [IX_clientes_Nit] ON [db_NEXO].[tbl_clientes] ([Nit]);
 CREATE UNIQUE INDEX [IX_diccionario_cliente_Unico] ON [db_NEXO].[tbl_diccionario_cliente] ([ClienteId], [TerminoNormalizado], [Tipo], [Contexto]);
 CREATE INDEX [IX_diccionario_cliente_ClienteId_Tipo] ON [db_NEXO].[tbl_diccionario_cliente] ([ClienteId], [Tipo]);
 CREATE UNIQUE INDEX [IX_mapeo_vehiculo_tarifario_TipoVehiculo] ON [db_NEXO].[tbl_mapeo_vehiculo_tarifario] ([TipoVehiculo]);
+CREATE UNIQUE INDEX [IX_plantillas_mapeo_cliente_Firma] ON [db_NEXO].[tbl_plantillas_mapeo_cliente] ([ClienteId], [FirmaEncabezados]);
 CREATE INDEX [IX_colocaciones_cargue_ItemPlanCargueId] ON [db_NEXO].[tbl_colocaciones_cargue] ([ItemPlanCargueId]);
 CREATE INDEX [IX_colocaciones_cargue_PlanCargueId_Cargada] ON [db_NEXO].[tbl_colocaciones_cargue] ([PlanCargueId], [Cargada]);
 CREATE INDEX [IX_cotizacion_conexos_CotizacionId] ON [db_NEXO].[tbl_cotizacion_conexos] ([CotizacionId]);
