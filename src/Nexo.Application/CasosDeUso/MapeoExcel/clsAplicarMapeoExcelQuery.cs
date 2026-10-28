@@ -79,10 +79,10 @@ public sealed class clsAplicarMapeoExcelQueryHandler(IDiccionarioClienteReposito
 
     // ---------------------------------------------------------------- el mapeo
 
-    private sealed record ColumnaAplicable(int Indice, string Campo, string Transformacion);
+    internal sealed record ColumnaAplicable(int Indice, string Campo, string Transformacion);
 
     /// <summary>El mapeo es una entrada externa: campos y conversiones de las listas cerradas, sin columnas repetidas ni campos duplicados.</summary>
-    private static List<ColumnaAplicable> ValidarColumnas(IReadOnlyList<clsColumnaAAplicar>? entrada)
+    internal static List<ColumnaAplicable> ValidarColumnas(IReadOnlyList<clsColumnaAAplicar>? entrada)
     {
         if (entrada is null || entrada.Count == 0)
             throw new clsValidationFailedException("MAPEO_REQUERIDO", "Envía el mapeo de las columnas del archivo.");

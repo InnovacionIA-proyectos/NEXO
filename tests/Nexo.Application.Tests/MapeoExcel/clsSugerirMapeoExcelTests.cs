@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Nexo.Application.CasosDeUso.DiccionarioCliente.Interfaces;
+using Nexo.Application.CasosDeUso.PlantillasMapeo.Interfaces;
 using Nexo.Application.CasosDeUso.MapeoExcel;
 using Nexo.Application.CasosDeUso.Solicitudes;
 using Nexo.Application.Common;
@@ -22,6 +23,7 @@ public class clsSugerirMapeoExcelTests
     private readonly Mock<IAsistenteIaPort> _ia = new();
     private readonly Mock<IDiccionarioClienteRepository> _dic = new();
     private readonly Mock<ICurrentUserPort> _usuario = new();
+    private readonly Mock<IPlantillasMapeoRepository> _plantillas = new();
     private clsPeticionIa? _enviada;
 
     public clsSugerirMapeoExcelTests()
@@ -32,7 +34,7 @@ public class clsSugerirMapeoExcelTests
             .ReturnsAsync([]);
     }
 
-    private clsSugerirMapeoExcelQueryHandler Manejador() => new(_ia.Object, _dic.Object, _usuario.Object);
+    private clsSugerirMapeoExcelQueryHandler Manejador() => new(_ia.Object, _dic.Object, _usuario.Object, _plantillas.Object);
 
     private static clsTerminoCliente Termino(string texto, string campo, Guid? cliente = null) => new()
     {

@@ -779,7 +779,7 @@ Biblioteca) y el campo se quedaba sin sugerencias. Ahora:
 
 | Endpoint | Roles |
 |---|---|
-| `POST analizar-excel`, `POST sugerir-mapeo`, `POST aplicar-mapeo`, `POST normalizar-valores`, `POST /` (capturar) | `Comercial`, `Admin` |
+| `POST analizar-excel`, `POST sugerir-mapeo`, `POST aplicar-mapeo`, `POST normalizar-valores`, `PUT/GET/DELETE plantillas-mapeo`, `POST /` (capturar) | `Comercial`, `Admin` |
 | `GET aprovisionamiento`, `GET clientes` | `Comercial`, `Admin` (revisado caso por caso: se mantienen) |
 | `GET departamentos`, `GET ciudades`, `GET municipios` | **cualquier rol válido de Nexo** (hay que estar autenticado; sin sesión → `401`) |
 
@@ -795,6 +795,9 @@ Propone a qué campo de NEXO corresponde cada columna del Excel de un cliente. E
 revisa y la confirma en la pantalla de mapeo. Recibe lo que ya devolvió `analizar-excel` para **una** hoja (no vuelve a leer el archivo).
 
 Cómo se arma, en este orden:
+0. **La plantilla guardada del cliente** (ver `plantillas-mapeo`, abajo): si el cliente ya confirmó un mapeo para **exactamente** estos encabezados (sin importar mayúsculas ni
+   tildes, pero sí el orden y la cantidad), se devuelve ese mapeo con `origen = "plantilla"`, `confianza = 1`, `plantillaId` y `motivoSinIa = "PLANTILLA_RECONOCIDA"`, y **no se
+   llama a la IA**. Si cambia un encabezado, se agrega, se quita o se reordena una columna, no hay plantilla y se sugiere como siempre (pasos 1 a 3). Requiere `clienteId`.
 1. **El diccionario del cliente manda** (§3.19.1): una columna cuyo encabezado está en su diccionario (o en el general) se resuelve sin IA, con
    `confianza = 1` y `origen = "diccionario"`. Si el diccionario resuelve todas las columnas, no se llama a la IA (`DICCIONARIO_COMPLETO`).
 2. **La IA completa lo pendiente**, con datos mínimos: los encabezados, **hasta 20 filas** de muestra y las pistas del diccionario. Antes de salir,
@@ -821,9 +824,10 @@ no se esconde**: responde `429 IA_TOPE_DIARIO` (§3.22 si el módulo de IA está
 ```ts
 interface SugerenciaMapeoDto {
   iaUsada: boolean
-  motivoSinIa: string | null        // DICCIONARIO_COMPLETO | IA_NO_DISPONIBLE | IA_* ; null si la IA participó
+  motivoSinIa: string | null        // PLANTILLA_RECONOCIDA | DICCIONARIO_COMPLETO | IA_NO_DISPONIBLE | IA_* ; null si la IA participó
   columnas: ColumnaMapeadaDto[]     // una por columna, en el orden del archivo
   dudas: string[]                   // lo que el usuario debería mirar (máx. 10)
+  plantillaId: string | null        // la plantilla guardada que se reconoció; null si no hubo
 }
 interface ColumnaMapeadaDto {
   indice: number                    // base 0
@@ -831,7 +835,7 @@ interface ColumnaMapeadaDto {
   campo: string                     // campo de NEXO, o "ignorar"
   transformacion: string            // ver la lista de abajo
   confianza: number                 // 0..1 (1 con diccionario, 0 sin propuesta)
-  origen: "diccionario" | "ia" | "ninguno"
+  origen: "plantilla" | "diccionario" | "ia" | "ninguno"
   nota: string | null
 }
 ```
@@ -844,6 +848,37 @@ interface ColumnaMapeadaDto {
   `dividir_origen_destino` con `origen`/`destino`, `numero_coma_decimal` con un campo numérico, `fecha` con `deadline`; una columna `ignorar` siempre lleva `ninguna`.
 - **→** `200 SugerenciaMapeoDto`
 - **Errores**: `400 VALIDATION_ERROR` (sin encabezados, o más de 100) · `400 ENCABEZADOS_REQUERIDOS` · `400 DEMASIADAS_COLUMNAS` · `429 IA_TOPE_DIARIO`
+
+#### `/api/captura-solicitudes/plantillas-mapeo` — plantillas de mapeo por cliente
+El mapeo que el usuario **confirmó** para el Excel de un cliente se guarda como su plantilla (`tbl_plantillas_mapeo_cliente`). Cuando llega otro archivo del cliente con
+**los mismos encabezados**, `sugerir-mapeo` devuelve ese mapeo en vez de llamar a la IA. Roles: `Comercial`, `Admin`.
+
+La plantilla se reconoce por la **firma de los encabezados**: el SHA-256 de los encabezados normalizados (sin tildes ni mayúsculas, espacios y puntuación colapsados) **y en orden**.
+`Peso (TON)` y `PESO (ton)` dan la misma firma; cambiar una palabra, agregar, quitar o reordenar una columna da otra, y el archivo se sugiere de nuevo. Un cliente tiene una sola
+plantilla por conjunto de encabezados.
+
+**`PUT /api/captura-solicitudes/plantillas-mapeo`** — guarda o reemplaza la plantilla (la que ya tenga esos encabezados). `201` la primera vez, `200` si reemplazó.
+
+| Body | | Tipo | Restricción |
+|---|---|---|---|
+| `clienteId` | **requerido** | UUID | Debe existir |
+| `nombre` | *opcional* | string | máx. 100 |
+| `encabezados` | **requerido** | string[] | 1 a 100, en el orden del archivo; cada uno máx. 200 caracteres |
+| `columnas` | **requerido** | `{ indice, campo, transformacion? }[]` | El mismo mapeo de `aplicar-mapeo` (una entrada por columna; las que no se usan, `ignorar`). Se valida igual: campos y conversiones de las listas, sin campos repetidos y con origen y destino; `indice` < cantidad de encabezados |
+
+**`GET /api/captura-solicitudes/plantillas-mapeo?clienteId=`** — las plantillas del cliente (sin `clienteId`, las de todos).
+**`DELETE /api/captura-solicitudes/plantillas-mapeo/{id}`** — la borra (`204`); el siguiente archivo con esos encabezados se vuelve a sugerir.
+
+```ts
+interface PlantillaMapeoDto {
+  id: string; clienteId: string; clienteNombre: string | null; nombre: string | null
+  encabezados: string[]                                   // tal como se guardaron
+  columnas: { indice: number, campo: string, transformacion: string }[]
+  createdAt: string; updatedAt: string | null
+}
+```
+- **Errores**: `400 VALIDATION_ERROR` · `400 CLIENTE_REQUERIDO` · `400 CLIENTE_NO_ENCONTRADO` · `400 NOMBRE_DEMASIADO_LARGO` · `400 ENCABEZADOS_REQUERIDOS` · `400 DEMASIADAS_COLUMNAS` · `400 ENCABEZADO_DEMASIADO_LARGO` ·
+  `400 COLUMNA_FUERA_DE_RANGO` · los del mapeo de `aplicar-mapeo` (`MAPEO_REQUERIDO`, `CAMPO_INVALIDO`, `TRANSFORMACION_INVALIDA`, `TRANSFORMACION_NO_APLICA`, `CAMPO_DUPLICADO`, `CAMPO_REQUERIDO`, `COLUMNA_INVALIDA`) · `404 PLANTILLA_NO_ENCONTRADA` (borrar)
 
 #### `POST /api/captura-solicitudes/aplicar-mapeo`
 Aplica el mapeo que el usuario **confirmó** a **todas** las filas del Excel y devuelve las líneas listas para `POST /api/captura-solicitudes`, más los
@@ -2306,7 +2341,7 @@ abiertos a los 6 roles.
 
 | Operación | Com | AdmBib | AdmTar | ServLog | Líder | Admin |
 |---|:-:|:-:|:-:|:-:|:-:|:-:|
-| `POST /api/captura-solicitudes/analizar-excel` · `POST .../sugerir-mapeo` · `POST .../aplicar-mapeo` · `POST .../normalizar-valores` · `POST /api/captura-solicitudes` · `GET aprovisionamiento` · `GET clientes` | ✅ | | | | | ✅ |
+| `POST /api/captura-solicitudes/analizar-excel` · `POST .../sugerir-mapeo` · `POST .../aplicar-mapeo` · `POST .../normalizar-valores` · `PUT/GET/DELETE .../plantillas-mapeo` · `POST /api/captura-solicitudes` · `GET aprovisionamiento` · `GET clientes` | ✅ | | | | | ✅ |
 | `GET /api/captura-solicitudes/ciudades` · `departamentos` · `municipios` (S5-HU-22.1: cualquier rol válido) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | **Bandeja y Mesa**: `GET /api/solicitudes` · `GET /api/solicitudes/{id}` · `GET .../propuesta-tarifa` · `/hubs/bandeja` (#307) | ✅ | | ✅ | ✅ | ✅ | ✅ |
 | `POST /api/solicitudes` (#307, D5: solo Admin) | | | | | | ✅ |

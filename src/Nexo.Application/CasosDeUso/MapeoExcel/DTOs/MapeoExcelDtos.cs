@@ -8,7 +8,7 @@ namespace Nexo.Application.CasosDeUso.MapeoExcel.DTOs;
 /// <param name="Campo">Campo de NEXO al que corresponde, o <c>ignorar</c> si no se usa o no se supo.</param>
 /// <param name="Transformacion">Cómo se convierte su valor antes de usarlo (ver <see cref="clsTransformacionesMapeo"/>).</param>
 /// <param name="Confianza">De 0 a 1. Con <c>diccionario</c> siempre es 1; con <c>ninguno</c>, 0.</param>
-/// <param name="Origen"><c>diccionario</c> (lo guardado del cliente), <c>ia</c> (lo propuso el modelo) o <c>ninguno</c> (sin propuesta).</param>
+/// <param name="Origen"><c>plantilla</c> (el mapeo ya confirmado de esos encabezados), <c>diccionario</c> (lo guardado del cliente), <c>ia</c> (lo propuso el modelo) o <c>ninguno</c> (sin propuesta).</param>
 /// <param name="Nota">Una aclaración corta de por qué; puede venir vacía.</param>
 public sealed record clsColumnaMapeadaDto(
     int Indice,
@@ -30,11 +30,13 @@ public sealed record clsColumnaMapeadaDto(
 /// función apagada) o el código <c>IA_*</c> del error del proveedor. Null cuando sí participó.
 /// </param>
 /// <param name="Dudas">Lo que el usuario debería mirar: columnas en conflicto, campos obligatorios sin columna, observaciones del modelo.</param>
+/// <param name="PlantillaId">La plantilla guardada que se reconoció (los mismos encabezados que un archivo anterior del cliente); null si no hubo.</param>
 public sealed record clsSugerenciaMapeoDto(
     bool IaUsada,
     string? MotivoSinIa,
     IReadOnlyList<clsColumnaMapeadaDto> Columnas,
-    IReadOnlyList<string> Dudas);
+    IReadOnlyList<string> Dudas,
+    Guid? PlantillaId = null);
 
 // ---------------------------------------------------------------- aplicar el mapeo
 
