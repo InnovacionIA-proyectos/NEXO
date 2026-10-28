@@ -1,0 +1,166 @@
+{
+  "caso": "caso_06_cliente_c_region_2",
+  "archivo": "casos/caso_06_cliente_c_region_2.xlsx",
+  "hoja": "Datos",
+  "cliente": "C",
+  "formato": "matriz",
+  "descripcion": "Mismo formulario en matriz para otra región, con un puerto de origen más.",
+  "filaEncabezado": 20,
+  "filaSubEncabezado": null,
+  "totalFilas": 37,
+  "limitaciones": [
+    "El origen viene en el encabezado de cada columna (requiere despivotar).",
+    "El destino no está en ninguna columna: es la región del formulario (título)."
+  ],
+  "columnas": [
+    {
+      "indice": 0,
+      "columna": "Columna B",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [],
+      "nota": "Columna vacía."
+    },
+    {
+      "indice": 1,
+      "columna": "TIPO DE SERVICIO",
+      "campo": "tipoVehiculo",
+      "transformacion": "ninguna",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [],
+      "nota": "Tipo de servicio: vehículos, contenedores por rango de peso y servicios adicionales mezclados."
+    },
+    {
+      "indice": 2,
+      "columna": "TIPO DE SERVICIO",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [
+        {
+          "campo": "tipoVehiculo",
+          "transformacion": "ninguna"
+        }
+      ],
+      "nota": "Repite la columna anterior (celda combinada)."
+    },
+    {
+      "indice": 3,
+      "columna": "CARTAGENA",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": true,
+      "alternativasAceptadas": [],
+      "nota": "Tarifa por puerto de origen: el origen viene en el encabezado."
+    },
+    {
+      "indice": 4,
+      "columna": "CARTAGENA",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": true,
+      "alternativasAceptadas": [],
+      "nota": "Tarifa por puerto de origen: el origen viene en el encabezado."
+    },
+    {
+      "indice": 5,
+      "columna": "BARRANQUILLA",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": true,
+      "alternativasAceptadas": [],
+      "nota": "Tarifa por puerto de origen: el origen viene en el encabezado."
+    },
+    {
+      "indice": 6,
+      "columna": "BARRANQUILLA",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": true,
+      "alternativasAceptadas": [],
+      "nota": "Tarifa por puerto de origen: el origen viene en el encabezado."
+    },
+    {
+      "indice": 7,
+      "columna": "SANTA MARTA",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": true,
+      "alternativasAceptadas": [],
+      "nota": "Tarifa por puerto de origen: el origen viene en el encabezado."
+    },
+    {
+      "indice": 8,
+      "columna": "SANTA MARTA",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": true,
+      "alternativasAceptadas": [],
+      "nota": "Tarifa por puerto de origen: el origen viene en el encabezado."
+    },
+    {
+      "indice": 9,
+      "columna": "BUENAVENTURA",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": true,
+      "alternativasAceptadas": [],
+      "nota": "Tarifa por puerto de origen: el origen viene en el encabezado."
+    },
+    {
+      "indice": 10,
+      "columna": "BUENAVENTURA",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": true,
+      "alternativasAceptadas": [],
+      "nota": "Tarifa por puerto de origen: el origen viene en el encabezado."
+    },
+    {
+      "indice": 11,
+      "columna": "MEDELLIN",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": true,
+      "alternativasAceptadas": [],
+      "nota": "Tarifa por puerto de origen: el origen viene en el encabezado."
+    },
+    {
+      "indice": 12,
+      "columna": "MEDELLIN",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": true,
+      "alternativasAceptadas": [],
+      "nota": "Tarifa por puerto de origen: el origen viene en el encabezado."
+    },
+    {
+      "indice": 13,
+      "columna": "Columna O",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [],
+      "nota": null
+    },
+    {
+      "indice": 14,
+      "columna": "Columna P",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [],
+      "nota": null
+    },
+    {
+      "indice": 15,
+      "columna": "Columna Q",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [],
+      "nota": "Valor de referencia sin encabezado."
+    }
+  ]
+}

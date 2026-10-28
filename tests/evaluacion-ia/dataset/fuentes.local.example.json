@@ -1,0 +1,34 @@
+{
+  "caso_01_cliente_a_importacion": {
+    "archivo": "docs/docs_raw/<archivo del cliente>.xlsx",
+    "hoja": "<nombre de la hoja>"
+  },
+  "caso_02_cliente_a_exportacion": {
+    "archivo": "docs/docs_raw/<archivo del cliente>.xlsx",
+    "hoja": "<nombre de la hoja>"
+  },
+  "caso_03_cliente_a_distribucion": {
+    "archivo": "docs/docs_raw/<archivo del cliente>.xlsx",
+    "hoja": "<nombre de la hoja>"
+  },
+  "caso_04_cliente_b_escenarios": {
+    "archivo": "docs/docs_raw/<archivo del cliente>.xlsx",
+    "hoja": "<nombre de la hoja>"
+  },
+  "caso_05_cliente_c_region_1": {
+    "archivo": "docs/docs_raw/<archivo del cliente>.xlsx",
+    "hoja": "<nombre de la hoja>"
+  },
+  "caso_06_cliente_c_region_2": {
+    "archivo": "docs/docs_raw/<archivo del cliente>.xlsx",
+    "hoja": "<nombre de la hoja>"
+  },
+  "caso_07_cliente_d_nacional": {
+    "archivo": "docs/docs_raw/<archivo del cliente>.xlsx",
+    "hoja": "<nombre de la hoja>"
+  },
+  "caso_08_cliente_d_impo_expo": {
+    "archivo": "docs/docs_raw/<archivo del cliente>.xlsx",
+    "hoja": "<nombre de la hoja>"
+  }
+}

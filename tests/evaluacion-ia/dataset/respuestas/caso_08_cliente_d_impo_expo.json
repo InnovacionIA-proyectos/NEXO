@@ -1,0 +1,157 @@
+{
+  "caso": "caso_08_cliente_d_impo_expo",
+  "archivo": "casos/caso_08_cliente_d_impo_expo.xlsx",
+  "hoja": "Datos",
+  "cliente": "D",
+  "formato": "fila_por_linea",
+  "descripcion": "Formulario de oferta de importación y exportación: una fila por ruta y contenedor con rango de peso.",
+  "filaEncabezado": 10,
+  "filaSubEncabezado": null,
+  "totalFilas": 66,
+  "limitaciones": [
+    "El tipo de contenedor y el rango de peso vienen juntos en la misma celda."
+  ],
+  "columnas": [
+    {
+      "indice": 0,
+      "columna": "Ruta",
+      "campo": "referencia",
+      "transformacion": "ninguna",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [],
+      "nota": "Identificador de la ruta del cliente."
+    },
+    {
+      "indice": 1,
+      "columna": "Secuencia de entrega",
+      "campo": "origen",
+      "transformacion": "dividir_origen_destino",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [
+        {
+          "campo": "destino",
+          "transformacion": "dividir_origen_destino"
+        }
+      ],
+      "nota": "«ORIGEN-DESTINO» en una sola celda."
+    },
+    {
+      "indice": 2,
+      "columna": "N° entregas",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [],
+      "nota": "Número de entregas: no hay campo."
+    },
+    {
+      "indice": 3,
+      "columna": "Km ref.",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [],
+      "nota": "Kilómetros de referencia: no hay campo."
+    },
+    {
+      "indice": 4,
+      "columna": "Tipo de vehículo",
+      "campo": "claseContenedor",
+      "transformacion": "ninguna",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [
+        {
+          "campo": "tipoVehiculo",
+          "transformacion": "ninguna"
+        }
+      ],
+      "nota": "Contenedor de 20 o 40 pies con su rango de peso (C20 de 0 a 8 Ton)."
+    },
+    {
+      "indice": 5,
+      "columna": "Config. SICE-TAC",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [
+        {
+          "campo": "tipoVehiculo",
+          "transformacion": "ninguna"
+        }
+      ],
+      "nota": "Configuración SICE-TAC."
+    },
+    {
+      "indice": 6,
+      "columna": "Tiempo logístico ref. (h)",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [],
+      "nota": "Tiempo logístico de referencia de SICE-TAC."
+    },
+    {
+      "indice": 7,
+      "columna": "Costo variable",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [],
+      "nota": "Costo o tarifa que diligencia el transportador."
+    },
+    {
+      "indice": 8,
+      "columna": "Costo fijo (conducción + descargue; cargue NO se cobra)",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [],
+      "nota": "Costo o tarifa que diligencia el transportador."
+    },
+    {
+      "indice": 9,
+      "columna": "Peajes",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [],
+      "nota": "Costo o tarifa que diligencia el transportador."
+    },
+    {
+      "indice": 10,
+      "columna": "Costo operación ref. SICE-TAC",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [],
+      "nota": "Costo o tarifa que diligencia el transportador."
+    },
+    {
+      "indice": 11,
+      "columna": "Intermediación (sin aux.)",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [],
+      "nota": "Costo o tarifa que diligencia el transportador."
+    },
+    {
+      "indice": 12,
+      "columna": "TARIFA SIN AUXILIAR",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [],
+      "nota": "Costo o tarifa que diligencia el transportador."
+    },
+    {
+      "indice": 13,
+      "columna": "Tarifa con aux. por tonelada",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [],
+      "nota": "Costo o tarifa que diligencia el transportador."
+    }
+  ]
+}

@@ -71,3 +71,6 @@ docs/Database/seeder/Libro1.xlsx
 
 # Exports crudos de tablas reales (SICE-TAC, plaza, tarifas) para verificación puntual — nunca al repo público
 docs/tbl*.csv
+
+# Dataset dorado (#353): de qué Excel real sale cada caso — los nombres de archivo y hoja identifican al cliente
+tests/evaluacion-ia/dataset/fuentes.local.json

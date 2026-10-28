@@ -1,0 +1,188 @@
+{
+  "caso": "caso_07_cliente_d_nacional",
+  "archivo": "casos/caso_07_cliente_d_nacional.xlsx",
+  "hoja": "Datos",
+  "cliente": "D",
+  "formato": "fila_por_linea",
+  "descripcion": "Formulario de oferta nacional: una fila por ruta y vehículo; la ruta es una secuencia de entregas con varias paradas.",
+  "filaEncabezado": 10,
+  "filaSubEncabezado": null,
+  "totalFilas": 342,
+  "limitaciones": [
+    "La secuencia de entregas tiene varias paradas: dividir_origen_destino solo parte dos ciudades."
+  ],
+  "columnas": [
+    {
+      "indice": 0,
+      "columna": "Ruta",
+      "campo": "referencia",
+      "transformacion": "ninguna",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [],
+      "nota": "Identificador de la ruta del cliente (Ruta 1...)."
+    },
+    {
+      "indice": 1,
+      "columna": "Secuencia de entrega",
+      "campo": "origen",
+      "transformacion": "dividir_origen_destino",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [
+        {
+          "campo": "destino",
+          "transformacion": "dividir_origen_destino"
+        }
+      ],
+      "nota": "Secuencia de entregas: primera ciudad = origen. Con más de dos ciudades la transformación no puede partirla."
+    },
+    {
+      "indice": 2,
+      "columna": "N° entregas",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [],
+      "nota": "Número de entregas: no hay campo."
+    },
+    {
+      "indice": 3,
+      "columna": "Km ref.",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [],
+      "nota": "Kilómetros de referencia: no hay campo."
+    },
+    {
+      "indice": 4,
+      "columna": "Tipo de vehículo",
+      "campo": "tipoVehiculo",
+      "transformacion": "ninguna",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [],
+      "nota": null
+    },
+    {
+      "indice": 5,
+      "columna": "Config. SICE-TAC",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [
+        {
+          "campo": "tipoVehiculo",
+          "transformacion": "ninguna"
+        }
+      ],
+      "nota": "Configuración SICE-TAC: describe el mismo vehículo de la columna anterior."
+    },
+    {
+      "indice": 6,
+      "columna": "Capacidad (t)",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [],
+      "nota": "Capacidad del vehículo en toneladas, no el peso de la carga."
+    },
+    {
+      "indice": 7,
+      "columna": "Tiempo logístico ref. (h)",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [],
+      "nota": "Tiempo logístico de referencia de SICE-TAC."
+    },
+    {
+      "indice": 8,
+      "columna": "Costo variable",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [],
+      "nota": "Costo o tarifa que diligencia el transportador."
+    },
+    {
+      "indice": 9,
+      "columna": "Costo fijo (conducción + descargue; cargue NO se cobra)",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [],
+      "nota": "Costo o tarifa que diligencia el transportador."
+    },
+    {
+      "indice": 10,
+      "columna": "Peajes",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [],
+      "nota": "Costo o tarifa que diligencia el transportador."
+    },
+    {
+      "indice": 11,
+      "columna": "Costo operación ref. SICE-TAC",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [],
+      "nota": "Costo o tarifa que diligencia el transportador."
+    },
+    {
+      "indice": 12,
+      "columna": "Intermediación (sin aux.)",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [],
+      "nota": "Costo o tarifa que diligencia el transportador."
+    },
+    {
+      "indice": 13,
+      "columna": "TARIFA SIN AUXILIAR",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [],
+      "nota": "Costo o tarifa que diligencia el transportador."
+    },
+    {
+      "indice": 14,
+      "columna": "Costo auxiliares descargue",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [],
+      "nota": "Costo o tarifa que diligencia el transportador."
+    },
+    {
+      "indice": 15,
+      "columna": "Intermediación (con aux.)",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [],
+      "nota": "Costo o tarifa que diligencia el transportador."
+    },
+    {
+      "indice": 16,
+      "columna": "TARIFA CON AUXILIAR",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [],
+      "nota": "Costo o tarifa que diligencia el transportador."
+    },
+    {
+      "indice": 17,
+      "columna": "Tarifa con aux. por tonelada",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [],
+      "nota": "Costo o tarifa que diligencia el transportador."
+    }
+  ]
+}
