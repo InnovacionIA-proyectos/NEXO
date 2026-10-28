@@ -108,3 +108,58 @@ Medida el 2026-10-27 sobre la **semilla sintética** (22 casos, 50 repeticiones)
 | Revisión de las etiquetas por un experto de Operaciones | Operaciones, con apoyo de @bquinterobtst | Marcar `etiquetaValidada: true` caso por caso |
 | Volver a medir la línea base con las cargas reales y actualizar la sección 5 | Quien corra el estudio | `evaluar.py` y pegar el informe |
 | Confirmar el tamaño y la composición del dataset (sección 3) | Operaciones | Acuerdo escrito |
+
+## 7. Modo sombra: las mismas métricas con tráfico real
+
+Con `IA_SOMBRA_HABILITADA=true` el Cubicador compara, en segundo plano, cada recomendación del motor con la de Claude y deja una fila en `dbo_cubicador.iaSombra` (ver [ROTACION-LLAVE-ANTHROPIC.md](../despliegue/ROTACION-LLAVE-ANTHROPIC.md) §7). La respuesta al usuario no cambia ni se retrasa. El modelo **no ve** lo que respondió el motor.
+
+Cada fila ya trae las cuentas de este documento, calculadas con el mismo criterio que `metricas.py`: acuerdo en la flota exacta y en la configuración, cantidad de vehículos, y el respeto de peso, volumen y unidades **recalculado con el catálogo** (no lo que el modelo dijo). Lo que no está en la tabla es la decisión humana correcta: esta medición dice cuánto se parece el modelo al motor, no cuánto acierta. Para eso sigue haciendo falta el dataset validado de §3.
+
+Consultas de solo lectura (cambiar `dbo_cubicador` si el esquema es otro):
+
+```sql
+-- Qué pasó con cada intento
+SELECT Estado, COUNT(*) AS intentos
+FROM [dbo_cubicador].[iaSombra]
+GROUP BY Estado
+ORDER BY intentos DESC;
+
+-- Acuerdo con el motor (solo las comparaciones que se pudieron hacer)
+SELECT
+    COUNT(*) AS comparadas,
+    AVG(CASE WHEN CoincideResultado = 1 THEN 1.0 ELSE 0.0 END) AS acuerdo_en_asignar,
+    AVG(CASE WHEN CoincideFlota = 1 THEN 1.0 ELSE 0.0 END) AS flota_exacta,
+    AVG(CASE WHEN CoincideConfiguracion = 1 THEN 1.0 ELSE 0.0 END) AS misma_configuracion,
+    AVG(CASE WHEN CantidadIa = CantidadMotor THEN 1.0 ELSE 0.0 END) AS misma_cantidad,
+    AVG(CASE WHEN CantidadIa > CantidadMotor THEN 1.0 ELSE 0.0 END) AS ia_pide_mas,
+    AVG(CASE WHEN CantidadIa < CantidadMotor THEN 1.0 ELSE 0.0 END) AS ia_pide_menos
+FROM [dbo_cubicador].[iaSombra]
+WHERE Estado = N'OK';
+
+-- Seguridad: cuántas veces lo que propuso el modelo no se puede cargar
+SELECT
+    SUM(CASE WHEN IaRespetaPeso = 0 THEN 1 ELSE 0 END) AS excede_peso,
+    SUM(CASE WHEN IaRespetaVolumen = 0 THEN 1 ELSE 0 END) AS excede_volumen,
+    SUM(CASE WHEN IaConservaUnidades = 0 THEN 1 ELSE 0 END) AS pierde_o_repite_unidades
+FROM [dbo_cubicador].[iaSombra]
+WHERE Estado = N'OK';
+
+-- Latencia del modelo (ms)
+SELECT DISTINCT
+    PERCENTILE_CONT(0.50) WITHIN GROUP (ORDER BY LatenciaIaMs) OVER () AS p50_ms,
+    PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY LatenciaIaMs) OVER () AS p95_ms
+FROM [dbo_cubicador].[iaSombra]
+WHERE Estado = N'OK';
+
+-- Costo por cubicación. Los precios son USD por millón de tokens: poner los vigentes del modelo.
+DECLARE @precio_entrada decimal(10,4) = 2.0;
+DECLARE @precio_salida decimal(10,4) = 10.0;
+SELECT
+    COUNT(*) AS llamadas,
+    SUM(TokensEntrada * @precio_entrada + TokensSalida * @precio_salida) / 1000000.0 AS usd_total,
+    SUM(TokensEntrada * @precio_entrada + TokensSalida * @precio_salida) / 1000000.0 / NULLIF(COUNT(*), 0) AS usd_por_cubicacion
+FROM [dbo_cubicador].[iaSombra]
+WHERE TokensEntrada > 0;
+```
+
+La latencia es la del modelo (su propia llamada), no la de la API del Cubicador: esa no cambia. Una fila con `Estado` distinto de `OK` cuenta como intento fallido (límite del proveedor, tiempo agotado, respuesta que no cumple el contrato) y entra en la tasa de fallos, no en el acuerdo.
