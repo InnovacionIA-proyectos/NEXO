@@ -24,6 +24,7 @@ from datetime import datetime, timezone
 import pytest
 import pytest_asyncio
 from sqlalchemy import text
+from sqlalchemy.pool import NullPool
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from infrastructure.persistence.modelos import (
@@ -33,6 +34,7 @@ from infrastructure.persistence.modelos import (
     PlanCargueModel,
     VehiculoCubicacionModel,
 )
+from domain.entidades.entidades import ItemPlanCargue
 from infrastructure.persistence.repositorios.plan_cargue_repo import SqlPlanCargueRepository
 
 _ESQUEMA = "pruebas_344"
@@ -70,7 +72,11 @@ async def sesion():
     if url is None:
         _falta("sin SQL Server: definir MSSQL_SA_PASSWORD o CUBICADOR_TEST_MSSQL_URL")
 
-    motor = create_async_engine(url)
+    # NullPool: sin el, el pool guarda conexiones vivas entre pruebas y, como
+    # pytest-asyncio da un bucle por prueba, las que sobreviven se cierran en
+    # un bucle ya muerto -> "Event loop is closed" en el teardown de la
+    # siguiente. Sin pool no hay nada que sobreviva.
+    motor = create_async_engine(url, poolclass=NullPool)
     try:
         async with motor.connect() as c:
             await c.execute(text("SELECT 1"))
@@ -145,33 +151,70 @@ async def _sembrar(sesion) -> str:
     return plan_id
 
 
-async def test_el_recorrido_del_plan_no_revienta_contra_sqlserver(sesion):
-    """Los cinco metodos que filtran por booleano, ejecutados de verdad.
+async def test_el_recorrido_del_plan_contra_sqlserver(sesion):
+    """Lectura Y escritura, en una sola prueba a proposito.
 
-    Antes de #344 el primero reventaba con el error 102 de SQL Server
-    ("Incorrect syntax near '0'"), porque `.is_(False)` compila a `IS 0`. Como
-    la suite corre contra SQLite -que si acepta esa forma- nada lo veia.
+    **Por que una sola.** Con dos o mas pruebas async en este archivo, aioodbc
+    deja hilos atados al bucle anterior y las pares revientan en el teardown
+    con "Event loop is closed". Es un problema PREEXISTENTE del arnes -pasa
+    igual en `test_nexo_client.py`, que esta rama no toca- y no se arregla con
+    `NullPool` ni con `loop_scope="module"`; se intentaron los dos.
+
+    El precio: cuando falla, el informe nombra el primer paso que reviento y
+    no los demas. Se asume a cambio de cubrir el recorrido, que es lo que
+    faltaba. Dividirla en un caso por metodo queda para cuando se arregle el
+    arnes.
     """
     plan_id = await _sembrar(sesion)
     repo = SqlPlanCargueRepository(sesion)
 
+    # --- lectura: los cinco metodos que filtran por booleano ---------------
+    # Antes de #344 el primero reventaba con el error 102 ("Incorrect syntax
+    # near '0'"), porque `.is_(False)` compila a `IS 0`. Como la suite corre
+    # contra SQLite -que si acepta esa forma- nada lo veia.
     sobrantes = await repo.obtener_sobrantes(plan_id)
     assert sum(c for _, c in sobrantes) == 1, "una de las dos unidades quedo sin cargar"
 
     assert await repo.cargo_algo(plan_id) is True
 
-    # Con una bloqueada y una que no, el filtro tiene algo que descartar: si
-    # alguien quitara el `AND bloqueada`, esto lo nota. Con las dos sin
-    # bloquear, esperar `[]` pasaba aunque el filtro no existiera.
+    # Filtra por DOS booleanos. La siembra deja una que cumple los dos y otra
+    # que no cumple ninguno, asi que si alguien quitara el `AND bloqueada`
+    # esto lo nota; esperar lista vacia habria pasado igual.
     bloqueadas = await repo.obtener_colocaciones_bloqueadas(plan_id)
-    assert [c.indice_unidad for c in bloqueadas] == [0], (
-        "solo la unidad 0 esta cargada Y bloqueada")
+    assert [c.indice_unidad for c in bloqueadas] == [0]
 
     flota = await repo.flota(plan_id)
     assert len(flota) == 1
-    assert flota[0]["unidadesTotales"] == 2
-    assert flota[0]["unidadesCargadas"] == 1
+    assert (flota[0]["unidadesTotales"], flota[0]["unidadesCargadas"]) == (2, 1)
 
     por_linea = await repo.listar_por_linea("linea-344")
     assert len(por_linea) == 1
     assert por_linea[0]["unidadesCargadas"] == 1
+
+    # --- escritura: lo que de verdad hace el puente ------------------------
+    # `eliminar_planes_de_linea` -> `crear` -> `guardar_item`, los tres que
+    # llama `crear_plan_desde_linea` y en ese orden. Ninguno se ejecutaba
+    # contra SQL Server: la siembra de arriba inserta con el ORM directo y
+    # despues solo lee. La issue advertia que "tras arreglar la 316 puede
+    # aparecer el siguiente fallo"; sin esto, el primero en verlo seria QA.
+    await repo.eliminar_planes_de_linea("linea-344")
+    assert await repo.listar_por_linea("linea-344") == [], "no quedo nada de la flota vieja"
+
+    plan = await repo.crear("Mesa - ruta - Vehiculo 1", "v-1",
+                            linea_solicitud_id="linea-344", numero_vehiculo=1)
+    assert plan.id and plan.id != plan_id
+
+    guardado = await repo.guardar_item(plan.id, None, ItemPlanCargue(
+        plan_cargue_id=plan.id, sku="POS-1", descripcion="Caja",
+        largo_mm=600, ancho_mm=400, alto_mm=400, peso_kg=10, cantidad=3))
+    assert guardado.id
+
+    # Y que lo escrito se relea igual.
+    flota_nueva = await repo.flota(plan.id)
+    assert len(flota_nueva) == 1
+    assert flota_nueva[0]["unidadesTotales"] == 0, "sin optimizar no hay colocaciones todavia"
+
+    # --- el camino del fallo, que usa el worker ----------------------------
+    await repo.marcar_error(plan.id, "Fallo interno del Cubicador (correlacion c-1).")
+    fila = await sesion.get(PlanCargueModel, plan.id)
+    assert fila is not None and fila.estado == "error"
