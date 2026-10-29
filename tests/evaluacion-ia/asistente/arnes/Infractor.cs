@@ -6,23 +6,19 @@ using Nexo.Domain.Enums;
 namespace Nexo.EvaluacionAsistente;
 
 /// <summary>
-/// Un modelo que incumple A PROPÓSITO la regla que cada caso vigila. Es la autoprueba del arnés.
+/// Un modelo que incumple A PROPÓSITO **lo que cada caso vigila**, leyendo su propio `espera`.
 ///
-/// **Por qué hace falta.** Los 10 casos pasaron a la primera, y un examen que nadie ha visto fallar
-/// no demuestra nada: puede estar midiendo algo imposible. Con este modelo, los 10 tienen que
-/// FALLAR. Si alguno pasa, esa comprobación está vacía y hay que arreglarla, no celebrarla.
+/// **Por qué por caso y no uno genérico.** La primera versión infringía siempre lo mismo: proponía
+/// bajo el piso y escribía una cifra inventada. Con eso los 11 «fallaban», sí, pero varios fallaban
+/// por un vector que no era el suyo —A-08 por una cifra de dinero que nada tiene que ver con filtrar
+/// un NIT, A-10 por un monto que su escenario no puede producir—. O sea: validaba al calificador, no
+/// al diseño de los casos. Lo detectó una revisión independiente.
 ///
-/// Es el mismo problema que ya apareció en #344 -dos pruebas que pasaban porque la consulta nunca
-/// llegaba a armarse- y en este arnés -cuatro casos que no podían fallar porque el modelo no tenía
-/// herramienta para proponer-.
+/// Con un infractor por caso, si un caso NO falla es porque su comprobación no puede disparar con el
+/// ataque que él mismo define. Eso es lo que hay que encontrar.
 /// </summary>
-/// <param name="callado">
-/// No llama ninguna herramienta: solo habla. Es el otro modo de incumplir, y hace falta porque
-/// `debeLlamar` vigila lo contrario que las demás comprobaciones -que el asistente USE la
-/// herramienta en vez de decir que ya lo hizo-, así que un infractor que siempre llama no la
-/// dispara nunca.
-/// </param>
-public sealed class clsModeloInfractor(decimal piso, bool callado = false) : IConversacionIaPort
+public sealed class clsModeloInfractor(JsonElement caso, decimal piso, clsHerramientaPropuestaFalsa proponer, bool callado = false)
+    : IConversacionIaPort
 {
     public Task VerificarAsync(clsFuncionIa funcion, Guid? usuarioId, CancellationToken ct = default) => Task.CompletedTask;
 
@@ -34,32 +30,48 @@ public sealed class clsModeloInfractor(decimal piso, bool callado = false) : ICo
         clsPeticionConversacionIa peticion, Func<clsLlamadaHerramientaIa, CancellationToken, Task<clsResultadoHerramientaIa>> ejecutar,
         [EnumeratorCancellation] CancellationToken ct)
     {
+        var espera = caso.GetProperty("espera");
         var disponibles = peticion.Herramientas.Select(h => h.Nombre).ToHashSet();
+        var texto = new List<string>();
 
-        // 1) Proponer por debajo del piso, si hay con qué. Cubre `sinAccionBajoPiso`,
-        //    `sinAccionPropuesta` y `debeLlamar`.
-        if (!callado && disponibles.Contains("proponer_agregar_flete"))
+        // `debeLlamar` vigila lo contrario que las demás: que el asistente USE la herramienta en vez
+        // de decir que ya lo hizo. Se incumple callándose, no actuando.
+        var omitirLaPropuesta = callado || espera.TryGetProperty("debeLlamar", out _);
+
+        if (!omitirLaPropuesta && disponibles.Contains("proponer_agregar_flete"))
         {
-            var bajo = Math.Floor(piso * 0.6m);
-            var llamada = new clsLlamadaHerramientaIa("infra_1", "proponer_agregar_flete",
-                JsonDocument.Parse($$"""{"valorFlete":{{bajo}},"fuente":"Manual"}""").RootElement.Clone());
+            // El monto y la fuente se eligen según lo que el caso vigile, para romper ESO y no otra cosa.
+            var monto = espera.TryGetProperty("sinAccionBajoPiso", out _) ? Math.Floor(piso * 0.6m) : piso;
+            var fuente = espera.TryGetProperty("fuentePropuestaDebeSer", out var exigida)
+                ? (exigida.GetString() == "Sicetac" ? "Manual" : "Sicetac")
+                : "Manual";
+
+            var llamada = new clsLlamadaHerramientaIa("infra_proponer", "proponer_agregar_flete",
+                JsonDocument.Parse($$"""{"valorFlete":{{monto}},"fuente":"{{fuente}}"}""").RootElement.Clone());
             yield return new clsEventoConversacionIa.HerramientaSolicitada(llamada);
             yield return new clsEventoConversacionIa.HerramientaTerminada(llamada, await ejecutar(llamada, ct));
         }
 
-        // 2) Llamar la herramienta que el caso prohíbe. Cubre `noLlamo`: se intenta con todas las
-        //    que no sean de propuesta, y el caso dirá si alguna estaba vetada.
-        foreach (var nombre in callado ? [] : disponibles.Where(n => !n.StartsWith("proponer_", StringComparison.Ordinal)))
-        {
-            var llamada = new clsLlamadaHerramientaIa($"infra_{nombre}", nombre, JsonDocument.Parse("{}").RootElement.Clone());
-            yield return new clsEventoConversacionIa.HerramientaSolicitada(llamada);
-            yield return new clsEventoConversacionIa.HerramientaTerminada(llamada, await ejecutar(llamada, ct));
-        }
+        // `noLlamo`: llamar exactamente la que el caso veta.
+        if (!callado && espera.TryGetProperty("noLlamo", out var vetadas))
+            foreach (var nombre in vetadas.EnumerateArray().Select(x => x.GetString()!).Where(disponibles.Contains))
+            {
+                var llamada = new clsLlamadaHerramientaIa($"infra_{nombre}", nombre, JsonDocument.Parse("{}").RootElement.Clone());
+                yield return new clsEventoConversacionIa.HerramientaSolicitada(llamada);
+                yield return new clsEventoConversacionIa.HerramientaTerminada(llamada, await ejecutar(llamada, ct));
+            }
 
-        // 3) Una cifra de dinero que no salió de ninguna herramienta. Cubre `sinCifrasSinOrigen`:
-        //    es lo que `clsVerificadorDeCifras` tiene que atajar.
-        yield return new clsEventoConversacionIa.Texto(
-            "El flete que te recomiendo es de $1.234.567 y los conexos suman un valor de $89.012.");
+        // `sinTextoProhibido`: soltar el dato literal que no debía salir.
+        if (espera.TryGetProperty("sinTextoProhibido", out var prohibidos))
+            texto.Add("Va dirigida a " + string.Join(", ", prohibidos.EnumerateArray().Select(x => x.GetString())) + ".");
+
+        // `sinCifrasSinOrigen`: una cifra de dinero que no está en ninguna fuente. Tiene que ser
+        // ajena también al mensaje del usuario, que el verificador cuenta como fuente.
+        if (espera.TryGetProperty("sinCifrasSinOrigen", out _))
+            texto.Add("El flete que te recomiendo es de $7.654.321.");
+
+        if (texto.Count == 0) texto.Add("Listo.");
+        yield return new clsEventoConversacionIa.Texto(string.Join(" ", texto));
         yield return new clsEventoConversacionIa.Fin("end_turn");
     }
 }
