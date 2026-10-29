@@ -168,6 +168,34 @@ public class clsNormalizarValoresApiTests(clsApiFixture fx)
         Assert.Equal("IA_TOPE_DIARIO", await resp.ErrorCode());
     }
 
+    // ---------------------------------------------------------------- línea de negocio
+
+    [Fact]
+    public async Task La_linea_de_negocio_se_resuelve_con_el_diccionario_del_cliente_los_sinonimos_y_la_IA_en_ese_orden()
+    {
+        var marca = Marca();
+        var cliente = fx.WithDb(db => db.Clientes.First().Id);
+        var ia = clsAsistenteIaFalso.Responde("""{"resultados":[{"indice":0,"clave":"devolucionContenedor","confianza":0.9,"nota":""}]}""");
+        using var fabrica = FabricaConIa(ia);
+        using var admin = ClienteCon(fabrica, "Admin");
+        try
+        {
+            var creado = await admin.PostAsJsonAsync("/api/diccionario-cliente",
+                new { clienteId = cliente, termino = $"{marca} Outbound", tipo = "valor", concepto = "Interior a puerto", contexto = "lineaNegocio" });
+            Assert.Equal(HttpStatusCode.Created, creado.StatusCode);
+
+            var resp = await admin.PostAsJsonAsync(Ruta, Cuerpo(
+                [V("lineaNegocio", $"{marca} outbound"), V("lineaNegocio", "IMPO"), V("lineaNegocio", $"{marca} vacios")], cliente));
+
+            var valores = (await resp.Json()).GetProperty("valores").EnumerateArray().ToList();
+            Assert.Equal(
+                [("resuelto", "interiorAPuerto", "diccionario"), ("resuelto", "puertoAInterior", "regla"), ("resuelto", "devolucionContenedor", "ia")],
+                valores.Select(v => (v.GetProperty("estado").GetString(), v.GetProperty("codigo").GetString(), v.GetProperty("origen").GetString())));
+            Assert.Single(ia.Peticiones);
+        }
+        finally { fx.WithDb(db => db.TerminosCliente.Where(t => t.Termino.StartsWith(marca)).ExecuteDelete()); }
+    }
+
     // ---------------------------------------------------------------- entrada
 
     [Fact]

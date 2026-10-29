@@ -103,7 +103,7 @@ public class clsCapturaSolicitudesController(
             req.PrimeraFila), ct));
 
     /// <summary>
-    /// Lleva los textos libres distintos de un Excel (tipo de vehículo, carrocería y ciudad) a los valores oficiales de NEXO. Primero reglas exactas
+    /// Lleva los textos libres distintos de un Excel (tipo de vehículo, carrocería, línea de negocio y ciudad) a los valores oficiales de NEXO. Primero reglas exactas
     /// (diccionario del cliente —<c>clienteId</c> o <c>clienteNit</c>, que solo busca el cliente local—, alias, catálogo oficial, código DANE o nombre de municipio); con lo que no resuelven, UNA sola llamada a la IA por
     /// todos los textos distintos, con listas cerradas: lo que el modelo elige solo vale si la regla lo valida. No persiste nada; lo que siga sin
     /// resolverse se envía tal cual al capturar y la captura lo manda a la cuarentena de vehículos. Si la IA está apagada o falla responde igual
