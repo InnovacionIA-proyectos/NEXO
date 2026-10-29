@@ -42,3 +42,23 @@ propio del vehículo**. Es una ampliación: nada de lo que antes coincidía deja
 - Contra el motor real con un DWSice de mentira (una base temporal con `tblRutasSicetac`): `C2` encuentra la fila `2` (antes caía en `CA_`), `C3` la `3`,
   cada Turbo su código, `CA_` se pide por su código, y el aprovisionamiento del contenedor igual. Quitar el mapeo hace fallar esas pruebas.
 - Falta confirmarlo en producción con el DWSice y SAP reales (Turbo y Sencillo contra datos reales).
+
+## Contenedores: el vehículo sale de `tbl_rangos_peso_contenedor` y la carrocería por defecto es PORTACONTENEDORES
+
+**Qué vehículo.** En una línea de contenedor el vehículo se escoge por el tamaño del contenedor y su peso con `tbl_rangos_peso_contenedor`
+(`docs/Database/379_rangos_peso_contenedor.sql`): entre las filas de ese tamaño, la de menor `PesoMaximo` que alcance para el peso. El tamaño (20 o 40 pies) sale de la clase
+de contenedor (`CNT40.HC`, `CNT20.IT`…). El vehículo de la tabla es el de NEXO y se traduce con el mapeo antes de buscar en SICE-TAC (`C2` → `2`). Por encima del tope más alto de
+cada tamaño (34.000 kg en 40 pies, 30.000 kg en 20 pies) ningún vehículo aplica y no hay piso: no se cae en el de otro vehículo. Si la tabla no está disponible o está vacía se usa la regla anterior
+(los rangos de SAP `tblRangoPeso` y `tblContenedorRangoPeso`).
+
+Se usa en el camino oficial de SICE-TAC y, para una línea de contenedor **sin vehículo**, también en la búsqueda tolerante (que antes tomaba la fila más barata de cualquier vehículo de la ruta).
+
+**Cambio de comportamiento frente a los rangos de SAP** (la tabla nueva sale del documento de negocio y se mantuvo): en 40 pies, 25.000 kg pasa de 3S3 a 3S2, 22.500 kg de 3S3 a 2S3 y
+5.000 kg de 2S2 a 2L3; en 20 pies, 8.200 kg pasa del camión de dos ejes a 2S2. Está cubierto en las pruebas con los pesos de cada borde.
+
+**Carrocería.** Una línea de contenedor viaja en `PORTACONTENEDORES`: es la unidad por defecto cuando la línea no trae otra carrocería. Antes quedaba en `ESTACAS` (el parámetro 458) y se
+elegía la unidad más barata de la ruta. En el camino oficial, si SICE-TAC no trae filas de portacontenedores para esa ruta se vuelve a la unidad de siempre y la unidad usada queda en el criterio
+del candidato; una carrocería explícita de la línea (por ejemplo furgón) manda.
+
+**Pendiente de confirmar con datos reales:** que las 11 líneas de contenedor del análisis (Inbound) coincidan con el Excel del cliente (por ejemplo 3S3 + PORTACONTENEDORES = 8.320.586). No hay
+DWSice ni SAP reales en desarrollo; las pruebas usan bases de mentira construidas por la propia prueba.

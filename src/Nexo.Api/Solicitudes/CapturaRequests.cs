@@ -205,6 +205,10 @@ public class clsSugerirMapeoRequest
     /// <summary>El cliente dueño del archivo; su diccionario es la mejor pista. Sin él solo se usa el diccionario general.</summary>
     public Guid? ClienteId { get; set; }
 
+    /// <summary>Alternativa a <c>clienteId</c>: el NIT del cliente o prospecto (con o sin puntos, espacios y dígito de verificación). Si vienen los dos manda <c>clienteId</c>.</summary>
+    [MaxLength(30)]
+    public string? ClienteNit { get; set; }
+
     [Required, MinLength(1), MaxLength(100)]
     public List<string> Encabezados { get; set; } = null!;
 
@@ -215,7 +219,7 @@ public class clsSugerirMapeoRequest
 /// <summary>Un texto libre de una columna del Excel.</summary>
 public class clsValorANormalizarRequest
 {
-    /// <summary><c>tipoVehiculo</c>, <c>carroceria</c> o <c>ciudad</c> (origen, destino y demás ciudades).</summary>
+    /// <summary><c>tipoVehiculo</c>, <c>carroceria</c>, <c>lineaNegocio</c> o <c>ciudad</c> (origen, destino y demás ciudades).</summary>
     [Required, MaxLength(20)]
     public string Campo { get; set; } = null!;
 
@@ -228,6 +232,10 @@ public class clsNormalizarValoresRequest
 {
     /// <summary>El cliente dueño del archivo; su diccionario manda. Sin él solo se usa el diccionario general.</summary>
     public Guid? ClienteId { get; set; }
+
+    /// <summary>Alternativa a <c>clienteId</c>: el NIT del cliente o prospecto (con o sin puntos, espacios y dígito de verificación). Si vienen los dos manda <c>clienteId</c>.</summary>
+    [MaxLength(30)]
+    public string? ClienteNit { get; set; }
 
     [Required, MinLength(1), MaxLength(1000)]
     public List<clsValorANormalizarRequest> Valores { get; set; } = null!;
@@ -257,6 +265,10 @@ public class clsAplicarMapeoRequest
 {
     /// <summary>El cliente dueño del archivo; su diccionario traduce los valores. Sin él solo se usa el diccionario general.</summary>
     public Guid? ClienteId { get; set; }
+
+    /// <summary>Alternativa a <c>clienteId</c>: el NIT del cliente o prospecto (con o sin puntos, espacios y dígito de verificación). Si vienen los dos manda <c>clienteId</c>.</summary>
+    [MaxLength(30)]
+    public string? ClienteNit { get; set; }
 
     [Required, MinLength(1), MaxLength(100)]
     public List<clsColumnaAplicarRequest> Columnas { get; set; } = null!;

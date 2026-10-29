@@ -52,6 +52,7 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
     private readonly ISapTarifaFleteEnVivoPort _sapEnVivo;
     private readonly IPublicadorDeMensajes _publicador;
     private readonly IMapeoVehiculoTarifarioPort _mapeo;
+    private readonly IRangosPesoContenedorPort _rangos;
     private readonly bool _dwConfigurado;
     private readonly bool _dcConfigurado;
 
@@ -59,7 +60,7 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
         clsNexoDbContext db, IServiceProvider sp, IServiceScopeFactory scopes,
         IMemoryCache cache, TimeProvider clock, IAjustesVigenciaPlazaRepository ajustes,
         IClavesSoloSicetacPort reglas, ISapTarifaFleteEnVivoPort sapEnVivo, IPublicadorDeMensajes publicador,
-        IMapeoVehiculoTarifarioPort mapeo)
+        IMapeoVehiculoTarifarioPort mapeo, IRangosPesoContenedorPort rangos)
     {
         _db = db;
         _scopes = scopes;
@@ -72,6 +73,7 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
         _sapEnVivo = sapEnVivo;
         _publicador = publicador;
         _mapeo = mapeo;
+        _rangos = rangos;
     }
 
     /// <summary>
@@ -312,7 +314,10 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
             sicetac = esDevolucion
                 ? await CandidatoVacioAsync(dw, origen, destino, origenDane, destinoDane, vehiculo, carroceriaLinea, esContenedor: true,
                     permitirVehiculoRelajado: true, horasSolicitud, ct)
-                : await CandidatoSicetacAsync(dw, origen, destino, origenDane, destinoDane, vehiculo, linea.Tipologia, carroceriaLinea, horasSolicitud, ct);
+                : await CandidatoSicetacAsync(
+                    dw, origen, destino, origenDane, destinoDane,
+                    await VehiculoDeContenedorSinVehiculoAsync(linea, vehiculo, esContenedor, ct) ?? vehiculo,
+                    linea.Tipologia, carroceriaLinea ?? CarroceriaPorDefectoDeContenedor(esContenedor), horasSolicitud, ct);
 
         // #300: si no hay piso SICE-TAC porque el período más reciente cargado no es el del mes actual, se dice
         // (justificación + motivo de pendiente) en vez de un "sin piso" mudo. Sin piso nunca hay modo automático
@@ -649,6 +654,23 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
             Advertencia: vehiculoRelajado ? AdvertenciaVehiculoRelajado(vehiculo) : null,
             ValorPisoBase: fila.Valor, ValorTiemposLogisticos: valor - fila.Valor, Configuracion: fila.Configuracion,
             VehiculoRelajado: vehiculoRelajado);
+    }
+
+    private const string CarroceriaDeContenedor = "PORTACONTENEDORES";
+
+    /// <summary>Una línea de contenedor viaja en portacontenedores: es la carrocería por defecto cuando la línea no trae otra.</summary>
+    private static string? CarroceriaPorDefectoDeContenedor(bool esContenedor) => esContenedor ? CarroceriaDeContenedor : null;
+
+    /// <summary>
+    /// El vehículo que corresponde a una línea de contenedor SIN vehículo, según el tamaño del contenedor y su peso (<c>tbl_rangos_peso_contenedor</c>).
+    /// Sin él, la búsqueda tolerante tomaba la fila más barata de cualquier vehículo de la ruta. Null si la línea ya trae vehículo, no es de contenedor,
+    /// faltan el tamaño o el peso, la tabla no está disponible o ningún vehículo aplica a ese peso.
+    /// </summary>
+    private async Task<string?> VehiculoDeContenedorSinVehiculoAsync(clsLineaSolicitud linea, string? vehiculo, bool esContenedor, CancellationToken ct)
+    {
+        if (!esContenedor || !string.IsNullOrWhiteSpace(vehiculo) || linea.Peso is not { } peso) return null;
+        if (clsRecomendadorDeVehiculoDeContenedor.Pies(linea.ClaseContenedor) is not { } pies) return null;
+        return (await _rangos.VehiculoParaAsync(pies, peso, ct)).TipoVehiculo;
     }
 
     private static string AdvertenciaVehiculoRelajado(string? vehiculo) =>

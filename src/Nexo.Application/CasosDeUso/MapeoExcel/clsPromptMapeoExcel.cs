@@ -28,7 +28,7 @@ public static class clsPromptMapeoExcel
         ["tipoVehiculo"] = "tipo de vehículo o configuración (turbo, sencillo, patineta, mula, 3S3, 2S2…)",
         ["carroceria"] = "carrocería del vehículo (furgón, estacas, plataforma, portacontenedores…)",
         ["tipologia"] = "tipología de la carga (general, refrigerada, peligrosa…)",
-        ["lineaNegocio"] = "línea de negocio (nacional, importación, exportación, contenedores…)",
+        ["lineaNegocio"] = "línea de negocio: Nacional, Puerto a interior (importación), Interior a puerto (exportación), Devolución de contenedor, Andino o Licitaciones",
         ["claseViaje"] = "clase de viaje (contenedor, cupo, carga suelta, extradimensionado)",
         ["claseContenedor"] = "clase de contenedor (20 o 40 pies, ST, HC…)",
         ["exclusivo"] = "si el servicio es exclusivo (sí/no)",

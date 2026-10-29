@@ -29,6 +29,8 @@ using Nexo.Infrastructure.Catalogos.Adaptadores;
 using Nexo.Infrastructure.Cubicacion.Adaptadores;
 using Nexo.Infrastructure.External;
 using Nexo.Infrastructure.Identidad.Adaptadores;
+using Nexo.Application.CasosDeUso.Asistente.Conversacion;
+using Nexo.Infrastructure.Asistente;
 using Nexo.Infrastructure.IA;
 using Nexo.Infrastructure.IA.Repositorios;
 using Nexo.Application.CasosDeUso.IA.Interfaces;
@@ -206,6 +208,12 @@ public static class clsDependencyInjection
             sp.GetRequiredService<clsAnthropicAdapter>(), sp.GetRequiredService<IUsoIaRepository>(),
             sp.GetRequiredService<IOptions<clsOpcionesAnthropic>>(), sp.GetRequiredService<TimeProvider>(),
             sp.GetRequiredService<ILogger<clsAsistenteIaConRegistro>>()));
+        services.AddScoped<IConversacionIaPort>(sp => new clsConversacionIaConRegistro(
+            sp.GetRequiredService<clsAnthropicAdapter>(), sp.GetRequiredService<IUsoIaRepository>(),
+            sp.GetRequiredService<IOptions<clsOpcionesAnthropic>>(), sp.GetRequiredService<TimeProvider>(),
+            sp.GetRequiredService<ILogger<clsConversacionIaConRegistro>>()));
+        services.AddScoped<IConversacionesAsistenteRepository, clsEfConversacionesAsistenteRepository>();
+        services.AddScoped<IPreferenciasAsistenteRepository, clsEfPreferenciasAsistenteRepository>();
         services.AddScoped<IDestinatariosDeAlertaPort, clsDestinatariosDeAlertaAdapter>();
 
         // Reglas "solo SICE-TAC" (el mismo repositorio implementa el puerto de lectura
@@ -232,6 +240,7 @@ public static class clsDependencyInjection
         // "Aplicar propuestas" en Cotizaciones) + matriz SICE-TAC de solo lectura.
         // El mapeo de vehículos se lee con su propio alcance de base de datos: lo consultan costeos en paralelo.
         services.AddSingleton<IMapeoVehiculoTarifarioPort, clsMapeoVehiculoTarifarioAdapter>();
+        services.AddSingleton<IRangosPesoContenedorPort, clsRangosPesoContenedorAdapter>();
         services.AddScoped<ITarifarioSapPort, clsTarifarioSapAdapter>();
         services.AddScoped<IPropuestaTarifaPort, clsPropuestaTarifaAdapter>();
 

@@ -130,7 +130,10 @@ public sealed class clsCapturarSolicitudCommandHandler(
             // #300: solo una línea que ES una devolución de contenedor arranca con 1h+1h. "Retorna contenedor"
             // de un viaje cargado ya no toca las horas de la línea (RN-03): el tramo vacío de retorno se calcula
             // aparte, con sus propias 1h+1h (clsPropuestaTarifaAdapter).
-            var lineaNegocio = ParseLineaNegocio(lr.LineaNegocio);
+            var lineaNegocio = clsLineasDeNegocio.Reconocer(lr.LineaNegocio);
+            if (lineaNegocio is null && !string.IsNullOrWhiteSpace(lr.LineaNegocio))
+                throw new clsValidationFailedException("LINEA_NEGOCIO_INVALIDO",
+                    $"Línea {numeroLinea}: la línea de negocio «{lr.LineaNegocio.Trim()}» no es válida. Usa: {clsLineasDeNegocio.NombresSeparados}.");
             var (horasCargue, horasDescargue) = clsResolucionHorasLinea.Resolver(
                 lr.HorasCargue, lr.HorasDescargue, lineaNegocio == LineaNegocio.DevolucionContenedor,
                 horasCargueSolicitud, horasDescargueSolicitud);
@@ -341,19 +344,6 @@ public sealed class clsCapturarSolicitudCommandHandler(
         foreach (var t in Enum.GetValues<TipologiaCarga>())
             if (normalizado.Contains(t.ToString(), StringComparison.OrdinalIgnoreCase))
                 return t;
-        return null;
-    }
-
-    private static LineaNegocio? ParseLineaNegocio(string? valor)
-    {
-        if (string.IsNullOrWhiteSpace(valor)) return null;
-        var n = clsResolucionDeCatalogos.SinTildes(valor).Replace(" ", "").Replace("/", "").Replace("-", "").Replace("_", "").ToUpperInvariant();
-        if (n.Contains("DEVOLUCION")) return LineaNegocio.DevolucionContenedor;
-        if (n.Contains("ANDINO")) return LineaNegocio.Andino;
-        if (n.Contains("LICITACION")) return LineaNegocio.Licitaciones;
-        if (n.Contains("PUERTOAINTERIOR")) return LineaNegocio.PuertoAInterior;
-        if (n.Contains("INTERIORAPUERTO")) return LineaNegocio.InteriorAPuerto;
-        if (n.Contains("NACIONAL")) return LineaNegocio.Nacional;
         return null;
     }
 
