@@ -39,7 +39,9 @@ public static class clsCapturarSolicitudValidador
         }
     }
 
-    private static void ValidarLinea(clsCapturaLineaInput lr, int numeroLinea)
+    /// <summary>Las reglas de una línea (origen y destino, unidades y peso). La captura las aplica a cada línea del pliego y la importación de un
+    /// Excel a cada fila, así que lo que una acepta la otra también.</summary>
+    public static void ValidarLinea(clsCapturaLineaInput lr, int numeroLinea)
     {
         if (string.IsNullOrWhiteSpace(lr.Origen) || string.IsNullOrWhiteSpace(lr.Destino))
             throw new clsValidationFailedException("LINEA_INCOMPLETA", "Cada línea debe traer origen y destino.");

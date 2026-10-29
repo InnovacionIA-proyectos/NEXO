@@ -34,6 +34,7 @@ public class clsNexoDbContext : DbContext
     public DbSet<clsConfiguracionVehiculo> ConfiguracionesVehiculo => Set<clsConfiguracionVehiculo>();
     public DbSet<clsAliasElemento> AliasElementos => Set<clsAliasElemento>();
     public DbSet<clsTerminoCliente> TerminosCliente => Set<clsTerminoCliente>();
+    public DbSet<clsPlantillaMapeoCliente> PlantillasMapeo => Set<clsPlantillaMapeoCliente>();
     public DbSet<clsTarifaHistorica> TarifasHistoricas => Set<clsTarifaHistorica>();
     public DbSet<clsServicioConexo> ServiciosConexos => Set<clsServicioConexo>();
     public DbSet<clsCotizacion> Cotizaciones => Set<clsCotizacion>();
@@ -276,6 +277,18 @@ public class clsNexoDbContext : DbContext
             e.Property(x => x.Activo).HasDefaultValue(true);
             e.HasIndex(x => new { x.ClienteId, x.TerminoNormalizado, x.Tipo, x.Contexto }).IsUnique();
             e.HasIndex(x => new { x.ClienteId, x.Tipo });
+            e.HasOne(x => x.Cliente).WithMany().HasForeignKey(x => x.ClienteId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // El mapeo de columnas que un cliente ya confirmó, para reusarlo con los mismos encabezados. Sin migración de EF: el esquema vive en ESQUEMA_NEXO.sql.
+        b.Entity<clsPlantillaMapeoCliente>(e =>
+        {
+            e.ToTable("tbl_plantillas_mapeo_cliente");
+            e.Property(x => x.Nombre).HasMaxLength(100);
+            e.Property(x => x.FirmaEncabezados).HasMaxLength(64).IsRequired();
+            e.Property(x => x.Encabezados).IsRequired();
+            e.Property(x => x.Columnas).IsRequired();
+            e.HasIndex(x => new { x.ClienteId, x.FirmaEncabezados }).IsUnique();
             e.HasOne(x => x.Cliente).WithMany().HasForeignKey(x => x.ClienteId).OnDelete(DeleteBehavior.Restrict);
         });
 
