@@ -2383,6 +2383,62 @@ interface ResultadoHerramientaDto {
 | `consultar_servicios_conexos` | `GET /api/servicios-conexos` (solo activos) | todos | opcional `q`, `categoria`, `top` |
 | `buscar_ciudades_dane` | `GET /api/captura-solicitudes/ciudades` | todos | al menos uno de `q`, `departamento`; `top` |
 
+### 3.24 Conversación con el asistente de cotización — `/api/asistente/conversaciones`
+
+El AdminTarifas conversa con el asistente y este responde en tiempo real, apoyándose en las herramientas de lectura de §3.23 (con los
+permisos de quien pregunta). **No inventa precios:** todo valor que cita viene de una herramienta y lleva su fuente; si en la respuesta
+aparece una cifra de dinero que no salió de ninguna consulta (ni de lo que escribió la persona), la respuesta se descarta y se reemplaza
+por un aviso, y eso es lo que queda guardado. El asistente **no escribe** nada en NEXO.
+
+Cada conversación es de quien la inicia y queda guardada con sus mensajes y las herramientas que usó (entrada, fuente y resultado), para
+auditarla. Límites por configuración (`Asistente__MaxTurnos`, 20 mensajes por conversación; `Asistente__MaxCaracteresMensaje`, 2 000;
+`Asistente__MaxIteracionesHerramientas`, 6 rondas de consultas por respuesta; `Asistente__MaxTokensRespuesta`, 2 048) y el tope diario de
+tokens por persona de §3.22. La función se apaga con `Anthropic__Funciones__AsistenteCotizacion=false` (o toda la IA con
+`Anthropic__Habilitada=false`).
+
+#### `POST /api/asistente/conversaciones/mensajes`
+- **Roles**: AdminTarifas, Admin.
+- **Body**: `{ conversacionId?: Guid, mensaje: string }`. Sin `conversacionId` empieza una conversación nueva.
+- **→** `200 text/event-stream`. Cada evento es `event: <nombre>` + `data: <JSON en una línea>`:
+
+| Evento | `data` | Cuándo |
+|---|---|---|
+| `conversacion` | `{ conversacionId, mensajeId }` | Primero. `mensajeId` es el de la respuesta que se está generando |
+| `texto` | `{ delta }` | Cada trozo de la respuesta, a medida que se genera; se concatenan |
+| `herramienta` | `{ nombre, estado, fuente? }` | `estado`: `ejecutando`, `ok` o `error`. Muestra qué está consultando el asistente |
+| `reemplazo` | `{ texto, cifrasSinOrigen[] }` | La respuesta traía cifras de dinero sin origen: lo mostrado debe sustituirse por `texto` (es lo que queda guardado) |
+| `fin` | `{ conversacionId, mensajeId, estado }` | Último en el caso normal. `estado`: `completo` o `descartado` |
+| `error` | `{ codigo, mensaje }` | Último si la respuesta se cortó a mitad (lo ya mostrado queda como `incompleto`): `IA_NO_DISPONIBLE`, `IA_TIEMPO_AGOTADO`, `IA_LIMITE_PROVEEDOR`, `IA_RECHAZADA`, `IA_RESPUESTA_TRUNCADA`, `ASISTENTE_DEMASIADAS_CONSULTAS`, `ASISTENTE_ERROR` |
+
+- **Errores antes de abrir el flujo** (respuesta HTTP normal): `400 MENSAJE_REQUERIDO` · `400 MENSAJE_DEMASIADO_LARGO` ·
+  `403 CONVERSACION_AJENA` · `404 CONVERSACION_NO_ENCONTRADA` · `429 ASISTENTE_LIMITE_TURNOS` (`details: { maxTurnos }`; hay que empezar
+  otra conversación) · `429 IA_TOPE_DIARIO` · `503 IA_APAGADA` / `IA_NO_CONFIGURADA` / `IA_FUNCION_DESHABILITADA`.
+- El navegador no puede usar `EventSource` (es solo `GET`): se lee el cuerpo con `fetch` y su `ReadableStream`. Si el cliente cierra la
+  conexión, lo generado hasta ese momento queda como `incompleto`.
+
+#### `GET /api/asistente/conversaciones`
+Las conversaciones de quien consulta, de la más reciente a la más antigua. Query: `top` (1–200, def. 50).
+- **Roles**: AdminTarifas, Admin.
+- **→** `200 [ { id, titulo, turnos, createdAt, updatedAt } ]`
+
+#### `GET /api/asistente/conversaciones/{id}`
+La conversación con sus mensajes y las herramientas usadas en cada respuesta. La ve su dueño y el Admin (que puede auditarla; no escribe
+en conversaciones ajenas).
+- **Roles**: AdminTarifas, Admin.
+- **→** `200`
+```ts
+interface ConversacionDetalleDto {
+  id: Guid; titulo: string; turnos: number; usuarioId: Guid; createdAt: string; updatedAt: string
+  mensajes: { id: Guid; orden: number; rol: "user" | "assistant"; contenido: string
+              estado: "en_curso" | "completo" | "incompleto" | "descartado"; createdAt: string }[]
+  herramientas: { mensajeId: Guid; herramienta: string; entrada: string       // JSON como texto
+                  encontrado: boolean | null; fuente: string | null
+                  resultado: string                                            // "ok" o el código del error
+                  latenciaMs: number; createdAt: string }[]
+}
+```
+- **Errores**: `403 CONVERSACION_AJENA` · `404 CONVERSACION_NO_ENCONTRADA`
+
 ## 4. Hubs de SignalR — conexión
 
 ```js
@@ -2440,6 +2496,7 @@ abiertos a los 6 roles.
 | `/api/tarifas-plaza` (todo, incluido `GET`) (#307: + AdminBiblioteca) | | ✅ | ✅ | | | ✅ |
 | Escrituras de los 6 passthrough de catálogo (§3.14.1) | | | ✅ | | | ✅ |
 | `/api/asistente/herramientas`: el endpoint es de cualquier rol; cada herramienta repite los roles de la consulta que envuelve (§3.23) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `/api/asistente/conversaciones` (conversar y leer las propias; el Admin además lee cualquiera) (§3.24) | | | ✅ | | | ✅ |
 
 ---
 

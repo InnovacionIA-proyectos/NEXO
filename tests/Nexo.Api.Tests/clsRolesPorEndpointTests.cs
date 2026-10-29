@@ -70,6 +70,9 @@ public class clsRolesPorEndpointTests(clsApiFixture fx)
             new("Asistente POST herramienta (todos los roles)", HttpMethod.Post, "/api/asistente/herramientas/consultar_piso_sicetac", Todos, new { }),
             new("Asistente POST consultar_tarifa_plaza_nexo", HttpMethod.Post, "/api/asistente/herramientas/consultar_tarifa_plaza_nexo", Biblioteca, new { }),
             new("Asistente POST consultar_propuesta_linea", HttpMethod.Post, "/api/asistente/herramientas/consultar_propuesta_linea", Mesa, new { }),
+            new("Asistente conversaciones POST mensajes", HttpMethod.Post, "/api/asistente/conversaciones/mensajes", ["AdminTarifas", "Admin"], new { }),
+            new("Asistente conversaciones GET", HttpMethod.Get, "/api/asistente/conversaciones", ["AdminTarifas", "Admin"]),
+            new("Asistente conversaciones GET /{id}", HttpMethod.Get, $"/api/asistente/conversaciones/{Inexistente}", ["AdminTarifas", "Admin"]),
             new("Asistente POST consultar_aprovisionamiento", HttpMethod.Post, "/api/asistente/herramientas/consultar_aprovisionamiento", ["Comercial", "Admin"], new { }),
 
             // ---- Cubicador completo para AdminTarifas (#310); AdminBiblioteca no

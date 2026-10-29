@@ -75,6 +75,8 @@ Un Excel de cliente, un documento o un mensaje de chat pueden traer texto que in
 ## 8. Costo, uso y respuesta a incidentes
 
 - Cada llamada queda registrada (usuario, función, modelo, tokens de entrada y salida, latencia, resultado) sin guardar el contenido enviado.
+- **Las conversaciones del asistente de cotización sí se guardan, en la base de NEXO** (no en el proveedor): cada conversación es de quien la inicia, con sus mensajes y, por cada herramienta que el asistente usó, la entrada, lo que devolvió, su fuente y cómo terminó. Es la prueba de dónde salió cada valor que se mostró y la base de la auditoría; solo las ve su dueño y el Admin. Pueden contener lo que la persona escriba, por lo que tienen el trato de cualquier dato de NEXO y su retención debe definirla el responsable de datos (aún no hay purga automática). El registro de uso (`tbl_ia_uso`) sigue sin guardar contenido.
+- La respuesta del asistente pasa por una compuerta antes de guardarse: si trae una cifra de dinero que no salió de una herramienta ni de lo que escribió la persona, se descarta y se guarda un aviso en su lugar (§4: ningún valor de tarifa sale del modelo).
 - Hay **tope por usuario y por día**, límite de gasto mensual por *workspace* y un **interruptor general** de apagado.
 - **Si la llave se filtra o el gasto se dispara:** revocar la llave en la consola del proveedor, desactivar las funciones de IA con el interruptor, rotar la llave en Dokploy y GitHub Secrets, y revisar el registro de uso del período.
 
