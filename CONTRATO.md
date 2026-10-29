@@ -1860,6 +1860,26 @@ La última recomendación de una línea.
   recomendación para esa línea; antes salía como `503 CUBICADOR_ERROR` y el front no podía distinguir "todavía no hay" de una caída) ·
   mismos 503 que el POST. El `503` queda solo para fallas reales del Cubicador.
 
+#### `GET /api/cubicacion/explicacion` — por qué se eligió esa flota
+S6-HU-35.6/#419: reenvía al Cubicador su `GET /recomendaciones/explicacion` (S6-HU-35.4/#369) con la llave de NEXO (`Cubicador3D:RecomendacionesApiKey`) y devuelve el texto en lenguaje
+natural que explica la recomendación. El portal **no** habla con el Cubicador: solo con esta ruta. **Se pide DESPUÉS de pintar los números** de la recomendación; el modelo tarda varios segundos.
+
+- **Roles**: los mismos que `GET /api/cubicacion` — `Comercial`, `AdminBiblioteca`, `AdminTarifas`, `Admin`.
+
+| Query | | Tipo | Restricción |
+|---|---|---|---|
+| `idLineaSolicitud` | **requerido** | string | |
+| `origenSistema` | **requerido** | string | `NEXO` \| `COTIFLY`, como en `GET /api/cubicacion`: el Cubicador lee la misma corrida por la pareja línea + origen |
+
+- **→** `200 { "explicacion": string | null }`
+- **Siempre `200`.** El texto es opcional: con el Cubicador sin configurar, caído, sin responder (tiempo agotado), que rechaza la llave, sin recomendación para la línea, que devuelve `null` o una respuesta que no
+  se entiende, NEXO responde `{ "explicacion": null }` (la falla queda en el log) y el front simplemente no muestra el bloque. Un 5xx obligaría a tratar un caso normal como error.
+- **Errores**: `400 PARAMETROS_REQUERIDOS` (falta `idLineaSolicitud` u `origenSistema`) · `401` · `403`.
+- **Tiempo de espera propio**: `Cubicador3D:ExplicacionTimeoutSegundos` (def. 30, entre 5 y 120), mayor que el de la recomendación (`Cubicador3D:OutboundTimeoutSegundos`, def. 15) porque el texto lo escribe un modelo.
+- **Por aquí no pasa ninguna tarifa ni valor comercial**: NEXO solo reenvía el texto que el Cubicador ya verificó contra las cifras del motor.
+- **Despliegue**: la ruta depende del endpoint del Cubicador (S6-HU-35.4). Puede desplegarse antes que el Cubicador (responde `explicacion: null` mientras no exista: el 404 del Cubicador se trata como «sin explicación»),
+  pero el texto solo aparece cuando el Cubicador con S6-HU-35.4 está desplegado y tiene configurada su llave del modelo.
+
 #### `GET /api/lineas-solicitud/{id}/cubicacion` — solo servicio a servicio
 - **Auth**: `Authorization: Bearer <clave de servicio>` (§1.2). No acepta la
   identidad del portal. **No es para el frontend.**
@@ -2576,7 +2596,7 @@ abiertos a los 6 roles.
 | `POST /api/solicitudes/{id}/lineas:bulk` (#307, D5: solo Admin) | | | | | | ✅ |
 | `POST /api/solicitudes/{id}/rechazar` | ✅ | | | | | ✅ |
 | `POST /api/solicitudes/{id}/recalcular-score` (#307, D5: solo Admin) | | | | | | ✅ |
-| `POST /api/cubicacion` · `GET /api/cubicacion` (#300 + AdminTarifas; #307: AdminBiblioteca lo conserva) | ✅ | ✅ | ✅ | | | ✅ |
+| `POST /api/cubicacion` · `GET /api/cubicacion` · `GET /api/cubicacion/explicacion` (#300 + AdminTarifas; #307: AdminBiblioteca lo conserva) | ✅ | ✅ | ✅ | | | ✅ |
 | **Cotizaciones, lecturas**: `GET /api/cotizaciones/{id}` · `por-solicitud/{id}` · `exportar-excel` (#307) | ✅ | | ✅ | ✅ | ✅ | ✅ |
 | `POST /api/cotizaciones` · `aplicar-propuestas` | ✅ | | ✅ | | | ✅ |
 | `POST /api/cotizaciones/{id}/resultado` | ✅ | | | | | ✅ |

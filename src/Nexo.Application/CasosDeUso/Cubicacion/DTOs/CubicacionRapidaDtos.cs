@@ -79,3 +79,6 @@ public sealed record clsRecomendacionDto(
     string? MotivoSinSeleccion, bool Condicionada, IReadOnlyList<string> MercanciasCondicionadas,
     IReadOnlyList<clsVehiculoRecomendadoDto> Vehiculos, IReadOnlyList<string> Advertencias,
     clsExtradimensionDto? Extradimension);
+
+/// <summary>El texto que explica en lenguaje natural por qué el Cubicador eligió esa flota; null cuando no hay explicación.</summary>
+public sealed record clsExplicacionRecomendacionDto(string? Explicacion);
