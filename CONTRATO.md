@@ -959,17 +959,21 @@ interface ErrorDeFilaDto {
 - **Errores** (el mapeo mismo es inválido): `400 VALIDATION_ERROR` · `400 MAPEO_REQUERIDO` · `400 DEMASIADAS_COLUMNAS` · `400 DEMASIADAS_FILAS` · `400 COLUMNA_INVALIDA` · `400 CAMPO_INVALIDO` · `400 TRANSFORMACION_INVALIDA` · `400 TRANSFORMACION_NO_APLICA` · `400 CAMPO_DUPLICADO` · `400 CAMPO_REQUERIDO`
 
 #### `POST /api/captura-solicitudes/normalizar-valores`
-Lleva los textos libres **distintos** de un Excel (tipo de vehículo, carrocería y ciudad) a los valores oficiales de NEXO. No persiste nada: el usuario
+Lleva los textos libres **distintos** de un Excel (tipo de vehículo, carrocería, línea de negocio y ciudad) a los valores oficiales de NEXO. No persiste nada: el usuario
 revisa el resultado y la captura sigue como siempre. Se llama con los valores distintos de las columnas ya mapeadas (los de `aplicar-mapeo`), no fila por fila.
 
 Cómo se resuelve, en este orden:
 1. **Reglas exactas, sin IA.** `tipoVehiculo`: el diccionario del cliente (§3.19.1, `valor` con contexto `tipoVehiculo`) → el alias global de vehículos (§3.19) → el
    catálogo oficial (código o descripción idénticos). `carroceria`: el diccionario del cliente → las carrocerías de las configuraciones oficiales no descartadas.
+   `lineaNegocio`: el diccionario del cliente (`valor` con contexto `lineaNegocio`; su `concepto` debe ser una de las seis líneas, si no se ignora) → una de las seis líneas de NEXO escrita
+   como tal (`Puerto a interior`, `puertoAInterior`…) → los únicos sinónimos inequívocos: `impo`/`importación` = Puerto a interior y `expo`/`exportación` = Interior a puerto.
+   **«Inbound», «Outbound» y similares no tienen regla**: cada cliente los usa distinto, así que salen del diccionario del cliente o de la IA.
    `ciudad`: un **código DANE** (5 dígitos, o los 8 del catálogo) → un **nombre de municipio de Colombia con las mismas palabras** (sin tildes, puntuación ni «D.C.»;
    `Bogota D.C.` = `Bogotá, D.C.`), usando el departamento si el texto lo trae (`Santa Rosa, Cauca`, `Santa Rosa (Antioquia)`). Lo del cliente manda sobre lo general;
    sin `clienteId` solo valen los generales.
 2. **Una sola llamada a la IA** por todos los textos distintos que siguen sin resolver (nunca una por fila), solo si hay una lista cerrada de dónde elegir: el catálogo
-   oficial de vehículos, las carrocerías oficiales, o los **hasta 8 municipios más parecidos** de ese texto. Un texto con datos sensibles (correo, NIT, número largo) no sale hacia
+   oficial de vehículos, las carrocerías oficiales, **las seis líneas de negocio de NEXO** o los **hasta 8 municipios más parecidos** de ese texto. Sin el apoyo de un diccionario, la
+   IA responde con confianza baja a «Inbound»/«Outbound», así que quedan `sin_resolver`. Un texto con datos sensibles (correo, NIT, número largo) no sale hacia
    la IA. Máximo 150 textos por llamada a la IA; el resto queda `sin_resolver` con una nota.
 3. **Nada se asigna porque lo diga el modelo.** El modelo no escribe un valor: elige una `clave` de la lista que se le dio (o `NINGUNA`). Su elección solo se acepta si la clave
    **está en esa lista** y la **confianza es ≥ 0.7**; si no, el texto queda `sin_resolver`. Un texto que intente dar órdenes no cambia nada.
@@ -983,7 +987,7 @@ proveedor; `SIN_PENDIENTES` si las reglas resolvieron todo o lo que falta no tie
 | Body | | Tipo | Restricción |
 |---|---|---|---|
 | `clienteId` | *opcional* | UUID | El cliente dueño del archivo; su diccionario manda |
-| `valores` | **requerido** | `{ campo, valor }[]` | 1 a 1000. `campo`: `tipoVehiculo` · `carroceria` · `ciudad` (origen, destino y demás ciudades). `valor`: máx. 150 caracteres; los vacíos se saltan |
+| `valores` | **requerido** | `{ campo, valor }[]` | 1 a 1000. `campo`: `tipoVehiculo` · `carroceria` · `lineaNegocio` · `ciudad` (origen, destino y demás ciudades). `valor`: máx. 150 caracteres; los vacíos se saltan |
 
 ```ts
 interface ResultadoNormalizacionDto {
@@ -995,10 +999,10 @@ interface ResultadoNormalizacionDto {
 interface ValorNormalizadoDto {
   campo: string; valor: string      // el texto tal como llegó
   estado: "resuelto" | "ambiguo" | "sin_resolver"
-  codigo: string | null             // tipoVehiculo: el código · carroceria: el nombre del catálogo · ciudad: el código DANE
-  descripcion: string | null        // la del tipo de vehículo, o «Municipio, Departamento»
+  codigo: string | null             // tipoVehiculo: el código · carroceria: el nombre del catálogo · lineaNegocio: "nacional" | "puertoAInterior" | "interiorAPuerto" | "devolucionContenedor" | "andino" | "licitaciones" · ciudad: el código DANE
+  descripcion: string | null        // la del tipo de vehículo, el nombre de la línea de negocio («Puerto a interior») o «Municipio, Departamento»
   municipioId: number | null        // solo ciudad resuelta (tbl_municipios.Id)
-  origen: "diccionario" | "alias" | "catalogo" | "dane" | "ia" | "ninguno"
+  origen: "diccionario" | "alias" | "catalogo" | "regla" | "dane" | "ia" | "ninguno"   // "regla" = sinónimo inequívoco de la línea de negocio (impo, expo)
   confianza: number                 // 1 si lo resolvió una regla; la del modelo con "ia"; 0 sin resolver
   nota: string | null
   candidatos: { municipioId: number, codigoDane: string, municipio: string, departamento: string }[] | null  // solo "ambiguo" (máx. 8)
@@ -1014,6 +1018,10 @@ Casos:
 | `3S3` · `Tractocamion 3S3` (idénticos al catálogo) | tipoVehiculo | `resuelto`, `catalogo` |
 | `Tractomula` (nadie lo mapeó) | tipoVehiculo | a la IA con el catálogo; si elige `3S3` con confianza ≥ 0.7 → `resuelto`, `ia`; si no → `sin_resolver` (en la captura, cuarentena) |
 | `furgon` (carrocería oficial `Furgón`) | carroceria | `resuelto`, `catalogo` |
+| `Outbound` (término del cliente → Interior a puerto) | lineaNegocio | `resuelto`, `diccionario`, `codigo = interiorAPuerto` (solo con su `clienteId`) |
+| `IMPO` · `Importación` · `EXPO` · `Exportación` | lineaNegocio | `resuelto`, `regla` (Puerto a interior / Interior a puerto) |
+| `Nacional` · `Puerto a interior` · `Andino`… (idénticos a las seis) | lineaNegocio | `resuelto`, `catalogo` |
+| `Inbound` (nadie lo mapeó) | lineaNegocio | a la IA con las seis líneas; con confianza < 0.7 → `sin_resolver` |
 | `76001` · `76001000` | ciudad | `resuelto`, `dane` (solo municipios de Colombia; si no existe → `sin_resolver`) |
 | `Bogota D.C.` · `medellin` · `Sta   Marta` | ciudad | `resuelto`, `catalogo` |
 | `Santa Rosa, Cauca` | ciudad | `resuelto`, `catalogo` (el departamento desempata) |
@@ -1069,7 +1077,7 @@ tal como llegó (limpio de espacios).
 | `tipoVehiculo` | *opcional* | string | máx. 100 |
 | `carroceria` | *opcional* | string | máx. 100 |
 | `tipologia` | *opcional* | string | `TipologiaCarga` |
-| `lineaNegocio` | *opcional* | string | máx. 100 |
+| `lineaNegocio` | *opcional* | string | máx. 100. Una de las seis: `Nacional`, `Puerto a interior`, `Interior a puerto`, `Devolución de contenedor`, `Andino`, `Licitaciones` (también como `puertoAInterior`, mayúsculas o con guiones). Vacío = sin línea de negocio. **Cualquier otro texto es `400 LINEA_NEGOCIO_INVALIDO`** (con el número de línea y el valor recibido; antes se guardaba en blanco sin avisar). `normalizar-valores` traduce el texto del cliente al valor de NEXO |
 | `claseViaje` | *opcional* | string | máx. 50 |
 | `claseContenedor` | *opcional* | string | máx. 20 |
 | `exclusivo`, `consolidado`, `retornaContenedor`, `levanteContenedorDiferente` | *opcional* | boolean | #300: `retornaContenedor` agrega el tramo vacío de retorno (1 h + 1 h, aparte) y **ya no cambia las horas de la línea** (RN-03) |
@@ -1115,7 +1123,7 @@ Ejemplo: `peso` 1000 con una posición de 100 kg → `201`; posiciones que suman
 `POST /api/solicitudes/{id}/lineas:bulk` no valida la suma.
 
 - **→** `201 CapturaResultDto`, header `Location: /api/solicitudes/{id}`
-- **Errores**: `400 CLIENTE_REQUERIDO` · `400 CLIENTE_INVALIDO` · `400 CLIENTE_BP_INVALIDO` · `400 DWCUBOS_NO_CONFIGURADO` (se usó `clienteBp` y el DW no está configurado en el ambiente) · `400 ENUM_INVALIDO` · `400 LINEA_INCOMPLETA` · `400 PESO_REQUERIDO` · `400 PESO_INCONSISTENTE` · `400 CUBICACION_DEMASIADO_GRANDE` (#304: más de 10.000 unidades en las posiciones de una línea). Una posición sin `pesoKg`, con `pesoKg` 0 o con `cantidad` > 10000 sale como `400 VALIDATION_ERROR` (validación de campos)
+- **Errores**: `400 LINEA_NEGOCIO_INVALIDO` · `400 CLIENTE_REQUERIDO` · `400 CLIENTE_INVALIDO` · `400 CLIENTE_BP_INVALIDO` · `400 DWCUBOS_NO_CONFIGURADO` (se usó `clienteBp` y el DW no está configurado en el ambiente) · `400 ENUM_INVALIDO` · `400 LINEA_INCOMPLETA` · `400 PESO_REQUERIDO` · `400 PESO_INCONSISTENTE` · `400 CUBICACION_DEMASIADO_GRANDE` (#304: más de 10.000 unidades en las posiciones de una línea). Una posición sin `pesoKg`, con `pesoKg` 0 o con `cantidad` > 10000 sale como `400 VALIDATION_ERROR` (validación de campos)
 
 **Preguntas del contrato de captura (S6-HU-29.3/#313).** Tres preguntas del informe del front de Nexo, con su respuesta:
 

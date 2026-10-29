@@ -215,7 +215,7 @@ public class clsSugerirMapeoRequest
 /// <summary>Un texto libre de una columna del Excel.</summary>
 public class clsValorANormalizarRequest
 {
-    /// <summary><c>tipoVehiculo</c>, <c>carroceria</c> o <c>ciudad</c> (origen, destino y demás ciudades).</summary>
+    /// <summary><c>tipoVehiculo</c>, <c>carroceria</c>, <c>lineaNegocio</c> o <c>ciudad</c> (origen, destino y demás ciudades).</summary>
     [Required, MaxLength(20)]
     public string Campo { get; set; } = null!;
 
