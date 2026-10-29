@@ -100,9 +100,32 @@ class ServicioSombra:
             await asyncio.wait(set(self._pendientes), timeout=timeout)
 
     async def cerrar(self, timeout: float = 10.0) -> None:
+        """Cierre ordenado: espera lo que alcance a terminar y cancela el resto.
+
+        `cancel()` solo PIDE la cancelacion. Sin el `gather` de abajo, `cerrar`
+        regresaba con tareas a las que se les habia pedido parar y que todavia
+        no habian parado, y eso tiene dos costos:
+
+        - en produccion, el ciclo de vida de la API llama a esto en su
+          `finally` y el proceso sigue su camino sin esperarlas, asi que una
+          comparacion puede quedar cortada a mitad de su escritura en
+          `iaSombra`;
+        - en las pruebas, la tarea sobrevivia al final del test y pytest-asyncio
+          se quedaba esperandola al cerrar su bucle (`_cancel_all_tasks`). La
+          suite se colgaba 3 de cada 5 corridas, siempre en
+          `test_la_respuesta_no_espera_al_modelo`, que cierra con un modelo
+          falso de 3 segundos todavia en curso.
+
+        `return_exceptions=True` porque aca se recoge, no se propaga: las tareas
+        terminan con `CancelledError` y cualquier otro fallo ya quedo en el log
+        de `_ejecutar`.
+        """
         await self.esperar_pendientes(timeout)
-        for t in list(self._pendientes):
+        tareas = list(self._pendientes)
+        for t in tareas:
             t.cancel()
+        if tareas:
+            await asyncio.gather(*tareas, return_exceptions=True)
 
     @property
     def pendientes(self) -> int:
