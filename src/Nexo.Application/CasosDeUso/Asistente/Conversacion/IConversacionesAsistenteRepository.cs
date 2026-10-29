@@ -26,4 +26,26 @@ public interface IConversacionesAsistenteRepository
     Task FinalizarMensajeAsync(Guid mensajeId, string contenido, string estado, CancellationToken ct = default);
 
     Task RegistrarHerramientaAsync(clsUsoHerramientaAsistente uso, CancellationToken ct = default);
+
+    /// <summary>Agrega al final de la conversación un mensaje del asistente ya completo (por ejemplo el resultado de una acción confirmada).</summary>
+    Task AgregarMensajeAsistenteAsync(Guid conversacionId, string contenido, CancellationToken ct = default);
+
+    Task<clsAccionAsistente> CrearAccionAsync(clsAccionAsistente accion, CancellationToken ct = default);
+
+    Task<clsAccionAsistente?> ObtenerAccionAsync(Guid id, CancellationToken ct = default);
+
+    Task<IReadOnlyList<clsAccionAsistente>> AccionesAsync(Guid conversacionId, CancellationToken ct = default);
+
+    Task<int> ContarAccionesDelMensajeAsync(Guid mensajeId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Pasa la acción de <c>pendiente</c> a <c>ejecutando</c> en un solo paso atómico y solo si no ha vencido: dos confirmaciones
+    /// simultáneas no pueden aplicar el cambio dos veces. Devuelve false si la acción ya no estaba pendiente o venció.
+    /// </summary>
+    Task<bool> TomarAccionAsync(Guid id, DateTimeOffset ahora, CancellationToken ct = default);
+
+    /// <summary>Pasa la acción de <c>pendiente</c> a <c>cancelada</c> (atómico). False si ya no estaba pendiente.</summary>
+    Task<bool> CancelarAccionAsync(Guid id, DateTimeOffset ahora, CancellationToken ct = default);
+
+    Task ResolverAccionAsync(Guid id, string estado, string? codigo, string? mensaje, DateTimeOffset ahora, CancellationToken ct = default);
 }

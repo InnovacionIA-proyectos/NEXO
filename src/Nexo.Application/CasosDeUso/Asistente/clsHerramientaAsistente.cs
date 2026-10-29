@@ -114,6 +114,32 @@ public sealed class clsEntradaHerramienta(string herramienta, JsonElement json)
         return valor;
     }
 
+    public decimal? Decimal(string campo, decimal minimo, decimal maximo)
+    {
+        var elemento = Buscar(campo);
+        if (elemento is null) return null;
+
+        var valor = elemento.Value.ValueKind switch
+        {
+            JsonValueKind.Number when elemento.Value.TryGetDecimal(out var n) => n,
+            JsonValueKind.String when decimal.TryParse(elemento.Value.GetString(), NumberStyles.Number, CultureInfo.InvariantCulture, out var n) => n,
+            _ => throw Invalida($"\"{campo}\" debe ser un número."),
+        };
+        if (valor < minimo || valor > maximo) throw Invalida($"\"{campo}\" debe estar entre {minimo:0.##} y {maximo:0.##}.");
+        return valor;
+    }
+
+    /// <summary>Los objetos de una lista del cuerpo; exige al menos uno y no más de <paramref name="maximo"/>.</summary>
+    public IReadOnlyList<clsEntradaHerramienta> Objetos(string campo, int maximo)
+    {
+        if (!json.TryGetProperty(campo, out var lista) || lista.ValueKind is not JsonValueKind.Array)
+            throw Invalida($"\"{campo}\" debe ser una lista.");
+        var items = lista.EnumerateArray().ToList();
+        if (items.Count is 0 || items.Count > maximo) throw Invalida($"\"{campo}\" debe tener entre 1 y {maximo} elementos.");
+        if (items.Any(i => i.ValueKind is not JsonValueKind.Object)) throw Invalida($"cada elemento de \"{campo}\" debe ser un objeto.");
+        return items.Select(i => new clsEntradaHerramienta(herramienta, i)).ToList();
+    }
+
     /// <summary>Un tope de filas: sin valor, <paramref name="porDefecto"/>; con valor, entre 1 y <paramref name="maximo"/>.</summary>
     public int Tope(string campo, int porDefecto, int maximo) => Entero(campo, 1, maximo) ?? porDefecto;
 

@@ -20,6 +20,12 @@ public abstract record clsEventoAsistente
     /// <summary><paramref name="Estado"/>: <c>completo</c>, <c>incompleto</c> o <c>descartado</c>.</summary>
     public sealed record Fin(Guid ConversacionId, Guid MensajeId, string Estado) : clsEventoAsistente;
 
+    /// <summary>
+    /// El asistente propuso un cambio. Nada se ha modificado: la persona debe confirmarlo (<c>POST /api/asistente/acciones/{id}/confirmar</c>)
+    /// o cancelarlo.
+    /// </summary>
+    public sealed record Accion(clsAccionAsistenteDto Propuesta) : clsEventoAsistente;
+
     /// <summary>La respuesta se cortó a mitad de la transmisión; lo ya mostrado queda como respuesta incompleta.</summary>
     public sealed record Error(string Codigo, string Mensaje) : clsEventoAsistente;
 }
@@ -34,4 +40,22 @@ public sealed record clsUsoHerramientaDto(
 
 public sealed record clsConversacionDetalleDto(
     Guid Id, string Titulo, int Turnos, Guid UsuarioId, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt,
-    IReadOnlyList<clsMensajeAsistenteDto> Mensajes, IReadOnlyList<clsUsoHerramientaDto> Herramientas);
+    IReadOnlyList<clsMensajeAsistenteDto> Mensajes, IReadOnlyList<clsUsoHerramientaDto> Herramientas,
+    IReadOnlyList<clsAccionAsistenteDto> Acciones);
+
+/// <summary>Un cambio propuesto por el asistente. <paramref name="Parametros"/> es lo que se aplicaría, tal como lo validó el servidor.</summary>
+public sealed record clsAccionAsistenteDto(
+    Guid Id, Guid ConversacionId, Guid MensajeId, string Tipo, string Resumen, System.Text.Json.JsonElement Parametros, string Estado,
+    DateTimeOffset VenceAt, DateTimeOffset? ResueltaAt, string? ResultadoCodigo, string? ResultadoMensaje, DateTimeOffset CreatedAt)
+{
+    public static clsAccionAsistenteDto De(Nexo.Domain.Asistente.Entidades.clsAccionAsistente a) => new(
+        a.Id, a.ConversacionId, a.MensajeId, a.Tipo, a.Resumen, System.Text.Json.JsonDocument.Parse(a.Parametros).RootElement.Clone(), a.Estado,
+        a.VenceAt, a.ResueltaAt, a.ResultadoCodigo, a.ResultadoMensaje, a.CreatedAt);
+}
+
+/// <summary>Quién conversa y en qué respuesta, para las herramientas que necesitan saberlo (las que proponen cambios).</summary>
+public sealed class clsContextoConversacionAsistente
+{
+    public Guid? ConversacionId { get; set; }
+    public Guid? MensajeId { get; set; }
+}

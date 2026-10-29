@@ -53,6 +53,7 @@ public class clsNexoDbContext : DbContext
     public DbSet<clsConversacionAsistente> ConversacionesAsistente => Set<clsConversacionAsistente>();
     public DbSet<clsMensajeAsistente> MensajesAsistente => Set<clsMensajeAsistente>();
     public DbSet<clsUsoHerramientaAsistente> UsosHerramientaAsistente => Set<clsUsoHerramientaAsistente>();
+    public DbSet<clsAccionAsistente> AccionesAsistente => Set<clsAccionAsistente>();
     public DbSet<clsItemPlanCargue> ItemsPlanCargue => Set<clsItemPlanCargue>();
     public DbSet<clsColocacionCargue> ColocacionesCargue => Set<clsColocacionCargue>();
     public DbSet<clsMunicipio> Municipios => Set<clsMunicipio>();
@@ -429,6 +430,22 @@ public class clsNexoDbContext : DbContext
             e.HasIndex(x => new { x.ConversacionId, x.CreatedAt });
             e.HasOne<clsConversacionAsistente>().WithMany().HasForeignKey(x => x.ConversacionId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne<clsMensajeAsistente>().WithMany().HasForeignKey(x => x.MensajeId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // Cambios que el asistente propone y la persona confirma (o no): también son la auditoría de cada escritura.
+        b.Entity<clsAccionAsistente>(e =>
+        {
+            e.ToTable("tbl_asistente_acciones");
+            e.Property(x => x.Tipo).HasMaxLength(40).IsRequired();
+            e.Property(x => x.Resumen).HasMaxLength(500).IsRequired();
+            e.Property(x => x.Estado).HasMaxLength(20).IsRequired();
+            e.Property(x => x.ResultadoCodigo).HasMaxLength(60);
+            e.Property(x => x.ResultadoMensaje).HasMaxLength(500);
+            e.HasIndex(x => new { x.ConversacionId, x.CreatedAt });
+            e.HasIndex(x => x.MensajeId);
+            e.HasOne<clsConversacionAsistente>().WithMany().HasForeignKey(x => x.ConversacionId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<clsMensajeAsistente>().WithMany().HasForeignKey(x => x.MensajeId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<clsUsuario>().WithMany().HasForeignKey(x => x.UsuarioId).OnDelete(DeleteBehavior.Restrict);
         });
 
         // ------------------------------------------------------------- Cubicador 3D

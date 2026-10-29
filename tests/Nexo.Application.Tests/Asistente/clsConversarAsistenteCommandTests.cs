@@ -44,59 +44,6 @@ public class clsConversarAsistenteCommandTests
         }
     }
 
-    private sealed class clsRepositorioEnMemoria : IConversacionesAsistenteRepository
-    {
-        public List<clsConversacionAsistente> Conversaciones { get; } = [];
-        public List<clsMensajeAsistente> Mensajes { get; } = [];
-        public List<clsUsoHerramientaAsistente> Herramientas { get; } = [];
-
-        public Task<clsConversacionAsistente?> ObtenerAsync(Guid id, CancellationToken ct = default) =>
-            Task.FromResult(Conversaciones.FirstOrDefault(c => c.Id == id));
-
-        public Task<IReadOnlyList<clsMensajeAsistente>> MensajesAsync(Guid conversacionId, CancellationToken ct = default) =>
-            Task.FromResult<IReadOnlyList<clsMensajeAsistente>>(Mensajes.Where(m => m.ConversacionId == conversacionId).OrderBy(m => m.Orden).ToList());
-
-        public Task<IReadOnlyList<clsUsoHerramientaAsistente>> HerramientasAsync(Guid conversacionId, CancellationToken ct = default) =>
-            Task.FromResult<IReadOnlyList<clsUsoHerramientaAsistente>>(Herramientas.Where(h => h.ConversacionId == conversacionId).ToList());
-
-        public Task<IReadOnlyList<clsConversacionAsistente>> ListarDeUsuarioAsync(Guid usuarioId, int top, CancellationToken ct = default) =>
-            Task.FromResult<IReadOnlyList<clsConversacionAsistente>>(Conversaciones.Where(c => c.UsuarioId == usuarioId).Take(top).ToList());
-
-        public Task<clsConversacionAsistente> CrearAsync(Guid usuarioId, string titulo, CancellationToken ct = default)
-        {
-            var c = new clsConversacionAsistente { UsuarioId = usuarioId, Titulo = titulo };
-            Conversaciones.Add(c);
-            return Task.FromResult(c);
-        }
-
-        public Task<Guid> IniciarTurnoAsync(Guid conversacionId, string mensajeUsuario, CancellationToken ct = default)
-        {
-            var siguiente = Mensajes.Count(m => m.ConversacionId == conversacionId) + 1;
-            Mensajes.Add(new clsMensajeAsistente { ConversacionId = conversacionId, Orden = siguiente, Rol = clsMensajeAsistente.RolUsuario, Contenido = mensajeUsuario });
-            var respuesta = new clsMensajeAsistente
-            {
-                ConversacionId = conversacionId, Orden = siguiente + 1, Rol = clsMensajeAsistente.RolAsistente, Estado = clsMensajeAsistente.EstadoEnCurso,
-            };
-            Mensajes.Add(respuesta);
-            Conversaciones.First(c => c.Id == conversacionId).Turnos++;
-            return Task.FromResult(respuesta.Id);
-        }
-
-        public Task FinalizarMensajeAsync(Guid mensajeId, string contenido, string estado, CancellationToken ct = default)
-        {
-            var m = Mensajes.First(x => x.Id == mensajeId);
-            m.Contenido = contenido;
-            m.Estado = estado;
-            return Task.CompletedTask;
-        }
-
-        public Task RegistrarHerramientaAsync(clsUsoHerramientaAsistente uso, CancellationToken ct = default)
-        {
-            Herramientas.Add(uso);
-            return Task.CompletedTask;
-        }
-    }
-
     private sealed class clsHerramientaDePrueba(string nombre, Func<JsonElement, Task<clsResultadoHerramienta>> ejecutar, params RolUsuario[] roles) : IHerramientaAsistente
     {
         public string Nombre => nombre;
@@ -106,7 +53,7 @@ public class clsConversarAsistenteCommandTests
         public Task<clsResultadoHerramienta> EjecutarAsync(JsonElement entrada, CancellationToken ct = default) => ejecutar(entrada);
     }
 
-    private readonly clsRepositorioEnMemoria _repo = new();
+    private readonly clsRepositorioConversacionesEnMemoria _repo = new();
     private readonly Mock<ICurrentUserPort> _usuario = new();
     private readonly clsLimitesAsistente _limites = new();
     private clsModeloGuionado _modelo = null!;
@@ -129,7 +76,7 @@ public class clsConversarAsistenteCommandTests
             ? herramientas
             : [new clsHerramientaDePrueba("consultar_piso_sicetac", _ => Task.FromResult(PisoPorDefecto))];
         return new clsConversarAsistenteCommandHandler(
-            _modelo, _repo, new clsHerramientasDelAsistente(todas, _usuario.Object), _usuario.Object, _limites);
+            _modelo, _repo, new clsHerramientasDelAsistente(todas, _usuario.Object), _usuario.Object, _limites, new clsContextoConversacionAsistente());
     }
 
     private static async IAsyncEnumerable<clsEventoConversacionIa> Eventos(params clsEventoConversacionIa[] eventos)

@@ -67,4 +67,56 @@ public sealed class clsEfConversacionesAsistenteRepository(clsNexoDbContext db, 
         db.UsosHerramientaAsistente.Add(uso);
         await db.SaveChangesAsync(ct);
     }
+
+    public async Task AgregarMensajeAsistenteAsync(Guid conversacionId, string contenido, CancellationToken ct = default)
+    {
+        var ahora = reloj.GetUtcNow();
+        var siguiente = (await db.MensajesAsistente.Where(m => m.ConversacionId == conversacionId).MaxAsync(m => (int?)m.Orden, ct) ?? 0) + 1;
+        db.MensajesAsistente.Add(new clsMensajeAsistente
+        {
+            ConversacionId = conversacionId, Orden = siguiente, Rol = clsMensajeAsistente.RolAsistente,
+            Contenido = contenido, Estado = clsMensajeAsistente.EstadoCompleto, CreatedAt = ahora,
+        });
+        var conversacion = await db.ConversacionesAsistente.FirstAsync(c => c.Id == conversacionId, ct);
+        conversacion.UpdatedAt = ahora;
+        await db.SaveChangesAsync(ct);
+    }
+
+    public async Task<clsAccionAsistente> CrearAccionAsync(clsAccionAsistente accion, CancellationToken ct = default)
+    {
+        db.AccionesAsistente.Add(accion);
+        await db.SaveChangesAsync(ct);
+        return accion;
+    }
+
+    public Task<clsAccionAsistente?> ObtenerAccionAsync(Guid id, CancellationToken ct = default) =>
+        db.AccionesAsistente.AsNoTracking().FirstOrDefaultAsync(a => a.Id == id, ct);
+
+    public async Task<IReadOnlyList<clsAccionAsistente>> AccionesAsync(Guid conversacionId, CancellationToken ct = default) =>
+        await db.AccionesAsistente.AsNoTracking().Where(a => a.ConversacionId == conversacionId).OrderBy(a => a.CreatedAt).ToListAsync(ct);
+
+    public Task<int> ContarAccionesDelMensajeAsync(Guid mensajeId, CancellationToken ct = default) =>
+        db.AccionesAsistente.CountAsync(a => a.MensajeId == mensajeId, ct);
+
+    public async Task<bool> TomarAccionAsync(Guid id, DateTimeOffset ahora, CancellationToken ct = default) =>
+        await db.AccionesAsistente
+            .Where(a => a.Id == id && a.Estado == clsAccionAsistente.EstadoPendiente && a.VenceAt > ahora)
+            .ExecuteUpdateAsync(s => s.SetProperty(a => a.Estado, clsAccionAsistente.EstadoEjecutando), ct) == 1;
+
+    public async Task<bool> CancelarAccionAsync(Guid id, DateTimeOffset ahora, CancellationToken ct = default) =>
+        await db.AccionesAsistente
+            .Where(a => a.Id == id && a.Estado == clsAccionAsistente.EstadoPendiente)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(a => a.Estado, clsAccionAsistente.EstadoCancelada)
+                .SetProperty(a => a.ResueltaAt, ahora), ct) == 1;
+
+    public async Task ResolverAccionAsync(Guid id, string estado, string? codigo, string? mensaje, DateTimeOffset ahora, CancellationToken ct = default)
+    {
+        var recortado = mensaje is { Length: > 500 } ? mensaje[..500] : mensaje;
+        await db.AccionesAsistente.Where(a => a.Id == id).ExecuteUpdateAsync(s => s
+            .SetProperty(a => a.Estado, estado)
+            .SetProperty(a => a.ResultadoCodigo, codigo)
+            .SetProperty(a => a.ResultadoMensaje, recortado)
+            .SetProperty(a => a.ResueltaAt, ahora), ct);
+    }
 }

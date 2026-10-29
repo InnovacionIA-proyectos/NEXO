@@ -74,6 +74,7 @@ public class clsAsistenteConversacionesController(
         clsEventoAsistente.Fragmento e => ("texto", e),
         clsEventoAsistente.Herramienta e => ("herramienta", e),
         clsEventoAsistente.Reemplazo e => ("reemplazo", e),
+        clsEventoAsistente.Accion e => ("accion", e.Propuesta),
         clsEventoAsistente.Fin e => ("fin", e),
         clsEventoAsistente.Error e => ("error", e),
         _ => ("desconocido", evento),
