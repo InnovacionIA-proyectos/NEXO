@@ -4,7 +4,8 @@ extraen a un microservicio - son EF/SQLAlchemy puro, igual que en NEXO."""
 
 from __future__ import annotations
 
-from typing import Protocol
+from datetime import datetime
+from typing import TYPE_CHECKING, Protocol
 
 from domain.entidades.catalogo import Catalogo
 from domain.entidades.recomendacion import MercanciaRecomendada, RecomendacionGuardada
@@ -14,6 +15,10 @@ from domain.entidades.entidades import (
     PlanCargue,
     VehiculoCubicacion,
 )
+
+
+if TYPE_CHECKING:
+    from application.ia_sombra.registro import RegistroSombra
 
 
 class IVehiculoCubicacionRepository(Protocol):
@@ -234,4 +239,14 @@ class ICatalogoCrudRepository(Protocol):
         Server no dice cuantas ni de donde: con esto el CRUD responde "3
         mercancias la referencian" en vez de un conflicto generico.
         """
+        ...
+
+
+class IIaSombraRepository(Protocol):
+    """Registro de las diferencias entre el motor y el modelo en modo sombra. Solo agrega filas."""
+
+    async def guardar(self, registro: "RegistroSombra") -> None: ...
+
+    async def tokens_desde(self, desde: datetime) -> int:
+        """Tokens (entrada + salida) consumidos desde ese momento: lo que usa el tope diario."""
         ...

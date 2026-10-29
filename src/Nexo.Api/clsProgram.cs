@@ -1,9 +1,12 @@
 using Nexo.Api.Trabajos;
 using Nexo.Application.CasosDeUso.Bandeja.Interfaces;
 using Nexo.Application.CasosDeUso.Trabajos.Interfaces;
+using Nexo.Application.CasosDeUso.Asistente;
 using Nexo.Application.CasosDeUso.Costeo;
 using Nexo.Application.CasosDeUso.DiccionarioCliente;
 using Nexo.Application.CasosDeUso.IA;
+using Nexo.Application.CasosDeUso.MapeoExcel;
+using Nexo.Application.CasosDeUso.PlantillasMapeo;
 using Nexo.Application.CasosDeUso.Trabajos;
 using Nexo.Infrastructure.Common.Mensajeria;
 using System.Text.Json.Serialization;
@@ -87,6 +90,8 @@ builder.Services.AddScoped<INotificadorDePlanCargue, clsNotificadorPlanCargueSig
 builder.Services.AddPlanDeCargueUseCases();
 builder.Services.AddDiccionarioClienteUseCases();
 builder.Services.AddIaUseCases();
+builder.Services.AddMapeoExcelUseCases();
+builder.Services.AddPlantillasMapeoUseCases();
 builder.Services.AddCubicacionUseCases();
 builder.Services.AddCotizacionesUseCases();
 builder.Services.AddNotificacionesUseCases();
@@ -102,6 +107,7 @@ builder.Services.AddMetricasUseCases();
 builder.Services.AddCatalogosUseCases();
 builder.Services.AddRangosPesoUseCases();
 builder.Services.AddTarifasPlazaUseCases();
+builder.Services.AddAsistenteUseCases();
 // Arma la cadena de priorización al arrancar y se va. NO tiene reloj: el reloj vive en
 // la saga, dentro del broker. Reemplaza al RecalculoScoreHostedService, que llevaba un
 // PeriodicTimer adentro y por lo tanto se duplicaba con cada réplica del API.

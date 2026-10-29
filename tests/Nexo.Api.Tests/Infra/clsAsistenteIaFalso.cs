@@ -12,9 +12,9 @@ public sealed class clsAsistenteIaFalso : IAsistenteIaPort
 {
     private readonly HashSet<clsFuncionIa> _habilitadas;
     private readonly Func<clsPeticionIa, clsRespuestaIa>? _responder;
-    private readonly clsServiceUnavailableException? _error;
+    private readonly Exception? _error;
 
-    private clsAsistenteIaFalso(IEnumerable<clsFuncionIa> habilitadas, Func<clsPeticionIa, clsRespuestaIa>? responder, clsServiceUnavailableException? error)
+    private clsAsistenteIaFalso(IEnumerable<clsFuncionIa> habilitadas, Func<clsPeticionIa, clsRespuestaIa>? responder, Exception? error)
     {
         _habilitadas = [.. habilitadas];
         _responder = responder;
@@ -34,6 +34,10 @@ public sealed class clsAsistenteIaFalso : IAsistenteIaPort
     public static clsAsistenteIaFalso Falla(string codigo, params clsFuncionIa[] habilitadas) =>
         new(habilitadas.Length == 0 ? Enum.GetValues<clsFuncionIa>() : habilitadas, responder: null,
             new clsServiceUnavailableException(codigo, "Error simulado del proveedor de IA."));
+
+    /// <summary>Lanza siempre <paramref name="error"/> (por ejemplo un tope de uso superado), como lo haría el puerto real.</summary>
+    public static clsAsistenteIaFalso Lanza(Exception error, params clsFuncionIa[] habilitadas) =>
+        new(habilitadas.Length == 0 ? Enum.GetValues<clsFuncionIa>() : habilitadas, responder: null, error);
 
     /// <summary>Como un ambiente sin llave: nada habilitado y toda llamada responde <c>IA_NO_CONFIGURADA</c>.</summary>
     public static clsAsistenteIaFalso SinConfigurar() =>

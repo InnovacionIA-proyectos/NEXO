@@ -10,12 +10,15 @@ from fastapi import Depends, HTTPException, Security
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from application.ia_sombra.servicio import ServicioSombra
 from application.ports.externos import ILineaSolicitudPort
 from infrastructure.clientes.nexo_client import NexoLineaSolicitudClient
 from infrastructure.mensajeria.rabbitmq import RabbitMqEventosPublisher
-from infrastructure.persistence.db import obtener_sesion
+from infrastructure.ia.anthropic_cliente import AnthropicClienteIa
+from infrastructure.persistence.db import SessionLocal, obtener_sesion
 from infrastructure.persistence.repositorios.catalogo_crud_repo import SqlCatalogoCrudRepository
 from infrastructure.persistence.repositorios.catalogo_repo import SqlCatalogoRepository
+from infrastructure.persistence.repositorios.ia_sombra_repo import SqlIaSombraRepository
 from infrastructure.persistence.repositorios.parametros_repo import SqlParametrosCubicacionRepository
 from infrastructure.persistence.repositorios.plan_cargue_repo import SqlPlanCargueRepository
 from infrastructure.persistence.repositorios.recomendacion_repo import SqlRecomendacionRepository
@@ -56,6 +59,27 @@ def obtener_eventos_publisher() -> RabbitMqEventosPublisher:
     if _publisher is None:
         raise RuntimeError("El publisher de RabbitMQ no se ha inicializado (ver lifespan de api/main.py).")
     return _publisher
+
+
+# Modo sombra de la IA: un solo servicio por proceso (lleva la cuenta de las comparaciones en curso).
+# Nace apagado: sin IA_SOMBRA_HABILITADA y sin ANTHROPIC_API_KEY no hace nada.
+_servicio_sombra: ServicioSombra | None = None
+
+
+def obtener_servicio_sombra() -> ServicioSombra:
+    global _servicio_sombra
+    if _servicio_sombra is None:
+        _servicio_sombra = ServicioSombra(
+            fabrica_sesion=SessionLocal,
+            fabrica_repos=lambda s: (SqlCatalogoRepository(s), SqlParametrosCubicacionRepository(s), SqlIaSombraRepository(s)),
+            fabrica_cliente=AnthropicClienteIa,
+        )
+    return _servicio_sombra
+
+
+async def cerrar_servicio_sombra() -> None:
+    if _servicio_sombra is not None:
+        await _servicio_sombra.cerrar()
 
 
 _bearer_scheme = HTTPBearer(auto_error=False)

@@ -195,3 +195,76 @@ public class clsCapturaPosicionRequest
     [MaxLength(40)]
     public string? CodigoTipoMercancia { get; set; }
 }
+
+/// <summary>
+/// Pide una propuesta de mapeo de columnas para UNA hoja de un Excel ya analizado: los encabezados y las filas que devolvió
+/// <c>analizar-excel</c>. Solo se usan las primeras 20 filas.
+/// </summary>
+public class clsSugerirMapeoRequest
+{
+    /// <summary>El cliente dueño del archivo; su diccionario es la mejor pista. Sin él solo se usa el diccionario general.</summary>
+    public Guid? ClienteId { get; set; }
+
+    [Required, MinLength(1), MaxLength(100)]
+    public List<string> Encabezados { get; set; } = null!;
+
+    [MaxLength(1000)]
+    public List<List<string>?>? Filas { get; set; }
+}
+
+/// <summary>Un texto libre de una columna del Excel.</summary>
+public class clsValorANormalizarRequest
+{
+    /// <summary><c>tipoVehiculo</c>, <c>carroceria</c> o <c>ciudad</c> (origen, destino y demás ciudades).</summary>
+    [Required, MaxLength(20)]
+    public string Campo { get; set; } = null!;
+
+    [MaxLength(150)]
+    public string? Valor { get; set; }
+}
+
+/// <summary>Los textos libres distintos de un Excel (vehículo, carrocería, ciudad) para llevarlos a los valores oficiales de NEXO.</summary>
+public class clsNormalizarValoresRequest
+{
+    /// <summary>El cliente dueño del archivo; su diccionario manda. Sin él solo se usa el diccionario general.</summary>
+    public Guid? ClienteId { get; set; }
+
+    [Required, MinLength(1), MaxLength(1000)]
+    public List<clsValorANormalizarRequest> Valores { get; set; } = null!;
+}
+
+/// <summary>Una columna del archivo y lo que se hace con ella, tal como la confirmó el usuario.</summary>
+public class clsColumnaAplicarRequest
+{
+    /// <summary>Posición de la columna en las filas (base 0).</summary>
+    [Range(0, 99)]
+    public int Indice { get; set; }
+
+    /// <summary>Campo de NEXO al que va, o <c>ignorar</c>.</summary>
+    [Required, MaxLength(40)]
+    public string Campo { get; set; } = null!;
+
+    /// <summary>Una de las conversiones de la sugerencia de mapeo; vacía equivale a <c>ninguna</c>.</summary>
+    [MaxLength(40)]
+    public string? Transformacion { get; set; }
+}
+
+/// <summary>
+/// Aplica un mapeo ya confirmado a TODAS las filas de un Excel analizado: las columnas con su campo y conversión, y las filas que devolvió
+/// <c>analizar-excel</c> (sin el encabezado).
+/// </summary>
+public class clsAplicarMapeoRequest
+{
+    /// <summary>El cliente dueño del archivo; su diccionario traduce los valores. Sin él solo se usa el diccionario general.</summary>
+    public Guid? ClienteId { get; set; }
+
+    [Required, MinLength(1), MaxLength(100)]
+    public List<clsColumnaAplicarRequest> Columnas { get; set; } = null!;
+
+    [Required, MaxLength(5000)]
+    public List<List<string>?> Filas { get; set; } = null!;
+
+    /// <summary>El número que tiene en el archivo la primera fila enviada (2 si hay un solo encabezado), para que los errores digan la fila de Excel.</summary>
+    [Range(1, 1_000_000)]
+    public int PrimeraFila { get; set; } = 2;
+}

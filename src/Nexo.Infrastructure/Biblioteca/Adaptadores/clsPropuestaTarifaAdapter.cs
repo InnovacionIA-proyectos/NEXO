@@ -51,13 +51,15 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
     private readonly IClavesSoloSicetacPort _reglas;
     private readonly ISapTarifaFleteEnVivoPort _sapEnVivo;
     private readonly IPublicadorDeMensajes _publicador;
+    private readonly IMapeoVehiculoTarifarioPort _mapeo;
     private readonly bool _dwConfigurado;
     private readonly bool _dcConfigurado;
 
     public clsPropuestaTarifaAdapter(
         clsNexoDbContext db, IServiceProvider sp, IServiceScopeFactory scopes,
         IMemoryCache cache, TimeProvider clock, IAjustesVigenciaPlazaRepository ajustes,
-        IClavesSoloSicetacPort reglas, ISapTarifaFleteEnVivoPort sapEnVivo, IPublicadorDeMensajes publicador)
+        IClavesSoloSicetacPort reglas, ISapTarifaFleteEnVivoPort sapEnVivo, IPublicadorDeMensajes publicador,
+        IMapeoVehiculoTarifarioPort mapeo)
     {
         _db = db;
         _scopes = scopes;
@@ -69,6 +71,7 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
         _reglas = reglas;
         _sapEnVivo = sapEnVivo;
         _publicador = publicador;
+        _mapeo = mapeo;
     }
 
     /// <summary>
@@ -376,6 +379,7 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
             plazaVigente = await CandidatoSapAsync(
                 dc, tablaPlaza, "plaza", linea.clsRuta.OrigenMunicipio, linea.clsRuta.DestinoMunicipio,
                 vehiculo, linea.Peso, soloVigentes: true, ajustesVigencia, ct,
+                exigeVehiculoDePlaza: linea.ClaseViaje == ClaseViaje.Cupo,
                 criterioExtra: esDevolucion ? "devolución de contenedor: consolidado, exclusivo y clase de contenedor iguales a los de la línea" : null);
         }
 
@@ -400,7 +404,8 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
             if (dc is not null)
                 historico = await CandidatoSapAsync(
                     dc, dc.TarifasLogSap, "historico_sap", linea.clsRuta.OrigenMunicipio, linea.clsRuta.DestinoMunicipio,
-                    vehiculo, linea.Peso, soloVigentes: false, ajustesVigencia, ct, ventanaMeses: 3);
+                    vehiculo, linea.Peso, soloVigentes: false, ajustesVigencia, ct, ventanaMeses: 3,
+                    exigeVehiculoDePlaza: linea.ClaseViaje == ClaseViaje.Cupo);
             if (historico is null)
                 historico = await historicoInterno.BuscarAsync(consultaInterna, ct);
         }
@@ -672,7 +677,8 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
         var relajado = false;
         if (pidioVehiculo)
         {
-            var config = vehiculo!.Trim().ToUpper();
+            // El código con el que SICE-TAC conoce al vehículo (el Sencillo C2 es 2 en SICE-TAC); sin mapeo, el del propio vehículo.
+            var config = (await _mapeo.SicetacAsync(vehiculo, ct: ct))!;
             fila = SeleccionarSiceVacio(await FilasSiceCacheadasAsync($"{claveBase}:{config}", baseQ.Where(r => r.Configuracion == config), ct), carroceria, esContenedor);
             if (fila is not null) criterio += $" · configuración {config}";
         }
@@ -765,7 +771,8 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
         var pidioVehiculo = !string.IsNullOrWhiteSpace(vehiculo);
         if (pidioVehiculo)
         {
-            var config = vehiculo!.Trim().ToUpper();
+            // El código con el que SICE-TAC conoce al vehículo (el Sencillo C2 es 2 en SICE-TAC); sin mapeo, el del propio vehículo.
+            var config = (await _mapeo.SicetacAsync(vehiculo, ct: ct))!;
             fila = SeleccionarSice(await FilasSiceCacheadasAsync($"{claveBase}:{config}", baseQ.Where(r => r.Configuracion == config), ct), tipologia, carroceria);
             if (fila is not null) criterio += $" · configuración {config}";
         }
@@ -927,7 +934,7 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
         clsMunicipio? origenMunicipio, clsMunicipio? destinoMunicipio,
         string? vehiculo, decimal? peso, bool soloVigentes,
         IReadOnlyDictionary<int, DateTime> ajustesVigencia, CancellationToken ct,
-        int? ventanaMeses = null, string? criterioExtra = null) where T : clsSapTarifaBase
+        int? ventanaMeses = null, string? criterioExtra = null, bool exigeVehiculoDePlaza = false) where T : clsSapTarifaBase
     {
         var codigosOrigen = CodigosZonaSap(origenMunicipio);
         var codigosDestino = CodigosZonaSap(destinoMunicipio);
@@ -958,7 +965,13 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
         var vehiculoAplicado = false;
         if (vehiculoPedido)
         {
-            var idVehiculo = await IdVehiculoSapAsync(dc, vehiculo!, ct);
+            // El código con el que Plaza/SAP conoce al vehículo (el Sencillo C2 es 2; el Turbo 2L1/2L3 se tarifa como 2L2). Un vehículo mapeado
+            // sin código de plaza no tiene tarifa ahí: en una línea de cupo, que se define por el vehículo, no se ofrece la de otro.
+            var plaza = await _mapeo.PlazaAsync(vehiculo, ct);
+            if (plaza.SinTarifaDePlaza && exigeVehiculoDePlaza) return null;
+            var idVehiculo = plaza.SinTarifaDePlaza
+                ? null
+                : await IdVehiculoSapAsync(dc, plaza.Codigo!, ct) ?? await IdVehiculoSapAsync(dc, vehiculo!, ct);
             if (idVehiculo is not null)
             {
                 var conVehiculo = query.Where(t => t.TipoVehiculo == idVehiculo);

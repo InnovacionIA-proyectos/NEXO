@@ -21,6 +21,7 @@ from api.dependencias import (
     obtener_catalogo_repo,
     obtener_parametros_repo,
     obtener_recomendacion_repo,
+    obtener_servicio_sombra,
     verificar_origen_sistema,
 )
 from api.dtos.recomendaciones import (
@@ -110,6 +111,7 @@ async def crear(
     catalogo_repo=Depends(obtener_catalogo_repo),
     parametros_repo=Depends(obtener_parametros_repo),
     recomendacion_repo=Depends(obtener_recomendacion_repo),
+    servicio_sombra=Depends(obtener_servicio_sombra),
 ):
     exigir_origen_declarado(peticion.origen_sistema, origen_sistema)
 
@@ -129,6 +131,8 @@ async def crear(
     )
     guardada = await cu.crear_recomendacion(
         catalogo_repo, parametros_repo, recomendacion_repo, solicitud)
+    # Modo sombra: agenda la comparacion con el modelo y regresa en el acto; la respuesta de abajo no depende de ella.
+    servicio_sombra.programar(guardada, solicitud.mercancias, solicitud.clase_viaje_preferida)
     return _a_dto(guardada)
 
 

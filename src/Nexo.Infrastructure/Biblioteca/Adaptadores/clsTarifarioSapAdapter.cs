@@ -76,9 +76,11 @@ public sealed class clsTarifarioSapAdapter : ITarifarioSapPort
     private readonly IMemoryCache _cache;
     private readonly TimeProvider _clock;
     private readonly IAjustesVigenciaPlazaRepository _ajustes;
+    private readonly IMapeoVehiculoTarifarioPort _mapeo;
 
     public clsTarifarioSapAdapter(
-        IServiceProvider sp, clsNexoDbContext db, IMemoryCache cache, TimeProvider clock, IAjustesVigenciaPlazaRepository ajustes)
+        IServiceProvider sp, clsNexoDbContext db, IMemoryCache cache, TimeProvider clock, IAjustesVigenciaPlazaRepository ajustes,
+        IMapeoVehiculoTarifarioPort mapeo)
     {
         _dc = sp.GetService<clsDbSolucionesTiDbContext>();
         _dw = sp.GetService<clsDwSiceDbContext>();
@@ -86,6 +88,7 @@ public sealed class clsTarifarioSapAdapter : ITarifarioSapPort
         _cache = cache;
         _clock = clock;
         _ajustes = ajustes;
+        _mapeo = mapeo;
     }
 
     public async Task<clsResultadoTarifarioSap?> ConsultarAsync(clsConsultaTarifarioSap c, CancellationToken ct = default)
@@ -97,11 +100,18 @@ public sealed class clsTarifarioSapAdapter : ITarifarioSapPort
         var lineaId = c.LineaNegocio is { } ln ? CodigoLinea[ln] : (int?)null;
         var claseViajeId = c.ClaseViaje is { } cv ? CodigoClaseViaje[cv] : (int?)null;
         var claseContId = await IdClaseContenedorAsync(c.ClaseContenedor, ct);
-        var vehiculoId = await IdVehiculoAsync(c.ConfigVehiculo, ct);
+        // El código con el que Plaza/SAP conoce al vehículo (el Sencillo C2 es 2; el Turbo 2L1/2L3 se tarifa como 2L2). Un vehículo mapeado sin
+        // código de plaza no tiene tarifa ahí: en una línea de cupo, que se define por el vehículo, no se ofrece la de otro.
+        var plaza = await _mapeo.PlazaAsync(c.ConfigVehiculo, ct);
+        var sinPlazaParaElVehiculo = plaza.SinTarifaDePlaza && claseViajeId == 2;
+        var vehiculoId = plaza.SinTarifaDePlaza
+            ? null
+            : await IdVehiculoAsync(plaza.Codigo, ct) ?? await IdVehiculoAsync(c.ConfigVehiculo, ct);
         var carroceriaCod = await CodigoCarroceriaAsync(c.Carroceria, ct);
 
-        var (candidatas, criterio) = await BuscarConZonasAsync(
-            lineaId, claseViajeId, claseContId, vehiculoId, carroceriaCod, c.Peso, origen, destino, ct);
+        var (candidatas, criterio) = sinPlazaParaElVehiculo
+            ? ([], "sin tarifa de plaza para este vehículo")
+            : await BuscarConZonasAsync(lineaId, claseViajeId, claseContId, vehiculoId, carroceriaCod, c.Peso, origen, destino, ct);
 
         var sicetac = await SicetacOficialAsync(c, origen, destino, claseContId, vehiculoId, carroceriaCod, ct);
 
@@ -368,11 +378,10 @@ public sealed class clsTarifarioSapAdapter : ITarifarioSapPort
 
         string? config;
         if (claseViajeId == 1)
-            config = await ConfigPorRangoPesoAsync(claseContId, c.Peso, ct);
+            config = await _mapeo.SicetacAsync(await ConfigPorRangoPesoAsync(claseContId, c.Peso, ct), ct: ct);
         else
-            config = string.IsNullOrWhiteSpace(c.ConfigVehiculo)
-                ? null
-                : c.ConfigVehiculo.Trim().ToUpperInvariant().TrimStart('C');
+            // El código con el que SICE-TAC conoce al vehículo; sin fila de mapeo se conserva la regla de antes (quitar la C inicial).
+            config = await _mapeo.SicetacAsync(c.ConfigVehiculo, v => v.Trim().ToUpperInvariant().TrimStart('C'), ct);
         if (string.IsNullOrWhiteSpace(config)) return null;
 
         var tipoCarga = await ParametroAsync(457, ct) ?? "General";
