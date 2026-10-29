@@ -18,7 +18,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm.exc import StaleDataError
 
-from api.dependencias import cerrar_publisher, iniciar_publisher
+from api.dependencias import cerrar_publisher, cerrar_servicio_sombra, iniciar_publisher
 from api.routers import catalogo, planes_cargue, recomendaciones
 from application.excepciones import AppException, ConflictException, NotFoundException, ServiceUnavailableException, ValidationFailedException
 from infrastructure.persistence.db import crear_tablas
@@ -38,6 +38,7 @@ async def lifespan(app: FastAPI):
     try:
         yield
     finally:
+        await cerrar_servicio_sombra()
         await cerrar_publisher()
 
 

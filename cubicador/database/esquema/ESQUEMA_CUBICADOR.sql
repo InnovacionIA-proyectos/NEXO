@@ -218,6 +218,47 @@ CREATE TABLE [dbo_cubicador].[recomendacionVehiculoMercancia] (
 );
 GO
 
+-- --- Tabla 10: iaSombra ---------------------------------------------------------
+-- Diferencias entre el motor y el modelo de lenguaje en modo sombra: una fila por
+-- recomendacion comparada (o por intento que no se pudo comparar; Estado trae el
+-- codigo). Solo se agrega. No guarda lo que se envia al modelo. Script para una
+-- base existente: cubicador/database/esquema/367_ia_sombra.sql
+CREATE TABLE [dbo_cubicador].[iaSombra] (
+    [Id] nvarchar(36) NOT NULL,
+    [IdRecomendacion] nvarchar(36) NOT NULL,
+    [IdLineaSolicitud] nvarchar(100) NOT NULL,
+    [OrigenSistema] nvarchar(20) NOT NULL,
+    [Estado] nvarchar(40) NOT NULL,
+    [Modelo] nvarchar(100) NULL,
+    [Esfuerzo] nvarchar(10) NULL,
+    [ResultadoMotor] nvarchar(40) NOT NULL,
+    [ResultadoIa] nvarchar(40) NULL,
+    [MotivoMotor] nvarchar(40) NULL,
+    [MotivoIa] nvarchar(40) NULL,
+    [CantidadMotor] int NOT NULL,
+    [CantidadIa] int NULL,
+    [FlotaMotor] nvarchar(max) NOT NULL,
+    [FlotaIa] nvarchar(max) NULL,
+    [CoincideResultado] bit NULL,
+    [CoincideFlota] bit NULL,
+    [CoincideConfiguracion] bit NULL,
+    [IaRespetaPeso] bit NULL,
+    [IaRespetaVolumen] bit NULL,
+    [IaConservaUnidades] bit NULL,
+    [Violaciones] nvarchar(max) NULL,
+    [Explicacion] nvarchar(500) NULL,
+    [TokensEntrada] int NOT NULL CONSTRAINT [DF_iaSombra_TokensEntrada] DEFAULT (0),
+    [TokensSalida] int NOT NULL CONSTRAINT [DF_iaSombra_TokensSalida] DEFAULT (0),
+    [LatenciaIaMs] int NULL,
+    [CreatedAt] datetimeoffset NOT NULL CONSTRAINT [DF_iaSombra_CreatedAt] DEFAULT (sysdatetimeoffset())
+    , CONSTRAINT [PK_iaSombra] PRIMARY KEY ([Id])
+    , CONSTRAINT [CK_iaSombra_OrigenSistema] CHECK ([OrigenSistema] IN (N'NEXO', N'COTIFLY'))
+    , CONSTRAINT [CK_iaSombra_FlotaMotor] CHECK (ISJSON([FlotaMotor]) = 1)
+    , CONSTRAINT [CK_iaSombra_FlotaIa] CHECK ([FlotaIa] IS NULL OR ISJSON([FlotaIa]) = 1)
+    , CONSTRAINT [CK_iaSombra_Violaciones] CHECK ([Violaciones] IS NULL OR ISJSON([Violaciones]) = 1)
+);
+GO
+
 -- --- Llaves foráneas (después de crear las 9 tablas, en bloque) ----------------
 
 ALTER TABLE [dbo_cubicador].[tiposMercancia] ADD CONSTRAINT [FK_tiposMercancia_categoriaMercancia_IdCategoria]
@@ -254,4 +295,6 @@ CREATE INDEX [IX_tiposMercancia_IdCategoria] ON [dbo_cubicador].[tiposMercancia]
 CREATE INDEX [IX_relacionVehiculosCarroceria_IdCarroceria] ON [dbo_cubicador].[relacionVehiculosCarroceria] ([IdCarroceria]);
 CREATE INDEX [IX_recomendacionVehiculo_IdLineaSolicitud_OrigenSistema] ON [dbo_cubicador].[recomendacionVehiculo] ([IdLineaSolicitud], [OrigenSistema]);
 CREATE INDEX [IX_recomendacionVehiculoMercancia_IdRecomendacionVehiculo] ON [dbo_cubicador].[recomendacionVehiculoMercancia] ([IdRecomendacionVehiculo]);
+CREATE INDEX [IX_iaSombra_IdRecomendacion] ON [dbo_cubicador].[iaSombra] ([IdRecomendacion]);
+CREATE INDEX [IX_iaSombra_CreatedAt] ON [dbo_cubicador].[iaSombra] ([CreatedAt]) INCLUDE ([TokensEntrada], [TokensSalida]);
 GO

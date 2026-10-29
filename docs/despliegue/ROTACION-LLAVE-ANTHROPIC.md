@@ -5,7 +5,7 @@ Guía operativa de la llave con la que NEXO llama a Claude. Las decisiones de fo
 ## 1. Reglas
 
 - **La llave vive solo en variables de entorno de Dokploy.** Nunca en el repositorio, en `appsettings`, en el front ni en logs. Una prueba del repositorio (`clsSecretosEnElRepositorioTests`) falla si un archivo versionado contiene una llave con forma real o un valor para `Anthropic__ApiKey`.
-- **Una *workspace* y una llave por servicio** (`nexo-api` hoy; el Cubicador cuando use IA). El gasto se limita por *workspace*, así que sin una por servicio no se puede acotar ni revocar cada uno por separado.
+- **Una *workspace* y una llave por servicio** (`nexo-api` y `cubicador-api`). El gasto se limita por *workspace*, así que sin una por servicio no se puede acotar ni revocar cada uno por separado.
 - **GitHub Secrets: no se agrega.** El CI nunca llama a la API (el adaptador se prueba con un proveedor simulado) y el despliegue lo hace Dokploy con sus propias variables. Si más adelante un workflow bajo demanda (evaluación de prompts) necesita llamar al proveedor, se agrega entonces `ANTHROPIC_API_KEY` como secret de **ese** workflow, con su propio entorno protegido.
 
 ## 2. Estado verificado el 2026-10-27
@@ -36,7 +36,7 @@ Los hace quien administra la cuenta; no se pueden hacer desde el repositorio.
 | `Anthropic__LimiteTokensPorUsuarioDia` | `500000` | Tope de tokens por persona y por día (hora de Colombia). `0` lo desactiva. Al superarlo, `429 IA_TOPE_DIARIO`. |
 | `Anthropic__Model` | `claude-sonnet-5-5` | Configuración, no código. `claude-sonnet-5` y `claude-sonnet-4-6` también funcionan con esta cuenta. |
 | `Anthropic__Effort` | `high` | `low`, `medium`, `high`, `xhigh` o `max`. |
-| `Anthropic__Funciones__ImportacionExcel` / `AsistenteCotizacion` / `ApoyoCubicador` | `false` | Cada función se enciende por separado, solo cuando esté aprobada en el ADR. `ImportacionExcel` habilita la sugerencia de mapeo de columnas (`POST /api/captura-solicitudes/sugerir-mapeo`); con ella apagada ese endpoint sigue respondiendo con lo del diccionario del cliente. |
+| `Anthropic__Funciones__ImportacionExcel` / `AsistenteCotizacion` / `ApoyoCubicador` | `false` | Cada función se enciende por separado, solo cuando esté aprobada en el ADR. `ImportacionExcel` habilita la sugerencia de mapeo de columnas (`POST /api/captura-solicitudes/sugerir-mapeo`) y la normalización de textos libres (`POST /api/captura-solicitudes/normalizar-valores`); con ella apagada esos endpoints siguen respondiendo con lo que resuelven las reglas (diccionario del cliente, alias, catálogos y DANE). |
 
 Las demás (`RazonamientoAdaptativo`, `TimeoutSegundos`, `MaxReintentos`, `MaxTokensSalida`) tienen valores por defecto y solo se agregan para cambiarlos. Un cambio de variables exige redesplegar la app.
 
@@ -86,3 +86,23 @@ Rutinaria (sugerido cada 90 días) y de inmediato si la llave pudo exponerse.
 3. Crear y configurar la llave nueva (§3 y §4).
 4. Revisar el uso del período en la consola y en NEXO (`GET /api/ia/uso/gasto`, solo Admin, y la tabla `tbl_ia_uso` por usuario y función) para ver qué función y qué usuario la consumieron.
 5. Si la llave estuvo en un archivo versionado, retirarla del historial y tratarla como comprometida aunque ya se haya revocado.
+
+## 7. Cubicador: modo sombra (llave y límite propios)
+
+El servicio Python del Cubicador usa su **propia llave, en su propia *workspace*** (por ejemplo `cubicador-api`), con su propio límite de gasto mensual: no se reutiliza la de NEXO, así que se puede revocar, rotar y acotar por separado. Los pasos 1 a 4 de §3 se repiten para esa *workspace*.
+
+En Dokploy, app `cubicador-api` (pestaña Environment). Nada de esto va al repositorio ni a la imagen:
+
+| Variable | Valor | Nota |
+|---|---|---|
+| `IA_SOMBRA_HABILITADA` | `false` | **Interruptor de apagado.** Con `true` y una llave, cada `POST /recomendaciones` agenda una comparación con Claude en segundo plano. Nace apagado. |
+| `ANTHROPIC_API_KEY` | la llave de la *workspace* del Cubicador | Secreto. Vacía = la función no hace nada y no se toca la red. |
+| `ANTHROPIC_WORKSPACE_ID` | `wrkspc_…` | Solo si la llave es de organización. |
+| `ANTHROPIC_MODEL` / `ANTHROPIC_EFFORT` | `claude-sonnet-5-5` / `high` | Configuración, no código. |
+| `IA_SOMBRA_MUESTREO` | `1.0` | Fracción de recomendaciones que se comparan (0 a 1): sirve para acotar el gasto sin apagarla. |
+| `IA_SOMBRA_TOPE_TOKENS_DIA` | `1000000` | Tope de tokens (entrada + salida) por día, hora de Colombia; al alcanzarlo no se compara hasta el día siguiente. `0` lo desactiva. Va **además** del límite mensual de la *workspace*, que es el que de verdad corta el gasto. |
+| `IA_SOMBRA_TIMEOUT_SEGUNDOS`, `IA_SOMBRA_MAX_CONCURRENTES`, `IA_SOMBRA_MAX_PENDIENTES`, `IA_SOMBRA_MAX_TOKENS_SALIDA` | `60`, `2`, `20`, `4096` | Solo para cambiarlos. Con más comparaciones esperando que `MAX_PENDIENTES`, las nuevas se descartan: la API nunca se encola detrás del modelo. |
+
+**Antes de encenderlo** hay que aplicar `cubicador/database/esquema/367_ia_sombra.sql` (tabla `dbo_cubicador.iaSombra`). Cada comparación, o intento que falla, deja una fila con el motivo en `Estado`; el contenido enviado al modelo no se guarda.
+
+**Apagarlo** es poner `IA_SOMBRA_HABILITADA=false` (o vaciar la llave) y redesplegar `cubicador-api`; la respuesta al usuario es la misma encendido o apagado. **Verificar la salida** a `api.anthropic.com` desde el contenedor con §5a y §5b (la imagen del Cubicador no trae `curl`: usar `python -c` con `httpx`, o probar desde el contenedor de NEXO que sí lo trae).

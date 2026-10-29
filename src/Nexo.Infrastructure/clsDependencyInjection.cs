@@ -3,6 +3,7 @@ using Nexo.Application.CasosDeUso.Biblioteca.Interfaces;
 using Nexo.Application.CasosDeUso.BibliotecaSapHistorico.Interfaces;
 using Nexo.Application.CasosDeUso.Catalogos.Interfaces;
 using Nexo.Application.CasosDeUso.DiccionarioCliente.Interfaces;
+using Nexo.Application.CasosDeUso.PlantillasMapeo.Interfaces;
 using Nexo.Application.CasosDeUso.Costeo.Interfaces;
 using Nexo.Application.CasosDeUso.Cotizaciones.Interfaces;
 using Nexo.Application.CasosDeUso.Cubicacion.Interfaces;
@@ -237,6 +238,8 @@ public static class clsDependencyInjection
 
         // Biblioteca: tarifario SAP TM + propuesta de tarifa (cierra el bloqueo de
         // "Aplicar propuestas" en Cotizaciones) + matriz SICE-TAC de solo lectura.
+        // El mapeo de vehículos se lee con su propio alcance de base de datos: lo consultan costeos en paralelo.
+        services.AddSingleton<IMapeoVehiculoTarifarioPort, clsMapeoVehiculoTarifarioAdapter>();
         services.AddScoped<ITarifarioSapPort, clsTarifarioSapAdapter>();
         services.AddScoped<IPropuestaTarifaPort, clsPropuestaTarifaAdapter>();
 
@@ -277,6 +280,7 @@ public static class clsDependencyInjection
         services.AddScoped<IConfiguracionesVehiculoPort, clsEfConfiguracionesVehiculoRepository>();
         services.AddScoped<IAliasCatalogoPort, clsEfAliasCatalogoRepository>();
         services.AddScoped<IDiccionarioClienteRepository, clsEfDiccionarioClienteRepository>();
+        services.AddScoped<IPlantillasMapeoRepository, clsEfPlantillasMapeoRepository>();
         services.AddScoped<IClientesPort, clsEfClientesRepository>();
         services.AddScoped<IClientesDwPort, clsClientesDwAdapter>();
         services.AddScoped<IProspectosDwPort, clsProspectosDwAdapter>();

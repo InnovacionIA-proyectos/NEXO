@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Nexo.Application.CasosDeUso.DiccionarioCliente.Interfaces;
+using Nexo.Application.CasosDeUso.PlantillasMapeo.Interfaces;
 using Nexo.Application.CasosDeUso.MapeoExcel;
 using Nexo.Application.CasosDeUso.Solicitudes;
 using Nexo.Application.Common;
@@ -22,6 +23,7 @@ public class clsSugerirMapeoExcelTests
     private readonly Mock<IAsistenteIaPort> _ia = new();
     private readonly Mock<IDiccionarioClienteRepository> _dic = new();
     private readonly Mock<ICurrentUserPort> _usuario = new();
+    private readonly Mock<IPlantillasMapeoRepository> _plantillas = new();
     private clsPeticionIa? _enviada;
 
     public clsSugerirMapeoExcelTests()
@@ -32,7 +34,7 @@ public class clsSugerirMapeoExcelTests
             .ReturnsAsync([]);
     }
 
-    private clsSugerirMapeoExcelQueryHandler Manejador() => new(_ia.Object, _dic.Object, _usuario.Object);
+    private clsSugerirMapeoExcelQueryHandler Manejador() => new(_ia.Object, _dic.Object, _usuario.Object, _plantillas.Object);
 
     private static clsTerminoCliente Termino(string texto, string campo, Guid? cliente = null) => new()
     {
@@ -254,6 +256,20 @@ public class clsSugerirMapeoExcelTests
         var r = await Manejador().Handle(Consulta(["Origen", "Ruta completa"]));
 
         Assert.Equal(("ignorar", "ninguna"), (r.Columnas[1].Campo, r.Columnas[1].Transformacion));
+    }
+
+    [Fact]
+    public async Task Una_conversion_que_no_corresponde_al_campo_se_descarta_y_la_fecha_limite_es_un_campo()
+    {
+        IaResponde(Json(
+            Col(0, "origen", "peso_toneladas_a_kg"), Col(1, "referencia", "numero_coma_decimal"), Col(2, "peso", "dividir_origen_destino"),
+            Col(3, "peso", "peso_toneladas_a_kg"), Col(4, "deadline", "fecha"), Col(5, "origen", "dividir_origen_destino")));
+
+        var r = await Manejador().Handle(Consulta(["A", "B", "C", "D", "E", "F"]));
+
+        Assert.Equal(
+            [("origen", "ninguna"), ("referencia", "ninguna"), ("peso", "ninguna"), ("peso", "peso_toneladas_a_kg"), ("deadline", "fecha"), ("origen", "dividir_origen_destino")],
+            r.Columnas.Select(c => (c.Campo, c.Transformacion)));
     }
 
     [Fact]
