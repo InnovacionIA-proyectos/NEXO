@@ -23,14 +23,44 @@
 -- para los catálogos que hay que poblar con datos ya calculados (tampoco por
 -- migración).
 --
--- Orden: 1) tablas agrupadas por módulo de negocio, cada una con un comentario
--- corto de su objetivo; 2) llaves foráneas; 3) índices; 4) triggers. Las FK
--- van aparte porque varias tablas se referencian cruzado (p. ej.
--- tbl_cotizaciones <-> tbl_tarifas_historicas) y así el orden de creación de
--- las tablas no importa. Los triggers van al final porque necesitan que sus
--- tablas ya existan (SQL Server exige que `CREATE TRIGGER` sea la única
--- sentencia de su lote — por eso llevan `GO` antes y después).
+-- Orden: 0) el esquema db_NEXO, si no existe; 1) tablas agrupadas por módulo de
+-- negocio, cada una con un comentario corto de su objetivo; 2) índices;
+-- 3) llaves foráneas; 4) triggers. Las FK van aparte porque varias tablas se
+-- referencian cruzado (p. ej. tbl_cotizaciones <-> tbl_tarifas_historicas) y así
+-- el orden de creación de las tablas no importa. Los índices van ANTES que las
+-- FK porque algunas FK apuntan a un índice único y no a la llave primaria
+-- (OutboxMessage -> InboxState(MessageId, ConsumerId), tbl_rangos_peso_contenedor
+-- -> tbl_mapeo_vehiculo_tarifario(TipoVehiculo)): SQL Server exige que ese
+-- índice ya exista. Los triggers van al final porque necesitan que sus tablas ya
+-- existan (SQL Server exige que `CREATE TRIGGER` sea la única sentencia de su
+-- lote — por eso llevan `GO` antes y después).
+--
+-- Verificado contra la base de pruebas (dbInformesAutomatizados_Pruebas.db_NEXO,
+-- SQL Server 2019, nivel de compatibilidad 130, collation Modern_Spanish_CI_AS)
+-- el 2026-10-27: corrido completo en una base vacía, crea las mismas tablas,
+-- columnas, defaults, índices, llaves foráneas, CHECK y trigger. No incluye lo que
+-- en esa base es resto y no debe recrearse: tbl_tarifas_sicetac (retirada, ver
+-- sección Biblioteca de tarifas) y las copias de respaldo *_bak_AAAAMMDD y
+-- __EFMigrationsHistory_backup_AAAAMMDD.
+-- Diferencia conocida: la base de pruebas NO tiene 8 de las llaves foráneas de este
+-- archivo (OutboxMessage -> InboxState y -> OutboxState, tbl_planes_cargue ->
+-- tbl_vehiculos_cubicacion, tbl_solicitudes -> tbl_clientes y -> tbl_usuarios, y las 3
+-- de tbl_tarifas_historicas). Este archivo las conserva porque el modelo del backend
+-- (clsNexoDbContext) las declara; lo que falta corregir es esa base (ver
+-- docs/backlog/2026-10-27_PENDIENTES-MAPEO-VEHICULO.md).
 -- =============================================================================
+
+-- =============================================================================
+-- 0. ESQUEMA
+-- =============================================================================
+-- En una base nueva el esquema todavía no existe. Si Database__Esquema tiene otro
+-- nombre, reemplazar db_NEXO aquí y en todo el archivo.
+-- Los índices filtrados (WHERE ...) exigen estas opciones. DBeaver y SSMS las traen
+-- activas, sqlcmd no: se fijan aquí para que el resultado no dependa de la herramienta.
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+IF SCHEMA_ID(N'db_NEXO') IS NULL EXEC(N'CREATE SCHEMA [db_NEXO]');
+GO
 
 -- =============================================================================
 -- 1. TABLAS
@@ -88,12 +118,12 @@ CREATE TABLE [db_NEXO].[tbl_rutas] (
     [Id] uniqueidentifier NOT NULL,
     [Origen] nvarchar(150) NOT NULL,
     [Destino] nvarchar(150) NOT NULL,
+    [CreatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset()),
+    [UpdatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset()),
     -- S5-HU-16.1/#254: código DANE real del Origen/Destino (FK a tbl_municipios), NULL en
     -- rutas creadas antes de esta issue o cuyo texto no resolvió contra el catálogo.
     [OrigenMunicipioId] int NULL,
-    [DestinoMunicipioId] int NULL,
-    [CreatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset()),
-    [UpdatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset())
+    [DestinoMunicipioId] int NULL
     , CONSTRAINT [PK_rutas] PRIMARY KEY ([Id])
 );
 
@@ -106,7 +136,7 @@ CREATE TABLE [db_NEXO].[tbl_configuraciones_vehiculo] (
     [CreatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset()),
     [UpdatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset()),
     [EsCatalogoOficial] bit NOT NULL DEFAULT (CONVERT([bit],(0))), -- S5-HU-18.4/#276: fila que calza con un código canónico del Cubicador
-    [Descartada] bit NOT NULL DEFAULT (CONVERT([bit],(0))) -- S6-HU-27.3/#322: fila en cuarentena que un humano descartó en la bandeja de normalización (sale de la bandeja, no se borra)
+    [Descartada] bit NOT NULL CONSTRAINT [DF_configuraciones_vehiculo_Descartada] DEFAULT ((0)) -- S6-HU-27.3/#322: fila en cuarentena que un humano descartó en la bandeja de normalización (sale de la bandeja, no se borra)
     , CONSTRAINT [PK_configuraciones_vehiculo] PRIMARY KEY ([Id])
 );
 
@@ -152,6 +182,57 @@ CREATE TABLE [db_NEXO].[tbl_diccionario_cliente] (
         ([Tipo] = N'valor' AND [Contexto] IS NOT NULL) OR ([Tipo] <> N'valor' AND [Contexto] IS NULL))
 );
 
+-- Mapeo de columnas ya confirmado para un formato de Excel de un cliente. Se reconoce por FirmaEncabezados (SHA-256 de los
+-- encabezados normalizados y en orden); si llega un Excel con la misma firma se aplica la plantilla sin llamar a la IA.
+-- Encabezados y Columnas son JSON. Complementa a tbl_diccionario_cliente (vocabulario término por término, pista para la IA
+-- cuando no hay plantilla). Script para una base existente: docs/Database/361_plantillas_mapeo_cliente.sql.
+CREATE TABLE [db_NEXO].[tbl_plantillas_mapeo_cliente] (
+    [Id] uniqueidentifier NOT NULL,
+    [ClienteId] uniqueidentifier NOT NULL,
+    [Nombre] nvarchar(100) NULL,
+    [FirmaEncabezados] nvarchar(64) NOT NULL,
+    [Encabezados] nvarchar(max) NOT NULL,
+    [Columnas] nvarchar(max) NOT NULL,
+    [CreatedAt] datetimeoffset NOT NULL CONSTRAINT [DF_plantillas_mapeo_cliente_CreatedAt] DEFAULT (sysdatetimeoffset()),
+    [UpdatedAt] datetimeoffset NULL
+    , CONSTRAINT [PK_plantillas_mapeo_cliente] PRIMARY KEY ([Id])
+    , CONSTRAINT [CK_plantillas_mapeo_cliente_Encabezados] CHECK (ISJSON([Encabezados]) = 1)
+    , CONSTRAINT [CK_plantillas_mapeo_cliente_Columnas] CHECK (ISJSON([Columnas]) = 1)
+);
+
+-- Código de cada tipo de vehículo en SICE-TAC (CONFIGURACION de tblRutasSicetac) y en Plaza/SAP (el mismo para tblSAPTarifas
+-- y tbl_tarifas_plaza). Global, no por cliente. Parte del TipoVehiculo ya resuelto por tbl_alias_elementos. CodigoPlazaSap NULL
+-- = sin tarifa de plaza. Script con la carga inicial: docs/Database/377_mapeo_vehiculo_tarifario.sql.
+CREATE TABLE [db_NEXO].[tbl_mapeo_vehiculo_tarifario] (
+    [Id] uniqueidentifier NOT NULL,
+    [TipoVehiculo] nvarchar(20) NOT NULL,
+    [CodigoSicetac] nvarchar(20) NOT NULL,
+    [NombreSicetac] nvarchar(200) NULL,
+    [CodigoPlazaSap] nvarchar(20) NULL,
+    [NombreTarifasPlaza] nvarchar(100) NULL,
+    [Verificacion] nvarchar(500) NULL,
+    [Activo] bit NOT NULL CONSTRAINT [DF_mapeo_vehiculo_tarifario_Activo] DEFAULT (1),
+    [CreatedAt] datetimeoffset NOT NULL CONSTRAINT [DF_mapeo_vehiculo_tarifario_CreatedAt] DEFAULT (sysdatetimeoffset()),
+    [UpdatedAt] datetimeoffset NULL
+    , CONSTRAINT [PK_mapeo_vehiculo_tarifario] PRIMARY KEY ([Id])
+);
+
+-- Qué vehículo lleva un contenedor de 20 o 40 pies según su peso. TipoVehiculo es el código de NEXO, el mismo de
+-- tbl_mapeo_vehiculo_tarifario (llave foránea hacia su índice único). Se escoge
+-- la fila de menor PesoMaximo que alcance para el peso. Script con la carga inicial: docs/Database/379_rangos_peso_contenedor.sql.
+CREATE TABLE [db_NEXO].[tbl_rangos_peso_contenedor] (
+    [Id] uniqueidentifier NOT NULL,
+    [Contenedor] int NOT NULL,
+    [TipoVehiculo] nvarchar(20) NOT NULL,
+    [PesoMaximo] int NOT NULL,
+    [Activo] bit NOT NULL CONSTRAINT [DF_rangos_peso_contenedor_Activo] DEFAULT (1),
+    [CreatedAt] datetimeoffset NOT NULL CONSTRAINT [DF_rangos_peso_contenedor_CreatedAt] DEFAULT (sysdatetimeoffset()),
+    [UpdatedAt] datetimeoffset NULL
+    , CONSTRAINT [PK_rangos_peso_contenedor] PRIMARY KEY ([Id])
+    , CONSTRAINT [CK_rangos_peso_contenedor_Contenedor] CHECK ([Contenedor] IN (20, 40))
+    , CONSTRAINT [CK_rangos_peso_contenedor_PesoMaximo] CHECK ([PesoMaximo] > 0)
+);
+
 -- Catálogo propio de municipios (Colombia/Venezuela/Ecuador) para el
 -- desplegable de Origen/Destino en Captura de Solicitudes (S4-HU-09.1).
 -- Poblada UNA SOLA VEZ desde tblSAPDANE/tblZonasTarificacionRelacion/
@@ -167,7 +248,7 @@ CREATE TABLE [db_NEXO].[tbl_municipios] (
     [Pais] nvarchar(2) NOT NULL,
     [NombreTarifasPlaza] nvarchar(60) NULL,
     [ZonaTarificacion] nvarchar(60) NULL
-    , CONSTRAINT [PK_municipios] PRIMARY KEY ([Id])
+    , CONSTRAINT [PK_tbl_municipios] PRIMARY KEY ([Id])
 );
 
 -- Catálogo CRUD propio de bandas de peso (kg) para el formulario de Tarifas de
@@ -180,7 +261,7 @@ CREATE TABLE [db_NEXO].[tbl_pesos] (
     [Id] int NOT NULL IDENTITY,
     [PesoMinimo] int NOT NULL,
     [PesoMaximo] int NULL
-    , CONSTRAINT [PK_pesos] PRIMARY KEY ([Id])
+    , CONSTRAINT [PK_tbl_pesos] PRIMARY KEY ([Id])
 );
 
 -- Dimensiones/capacidad físicas reales de un vehículo, para el Plan de Cargue
@@ -392,13 +473,13 @@ CREATE TABLE [db_NEXO].[tbl_cotizaciones] (
     [Estado] nvarchar(20) NOT NULL DEFAULT (N'Borrador'),
     [Resultado] nvarchar(20) NOT NULL DEFAULT (N'SinDefinir'),
     [Total] decimal(18,2) NOT NULL DEFAULT ((0.0)),
-    [EsAutoCosteo] bit NOT NULL DEFAULT ((0)), -- S4-HU-15.6/#252: auto-costeada nunca pasa por /entregar
     [EntregadaPor] uniqueidentifier NULL,
     [EntregadaAt] datetimeoffset NULL,
-    [ModificadaTrasEntregaAt] datetimeoffset NULL, -- S5-HU-20.1/#286: último cambio de conexos tras entregar; NO mueve Estado ni EntregadaAt (SLA/métricas)
     [CreatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset()),
     [UpdatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset()),
-    [RowVersion] timestamp NULL
+    [RowVersion] timestamp NULL,
+    [EsAutoCosteo] bit NOT NULL CONSTRAINT [DF_cotizaciones_EsAutoCosteo] DEFAULT ((0)), -- S4-HU-15.6/#252: auto-costeada nunca pasa por /entregar
+    [ModificadaTrasEntregaAt] datetimeoffset NULL -- S5-HU-20.1/#286: último cambio de conexos tras entregar; NO mueve Estado ni EntregadaAt (SLA/métricas)
     , CONSTRAINT [PK_cotizaciones] PRIMARY KEY ([Id])
 );
 
@@ -422,16 +503,16 @@ CREATE TABLE [db_NEXO].[tbl_cotizacion_lineas] (
 CREATE TABLE [db_NEXO].[tbl_cotizacion_conexos] (
     [Id] uniqueidentifier NOT NULL,
     [CotizacionId] uniqueidentifier NOT NULL,
-    [CotizacionLineaId] uniqueidentifier NOT NULL, -- S4-HU-15.4/#250: conexo ligado a UNA línea, ya no "general"
     [ServicioConexoId] uniqueidentifier NULL,
     [Cantidad] decimal(12,2) NOT NULL,
     [ValorAplicado] decimal(18,2) NOT NULL,
+    [CreatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset()),
+    [UpdatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset()),
+    [CotizacionLineaId] uniqueidentifier NOT NULL, -- S4-HU-15.4/#250: conexo ligado a UNA línea, ya no "general"
     -- S5-HU-18/#262: 'individual' | 'general' — trazabilidad de si el usuario lo agregó a
     -- esta línea puntual o pidió agregarlo a todas las líneas de una sola vez (que de
     -- todas formas crea una fila por línea, cada una CON su CotizacionLineaId).
-    [Origen] nvarchar(20) NOT NULL DEFAULT (N'individual'),
-    [CreatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset()),
-    [UpdatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset())
+    [Origen] nvarchar(20) NOT NULL CONSTRAINT [DF_cotizacion_conexos_Origen] DEFAULT (N'individual')
     , CONSTRAINT [PK_cotizacion_conexos] PRIMARY KEY ([Id])
 );
 
@@ -611,11 +692,11 @@ CREATE TABLE [db_NEXO].[tbl_planes_cargue] (
     [UtilizacionPiso] decimal(6,2) NOT NULL,
     [Puntaje] decimal(6,2) NOT NULL,
     [IncidenciasJson] nvarchar(max) NOT NULL,
-    [MetricasJson] nvarchar(max) NULL,
     [CreatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset()),
     [UpdatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset()),
     [LineaSolicitudId] uniqueidentifier NULL,
-    [NumeroVehiculo] int NOT NULL DEFAULT ((0))
+    [NumeroVehiculo] int NOT NULL DEFAULT ((0)),
+    [MetricasJson] nvarchar(max) NULL
     , CONSTRAINT [PK_planes_cargue] PRIMARY KEY ([Id])
 );
 
@@ -867,55 +948,7 @@ CREATE TABLE [db_NEXO].[__EFMigrationsHistory] (
 );
 
 -- =============================================================================
--- 2. LLAVES FORÁNEAS
--- =============================================================================
--- Todas se agregan después de crear las tablas para no depender del orden de
--- creación (hay referencias cruzadas, p. ej. tbl_cotizaciones <-> tbl_tarifas_historicas).
-
-ALTER TABLE [db_NEXO].[tbl_audit_log] ADD CONSTRAINT [FK_audit_log_usuarios_UsuarioId] FOREIGN KEY ([UsuarioId]) REFERENCES [db_NEXO].[tbl_usuarios] ([Id]);
-ALTER TABLE [db_NEXO].[tbl_ia_uso] ADD CONSTRAINT [FK_ia_uso_usuarios_UsuarioId] FOREIGN KEY ([UsuarioId]) REFERENCES [db_NEXO].[tbl_usuarios] ([Id]);
-ALTER TABLE [db_NEXO].[tbl_asistente_conversaciones] ADD CONSTRAINT [FK_asistente_conversaciones_usuarios_UsuarioId] FOREIGN KEY ([UsuarioId]) REFERENCES [db_NEXO].[tbl_usuarios] ([Id]);
-ALTER TABLE [db_NEXO].[tbl_asistente_mensajes] ADD CONSTRAINT [FK_asistente_mensajes_conversaciones_ConversacionId] FOREIGN KEY ([ConversacionId]) REFERENCES [db_NEXO].[tbl_asistente_conversaciones] ([Id]);
-ALTER TABLE [db_NEXO].[tbl_asistente_herramientas_uso] ADD CONSTRAINT [FK_asistente_herramientas_uso_conversaciones_ConversacionId] FOREIGN KEY ([ConversacionId]) REFERENCES [db_NEXO].[tbl_asistente_conversaciones] ([Id]);
-ALTER TABLE [db_NEXO].[tbl_asistente_herramientas_uso] ADD CONSTRAINT [FK_asistente_herramientas_uso_mensajes_MensajeId] FOREIGN KEY ([MensajeId]) REFERENCES [db_NEXO].[tbl_asistente_mensajes] ([Id]);
-ALTER TABLE [db_NEXO].[tbl_asistente_acciones] ADD CONSTRAINT [FK_asistente_acciones_conversaciones_ConversacionId] FOREIGN KEY ([ConversacionId]) REFERENCES [db_NEXO].[tbl_asistente_conversaciones] ([Id]);
-ALTER TABLE [db_NEXO].[tbl_asistente_acciones] ADD CONSTRAINT [FK_asistente_acciones_mensajes_MensajeId] FOREIGN KEY ([MensajeId]) REFERENCES [db_NEXO].[tbl_asistente_mensajes] ([Id]);
-ALTER TABLE [db_NEXO].[tbl_asistente_acciones] ADD CONSTRAINT [FK_asistente_acciones_usuarios_UsuarioId] FOREIGN KEY ([UsuarioId]) REFERENCES [db_NEXO].[tbl_usuarios] ([Id]);
-ALTER TABLE [db_NEXO].[tbl_colocaciones_cargue] ADD CONSTRAINT [FK_colocaciones_cargue_items_plan_cargue_ItemPlanCargueId] FOREIGN KEY ([ItemPlanCargueId]) REFERENCES [db_NEXO].[tbl_items_plan_cargue] ([Id]);
-ALTER TABLE [db_NEXO].[tbl_colocaciones_cargue] ADD CONSTRAINT [FK_colocaciones_cargue_planes_cargue_PlanCargueId] FOREIGN KEY ([PlanCargueId]) REFERENCES [db_NEXO].[tbl_planes_cargue] ([Id]) ON DELETE CASCADE;
-ALTER TABLE [db_NEXO].[tbl_cotizacion_conexos] ADD CONSTRAINT [FK_cotizacion_conexos_cotizaciones_CotizacionId] FOREIGN KEY ([CotizacionId]) REFERENCES [db_NEXO].[tbl_cotizaciones] ([Id]) ON DELETE CASCADE;
-ALTER TABLE [db_NEXO].[tbl_cotizacion_conexos] ADD CONSTRAINT [FK_cotizacion_conexos_servicios_conexos_ServicioConexoId] FOREIGN KEY ([ServicioConexoId]) REFERENCES [db_NEXO].[tbl_servicios_conexos] ([Id]);
--- NO CASCADE: clsCotizacion ya cascadea directo hacia Conexos (constraint de arriba) —
--- un segundo camino Cotizacion->Lineas->Conexos en cascada violaría "multiple cascade paths".
-ALTER TABLE [db_NEXO].[tbl_cotizacion_conexos] ADD CONSTRAINT [FK_cotizacion_conexos_cotizacion_lineas_CotizacionLineaId] FOREIGN KEY ([CotizacionLineaId]) REFERENCES [db_NEXO].[tbl_cotizacion_lineas] ([Id]);
-ALTER TABLE [db_NEXO].[tbl_cotizacion_lineas] ADD CONSTRAINT [FK_cotizacion_lineas_cotizaciones_CotizacionId] FOREIGN KEY ([CotizacionId]) REFERENCES [db_NEXO].[tbl_cotizaciones] ([Id]) ON DELETE CASCADE;
-ALTER TABLE [db_NEXO].[tbl_cotizacion_lineas] ADD CONSTRAINT [FK_cotizacion_lineas_lineas_solicitud_LineaSolicitudId] FOREIGN KEY ([LineaSolicitudId]) REFERENCES [db_NEXO].[tbl_lineas_solicitud] ([Id]);
-ALTER TABLE [db_NEXO].[tbl_cotizaciones] ADD CONSTRAINT [FK_cotizaciones_solicitudes_SolicitudId] FOREIGN KEY ([SolicitudId]) REFERENCES [db_NEXO].[tbl_solicitudes] ([Id]);
-ALTER TABLE [db_NEXO].[tbl_cotizaciones] ADD CONSTRAINT [FK_cotizaciones_usuarios_EntregadaPor] FOREIGN KEY ([EntregadaPor]) REFERENCES [db_NEXO].[tbl_usuarios] ([Id]);
-ALTER TABLE [db_NEXO].[tbl_items_plan_cargue] ADD CONSTRAINT [FK_items_plan_cargue_planes_cargue_PlanCargueId] FOREIGN KEY ([PlanCargueId]) REFERENCES [db_NEXO].[tbl_planes_cargue] ([Id]) ON DELETE CASCADE;
-ALTER TABLE [db_NEXO].[tbl_rechazos_cubicacion_linea] ADD CONSTRAINT [FK_rechazos_cubicacion_linea_lineas_solicitud_LineaSolicitudId] FOREIGN KEY ([LineaSolicitudId]) REFERENCES [db_NEXO].[tbl_lineas_solicitud] ([Id]) ON DELETE CASCADE;
-ALTER TABLE [db_NEXO].[tbl_lineas_solicitud] ADD CONSTRAINT [FK_lineas_solicitud_configuraciones_vehiculo_ConfigVehiculoId] FOREIGN KEY ([ConfigVehiculoId]) REFERENCES [db_NEXO].[tbl_configuraciones_vehiculo] ([Id]);
-ALTER TABLE [db_NEXO].[tbl_lineas_solicitud] ADD CONSTRAINT [FK_lineas_solicitud_rutas_RutaId] FOREIGN KEY ([RutaId]) REFERENCES [db_NEXO].[tbl_rutas] ([Id]);
-ALTER TABLE [db_NEXO].[tbl_rutas] ADD CONSTRAINT [FK_rutas_municipios_OrigenMunicipioId] FOREIGN KEY ([OrigenMunicipioId]) REFERENCES [db_NEXO].[tbl_municipios] ([Id]);
-ALTER TABLE [db_NEXO].[tbl_rutas] ADD CONSTRAINT [FK_rutas_municipios_DestinoMunicipioId] FOREIGN KEY ([DestinoMunicipioId]) REFERENCES [db_NEXO].[tbl_municipios] ([Id]);
-ALTER TABLE [db_NEXO].[tbl_lineas_solicitud] ADD CONSTRAINT [FK_lineas_solicitud_solicitudes_SolicitudId] FOREIGN KEY ([SolicitudId]) REFERENCES [db_NEXO].[tbl_solicitudes] ([Id]) ON DELETE CASCADE;
-ALTER TABLE [db_NEXO].[OutboxMessage] ADD CONSTRAINT [FK_OutboxMessage_InboxState_InboxMessageId_InboxConsumerId] FOREIGN KEY ([InboxMessageId], [InboxConsumerId]) REFERENCES [db_NEXO].[InboxState] ([MessageId], [ConsumerId]);
-ALTER TABLE [db_NEXO].[OutboxMessage] ADD CONSTRAINT [FK_OutboxMessage_OutboxState_OutboxId] FOREIGN KEY ([OutboxId]) REFERENCES [db_NEXO].[OutboxState] ([OutboxId]);
-ALTER TABLE [db_NEXO].[tbl_planes_cargue] ADD CONSTRAINT [FK_planes_cargue_vehiculos_cubicacion_VehiculoId] FOREIGN KEY ([VehiculoId]) REFERENCES [db_NEXO].[tbl_vehiculos_cubicacion] ([Id]);
-ALTER TABLE [db_NEXO].[tbl_servicios_conexos] ADD CONSTRAINT [FK_servicios_conexos_usuarios_ActualizadoPor] FOREIGN KEY ([ActualizadoPor]) REFERENCES [db_NEXO].[tbl_usuarios] ([Id]);
-ALTER TABLE [db_NEXO].[tbl_solicitudes] ADD CONSTRAINT [FK_solicitudes_clientes_ClienteId] FOREIGN KEY ([ClienteId]) REFERENCES [db_NEXO].[tbl_clientes] ([Id]);
-ALTER TABLE [db_NEXO].[tbl_diccionario_cliente] ADD CONSTRAINT [FK_diccionario_cliente_clientes_ClienteId] FOREIGN KEY ([ClienteId]) REFERENCES [db_NEXO].[tbl_clientes] ([Id]);
-ALTER TABLE [db_NEXO].[tbl_solicitudes] ADD CONSTRAINT [FK_solicitudes_usuarios_CreadoPor] FOREIGN KEY ([CreadoPor]) REFERENCES [db_NEXO].[tbl_usuarios] ([Id]);
-ALTER TABLE [db_NEXO].[tbl_tarifas_historicas] ADD CONSTRAINT [FK_tarifas_historicas_configuraciones_vehiculo_ConfigVehiculoId] FOREIGN KEY ([ConfigVehiculoId]) REFERENCES [db_NEXO].[tbl_configuraciones_vehiculo] ([Id]);
-ALTER TABLE [db_NEXO].[tbl_tarifas_historicas] ADD CONSTRAINT [FK_tarifas_historicas_cotizaciones_CotizacionId] FOREIGN KEY ([CotizacionId]) REFERENCES [db_NEXO].[tbl_cotizaciones] ([Id]);
-ALTER TABLE [db_NEXO].[tbl_tarifas_historicas] ADD CONSTRAINT [FK_tarifas_historicas_rutas_RutaId] FOREIGN KEY ([RutaId]) REFERENCES [db_NEXO].[tbl_rutas] ([Id]);
-ALTER TABLE [db_NEXO].[tbl_tarifas_plaza] ADD CONSTRAINT [FK_tarifas_plaza_municipios_OrigenMunicipioId] FOREIGN KEY ([OrigenMunicipioId]) REFERENCES [db_NEXO].[tbl_municipios] ([Id]);
-ALTER TABLE [db_NEXO].[tbl_tarifas_plaza] ADD CONSTRAINT [FK_tarifas_plaza_municipios_DestinoMunicipioId] FOREIGN KEY ([DestinoMunicipioId]) REFERENCES [db_NEXO].[tbl_municipios] ([Id]);
-ALTER TABLE [db_NEXO].[tbl_tarifas_plaza] ADD CONSTRAINT [FK_tarifas_plaza_pesos_PesoId] FOREIGN KEY ([PesoId]) REFERENCES [db_NEXO].[tbl_pesos] ([Id]);
-ALTER TABLE [db_NEXO].[tbl_tarifas_plaza_historico] ADD CONSTRAINT [FK_tarifas_plaza_historico_tarifas_plaza_TarifaPlazaId] FOREIGN KEY ([TarifaPlazaId]) REFERENCES [db_NEXO].[tbl_tarifas_plaza] ([Id]) ON DELETE CASCADE;
-
--- =============================================================================
--- 3. ÍNDICES
+-- 2. ÍNDICES
 -- =============================================================================
 -- Únicos: reglas de negocio (NIT de cliente, ruta origen+destino, email de
 -- usuario, etc.). El resto son de rendimiento, sobre las columnas por las que
@@ -927,6 +960,9 @@ CREATE INDEX [IX_audit_log_UsuarioId] ON [db_NEXO].[tbl_audit_log] ([UsuarioId])
 CREATE UNIQUE INDEX [IX_clientes_Nit] ON [db_NEXO].[tbl_clientes] ([Nit]);
 CREATE UNIQUE INDEX [IX_diccionario_cliente_Unico] ON [db_NEXO].[tbl_diccionario_cliente] ([ClienteId], [TerminoNormalizado], [Tipo], [Contexto]);
 CREATE INDEX [IX_diccionario_cliente_ClienteId_Tipo] ON [db_NEXO].[tbl_diccionario_cliente] ([ClienteId], [Tipo]);
+CREATE UNIQUE INDEX [IX_mapeo_vehiculo_tarifario_TipoVehiculo] ON [db_NEXO].[tbl_mapeo_vehiculo_tarifario] ([TipoVehiculo]);
+CREATE UNIQUE INDEX [IX_plantillas_mapeo_cliente_Firma] ON [db_NEXO].[tbl_plantillas_mapeo_cliente] ([ClienteId], [FirmaEncabezados]);
+CREATE UNIQUE INDEX [IX_rangos_peso_contenedor_Contenedor_TipoVehiculo] ON [db_NEXO].[tbl_rangos_peso_contenedor] ([Contenedor], [TipoVehiculo]);
 CREATE INDEX [IX_colocaciones_cargue_ItemPlanCargueId] ON [db_NEXO].[tbl_colocaciones_cargue] ([ItemPlanCargueId]);
 CREATE INDEX [IX_colocaciones_cargue_PlanCargueId_Cargada] ON [db_NEXO].[tbl_colocaciones_cargue] ([PlanCargueId], [Cargada]);
 CREATE INDEX [IX_cotizacion_conexos_CotizacionId] ON [db_NEXO].[tbl_cotizacion_conexos] ([CotizacionId]);
@@ -955,8 +991,8 @@ CREATE INDEX [IX_lineas_solicitud_RutaId] ON [db_NEXO].[tbl_lineas_solicitud] ([
 CREATE INDEX [IX_lineas_solicitud_SolicitudId] ON [db_NEXO].[tbl_lineas_solicitud] ([SolicitudId]);
 CREATE UNIQUE INDEX [IX_mapeo_rol_portal_IdRolPortal] ON [db_NEXO].[tbl_mapeo_rol_portal] ([IdRolPortal]) WHERE ([IdRolPortal] IS NOT NULL);
 -- Llave natural real (el código DANE solo no es único, choca entre Venezuela y Ecuador).
-CREATE UNIQUE INDEX [IX_municipios_CodigoDane_Pais] ON [db_NEXO].[tbl_municipios] ([CodigoDane], [Pais]);
-CREATE INDEX [IX_municipios_NombreTarifasPlaza] ON [db_NEXO].[tbl_municipios] ([NombreTarifasPlaza]);
+CREATE UNIQUE INDEX [IX_tbl_municipios_CodigoDane_Pais] ON [db_NEXO].[tbl_municipios] ([CodigoDane], [Pais]);
+CREATE INDEX [IX_tbl_municipios_NombreTarifasPlaza] ON [db_NEXO].[tbl_municipios] ([NombreTarifasPlaza]);
 CREATE INDEX [IX_OutboxMessage_EnqueueTime] ON [db_NEXO].[OutboxMessage] ([EnqueueTime]);
 CREATE INDEX [IX_OutboxMessage_ExpirationTime] ON [db_NEXO].[OutboxMessage] ([ExpirationTime]);
 CREATE UNIQUE INDEX [IX_OutboxMessage_InboxMessageId_InboxConsumerId_SequenceNumber] ON [db_NEXO].[OutboxMessage] ([InboxMessageId], [InboxConsumerId], [SequenceNumber]) WHERE ([InboxMessageId] IS NOT NULL AND [InboxConsumerId] IS NOT NULL);
@@ -984,10 +1020,61 @@ CREATE UNIQUE INDEX [IX_usuarios_Email] ON [db_NEXO].[tbl_usuarios] ([Email]);
 CREATE UNIQUE INDEX [IX_usuarios_IdentidadPortalId] ON [db_NEXO].[tbl_usuarios] ([IdentidadPortalId]) WHERE ([IdentidadPortalId] IS NOT NULL);
 
 -- =============================================================================
+-- 3. LLAVES FORÁNEAS
+-- =============================================================================
+-- Todas se agregan después de crear las tablas para no depender del orden de
+-- creación (hay referencias cruzadas, p. ej. tbl_cotizaciones <-> tbl_tarifas_historicas),
+-- y después de los índices porque algunas apuntan a un índice único (ver encabezado).
+
+ALTER TABLE [db_NEXO].[tbl_audit_log] ADD CONSTRAINT [FK_audit_log_usuarios_UsuarioId] FOREIGN KEY ([UsuarioId]) REFERENCES [db_NEXO].[tbl_usuarios] ([Id]);
+ALTER TABLE [db_NEXO].[tbl_ia_uso] ADD CONSTRAINT [FK_ia_uso_usuarios_UsuarioId] FOREIGN KEY ([UsuarioId]) REFERENCES [db_NEXO].[tbl_usuarios] ([Id]);
+ALTER TABLE [db_NEXO].[tbl_asistente_conversaciones] ADD CONSTRAINT [FK_asistente_conversaciones_usuarios_UsuarioId] FOREIGN KEY ([UsuarioId]) REFERENCES [db_NEXO].[tbl_usuarios] ([Id]);
+ALTER TABLE [db_NEXO].[tbl_asistente_mensajes] ADD CONSTRAINT [FK_asistente_mensajes_conversaciones_ConversacionId] FOREIGN KEY ([ConversacionId]) REFERENCES [db_NEXO].[tbl_asistente_conversaciones] ([Id]);
+ALTER TABLE [db_NEXO].[tbl_asistente_herramientas_uso] ADD CONSTRAINT [FK_asistente_herramientas_uso_conversaciones_ConversacionId] FOREIGN KEY ([ConversacionId]) REFERENCES [db_NEXO].[tbl_asistente_conversaciones] ([Id]);
+ALTER TABLE [db_NEXO].[tbl_asistente_herramientas_uso] ADD CONSTRAINT [FK_asistente_herramientas_uso_mensajes_MensajeId] FOREIGN KEY ([MensajeId]) REFERENCES [db_NEXO].[tbl_asistente_mensajes] ([Id]);
+ALTER TABLE [db_NEXO].[tbl_asistente_acciones] ADD CONSTRAINT [FK_asistente_acciones_conversaciones_ConversacionId] FOREIGN KEY ([ConversacionId]) REFERENCES [db_NEXO].[tbl_asistente_conversaciones] ([Id]);
+ALTER TABLE [db_NEXO].[tbl_asistente_acciones] ADD CONSTRAINT [FK_asistente_acciones_mensajes_MensajeId] FOREIGN KEY ([MensajeId]) REFERENCES [db_NEXO].[tbl_asistente_mensajes] ([Id]);
+ALTER TABLE [db_NEXO].[tbl_asistente_acciones] ADD CONSTRAINT [FK_asistente_acciones_usuarios_UsuarioId] FOREIGN KEY ([UsuarioId]) REFERENCES [db_NEXO].[tbl_usuarios] ([Id]);
+ALTER TABLE [db_NEXO].[tbl_colocaciones_cargue] ADD CONSTRAINT [FK_colocaciones_cargue_items_plan_cargue_ItemPlanCargueId] FOREIGN KEY ([ItemPlanCargueId]) REFERENCES [db_NEXO].[tbl_items_plan_cargue] ([Id]);
+ALTER TABLE [db_NEXO].[tbl_colocaciones_cargue] ADD CONSTRAINT [FK_colocaciones_cargue_planes_cargue_PlanCargueId] FOREIGN KEY ([PlanCargueId]) REFERENCES [db_NEXO].[tbl_planes_cargue] ([Id]) ON DELETE CASCADE;
+ALTER TABLE [db_NEXO].[tbl_cotizacion_conexos] ADD CONSTRAINT [FK_cotizacion_conexos_cotizaciones_CotizacionId] FOREIGN KEY ([CotizacionId]) REFERENCES [db_NEXO].[tbl_cotizaciones] ([Id]) ON DELETE CASCADE;
+ALTER TABLE [db_NEXO].[tbl_cotizacion_conexos] ADD CONSTRAINT [FK_cotizacion_conexos_servicios_conexos_ServicioConexoId] FOREIGN KEY ([ServicioConexoId]) REFERENCES [db_NEXO].[tbl_servicios_conexos] ([Id]);
+-- NO CASCADE: clsCotizacion ya cascadea directo hacia Conexos (constraint de arriba) —
+-- un segundo camino Cotizacion->Lineas->Conexos en cascada violaría "multiple cascade paths".
+ALTER TABLE [db_NEXO].[tbl_cotizacion_conexos] ADD CONSTRAINT [FK_cotizacion_conexos_cotizacion_lineas_CotizacionLineaId] FOREIGN KEY ([CotizacionLineaId]) REFERENCES [db_NEXO].[tbl_cotizacion_lineas] ([Id]);
+ALTER TABLE [db_NEXO].[tbl_cotizacion_lineas] ADD CONSTRAINT [FK_cotizacion_lineas_cotizaciones_CotizacionId] FOREIGN KEY ([CotizacionId]) REFERENCES [db_NEXO].[tbl_cotizaciones] ([Id]) ON DELETE CASCADE;
+ALTER TABLE [db_NEXO].[tbl_cotizacion_lineas] ADD CONSTRAINT [FK_cotizacion_lineas_lineas_solicitud_LineaSolicitudId] FOREIGN KEY ([LineaSolicitudId]) REFERENCES [db_NEXO].[tbl_lineas_solicitud] ([Id]);
+ALTER TABLE [db_NEXO].[tbl_cotizaciones] ADD CONSTRAINT [FK_cotizaciones_solicitudes_SolicitudId] FOREIGN KEY ([SolicitudId]) REFERENCES [db_NEXO].[tbl_solicitudes] ([Id]);
+ALTER TABLE [db_NEXO].[tbl_cotizaciones] ADD CONSTRAINT [FK_cotizaciones_usuarios_EntregadaPor] FOREIGN KEY ([EntregadaPor]) REFERENCES [db_NEXO].[tbl_usuarios] ([Id]);
+ALTER TABLE [db_NEXO].[tbl_items_plan_cargue] ADD CONSTRAINT [FK_items_plan_cargue_planes_cargue_PlanCargueId] FOREIGN KEY ([PlanCargueId]) REFERENCES [db_NEXO].[tbl_planes_cargue] ([Id]) ON DELETE CASCADE;
+ALTER TABLE [db_NEXO].[tbl_rechazos_cubicacion_linea] ADD CONSTRAINT [FK_rechazos_cubicacion_linea_lineas_solicitud_LineaSolicitudId] FOREIGN KEY ([LineaSolicitudId]) REFERENCES [db_NEXO].[tbl_lineas_solicitud] ([Id]) ON DELETE CASCADE;
+ALTER TABLE [db_NEXO].[tbl_lineas_solicitud] ADD CONSTRAINT [FK_lineas_solicitud_configuraciones_vehiculo_ConfigVehiculoId] FOREIGN KEY ([ConfigVehiculoId]) REFERENCES [db_NEXO].[tbl_configuraciones_vehiculo] ([Id]);
+ALTER TABLE [db_NEXO].[tbl_lineas_solicitud] ADD CONSTRAINT [FK_lineas_solicitud_rutas_RutaId] FOREIGN KEY ([RutaId]) REFERENCES [db_NEXO].[tbl_rutas] ([Id]);
+ALTER TABLE [db_NEXO].[tbl_rutas] ADD CONSTRAINT [FK_rutas_municipios_OrigenMunicipioId] FOREIGN KEY ([OrigenMunicipioId]) REFERENCES [db_NEXO].[tbl_municipios] ([Id]);
+ALTER TABLE [db_NEXO].[tbl_rutas] ADD CONSTRAINT [FK_rutas_municipios_DestinoMunicipioId] FOREIGN KEY ([DestinoMunicipioId]) REFERENCES [db_NEXO].[tbl_municipios] ([Id]);
+ALTER TABLE [db_NEXO].[tbl_lineas_solicitud] ADD CONSTRAINT [FK_lineas_solicitud_solicitudes_SolicitudId] FOREIGN KEY ([SolicitudId]) REFERENCES [db_NEXO].[tbl_solicitudes] ([Id]) ON DELETE CASCADE;
+-- Apunta al índice único AK_InboxState_MessageId_ConsumerId, no a la llave primaria.
+ALTER TABLE [db_NEXO].[OutboxMessage] ADD CONSTRAINT [FK_OutboxMessage_InboxState_InboxMessageId_InboxConsumerId] FOREIGN KEY ([InboxMessageId], [InboxConsumerId]) REFERENCES [db_NEXO].[InboxState] ([MessageId], [ConsumerId]);
+ALTER TABLE [db_NEXO].[OutboxMessage] ADD CONSTRAINT [FK_OutboxMessage_OutboxState_OutboxId] FOREIGN KEY ([OutboxId]) REFERENCES [db_NEXO].[OutboxState] ([OutboxId]);
+ALTER TABLE [db_NEXO].[tbl_planes_cargue] ADD CONSTRAINT [FK_planes_cargue_vehiculos_cubicacion_VehiculoId] FOREIGN KEY ([VehiculoId]) REFERENCES [db_NEXO].[tbl_vehiculos_cubicacion] ([Id]);
+ALTER TABLE [db_NEXO].[tbl_servicios_conexos] ADD CONSTRAINT [FK_servicios_conexos_usuarios_ActualizadoPor] FOREIGN KEY ([ActualizadoPor]) REFERENCES [db_NEXO].[tbl_usuarios] ([Id]);
+ALTER TABLE [db_NEXO].[tbl_solicitudes] ADD CONSTRAINT [FK_solicitudes_clientes_ClienteId] FOREIGN KEY ([ClienteId]) REFERENCES [db_NEXO].[tbl_clientes] ([Id]);
+ALTER TABLE [db_NEXO].[tbl_diccionario_cliente] ADD CONSTRAINT [FK_diccionario_cliente_clientes_ClienteId] FOREIGN KEY ([ClienteId]) REFERENCES [db_NEXO].[tbl_clientes] ([Id]);
+ALTER TABLE [db_NEXO].[tbl_plantillas_mapeo_cliente] ADD CONSTRAINT [FK_plantillas_mapeo_cliente_clientes_ClienteId] FOREIGN KEY ([ClienteId]) REFERENCES [db_NEXO].[tbl_clientes] ([Id]);
+-- Apunta al índice único IX_mapeo_vehiculo_tarifario_TipoVehiculo, no a la llave primaria.
+ALTER TABLE [db_NEXO].[tbl_rangos_peso_contenedor] ADD CONSTRAINT [FK_rangos_peso_contenedor_mapeo_vehiculo_tarifario_TipoVehiculo] FOREIGN KEY ([TipoVehiculo]) REFERENCES [db_NEXO].[tbl_mapeo_vehiculo_tarifario] ([TipoVehiculo]);
+ALTER TABLE [db_NEXO].[tbl_solicitudes] ADD CONSTRAINT [FK_solicitudes_usuarios_CreadoPor] FOREIGN KEY ([CreadoPor]) REFERENCES [db_NEXO].[tbl_usuarios] ([Id]);
+ALTER TABLE [db_NEXO].[tbl_tarifas_historicas] ADD CONSTRAINT [FK_tarifas_historicas_configuraciones_vehiculo_ConfigVehiculoId] FOREIGN KEY ([ConfigVehiculoId]) REFERENCES [db_NEXO].[tbl_configuraciones_vehiculo] ([Id]);
+ALTER TABLE [db_NEXO].[tbl_tarifas_historicas] ADD CONSTRAINT [FK_tarifas_historicas_cotizaciones_CotizacionId] FOREIGN KEY ([CotizacionId]) REFERENCES [db_NEXO].[tbl_cotizaciones] ([Id]);
+ALTER TABLE [db_NEXO].[tbl_tarifas_historicas] ADD CONSTRAINT [FK_tarifas_historicas_rutas_RutaId] FOREIGN KEY ([RutaId]) REFERENCES [db_NEXO].[tbl_rutas] ([Id]);
+ALTER TABLE [db_NEXO].[tbl_tarifas_plaza] ADD CONSTRAINT [FK_tarifas_plaza_municipios_OrigenMunicipioId] FOREIGN KEY ([OrigenMunicipioId]) REFERENCES [db_NEXO].[tbl_municipios] ([Id]);
+ALTER TABLE [db_NEXO].[tbl_tarifas_plaza] ADD CONSTRAINT [FK_tarifas_plaza_municipios_DestinoMunicipioId] FOREIGN KEY ([DestinoMunicipioId]) REFERENCES [db_NEXO].[tbl_municipios] ([Id]);
+ALTER TABLE [db_NEXO].[tbl_tarifas_plaza] ADD CONSTRAINT [FK_tarifas_plaza_pesos_PesoId] FOREIGN KEY ([PesoId]) REFERENCES [db_NEXO].[tbl_pesos] ([Id]);
+ALTER TABLE [db_NEXO].[tbl_tarifas_plaza_historico] ADD CONSTRAINT [FK_tarifas_plaza_historico_tarifas_plaza_TarifaPlazaId] FOREIGN KEY ([TarifaPlazaId]) REFERENCES [db_NEXO].[tbl_tarifas_plaza] ([Id]) ON DELETE CASCADE;
+
+-- =============================================================================
 -- 4. TRIGGERS
 -- =============================================================================
-
-GO
 
 -- Cada vez que se actualiza el Valor, la Vigencia o los DetallesTarifa de una
 -- fila de tbl_tarifas_plaza, archiva el valor ANTERIOR completo (todas sus
@@ -995,6 +1082,7 @@ GO
 -- UPDATE que no toque esas 3 columnas (ej. si algo más las vuelve a guardar
 -- igual). Soporta actualizar varias filas en una sola sentencia (opera sobre
 -- toda la pseudo-tabla "deleted", no fila por fila).
+GO
 CREATE TRIGGER [db_NEXO].[TRG_tarifas_plaza_historico]
 ON [db_NEXO].[tbl_tarifas_plaza]
 AFTER UPDATE
