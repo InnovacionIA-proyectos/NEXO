@@ -16,7 +16,13 @@ public sealed class clsOpcionesAnthropic
     public const string Seccion = "Anthropic";
 
     public const string ModeloPorDefecto = "claude-sonnet-5-5";
-    public const string EsfuerzoPorDefecto = "high";
+    // `medium` sale de la evaluacion del mapeo de Excel (#353/#363): 93,8 % de acierto contra 91,7 % de `high`, 0 falsos positivos
+    // en las dos y US$ 0,0196 por Excel contra US$ 0,0217. `high` sirve igual -la diferencia de acierto esta dentro del ruido del
+    // dataset, donde una columna mueve unos 6 puntos-, asi que esto se elige por costo, no porque `high` este mal.
+    //
+    // OJO: el esfuerzo es GLOBAL, lo comparten el mapeo y el asistente de cotizacion, y al asistente nadie lo ha medido en `medium`.
+    // Si llega a hacer falta un esfuerzo distinto por funcion, hay que partir esta opcion; hoy no lo es.
+    public const string EsfuerzoPorDefecto = "medium";
 
     public string? ApiKey { get; set; }
 
