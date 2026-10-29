@@ -2,6 +2,12 @@
 
 _Fecha: 2026-10-19_
 
+> **Estado al 2026-10-27:** el riesgo de abajo ya no aplica en el código. `RolUsuario` (`src/Nexo.Domain/Enums/Enums.cs`) ya
+> tiene `AdminBiblioteca` y ya no tiene `CoordinadorFletes` (está en QA). En la base de pruebas no queda ninguna fila con
+> `CoordinadorFletes`: 5 usuarios y 1 mapeo de portal tienen `AdminBiblioteca`. Falta solo lo de la sección "Qué falta":
+> confirmar que ese backend está desplegado en el ambiente que usa esta base, probar con un usuario real y borrar las dos
+> tablas de respaldo.
+
 ## Qué se hizo ya (DATA-3)
 
 Se corrió contra `dbInformesAutomatizados_Pruebas.db_NEXO` (base de pruebas):

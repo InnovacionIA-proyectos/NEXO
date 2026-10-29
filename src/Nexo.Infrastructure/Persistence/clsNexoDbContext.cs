@@ -34,6 +34,7 @@ public class clsNexoDbContext : DbContext
     public DbSet<clsConfiguracionVehiculo> ConfiguracionesVehiculo => Set<clsConfiguracionVehiculo>();
     public DbSet<clsAliasElemento> AliasElementos => Set<clsAliasElemento>();
     public DbSet<clsTerminoCliente> TerminosCliente => Set<clsTerminoCliente>();
+    public DbSet<clsPlantillaMapeoCliente> PlantillasMapeo => Set<clsPlantillaMapeoCliente>();
     public DbSet<clsTarifaHistorica> TarifasHistoricas => Set<clsTarifaHistorica>();
     public DbSet<clsServicioConexo> ServiciosConexos => Set<clsServicioConexo>();
     public DbSet<clsCotizacion> Cotizaciones => Set<clsCotizacion>();
@@ -55,6 +56,7 @@ public class clsNexoDbContext : DbContext
     public DbSet<clsItemPlanCargue> ItemsPlanCargue => Set<clsItemPlanCargue>();
     public DbSet<clsColocacionCargue> ColocacionesCargue => Set<clsColocacionCargue>();
     public DbSet<clsMunicipio> Municipios => Set<clsMunicipio>();
+    public DbSet<clsMapeoVehiculoTarifario> MapeosVehiculoTarifario => Set<clsMapeoVehiculoTarifario>();
     public DbSet<clsRangoPeso> RangosPeso => Set<clsRangoPeso>();
     public DbSet<clsTarifaPlaza> TarifasPlaza => Set<clsTarifaPlaza>();
     public DbSet<clsTarifaPlazaHistorico> TarifasPlazaHistorico => Set<clsTarifaPlazaHistorico>();
@@ -272,6 +274,18 @@ public class clsNexoDbContext : DbContext
             e.Property(x => x.Activo).HasDefaultValue(true);
             e.HasIndex(x => new { x.ClienteId, x.TerminoNormalizado, x.Tipo, x.Contexto }).IsUnique();
             e.HasIndex(x => new { x.ClienteId, x.Tipo });
+            e.HasOne(x => x.Cliente).WithMany().HasForeignKey(x => x.ClienteId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // El mapeo de columnas que un cliente ya confirmó, para reusarlo con los mismos encabezados. Sin migración de EF: el esquema vive en ESQUEMA_NEXO.sql.
+        b.Entity<clsPlantillaMapeoCliente>(e =>
+        {
+            e.ToTable("tbl_plantillas_mapeo_cliente");
+            e.Property(x => x.Nombre).HasMaxLength(100);
+            e.Property(x => x.FirmaEncabezados).HasMaxLength(64).IsRequired();
+            e.Property(x => x.Encabezados).IsRequired();
+            e.Property(x => x.Columnas).IsRequired();
+            e.HasIndex(x => new { x.ClienteId, x.FirmaEncabezados }).IsUnique();
             e.HasOne(x => x.Cliente).WithMany().HasForeignKey(x => x.ClienteId).OnDelete(DeleteBehavior.Restrict);
         });
 
@@ -500,6 +514,19 @@ public class clsNexoDbContext : DbContext
             e.ToTable("tbl_reglas_solo_sicetac");
             // Clave natural única: no repetir la misma ruta + tipo de vehículo.
             e.HasIndex(x => new { x.Origen, x.Destino, x.TipoVehiculo }).IsUnique();
+        });
+
+        // Código de cada vehículo de NEXO en SICE-TAC y en Plaza/SAP. El esquema vive en ESQUEMA_NEXO.sql (sin migración de EF).
+        b.Entity<clsMapeoVehiculoTarifario>(e =>
+        {
+            e.ToTable("tbl_mapeo_vehiculo_tarifario");
+            e.Property(x => x.TipoVehiculo).HasMaxLength(20).IsRequired();
+            e.Property(x => x.CodigoSicetac).HasMaxLength(20).IsRequired();
+            e.Property(x => x.NombreSicetac).HasMaxLength(200);
+            e.Property(x => x.CodigoPlazaSap).HasMaxLength(20);
+            e.Property(x => x.NombreTarifasPlaza).HasMaxLength(100);
+            e.Property(x => x.Verificacion).HasMaxLength(500);
+            e.HasIndex(x => x.TipoVehiculo).IsUnique();
         });
 
         b.Entity<clsMunicipio>(e =>
