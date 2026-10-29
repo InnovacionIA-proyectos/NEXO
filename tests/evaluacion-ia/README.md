@@ -38,6 +38,7 @@ dotnet run --project tests/evaluacion-ia/arnes
 # Opciones
 #   --modelos claude-sonnet-5-5,claude-haiku-5-5   --esfuerzos low,high   --repeticiones 1
 #   --casos caso_01,caso_05   --paralelo 3   --timeout 60
+#   --combinaciones claude-sonnet-5-5:low,claude-sonnet-5-5:high,claude-opus-5-5:high   (en vez del cruce modelos × esfuerzos)
 ```
 
 Cada llamada cuesta centavos de dólar; la corrida completa, unos pocos dólares (el informe trae el total estimado).

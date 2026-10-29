@@ -29,6 +29,8 @@ namespace Nexo.EvaluacionIa;
 /// Uso (desde la raíz del repo):
 ///   dotnet run --project tests/evaluacion-ia/arnes -- [--modelos a,b] [--esfuerzos low,medium,high] [--repeticiones 3]
 ///                                                     [--casos caso_01,caso_05] [--paralelo 3] [--timeout 60] [--seco] [--autoprueba]
+///                                                     [--combinaciones claude-sonnet-5-5:low,claude-opus-5-5:high]
+/// --combinaciones reemplaza a --modelos × --esfuerzos cuando no hace falta el cruce completo.
 /// La llave sale de Anthropic__ApiKey (variable de entorno o .env de la raíz); nunca se escribe en el informe ni en consola.
 /// <c>--autoprueba</c> prueba el propio arnés sin llamar a la IA: una IA falsa devuelve la respuesta correcta y el informe debe dar 100 %.
 /// </summary>
@@ -50,7 +52,9 @@ public static class Program
             return 1;
         }
 
-        var combos = opciones.Modelos.SelectMany(m => opciones.Esfuerzos.Select(e => new clsCombo(m, e))).ToList();
+        var combos = opciones.Combinaciones.Count > 0
+            ? opciones.Combinaciones.ToList()
+            : opciones.Modelos.SelectMany(m => opciones.Esfuerzos.Select(e => new clsCombo(m, e))).ToList();
         var total = combos.Count * casos.Count * opciones.Repeticiones;
         Console.WriteLine($"{casos.Count} casos × {combos.Count} combinaciones × {opciones.Repeticiones} repeticiones = {total} llamadas.");
         if (opciones.Seco)
@@ -204,7 +208,7 @@ public static class Program
 
 public sealed record clsOpcionesArnes(
     IReadOnlyList<string> Modelos, IReadOnlyList<string> Esfuerzos, int Repeticiones, IReadOnlyList<string> Casos, int Paralelo,
-    int? TimeoutSegundos, bool Seco, bool Autoprueba)
+    int? TimeoutSegundos, bool Seco, bool Autoprueba, IReadOnlyList<clsCombo> Combinaciones)
 {
     public static clsOpcionesArnes Leer(string[] args)
     {
@@ -224,7 +228,8 @@ public sealed record clsOpcionesArnes(
             int.TryParse(Valor("paralelo"), out var p) ? Math.Clamp(p, 1, 8) : 3,
             int.TryParse(Valor("timeout"), out var t) ? t : null,
             args.Contains("--seco"),
-            args.Contains("--autoprueba"));
+            args.Contains("--autoprueba"),
+            Lista("combinaciones", "").Select(c => c.Split(':', 2)).Where(c => c.Length == 2).Select(c => new clsCombo(c[0].Trim(), c[1].Trim())).ToList());
     }
 }
 
