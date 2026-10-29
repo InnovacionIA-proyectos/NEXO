@@ -77,6 +77,11 @@ public static class clsDependencyInjection
         services.AddScoped<IHerramientaAsistente, clsProponerAgregarConexosHerramienta>();
         services.AddScoped<IHerramientaAsistente, clsProponerRechazarLineaHerramienta>();
         services.AddScoped<IHerramientaAsistente, clsProponerCambiarVehiculoHerramienta>();
+        services.AddScoped<IHerramientaAsistente, clsProponerGuardarPreferenciaHerramienta>();
+        services.AddScoped<IHerramientaAsistente, clsListarPreferenciasHerramienta>();
+        services.AddScoped<ICommandHandler<clsGuardarPreferenciaAsistenteCommand, clsPreferenciaAsistenteDto>, clsGuardarPreferenciaAsistenteCommandHandler>();
+        services.AddScoped<IQueryHandler<clsListarPreferenciasAsistenteQuery, IReadOnlyList<clsPreferenciaAsistenteDto>>, clsListarPreferenciasAsistenteQueryHandler>();
+        services.AddScoped<ICommandHandler<clsEliminarPreferenciaAsistenteCommand, Unit>, clsEliminarPreferenciaAsistenteCommandHandler>();
         services.AddScoped<clsContextoConversacionAsistente>();
         services.AddScoped<ICommandHandler<clsConfirmarAccionAsistenteCommand, clsAccionAsistenteDto>, clsConfirmarAccionAsistenteCommandHandler>();
         services.AddScoped<ICommandHandler<clsCancelarAccionAsistenteCommand, clsAccionAsistenteDto>, clsCancelarAccionAsistenteCommandHandler>();

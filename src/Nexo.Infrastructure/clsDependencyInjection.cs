@@ -213,6 +213,7 @@ public static class clsDependencyInjection
             sp.GetRequiredService<IOptions<clsOpcionesAnthropic>>(), sp.GetRequiredService<TimeProvider>(),
             sp.GetRequiredService<ILogger<clsConversacionIaConRegistro>>()));
         services.AddScoped<IConversacionesAsistenteRepository, clsEfConversacionesAsistenteRepository>();
+        services.AddScoped<IPreferenciasAsistenteRepository, clsEfPreferenciasAsistenteRepository>();
         services.AddScoped<IDestinatariosDeAlertaPort, clsDestinatariosDeAlertaAdapter>();
 
         // Reglas "solo SICE-TAC" (el mismo repositorio implementa el puerto de lectura

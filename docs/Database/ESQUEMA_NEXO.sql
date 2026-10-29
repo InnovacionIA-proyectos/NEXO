@@ -873,9 +873,22 @@ CREATE TABLE [db_NEXO].[tbl_asistente_acciones] (
     [ResultadoMensaje] nvarchar(500) NULL,
     [CreatedAt] datetimeoffset NOT NULL CONSTRAINT [DF_asistente_acciones_CreatedAt] DEFAULT (sysdatetimeoffset())
     , CONSTRAINT [PK_asistente_acciones] PRIMARY KEY ([Id])
-    , CONSTRAINT [CK_asistente_acciones_tipo] CHECK ([Tipo] IN (N'agregar_flete', N'editar_flete', N'agregar_conexos', N'rechazar_linea', N'cambiar_vehiculo'))
+    , CONSTRAINT [CK_asistente_acciones_tipo] CHECK ([Tipo] IN (N'agregar_flete', N'editar_flete', N'agregar_conexos', N'rechazar_linea', N'cambiar_vehiculo', N'guardar_preferencia'))
     , CONSTRAINT [CK_asistente_acciones_estado] CHECK ([Estado] IN (N'pendiente', N'ejecutando', N'ejecutada', N'fallida', N'cancelada', N'vencida'))
     , CONSTRAINT [CK_asistente_acciones_parametros_json] CHECK (ISJSON([Parametros]) = 1)
+);
+
+-- Reglas y preferencias propias de cada persona para el asistente de cotización (es de quien la guarda; el asistente la recibe al
+-- inicio de sus conversaciones y nunca reemplaza las reglas del sistema).
+-- Script para aplicarla a una base existente: docs/Database/376_asistente_preferencias.sql.
+CREATE TABLE [db_NEXO].[tbl_asistente_preferencias] (
+    [Id] uniqueidentifier NOT NULL,
+    [UsuarioId] uniqueidentifier NOT NULL,
+    [Texto] nvarchar(300) NOT NULL,
+    [ConversacionId] uniqueidentifier NULL,
+    [CreatedAt] datetimeoffset NOT NULL CONSTRAINT [DF_asistente_preferencias_CreatedAt] DEFAULT (sysdatetimeoffset())
+    , CONSTRAINT [PK_asistente_preferencias] PRIMARY KEY ([Id])
+    , CONSTRAINT [CK_asistente_preferencias_texto] CHECK (LEN(LTRIM(RTRIM([Texto]))) >= 5)
 );
 
 -- --- Mensajería (MassTransit — Transactional Outbox/Inbox) ---------------------------
@@ -981,6 +994,7 @@ CREATE INDEX [IX_asistente_herramientas_uso_ConversacionId_CreatedAt] ON [db_NEX
 CREATE INDEX [IX_asistente_herramientas_uso_MensajeId] ON [db_NEXO].[tbl_asistente_herramientas_uso] ([MensajeId]);
 CREATE INDEX [IX_asistente_acciones_ConversacionId_CreatedAt] ON [db_NEXO].[tbl_asistente_acciones] ([ConversacionId], [CreatedAt]);
 CREATE INDEX [IX_asistente_acciones_MensajeId] ON [db_NEXO].[tbl_asistente_acciones] ([MensajeId]);
+CREATE INDEX [IX_asistente_preferencias_UsuarioId_CreatedAt] ON [db_NEXO].[tbl_asistente_preferencias] ([UsuarioId], [CreatedAt]);
 CREATE INDEX [IX_InboxState_Delivered] ON [db_NEXO].[InboxState] ([Delivered]);
 CREATE INDEX [IX_items_plan_cargue_PlanCargueId] ON [db_NEXO].[tbl_items_plan_cargue] ([PlanCargueId]);
 -- Filtrado a las pendientes: indexar las ya resueltas no aporta y la tabla crece.
@@ -1035,6 +1049,8 @@ ALTER TABLE [db_NEXO].[tbl_asistente_herramientas_uso] ADD CONSTRAINT [FK_asiste
 ALTER TABLE [db_NEXO].[tbl_asistente_acciones] ADD CONSTRAINT [FK_asistente_acciones_conversaciones_ConversacionId] FOREIGN KEY ([ConversacionId]) REFERENCES [db_NEXO].[tbl_asistente_conversaciones] ([Id]);
 ALTER TABLE [db_NEXO].[tbl_asistente_acciones] ADD CONSTRAINT [FK_asistente_acciones_mensajes_MensajeId] FOREIGN KEY ([MensajeId]) REFERENCES [db_NEXO].[tbl_asistente_mensajes] ([Id]);
 ALTER TABLE [db_NEXO].[tbl_asistente_acciones] ADD CONSTRAINT [FK_asistente_acciones_usuarios_UsuarioId] FOREIGN KEY ([UsuarioId]) REFERENCES [db_NEXO].[tbl_usuarios] ([Id]);
+ALTER TABLE [db_NEXO].[tbl_asistente_preferencias] ADD CONSTRAINT [FK_asistente_preferencias_usuarios_UsuarioId] FOREIGN KEY ([UsuarioId]) REFERENCES [db_NEXO].[tbl_usuarios] ([Id]);
+ALTER TABLE [db_NEXO].[tbl_asistente_preferencias] ADD CONSTRAINT [FK_asistente_preferencias_conversaciones_ConversacionId] FOREIGN KEY ([ConversacionId]) REFERENCES [db_NEXO].[tbl_asistente_conversaciones] ([Id]);
 ALTER TABLE [db_NEXO].[tbl_colocaciones_cargue] ADD CONSTRAINT [FK_colocaciones_cargue_items_plan_cargue_ItemPlanCargueId] FOREIGN KEY ([ItemPlanCargueId]) REFERENCES [db_NEXO].[tbl_items_plan_cargue] ([Id]);
 ALTER TABLE [db_NEXO].[tbl_colocaciones_cargue] ADD CONSTRAINT [FK_colocaciones_cargue_planes_cargue_PlanCargueId] FOREIGN KEY ([PlanCargueId]) REFERENCES [db_NEXO].[tbl_planes_cargue] ([Id]) ON DELETE CASCADE;
 ALTER TABLE [db_NEXO].[tbl_cotizacion_conexos] ADD CONSTRAINT [FK_cotizacion_conexos_cotizaciones_CotizacionId] FOREIGN KEY ([CotizacionId]) REFERENCES [db_NEXO].[tbl_cotizaciones] ([Id]) ON DELETE CASCADE;

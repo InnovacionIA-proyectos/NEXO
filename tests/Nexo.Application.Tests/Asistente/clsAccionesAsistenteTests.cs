@@ -28,6 +28,7 @@ public class clsAccionesAsistenteTests
     private static readonly Guid Servicio = Guid.Parse("cccccccc-0000-0000-0000-000000000001");
 
     private readonly clsRepositorioConversacionesEnMemoria _repo = new();
+    private readonly clsRepositorioPreferenciasEnMemoria _preferencias = new();
     private readonly Mock<ICurrentUserPort> _usuario = new();
     private readonly Mock<IQueryHandler<clsObtenerCotizacionQuery, clsCotizacionDto>> _cotizaciones = new();
     private readonly clsContextoConversacionAsistente _contexto = new();
@@ -81,9 +82,11 @@ public class clsAccionesAsistenteTests
     private Task<clsResultadoHerramienta> Proponer(string herramienta, string json) => Catalogo().EjecutarAsync(herramienta, Entrada(json));
 
     private clsConfirmarAccionAsistenteCommandHandler Confirmador() => new(
-        _repo, _usuario.Object, _reloj, _agregarFlete.Object, _editarFlete.Object, _agregarConexos.Object, _rechazar.Object, _cambiarVehiculo.Object);
+        _repo, _usuario.Object, _reloj, _agregarFlete.Object, _editarFlete.Object, _agregarConexos.Object, _rechazar.Object, _cambiarVehiculo.Object, GuardarPreferencia());
 
     private clsCancelarAccionAsistenteCommandHandler Cancelador() => new(_repo, _usuario.Object, _reloj);
+
+    private clsGuardarPreferenciaAsistenteCommandHandler GuardarPreferencia() => new(_preferencias, _usuario.Object, _limites);
 
     private void ValorPermitido(string texto) =>
         _repo.Mensajes.First(m => m.Rol == clsMensajeAsistente.RolUsuario).Contenido = texto;
@@ -400,7 +403,7 @@ public class clsAccionesAsistenteTests
         otro.SetupGet(u => u.Rol).Returns(RolUsuario.Admin);
 
         var confirmar = await Assert.ThrowsAsync<clsForbiddenException>(() =>
-            new clsConfirmarAccionAsistenteCommandHandler(_repo, otro.Object, _reloj, _agregarFlete.Object, _editarFlete.Object, _agregarConexos.Object, _rechazar.Object, _cambiarVehiculo.Object)
+            new clsConfirmarAccionAsistenteCommandHandler(_repo, otro.Object, _reloj, _agregarFlete.Object, _editarFlete.Object, _agregarConexos.Object, _rechazar.Object, _cambiarVehiculo.Object, GuardarPreferencia())
                 .Handle(new clsConfirmarAccionAsistenteCommand(accion.Id)));
         var cancelar = await Assert.ThrowsAsync<clsForbiddenException>(() =>
             new clsCancelarAccionAsistenteCommandHandler(_repo, otro.Object, _reloj).Handle(new clsCancelarAccionAsistenteCommand(accion.Id)));
@@ -463,7 +466,7 @@ public class clsAccionesAsistenteTests
         [
             new clsProponerAgregarFleteHerramienta(_repo, contexto, _usuario.Object, _cotizaciones.Object, _limites, _reloj),
         ], _usuario.Object);
-        var handler = new clsConversarAsistenteCommandHandler(modelo.Object, _repo, catalogo, _usuario.Object, _limites, contexto);
+        var handler = new clsConversarAsistenteCommandHandler(modelo.Object, _repo, catalogo, _usuario.Object, _limites, contexto, _preferencias);
 
         List<clsEventoAsistente> eventos = [];
         await foreach (var e in await handler.Handle(new clsConversarAsistenteCommand(null, "Pon el flete en $4.500.000"))) eventos.Add(e);

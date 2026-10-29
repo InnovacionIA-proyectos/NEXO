@@ -24,7 +24,8 @@ public sealed class clsConfirmarAccionAsistenteCommandHandler(
     ICommandHandler<clsEditarLineaCotizacionCommand, clsCotizacionDto> editarFlete,
     ICommandHandler<clsAgregarConexosCotizacionCommand, clsCotizacionDto> agregarConexos,
     ICommandHandler<clsRechazarLineaCotizacionCommand, clsLineaRechazoDto> rechazarLinea,
-    ICommandHandler<clsCambiarVehiculoLineaCommand, clsLineaVehiculoDto> cambiarVehiculo)
+    ICommandHandler<clsCambiarVehiculoLineaCommand, clsLineaVehiculoDto> cambiarVehiculo,
+    ICommandHandler<clsGuardarPreferenciaAsistenteCommand, clsPreferenciaAsistenteDto> guardarPreferencia)
     : ICommandHandler<clsConfirmarAccionAsistenteCommand, clsAccionAsistenteDto>
 {
     public async Task<clsAccionAsistenteDto> Handle(clsConfirmarAccionAsistenteCommand command, CancellationToken ct = default)
@@ -86,6 +87,13 @@ public sealed class clsConfirmarAccionAsistenteCommandHandler(
     {
         using var doc = JsonDocument.Parse(accion.Parametros);
         var p = doc.RootElement;
+
+        if (accion.Tipo == clsAccionAsistente.TipoGuardarPreferencia)
+        {
+            await guardarPreferencia.Handle(new clsGuardarPreferenciaAsistenteCommand(p.GetProperty("texto").GetString(), accion.ConversacionId), ct);
+            return;
+        }
+
         var cotizacionId = p.GetProperty("cotizacionId").GetGuid();
 
         switch (accion.Tipo)

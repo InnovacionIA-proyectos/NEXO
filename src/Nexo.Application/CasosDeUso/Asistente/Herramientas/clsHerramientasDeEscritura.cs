@@ -26,10 +26,12 @@ public abstract class clsHerramientaPropuestaBase(
     IConversacionesAsistenteRepository conversaciones,
     clsContextoConversacionAsistente contexto,
     ICurrentUserPort usuario,
-    IQueryHandler<clsObtenerCotizacionQuery, clsCotizacionDto> cotizaciones,
     clsLimitesAsistente limites,
     TimeProvider reloj) : clsHerramientaBase
 {
+    protected IConversacionesAsistenteRepository Conversaciones => conversaciones;
+    protected clsContextoConversacionAsistente ContextoActual => contexto;
+
     private const string FuentePropuesta = "NEXO · acción propuesta (aún sin aplicar)";
 
     // Escribir es de quien costea: los mismos roles que los endpoints de edición de la cotización.
@@ -65,7 +67,20 @@ public abstract class clsHerramientaPropuestaBase(
             new clsAccionPropuestaDto(accion.Id, accion.Tipo, accion.Resumen, accion.Estado, accion.VenceAt), FuentePropuesta,
             "Nada se ha modificado. La persona debe confirmar el cambio en pantalla; no lo des por hecho ni digas que ya está aplicado.");
     }
+}
 
+/// <summary>
+/// Base de las propuestas sobre una cotización: además comprueban que la cotización exista y que cualquier valor de dinero salga de una
+/// consulta de la conversación o de lo que escribió la persona.
+/// </summary>
+public abstract class clsHerramientaPropuestaDeCotizacionBase(
+    IConversacionesAsistenteRepository conversaciones,
+    clsContextoConversacionAsistente contexto,
+    ICurrentUserPort usuario,
+    IQueryHandler<clsObtenerCotizacionQuery, clsCotizacionDto> cotizaciones,
+    clsLimitesAsistente limites,
+    TimeProvider reloj) : clsHerramientaPropuestaBase(conversaciones, contexto, usuario, limites, reloj)
+{
     /// <summary>La cotización existe (si no, es un error para el modelo y no se deja nada pendiente).</summary>
     protected Task<clsCotizacionDto> CotizacionAsync(Guid id, CancellationToken ct) =>
         cotizaciones.Handle(new clsObtenerCotizacionQuery(id), ct);
@@ -76,10 +91,10 @@ public abstract class clsHerramientaPropuestaBase(
     /// </summary>
     protected async Task ExigirOrigenDelValorAsync(decimal valor, string nombreDelCampo, CancellationToken ct)
     {
-        if (contexto.ConversacionId is not { } conversacionId) return;
+        if (ContextoActual.ConversacionId is not { } conversacionId) return;
 
-        var mensajes = await conversaciones.MensajesAsync(conversacionId, ct);
-        var herramientas = await conversaciones.HerramientasAsync(conversacionId, ct);
+        var mensajes = await Conversaciones.MensajesAsync(conversacionId, ct);
+        var herramientas = await Conversaciones.HerramientasAsync(conversacionId, ct);
         var fuentes = mensajes.Where(m => m.Rol == clsMensajeAsistente.RolUsuario).Select(m => m.Contenido)
             .Concat(herramientas.Select(h => h.Salida).OfType<string>());
 
@@ -98,7 +113,7 @@ public abstract class clsHerramientaPropuestaBase(
 public sealed class clsProponerAgregarFleteHerramienta(
     IConversacionesAsistenteRepository conversaciones, clsContextoConversacionAsistente contexto, ICurrentUserPort usuario,
     IQueryHandler<clsObtenerCotizacionQuery, clsCotizacionDto> cotizaciones, clsLimitesAsistente limites, TimeProvider reloj)
-    : clsHerramientaPropuestaBase(conversaciones, contexto, usuario, cotizaciones, limites, reloj)
+    : clsHerramientaPropuestaDeCotizacionBase(conversaciones, contexto, usuario, cotizaciones, limites, reloj)
 {
     public override string Nombre => "proponer_agregar_flete";
 
@@ -142,7 +157,7 @@ public sealed class clsProponerAgregarFleteHerramienta(
 public sealed class clsProponerEditarFleteHerramienta(
     IConversacionesAsistenteRepository conversaciones, clsContextoConversacionAsistente contexto, ICurrentUserPort usuario,
     IQueryHandler<clsObtenerCotizacionQuery, clsCotizacionDto> cotizaciones, clsLimitesAsistente limites, TimeProvider reloj)
-    : clsHerramientaPropuestaBase(conversaciones, contexto, usuario, cotizaciones, limites, reloj)
+    : clsHerramientaPropuestaDeCotizacionBase(conversaciones, contexto, usuario, cotizaciones, limites, reloj)
 {
     public override string Nombre => "proponer_editar_flete";
 
@@ -183,7 +198,7 @@ public sealed class clsProponerEditarFleteHerramienta(
 public sealed class clsProponerAgregarConexosHerramienta(
     IConversacionesAsistenteRepository conversaciones, clsContextoConversacionAsistente contexto, ICurrentUserPort usuario,
     IQueryHandler<clsObtenerCotizacionQuery, clsCotizacionDto> cotizaciones, clsLimitesAsistente limites, TimeProvider reloj)
-    : clsHerramientaPropuestaBase(conversaciones, contexto, usuario, cotizaciones, limites, reloj)
+    : clsHerramientaPropuestaDeCotizacionBase(conversaciones, contexto, usuario, cotizaciones, limites, reloj)
 {
     private const int MaxItems = 20;
 
@@ -232,7 +247,7 @@ public sealed class clsProponerAgregarConexosHerramienta(
 public sealed class clsProponerRechazarLineaHerramienta(
     IConversacionesAsistenteRepository conversaciones, clsContextoConversacionAsistente contexto, ICurrentUserPort usuario,
     IQueryHandler<clsObtenerCotizacionQuery, clsCotizacionDto> cotizaciones, clsLimitesAsistente limites, TimeProvider reloj)
-    : clsHerramientaPropuestaBase(conversaciones, contexto, usuario, cotizaciones, limites, reloj)
+    : clsHerramientaPropuestaDeCotizacionBase(conversaciones, contexto, usuario, cotizaciones, limites, reloj)
 {
     public override string Nombre => "proponer_rechazar_linea";
 
@@ -265,7 +280,7 @@ public sealed class clsProponerRechazarLineaHerramienta(
 public sealed class clsProponerCambiarVehiculoHerramienta(
     IConversacionesAsistenteRepository conversaciones, clsContextoConversacionAsistente contexto, ICurrentUserPort usuario,
     IQueryHandler<clsObtenerCotizacionQuery, clsCotizacionDto> cotizaciones, clsLimitesAsistente limites, TimeProvider reloj)
-    : clsHerramientaPropuestaBase(conversaciones, contexto, usuario, cotizaciones, limites, reloj)
+    : clsHerramientaPropuestaDeCotizacionBase(conversaciones, contexto, usuario, cotizaciones, limites, reloj)
 {
     public override string Nombre => "proponer_cambiar_vehiculo";
 

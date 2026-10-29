@@ -12,6 +12,7 @@ public class clsAccionAsistente
     public const string TipoAgregarConexos = "agregar_conexos";
     public const string TipoRechazarLinea = "rechazar_linea";
     public const string TipoCambiarVehiculo = "cambiar_vehiculo";
+    public const string TipoGuardarPreferencia = "guardar_preferencia";
 
     /// <summary>Propuesta, esperando que la persona confirme o cancele. Nada se ha tocado.</summary>
     public const string EstadoPendiente = "pendiente";

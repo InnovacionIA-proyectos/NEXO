@@ -54,6 +54,7 @@ public class clsConversarAsistenteCommandTests
     }
 
     private readonly clsRepositorioConversacionesEnMemoria _repo = new();
+    private readonly clsRepositorioPreferenciasEnMemoria _preferencias = new();
     private readonly Mock<ICurrentUserPort> _usuario = new();
     private readonly clsLimitesAsistente _limites = new();
     private clsModeloGuionado _modelo = null!;
@@ -76,7 +77,7 @@ public class clsConversarAsistenteCommandTests
             ? herramientas
             : [new clsHerramientaDePrueba("consultar_piso_sicetac", _ => Task.FromResult(PisoPorDefecto))];
         return new clsConversarAsistenteCommandHandler(
-            _modelo, _repo, new clsHerramientasDelAsistente(todas, _usuario.Object), _usuario.Object, _limites, new clsContextoConversacionAsistente());
+            _modelo, _repo, new clsHerramientasDelAsistente(todas, _usuario.Object), _usuario.Object, _limites, new clsContextoConversacionAsistente(), _preferencias);
     }
 
     private static async IAsyncEnumerable<clsEventoConversacionIa> Eventos(params clsEventoConversacionIa[] eventos)

@@ -2392,6 +2392,9 @@ interface ResultadoHerramientaDto {
 | `proponer_agregar_conexos` | `POST /api/cotizaciones/{id}/conexos` | `cotizacionId`, `items[]` (`lineaId`, `servicioConexoId`, `cantidad`; opcional `valorAplicado`) |
 | `proponer_rechazar_linea` | `POST /api/cotizaciones/{id}/lineas/{lineaId}/rechazo` | `cotizacionId`, `lineaSolicitudId`, `motivo` |
 | `proponer_cambiar_vehiculo` | `PUT /api/cotizaciones/{id}/lineas/{lineaId}/vehiculo` | `cotizacionId`, `lineaSolicitudId`, `tipoVehiculo` o `configVehiculoId`; opcional `carroceria` |
+| `proponer_guardar_preferencia` | guardar una regla o preferencia propia (§3.24.2) | `texto` (hasta 300 caracteres, sin valores de dinero) |
+
+También para AdminTarifas y Admin: `listar_preferencias` (lee las preferencias de quien conversa; sin entrada).
 
 ### 3.24 Conversación con el asistente de cotización — `/api/asistente/conversaciones`
 
@@ -2416,6 +2419,7 @@ tokens por persona de §3.22. La función se apaga con `Anthropic__Funciones__As
 | `conversacion` | `{ conversacionId, mensajeId }` | Primero. `mensajeId` es el de la respuesta que se está generando |
 | `texto` | `{ delta }` | Cada trozo de la respuesta, a medida que se genera; se concatenan |
 | `herramienta` | `{ nombre, estado, fuente? }` | `estado`: `ejecutando`, `ok` o `error`. Muestra qué está consultando el asistente |
+| `preferencias` | `[ { id, texto, createdAt } ]` | Después de `conversacion`, solo si la persona tiene preferencias guardadas: las que el asistente recibe en esta respuesta (para mostrar que se aplican) |
 | `accion` | `AccionAsistenteDto` | El asistente propuso un cambio (§3.24.1). Nada se ha modificado: la persona debe confirmarlo o cancelarlo |
 | `reemplazo` | `{ texto, cifrasSinOrigen[] }` | La respuesta traía cifras de dinero sin origen: lo mostrado debe sustituirse por `texto` (es lo que queda guardado) |
 | `fin` | `{ conversacionId, mensajeId, estado }` | Último en el caso normal. `estado`: `completo` o `descartado` |
@@ -2468,7 +2472,7 @@ terminó: es la auditoría de la escritura.
 ```ts
 interface AccionAsistenteDto {
   id: Guid; conversacionId: Guid; mensajeId: Guid
-  tipo: "agregar_flete" | "editar_flete" | "agregar_conexos" | "rechazar_linea" | "cambiar_vehiculo"
+  tipo: "agregar_flete" | "editar_flete" | "agregar_conexos" | "rechazar_linea" | "cambiar_vehiculo" | "guardar_preferencia"
   resumen: string                       // lo que se le muestra a la persona para decidir
   parametros: object                    // exactamente lo que se aplicaría
   estado: "pendiente" | "ejecutando" | "ejecutada" | "fallida" | "cancelada" | "vencida"
@@ -2490,6 +2494,29 @@ Descarta el cambio propuesto sin aplicarlo.
 - **Roles**: AdminTarifas, Admin (y solo quien tiene la conversación).
 - **→** `200 AccionAsistenteDto` (`estado: "cancelada"`)
 - **Errores**: `403 ACCION_AJENA` · `404 ACCION_NO_ENCONTRADA` · `409 ACCION_YA_RESUELTA`
+
+### 3.24.2 Reglas y preferencias propias — `/api/asistente/preferencias`
+
+El AdminTarifas le dice al asistente, en la misma conversación, una regla o preferencia propia ("siempre que compares plaza vs histórico,
+avísame si difieren más de 20 %"). El asistente la **propone** (`proponer_guardar_preferencia`, evento `accion`) y se guarda cuando la
+persona la confirma (§3.24.1), igual que cualquier otro cambio. Desde ahí es de esa persona: el asistente la recibe al inicio de **cada**
+conversación suya (después de las reglas del sistema), lo muestra con el evento `preferencias` y le pide al modelo que diga cuándo la aplica.
+Nadie ve ni borra las de otra persona. Máximo `Asistente__MaxPreferencias` (20) por persona.
+
+**Son preferencias, no reglas.** No reemplazan ni saltan las reglas del sistema: el asistente sigue sin proponer un valor por debajo del piso
+SICE-TAC (lo aplica el dominio al confirmar), sin dar un precio que no venga de una consulta (se descarta la respuesta, §3.24) y sin evitar la
+confirmación de un cambio. Además, una preferencia que fije un valor de dinero (`400 PREFERENCIA_CON_VALOR`) o que intente apagar una regla
+(`400 PREFERENCIA_NO_PERMITIDA`: "ignora el piso", "inventa un valor", "sin consultar"…) no se acepta; el resto de códigos son
+`PREFERENCIA_REQUERIDA` y `PREFERENCIA_DEMASIADO_LARGA` (400), y `409 PREFERENCIA_REPETIDA` / `409 PREFERENCIAS_LLENAS` al proponer o al confirmar.
+
+#### `GET /api/asistente/preferencias`
+- **Roles**: AdminTarifas, Admin (cada persona ve solo las suyas).
+- **→** `200 [ { id: Guid, texto: string, createdAt: string } ]`, de la más antigua a la más reciente.
+
+#### `DELETE /api/asistente/preferencias/{id}`
+Borra una preferencia propia; el asistente deja de aplicarla desde la siguiente respuesta.
+- **Roles**: AdminTarifas, Admin.
+- **→** `204`. **Errores**: `404 PREFERENCIA_NO_ENCONTRADA` (también si es de otra persona).
 
 ## 4. Hubs de SignalR — conexión
 
@@ -2550,6 +2577,7 @@ abiertos a los 6 roles.
 | `/api/asistente/herramientas`: el endpoint es de cualquier rol; cada herramienta repite los roles de la consulta que envuelve (§3.23) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `/api/asistente/conversaciones` (conversar y leer las propias; el Admin además lee cualquiera) (§3.24) | | | ✅ | | | ✅ |
 | `/api/asistente/acciones/{id}/confirmar` y `/cancelar` (solo quien tiene la conversación) (§3.24.1) | | | ✅ | | | ✅ |
+| `/api/asistente/preferencias` (`GET`, `DELETE`; cada persona solo las suyas) (§3.24.2) | | | ✅ | | | ✅ |
 
 ---
 

@@ -23,7 +23,7 @@ public class clsAsistenteHerramientasApiTests(clsApiFixture fx)
 
     // Quien costea (AdminTarifas y Admin) además tiene las herramientas que proponen cambios.
     private static readonly string[] Proponer =
-        ["proponer_agregar_conexos", "proponer_agregar_flete", "proponer_cambiar_vehiculo", "proponer_editar_flete", "proponer_rechazar_linea"];
+        ["listar_preferencias", "proponer_agregar_conexos", "proponer_agregar_flete", "proponer_cambiar_vehiculo", "proponer_editar_flete", "proponer_guardar_preferencia", "proponer_rechazar_linea"];
 
     public static IEnumerable<object[]> HerramientasPorRol()
     {
