@@ -6,7 +6,7 @@ using Nexo.Application.Common.Abstractions;
 
 namespace Nexo.Application.CasosDeUso.Asistente.Herramientas;
 
-/// <summary>Catálogo de servicios logísticos conexos (cargue, descargue, estibas, escolta…) con su costo unitario vigente.</summary>
+/// <summary>Catálogo de servicios logísticos conexos (cargue, descargue, estibas, escolta…) con su costo unitario vigente y su precio de venta (uso interno).</summary>
 public sealed class clsConsultarServiciosConexosHerramienta(IQueryHandler<clsListarServiciosConexosQuery, clsPaginaServiciosDto> servicios)
     : clsHerramientaBase
 {
@@ -16,8 +16,9 @@ public sealed class clsConsultarServiciosConexosHerramienta(IQueryHandler<clsLis
     public override string Nombre => "consultar_servicios_conexos";
 
     public override string Descripcion =>
-        "Servicios logísticos conexos activos del catálogo de NEXO (por ejemplo cargue, descargue o escolta) con costo unitario, unidad, " +
-        "ciudad o ruta y vigencia. Los precios salen de aquí; no los estimes.";
+        "Servicios logísticos conexos activos del catálogo de NEXO (por ejemplo cargue, descargue o escolta) con costo unitario, precio de venta " +
+        "(precioVenta; si viene vacío el servicio se cotiza a su costo), unidad, ciudad o ruta y vigencia. Los precios salen de aquí; no los estimes. " +
+        "El costo es de uso interno: lo que se cotiza al cliente es el precio de venta.";
 
     public override string EsquemaEntradaJson => """
         {"type":"object","additionalProperties":false,"properties":{

@@ -58,7 +58,10 @@ public sealed class clsAgregarConexosCotizacionCommandHandler(
             if (!servicio.Activo)
                 throw new clsValidationFailedException("SERVICIO_INACTIVO", $"El servicio '{servicio.TipoServicio}' está inactivo.");
 
+            // El costo (ValorAplicado) puede venir en el request; lo que se cotiza sale siempre de la biblioteca: el precio de venta o, si el
+            // servicio no tiene, su costo. Queda fijo en el conexo aunque la biblioteca cambie después.
             var valor = item.ValorAplicado ?? servicio.CostoUnitario * item.Cantidad;
+            var precioVentaUnitario = Math.Round(servicio.PrecioVenta ?? servicio.CostoUnitario, 2, MidpointRounding.AwayFromZero);
             var conexo = new clsCotizacionConexo
             {
                 CotizacionId = c.Id,
@@ -67,10 +70,11 @@ public sealed class clsAgregarConexosCotizacionCommandHandler(
                 clsServicioConexo = servicio, // nav explícita: el DTO denormaliza nombre/categoría/dimensiones
                 Cantidad = item.Cantidad,
                 ValorAplicado = valor,
+                PrecioVentaUnitario = precioVentaUnitario,
                 Origen = origen,
             };
             c.Conexos.Add(conexo);
-            agregados.Add(new clsConexoCambiado(servicio.TipoServicio, item.Cantidad, valor));
+            agregados.Add(new clsConexoCambiado(servicio.TipoServicio, item.Cantidad, conexo.ValorVenta));
         }
         clsCotizacionCalculos.Recalcular(c);
 

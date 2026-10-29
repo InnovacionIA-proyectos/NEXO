@@ -316,6 +316,7 @@ public class clsNexoDbContext : DbContext
         {
             e.ToTable("tbl_servicios_conexos");
             e.Property(x => x.CostoUnitario).HasColumnType("decimal(18,2)");
+            e.Property(x => x.PrecioVenta).HasColumnType("decimal(18,2)");
             e.Property(x => x.Origen).HasDefaultValue(clsServicioConexo.NoAplica);
             e.Property(x => x.Destino).HasDefaultValue(clsServicioConexo.NoAplica);
             e.Property(x => x.Puerto).HasDefaultValue(clsServicioConexo.NoAplica);
@@ -369,6 +370,7 @@ public class clsNexoDbContext : DbContext
             e.ToTable("tbl_cotizacion_conexos");
             e.Property(x => x.Cantidad).HasColumnType("decimal(12,2)");
             e.Property(x => x.ValorAplicado).HasColumnType("decimal(18,2)");
+            e.Property(x => x.PrecioVentaUnitario).HasColumnType("decimal(18,2)");
             e.HasOne(x => x.clsServicioConexo)
              .WithMany()
              .HasForeignKey(x => x.ServicioConexoId)

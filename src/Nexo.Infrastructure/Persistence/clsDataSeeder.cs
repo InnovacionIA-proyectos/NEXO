@@ -204,7 +204,7 @@ public static class clsDataSeeder
             }
             foreach (var (serv, cant, valor) in conexos)
             {
-                c.Conexos.Add(new clsCotizacionConexo { clsServicioConexo = serv, Cantidad = cant, ValorAplicado = valor });
+                c.Conexos.Add(new clsCotizacionConexo { clsServicioConexo = serv, Cantidad = cant, ValorAplicado = valor, PrecioVentaUnitario = cant != 0 ? valor / cant : 0 });
                 total += valor;
             }
             c.Total = total;

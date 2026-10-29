@@ -23,7 +23,7 @@ public static class clsCotizacionDtoMappers
             c.Conexos.Select(x => new clsCotizacionConexoDto(
                 x.Id, x.CotizacionLineaId, x.ServicioConexoId, x.clsServicioConexo?.TipoServicio,
                 x.clsServicioConexo?.Categoria ?? "logistico", x.Cantidad, x.ValorAplicado,
-                x.Origen, x.clsServicioConexo?.ToDto())).ToList(),
+                x.Origen, x.clsServicioConexo?.ToDto(), x.PrecioVentaUnitario, x.ValorVenta)).ToList(),
             c.EsAutoCosteo,
             c.ModificadaTrasEntregaAt);
 }
