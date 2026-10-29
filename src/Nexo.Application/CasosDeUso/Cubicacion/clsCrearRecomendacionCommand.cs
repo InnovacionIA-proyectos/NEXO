@@ -28,6 +28,19 @@ public sealed class clsCrearRecomendacionCommandHandler(ICubicacionRapidaPort cu
 /// </summary>
 public sealed record clsConsultarRecomendacionQuery(string IdLineaSolicitud, string OrigenSistema) : IQuery<clsRecomendacionDto>;
 
+/// <summary>
+/// GET /api/cubicacion/explicacion?idLineaSolicitud=&amp;origenSistema= — el texto del Cubicador que explica la recomendación de esa línea.
+/// Opcional y sin errores: ver <see cref="ICubicadorExplicacionPort"/>.
+/// </summary>
+public sealed record clsObtenerExplicacionRecomendacionQuery(string IdLineaSolicitud, string OrigenSistema) : IQuery<clsExplicacionRecomendacionDto>;
+
+public sealed class clsObtenerExplicacionRecomendacionQueryHandler(ICubicadorExplicacionPort explicacion)
+    : IQueryHandler<clsObtenerExplicacionRecomendacionQuery, clsExplicacionRecomendacionDto>
+{
+    public async Task<clsExplicacionRecomendacionDto> Handle(clsObtenerExplicacionRecomendacionQuery query, CancellationToken ct = default)
+        => new(await explicacion.ObtenerAsync(query.IdLineaSolicitud, query.OrigenSistema, ct));
+}
+
 public sealed class clsConsultarRecomendacionQueryHandler(ICubicacionRapidaPort cubicacion)
     : IQueryHandler<clsConsultarRecomendacionQuery, clsRecomendacionDto>
 {
