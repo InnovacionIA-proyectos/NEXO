@@ -517,8 +517,9 @@ Qué guarda cada una de las 40 tablas del esquema de NEXO, qué significa cada c
 | `ActualizadoPor` | `uniqueidentifier` | Sí |  | Usuario que lo modificó por última vez |
 | `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset()` | Fecha de creación (auditoría) |
 | `UpdatedAt` | `datetimeoffset` | No | `sysdatetimeoffset()` | Fecha de última modificación (auditoría) |
+| `PrecioVenta` | `decimal(18,2)` | Sí |  | S6-HU-38.1/#407: precio al cliente, con su margen ya incluido. Vacío = el servicio todavía no tiene precio de venta y la cotización usa el costo |
 
-**Llaves e índices:** PK `PK_servicios_conexos` (Id); Único `UQ_servicios_conexos_dimensiones` (CodigoServicio, Origen, Destino, Puerto, Ruta, TipoMaquina); Índice `IX_servicios_conexos_ActualizadoPor` (ActualizadoPor); Índice `IX_servicios_conexos_CodigoServicio` (CodigoServicio).
+**Llaves e índices:** PK `PK_servicios_conexos` (Id); Único `UQ_servicios_conexos_dimensiones` (CodigoServicio, Origen, Destino, Puerto, Ruta, TipoMaquina); Índice `IX_servicios_conexos_ActualizadoPor` (ActualizadoPor); Índice `IX_servicios_conexos_CodigoServicio` (CodigoServicio); Check `CK_servicios_conexos_PrecioVenta` (vacío o ≥ 0).
 
 **FK salientes:** `ActualizadoPor` → `tbl_usuarios.Id` (NO ACTION).  
 **FK entrantes:** `tbl_cotizacion_conexos.ServicioConexoId` (NO ACTION).
@@ -728,7 +729,7 @@ Qué guarda cada una de las 40 tablas del esquema de NEXO, qué significa cada c
 
 ## 23. `tbl_cotizacion_conexos`
 
-**Entidad:** `clsCotizacionConexo` — **Para qué sirve:** Servicio conexo aplicado a una línea de la cotización, con la cantidad y el valor que realmente se cobró (puede diferir del catálogo).
+**Entidad:** `clsCotizacionConexo` — **Para qué sirve:** Servicio conexo aplicado a una línea de la cotización, con la cantidad, su costo y su precio de venta guardados al momento de agregarlo.
 
 | Columna | Tipo | Nullable | Default | Descripción |
 |---|---|---|---|---|
@@ -736,13 +737,16 @@ Qué guarda cada una de las 40 tablas del esquema de NEXO, qué significa cada c
 | `CotizacionId` | `uniqueidentifier` | No |  | Cotización |
 | `ServicioConexoId` | `uniqueidentifier` | Sí |  | Servicio del catálogo |
 | `Cantidad` | `decimal(12,2)` | No |  | Cantidad (toneladas, horas, puntos…) |
-| `ValorAplicado` | `decimal(18,2)` | No |  | Valor cobrado |
+| `ValorAplicado` | `decimal(18,2)` | No |  | Costo del conexo (costo unitario × cantidad). Desde S6-HU-38 lo que se cotiza es `PrecioVentaUnitario × Cantidad` |
 | `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset()` | Fecha de creación (auditoría) |
 | `UpdatedAt` | `datetimeoffset` | No | `sysdatetimeoffset()` | Fecha de última modificación (auditoría) |
 | `CotizacionLineaId` | `uniqueidentifier` | No |  | S4-HU-15.4/#250: línea de la cotización a la que se liga |
 | `Origen` | `nvarchar(20)` | No | `'individual'` | S5-HU-18/#262: `individual` (se agregó a esta línea) o `general` (se pidió para todas las líneas; igual crea una fila por línea) |
+| `PrecioVentaUnitario` | `decimal(18,2)` | No (*) |  | S6-HU-38.1/#407: precio de venta del servicio al agregarlo a la cotización (queda fijo aunque cambie la biblioteca); si el servicio no tenía precio de venta, el costo. Las filas anteriores al cambio se llenaron con su costo (`ValorAplicado / Cantidad`) |
 
-**Llaves e índices:** PK `PK_cotizacion_conexos` (Id); Índice `IX_cotizacion_conexos_CotizacionId` (CotizacionId); Índice `IX_cotizacion_conexos_CotizacionLineaId` (CotizacionLineaId); Índice `IX_cotizacion_conexos_ServicioConexoId` (ServicioConexoId).
+(*) En una base existente la columna queda permitiendo vacío hasta que se despliega S6-HU-38.2 y se corre la parte B de `407_precio_venta_conexos.sql`; en una base nueva (`ESQUEMA_NEXO.sql`) nace `NOT NULL`.
+
+**Llaves e índices:** PK `PK_cotizacion_conexos` (Id); Índice `IX_cotizacion_conexos_CotizacionId` (CotizacionId); Índice `IX_cotizacion_conexos_CotizacionLineaId` (CotizacionLineaId); Índice `IX_cotizacion_conexos_ServicioConexoId` (ServicioConexoId); Check `CK_cotizacion_conexos_PrecioVentaUnitario` (≥ 0).
 
 **FK salientes:** `CotizacionId` → `tbl_cotizaciones.Id` (ON DELETE CASCADE); `ServicioConexoId` → `tbl_servicios_conexos.Id` (NO ACTION); `CotizacionLineaId` → `tbl_cotizacion_lineas.Id` (NO ACTION).  
 **FK entrantes:** ninguna.

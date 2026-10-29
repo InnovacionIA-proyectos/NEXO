@@ -358,9 +358,13 @@ CREATE TABLE [db_NEXO].[tbl_servicios_conexos] (
     [Activo] bit NOT NULL DEFAULT (CONVERT([bit],(1))),
     [ActualizadoPor] uniqueidentifier NULL,
     [CreatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset()),
-    [UpdatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset())
+    [UpdatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset()),
+    -- S6-HU-38.1/#407: precio al cliente, con su margen ya incluido. NULL = el servicio todavía no tiene
+    -- precio de venta (la cotización usa el costo). Al final de la tabla, igual que en las bases existentes.
+    [PrecioVenta] decimal(18,2) NULL
     , CONSTRAINT [PK_servicios_conexos] PRIMARY KEY ([Id])
     , CONSTRAINT [UQ_servicios_conexos_dimensiones] UNIQUE ([CodigoServicio], [Origen], [Destino], [Puerto], [Ruta], [TipoMaquina])
+    , CONSTRAINT [CK_servicios_conexos_PrecioVenta] CHECK ([PrecioVenta] IS NULL OR [PrecioVenta] >= 0)
 );
 
 -- --- Solicitudes y costeo -------------------------------------------------------
@@ -512,8 +516,13 @@ CREATE TABLE [db_NEXO].[tbl_cotizacion_conexos] (
     -- S5-HU-18/#262: 'individual' | 'general' — trazabilidad de si el usuario lo agregó a
     -- esta línea puntual o pidió agregarlo a todas las líneas de una sola vez (que de
     -- todas formas crea una fila por línea, cada una CON su CotizacionLineaId).
-    [Origen] nvarchar(20) NOT NULL CONSTRAINT [DF_cotizacion_conexos_Origen] DEFAULT (N'individual')
+    [Origen] nvarchar(20) NOT NULL CONSTRAINT [DF_cotizacion_conexos_Origen] DEFAULT (N'individual'),
+    -- S6-HU-38.1/#407: precio de venta del servicio al agregarlo (queda fijo); si el servicio no tenía, el
+    -- costo. Lo que se cotiza es PrecioVentaUnitario × Cantidad; ValorAplicado sigue siendo el costo.
+    -- En las bases existentes queda NOT NULL con la parte B de 407_precio_venta_conexos.sql.
+    [PrecioVentaUnitario] decimal(18,2) NOT NULL
     , CONSTRAINT [PK_cotizacion_conexos] PRIMARY KEY ([Id])
+    , CONSTRAINT [CK_cotizacion_conexos_PrecioVentaUnitario] CHECK ([PrecioVentaUnitario] >= 0)
 );
 
 -- --- Biblioteca de tarifas ---------------------------------------------------------
