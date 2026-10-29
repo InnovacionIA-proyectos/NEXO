@@ -54,6 +54,14 @@ class CrearRecomendacionDto(ApiModel):
 # ----------------------------------------------------------------- respuesta
 
 
+class ExplicacionDto(ApiModel):
+    """El texto es OPCIONAL: `null` cuando la IA no esta configurada, fallo, o
+    escribio una cifra que no era del motor. La pantalla se dibuja igual sin el
+    (#369, segundo criterio)."""
+
+    explicacion: str | None = None
+
+
 class MercanciaDeVehiculoDto(ApiModel):
     """Lo que de UNA posicion de la solicitud viaja en este camion.
 
