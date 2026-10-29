@@ -2,7 +2,7 @@
 
 El examen con sus respuestas para medir qué tan bien propone Claude el mapeo de columnas (`POST /api/captura-solicitudes/sugerir-mapeo`).
 Cada caso es una hoja de Excel de un cliente y la respuesta correcta escrita por una persona: a qué campo de NEXO corresponde cada columna
-y con qué transformación. El arnés de evaluación (parte de kcano-ux) le pasa cada caso a Claude y compara su propuesta contra estas
+y con qué transformación. El arnés de evaluación ([`../arnes`](../arnes)) le pasa cada caso a Claude y compara su propuesta contra estas
 respuestas.
 
 ## Qué hay
@@ -19,18 +19,18 @@ respuestas.
 
 ## Los casos
 
-8 casos de 4 clientes (A, B, C y D). Solo hay Excels de esos 4 clientes; es una limitación para la lectura del informe.
+7 casos de 4 clientes (A, B, C y D). Solo hay Excels de esos 4 clientes; es una limitación para la lectura del informe.
+No hay caso de distribución: NEXO todavía no la mapea (decisión de Sara del 2026-10-29).
 
 | Caso | Formato | Columnas | Con campo | Filas |
 |---|---|---|---|---|
 | `caso_01_cliente_a_importacion` | vehículo en el encabezado | 25 | 3 | 21 |
 | `caso_02_cliente_a_exportacion` | vehículo en el encabezado | 13 | 3 | 14 |
-| `caso_03_cliente_a_distribucion` | vehículo en el encabezado | 20 | 3 | 148 |
+| `caso_03_cliente_a_nacional` | vehículo en el encabezado | 20 | 3 | 148 |
 | `caso_04_cliente_b_escenarios` | vehículo en el encabezado | 6 | 2 | 43 |
 | `caso_05_cliente_c_region_1` | matriz | 14 | 1 | 62 |
 | `caso_06_cliente_c_region_2` | matriz | 16 | 1 | 37 |
-| `caso_07_cliente_d_nacional` | una fila por línea | 18 | 3 | 342 |
-| `caso_08_cliente_d_impo_expo` | una fila por línea | 14 | 3 | 66 |
+| `caso_07_cliente_d_impo_expo` | una fila por línea | 14 | 3 | 66 |
 
 `formato`:
 - `fila_por_linea`: cada fila es un viaje y cada columna un dato. Es lo que `sugerir-mapeo` sabe representar.
@@ -42,15 +42,15 @@ respuestas.
 
 ```json
 {
-  "caso": "caso_07_cliente_d_nacional",
-  "archivo": "casos/caso_07_cliente_d_nacional.xlsx",
+  "caso": "caso_07_cliente_d_impo_expo",
+  "archivo": "casos/caso_07_cliente_d_impo_expo.xlsx",
   "hoja": "Datos",
   "cliente": "D",
   "formato": "fila_por_linea",
   "descripcion": "…",
   "filaEncabezado": 10,
   "filaSubEncabezado": null,
-  "totalFilas": 342,
+  "totalFilas": 66,
   "limitaciones": ["…"],
   "columnas": [
     {
@@ -75,18 +75,18 @@ respuestas.
 - `requiereDespivotar`: la columna trae en el encabezado un dato que debería ser un campo (vehículo, clase de viaje, origen). Con el contrato
   actual la única respuesta válida es `ignorar`; la marca sirve para contar cuánto de lo que llega no se puede representar todavía.
 
-## Cómo calificar (sugerencia para el arnés)
+## Cómo califica el arnés
 
-Una columna está bien si `campo` y `transformacion` de la propuesta son iguales a la respuesta o a una de sus `alternativasAceptadas`.
-Conviene reportar por separado:
+Una columna está bien si `campo` y `transformacion` de la propuesta son iguales a la respuesta o a una de sus `alternativasAceptadas`
+(en `ignorar` la transformación no cuenta). El informe reporta por separado:
 1. **Acierto en columnas con campo** (las que no son `ignorar`): lo que de verdad importa para importar el Excel.
 2. **Falsos positivos**: columnas que la respuesta deja en `ignorar` y la propuesta asigna a un campo (por ejemplo, la capacidad del vehículo
    como `peso`).
 3. **Acierto total** y **por formato**.
 4. **Columnas con `requiereDespivotar`**: cuántas son y qué propone el modelo en ellas.
 
-La comparación debe hacerse sobre los encabezados que devuelve `analizar-excel` para la réplica. Si algún día cambia esa regla, hay que
-volver a correr `generar_dataset.py` y revisar los índices.
+La comparación se hace sobre los encabezados que devuelve `analizar-excel` para la réplica: el arnés los lee con el lector de producción y
+se detiene si no coinciden con la respuesta. Si algún día cambia esa regla, hay que volver a correr `generar_dataset.py` y revisar los índices.
 
 ## Cómo se anonimizó
 
@@ -98,8 +98,9 @@ y cambian todo lo demás:
   del caso, conservando sufijos («-DTAI») y prefijos («AEROPUERTO»). También dentro de otros textos de la hoja.
 - **Departamento**: el de la ciudad nueva.
 - **Rutas de varias paradas**: cada ciudad por su reemplazo, con el mismo separador.
-- **Números** (volúmenes, kilómetros, precios, tiempos): inventados, con magnitud parecida y siempre distintos al original. Se conserva solo la
-  capacidad del vehículo del caso 7, que va ligada al tipo de vehículo.
+- **Números** (volúmenes, kilómetros, precios, tiempos): inventados, con magnitud parecida y siempre distintos al original.
+- **Tarifas ya diligenciadas**: si el original es un formulario ya respondido, esas columnas quedan vacías, como llega una licitación
+  (caso 5).
 - **Notas largas e instrucciones**: texto genérico. **Títulos y textos de arriba del encabezado**: texto genérico, conservando cuántos valores
   distintos tiene cada fila (si no, cambiaría la fila que `analizar-excel` toma como encabezado).
 - **Se conserva**: el vocabulario que el modelo debe reconocer (tipos de vehículo y servicio, configuraciones SICE-TAC, contenedores por rango

@@ -1,7 +1,8 @@
 """Genera el dataset dorado de mapeo de Excel (S6-HU-32.5, #353): réplicas anonimizadas y la respuesta correcta de cada caso.
 
 Uso (solo en el equipo que tiene los Excels originales):
-    python generar_dataset.py
+    python generar_dataset.py            todos los casos
+    python generar_dataset.py caso_05_…  solo los casos indicados
 
 Lee de qué archivo y hoja sale cada caso en fuentes.local.json (no se versiona: los nombres de archivo y de hoja identifican al
 cliente). Ver fuentes.local.example.json y el README.
@@ -73,9 +74,9 @@ CASOS = {
         },
         'limitaciones': ['El vehículo viene en el encabezado de cada columna de volumen (requiere despivotar).'],
     },
-    'caso_03_cliente_a_distribucion': {
+    'caso_03_cliente_a_nacional': {
         'cliente': 'A', 'formato': 'vehiculo_en_encabezado',
-        'descripcion': 'Distribución nacional: una fila por ruta con departamento del destino; volumen y tarifa por vehículo con su capacidad.',
+        'descripcion': 'Nacional: una fila por ruta con departamento del destino; volumen y tarifa por vehículo con su capacidad.',
         'tratamiento': {0: 'mantener', 1: 'ciudad', 2: 'ciudad', 3: 'departamento:2'},
         'respuesta': {
             0: col('referencia', nota='Consecutivo del cliente.'),
@@ -107,6 +108,8 @@ CASOS = {
         'cliente': 'C', 'formato': 'matriz',
         'descripcion': 'Formulario en matriz: tipo de servicio/vehículo en filas y puerto de origen en columnas; el destino es la región del formulario.',
         'tratamiento': {1: 'mantener', 2: 'mantener'},
+        # El original es el formulario ya diligenciado: las tarifas se vacían, como llega una licitación.
+        'vaciar': range(3, 11),
         'respuesta': {
             0: col(nota='Columna vacía.'),
             1: col('tipoVehiculo', nota='Tipo de servicio: vehículos, contenedores por rango de peso y servicios adicionales mezclados.'),
@@ -133,26 +136,7 @@ CASOS = {
         'limitaciones': ['El origen viene en el encabezado de cada columna (requiere despivotar).',
                          'El destino no está en ninguna columna: es la región del formulario (título).'],
     },
-    'caso_07_cliente_d_nacional': {
-        'cliente': 'D', 'formato': 'fila_por_linea',
-        'descripcion': 'Formulario de oferta nacional: una fila por ruta y vehículo; la ruta es una secuencia de entregas con varias paradas.',
-        'tratamiento': {0: 'mantener', 1: 'ruta', 4: 'mantener', 5: 'mantener', 6: 'mantener'},
-        'respuesta': {
-            0: col('referencia', nota='Identificador de la ruta del cliente (Ruta 1...).'),
-            1: col('origen', 'dividir_origen_destino', alternativas=DIV,
-                   nota='Secuencia de entregas: primera ciudad = origen. Con más de dos ciudades la transformación no puede partirla.'),
-            2: col(nota='Número de entregas: no hay campo.'),
-            3: col(nota='Kilómetros de referencia: no hay campo.'),
-            4: col('tipoVehiculo'),
-            5: col(nota='Configuración SICE-TAC: describe el mismo vehículo de la columna anterior.',
-                   alternativas=[{'campo': 'tipoVehiculo', 'transformacion': 'ninguna'}]),
-            6: col(nota='Capacidad del vehículo en toneladas, no el peso de la carga.'),
-            7: col(nota='Tiempo logístico de referencia de SICE-TAC.'),
-            **{i: col(nota='Costo o tarifa que diligencia el transportador.') for i in range(8, 18)},
-        },
-        'limitaciones': ['La secuencia de entregas tiene varias paradas: dividir_origen_destino solo parte dos ciudades.'],
-    },
-    'caso_08_cliente_d_impo_expo': {
+    'caso_07_cliente_d_impo_expo': {
         'cliente': 'D', 'formato': 'fila_por_linea',
         'descripcion': 'Formulario de oferta de importación y exportación: una fila por ruta y contenedor con rango de peso.',
         'tratamiento': {0: 'mantener', 1: 'ruta', 4: 'mantener', 5: 'mantener'},
@@ -282,6 +266,9 @@ def generar_caso(caso_id, spec, fuente, municipios):
             indice = celda.column - pc
             t = trat.get(indice, '')
             originales[(celda.row, indice)] = v
+            if indice in spec.get('vaciar', ()):
+                celda.value = None
+                continue
             if isinstance(v, str) and NOTA.match(v):
                 celda.value = an.nota(v) if len(v) > 20 else v
             elif isinstance(v, str) and len(v) > 60:
@@ -366,7 +353,12 @@ def respuesta(caso_id, spec, replica):
 def main():
     fuentes = json.loads((AQUI / 'fuentes.local.json').read_text(encoding='utf-8'))
     municipios = cargar_municipios()
-    for caso_id, spec in CASOS.items():
+    pedidos = sys.argv[1:] or list(CASOS)
+    desconocidos = [c for c in pedidos if c not in CASOS]
+    if desconocidos:
+        raise SystemExit('Casos desconocidos: %s' % ', '.join(desconocidos))
+    for caso_id in pedidos:
+        spec = CASOS[caso_id]
         replica = generar_caso(caso_id, spec, fuentes[caso_id], municipios)
         doc = respuesta(caso_id, spec, replica)
         (AQUI / 'respuestas' / (caso_id + '.json')).write_text(

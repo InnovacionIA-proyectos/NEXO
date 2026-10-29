@@ -7,7 +7,7 @@
     "archivo": "docs/docs_raw/<archivo del cliente>.xlsx",
     "hoja": "<nombre de la hoja>"
   },
-  "caso_03_cliente_a_distribucion": {
+  "caso_03_cliente_a_nacional": {
     "archivo": "docs/docs_raw/<archivo del cliente>.xlsx",
     "hoja": "<nombre de la hoja>"
   },
@@ -23,11 +23,7 @@
     "archivo": "docs/docs_raw/<archivo del cliente>.xlsx",
     "hoja": "<nombre de la hoja>"
   },
-  "caso_07_cliente_d_nacional": {
-    "archivo": "docs/docs_raw/<archivo del cliente>.xlsx",
-    "hoja": "<nombre de la hoja>"
-  },
-  "caso_08_cliente_d_impo_expo": {
+  "caso_07_cliente_d_impo_expo": {
     "archivo": "docs/docs_raw/<archivo del cliente>.xlsx",
     "hoja": "<nombre de la hoja>"
   }
