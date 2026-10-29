@@ -58,7 +58,7 @@ public class clsEditarTerminoClienteRequest
 
 /// <summary>
 /// Términos y conceptos que usa cada cliente en sus archivos (cómo se traduce cada palabra suya a lo que entiende NEXO). Leer lo puede
-/// cualquier rol válido (la importación lo consulta); crear, editar y borrar es de AdminBiblioteca, AdminTarifas y Admin.
+/// cualquier rol válido (la importación lo consulta); crear, editar y borrar es de Comercial, AdminBiblioteca, AdminTarifas y Admin.
 /// </summary>
 [ApiController]
 [Authorize]
@@ -71,7 +71,8 @@ public class clsDiccionarioClienteController(
     ICommandHandler<clsEliminarTerminoClienteCommand, Unit> eliminar)
     : ControllerBase
 {
-    private const string RolesEscritura = "AdminBiblioteca,AdminTarifas,Admin";
+    // El Comercial también lo mantiene: es quien importa los Excel de sus clientes y enseña qué significa cada término.
+    private const string RolesEscritura = "Comercial,AdminBiblioteca,AdminTarifas,Admin";
 
     /// <summary>
     /// Los términos del diccionario. Con <c>clienteId</c> trae los de ese cliente y, por defecto, también los que aplican a todos

@@ -51,25 +51,65 @@ public class clsDiccionarioClienteApiTests(clsApiFixture fx)
     }
 
     [Fact]
-    public async Task Escribir_solo_lo_pueden_AdminBiblioteca_AdminTarifas_y_Admin()
+    public async Task Escribir_solo_lo_pueden_Comercial_AdminBiblioteca_AdminTarifas_y_Admin()
     {
         var marca = Marca();
         try
         {
-            foreach (var rol in new[] { "Comercial", "ServiciosLogisticos", "LiderProceso" })
+            foreach (var rol in new[] { "ServiciosLogisticos", "LiderProceso" })
             {
                 using var c = fx.Client(rol);
                 Assert.Equal(HttpStatusCode.Forbidden, (await c.PostAsJsonAsync(Ruta, Termino($"{marca} {rol}"))).StatusCode);
                 Assert.Equal(HttpStatusCode.Forbidden, (await c.PutAsJsonAsync($"{Ruta}/{Guid.NewGuid()}", Termino("x"))).StatusCode);
                 Assert.Equal(HttpStatusCode.Forbidden, (await c.DeleteAsync($"{Ruta}/{Guid.NewGuid()}")).StatusCode);
             }
-            foreach (var rol in new[] { "AdminBiblioteca", "AdminTarifas", "Admin" })
+            foreach (var rol in new[] { "Comercial", "AdminBiblioteca", "AdminTarifas", "Admin" })
             {
                 using var c = fx.Client(rol);
                 Assert.Equal(HttpStatusCode.Created, (await c.PostAsJsonAsync(Ruta, Termino($"{marca} {rol}"))).StatusCode);
             }
         }
         finally { Limpiar(marca); }
+    }
+
+    [Fact]
+    public async Task El_Comercial_crea_edita_y_borra_un_termino_y_cada_cambio_queda_auditado_a_su_nombre()
+    {
+        var marca = Marca();
+        var comercial = fx.WithDb(db =>
+        {
+            var id = Guid.NewGuid();
+            db.Usuarios.Add(new Nexo.Domain.Usuarios.Entidades.clsUsuario
+            {
+                Id = id, Nombre = "Comercial diccionario " + id.ToString("N")[..8], Email = $"diccionario-{id:N}@boterosoto.com.co",
+                Rol = Nexo.Domain.Enums.RolUsuario.Comercial,
+            });
+            db.SaveChanges();
+            return id;
+        });
+        try
+        {
+            using var c = fx.Client("Comercial", comercial);
+
+            var creado = await Cuerpo(await c.PostAsJsonAsync(Ruta, Termino($"{marca} OUTBOUND", "valor", "Nacional", clienteId: ClienteExistente(), contexto: "lineaNegocio")));
+            var id = creado.GetProperty("id").GetGuid();
+            Assert.Equal(HttpStatusCode.OK, (await c.PutAsJsonAsync($"{Ruta}/{id}", Termino($"{marca} OUTBOUND", "valor", "Nacional", contexto: "lineaNegocio", ejemplo: "salida"))).StatusCode);
+            Assert.Equal(HttpStatusCode.NoContent, (await c.DeleteAsync($"{Ruta}/{id}")).StatusCode);
+
+            var acciones = fx.WithDb(db => db.AuditLogs.Where(a => a.EntidadId == id).OrderBy(a => a.CreatedAt).Select(a => new { a.UsuarioId, a.Accion }).ToList());
+            Assert.Equal(["crear_termino", "editar_termino", "eliminar_termino"], acciones.Select(a => a.Accion));
+            Assert.All(acciones, a => Assert.Equal(comercial, a.UsuarioId));
+        }
+        finally
+        {
+            Limpiar(marca);
+            fx.WithDb(db =>
+            {
+                db.AuditLogs.Where(a => a.UsuarioId == comercial).ExecuteDelete();
+                db.Usuarios.Where(u => u.Id == comercial).ExecuteDelete();
+                return 0;
+            });
+        }
     }
 
     // ---------------------------------------------------------------- ciclo completo

@@ -2119,6 +2119,8 @@ Las configuraciones de vehículo que la captura creó en **cuarentena** (`EsCata
 
 ### 3.19.1 Diccionario de términos por cliente — `/api/diccionario-cliente`
 
+Leer lo puede cualquier rol válido; **crear, editar y borrar: `Comercial`, `AdminBiblioteca`, `AdminTarifas` y `Admin`** (el Comercial lo mantiene al importar los Excel de sus clientes). Cada cambio queda en `tbl_audit_log` con el usuario que lo hizo.
+
 Cómo se traduce cada palabra que usa un cliente en sus archivos a lo que entiende NEXO. Complementa al diccionario global de alias
 de vehículos y contenedores (§3.19): el de alias son sinónimos de **todos** (T.MULA, TB, 40HC) que usa la captura; este guarda lo
 que es **propio de un cliente** (y las columnas y unidades de sus archivos). Tres tipos de término:
@@ -2572,6 +2574,7 @@ abiertos a los 6 roles.
 | `POST /api/vehiculos` (#310: + AdminTarifas; #307: sin AdminBiblioteca) | ✅ | | ✅ | | | ✅ |
 | `DELETE /api/vehiculos/{id}` | | | | | | ✅ |
 | `/api/pesos` (todo, incluido `GET`) (#307: + AdminBiblioteca) | | ✅ | ✅ | | | ✅ |
+| `POST/PUT/DELETE /api/diccionario-cliente` (§3.19.1; `GET` es de todos) | ✅ | ✅ | ✅ | | | ✅ |
 | `/api/tarifas-plaza` (todo, incluido `GET`) (#307: + AdminBiblioteca) | | ✅ | ✅ | | | ✅ |
 | Escrituras de los 6 passthrough de catálogo (§3.14.1) | | | ✅ | | | ✅ |
 | `/api/asistente/herramientas`: el endpoint es de cualquier rol; cada herramienta repite los roles de la consulta que envuelve (§3.23) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
