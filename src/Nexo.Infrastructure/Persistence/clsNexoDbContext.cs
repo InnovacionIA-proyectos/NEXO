@@ -59,6 +59,7 @@ public class clsNexoDbContext : DbContext
     public DbSet<clsColocacionCargue> ColocacionesCargue => Set<clsColocacionCargue>();
     public DbSet<clsMunicipio> Municipios => Set<clsMunicipio>();
     public DbSet<clsMapeoVehiculoTarifario> MapeosVehiculoTarifario => Set<clsMapeoVehiculoTarifario>();
+    public DbSet<clsRangoPesoContenedor> RangosPesoContenedor => Set<clsRangoPesoContenedor>();
     public DbSet<clsRangoPeso> RangosPeso => Set<clsRangoPeso>();
     public DbSet<clsTarifaPlaza> TarifasPlaza => Set<clsTarifaPlaza>();
     public DbSet<clsTarifaPlazaHistorico> TarifasPlazaHistorico => Set<clsTarifaPlazaHistorico>();
@@ -555,6 +556,14 @@ public class clsNexoDbContext : DbContext
             e.Property(x => x.NombreTarifasPlaza).HasMaxLength(100);
             e.Property(x => x.Verificacion).HasMaxLength(500);
             e.HasIndex(x => x.TipoVehiculo).IsUnique();
+        });
+
+        // Qué vehículo lleva un contenedor de 20 o 40 pies según su peso. El esquema vive en ESQUEMA_NEXO.sql (sin migración de EF).
+        b.Entity<clsRangoPesoContenedor>(e =>
+        {
+            e.ToTable("tbl_rangos_peso_contenedor");
+            e.Property(x => x.TipoVehiculo).HasMaxLength(20).IsRequired();
+            e.HasIndex(x => new { x.Contenedor, x.TipoVehiculo }).IsUnique();
         });
 
         b.Entity<clsMunicipio>(e =>
