@@ -15,8 +15,10 @@ Un examen para la IA que propone a qué campo de NEXO va cada columna del Excel 
 - Mide a la **IA sola**: sin cliente, sin plantilla y con el diccionario vacío. En producción el diccionario resuelve antes algunas
   columnas, así que el resultado real es igual o mejor.
 - Por cada combinación de modelo y esfuerzo: acierto en las columnas con campo, falsos positivos, acierto total, por caso y por formato,
-  columnas que requieren despivotar, errores más frecuentes, costo por Excel, latencia p50 y p95, y fallos.
+  acierto por campo de NEXO, columnas que requieren despivotar, errores más frecuentes, costo por Excel, latencia p50 y p95, y fallos.
 - Deja una **sugerencia automática** con su regla a la vista. La **recomendación** la escribe una persona en el informe.
+- El dataset tiene **16 columnas con campo** (origen 5, destino 4, referencia 4, tipoVehiculo 2, claseContenedor 1): una columna mal en
+  una corrida mueve el acierto unos 6 puntos. Por eso cada caso se repite 3 veces y conviene leer también los errores uno por uno.
 
 ## Cómo correrlo
 
@@ -24,8 +26,11 @@ Necesita en el `.env` de la raíz (o como variables de entorno) `Anthropic__ApiK
 `Anthropic__WorkspaceId`. La llave no se escribe nunca en el informe ni en la consola.
 
 ```bash
-# Desde la raíz del repo. Primero en seco: verifica los casos sin llamar a la IA.
+# Desde la raíz del repo. Primero en seco: verifica los casos (encabezados y respuestas válidas) sin llamar a la IA.
 dotnet run --project tests/evaluacion-ia/arnes -- --seco
+
+# Autoprueba del arnés, sin llamar a la IA: una IA falsa responde lo correcto y el informe debe dar 100 % y 0 falsos positivos.
+dotnet run --project tests/evaluacion-ia/arnes -- --autoprueba --repeticiones 1
 
 # Corrida completa por defecto: Sonnet 4.6 y 5.5 × esfuerzo low, medium y high × 3 repeticiones (126 llamadas).
 dotnet run --project tests/evaluacion-ia/arnes

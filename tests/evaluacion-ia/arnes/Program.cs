@@ -28,8 +28,9 @@ namespace Nexo.EvaluacionIa;
 ///
 /// Uso (desde la raíz del repo):
 ///   dotnet run --project tests/evaluacion-ia/arnes -- [--modelos a,b] [--esfuerzos low,medium,high] [--repeticiones 3]
-///                                                     [--casos caso_01,caso_05] [--paralelo 3] [--timeout 60] [--seco]
+///                                                     [--casos caso_01,caso_05] [--paralelo 3] [--timeout 60] [--seco] [--autoprueba]
 /// La llave sale de Anthropic__ApiKey (variable de entorno o .env de la raíz); nunca se escribe en el informe ni en consola.
+/// <c>--autoprueba</c> prueba el propio arnés sin llamar a la IA: una IA falsa devuelve la respuesta correcta y el informe debe dar 100 %.
 /// </summary>
 public static class Program
 {
@@ -59,7 +60,7 @@ public static class Program
         }
 
         var entorno = LeerEntorno(raiz);
-        if (string.IsNullOrWhiteSpace(entorno.GetValueOrDefault("Anthropic__ApiKey")))
+        if (!opciones.Autoprueba && string.IsNullOrWhiteSpace(entorno.GetValueOrDefault("Anthropic__ApiKey")))
         {
             Console.Error.WriteLine("Falta Anthropic__ApiKey (variable de entorno o .env de la raíz del repo).");
             return 1;
@@ -69,14 +70,14 @@ public static class Program
         var llamadas = new List<clsLlamada>();
         foreach (var combo in combos)
         {
-            var ia = new clsAnthropicAdapter(Options.Create(OpcionesAnthropic(entorno, combo, opciones.TimeoutSegundos)),
-                new clsAvisosEnConsola<clsAnthropicAdapter>());
+            IAsistenteIaPort? ia = opciones.Autoprueba ? null : new clsAnthropicAdapter(
+                Options.Create(OpcionesAnthropic(entorno, combo, opciones.TimeoutSegundos)), new clsAvisosEnConsola<clsAnthropicAdapter>());
             var trabajos = Enumerable.Range(1, opciones.Repeticiones).SelectMany(r => casos.Select(c => (Caso: c, Repeticion: r)));
             using var cupo = new SemaphoreSlim(opciones.Paralelo);
             var delCombo = await Task.WhenAll(trabajos.Select(async t =>
             {
                 await cupo.WaitAsync();
-                try { return await EvaluarAsync(ia, combo, t.Caso, t.Repeticion); }
+                try { return await EvaluarAsync(ia ?? new clsIaPerfecta(t.Caso.Respuesta), combo, t.Caso, t.Repeticion); }
                 finally { cupo.Release(); }
             }));
             llamadas.AddRange(delCombo);
@@ -87,7 +88,7 @@ public static class Program
 
         var carpeta = Path.Combine(raiz, "tests", "evaluacion-ia", "informes");
         Directory.CreateDirectory(carpeta);
-        var nombre = $"{inicio:yyyy-MM-dd_HHmm}_mapeo";
+        var nombre = $"{inicio:yyyy-MM-dd_HHmm}_mapeo" + (opciones.Autoprueba ? "_autoprueba" : "");
         await File.WriteAllTextAsync(Path.Combine(carpeta, nombre + ".json"), JsonSerializer.Serialize(llamadas, Json));
         await File.WriteAllTextAsync(Path.Combine(carpeta, nombre + ".md"), clsInforme.Escribir(inicio, opciones, casos, combos, llamadas));
         Console.WriteLine($"Informe: tests/evaluacion-ia/informes/{nombre}.md");
@@ -152,6 +153,13 @@ public static class Program
                     $"{respuesta.Caso}: los encabezados de analizar-excel no coinciden con la respuesta (columna {i}: " +
                     $"«{leidos.ElementAtOrDefault(i)}» contra «{esperados.ElementAtOrDefault(i)}»). Vuelve a correr generar_dataset.py.");
             }
+            // Y debe usar las listas cerradas vigentes de sugerir-mapeo: una respuesta imposible de dar no se puede acertar.
+            foreach (var c in respuesta.Columnas)
+                foreach (var (campo, transformacion) in c.AlternativasAceptadas.Select(a => (a.Campo, a.Transformacion)).Prepend((c.Campo, c.Transformacion)))
+                    if (!clsTerminoCliente.CamposDestino.Contains(campo) || !clsTransformacionesMapeo.Todas.Contains(transformacion)
+                        || !clsTransformacionesMapeo.Aplica(campo, transformacion))
+                        throw new InvalidOperationException(
+                            $"{respuesta.Caso}, columna {c.Indice}: «{campo}» con «{transformacion}» no es una respuesta válida de sugerir-mapeo.");
             casos.Add(new clsCaso(respuesta, hoja.Encabezados, hoja.Filas));
         }
         return casos;
@@ -196,7 +204,7 @@ public static class Program
 
 public sealed record clsOpcionesArnes(
     IReadOnlyList<string> Modelos, IReadOnlyList<string> Esfuerzos, int Repeticiones, IReadOnlyList<string> Casos, int Paralelo,
-    int? TimeoutSegundos, bool Seco)
+    int? TimeoutSegundos, bool Seco, bool Autoprueba)
 {
     public static clsOpcionesArnes Leer(string[] args)
     {
@@ -215,7 +223,8 @@ public sealed record clsOpcionesArnes(
             Lista("casos", ""),
             int.TryParse(Valor("paralelo"), out var p) ? Math.Clamp(p, 1, 8) : 3,
             int.TryParse(Valor("timeout"), out var t) ? t : null,
-            args.Contains("--seco"));
+            args.Contains("--seco"),
+            args.Contains("--autoprueba"));
     }
 }
 
@@ -245,13 +254,14 @@ public sealed record clsColumnaPropuesta(int Indice, string Campo, string Transf
 /// <param name="Errores">Las columnas mal propuestas, para leer qué se equivoca.</param>
 public sealed record clsCalificacion(
     int Columnas, int Aciertos, int ConCampo, int AciertosConCampo, int Ignorar, int FalsosPositivos,
-    IReadOnlyList<clsError> Errores, IReadOnlyList<clsDespivotar> Despivotar)
+    IReadOnlyList<clsError> Errores, IReadOnlyList<clsDespivotar> Despivotar, IReadOnlyList<clsPorCampo> PorCampo)
 {
     public static clsCalificacion De(clsRespuestaCaso respuesta, IReadOnlyList<clsColumnaPropuesta> propuesta)
     {
         int aciertos = 0, conCampo = 0, aciertosConCampo = 0, ignorar = 0, falsos = 0;
         var errores = new List<clsError>();
         var despivotar = new List<clsDespivotar>();
+        var porCampo = new List<clsPorCampo>();
         foreach (var esperada in respuesta.Columnas)
         {
             var p = propuesta.FirstOrDefault(c => c.Indice == esperada.Indice);
@@ -271,10 +281,11 @@ public sealed record clsCalificacion(
             {
                 conCampo++;
                 if (bien) aciertosConCampo++;
+                porCampo.Add(new clsPorCampo(esperada.Campo, bien));
             }
             if (esperada.RequiereDespivotar) despivotar.Add(new clsDespivotar(esperada.Columna, campo));
         }
-        return new(respuesta.Columnas.Count, aciertos, conCampo, aciertosConCampo, ignorar, falsos, errores, despivotar);
+        return new(respuesta.Columnas.Count, aciertos, conCampo, aciertosConCampo, ignorar, falsos, errores, despivotar, porCampo);
     }
 
     /// <summary>
@@ -294,6 +305,9 @@ public sealed record clsCalificacion(
 public sealed record clsError(int Indice, string Columna, string Esperado, string Propuesto);
 
 public sealed record clsDespivotar(string Columna, string Propuesto);
+
+/// <summary>Una columna con campo de la respuesta (origen, destino…) y si la propuesta la acertó: el acierto por campo de NEXO.</summary>
+public sealed record clsPorCampo(string Campo, bool Acierto);
 
 public sealed record clsLlamada(
     string Modelo, string Esfuerzo, string Caso, string Formato, int Repeticion, bool IaUsada, string? MotivoSinIa, string? ModeloRespondido,
@@ -361,6 +375,25 @@ public sealed class clsIaMedida(IAsistenteIaPort ia) : IAsistenteIaPort
         {
             Milisegundos = reloj.ElapsedMilliseconds;
         }
+    }
+}
+
+/// <summary>
+/// La IA falsa de <c>--autoprueba</c>: responde, en el formato que pide sugerir-mapeo, exactamente la respuesta correcta del caso. Sirve
+/// para probar que el arnés califica bien (debe dar 100 % y 0 falsos positivos) sin llamar al proveedor.
+/// </summary>
+public sealed class clsIaPerfecta(clsRespuestaCaso respuesta) : IAsistenteIaPort
+{
+    public bool Habilitada(clsFuncionIa funcion) => true;
+
+    public Task<clsRespuestaIa> CompletarAsync(clsPeticionIa peticion, CancellationToken ct = default)
+    {
+        var json = JsonSerializer.Serialize(new
+        {
+            columnas = respuesta.Columnas.Select(c => new { indice = c.Indice, campo = c.Campo, transformacion = c.Transformacion, confianza = 1.0, nota = "" }),
+            dudas = Array.Empty<string>(),
+        });
+        return Task.FromResult(new clsRespuestaIa(json, json, "autoprueba", 1000, 100, TimeSpan.FromMilliseconds(1)));
     }
 }
 

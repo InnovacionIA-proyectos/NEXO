@@ -45,6 +45,7 @@ public static class clsInforme
 
         Matriz(s, "Acierto con campo por caso", casos.Select(c => c.Respuesta.Caso).ToList(), combos, llamadas, l => l.Caso);
         Matriz(s, "Acierto con campo por formato", casos.Select(c => c.Respuesta.Formato).Distinct().ToList(), combos, llamadas, l => l.Formato);
+        PorCampo(s, casos, combos, llamadas);
 
         Despivotar(s, combos, llamadas);
         Errores(s, llamadas);
@@ -75,6 +76,29 @@ public static class clsInforme
                 return total == 0 ? "—" : Program.Pct((double)cal.Sum(x => x.AciertosConCampo) / total);
             });
             s.AppendLine($"| {fila} | " + string.Join(" | ", celdas) + " |");
+        }
+        s.AppendLine();
+    }
+
+    /// <summary>El acierto por campo de NEXO: de las columnas que la respuesta asigna a cada campo, cuántas acertó cada combinación.</summary>
+    private static void PorCampo(StringBuilder s, IReadOnlyList<clsCaso> casos, IReadOnlyList<clsCombo> combos, IReadOnlyList<clsLlamada> llamadas)
+    {
+        var campos = casos.SelectMany(c => c.Respuesta.Columnas).Where(c => c.Campo != "ignorar").Select(c => c.Campo).Distinct().Order().ToList();
+        s.AppendLine("## Acierto por campo de NEXO");
+        s.AppendLine();
+        s.AppendLine("Entre paréntesis, cuántas columnas de ese campo hay en el dataset.");
+        s.AppendLine();
+        s.AppendLine("| Campo | " + string.Join(" | ", combos) + " |");
+        s.AppendLine("|---|" + string.Concat(combos.Select(_ => "---|")));
+        foreach (var campo in campos)
+        {
+            var enDataset = casos.Sum(c => c.Respuesta.Columnas.Count(x => x.Campo == campo));
+            var celdas = combos.Select(c =>
+            {
+                var x = llamadas.Where(l => l.Combo == c && l.IaUsada).SelectMany(l => l.Calificacion.PorCampo).Where(p => p.Campo == campo).ToList();
+                return x.Count == 0 ? "—" : Program.Pct((double)x.Count(p => p.Acierto) / x.Count);
+            });
+            s.AppendLine($"| {campo} ({enDataset}) | " + string.Join(" | ", celdas) + " |");
         }
         s.AppendLine();
     }
