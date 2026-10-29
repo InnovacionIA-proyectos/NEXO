@@ -1,6 +1,0 @@
-﻿Id,Clave,Valor,Descripcion,CreadoPor
-f2c1bc4c-d3c4-4071-ba22-0353de9e1e7a,k_max,10,Tope de vehiculos por grupo antes de 'sin seleccion automatica',seeder
-663bfc5a-4285-4371-90a1-f8f1822562a1,factor_vol_util,0.90,Fraccion de volumen aprovechable en la practica,seeder
-30d0311f-5165-4f47-881d-75ec6e09bd2a,usar_alternativa,solo_respaldo,Si la carroceria alternativa entra desde el inicio o solo como respaldo,seeder
-f0a2ae59-f700-411b-8136-874ab270a4c4,umbral_alerta_llenado,0.75,Por debajo de este llenado se marca alerta,seeder
-4472ffac-0f19-436a-af76-003ca8c39528,margen_cg,0.30,Centro de gravedad dentro de +-30% del centro,seeder
