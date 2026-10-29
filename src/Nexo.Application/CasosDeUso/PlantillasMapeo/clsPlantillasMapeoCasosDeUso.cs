@@ -4,6 +4,7 @@ using Nexo.Application.CasosDeUso.MapeoExcel;
 using Nexo.Application.CasosDeUso.MapeoExcel.DTOs;
 using Nexo.Application.CasosDeUso.PlantillasMapeo.DTOs;
 using Nexo.Application.CasosDeUso.PlantillasMapeo.Interfaces;
+using Nexo.Application.CasosDeUso.Solicitudes;
 using Nexo.Application.Common;
 using Nexo.Application.Common.Abstractions;
 using Nexo.Application.Common.Exceptions;
@@ -63,14 +64,17 @@ internal static class clsPlantillasMapeoReglas
 /// Guarda el mapeo que el usuario confirmó como la plantilla de un cliente. Es un «guardar o reemplazar»: la plantilla se identifica por los
 /// encabezados (su firma), así que guardar otra vez con los mismos encabezados actualiza la que ya había y no crea una segunda. El mapeo se
 /// valida igual que al aplicarlo (campos y conversiones de las listas, sin campos repetidos y con origen y destino): una plantilla que
-/// luego no se pudiera aplicar no sirve. 400 si el cliente no existe, los encabezados no son válidos o el mapeo no es válido.
+/// luego no se pudiera aplicar no sirve. El cliente se indica con <paramref name="ClienteId"/> o con <paramref name="ClienteNit"/> (si vienen los
+/// dos manda el id): con el NIT se usa el cliente local y, si aún no existe, se crea con los datos del DW. 400 si el cliente no existe, el NIT
+/// no es de ningún cliente ni prospecto, los encabezados no son válidos o el mapeo no es válido.
 /// </summary>
 public sealed record clsGuardarPlantillaMapeoCommand(
-    Guid? ClienteId, string? Nombre, IReadOnlyList<string?>? Encabezados, IReadOnlyList<clsColumnaAAplicar>? Columnas)
+    Guid? ClienteId, string? Nombre, IReadOnlyList<string?>? Encabezados, IReadOnlyList<clsColumnaAAplicar>? Columnas, string? ClienteNit = null)
     : ICommand<clsPlantillaGuardadaDto>;
 
 public sealed class clsGuardarPlantillaMapeoCommandHandler(
-    IPlantillasMapeoRepository repositorio, IAuditoriaPort auditoria, ICurrentUserPort usuarioActual, IUnitOfWork uow, TimeProvider reloj)
+    IPlantillasMapeoRepository repositorio, IAuditoriaPort auditoria, ICurrentUserPort usuarioActual, IUnitOfWork uow, TimeProvider reloj,
+    clsClienteDeImportacion clienteDeImportacion)
     : ICommandHandler<clsGuardarPlantillaMapeoCommand, clsPlantillaGuardadaDto>
 {
     public Task<clsPlantillaGuardadaDto> Handle(clsGuardarPlantillaMapeoCommand command, CancellationToken ct = default) =>
@@ -78,10 +82,17 @@ public sealed class clsGuardarPlantillaMapeoCommandHandler(
 
     private async Task<clsPlantillaGuardadaDto> Guardar(clsGuardarPlantillaMapeoCommand command, bool reintento, CancellationToken ct)
     {
-        if (command.ClienteId is not { } clienteId)
-            throw new clsValidationFailedException("CLIENTE_REQUERIDO", "Indica el cliente dueño de la plantilla.");
-        if (!await repositorio.ClienteExisteAsync(clienteId, ct))
-            throw new clsValidationFailedException("CLIENTE_NO_ENCONTRADO", "El cliente no existe.");
+        Guid clienteId;
+        if (command.ClienteId is { } id)
+        {
+            if (!await repositorio.ClienteExisteAsync(id, ct))
+                throw new clsValidationFailedException("CLIENTE_NO_ENCONTRADO", "El cliente no existe.");
+            clienteId = id;
+        }
+        else if (!string.IsNullOrWhiteSpace(command.ClienteNit))
+            clienteId = await clienteDeImportacion.ObtenerOCrearAsync(command.ClienteNit, ct);
+        else
+            throw new clsValidationFailedException("CLIENTE_REQUERIDO", "Indica el cliente dueño de la plantilla (clienteId o clienteNit).");
 
         var nombre = clsTexto.Limpiar(command.Nombre);
         if (nombre is { Length: > clsPlantillasMapeoReglas.MaxNombre })
@@ -190,5 +201,6 @@ public static class clsPlantillasMapeoDependencyInjection
     public static IServiceCollection AddPlantillasMapeoUseCases(this IServiceCollection services) => services
         .AddScoped<ICommandHandler<clsGuardarPlantillaMapeoCommand, clsPlantillaGuardadaDto>, clsGuardarPlantillaMapeoCommandHandler>()
         .AddScoped<IQueryHandler<clsListarPlantillasMapeoQuery, IReadOnlyList<clsPlantillaMapeoDto>>, clsListarPlantillasMapeoQueryHandler>()
-        .AddScoped<ICommandHandler<clsEliminarPlantillaMapeoCommand, Unit>, clsEliminarPlantillaMapeoCommandHandler>();
+        .AddScoped<ICommandHandler<clsEliminarPlantillaMapeoCommand, Unit>, clsEliminarPlantillaMapeoCommandHandler>()
+        .AddScoped<clsClienteDeImportacion>();
 }
