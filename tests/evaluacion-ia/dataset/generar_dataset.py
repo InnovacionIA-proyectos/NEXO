@@ -140,6 +140,8 @@ CASOS = {
         'cliente': 'D', 'formato': 'fila_por_linea',
         'descripcion': 'Formulario de oferta de importación y exportación: una fila por ruta y contenedor con rango de peso.',
         'tratamiento': {0: 'mantener', 1: 'ruta', 4: 'mantener', 5: 'mantener'},
+        # El original es el formulario ya costeado: los costos y tarifas se vacían, como llega una licitación.
+        'vaciar': range(7, 14),
         'respuesta': {
             0: col('referencia', nota='Identificador de la ruta del cliente.'),
             1: col('origen', 'dividir_origen_destino', alternativas=DIV, nota='«ORIGEN-DESTINO» en una sola celda.'),

@@ -100,7 +100,7 @@ y cambian todo lo demás:
 - **Rutas de varias paradas**: cada ciudad por su reemplazo, con el mismo separador.
 - **Números** (volúmenes, kilómetros, precios, tiempos): inventados, con magnitud parecida y siempre distintos al original.
 - **Tarifas ya diligenciadas**: si el original es un formulario ya respondido, esas columnas quedan vacías, como llega una licitación
-  (caso 5).
+  (casos 5 y 7).
 - **Notas largas e instrucciones**: texto genérico. **Títulos y textos de arriba del encabezado**: texto genérico, conservando cuántos valores
   distintos tiene cada fila (si no, cambiaría la fila que `analizar-excel` toma como encabezado).
 - **Se conserva**: el vocabulario que el modelo debe reconocer (tipos de vehículo y servicio, configuraciones SICE-TAC, contenedores por rango
