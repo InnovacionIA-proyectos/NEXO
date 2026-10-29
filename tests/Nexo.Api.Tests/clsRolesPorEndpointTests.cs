@@ -72,6 +72,12 @@ public class clsRolesPorEndpointTests(clsApiFixture fx)
             new("Asistente POST consultar_propuesta_linea", HttpMethod.Post, "/api/asistente/herramientas/consultar_propuesta_linea", Mesa, new { }),
             new("Asistente POST consultar_aprovisionamiento", HttpMethod.Post, "/api/asistente/herramientas/consultar_aprovisionamiento", ["Comercial", "Admin"], new { }),
 
+            // ---- diccionario de términos por cliente: leer es para todos; escribir también lo hace el Comercial
+            new("Diccionario cliente GET", HttpMethod.Get, "/api/diccionario-cliente", Todos),
+            new("Diccionario cliente POST", HttpMethod.Post, "/api/diccionario-cliente", ["Comercial", "AdminBiblioteca", "AdminTarifas", "Admin"], new { }),
+            new("Diccionario cliente PUT", HttpMethod.Put, $"/api/diccionario-cliente/{Inexistente}", ["Comercial", "AdminBiblioteca", "AdminTarifas", "Admin"], new { }),
+            new("Diccionario cliente DELETE", HttpMethod.Delete, $"/api/diccionario-cliente/{Inexistente}", ["Comercial", "AdminBiblioteca", "AdminTarifas", "Admin"]),
+
             // ---- Cubicador completo para AdminTarifas (#310); AdminBiblioteca no
             new("planes-cargue POST", HttpMethod.Post, "/api/planes-cargue", CosteoYCubicador, new { }),
             new("planes-cargue POST /demo", HttpMethod.Post, "/api/planes-cargue/demo", CosteoYCubicador, Sondeable: false),
