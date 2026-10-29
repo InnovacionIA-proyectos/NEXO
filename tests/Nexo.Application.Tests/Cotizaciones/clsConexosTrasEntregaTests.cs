@@ -63,7 +63,7 @@ public class clsConexosTrasEntregaTests
         var existente = new clsCotizacionConexo
         {
             Id = Guid.NewGuid(), CotizacionId = c.Id, CotizacionLineaId = lineaId, ServicioConexoId = servicio.Id,
-            clsServicioConexo = servicio, Cantidad = 2, ValorAplicado = 100_000m,
+            clsServicioConexo = servicio, Cantidad = 2, ValorAplicado = 100_000m, PrecioVentaUnitario = 50_000m,
         };
         c.Conexos.Add(existente);
         c.Total = 1_100_000m;

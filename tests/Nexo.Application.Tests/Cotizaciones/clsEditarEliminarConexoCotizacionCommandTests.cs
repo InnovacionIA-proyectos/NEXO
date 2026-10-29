@@ -41,7 +41,7 @@ public class clsEditarEliminarConexoCotizacionCommandTests
         var conexo = new clsCotizacionConexo
         {
             Id = Guid.NewGuid(), CotizacionId = cotizacionId, CotizacionLineaId = lineaId,
-            ServicioConexoId = servicio.Id, clsServicioConexo = servicio, Cantidad = 2, ValorAplicado = 100_000m,
+            ServicioConexoId = servicio.Id, clsServicioConexo = servicio, Cantidad = 2, ValorAplicado = 100_000m, PrecioVentaUnitario = 50_000m,
         };
         var cotizacion = new clsCotizacion { Id = cotizacionId, Estado = estado, Total = 100_000m };
         cotizacion.Lineas.Add(new clsCotizacionLinea { Id = lineaId, CotizacionId = cotizacionId });

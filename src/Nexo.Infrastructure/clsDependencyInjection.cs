@@ -340,6 +340,23 @@ public static class clsDependencyInjection
             services.AddScoped<ICubicacionRapidaPort, clsCubicacionRapidaNoConfiguradoAdapter>();
         }
 
+        // GET /recomendaciones/explicacion: mismas llaves, pero el texto lo escribe un modelo y tarda segundos, así que tiene su propio tiempo de
+        // espera (por defecto 30 s). Sin configurar no es un error: la explicación es opcional y sale en null.
+        if (!string.IsNullOrWhiteSpace(cubicadorOutboundBaseUrl) && !string.IsNullOrWhiteSpace(cubicadorRecomendacionesApiKey))
+        {
+            services.AddHttpClient<ICubicadorExplicacionPort, clsCubicadorExplicacionAdapter>(cliente =>
+            {
+                cliente.BaseAddress = new Uri(cubicadorOutboundBaseUrl.TrimEnd('/') + "/");
+                cliente.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", cubicadorRecomendacionesApiKey);
+                cliente.Timeout = TimeSpan.FromSeconds(
+                    int.TryParse(config["Cubicador3D:ExplicacionTimeoutSegundos"], out var se) ? Math.Clamp(se, 5, 120) : 30);
+            });
+        }
+        else
+        {
+            services.AddScoped<ICubicadorExplicacionPort, clsCubicadorExplicacionNoConfiguradoAdapter>();
+        }
+
         // S5-HU-18.6/#278: passthrough de los seis CRUD de catálogo del Cubicador
         // (cubicador/CONTRATO.md §3.2). OutboundApiKey es la llave GENÉRICA
         // (CUBICADOR_API_KEY del lado del Cubicador, que `verificar_api_key` valida para

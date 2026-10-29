@@ -127,6 +127,17 @@ public class clsCotizacionConexo : IAuditable
     public decimal ValorAplicado { get; set; }
 
     /// <summary>
+    /// Precio de venta de una unidad del servicio en el momento de agregarlo: el de la biblioteca o, si no tenía, su costo. Queda fijo aunque la
+    /// biblioteca cambie después. <see cref="ValorAplicado"/> sigue siendo el COSTO; lo que se cotiza es <see cref="ValorVenta"/>.
+    /// </summary>
+    [Range(typeof(decimal), "0", "9999999999999.99", ParseLimitsInInvariantCulture = true)]
+    public decimal PrecioVentaUnitario { get; set; }
+
+    /// <summary>Lo que se cotiza del conexo: <see cref="PrecioVentaUnitario"/> × <see cref="Cantidad"/>, a 2 decimales (como el costo).</summary>
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+    public decimal ValorVenta => Math.Round(PrecioVentaUnitario * Cantidad, 2, MidpointRounding.AwayFromZero);
+
+    /// <summary>
     /// S5-HU-18/#262: "individual" (el usuario lo agregó a ESTA línea puntual) o
     /// "general" (el usuario pidió agregarlo a TODAS las líneas de la cotización de una
     /// sola vez, lo que en la práctica crea un clsCotizacionConexo por línea — sigue

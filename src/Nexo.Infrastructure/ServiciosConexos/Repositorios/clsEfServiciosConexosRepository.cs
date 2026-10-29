@@ -78,9 +78,19 @@ public sealed class clsEfServiciosConexosRepository(clsNexoDbContext db) : IServ
         db.AuditLogs.Add(new clsAuditLog
         {
             UsuarioId = servicio.ActualizadoPor, Entidad = "servicios_conexos", EntidadId = servicio.Id,
-            Accion = "crear", Diff = $"{{\"codigoServicio\":\"{servicio.CodigoServicio}\",\"tipoServicio\":\"{servicio.TipoServicio}\"}}",
+            Accion = "crear", Diff = System.Text.Json.JsonSerializer.Serialize(new
+            {
+                codigoServicio = servicio.CodigoServicio, tipoServicio = servicio.TipoServicio, precioVenta = servicio.PrecioVenta,
+            }),
         });
     }
+
+    public void RegistrarCambioDePrecioVenta(clsServicioConexo servicio, decimal? precioVentaAntes) =>
+        db.AuditLogs.Add(new clsAuditLog
+        {
+            UsuarioId = servicio.ActualizadoPor, Entidad = "servicios_conexos", EntidadId = servicio.Id,
+            Accion = "editar", Diff = System.Text.Json.JsonSerializer.Serialize(new { precioVenta = new { antes = precioVentaAntes, despues = servicio.PrecioVenta } }),
+        });
 
     public Task<clsServicioConexo?> ObtenerAsync(Guid id, CancellationToken ct) =>
         db.ServiciosConexos.FirstOrDefaultAsync(s => s.Id == id, ct);
@@ -108,7 +118,7 @@ public sealed class clsEfServiciosConexosRepository(clsNexoDbContext db) : IServ
             // dejan vacías y se normalizan a "NO APLICA"). Si la primera fila no parece
             // encabezado, se asume Codigo | Tipo | Costo en las 3 primeras columnas.
             int cCodigo = 1, cTipo = 2, cCosto = 3, cOrigen = 0, cDestino = 0, cPuerto = 0, cRuta = 0,
-                cMaquina = 0, cUnidad = 0, cVigencia = 0, cCategoria = 0, cActivo = 0, primeraDataIdx = 0;
+                cMaquina = 0, cUnidad = 0, cVigencia = 0, cCategoria = 0, cActivo = 0, cPrecioVenta = 0, primeraDataIdx = 0;
             var cols = usado.ColumnCount();
             var enc = filas.First();
             string H(int c) => clsTexto.Normalizar(Txt(enc, c));
@@ -119,7 +129,9 @@ public sealed class clsEfServiciosConexosRepository(clsNexoDbContext db) : IServ
                 for (var c = 1; c <= cols; c++)
                 {
                     var h = H(c);
-                    if (h.Contains("CODIGO")) cCodigo = c;
+                    // La columna de venta se busca PRIMERO: «VALOR VENTA» o «PRECIO VENTA» no son el costo aunque contengan «VALOR».
+                    if (h.Contains("VENTA")) cPrecioVenta = c;
+                    else if (h.Contains("CODIGO")) cCodigo = c;
                     else if (h.Contains("TIPO SERVICIO") || h.Contains("SERVICIO")) cTipo = c;
                     else if (h.Contains("ORIGEN")) cOrigen = c;
                     else if (h.Contains("DESTINO")) cDestino = c;
@@ -174,6 +186,9 @@ public sealed class clsEfServiciosConexosRepository(clsNexoDbContext db) : IServ
                 // genérico. Una fila inválida nunca descarta las demás: se cuenta y se sigue.
                 var costo = LeerDecimal(fila.Cell(cCosto));
                 var unidad = cUnidad > 0 ? Txt(fila, cUnidad) : "";
+                // Sin columna o con la celda vacía no hay precio de venta que leer: no se toca el que ya tenga el servicio.
+                var precioVentaTxt = cPrecioVenta > 0 ? Txt(fila, cPrecioVenta) : "";
+                var precioVenta = precioVentaTxt.Length > 0 ? LeerDecimal(fila.Cell(cPrecioVenta)) : null;
                 string? motivoInvalido =
                     codigo.Length == 0 ? "CODIGO vacío"
                     : tipo.Length == 0 ? "TIPO SERVICIO vacío"
@@ -184,6 +199,9 @@ public sealed class clsEfServiciosConexosRepository(clsNexoDbContext db) : IServ
                     : unidad.Length > 30 ? $"UNIDAD de {unidad.Length} caracteres (máx. 30)"
                     : costo < 0 ? "COSTO/VALOR negativo"
                     : costo >= 10_000_000_000_000_000m ? "COSTO/VALOR excede el máximo permitido (16 dígitos enteros)"
+                    : precioVentaTxt.Length > 0 && precioVenta is null ? "PRECIO VENTA ilegible"
+                    : precioVenta < 0 ? "PRECIO VENTA negativo"
+                    : precioVenta >= 10_000_000_000_000_000m ? "PRECIO VENTA excede el máximo permitido (16 dígitos enteros)"
                     : null;
                 if (motivoInvalido is not null)
                 {
@@ -211,6 +229,7 @@ public sealed class clsEfServiciosConexosRepository(clsNexoDbContext db) : IServ
                 {
                     existente.TipoServicio = tipo;
                     existente.CostoUnitario = costo!.Value;
+                    if (precioVenta is { } pv) existente.PrecioVenta = Math.Round(pv, 2, MidpointRounding.AwayFromZero);
                     existente.Unidad = unidad;
                     if (vigencia is { } v) existente.Vigencia = v;
                     if (categoria.Length > 0) existente.Categoria = clsServicioConexoCategoria.Normalizada(categoria);
@@ -235,6 +254,7 @@ public sealed class clsEfServiciosConexosRepository(clsNexoDbContext db) : IServ
                     Ruta = ruta,
                     TipoMaquina = maquina,
                     CostoUnitario = costo!.Value,
+                    PrecioVenta = precioVenta is { } nuevoPv ? Math.Round(nuevoPv, 2, MidpointRounding.AwayFromZero) : null,
                     Unidad = unidad,
                     Vigencia = vigencia ?? DateOnly.FromDateTime(DateTime.UtcNow),
                     Categoria = clsServicioConexoCategoria.Normalizada(categoria),

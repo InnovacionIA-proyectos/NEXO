@@ -32,6 +32,10 @@ public class clsCrearServicioConexoRequest
     [Required, Range(typeof(decimal), "0", "9999999999999.99", ParseLimitsInInvariantCulture = true)]
     public decimal CostoUnitario { get; set; }
 
+    /// <summary>Precio al cliente del servicio, con su margen incluido. Opcional: sin él, el servicio se cotiza a su costo.</summary>
+    [Range(typeof(decimal), "0", "9999999999999.99", ParseLimitsInInvariantCulture = true)]
+    public decimal? PrecioVenta { get; set; }
+
     [Required, MaxLength(30)]
     public string Unidad { get; set; } = null!;
 
@@ -71,6 +75,13 @@ public class clsEditarServicioConexoRequest
 
     [Range(typeof(decimal), "0", "9999999999999.99", ParseLimitsInInvariantCulture = true)]
     public decimal? CostoUnitario { get; set; }
+
+    /// <summary>Nuevo precio de venta. Un PATCH sin este campo no lo toca; para borrarlo usa <see cref="LimpiarPrecioVenta"/>.</summary>
+    [Range(typeof(decimal), "0", "9999999999999.99", ParseLimitsInInvariantCulture = true)]
+    public decimal? PrecioVenta { get; set; }
+
+    /// <summary><c>true</c> deja el servicio sin precio de venta (se cotizará a su costo). No se puede combinar con <see cref="PrecioVenta"/>.</summary>
+    public bool? LimpiarPrecioVenta { get; set; }
 
     [MaxLength(30)]
     public string? Unidad { get; set; }

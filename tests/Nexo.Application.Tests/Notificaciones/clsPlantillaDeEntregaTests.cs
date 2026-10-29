@@ -44,6 +44,19 @@ public class clsPlantillaDeEntregaTests
     }
 
     [Fact]
+    public void El_subtotal_de_servicios_del_correo_es_el_de_venta_y_no_el_costo()
+    {
+        var c = Cotizacion();
+        c.Conexos.Add(new clsCotizacionConexo { Cantidad = 2, ValorAplicado = 100_000m, PrecioVentaUnitario = 80_000m });
+        c.Total = 48_982_983m + 160_000m;
+
+        var cuerpo = clsPlantillaDeEntrega.CuerpoHtml(c, Cliente, "Ismael");
+
+        Assert.Contains("160.000 COP", cuerpo);
+        Assert.DoesNotContain("100.000 COP", cuerpo);
+    }
+
+    [Fact]
     public void El_cuerpo_nunca_pierde_el_aviso_de_que_es_interno()
     {
         // Regla de negocio, no solo cosmética: este correo no se le manda al cliente.
