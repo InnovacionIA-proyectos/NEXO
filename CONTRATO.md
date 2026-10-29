@@ -820,6 +820,7 @@ no se esconde**: responde `429 IA_TOPE_DIARIO` (§3.22 si el módulo de IA está
 | Body | | Tipo | Restricción |
 |---|---|---|---|
 | `clienteId` | *opcional* | UUID | El cliente dueño del archivo. Sin él solo se usa el diccionario general |
+| `clienteNit` | *opcional* | string | máx. 30. Alternativa a `clienteId`: el NIT del cliente o prospecto (ver «Cliente por NIT»); si vienen los dos, manda `clienteId`. **Solo busca** el cliente local; si no existe se responde como sin cliente |
 | `encabezados` | **requerido** | string[] | 1 a 100 columnas, en el orden del archivo |
 | `filas` | *opcional* | string[][] | Las filas de la misma hoja (máx. 1000; solo se usan las primeras 20) |
 
@@ -850,6 +851,15 @@ interface ColumnaMapeadaDto {
   `dividir_origen_destino` con `origen`/`destino`, `numero_coma_decimal` con un campo numérico, `fecha` con `deadline`; una columna `ignorar` siempre lleva `ninguna`.
 - **→** `200 SugerenciaMapeoDto`
 - **Errores**: `400 VALIDATION_ERROR` (sin encabezados, o más de 100) · `400 ENCABEZADOS_REQUERIDOS` · `400 DEMASIADAS_COLUMNAS` · `429 IA_TOPE_DIARIO`
+
+#### Cliente por NIT (`clienteNit`)
+Con el DW configurado, `GET /clientes` devuelve `clienteId = null` (el cliente puede no existir aún en NEXO), así que `sugerir-mapeo`, `aplicar-mapeo`, `normalizar-valores`, `PUT plantillas-mapeo` y
+`GET plantillas-mapeo` aceptan el **NIT** como alternativa a `clienteId` (también el de un prospecto). Si vienen los dos, manda `clienteId`.
+- **Formato**: se compara sin puntos, espacios ni dígito de verificación (lo que va después del primer guion): `900.123.456-7`, `900 123 456` y `900123456` son el mismo cliente.
+- **Lecturas** (`sugerir-mapeo`, `aplicar-mapeo`, `normalizar-valores`, `GET plantillas-mapeo`): buscan el cliente local por NIT y **nunca crean** uno. Si no existe se comportan como sin cliente
+  (solo diccionario general, sin plantilla; el `GET` responde lista vacía).
+- **`PUT plantillas-mapeo`**: si el NIT no tiene cliente local, lo **crea** con nombre y NIT del catálogo de clientes del DW o, si no está, de la tabla de prospectos. Nunca duplica por NIT: un
+  prospecto que luego es cliente real sigue siendo el mismo cliente local. `400 CLIENTE_NIT_INVALIDO` si el NIT no es de ningún cliente ni prospecto (un NIT en blanco es `400 CLIENTE_REQUERIDO`).
 
 #### `/api/captura-solicitudes/plantillas-mapeo` — plantillas de mapeo por cliente
 El mapeo que el usuario **confirmó** para el Excel de un cliente se guarda como su plantilla (`tbl_plantillas_mapeo_cliente`). Cuando llega otro archivo del cliente con
@@ -883,12 +893,13 @@ Las columnas se guardan con una **versión** (`{ "version": 1, "columnas": [...]
 
 | Body | | Tipo | Restricción |
 |---|---|---|---|
-| `clienteId` | **requerido** | UUID | Debe existir |
+| `clienteId` | condicional | UUID | **Requerido si no viene `clienteNit`**; debe existir. Si vienen los dos, manda este |
+| `clienteNit` | condicional | string | máx. 30. **Requerido si no viene `clienteId`**. Si no tiene cliente local, se crea con los datos del DW (ver «Cliente por NIT»); `400 CLIENTE_NIT_INVALIDO` si no es de ningún cliente ni prospecto |
 | `nombre` | *opcional* | string | máx. 100 |
 | `encabezados` | **requerido** | string[] | 1 a 100, en el orden del archivo; cada uno máx. 200 caracteres |
 | `columnas` | **requerido** | `{ indice, campo, transformacion? }[]` | El mismo mapeo de `aplicar-mapeo` (una entrada por columna; las que no se usan, `ignorar`). Se valida igual: campos y conversiones de las listas, sin campos repetidos y con origen y destino; `indice` < cantidad de encabezados |
 
-**`GET /api/captura-solicitudes/plantillas-mapeo?clienteId=`** — las plantillas del cliente (sin `clienteId`, las de todos).
+**`GET /api/captura-solicitudes/plantillas-mapeo?clienteId=`** (o **`?clienteNit=`**) — las plantillas del cliente (sin ninguno de los dos, las de todos). Con un NIT que aún no tiene cliente local responde `200 []` y no crea nada.
 **`DELETE /api/captura-solicitudes/plantillas-mapeo/{id}`** — la borra (`204`); el siguiente archivo con esos encabezados se vuelve a sugerir.
 
 ```ts
@@ -923,6 +934,7 @@ peso requerido y coherente con la carga. Lo que sale en `lineas` la captura lo a
 | Body | | Tipo | Restricción |
 |---|---|---|---|
 | `clienteId` | *opcional* | UUID | El cliente dueño del archivo; su diccionario traduce los valores |
+| `clienteNit` | *opcional* | string | máx. 30. Alternativa a `clienteId`: el NIT del cliente o prospecto (ver «Cliente por NIT»); si vienen los dos, manda `clienteId`. **Solo busca** el cliente local; si no existe se responde como sin cliente |
 | `columnas` | **requerido** | `{ indice, campo, transformacion? }[]` | 1 a 100. `campo` es uno de `sugerir-mapeo` o `ignorar`; `transformacion` una de su lista (vacía = `ninguna`). Debe haber una columna de `origen` y una de `destino` (o una `dividir_origen_destino`); dos columnas no pueden apuntar al mismo campo |
 | `filas` | **requerido** | string[][] | Hasta 5000 filas, sin el encabezado |
 | `primeraFila` | *opcional* | int | El número que tiene en el archivo la primera fila enviada (2 por defecto: un solo encabezado), para que los errores digan la fila de Excel |
@@ -983,6 +995,7 @@ proveedor; `SIN_PENDIENTES` si las reglas resolvieron todo o lo que falta no tie
 | Body | | Tipo | Restricción |
 |---|---|---|---|
 | `clienteId` | *opcional* | UUID | El cliente dueño del archivo; su diccionario manda |
+| `clienteNit` | *opcional* | string | máx. 30. Alternativa a `clienteId`: el NIT del cliente o prospecto (ver «Cliente por NIT»); si vienen los dos, manda `clienteId`. **Solo busca** el cliente local; si no existe se responde como sin cliente |
 | `valores` | **requerido** | `{ campo, valor }[]` | 1 a 1000. `campo`: `tipoVehiculo` · `carroceria` · `ciudad` (origen, destino y demás ciudades). `valor`: máx. 150 caracteres; los vacíos se saltan |
 
 ```ts
