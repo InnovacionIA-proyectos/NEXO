@@ -13,6 +13,9 @@ aiosqlite>=0.20
 aio-pika>=9.4
 httpx>=0.27
 
+# Modo sombra de la IA: SDK oficial de Anthropic (solo se usa con IA_SOMBRA_HABILITADA=true y una llave).
+anthropic>=2.3,<3
+
 # SQL Server (S5-HU-17.1). aioodbc es el driver async que usa SQLAlchemy con el
 # dialecto mssql+aioodbc; pyodbc es su capa sincrona por debajo y lo necesita
 # alembic, que no es async. Los dos exigen el "ODBC Driver 18 for SQL Server"

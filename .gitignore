@@ -56,3 +56,19 @@ docs/Database/propuesta-bd-nexo.md
 analitica/00-fuentes/Historicos_SICE/
 analitica/00-fuentes/historico-sicetac/*.xlsx
 **/SICETAC_*.xlsx
+
+# Excels de licitaciones/RFQ de clientes reales (datos comerciales, nunca al repo público)
+docs/docs_raw/1_Formulario de licitación-2026Inboun-RFQ-BoteroSoto-1015261554.xlsx
+docs/docs_raw/Bellota hoja de trabajo (1) (1).xlsx
+docs/docs_raw/EPM FORMULARIO DE PRECIOS-TRANS NACIONAL 2020 -2021 (2).xlsx
+docs/docs_raw/INFORMACIÓN LICITACIÓN LH MASIVO TOLHUCA 1 - COSTEADA.xlsx
+docs/docs_raw/Plantilla_Licitacion_Transp_Colombia_123.xlsx
+docs/docs_raw/rangos de peso contenedores.xlsx
+docs/documentacion/RANGOS-PESO-CONTENEDORES-NORMALIZADO.xlsx
+docs/Database/seeder/Libro1.xlsx
+
+# Archivos temporales de Office (se crean mientras un Excel/Word está abierto)
+~$*
+
+# Exports crudos de tablas reales (SICE-TAC, plaza, tarifas) para verificación puntual — nunca al repo público
+docs/tbl*.csv
