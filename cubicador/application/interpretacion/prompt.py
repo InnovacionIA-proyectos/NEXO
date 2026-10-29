@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import json
 
-from application.interpretacion.lectura import MAX_POSICIONES, MOTIVOS
+from application.interpretacion.lectura import MOTIVOS
 from domain.entidades.catalogo import Catalogo
 
 VERSION = "1"
@@ -70,9 +70,12 @@ def esquema_salida(catalogo: Catalogo) -> dict:
     return {
         "type": "object",
         "properties": {
+            # Sin `maxItems`: la API lo rechaza en la salida estructurada
+            # ("For 'array' type, property 'maxItems' is not supported").
+            # El tope vive en `lectura.MAX_POSICIONES`, que es donde sirve:
+            # ahi se aplica a lo que el modelo de verdad respondio.
             "posiciones": {
                 "type": "array",
-                "maxItems": MAX_POSICIONES,
                 "items": {
                     "type": "object",
                     "properties": {

@@ -64,8 +64,8 @@
     {
       "id": "I-08",
       "derivadoDe": "S-08",
-      "nota": "Carga extradimensionada. La interpretacion NO decide eso: entrega la posicion y el motor dictamina.",
-      "texto": "Necesito despachar una pieza encajonada de 13 metros de largo, 1 m de ancho y 1 m de alto, de 800 kilos.",
+      "nota": "Carga extradimensionada. La interpretacion NO decide eso: entrega la posicion y el motor dictamina. El texto nombra la mercancia de forma explicita a proposito: lo que se mide aca es que una medida absurda pase tal cual, no que el modelo adivine el tipo desde un sustantivo vago. La primera version decia pieza encajonada y el modelo respondio CODIGO_DESCONOCIDO, con razon.",
+      "texto": "Necesito despachar una caja de carton de 13 metros de largo, 1 m de ancho y 1 m de alto, de 800 kilos.",
       "posicionesCorrectas": [
         {"codigo": "CAJAS_CARTON", "cantidad": 1, "largoCm": 1300, "anchoCm": 100, "altoCm": 100, "pesoKg": 800}
       ]
@@ -118,7 +118,7 @@
     {
       "id": "I-14",
       "derivadoDe": "S-14",
-      "texto": "Una pieza en guacal de 2 x 1 x 1 metros que pesa 40 toneladas.",
+      "texto": "Una caja de carton de 2 x 1 x 1 metros que pesa 40 toneladas.",
       "posicionesCorrectas": [
         {"codigo": "CAJAS_CARTON", "cantidad": 1, "largoCm": 200, "anchoCm": 100, "altoCm": 100, "pesoKg": 40000}
       ]

@@ -110,3 +110,40 @@ Mientras se desarrolla, en `cubicador/.env` (que es local y no se versiona):
 `cubicador/.env.example`, que son los que rigen en QA y producción. El
 interruptor `IA_SOMBRA_HABILITADA` sigue en `false`: para medir la
 interpretación no hace falta encender el modo sombra.
+
+### Correr la evaluación de la interpretación
+
+```bash
+# gratis: arma los mensajes y no llama a nadie
+python evaluar_interpretacion.py --simular
+
+# un caso suelto, para afinar el prompt
+python evaluar_interpretacion.py --solo I-07
+
+# la corrida completa (lee ANTHROPIC_API_KEY de cubicador/.env)
+python evaluar_interpretacion.py --salida-md informe_interpretacion.md
+```
+
+Los topes vienen puestos: `--max-llamadas` nace en **una por caso**, así que
+cualquier reintento que nadie previó aborta la corrida en vez de multiplicarla,
+y `--max-tokens` corta a 500.000. Abortar y no solo avisar es el punto.
+
+### Qué NO prueba esta medición
+
+Los 30 casos **los escribimos nosotros**, derivando el texto de posiciones que
+ya estaban validadas. Eso los hace buenos para lo que son —una red de seguridad
+que corre en segundos y cuesta veinte centavos— y malos para decidir nada por sí
+solos: nadie mide bien su propio examen.
+
+Falta el texto de capturas reales, que se escribe peor de lo que uno imagina:
+abreviaturas, medidas en pulgadas, dos mercancías en una frase sin separador,
+cantidades en letras. Eso es lo mismo que el estudio de #366 dejó anotado para
+el motor —`extraer_cargas_reales.sql` y que Operaciones valide las etiquetas— y
+vale igual acá.
+
+Un dato de la primera corrida que ilustra el riesgo al revés: dos casos
+"fallaron" y **el equivocado era el dataset**, no el modelo. Los textos decían
+*pieza encajonada* y *pieza en guacal*, y se esperaba `CAJAS_CARTON`; el modelo
+respondió `CODIGO_DESCONOCIDO`, que es exactamente lo que se le pide —no forzar
+al código más parecido—. Se corrigieron los textos, no el modelo. Conviene
+mirar cada fallo con esa sospecha antes de tocar el prompt.
