@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Nexo.Application.CasosDeUso.MapeoExcel.DTOs;
 using Nexo.Application.CasosDeUso.PlantillasMapeo;
 using Nexo.Application.CasosDeUso.PlantillasMapeo.DTOs;
+using Nexo.Application.CasosDeUso.Solicitudes;
 using Nexo.Application.Common.Abstractions;
 
 namespace Nexo.Api.Solicitudes;
@@ -11,8 +12,15 @@ namespace Nexo.Api.Solicitudes;
 /// <summary>Guarda el mapeo de columnas que el usuario confirmó como la plantilla de un cliente.</summary>
 public class clsGuardarPlantillaMapeoRequest
 {
-    [Required]
+    /// <summary>El cliente dueño de la plantilla. Alternativa: <c>clienteNit</c>; si vienen los dos manda este.</summary>
     public Guid? ClienteId { get; set; }
+
+    /// <summary>
+    /// El NIT del cliente o prospecto (con o sin puntos, espacios y dígito de verificación). Si aún no tiene cliente local se crea con los datos
+    /// del DW; 400 <c>CLIENTE_NIT_INVALIDO</c> si no es de ningún cliente ni prospecto.
+    /// </summary>
+    [MaxLength(30)]
+    public string? ClienteNit { get; set; }
 
     /// <summary>Un nombre para reconocerla en una lista (opcional).</summary>
     [MaxLength(100)]
@@ -37,7 +45,8 @@ public class clsGuardarPlantillaMapeoRequest
 public class clsPlantillasMapeoController(
     ICommandHandler<clsGuardarPlantillaMapeoCommand, clsPlantillaGuardadaDto> guardar,
     IQueryHandler<clsListarPlantillasMapeoQuery, IReadOnlyList<clsPlantillaMapeoDto>> listar,
-    ICommandHandler<clsEliminarPlantillaMapeoCommand, Unit> eliminar)
+    ICommandHandler<clsEliminarPlantillaMapeoCommand, Unit> eliminar,
+    clsClienteDeImportacion clienteDeImportacion)
     : ControllerBase
 {
     /// <summary>
@@ -53,18 +62,29 @@ public class clsPlantillasMapeoController(
     {
         var resultado = await guardar.Handle(new clsGuardarPlantillaMapeoCommand(
             req.ClienteId, req.Nombre, req.Encabezados,
-            req.Columnas.Select(c => new clsColumnaAAplicar(c.Indice, c.Campo, c.Transformacion)).ToList()), ct);
+            req.Columnas.Select(c => new clsColumnaAAplicar(c.Indice, c.Campo, c.Transformacion)).ToList(), req.ClienteNit), ct);
         return resultado.Creada
             ? Created($"/api/captura-solicitudes/plantillas-mapeo?clienteId={resultado.Plantilla.ClienteId}", resultado.Plantilla)
             : Ok(resultado.Plantilla);
     }
 
-    /// <summary>Las plantillas guardadas: con <c>clienteId</c> las de ese cliente; sin él, las de todos.</summary>
+    /// <summary>
+    /// Las plantillas guardadas: con <c>clienteId</c> o <c>clienteNit</c> las de ese cliente; sin ninguno, las de todos. Con un NIT que aún no tiene
+    /// cliente local no hay plantillas: responde lista vacía y no crea nada.
+    /// </summary>
     [HttpGet]
     [Authorize(Roles = "Comercial,Admin")]
     [ProducesResponseType(StatusCodes.Status200OK)]
-    public async Task<ActionResult<IReadOnlyList<clsPlantillaMapeoDto>>> Listar([FromQuery] Guid? clienteId, CancellationToken ct = default)
-        => Ok(await listar.Handle(new clsListarPlantillasMapeoQuery(clienteId), ct));
+    public async Task<ActionResult<IReadOnlyList<clsPlantillaMapeoDto>>> Listar(
+        [FromQuery] Guid? clienteId, [FromQuery] string? clienteNit, CancellationToken ct = default)
+    {
+        if (clienteId is null && !string.IsNullOrWhiteSpace(clienteNit))
+        {
+            clienteId = await clienteDeImportacion.BuscarLocalAsync(clienteNit, ct);
+            if (clienteId is null) return Ok(Array.Empty<clsPlantillaMapeoDto>());
+        }
+        return Ok(await listar.Handle(new clsListarPlantillasMapeoQuery(clienteId), ct));
+    }
 
     /// <summary>Borra una plantilla: el siguiente archivo con esos encabezados se vuelve a analizar. 204; 404 si no existe.</summary>
     [HttpDelete("{id:guid}")]

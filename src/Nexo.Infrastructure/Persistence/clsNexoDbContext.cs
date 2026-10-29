@@ -1,3 +1,4 @@
+using Nexo.Domain.Asistente.Entidades;
 using Nexo.Domain.Auditoria.Entidades;
 using Nexo.Domain.BibliotecaTarifas.Entidades;
 using Nexo.Domain.Catalogos.Entidades;
@@ -49,10 +50,16 @@ public class clsNexoDbContext : DbContext
     public DbSet<clsPlanCargue> PlanesCargue => Set<clsPlanCargue>();
     public DbSet<clsRechazoCubicacionLinea> RechazosCubicacionLinea => Set<clsRechazoCubicacionLinea>();
     public DbSet<clsUsoIa> UsosIa => Set<clsUsoIa>();
+    public DbSet<clsConversacionAsistente> ConversacionesAsistente => Set<clsConversacionAsistente>();
+    public DbSet<clsMensajeAsistente> MensajesAsistente => Set<clsMensajeAsistente>();
+    public DbSet<clsUsoHerramientaAsistente> UsosHerramientaAsistente => Set<clsUsoHerramientaAsistente>();
+    public DbSet<clsAccionAsistente> AccionesAsistente => Set<clsAccionAsistente>();
+    public DbSet<clsPreferenciaAsistente> PreferenciasAsistente => Set<clsPreferenciaAsistente>();
     public DbSet<clsItemPlanCargue> ItemsPlanCargue => Set<clsItemPlanCargue>();
     public DbSet<clsColocacionCargue> ColocacionesCargue => Set<clsColocacionCargue>();
     public DbSet<clsMunicipio> Municipios => Set<clsMunicipio>();
     public DbSet<clsMapeoVehiculoTarifario> MapeosVehiculoTarifario => Set<clsMapeoVehiculoTarifario>();
+    public DbSet<clsRangoPesoContenedor> RangosPesoContenedor => Set<clsRangoPesoContenedor>();
     public DbSet<clsRangoPeso> RangosPeso => Set<clsRangoPeso>();
     public DbSet<clsTarifaPlaza> TarifasPlaza => Set<clsTarifaPlaza>();
     public DbSet<clsTarifaPlazaHistorico> TarifasPlazaHistorico => Set<clsTarifaPlazaHistorico>();
@@ -398,6 +405,61 @@ public class clsNexoDbContext : DbContext
             e.HasOne<clsUsuario>().WithMany().HasForeignKey(x => x.UsuarioId).OnDelete(DeleteBehavior.Restrict);
         });
 
+        // Conversaciones del asistente de cotización y auditoría de sus herramientas. El esquema vive en ESQUEMA_NEXO.sql (sin migración de EF).
+        b.Entity<clsConversacionAsistente>(e =>
+        {
+            e.ToTable("tbl_asistente_conversaciones");
+            e.Property(x => x.Titulo).HasMaxLength(120).IsRequired();
+            e.HasIndex(x => new { x.UsuarioId, x.UpdatedAt });
+            e.HasOne<clsUsuario>().WithMany().HasForeignKey(x => x.UsuarioId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        b.Entity<clsMensajeAsistente>(e =>
+        {
+            e.ToTable("tbl_asistente_mensajes");
+            e.Property(x => x.Rol).HasMaxLength(10).IsRequired();
+            e.Property(x => x.Estado).HasMaxLength(20).IsRequired();
+            e.HasIndex(x => new { x.ConversacionId, x.Orden }).IsUnique();
+            e.HasOne<clsConversacionAsistente>().WithMany().HasForeignKey(x => x.ConversacionId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        b.Entity<clsUsoHerramientaAsistente>(e =>
+        {
+            e.ToTable("tbl_asistente_herramientas_uso");
+            e.Property(x => x.Herramienta).HasMaxLength(60).IsRequired();
+            e.Property(x => x.Fuente).HasMaxLength(200);
+            e.Property(x => x.Resultado).HasMaxLength(40).IsRequired();
+            e.HasIndex(x => new { x.ConversacionId, x.CreatedAt });
+            e.HasOne<clsConversacionAsistente>().WithMany().HasForeignKey(x => x.ConversacionId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<clsMensajeAsistente>().WithMany().HasForeignKey(x => x.MensajeId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // Cambios que el asistente propone y la persona confirma (o no): también son la auditoría de cada escritura.
+        b.Entity<clsAccionAsistente>(e =>
+        {
+            e.ToTable("tbl_asistente_acciones");
+            e.Property(x => x.Tipo).HasMaxLength(40).IsRequired();
+            e.Property(x => x.Resumen).HasMaxLength(500).IsRequired();
+            e.Property(x => x.Estado).HasMaxLength(20).IsRequired();
+            e.Property(x => x.ResultadoCodigo).HasMaxLength(60);
+            e.Property(x => x.ResultadoMensaje).HasMaxLength(500);
+            e.HasIndex(x => new { x.ConversacionId, x.CreatedAt });
+            e.HasIndex(x => x.MensajeId);
+            e.HasOne<clsConversacionAsistente>().WithMany().HasForeignKey(x => x.ConversacionId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<clsMensajeAsistente>().WithMany().HasForeignKey(x => x.MensajeId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<clsUsuario>().WithMany().HasForeignKey(x => x.UsuarioId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // Reglas y preferencias propias de cada persona para el asistente de cotización.
+        b.Entity<clsPreferenciaAsistente>(e =>
+        {
+            e.ToTable("tbl_asistente_preferencias");
+            e.Property(x => x.Texto).HasMaxLength(300).IsRequired();
+            e.HasIndex(x => new { x.UsuarioId, x.CreatedAt });
+            e.HasOne<clsUsuario>().WithMany().HasForeignKey(x => x.UsuarioId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<clsConversacionAsistente>().WithMany().HasForeignKey(x => x.ConversacionId).OnDelete(DeleteBehavior.Restrict);
+        });
+
         // ------------------------------------------------------------- Cubicador 3D
         b.Entity<clsVehiculoCubicacion>(e =>
         {
@@ -494,6 +556,14 @@ public class clsNexoDbContext : DbContext
             e.Property(x => x.NombreTarifasPlaza).HasMaxLength(100);
             e.Property(x => x.Verificacion).HasMaxLength(500);
             e.HasIndex(x => x.TipoVehiculo).IsUnique();
+        });
+
+        // Qué vehículo lleva un contenedor de 20 o 40 pies según su peso. El esquema vive en ESQUEMA_NEXO.sql (sin migración de EF).
+        b.Entity<clsRangoPesoContenedor>(e =>
+        {
+            e.ToTable("tbl_rangos_peso_contenedor");
+            e.Property(x => x.TipoVehiculo).HasMaxLength(20).IsRequired();
+            e.HasIndex(x => new { x.Contenedor, x.TipoVehiculo }).IsUnique();
         });
 
         b.Entity<clsMunicipio>(e =>

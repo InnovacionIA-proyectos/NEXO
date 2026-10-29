@@ -29,8 +29,6 @@ public sealed class clsAsistenteIaConRegistro(
     TimeProvider reloj,
     ILogger<clsAsistenteIaConRegistro> log) : IAsistenteIaPort
 {
-    private static readonly TimeSpan DesfaseColombia = TimeSpan.FromHours(-5);
-
     private readonly clsOpcionesAnthropic _opciones = opciones.Value;
 
     public bool Habilitada(clsFuncionIa funcion) => interno.Habilitada(funcion);
@@ -65,27 +63,11 @@ public sealed class clsAsistenteIaConRegistro(
         }
     }
 
-    private async Task VerificarTopeAsync(clsPeticionIa peticion, CancellationToken ct)
-    {
-        var limite = _opciones.LimiteTokensPorUsuarioDiaEfectivo;
-        if (limite <= 0 || peticion.UsuarioId is not { } usuarioId) return;
-
-        var inicioDelDia = InicioDelDia(reloj.GetUtcNow());
-        var consumidos = await uso.TokensConsumidosDesdeAsync(usuarioId, inicioDelDia, ct);
-        if (consumidos < limite) return;
-
-        throw new clsLimiteExcedidoException(
-            "IA_TOPE_DIARIO",
-            $"Alcanzaste el tope diario de uso de la IA ({limite:N0} tokens). Se reinicia a la medianoche, hora de Colombia.",
-            new { limiteTokensPorDia = limite, tokensConsumidosHoy = consumidos, reiniciaEn = inicioDelDia.AddDays(1) });
-    }
+    private Task VerificarTopeAsync(clsPeticionIa peticion, CancellationToken ct) =>
+        clsTopeDiarioIa.VerificarAsync(uso, _opciones.LimiteTokensPorUsuarioDiaEfectivo, peticion.UsuarioId, reloj, ct);
 
     /// <summary>Medianoche de Colombia (UTC-5) del día al que pertenece <paramref name="ahora"/>.</summary>
-    internal static DateTimeOffset InicioDelDia(DateTimeOffset ahora)
-    {
-        var local = ahora.ToOffset(DesfaseColombia);
-        return new DateTimeOffset(local.Year, local.Month, local.Day, 0, 0, 0, DesfaseColombia);
-    }
+    internal static DateTimeOffset InicioDelDia(DateTimeOffset ahora) => clsTopeDiarioIa.InicioDelDia(ahora);
 
     private async Task RegistrarAsync(clsPeticionIa peticion, clsUsoDeTokens tokens, string resultado, Stopwatch cronometro)
     {

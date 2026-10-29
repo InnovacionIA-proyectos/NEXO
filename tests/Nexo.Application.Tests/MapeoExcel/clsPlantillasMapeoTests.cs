@@ -4,6 +4,8 @@ using Nexo.Application.CasosDeUso.MapeoExcel;
 using Nexo.Application.CasosDeUso.MapeoExcel.DTOs;
 using Nexo.Application.CasosDeUso.PlantillasMapeo;
 using Nexo.Application.CasosDeUso.PlantillasMapeo.Interfaces;
+using Nexo.Application.CasosDeUso.Solicitudes;
+using Nexo.Application.CasosDeUso.Solicitudes.Interfaces;
 using Nexo.Application.Common;
 using Nexo.Application.Common.Abstractions;
 using Nexo.Application.Common.Exceptions;
@@ -38,7 +40,8 @@ public class clsPlantillasMapeoTests
         _dic.Setup(d => d.ListarAsync(It.IsAny<Guid?>(), It.IsAny<bool>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
     }
 
-    private clsGuardarPlantillaMapeoCommandHandler Guardador() => new(_repo.Object, _auditoria.Object, _usuario.Object, _uow.Object, TimeProvider.System);
+    private clsGuardarPlantillaMapeoCommandHandler Guardador() => new(_repo.Object, _auditoria.Object, _usuario.Object, _uow.Object, TimeProvider.System,
+        new clsClienteDeImportacion(new Mock<IClientesPort>().Object, new Mock<IClientesDwPort>().Object, new Mock<IProspectosDwPort>().Object));
 
     private static clsColumnaAAplicar Col(int indice, string campo, string? transformacion = null) => new(indice, campo, transformacion);
 

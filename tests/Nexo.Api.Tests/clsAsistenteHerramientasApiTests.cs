@@ -21,11 +21,15 @@ public class clsAsistenteHerramientasApiTests(clsApiFixture fx)
 
     private static string[] Con(params string[] extra) => [.. ParaTodos, .. extra];
 
+    // Quien costea (AdminTarifas y Admin) además tiene las herramientas que proponen cambios.
+    private static readonly string[] Proponer =
+        ["listar_preferencias", "proponer_agregar_conexos", "proponer_agregar_flete", "proponer_cambiar_vehiculo", "proponer_editar_flete", "proponer_guardar_preferencia", "proponer_rechazar_linea"];
+
     public static IEnumerable<object[]> HerramientasPorRol()
     {
-        yield return ["Admin", Con("consultar_aprovisionamiento", "consultar_propuesta_linea", "consultar_tarifa_plaza_nexo")];
+        yield return ["Admin", Con(["consultar_aprovisionamiento", "consultar_propuesta_linea", "consultar_tarifa_plaza_nexo", .. Proponer])];
         yield return ["Comercial", Con("consultar_aprovisionamiento", "consultar_propuesta_linea")];
-        yield return ["AdminTarifas", Con("consultar_propuesta_linea", "consultar_tarifa_plaza_nexo")];
+        yield return ["AdminTarifas", Con(["consultar_propuesta_linea", "consultar_tarifa_plaza_nexo", .. Proponer])];
         yield return ["ServiciosLogisticos", Con("consultar_propuesta_linea")];
         yield return ["LiderProceso", Con("consultar_propuesta_linea")];
         yield return ["AdminBiblioteca", Con("consultar_tarifa_plaza_nexo")];

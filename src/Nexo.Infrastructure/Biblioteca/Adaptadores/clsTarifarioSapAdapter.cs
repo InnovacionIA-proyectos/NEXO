@@ -41,6 +41,7 @@ public sealed class clsTarifarioSapAdapter : ITarifarioSapPort
     private const int IdVehiculoC2 = 4;
     private const decimal PesoMinimoSicetacC2 = 4301m;
     private const string CodigoCarroceriaFurgon = "4";
+    private const string UnidadPortacontenedores = "PORTACONTENEDORES";
     private static readonly TimeSpan CacheTtl = TimeSpan.FromHours(1);
 
     // internal (no private): S5-HU-19.1/#281 las reutiliza para resolver el NOMBRE del
@@ -77,10 +78,11 @@ public sealed class clsTarifarioSapAdapter : ITarifarioSapPort
     private readonly TimeProvider _clock;
     private readonly IAjustesVigenciaPlazaRepository _ajustes;
     private readonly IMapeoVehiculoTarifarioPort _mapeo;
+    private readonly IRangosPesoContenedorPort _rangos;
 
     public clsTarifarioSapAdapter(
         IServiceProvider sp, clsNexoDbContext db, IMemoryCache cache, TimeProvider clock, IAjustesVigenciaPlazaRepository ajustes,
-        IMapeoVehiculoTarifarioPort mapeo)
+        IMapeoVehiculoTarifarioPort mapeo, IRangosPesoContenedorPort rangos)
     {
         _dc = sp.GetService<clsDbSolucionesTiDbContext>();
         _dw = sp.GetService<clsDwSiceDbContext>();
@@ -89,6 +91,7 @@ public sealed class clsTarifarioSapAdapter : ITarifarioSapPort
         _clock = clock;
         _ajustes = ajustes;
         _mapeo = mapeo;
+        _rangos = rangos;
     }
 
     public async Task<clsResultadoTarifarioSap?> ConsultarAsync(clsConsultaTarifarioSap c, CancellationToken ct = default)
@@ -378,16 +381,21 @@ public sealed class clsTarifarioSapAdapter : ITarifarioSapPort
 
         string? config;
         if (claseViajeId == 1)
-            config = await _mapeo.SicetacAsync(await ConfigPorRangoPesoAsync(claseContId, c.Peso, ct), ct: ct);
+            config = await ConfigDeContenedorAsync(c, claseContId, ct);
         else
             // El código con el que SICE-TAC conoce al vehículo; sin fila de mapeo se conserva la regla de antes (quitar la C inicial).
             config = await _mapeo.SicetacAsync(c.ConfigVehiculo, v => v.Trim().ToUpperInvariant().TrimStart('C'), ct);
         if (string.IsNullOrWhiteSpace(config)) return null;
 
         var tipoCarga = await ParametroAsync(457, ct) ?? "General";
-        var unidad = config == "2L3" || carroceriaCod == CodigoCarroceriaFurgon
+        var unidadDeSiempre = config == "2L3" || carroceriaCod == CodigoCarroceriaFurgon
             ? "FURGON"
             : await ParametroAsync(458, ct) ?? "ESTACAS";
+        // Una línea de contenedor viaja en portacontenedores: esa es la unidad por defecto. Si SICE-TAC no trae filas de esa unidad para la ruta se
+        // vuelve a la de siempre, y la unidad usada queda en el criterio del candidato.
+        string[] unidades = claseViajeId == 1 && carroceriaCod != CodigoCarroceriaFurgon
+            ? [UnidadPortacontenedores, unidadDeSiempre]
+            : [unidadDeSiempre];
 
         // #300: solo el período del mes y año actuales (sin mes de gracia). Se busca el más reciente HASTA el
         // actual: un período futuro ya cargado no tapa al vigente. Si no es el actual (o no hay ninguno) no hay piso.
@@ -407,17 +415,22 @@ public sealed class clsTarifarioSapAdapter : ITarifarioSapPort
         var porDane = c.OrigenDane is not null && c.DestinoDane is not null;
         var origenSinCeros = c.OrigenDane?.TrimStart('0');
         var destinoSinCeros = c.DestinoDane?.TrimStart('0');
-        var rutas = _dw.RutasSicetac
-            .Where(r => r.Periodo == periodo &&
-                        r.CondicionCarga == "CARGADO" &&
-                        r.NombreTipoCarga == tipoCarga &&
-                        r.NombreUnidadTransporte == unidad &&
-                        r.Configuracion == config &&
-                        r.ViaEstandar == "SI");
-        rutas = porDane
-            ? rutas.Where(r => r.Origen == origenSinCeros && r.Destino == destinoSinCeros)
-            : rutas.Where(r => EF.Functions.Like(r.NombreRuta, $"%{origen}%-%{destino}%"));
-        var top = await rutas.OrderByDescending(r => r.ValorSiceConHora).FirstOrDefaultAsync(ct);
+        clsRutaSicetacDw? top = null;
+        foreach (var unidad in unidades)
+        {
+            var rutas = _dw.RutasSicetac
+                .Where(r => r.Periodo == periodo &&
+                            r.CondicionCarga == "CARGADO" &&
+                            r.NombreTipoCarga == tipoCarga &&
+                            r.NombreUnidadTransporte == unidad &&
+                            r.Configuracion == config &&
+                            r.ViaEstandar == "SI");
+            rutas = porDane
+                ? rutas.Where(r => r.Origen == origenSinCeros && r.Destino == destinoSinCeros)
+                : rutas.Where(r => EF.Functions.Like(r.NombreRuta, $"%{origen}%-%{destino}%"));
+            top = await rutas.OrderByDescending(r => r.ValorSiceConHora).FirstOrDefaultAsync(ct);
+            if (top is not null) break;
+        }
         if (top is null) return null;
 
         // S4-HU-14.1/#221: bug gemelo del fallback tolerante de PropuestaTarifaAdapter —
@@ -429,9 +442,25 @@ public sealed class clsTarifarioSapAdapter : ITarifarioSapPort
         return new clsCandidatoTarifaDto(
             "sicetac", valor,
             $"{top.NombreRuta} · {top.Configuracion} · {top.NombreTipoCarga} · {top.NombreUnidadTransporte} · vía estándar",
-            $"oficial · periodo {periodo} · CARGADO · carga '{tipoCarga}' · unidad '{unidad}' · configuración {config}" +
+            $"oficial · periodo {periodo} · CARGADO · carga '{tipoCarga}' · unidad '{top.NombreUnidadTransporte}' · configuración {config}" +
                 (porDane ? $" · ruta DANE {c.OrigenDane}-{c.DestinoDane}" : string.Empty), 1,
             ValorPisoBase: top.Valor, ValorTiemposLogisticos: valor - top.Valor, Configuracion: top.Configuracion);
+    }
+
+    /// <summary>
+    /// El código de SICE-TAC del vehículo de una línea de contenedor, escogido por el tamaño del contenedor y su peso con <c>tbl_rangos_peso_contenedor</c>
+    /// y traducido con el mapeo de vehículos. Si la tabla no está disponible (o la clase de contenedor no trae 20 ni 40) se usa la regla de rangos de
+    /// SAP de antes.
+    /// </summary>
+    private async Task<string?> ConfigDeContenedorAsync(clsConsultaTarifarioSap c, int? claseContId, CancellationToken ct)
+    {
+        if (clsRecomendadorDeVehiculoDeContenedor.Pies(c.ClaseContenedor) is { } pies && c.Peso is { } peso)
+        {
+            var recomendado = await _rangos.VehiculoParaAsync(pies, peso, ct);
+            if (recomendado.TablaDisponible)
+                return recomendado.TipoVehiculo is null ? null : await _mapeo.SicetacAsync(recomendado.TipoVehiculo, ct: ct);
+        }
+        return await _mapeo.SicetacAsync(await ConfigPorRangoPesoAsync(claseContId, c.Peso, ct), ct: ct);
     }
 
     private async Task<string?> ConfigPorRangoPesoAsync(int? claseContId, decimal? peso, CancellationToken ct)
