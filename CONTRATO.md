@@ -384,7 +384,10 @@ interface CotizacionLineaDto {
 }
 interface CotizacionConexoDto {
   id: UUID; cotizacionLineaId: UUID; servicioConexoId: UUID | null; nombre: string | null; categoria: string
-  cantidad: Decimal; valorAplicado: Decimal
+  cantidad: Decimal
+  valorAplicado: Decimal            // el COSTO del conexo (uso interno; nunca va al cliente ni al correo/Excel de la cotización)
+  precioVentaUnitario: Decimal      // S6-HU-38.2/#408: precio de venta de UNA unidad, fijado al agregar el conexo (el de la biblioteca o, si no tenía, su costo)
+  valorVenta: Decimal               // lo que se cotiza: precioVentaUnitario × cantidad, a 2 decimales. Nunca null. El `total` suma este valor, no el costo
   origen: "individual" | "general" // S5-HU-18/#262: cómo se agregó — "general" = el usuario pidió agregarlo a todas las líneas de una vez (igual crea una fila por línea)
   servicio: ServicioConexoDto | null // S5-HU-18/#262: el servicio completo (dimensiones incluidas), para no tener que bajar el catálogo completo
 }
@@ -450,6 +453,7 @@ interface ServicioConexoDto {
   id: UUID; codigoServicio: string; tipoServicio: string
   origen: string; destino: string; puerto: string; ruta: string; tipoMaquina: string // "NO APLICA" si no aplica a este servicio
   costoUnitario: Decimal; unidad: string; vigencia: Fecha; categoria: string; activo: boolean
+  precioVenta: Decimal | null       // S6-HU-38.2/#408: precio al cliente con su margen. null = sin precio de venta: al cotizar el servicio se usa su costo
 }
 interface ImportarServiciosResultDto {
   filas: number; creadas: number; actualizadas: number; duplicadas: number; invalidas: number
@@ -1369,9 +1373,11 @@ Sobre una cotización `Entregada` deja `modificadaTrasEntregaAt` (sin tocar `est
 | `lineaId` | **requerido** | UUID | id de la línea DE LA COTIZACIÓN (no de la solicitud) a la que aplica — S4-HU-15.4/#250, ya no existe el conexo "general" sin línea |
 | `servicioConexoId` | **requerido** | UUID | servicio existente y activo |
 | `cantidad` | *opcional* | decimal | 0.01–999999.99, máx. 2 decimales, def. 1 |
-| `valorAplicado` | *opcional* | decimal | monetario. Si falta: `costoUnitario × cantidad` |
+| `valorAplicado` | *opcional* | decimal | monetario. Es el **costo** del conexo; si falta: `costoUnitario × cantidad`. **No cambia lo que se cotiza** |
 | `origen` | *opcional* | string | S5-HU-18/#262. `individual` (def.) \| `general` — si el usuario pidió agregarlo a TODAS las líneas de una vez (igual manda un item por línea) |
 
+- **Lo que se cotiza** (S6-HU-38.2/#408): el conexo guarda `precioVentaUnitario` = `precioVenta` del servicio o, si no tiene, su `costoUnitario`; `valorVenta = precioVentaUnitario × cantidad` y `total` suma el `valorVenta`. El precio
+  queda **fijo**: si después cambia la biblioteca, el conexo no cambia. El valor de venta **no se escribe a mano**: sale siempre de la biblioteca.
 - **→** `200 CotizacionDto`
 - **Errores**: `400 SERVICIO_INVALIDO` · `400 SERVICIO_INACTIVO` · `400 LINEA_INVALIDA` · `400 CANTIDAD_INVALIDA` · `400 ORIGEN_INVALIDO` · `404 COTIZACION_NO_ENCONTRADA` · `409 COTIZACION_CERRADA`
 
@@ -1384,7 +1390,9 @@ de cantidad no se podía deshacer, solo compensar agregando otra fila.
 | Body | | Tipo | Restricción |
 |---|---|---|---|
 | `cantidad` | **requerido** | decimal | 0.01–999999.99, máx. 2 decimales |
-| `valorAplicado` | *opcional* | decimal | monetario. Si falta: `costoUnitario × cantidad` |
+| `valorAplicado` | *opcional* | decimal | monetario. Es el **costo**; si falta: `costoUnitario × cantidad`. No cambia el precio de venta |
+
+Al cambiar la cantidad, `valorVenta` se recalcula con el `precioVentaUnitario` que quedó guardado al agregar el conexo.
 
 - **→** `200 CotizacionDto`
 - **Errores**: `400 CANTIDAD_INVALIDA` · `400 VALOR_REQUERIDO` (sin servicio para recalcular y sin `valorAplicado`) · `404 COTIZACION_NO_ENCONTRADA` · `404 CONEXO_NO_ENCONTRADO` · `409 COTIZACION_NO_EDITABLE`
@@ -1601,6 +1609,7 @@ archivo se puede editar y reimportar: las reglas que ya existen se reportan como
 | `tipoServicio` | **requerido** | string | máx. 120 |
 | `origen`, `destino`, `puerto`, `ruta`, `tipoMaquina` | *opcional* | string | la dimensión que no aplique a este servicio se guarda como `"NO APLICA"` — máx. 150 (origen/destino), 50 (puerto/ruta), 60 (tipoMaquina) |
 | `costoUnitario` | **requerido** | decimal | ≥ 0 |
+| `precioVenta` | *opcional* | decimal | ≥ 0, redondeado a 2 decimales. Sin él el servicio se cotiza a su costo. Puede ser menor que el costo (el front avisa) |
 | `unidad` | **requerido** | string | máx. 30 |
 | `vigencia` | **requerido** | fecha | solo fecha `"2026-12-31"` |
 | `categoria` | *opcional* | string | `logistico` \| `adicional`, def. `logistico` |
@@ -1613,19 +1622,23 @@ archivo se puede editar y reimportar: las reglas que ya existen se reportan como
 Actualización parcial: solo cambian los campos enviados y no nulos.
 
 - **Roles**: `ServiciosLogisticos`, `AdminTarifas`, `Admin`.
-- **Body**: los mismos campos que el POST, todos *opcionales*, mismas restricciones.
+- **Body**: los mismos campos que el POST, todos *opcionales*, mismas restricciones. Un `precioVenta` ausente o `null` **no se toca**; para **borrarlo** (dejar el servicio sin precio de venta) se envía
+  `"limpiarPrecioVenta": true`. Cada cambio del precio de venta queda en `tbl_audit_log` (`servicios_conexos`, `editar`) con el valor de antes y de después; crear también lo registra.
 - **→** `200 ServicioConexoDto`
-- **Errores**: `400 CATEGORIA_INVALIDA` · `404 SERVICIO_NO_ENCONTRADO`
+- **Errores**: `400 CATEGORIA_INVALIDA` · `400 PRECIO_VENTA_AMBIGUO` (`precioVenta` y `limpiarPrecioVenta` a la vez) · `404 SERVICIO_NO_ENCONTRADO`
 
 #### `POST /api/servicios-conexos/importar-excel`
 Columnas: Codigo, Tipo Servicio, Origen, Destino, Puerto, Ruta, Tipo Maquina, Costo
-Unitario, Unidad, Vigencia, Categoria, Activo — detección de encabezado tolerante (no
+Unitario, Precio Venta, Unidad, Vigencia, Categoria, Activo — detección de encabezado tolerante (no
 importa el orden ni si falta alguna columna opcional). Hace **upsert** por las 6
 dimensiones (código, origen, destino, puerto, ruta, tipo de máquina): una fila cuya
 combinación ya existe ACTUALIZA ese servicio en vez de crear uno nuevo — así el mismo
 archivo sirve para exportar, editar y recargar. La comparación de esa llave ignora
 mayúsculas y la forma Unicode de composición de tildes (S5-HU-19/#261); sigue
 distinguiendo acentos (`café` ≠ `cafe`).
+
+**Precio de venta** (S6-HU-38.2/#408): una columna cuyo encabezado contiene «VENTA» (`PRECIO VENTA`, `VALOR VENTA`) es el precio de venta y **no** se toma como costo, aunque diga «VALOR». Un archivo sin esa
+columna, o con la celda vacía, **no borra** el precio de venta que ya tenga el servicio (para borrarlo se usa el PATCH). Un precio ilegible, negativo o de más de 16 dígitos enteros invalida solo esa fila.
 
 Una fila inválida (campo obligatorio vacío, texto que excede el máximo de su columna,
 costo negativo o con más de 16 dígitos enteros) **nunca descarta el archivo completo**:
@@ -1638,7 +1651,7 @@ de las filas se sigue procesando.
 - **Errores**: `400 ARCHIVO_REQUERIDO` · `400 FORMATO_NO_SOPORTADO` · `400 EXCEL_INVALIDO` · `400 EXCEL_SIN_DATOS` · `400 SERVICIO_DUPLICADO` (choque residual contra la base, no detectado en memoria — caso raro, ver nota de #261 abajo)
 
 #### `GET /api/servicios-conexos/exportar-excel`
-Descarga el catálogo a Excel con las mismas 12 columnas que lee el importador — el mismo
+Descarga el catálogo a Excel con las mismas 13 columnas (incluye `PRECIO VENTA`, justo después de `COSTO UNITARIO`) que lee el importador — el mismo
 archivo sirve para editar y reimportar como actualización. S5-HU-19/#261: admite los
 mismos filtros que el listado.
 
@@ -1653,7 +1666,7 @@ mismos filtros que el listado.
 
 #### `GET /api/servicios-conexos/plantilla-excel/{tipo}`
 Plantilla de Excel descargable por tipo de servicio — cada una trae SOLO las columnas
-que ese tipo necesita (S5-HU-19/#261, corrige #249: antes las 4 traían las mismas 12).
+que ese tipo necesita (S5-HU-19/#261, corrige #249: antes las 4 traían las mismas 12); todas incluyen `PRECIO VENTA` después de `COSTO UNITARIO`.
 Sin fila de datos de ejemplo cargable: la fila 2 solo pre-llena las columnas
 verdaderamente fijas de ese tipo (p. ej. `unidad`/`categoria`); subida sin editar, no
 crea ningún registro.
@@ -2380,7 +2393,7 @@ interface ResultadoHerramientaDto {
 | `consultar_tarifa_plaza_nexo` | `GET /api/tarifas-plaza` | AdminBiblioteca, AdminTarifas, Admin | al menos uno de `q`, `lineaNegocio`, `tipoVehiculo`; `top` |
 | `consultar_aprovisionamiento` | `GET /api/captura-solicitudes/aprovisionamiento` | Comercial, Admin | `ciudadLevante`, `origen`; opcional `configuracion`, `carroceria` |
 | `consultar_propuesta_linea` | `GET /api/solicitudes/{id}/propuesta-tarifa`, una línea | Comercial (solo las suyas), AdminTarifas, ServiciosLogisticos, LiderProceso, Admin | `solicitudId`, `lineaId` |
-| `consultar_servicios_conexos` | `GET /api/servicios-conexos` (solo activos) | todos | opcional `q`, `categoria`, `top` |
+| `consultar_servicios_conexos` | `GET /api/servicios-conexos` (solo activos) | todos | opcional `q`, `categoria`, `top`. Devuelve costo y `precioVenta` (uso interno del personal) |
 | `buscar_ciudades_dane` | `GET /api/captura-solicitudes/ciudades` | todos | al menos uno de `q`, `departamento`; `top` |
 
 **Herramientas que proponen cambios** (solo AdminTarifas y Admin; ver §3.24.1). Ninguna escribe: dejan una acción pendiente que la persona confirma.

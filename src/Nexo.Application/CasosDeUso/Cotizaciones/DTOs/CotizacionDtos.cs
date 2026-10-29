@@ -23,7 +23,7 @@ public record clsCotizacionLineaDto(
 /// </summary>
 public record clsCotizacionConexoDto(
     Guid Id, Guid CotizacionLineaId, Guid? ServicioConexoId, string? Nombre, string Categoria, decimal Cantidad, decimal ValorAplicado,
-    string Origen = "individual", clsServicioConexoDto? Servicio = null);
+    string Origen = "individual", clsServicioConexoDto? Servicio = null, decimal PrecioVentaUnitario = 0, decimal ValorVenta = 0);
 
 public record clsCotizacionDto(
     Guid Id,

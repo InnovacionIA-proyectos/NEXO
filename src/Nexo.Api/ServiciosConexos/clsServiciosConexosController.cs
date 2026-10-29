@@ -45,7 +45,7 @@ public class clsServiciosConexosController(
     {
         var dto = await crear.Handle(new clsCrearServicioConexoCommand(
             req.CodigoServicio, req.TipoServicio, req.Origen, req.Destino, req.Puerto, req.Ruta, req.TipoMaquina,
-            req.CostoUnitario, req.Unidad, req.Vigencia, req.Categoria, req.Activo), ct);
+            req.CostoUnitario, req.Unidad, req.Vigencia, req.Categoria, req.Activo, req.PrecioVenta), ct);
         return Created($"/api/servicios-conexos/{dto.Id}", dto);
     }
 
@@ -59,10 +59,11 @@ public class clsServiciosConexosController(
     public async Task<ActionResult<clsServicioConexoDto>> Editar(Guid id, [FromBody] clsEditarServicioConexoRequest req, CancellationToken ct = default)
         => Ok(await editar.Handle(new clsEditarServicioConexoCommand(
             id, req.CodigoServicio, req.TipoServicio, req.Origen, req.Destino, req.Puerto, req.Ruta, req.TipoMaquina,
-            req.CostoUnitario, req.Unidad, req.Vigencia, req.Categoria, req.Activo), ct));
+            req.CostoUnitario, req.Unidad, req.Vigencia, req.Categoria, req.Activo, req.PrecioVenta, req.LimpiarPrecioVenta ?? false), ct));
 
     /// <summary>Carga masiva desde Excel (.xlsx): columnas Codigo, Tipo Servicio, Origen,
-    /// Destino, Puerto, Ruta, Tipo Maquina, Costo Unitario, Unidad, Vigencia, Categoria, Activo.</summary>
+    /// Destino, Puerto, Ruta, Tipo Maquina, Costo Unitario, Precio Venta, Unidad, Vigencia, Categoria, Activo.
+    /// Un archivo sin la columna Precio Venta (o con la celda vacía) no borra el precio de venta existente.</summary>
     [HttpPost("importar-excel")]
     [Authorize(Roles = "ServiciosLogisticos,AdminTarifas,Admin")]
     [RequestSizeLimit(10 * 1024 * 1024)]

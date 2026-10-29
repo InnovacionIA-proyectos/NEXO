@@ -123,10 +123,154 @@ public class clsServiciosConexosTests
         Assert.Equal(100, dto.GetProperty("costoUnitario").GetDecimal()); // se conservó
     }
 
+    // 5b) S6-HU-38.2/#408 — precio de venta.
+
+    private async Task<(Guid Id, string Codigo)> CrearConPrecio(decimal costo, decimal? precioVenta)
+    {
+        var codigo = $"PV_{Guid.NewGuid():N}"[..20];
+        var resp = await _fx.Client("Admin").PostJson("/api/servicios-conexos", new
+        {
+            codigoServicio = codigo, tipoServicio = "Precinto", costoUnitario = costo, precioVenta, unidad = "Por unidad", vigencia = "2026-12-31",
+        });
+        Assert.Equal(HttpStatusCode.Created, resp.StatusCode);
+        return ((await resp.Json()).GetProperty("id").GetGuid(), codigo);
+    }
+
+    private decimal? PrecioVentaDe(string codigo) => _fx.WithDb(db => db.ServiciosConexos.Single(s => s.CodigoServicio == codigo).PrecioVenta);
+
+    [Fact]
+    public async Task Crear_con_precio_de_venta_lo_devuelve_y_sin_el_queda_vacio()
+    {
+        var (conPrecio, _) = await CrearConPrecio(1000, 1500);
+        var (sinPrecio, _) = await CrearConPrecio(1000, null);
+
+        var lista = await _fx.Client().GetFromJsonAsync<JsonElement>("/api/servicios-conexos?pageSize=200&q=Precinto");
+        var items = lista.GetProperty("items").EnumerateArray().ToList();
+        Assert.Equal(1500m, items.Single(i => i.GetProperty("id").GetGuid() == conPrecio).GetProperty("precioVenta").GetDecimal());
+        Assert.Equal(JsonValueKind.Null, items.Single(i => i.GetProperty("id").GetGuid() == sinPrecio).GetProperty("precioVenta").ValueKind);
+    }
+
+    [Fact]
+    public async Task Un_precio_de_venta_negativo_es_400()
+    {
+        var resp = await _fx.Client("Admin").PostJson("/api/servicios-conexos", new
+        {
+            codigoServicio = $"PV_{Guid.NewGuid():N}"[..20], tipoServicio = "Precinto", costoUnitario = 1000, precioVenta = -1, unidad = "Por unidad", vigencia = "2026-12-31",
+        });
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task El_PATCH_cambia_el_precio_de_venta_no_lo_toca_si_no_viene_y_lo_borra_con_limpiarPrecioVenta()
+    {
+        var (id, codigo) = await CrearConPrecio(1000, 1500);
+        var admin = _fx.Client("Admin");
+
+        Assert.Equal(2000m, (await (await admin.PatchJson($"/api/servicios-conexos/{id}", new { precioVenta = 2000 })).Json()).GetProperty("precioVenta").GetDecimal());
+
+        var sinTocar = await (await admin.PatchJson($"/api/servicios-conexos/{id}", new { costoUnitario = 1100 })).Json();
+        Assert.Equal((1100m, 2000m), (sinTocar.GetProperty("costoUnitario").GetDecimal(), sinTocar.GetProperty("precioVenta").GetDecimal()));
+
+        var ambiguo = await admin.PatchJson($"/api/servicios-conexos/{id}", new { precioVenta = 500, limpiarPrecioVenta = true });
+        Assert.Equal(HttpStatusCode.BadRequest, ambiguo.StatusCode);
+        Assert.Equal("PRECIO_VENTA_AMBIGUO", await ambiguo.ErrorCode());
+        Assert.Equal(2000m, PrecioVentaDe(codigo));
+
+        var borrado = await (await admin.PatchJson($"/api/servicios-conexos/{id}", new { limpiarPrecioVenta = true })).Json();
+        Assert.Equal(JsonValueKind.Null, borrado.GetProperty("precioVenta").ValueKind);
+        Assert.Null(PrecioVentaDe(codigo));
+
+        // Crear y cada cambio de precio quedan en la auditoría con el precio de venta.
+        var diffs = _fx.WithDb(db => db.AuditLogs.Where(a => a.Entidad == "servicios_conexos" && a.EntidadId == id).OrderBy(a => a.CreatedAt).Select(a => a.Diff).ToList());
+        Assert.Contains(diffs, d => d != null && d.Contains("\"precioVenta\":1500"));
+        Assert.Contains(diffs, d => d != null && d.Contains("\"antes\":1500") && d.Contains("\"despues\":2000"));
+        Assert.Contains(diffs, d => d != null && d.Contains("\"antes\":2000") && d.Contains("\"despues\":null"));
+    }
+
+    [Fact]
+    public async Task ImportarExcel_lee_PRECIO_VENTA_y_una_columna_VALOR_VENTA_no_se_confunde_con_el_costo()
+    {
+        var existente = await CrearConPrecio(1000, null);
+        var nuevo = $"PVN_{Guid.NewGuid():N}"[..20];
+        var archivo = ArchivoExcel(["CODIGO", "TIPO SERVICIO", "VALOR VENTA", "COSTO UNITARIO", "UNIDAD"],
+        [
+            [existente.Codigo, "Precinto", "1800", "1200", "Por unidad"], // actualiza
+            [nuevo, "Precinto", "2500.5", "2000", "Por unidad"],            // crea
+        ]);
+
+        var resp = await _fx.Client("Admin").PostAsync("/api/servicios-conexos/importar-excel", archivo);
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+
+        var actualizado = _fx.WithDb(db => db.ServiciosConexos.Single(s => s.CodigoServicio == existente.Codigo));
+        Assert.Equal((1200m, 1800m), (actualizado.CostoUnitario, actualizado.PrecioVenta));
+        var creado = _fx.WithDb(db => db.ServiciosConexos.Single(s => s.CodigoServicio == nuevo));
+        Assert.Equal((2000m, 2500.5m), (creado.CostoUnitario, creado.PrecioVenta));
+    }
+
+    [Fact]
+    public async Task Reimportar_sin_la_columna_o_con_la_celda_vacia_no_borra_el_precio_de_venta()
+    {
+        var (_, codigo) = await CrearConPrecio(1000, 1500);
+        var admin = _fx.Client("Admin");
+
+        await admin.PostAsync("/api/servicios-conexos/importar-excel", ArchivoExcel(["CODIGO", "TIPO SERVICIO", "COSTO UNITARIO", "UNIDAD"], [[codigo, "Precinto", "1100", "Por unidad"]]));
+        Assert.Equal(1500m, PrecioVentaDe(codigo));
+
+        await admin.PostAsync("/api/servicios-conexos/importar-excel", ArchivoExcel(["CODIGO", "TIPO SERVICIO", "COSTO UNITARIO", "PRECIO VENTA", "UNIDAD"], [[codigo, "Precinto", "1200", "", "Por unidad"]]));
+        Assert.Equal(1500m, PrecioVentaDe(codigo));
+    }
+
+    [Fact]
+    public async Task Un_PRECIO_VENTA_ilegible_o_negativo_invalida_solo_esa_fila()
+    {
+        var bueno = $"PVB_{Guid.NewGuid():N}"[..20];
+        var malo = $"PVM_{Guid.NewGuid():N}"[..20];
+        var negativo = $"PVG_{Guid.NewGuid():N}"[..20];
+        var archivo = ArchivoExcel(["CODIGO", "TIPO SERVICIO", "COSTO UNITARIO", "PRECIO VENTA", "UNIDAD"],
+        [
+            [bueno, "Precinto", "1000", "1500", "Por unidad"],
+            [malo, "Precinto", "1000", "abc", "Por unidad"],
+            [negativo, "Precinto", "1000", "-5", "Por unidad"],
+        ]);
+
+        var resp = await _fx.Client("Admin").PostAsync("/api/servicios-conexos/importar-excel", archivo);
+        var dto = await resp.Json();
+
+        Assert.Equal((1, 2), (dto.GetProperty("creadas").GetInt32(), dto.GetProperty("invalidas").GetInt32()));
+        var errores = string.Join("|", dto.GetProperty("errores").EnumerateArray().Select(e => e.GetString()));
+        Assert.Contains("PRECIO VENTA ilegible", errores);
+        Assert.Contains("PRECIO VENTA negativo", errores);
+        Assert.Equal(1500m, PrecioVentaDe(bueno));
+        Assert.False(_fx.WithDb(db => db.ServiciosConexos.Any(s => s.CodigoServicio == malo || s.CodigoServicio == negativo)));
+    }
+
+    [Fact]
+    public async Task Exportar_escribe_el_precio_de_venta_y_reimportar_el_export_lo_conserva()
+    {
+        var (_, codigo) = await CrearConPrecio(1000, 1500);
+        var admin = _fx.Client("Admin");
+
+        var resp = await admin.GetAsync($"/api/servicios-conexos/exportar-excel?q={codigo}");
+        var bytes = await resp.Content.ReadAsByteArrayAsync();
+        using (var wb = new XLWorkbook(new MemoryStream(bytes)))
+        {
+            var ws = wb.Worksheets.First();
+            Assert.Equal("PRECIO VENTA", ws.Cell(1, 9).GetString());
+            Assert.Equal(1500m, ws.Cell(2, 9).GetValue<decimal>());
+        }
+
+        var contenido = new MultipartFormDataContent();
+        var parte = new ByteArrayContent(bytes);
+        parte.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        contenido.Add(parte, "archivo", "export.xlsx");
+        Assert.Equal(HttpStatusCode.OK, (await admin.PostAsync("/api/servicios-conexos/importar-excel", contenido)).StatusCode);
+        Assert.Equal(1500m, PrecioVentaDe(codigo));
+    }
+
     // 6) S4-HU-15.3/#249 — exportar catálogo, plantillas por tipo, e importar como upsert.
 
     [Fact]
-    public async Task ExportarExcel_devuelve_el_catalogo_con_las_12_columnas()
+    public async Task ExportarExcel_devuelve_el_catalogo_con_las_13_columnas()
     {
         var resp = await _fx.Client().GetAsync("/api/servicios-conexos/exportar-excel");
         Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
@@ -135,7 +279,7 @@ public class clsServiciosConexosTests
         var ws = wb.Worksheets.First();
         var encabezados = ws.Row(1).CellsUsed().Select(c => c.GetString()).ToList();
         Assert.Equal(["CODIGO", "TIPO SERVICIO", "ORIGEN", "DESTINO", "PUERTO", "RUTA", "TIPO MAQUINA",
-            "COSTO UNITARIO", "UNIDAD", "VIGENCIA", "CATEGORIA", "ACTIVO"], encabezados);
+            "COSTO UNITARIO", "PRECIO VENTA", "UNIDAD", "VIGENCIA", "CATEGORIA", "ACTIVO"], encabezados);
         Assert.True(ws.RowsUsed().Count() > 1, "debe traer al menos una fila de datos (catálogo sembrado).");
     }
 
@@ -318,10 +462,10 @@ public class clsServiciosConexosTests
     }
 
     [Theory] // S5-HU-19/#261: cada plantilla trae SOLO sus columnas, no las 12 de siempre.
-    [InlineData("almacenamiento", new[] { "CODIGO", "TIPO SERVICIO", "ORIGEN", "COSTO UNITARIO", "VIGENCIA", "UNIDAD", "CATEGORIA", "ACTIVO" })]
-    [InlineData("itr", new[] { "CODIGO", "TIPO SERVICIO", "ORIGEN", "PUERTO", "TIPO MAQUINA", "COSTO UNITARIO", "VIGENCIA", "UNIDAD", "CATEGORIA", "ACTIVO" })]
-    [InlineData("precinto", new[] { "CODIGO", "TIPO SERVICIO", "RUTA", "COSTO UNITARIO", "VIGENCIA", "UNIDAD", "CATEGORIA", "ACTIVO" })]
-    [InlineData("acompanamiento", new[] { "CODIGO", "TIPO SERVICIO", "ORIGEN", "DESTINO", "COSTO UNITARIO", "VIGENCIA", "UNIDAD", "CATEGORIA", "ACTIVO" })]
+    [InlineData("almacenamiento", new[] { "CODIGO", "TIPO SERVICIO", "ORIGEN", "COSTO UNITARIO", "PRECIO VENTA", "VIGENCIA", "UNIDAD", "CATEGORIA", "ACTIVO" })]
+    [InlineData("itr", new[] { "CODIGO", "TIPO SERVICIO", "ORIGEN", "PUERTO", "TIPO MAQUINA", "COSTO UNITARIO", "PRECIO VENTA", "VIGENCIA", "UNIDAD", "CATEGORIA", "ACTIVO" })]
+    [InlineData("precinto", new[] { "CODIGO", "TIPO SERVICIO", "RUTA", "COSTO UNITARIO", "PRECIO VENTA", "VIGENCIA", "UNIDAD", "CATEGORIA", "ACTIVO" })]
+    [InlineData("acompanamiento", new[] { "CODIGO", "TIPO SERVICIO", "ORIGEN", "DESTINO", "COSTO UNITARIO", "PRECIO VENTA", "VIGENCIA", "UNIDAD", "CATEGORIA", "ACTIVO" })]
     public async Task PlantillaExcel_trae_solo_las_columnas_de_su_tipo(string tipo, string[] columnasEsperadas)
     {
         var resp = await _fx.Client().GetAsync($"/api/servicios-conexos/plantilla-excel/{tipo}");

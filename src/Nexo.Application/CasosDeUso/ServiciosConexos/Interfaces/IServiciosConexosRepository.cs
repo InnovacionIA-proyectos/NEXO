@@ -17,6 +17,9 @@ public interface IServiciosConexosRepository
 
     void Agregar(clsServicioConexo servicio);
 
+    /// <summary>Deja en la auditoría el precio de venta que tenía el servicio y el que tiene ahora (se guarda con el resto de los cambios).</summary>
+    void RegistrarCambioDePrecioVenta(clsServicioConexo servicio, decimal? precioVentaAntes);
+
     Task<clsServicioConexo?> ObtenerAsync(Guid id, CancellationToken ct);
 
     /// <summary>

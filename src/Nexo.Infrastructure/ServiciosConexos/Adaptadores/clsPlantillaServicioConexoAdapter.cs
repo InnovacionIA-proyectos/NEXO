@@ -30,20 +30,20 @@ public sealed class clsPlantillaServicioConexoAdapter : IPlantillaServicioConexo
         var (nombreHoja, encabezados, fijos) = tipo.Trim().ToUpperInvariant() switch
         {
             "ALMACENAMIENTO" => ("Almacenamiento",
-                new[] { "CODIGO", "TIPO SERVICIO", "ORIGEN", "COSTO UNITARIO", "VIGENCIA", "UNIDAD", "CATEGORIA", "ACTIVO" },
-                new[] { "Almacenamiento", "Almacenamiento", "", "", "", "Por estiba", "logistico", "SI" }),
+                new[] { "CODIGO", "TIPO SERVICIO", "ORIGEN", "COSTO UNITARIO", "PRECIO VENTA", "VIGENCIA", "UNIDAD", "CATEGORIA", "ACTIVO" },
+                new[] { "Almacenamiento", "Almacenamiento", "", "", "", "", "Por estiba", "logistico", "SI" }),
 
             "ITR" => ("ITR",
-                new[] { "CODIGO", "TIPO SERVICIO", "ORIGEN", "PUERTO", "TIPO MAQUINA", "COSTO UNITARIO", "VIGENCIA", "UNIDAD", "CATEGORIA", "ACTIVO" },
-                new[] { "ITR", "ITR", "", "", "", "", "", "Por estiba", "logistico", "SI" }),
+                new[] { "CODIGO", "TIPO SERVICIO", "ORIGEN", "PUERTO", "TIPO MAQUINA", "COSTO UNITARIO", "PRECIO VENTA", "VIGENCIA", "UNIDAD", "CATEGORIA", "ACTIVO" },
+                new[] { "ITR", "ITR", "", "", "", "", "", "", "Por estiba", "logistico", "SI" }),
 
             "PRECINTO" => ("Precinto - Barra Satelital",
-                new[] { "CODIGO", "TIPO SERVICIO", "RUTA", "COSTO UNITARIO", "VIGENCIA", "UNIDAD", "CATEGORIA", "ACTIVO" },
-                new[] { "", "", "", "", "", "Por unidad", "adicional", "SI" }),
+                new[] { "CODIGO", "TIPO SERVICIO", "RUTA", "COSTO UNITARIO", "PRECIO VENTA", "VIGENCIA", "UNIDAD", "CATEGORIA", "ACTIVO" },
+                new[] { "", "", "", "", "", "", "Por unidad", "adicional", "SI" }),
 
             "ACOMPANAMIENTO" => ("Acompañamiento Vehicular",
-                new[] { "CODIGO", "TIPO SERVICIO", "ORIGEN", "DESTINO", "COSTO UNITARIO", "VIGENCIA", "UNIDAD", "CATEGORIA", "ACTIVO" },
-                new[] { "", "", "", "", "", "", "Por unidad", "adicional", "SI" }),
+                new[] { "CODIGO", "TIPO SERVICIO", "ORIGEN", "DESTINO", "COSTO UNITARIO", "PRECIO VENTA", "VIGENCIA", "UNIDAD", "CATEGORIA", "ACTIVO" },
+                new[] { "", "", "", "", "", "", "", "Por unidad", "adicional", "SI" }),
 
             _ => throw new clsValidationFailedException("TIPO_PLANTILLA_INVALIDO",
                 "El tipo debe ser 'almacenamiento', 'itr', 'precinto' o 'acompanamiento'."),

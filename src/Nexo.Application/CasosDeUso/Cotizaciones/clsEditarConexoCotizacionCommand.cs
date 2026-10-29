@@ -11,7 +11,7 @@ using Nexo.Domain.Enums;
 namespace Nexo.Application.CasosDeUso.Cotizaciones;
 
 /// <summary>
-/// S5-HU-18/#262: corregir la cantidad (y opcionalmente el valor aplicado) de un conexo ya
+/// S5-HU-18/#262: corregir la cantidad (y opcionalmente el costo, <c>ValorAplicado</c>) de un conexo ya
 /// agregado — antes la única forma de corregir un error de cantidad era agregar otra fila,
 /// sin poder deshacer la original.
 /// </summary>
@@ -41,10 +41,11 @@ public sealed class clsEditarConexoCotizacionCommandHandler(
 
         conexo.Cantidad = command.Cantidad;
         conexo.ValorAplicado = valor;
+        // El valor de venta se recalcula con el precio de venta que quedó fijo al agregar el conexo; el costo del request no lo cambia.
 
         clsCotizacionCalculos.Recalcular(c);
         auditoria.Registrar(usuarioActual.Id, "cotizaciones", c.Id, "editar_conexo",
-            $"{{\"conexoId\":\"{conexo.Id}\",\"cantidad\":{command.Cantidad},\"valorAplicado\":{valor}}}");
+            System.Text.Json.JsonSerializer.Serialize(new { conexoId = conexo.Id, cantidad = command.Cantidad, valorAplicado = valor, precioVentaUnitario = conexo.PrecioVentaUnitario, valorVenta = conexo.ValorVenta }));
         await uow.SaveChangesAsync(ct);
         return c.ToDto();
     }

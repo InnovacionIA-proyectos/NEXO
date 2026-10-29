@@ -8,11 +8,14 @@ using Nexo.Domain.Catalogos.Entidades;
 
 namespace Nexo.Application.CasosDeUso.ServiciosConexos;
 
-/// <summary>PATCH: solo se actualizan los campos presentes (no nulos) en el comando.</summary>
+/// <summary>
+/// PATCH: solo se actualizan los campos presentes (no nulos) en el comando. El precio de venta se borra con <paramref name="LimpiarPrecioVenta"/>
+/// (un <c>null</c> en <paramref name="PrecioVenta"/> significa "no tocar"); pedir las dos cosas a la vez es un error.
+/// </summary>
 public sealed record clsEditarServicioConexoCommand(
     Guid ServicioId, string? CodigoServicio, string? TipoServicio, string? Origen, string? Destino,
     string? Puerto, string? Ruta, string? TipoMaquina, decimal? CostoUnitario, string? Unidad,
-    DateOnly? Vigencia, string? Categoria, bool? Activo)
+    DateOnly? Vigencia, string? Categoria, bool? Activo, decimal? PrecioVenta = null, bool LimpiarPrecioVenta = false)
     : ICommand<clsServicioConexoDto>;
 
 public sealed class clsEditarServicioConexoCommandHandler(
@@ -24,6 +27,10 @@ public sealed class clsEditarServicioConexoCommandHandler(
         var servicio = await repo.ObtenerAsync(command.ServicioId, ct)
             ?? throw new clsNotFoundException("SERVICIO_NO_ENCONTRADO", "Servicio logístico no encontrado.");
 
+        if (command.LimpiarPrecioVenta && command.PrecioVenta is not null)
+            throw new clsValidationFailedException("PRECIO_VENTA_AMBIGUO", "Envía precioVenta o limpiarPrecioVenta, no los dos a la vez.");
+
+        var precioVentaAntes = servicio.PrecioVenta;
         if (command.CodigoServicio is not null) servicio.CodigoServicio = command.CodigoServicio.Trim();
         if (command.TipoServicio is not null) servicio.TipoServicio = command.TipoServicio.Trim();
         if (command.Origen is not null) servicio.Origen = Normalizar(command.Origen);
@@ -32,6 +39,8 @@ public sealed class clsEditarServicioConexoCommandHandler(
         if (command.Ruta is not null) servicio.Ruta = Normalizar(command.Ruta);
         if (command.TipoMaquina is not null) servicio.TipoMaquina = Normalizar(command.TipoMaquina);
         if (command.CostoUnitario is not null) servicio.CostoUnitario = command.CostoUnitario.Value;
+        if (command.LimpiarPrecioVenta) servicio.PrecioVenta = null;
+        else if (command.PrecioVenta is { } precioVenta) servicio.PrecioVenta = Math.Round(precioVenta, 2, MidpointRounding.AwayFromZero);
         if (command.Unidad is not null) servicio.Unidad = command.Unidad.Trim();
         if (command.Vigencia is not null) servicio.Vigencia = command.Vigencia.Value;
         if (command.Categoria is not null) servicio.Categoria = clsServicioConexoCategoria.Validada(command.Categoria);
@@ -45,6 +54,8 @@ public sealed class clsEditarServicioConexoCommandHandler(
                 servicio.Ruta, servicio.TipoMaquina, servicio.Id, ct))
             throw new clsConflictException("SERVICIO_DUPLICADO",
                 $"Ya existe otro servicio '{servicio.CodigoServicio}' con esa misma combinación de origen/destino/puerto/ruta/tipo de máquina.");
+
+        if (servicio.PrecioVenta != precioVentaAntes) repo.RegistrarCambioDePrecioVenta(servicio, precioVentaAntes);
 
         await uow.SaveChangesAsync(ct);
         return servicio.ToDto();
