@@ -1,23 +1,29 @@
 # Acta: decisión de alcance de la IA en el Cubicador (go / no-go)
 
 - **Issue:** S6-HU-35.5 (#370)
-- **Fecha:** 2026-10-30
-- **Estado:** decisión propuesta, pendiente de aprobación (ver al final)
+- **Fecha de apertura:** 2026-10-30
+- **Estado:** decisión **preliminar**. Se confirma cuando se completen los datos del modo sombra
+  (sección 3) y se firme la aprobación (sección 8).
 
-## Qué se decide
+## 1. Qué se decide
 
 Si la IA (Claude) amplía su papel en el Cubicador más allá del modo sombra, y con qué alcance
 queda la HU siguiente.
 
-## Evidencia
+La decisión se apoya en dos mediciones que responden preguntas distintas:
 
-### 1. Acierto contra el dataset dorado
+| Medición | Pregunta que responde | Estado |
+|---|---|---|
+| IA contra el dataset dorado | ¿Cuánto **acierta** la IA frente a respuestas validadas? | Hecha (sección 2) |
+| Modo sombra en QA | ¿Cuánto **se parece** la IA al motor con tráfico real, cuánto falla y cuánto cuesta? | En recolección (sección 3) |
+
+## 2. Resultado: la IA contra el dataset dorado
 
 La IA se midió con el mismo prompt, el mismo esquema de salida y la misma validación que usa el
 modo sombra en producción (`cubicador/application/ia_sombra/`), sobre los 22 casos validados de
 la semilla y con las mismas métricas que la línea base del motor. Los dos informes tienen la
-misma huella de dataset (`78884e7c8037`): se midieron sobre exactamente los mismos casos. Herramienta:
-`evaluacion-ia/cubicador/evaluar_ia.py`; informes completos:
+misma huella de dataset (`78884e7c8037`): se midieron sobre exactamente los mismos casos.
+Herramienta: `evaluacion-ia/cubicador/evaluar_ia.py`; informes completos:
 `evaluacion-ia/cubicador/informe_ia_semilla.md` y `informe_linea_base_semilla.md`.
 
 | Métrica | Motor | IA (Sonnet 5.5, esfuerzo high) |
@@ -44,16 +50,53 @@ repitió tres veces más) y una sola configuración: la de producción del modo 
 esfuerzo high, prompt v1). Alcanza para decir que la IA hoy no supera al motor; no alcanza para
 decir cuánto acertaría con cargas reales.
 
-### 2. Modo sombra con tráfico real
+## 3. Resultado: modo sombra en QA
 
-**No hay datos.** El código está en QA, pero el modo sombra nunca se encendió: falta la workspace
-y la llave de Anthropic del Cubicador, y la tabla `iaSombra` no existe en la base que usa hoy el
-Cubicador de QA. En la base propia del Cubicador (`dbCubicador_Pruebas`) ya está creada.
+### 3.1 Plan de recolección
 
-Aunque tuviera datos, el modo sombra mide **cuánto se parece la IA al motor**, no cuánto acierta.
-El acierto solo se mide contra respuestas validadas, como en el punto 1.
+| | |
+|---|---|
+| Estado al 2026-10-30 | **Apagado.** La tabla `dbo_cubicador.iaSombra` no existe en la base de QA y el Cubicador de QA no tiene llave de Anthropic. |
+| Prueba local (2026-10-30) | **Funciona de punta a punta** con el modelo real: la app respondió igual que siempre y dejó una fila en `iaSombra` con `Estado = OK`, la misma flota que el motor, 4,8 s y ~2.400 tokens. |
+| Tráfico esperado | QA recibió 134 recomendaciones entre el 2026-10-14 y el 2026-10-29: unas 15 por día hábil. |
+| Ventana | **10 días hábiles** desde el encendido, o **150 comparaciones con `Estado = OK`**, lo que ocurra después. |
+| Costo esperado | ~US$0,17 por día y ~US$2 en toda la ventana. El tope diario por defecto (1 millón de tokens, ~US$3,4) no debería alcanzarse. |
+| Qué no cambia | La respuesta al usuario: la comparación corre en segundo plano y el modelo no ve lo que respondió el motor. |
 
-### 3. Lo que la IA ya hace bien junto al motor
+Pasos para encenderlo (detalle en `docs/despliegue/ROTACION-LLAVE-ANTHROPIC.md` §7):
+
+1. Aplicar `cubicador/database/esquema/367_ia_sombra.sql` en la base que usa hoy el Cubicador de
+   QA (`dbTarifario_Nexo_Pruebas`, esquema `dbo_cubicador`). Es una tabla nueva: no toca las
+   existentes.
+2. En Dokploy, app `cubicador-api`: `IA_SOMBRA_HABILITADA=true`, `ANTHROPIC_API_KEY` y, si la
+   llave es de organización, `ANTHROPIC_WORKSPACE_ID`. Redesplegar.
+3. Pedir una recomendación desde NEXO y comprobar que aparece una fila en `iaSombra` con
+   `Estado = OK`.
+
+Si el Cubicador se traslada a su base propia (`dbCubicador_Pruebas`) antes de cerrar la ventana,
+las filas ya recolectadas se copian a la tabla `dbo.iaSombra` de esa base, que ya existe.
+
+### 3.2 Resultados (se completa al cerrar la ventana)
+
+Con las consultas de `docs/ia/ESTUDIO-CUBICADOR-IA.md` §7, de solo lectura.
+
+| Métrica | Resultado |
+|---|---|
+| Ventana (desde / hasta) | |
+| Intentos / comparaciones con `Estado = OK` | |
+| Intentos fallidos, por `Estado` | |
+| Acuerdo con el motor en asignar / no asignar | |
+| Flota exacta igual a la del motor | |
+| Misma configuración (sin mirar carrocería) | |
+| Misma cantidad / la IA pide más / la IA pide menos | |
+| Propuestas que exceden peso / volumen / pierden unidades | |
+| Latencia del modelo p50 / p95 | |
+| Costo total / por cubicación | |
+
+**Revisión manual obligatoria:** cada comparación en la que la IA pide **menos** vehículos que el
+motor se revisa una por una, para saber si es otro caso como S-19 o un error del motor.
+
+## 4. Lo que la IA ya hace bien junto al motor
 
 - **Interpretar descripciones libres de mercancía** en posiciones estructuradas (#368): 23/23
   casos exactos y 7/7 rechazos correctos; el motor valida todo lo que sale.
@@ -61,12 +104,12 @@ El acierto solo se mide contra respuestas validadas, como en el punto 1.
 
 En los dos casos la IA no decide: prepara datos o explica, y el motor sigue mandando.
 
-## Criterios
+## 5. Criterios
 
 Los criterios propuestos en la issue eran «acierto igual o superior al del motor» y «p95 de
 latencia no peor».
 
-| Criterio | Resultado | Comentario |
+| Criterio | Resultado con el dataset dorado | Comentario |
 |---|---|---|
 | Acierto igual o superior al del motor | **No cumple** | 95 % contra 100 % en flota mínima, con un error de seguridad |
 | p95 de latencia no peor | No aplica tal como está escrito | El motor responde en milisegundos y un modelo en segundos: nunca se cumpliría. En modo sombra la IA corre aparte y no retrasa la respuesta |
@@ -80,21 +123,31 @@ latencia no peor».
 3. **No retrasa la respuesta al usuario.** Si algún día la IA entrara en el camino de la
    respuesta, se fija un p95 máximo en segundos, no una comparación con el motor.
 4. Costo por cubicación de **US$0,02 o menos**.
+5. En modo sombra, **menos del 5 % de intentos fallidos** (tiempo agotado, límite del proveedor o
+   respuesta inválida).
 
-## Decisión propuesta
+## 6. Decisión
 
-**No-go** a que la IA decida la flota o reemplace al motor. No supera al motor y falla
-sistemáticamente en lo geométrico, que es justo lo que el motor resuelve.
+**Preliminar (con el dataset dorado):**
 
-**Go** a:
+- **No-go** a que la IA decida la flota o reemplace al motor. No supera al motor y falla
+  sistemáticamente en lo geométrico, que es justo lo que el motor resuelve.
+- **Go** a encender el modo sombra en QA para recolectar datos reales (sección 3). Es barato y no
+  afecta la respuesta.
+- **Go** a usar la IA donde complementa al motor sin decidir: interpretación de texto libre y
+  explicación de la recomendación.
 
-1. **Encender el modo sombra en QA**, para medir el parecido con tráfico real. Es barato
-   (~US$0,011 por cubicación; con el tope por defecto de 1 millón de tokens al día, el gasto
-   máximo es de unos US$3,4 diarios) y no afecta la respuesta.
-2. **Usar la IA donde complementa al motor sin decidir:** interpretación de texto libre y
-   explicación de la recomendación.
+**Cómo se confirma con el modo sombra.** Al cerrar la ventana:
 
-## Alcance de la HU siguiente
+- Si la IA pide menos vehículos que el motor en algún caso que la revisión manual confirma como
+  error de la IA, o el acuerdo en flota exacta es menor al 95 %, el no-go queda confirmado.
+- Si el acuerdo es alto y no hay casos de seguridad, el no-go se mantiene igual (parecerse al
+  motor no es superarlo), pero la siguiente reevaluación se hace con el dataset de cargas reales
+  validadas contra los criterios de la sección 5.
+
+**Final (se completa al cerrar la ventana):**
+
+## 7. Alcance de la HU siguiente
 
 **Interpretación de descripciones libres de mercancía en la captura.** Conectar el servicio de
 #368 al flujo real: el texto libre de una solicitud se convierte en posiciones, el motor las
@@ -105,16 +158,24 @@ medida).
   pulgadas, dos mercancías en una frase).
 - Mostrar la explicación de #369 junto a la recomendación.
 
-## Pendientes
+### Pendientes
 
 | Pendiente | Responsable | Para qué |
 |---|---|---|
-| Crear la workspace y la llave de Anthropic del Cubicador, y poner `ANTHROPIC_API_KEY`, `ANTHROPIC_WORKSPACE_ID` e `IA_SOMBRA_HABILITADA=true` en el Cubicador de QA | Bryan, con quien administre la cuenta de Anthropic y el despliegue | Encender el modo sombra |
-| Crear la tabla `iaSombra` donde corra el Cubicador (ya existe en `dbCubicador_Pruebas`; conviene encenderlo junto con el traslado a esa base, #423) | Bryan | Que el modo sombra pueda registrar |
+| Aplicar `367_ia_sombra.sql` en `dbTarifario_Nexo_Pruebas` | Bryan | Que el modo sombra pueda registrar |
+| Definir la llave del Cubicador (workspace propia, o la de organización con `ANTHROPIC_WORKSPACE_ID` mientras tanto), cargarla en Dokploy con `IA_SOMBRA_HABILITADA=true` y redesplegar | Bryan, con quien administre la cuenta de Anthropic y el despliegue | Encender el modo sombra |
+| Correr las consultas de §7 al cerrar la ventana, revisar los casos en que la IA pide menos y completar las secciones 3.2 y 6 | Bryan | Cerrar el acta |
 | Importar y validar cargas reales (`evaluacion-ia/cubicador/importar_cargas_reales.py`) y repetir la evaluación de la IA | Bryan | Medir el acierto con datos reales |
 | Cerrar #367 (tras verificar en QA) y #368 | Sara | Están terminadas pero abiertas |
 
-## Cómo reproducir la medición
+## 8. Aprobación
+
+| Rol | Nombre | Decisión | Fecha |
+|---|---|---|---|
+| Responsable de la issue | | | |
+| Líder técnico | | | |
+
+## Anexo: cómo reproducir la medición contra el dataset dorado
 
 ```bash
 # gratis: arma los mensajes sin llamar al modelo
@@ -128,10 +189,3 @@ python evaluacion-ia/cubicador/evaluar_ia.py --solo S-19 --repeticiones 3
 ```
 
 La corrida completa (22 llamadas) costó unos US$0,24.
-
-## Aprobación
-
-| Rol | Nombre | Decisión | Fecha |
-|---|---|---|---|
-| Responsable de la issue | | | |
-| Líder técnico | | | |
