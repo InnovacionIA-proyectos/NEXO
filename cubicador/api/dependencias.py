@@ -14,6 +14,8 @@ from application.ia_sombra.servicio import ServicioSombra
 from application.ports.externos import ILineaSolicitudPort
 from infrastructure.clientes.nexo_client import NexoLineaSolicitudClient
 from infrastructure.mensajeria.rabbitmq import RabbitMqEventosPublisher
+from application.explicacion.servicio import ServicioExplicacion
+from application.ia_sombra.configuracion import ConfiguracionSombra
 from infrastructure.ia.anthropic_cliente import AnthropicClienteIa
 from infrastructure.persistence.db import SessionLocal, obtener_sesion
 from infrastructure.persistence.repositorios.catalogo_crud_repo import SqlCatalogoCrudRepository
@@ -75,6 +77,20 @@ def obtener_servicio_sombra() -> ServicioSombra:
             fabrica_cliente=AnthropicClienteIa,
         )
     return _servicio_sombra
+
+
+def obtener_servicio_explicacion() -> ServicioExplicacion | None:
+    """`None` cuando no hay llave: el endpoint responde con `explicacion: null`.
+
+    Se construye por peticion y no como singleton -al reves que el modo
+    sombra-, porque este servicio no guarda estado: no lleva tareas en curso ni
+    cuentas que cerrar. Y asi, encender o apagar la IA cambiando el entorno no
+    exige reiniciar el proceso.
+    """
+    config = ConfiguracionSombra.desde_entorno()
+    if not config.api_key:
+        return None
+    return ServicioExplicacion(AnthropicClienteIa(config))
 
 
 async def cerrar_servicio_sombra() -> None:

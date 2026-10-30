@@ -1,7 +1,7 @@
 # Linea base del motor actual (seleccion_flota)
 
-- Fecha: 2026-10-27 · casos: 22 · repeticiones por caso: 50
-- Dataset: huella `41fefeb4e390` · 22 sintetico
+- Fecha: 2026-10-30 · casos: 22 · repeticiones por caso: 50
+- Dataset: huella `78884e7c8037` · 22 sintetico
 - Catalogo: QA calcado (5 vehiculos, 9 tipos de mercancia)
 
 | Metrica | Resultado |
@@ -15,5 +15,5 @@
 | Respeta el peso | 100.0 % (20/20) |
 | Respeta el volumen | 100.0 % (20/20) |
 | Conserva las unidades | 100.0 % (20/20) |
-| Latencia p50 / p95 / max | 0.489 / 10.057 / 130.438 ms |
+| Latencia p50 / p95 / max | 1.595 / 25.713 / 390.028 ms |
 | Costo por cubicacion | 0 USD (tokens de entrada/salida medios: 0.0/0.0) |

@@ -193,3 +193,46 @@ async def test_dos_mensajes_malformados_no_agotan_el_prefetch():
 
     sin_ackear = [i for i, m in enumerate(mensajes) if m.acks == 0]
     assert not sin_ackear, f"Mensajes sin ackear: {sin_ackear}. Con prefetch_count=2 el worker queda bloqueado."
+
+
+async def test_un_fallo_inesperado_no_publica_el_sql_crudo():
+    """Lo que sale de aca lo LEE EL USUARIO (#344).
+
+    NEXO guarda el mensaje del rechazo por linea y el front lo muestra tal
+    cual. Con `str(exc)` de un error de SQLAlchemy, en QA se vio la consulta
+    entera en pantalla -"... cargada IS 0 GROUP BY item_plan_cargue_id"-,
+    seguida de "revisa las medidas y los pesos", que ademas desorienta porque
+    los datos de la linea estaban bien.
+
+    El detalle no se pierde: va al log y a la DLQ. Lo que no puede es viajar
+    al usuario.
+    """
+    from sqlalchemy.exc import ProgrammingError
+
+    async def _falla_como_sql_server(*_a, **_k):
+        # El error exacto que se vio en QA: SQL Server rechaza `IS 0` con el 102.
+        raise ProgrammingError(
+            "SELECT colocaciones_cargue.item_plan_cargue_id, count(*) FROM "
+            "colocaciones_cargue WHERE colocaciones_cargue.cargada IS 0 "
+            "GROUP BY colocaciones_cargue.item_plan_cargue_id",
+            {}, Exception("[42000] Incorrect syntax near '0'. (102)"))
+
+    mensaje = _MensajeFalso(
+        {"tipo": "optimizar", "correlationId": "c-sql", "planId": "p-1", "solicitud": {}},
+        intentos_previos=worker_main.MAX_INTENTOS - 1,
+    )
+    publisher = _PublisherFalso()
+
+    import pytest as _pytest
+    with _pytest.MonkeyPatch.context() as mp:
+        mp.setattr(worker_main, "_ejecutar_solicitud", _falla_como_sql_server)
+        await worker_main._procesar(mensaje, publisher)
+
+    assert publisher.rechazos, "no se publico el rechazo"
+    codigo, texto = publisher.rechazos[0][1], publisher.rechazos[0][2]
+    assert codigo == "ERROR_INTERNO"
+
+    filtrado = [p for p in ("SELECT", "FROM", "WHERE", "GROUP BY", "IS 0", "IS 1", "Traceback")
+                if p.lower() in texto.lower()]
+    assert not filtrado, f"el mensaje al usuario trae detalle interno {filtrado}: {texto!r}"
+    assert "c-sql" in texto, "sin el id de correlacion no hay como hallar el detalle en el log"

@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Arnés adversario del asistente de cotización (S6-HU-36.5, #374). Se corre bajo demanda, nunca en CI:
+    a propósito NO está en Nexo.Clean.sln, igual que el arnés del mapeo. Ver el README de al lado.
+
+    Referencia al proyecto de pruebas de Application para reusar los repositorios en memoria que ya
+    existen (clsRepositorioConversacionesEnMemoria y clsRepositorioPreferenciasEnMemoria, 134 líneas):
+    copiarlos acá sería tener dos versiones de lo mismo divergiendo con el tiempo. Este arnés vive
+    bajo tests/ y es un activo de pruebas, así que la dependencia va en el sentido natural.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Nexo.EvaluacionAsistente</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>false</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\..\src\Nexo.Application\Nexo.Application.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Nexo.Infrastructure\Nexo.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\..\Nexo.Application.Tests\Nexo.Application.Tests.csproj" />
+  </ItemGroup>
+
+</Project>
