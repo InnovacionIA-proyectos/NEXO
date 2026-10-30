@@ -1,15 +1,15 @@
 """Publicador de eventos hacia RabbitMQ (ver CONTRATO.md seccion 6):
 exchange `cubicador.eventos` (topic), routing keys `cubicacion.solicitada`,
-`plan-de-cargue.generado`, `cubicacion.rechazada` y, desde S3-HU-03 (issue
-#110), `vehiculo.creado`/`vehiculo.actualizado`.
+`plan-de-cargue.generado`, `cubicacion.rechazada` y `vehiculo.creado`/
+`vehiculo.actualizado`.
 
 Verificado contra un RabbitMQ real en Docker Compose (ver
 docs/testDocumentation/PRUEBAS_DE_INTEGRACION.md seccion 2): flujo completo
 API -> publica -> worker consume -> persiste -> publica evento de resultado,
 mas el camino de reintentos/DLQ via `publicar_crudo`.
 
-Issue #28 (S2-HU-075): `plan-de-cargue.generado`/`cubicacion.rechazada` -los
-2 eventos que consume NEXO con un IConsumer<T> real de MassTransit- se
+`plan-de-cargue.generado`/`cubicacion.rechazada` -los 2 eventos que consume
+NEXO con un IConsumer<T> real de MassTransit- se
 publican envueltos en el "sobre" minimo de MassTransit (`_sobre_masstransit`)
 para que ese consumer los pueda deserializar. `cubicacion.solicitada` NO
 lleva sobre cuando lo publica Cubicador (nadie mas lo consume) - pero SI
@@ -33,11 +33,11 @@ EXCHANGE = "cubicador.eventos"
 logger = logging.getLogger("cubicador.rabbitmq")
 
 # Namespace C# real de los mensajes que SI consume NEXO con un IConsumer<T>
-# de MassTransit - ver NEXO/src/CabinaFletes.Mensajes/Cubicacion/
+# de MassTransit - ver NEXO/src/Nexo.Mensajes/Cubicacion/
 # MensajesDeCubicacion.cs. Acoplamiento cruzado real: si NEXO renombra esas
 # clases o el namespace, este valor queda desincronizado sin ningun error de
 # compilacion que lo avise - solo se nota si un mensaje deja de entregarse.
-_NAMESPACE_MENSAJES_NEXO = "CabinaFletes.Mensajes.Cubicacion"
+_NAMESPACE_MENSAJES_NEXO = "Nexo.Mensajes.Cubicacion"
 
 
 def _sobre_masstransit(tipo_csharp: str, payload: dict[str, Any]) -> dict[str, Any]:
@@ -134,10 +134,10 @@ class RabbitMqEventosPublisher:
         payload = {"correlationId": plan_id, "planId": plan_id, "codigo": codigo, "mensaje": mensaje}
         await self._publicar("cubicacion.rechazada", _sobre_masstransit("CubicacionRechazada", payload))
 
-    # S3-HU-03 (issue #110): catalogo de vehiculos - NEXO proyecta estos 2 eventos
-    # para no tener que llamar a Cubicador cada vez que alguien lee GET /api/vehiculos
-    # (issue #112). Mismo "sobre" de MassTransit que plan-de-cargue.generado/
-    # cubicacion.rechazada: los consume un IConsumer<T> real del lado de NEXO.
+    # Catalogo de vehiculos - NEXO proyecta estos 2 eventos para no tener que
+    # llamar a Cubicador cada vez que alguien lee GET /api/vehiculos. Mismo
+    # "sobre" de MassTransit que plan-de-cargue.generado/cubicacion.rechazada:
+    # los consume un IConsumer<T> real del lado de NEXO.
     async def publicar_vehiculo_creado(self, vehiculo_id: str, vehiculo: dict[str, Any]) -> None:
         payload = {"correlationId": vehiculo_id, "vehiculo": vehiculo}
         await self._publicar("vehiculo.creado", _sobre_masstransit("VehiculoCreado", payload))
@@ -147,10 +147,44 @@ class RabbitMqEventosPublisher:
         await self._publicar("vehiculo.actualizado", _sobre_masstransit("VehiculoActualizado", payload))
 
     # Cierra el trio del catalogo. Sin este evento la proyeccion de NEXO se queda con
-    # el vehiculo para siempre: GET /api/vehiculos (issue #112) lee de ahi, asi que
-    # seguiria ofreciendo un vehiculo que ya no existe en esta base, y el crear_plan
-    # que lo eligiera fallaria con VEHICULO_INVALIDO. Solo lleva el id: no hay fila
+    # el vehiculo para siempre: GET /api/vehiculos lee de ahi, asi que seguiria
+    # ofreciendo un vehiculo que ya no existe en esta base, y el crear_plan que
+    # lo eligiera fallaria con VEHICULO_INVALIDO. Solo lleva el id: no hay fila
     # que proyectar, solo una que borrar.
     async def publicar_vehiculo_eliminado(self, vehiculo_id: str) -> None:
         payload = {"correlationId": vehiculo_id, "vehiculoId": vehiculo_id}
         await self._publicar("vehiculo.eliminado", _sobre_masstransit("VehiculoEliminado", payload))
+
+    # --- Catalogo del contrato unico (S5-HU-17.4) --------------------------
+    # Mismo patron que el trio de vehiculo: sobre de MassTransit para que del
+    # otro lado lo consuma un IConsumer<T> real, `correlationId` con el id de
+    # la fila, y el evento de borrado lleva SOLO el id porque no hay fila que
+    # proyectar, solo una que quitar.
+    #
+    # Los publican los CRUD de S5-HU-17.5. Quedan escritos aca para que esas
+    # escrituras no tengan que inventar la forma del mensaje y se desvien de
+    # la que NEXO ya sabe consumir.
+
+    async def publicar_mercancia_creada(self, mercancia_id: str, mercancia: dict[str, Any]) -> None:
+        payload = {"correlationId": mercancia_id, "mercancia": mercancia}
+        await self._publicar("mercancia.creada", _sobre_masstransit("MercanciaCreada", payload))
+
+    async def publicar_mercancia_actualizada(self, mercancia_id: str, mercancia: dict[str, Any]) -> None:
+        payload = {"correlationId": mercancia_id, "mercancia": mercancia}
+        await self._publicar("mercancia.actualizada", _sobre_masstransit("MercanciaActualizada", payload))
+
+    async def publicar_mercancia_eliminada(self, mercancia_id: str) -> None:
+        payload = {"correlationId": mercancia_id, "mercanciaId": mercancia_id}
+        await self._publicar("mercancia.eliminada", _sobre_masstransit("MercanciaEliminada", payload))
+
+    async def publicar_carroceria_creada(self, carroceria_id: str, carroceria: dict[str, Any]) -> None:
+        payload = {"correlationId": carroceria_id, "carroceria": carroceria}
+        await self._publicar("carroceria.creada", _sobre_masstransit("CarroceriaCreada", payload))
+
+    async def publicar_carroceria_actualizada(self, carroceria_id: str, carroceria: dict[str, Any]) -> None:
+        payload = {"correlationId": carroceria_id, "carroceria": carroceria}
+        await self._publicar("carroceria.actualizada", _sobre_masstransit("CarroceriaActualizada", payload))
+
+    async def publicar_carroceria_eliminada(self, carroceria_id: str) -> None:
+        payload = {"correlationId": carroceria_id, "carroceriaId": carroceria_id}
+        await self._publicar("carroceria.eliminada", _sobre_masstransit("CarroceriaEliminada", payload))

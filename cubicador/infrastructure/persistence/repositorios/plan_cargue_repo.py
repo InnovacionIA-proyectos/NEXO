@@ -1,7 +1,22 @@
 """Implementa IPlanCargueRepository con SQLAlchemy. La clave de dominio
 "itemPlanCargueId#indice" que usa el motor para correlacionar unidades
 fisicas se arma y se deshace UNICAMENTE aqui - ni application ni el motor
-conocen el formato del id real de una fila."""
+conocen el formato del id real de una fila.
+
+**Los booleanos se filtran con `Modelo.campo` y `~Modelo.campo`, no con
+`.is_(True)` / `.is_(False)`** (#344). SQLAlchemy compila `.is_(True)` a
+`columna IS 1` y SQL Server no acepta esa forma: responde el error 102,
+"Incorrect syntax near '1'". Las dos que si acepta son `= 1` y `= 0`, que es
+a lo que compilan `Modelo.campo` y `~Modelo.campo`.
+
+El patron venia del Cubicador original, de la epoca de PostgreSQL -que si
+acepta `IS true`- y sobrevivio a la migracion a SQL Server (S5-HU-17.1). Los
+siete sitios de este archivo estaban rotos y nadie lo noto, porque **SQLite
+tambien acepta `IS 0`** y toda la suite corre contra SQLite: el plan de cargue
+3D desde una linea fallaba en QA con ERROR_INTERNO mientras las pruebas pasaban
+en verde. La guarda contra eso esta en
+`tests/infrastructure/test_sql_valido_en_sqlserver.py`.
+"""
 
 from __future__ import annotations
 
@@ -34,8 +49,8 @@ class SqlPlanCargueRepository:
         self, nombre: str, vehiculo_id: str, linea_solicitud_id: str | None = None, numero_vehiculo: int = 1,
         id: str | None = None,
     ) -> PlanCargue:
-        # `id`: S3-HU-02 (issue #105) - "crear_plan" desde NEXO manda el id ya generado
-        # alla (S3-HU-01.2); sin id (POST sincrono, demo, crear_desde_linea) se genera acá.
+        # `id`: "crear_plan" desde NEXO manda el id ya generado alla; sin id
+        # (POST sincrono, demo, crear_desde_linea) se genera acá.
         fila = PlanCargueModel(
             id=id or str(uuid.uuid4()), nombre=nombre, vehiculo_id=vehiculo_id,
             linea_solicitud_id=linea_solicitud_id, numero_vehiculo=numero_vehiculo,
@@ -60,14 +75,19 @@ class SqlPlanCargueRepository:
         if fila is None:
             return
 
-        # S3-HU-10.3 (issue #133): las colocaciones van PRIMERO, mismo orden que ya
-        # respeta `eliminar_item`. `ColocacionCargueModel` tiene FK a `planes_cargue`
+        # Las colocaciones van PRIMERO, mismo orden que ya respeta
+        # `eliminar_item`. `ColocacionCargueModel` tiene FK a `planes_cargue`
         # y a `items_plan_cargue` pero NO tiene relationship ni cascada, asi que el
         # `delete(fila)` de abajo (que si arrastra los items, por el cascade
         # delete-orphan de PlanCargueModel.items) dejaba las colocaciones apuntando a
-        # dos filas muertas: en Postgres, ForeignKeyViolationError en cualquier plan
-        # ya optimizado; en SQLite -sin PRAGMA foreign_keys- filas huerfanas en
-        # silencio.
+        # dos filas muertas: en SQL Server, IntegrityError (error 547, "conflicted
+        # with the FOREIGN KEY constraint") en cualquier plan ya optimizado; en
+        # SQLite -sin PRAGMA foreign_keys- filas huerfanas en silencio.
+        #
+        # El codigo no distingue el error por tipo de driver: SQLAlchemy ya
+        # normaliza los dos a `sqlalchemy.exc.IntegrityError`, asi que el cambio
+        # de motor (S5-HU-17.1, antes era Postgres y asyncpg) no requirio tocar
+        # nada aqui mas que este comentario.
         #
         # Importa mas de lo que parece: NEXO borra de forma optimista (responde antes
         # de saber si Cubicador lo logro), asi que el fallo dejaba a NEXO creyendo que
@@ -115,8 +135,8 @@ class SqlPlanCargueRepository:
         filas = (await self._s.execute(
             select(ColocacionCargueModel).where(
                 ColocacionCargueModel.plan_cargue_id == plan_id,
-                ColocacionCargueModel.bloqueada.is_(True),
-                ColocacionCargueModel.cargada.is_(True),
+                ColocacionCargueModel.bloqueada,
+                ColocacionCargueModel.cargada,
             )
         )).scalars().all()
         return [_colocacion_a_entidad(f) for f in filas]
@@ -153,8 +173,8 @@ class SqlPlanCargueRepository:
             fila.peso_encima_kg = col.peso_encima_kg
             fila.estado_estabilidad = col.estado_estabilidad
             fila.accesibilidad = col.accesibilidad
-            # Issue #151: cada reoptimizacion borra TODAS las filas y las
-            # reconstruye desde resultado.colocaciones (incluidas las `fijas` que
+            # Cada reoptimizacion borra TODAS las filas y las reconstruye desde
+            # resultado.colocaciones (incluidas las `fijas` que
             # entraron con bloqueada=True desde optimizar.py). Sin esta linea la
             # fila nueva se queda en el default=False del modelo y el flag se
             # pierde en cada ciclo de "Reoptimizar (respetar bloqueadas)".
@@ -193,8 +213,8 @@ class SqlPlanCargueRepository:
             await self._s.commit()
 
     async def marcar_error(self, plan_id: str | None, mensaje: str) -> None:
-        # S3-HU-10.1 (issue #131): `plan_id` puede ser None - lo llama el manejador de
-        # errores del worker con `cuerpo.get("planId")`, y un mensaje malformado puede
+        # `plan_id` puede ser None - lo llama el manejador de errores del
+        # worker con `cuerpo.get("planId")`, y un mensaje malformado puede
         # no traer la clave. Sin esta guarda, `get(Modelo, None)` emite hoy un
         # SAWarning ("fully NULL primary key identity") y SQLAlchemy avisa que podria
         # LANZAR en una version futura - lo que reintroduciria el atasco exacto que
@@ -272,7 +292,7 @@ class SqlPlanCargueRepository:
         plan = await self._s.get(PlanCargueModel, plan_id)
         assert plan is not None
         cargadas = (await self._s.execute(
-            select(ColocacionCargueModel).where(ColocacionCargueModel.plan_cargue_id == plan_id, ColocacionCargueModel.cargada.is_(True))
+            select(ColocacionCargueModel).where(ColocacionCargueModel.plan_cargue_id == plan_id, ColocacionCargueModel.cargada)
         )).scalars().all()
         for c in cargadas:
             clave = mapeos.clave(c.item_plan_cargue_id, c.indice_unidad)
@@ -286,8 +306,8 @@ class SqlPlanCargueRepository:
         await self._s.commit()
 
     async def eliminar_planes_de_linea(self, linea_solicitud_id: str) -> None:
-        # S3-HU-10.3 (issue #133): mismo defecto que tenia `eliminar()`, y aqui es
-        # PEOR - un `delete()` masivo no dispara la cascada del ORM, asi que sin este
+        # Mismo defecto que tenia `eliminar()`, y aqui es PEOR - un `delete()`
+        # masivo no dispara la cascada del ORM, asi que sin este
         # borrado explicito quedaban huerfanos los items ADEMAS de las colocaciones.
         #
         # No es teorico: lo llama `crear_plan_desde_linea` para reconstruir la flota,
@@ -308,7 +328,7 @@ class SqlPlanCargueRepository:
     async def obtener_sobrantes(self, plan_id: str) -> list[tuple[str, int]]:
         filas = (await self._s.execute(
             select(ColocacionCargueModel.item_plan_cargue_id, func.count())
-            .where(ColocacionCargueModel.plan_cargue_id == plan_id, ColocacionCargueModel.cargada.is_(False))
+            .where(ColocacionCargueModel.plan_cargue_id == plan_id, ~ColocacionCargueModel.cargada)
             .group_by(ColocacionCargueModel.item_plan_cargue_id)
         )).all()
         return [(item_id, cantidad) for item_id, cantidad in filas]
@@ -316,7 +336,7 @@ class SqlPlanCargueRepository:
     async def cargo_algo(self, plan_id: str) -> bool:
         fila = (await self._s.execute(
             select(ColocacionCargueModel.id).where(
-                ColocacionCargueModel.plan_cargue_id == plan_id, ColocacionCargueModel.cargada.is_(True),
+                ColocacionCargueModel.plan_cargue_id == plan_id, ColocacionCargueModel.cargada,
             ).limit(1)
         )).first()
         return fila is not None
@@ -348,7 +368,7 @@ class SqlPlanCargueRepository:
                 select(
                     ColocacionCargueModel.plan_cargue_id, func.count(),
                 ).where(
-                    ColocacionCargueModel.plan_cargue_id.in_(ids), ColocacionCargueModel.cargada.is_(True),
+                    ColocacionCargueModel.plan_cargue_id.in_(ids), ColocacionCargueModel.cargada,
                 ).group_by(ColocacionCargueModel.plan_cargue_id)
             )).all()
         ) if ids else {}
@@ -378,7 +398,7 @@ class SqlPlanCargueRepository:
         )).all())
         cargadas_por_plan = dict((await self._s.execute(
             select(ColocacionCargueModel.plan_cargue_id, func.count())
-            .where(ColocacionCargueModel.plan_cargue_id.in_(ids), ColocacionCargueModel.cargada.is_(True))
+            .where(ColocacionCargueModel.plan_cargue_id.in_(ids), ColocacionCargueModel.cargada)
             .group_by(ColocacionCargueModel.plan_cargue_id)
         )).all())
 

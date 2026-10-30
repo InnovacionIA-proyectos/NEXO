@@ -15,7 +15,7 @@ documentadas en la sección final, no por un `JOIN` físico ya resuelto.
 
 > Todas las columnas de fecha están en formato `AAAA-MM-DD HH:MM:SS`. Todos los
 > valores monetarios están en pesos colombianos (COP). Fuente: vistas
-> `analitica.*` sobre la BD transaccional `CabinaFletes` (servidor `localhost,1434`
+> `analitica.*` sobre la BD transaccional `Nexo` (servidor `localhost,1434`
 > en este entorno de desarrollo — no hay instancia de producción todavía).
 
 ### `solicitudes.csv`

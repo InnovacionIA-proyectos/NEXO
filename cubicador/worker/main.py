@@ -1,8 +1,8 @@
 """Worker consumidor de RabbitMQ: procesa `optimizar` y `crear_desde_linea`
-(las 2 operaciones pesadas, ver docs/DECISIONES_TECNICAS.md #5) mas, desde
-S3-HU-02 (issue #105), los 8 comandos de escritura del plan de cargue
-(crear_plan, crear_plan_demo, guardar_vehiculo, eliminar_vehiculo, guardar_item,
-importar_items, eliminar_item, eliminar_plan, ajustar_colocacion) - antes solo llegaban por el
+(las 2 operaciones pesadas, ver docs/DECISIONES_TECNICAS.md #5) mas los 8
+comandos de escritura del plan de cargue (crear_plan, crear_plan_demo,
+guardar_vehiculo, eliminar_vehiculo, guardar_item, importar_items,
+eliminar_item, eliminar_plan, ajustar_colocacion) - antes solo llegaban por el
 POST/DELETE/PATCH sincrono de `api/routers/planes_cargue.py` directo contra
 esta base; ahora TODA escritura, pesada o no, pasa por esta misma cola. Consume
 `cubicacion.solicitada` y publica `plan-de-cargue.generado` o
@@ -56,6 +56,8 @@ from infrastructure.alertas.correo import alertar_mensaje_en_dlq
 from infrastructure.clientes.nexo_client import NexoLineaSolicitudClient
 from infrastructure.mensajeria.rabbitmq import EXCHANGE, RabbitMqEventosPublisher, conectar_con_reintentos
 from infrastructure.persistence.db import SessionLocal, crear_tablas
+from infrastructure.persistence.repositorios.catalogo_repo import SqlCatalogoRepository
+from infrastructure.persistence.repositorios.parametros_repo import SqlParametrosCubicacionRepository
 from infrastructure.persistence.repositorios.plan_cargue_repo import SqlPlanCargueRepository
 from infrastructure.persistence.repositorios.vehiculo_repo import SqlVehiculoCubicacionRepository
 
@@ -63,9 +65,9 @@ RABBITMQ_URL = os.environ.get("CUBICADOR_RABBITMQ_URL", "amqp://guest:guest@loca
 COLA = "cubicador.optimizar"
 COLA_DLQ = "cubicacion.dlq"
 MAX_INTENTOS = 3
-# Umbrales del vigilante, configurables por ambiente (S3-HU-06.1): un entorno
-# con planes grandes puede necesitar mas de 5 min antes de dar uno por perdido,
-# y bajar el intervalo acelera la deteccion a costa de mas consultas.
+# Umbrales del vigilante, configurables por ambiente: un entorno con planes
+# grandes puede necesitar mas de 5 min antes de dar uno por perdido, y bajar
+# el intervalo acelera la deteccion a costa de mas consultas.
 TIMEOUT_PROCESANDO_MINUTOS = int(os.environ.get("CUBICADOR_TIMEOUT_PROCESANDO_MINUTOS", "5"))
 INTERVALO_VIGILANTE_SEGUNDOS = int(os.environ.get("CUBICADOR_INTERVALO_VIGILANTE_SEGUNDOS", "60"))
 # Codigo de rechazo propio del vigilante - no lo produce ningun caso de uso,
@@ -76,8 +78,8 @@ logger = logging.getLogger("cubicador.worker")
 
 #: Tipos que NO terminan con un plan vivo para reportar: "guardar_vehiculo" y
 #: "eliminar_vehiculo" no tienen plan (son catalogo suelto); "eliminar_plan" ya borro la
-#: fila que reportaria. Ver `_procesar`: para estos no se llama a `obtener_resultado` ni
-#: se publica "plan-de-cargue.generado" (S3-HU-02, issue #105).
+#: fila que reportaria. Ver `_procesar`: para estos no se llama a `obtener_resultado`
+#: ni se publica "plan-de-cargue.generado".
 TIPOS_SIN_RESULTADO_FINAL = frozenset({"guardar_vehiculo", "eliminar_vehiculo", "eliminar_plan"})
 
 
@@ -92,19 +94,21 @@ def _ajuste_de_solicitud(solicitud: dict) -> "ajustar_uc.AjusteColocacionInput":
 async def _ejecutar_solicitud(
     cuerpo: dict, planes: SqlPlanCargueRepository, vehiculos: SqlVehiculoCubicacionRepository,
     publisher: RabbitMqEventosPublisher,
+    catalogo: SqlCatalogoRepository | None = None,
+    parametros: SqlParametrosCubicacionRepository | None = None,
 ) -> str | None:
     """Corre el caso de uso. Devuelve el plan_id resultante para que `_procesar`
     reporte "plan-de-cargue.generado" (None para los tipos en
     `TIPOS_SIN_RESULTADO_FINAL`, que no tienen plan que reportar).
 
-    S3-HU-02 (issue #105): los 8 comandos nuevos reutilizan EXACTAMENTE los mismos
-    casos de uso que ya usa `api/routers/planes_cargue.py` (el POST sincrono que este
-    trabajo reemplaza) - nada de logica de negocio nueva acá, solo el cableado
+    Los 8 comandos nuevos reutilizan EXACTAMENTE los mismos casos de uso que
+    ya usa `api/routers/planes_cargue.py` (el POST sincrono que este trabajo
+    reemplaza) - nada de logica de negocio nueva acá, solo el cableado
     cola -> caso de uso -> escritura real en la base (antes solo llegaba por HTTP
     directo).
 
-    S3-HU-03 (issue #110): `guardar_vehiculo` es el UNICO tipo que publica su
-    propio evento acá mismo (vehiculo.creado/vehiculo.actualizado) en vez de
+    `guardar_vehiculo` es el UNICO tipo que publica su propio evento acá
+    mismo (vehiculo.creado/vehiculo.actualizado) en vez de
     dejarselo a `_procesar` - no tiene un plan_id que reportar via
     "plan-de-cargue.generado", y create-vs-update solo se sabe ANTES de guardar
     (¿ya existia esa fila?). Si publicar falla, la excepcion sube igual que
@@ -130,12 +134,20 @@ async def _ejecutar_solicitud(
 
     if tipo == "crear_desde_linea":
         lineas = NexoLineaSolicitudClient(NEXO_BASE_URL, NEXO_CALLBACK_API_KEY)
-        plan = await crear_plan_desde_linea(planes, vehiculos, lineas, solicitud["lineaSolicitudId"])
+        # El puente consume la recomendacion del motor de seleccion
+        # (S5-HU-17.6), asi que necesita el catalogo y las medidas estandar.
+        # Llegan desde `_consumir`, que los arma sobre la misma sesion que el
+        # resto: es una sola unidad de trabajo.
+        if catalogo is None or parametros is None:
+            raise RuntimeError(
+                "crear_desde_linea necesita el repositorio de catalogo y el de parametros.")
+        plan = await crear_plan_desde_linea(
+            planes, vehiculos, lineas, catalogo, parametros, solicitud["lineaSolicitudId"])
         return plan.id
 
     if tipo == "crear_plan":
-        # El plan_id lo genero NEXO (S3-HU-01.2): se crea la fila REAL con ESE id,
-        # nunca uno propio (HU S3-HU-02, criterio 1).
+        # El plan_id lo genero NEXO: se crea la fila REAL con ESE id,
+        # nunca uno propio.
         plan = await planes_uc.crear_plan(planes, solicitud["nombre"], solicitud["vehiculoId"], id=cuerpo["planId"])
         return plan.id
 
@@ -162,7 +174,7 @@ async def _ejecutar_solicitud(
         # rechazo y NO reintenta (el resultado seria el mismo siempre).
         vehiculo_id = cuerpo["planId"]
         await vehiculos_uc.eliminar_vehiculo(vehiculos, vehiculo_id)
-        # Cierra el trio del catalogo junto a vehiculo.creado/actualizado (S3-HU-03):
+        # Cierra el trio del catalogo junto a vehiculo.creado/actualizado:
         # sin este evento la proyeccion de NEXO se queda con el vehiculo para siempre
         # y GET /api/vehiculos seguiria ofreciendolo. Se publica DESPUES del borrado:
         # si el caso de uso rechaza (VEHICULO_EN_USO), no hay nada que anunciar.
@@ -204,8 +216,8 @@ async def _ejecutar_solicitud(
 
 
 async def _procesar(mensaje: aio_pika.IncomingMessage, publisher: RabbitMqEventosPublisher) -> None:
-    # S3-HU-10.1 (issue #131): TODO lo que corre antes del `try` de mas abajo va
-    # dentro de esta guarda. Ahi no habia ningun manejador de errores, asi que
+    # TODO lo que corre antes del `try` de mas abajo va dentro de esta
+    # guarda. Ahi no habia ningun manejador de errores, asi que
     # cualquier fallo -body ilegible, JSON que no es un objeto, falta
     # `correlationId`, cabecera `x-intentos` corrupta- lanzaba antes del `ack` y
     # dejaba el mensaje unacknowledged PARA SIEMPRE. Con prefetch_count=2 bastan dos
@@ -217,9 +229,9 @@ async def _procesar(mensaje: aio_pika.IncomingMessage, publisher: RabbitMqEvento
     # ackea. Perder un mensaje corrupto es aceptable; perder el worker, no.
     try:
         cuerpo = json.loads(mensaje.body)
-        # Issue #28: NEXO publica CubicacionSolicitada con MassTransit real, que
-        # envuelve el payload real bajo la clave "message" (mas messageType, etc
-        # - ver NEXO/docs/mensajeria/CUBICACION.md #1/#4). Cubicador no necesita
+        # NEXO publica CubicacionSolicitada con MassTransit real, que envuelve
+        # el payload real bajo la clave "message" (mas messageType, etc - ver
+        # NEXO/docs/mensajeria/CUBICACION.md). Cubicador no necesita
         # nada de MassTransit para si mismo (sus propios tests y su API siguen
         # publicando el payload plano, sin sobre) - por eso el desenvuelto es
         # opcional: si no hay "message", cuerpo queda igual que antes. Verificado
@@ -238,20 +250,22 @@ async def _procesar(mensaje: aio_pika.IncomingMessage, publisher: RabbitMqEvento
 
     async with SessionLocal() as sesion:
         planes = SqlPlanCargueRepository(sesion)
-        # Issue #162: mismo publisher que el resto del worker, para que
+        # Mismo publisher que el resto del worker, para que
         # listar_con_siembra() pueda publicar vehiculo.creado por cada preset
         # nuevo que siembre (p.ej. si el primer request tras un arranque llega
         # por cola en vez de por GET /vehiculos).
         vehiculos = SqlVehiculoCubicacionRepository(sesion, publisher)
         try:
-            plan_id = await _ejecutar_solicitud(cuerpo, planes, vehiculos, publisher)
-            # S3-HU-02 (issue #105): "guardar_vehiculo" no tiene plan que reportar y
-            # "eliminar_plan" ya borro el suyo - para esos dos no hay
+            plan_id = await _ejecutar_solicitud(
+                cuerpo, planes, vehiculos, publisher,
+                SqlCatalogoRepository(sesion), SqlParametrosCubicacionRepository(sesion))
+            # "guardar_vehiculo" no tiene plan que reportar y "eliminar_plan"
+            # ya borro el suyo - para esos dos no hay
             # "plan-de-cargue.generado" que publicar (ver TIPOS_SIN_RESULTADO_FINAL).
             if plan_id is not None and cuerpo["tipo"] not in TIPOS_SIN_RESULTADO_FINAL:
                 resultado = await obtener_resultado(planes, vehiculos, plan_id)
-                # S3-HU-03 (issue #109/#110): enriquecido con el `resultado` COMPLETO
-                # (items, colocaciones con geometria, metricas, incidencias) - no solo
+                # Enriquecido con el `resultado` COMPLETO (items, colocaciones
+                # con geometria, metricas, incidencias) - no solo
                 # el conteo de antes. Reusa el mismo DTO que ya arma el GET sincrono
                 # (`ResultadoPlanDto`), medido en docs/decisiones/
                 # medicion-evento-enriquecido-plan-cargue.md ANTES de escribir esto.
@@ -277,7 +291,7 @@ async def _procesar(mensaje: aio_pika.IncomingMessage, publisher: RabbitMqEvento
             logger.exception("Fallo procesando mensaje (intento %d/%d)", intentos_previos + 1, MAX_INTENTOS)
             try:
                 # La sesion puede haber quedado INUTILIZABLE: si el fallo fue durante
-                # un flush (p.ej. ForeignKeyViolationError al insertar un item contra
+                # un flush (p.ej. IntegrityError por llave foranea al insertar un item contra
                 # un plan que no existe), SQLAlchemy la deja en estado "pending
                 # rollback" y CUALQUIER operacion posterior sobre ella lanza
                 # PendingRollbackError - incluido el `marcar_error` de abajo, que es
@@ -288,15 +302,33 @@ async def _procesar(mensaje: aio_pika.IncomingMessage, publisher: RabbitMqEvento
                 if intentos_previos + 1 >= MAX_INTENTOS:
                     # `.get` por lo mismo que el `planId` de abajo: es la ultima
                     # indexacion directa del camino de error, y si falta `tipo` el propio
-                    # camino a la DLQ estallaria antes del ack (S3-HU-10.1, issue #131).
+                    # camino a la DLQ estallaria antes del ack.
                     await _mover_a_dlq(
                         mensaje, publisher, cuerpo.get("tipo", "desconocido"), str(exc), intentos_previos + 1,
                     )
-                    # S3-HU-10.1 (issue #131): `.get` por lo mismo que arriba - es la
-                    # linea que el mensaje sin planId de ci_docker_smoke.py hacia estallar
+                    # Lo que sale de aca lo LEE EL USUARIO: NEXO guarda este
+                    # mensaje por linea y el front lo muestra tal cual (#344).
+                    # `str(exc)` de un error de SQLAlchemy trae la consulta
+                    # entera, asi que en QA se vio "... cargada IS 0 GROUP BY
+                    # item_plan_cargue_id" en pantalla, seguido de "revisa las
+                    # medidas y los pesos" - que ademas desorienta, porque los
+                    # datos de la linea estaban bien.
+                    #
+                    # El detalle no se pierde: `logger.exception` de arriba ya
+                    # lo dejo completo, y la DLQ tambien lo lleva. Aca va el
+                    # correlation_id para poder encontrarlo en el log.
+                    #
+                    # Los errores de NEGOCIO no pasan por aca: los atiende el
+                    # `except AppException`, con su codigo y su mensaje, que si
+                    # son para el usuario.
+                    detalle = (
+                        f"Fallo interno del Cubicador tras {MAX_INTENTOS} intentos. "
+                        f"El detalle quedo en el log del servicio (correlacion {correlation_id}).")
+                    # `.get` por lo mismo que arriba - es la linea que el
+                    # mensaje sin planId de ci_docker_smoke.py hacia estallar
                     # en cada corrida, justo antes del ack.
-                    await planes.marcar_error(cuerpo.get("planId"), f"Fallo tras {MAX_INTENTOS} intentos: {exc}")
-                    await publisher.publicar_cubicacion_rechazada(correlation_id, "ERROR_INTERNO", str(exc))
+                    await planes.marcar_error(cuerpo.get("planId"), detalle)
+                    await publisher.publicar_cubicacion_rechazada(correlation_id, "ERROR_INTERNO", detalle)
                 else:
                     await _reencolar(mensaje, publisher, intentos_previos + 1)
             except Exception:  # noqa: BLE001 - ver el comentario del `finally`
@@ -305,8 +337,8 @@ async def _procesar(mensaje: aio_pika.IncomingMessage, publisher: RabbitMqEvento
                 # El ack va en `finally`, no al final del bloque: este codigo existe
                 # para REPORTAR un fallo, y si el reporte lanza su propia excepcion el
                 # mensaje queda unacknowledged para siempre - con prefetch_count=2, dos
-                # mensajes asi bloquean el worker entero (S3-HU-10.1 #131 blindo UNA
-                # causa, el planId faltante; el `finally` cierra la clase completa,
+                # mensajes asi bloquean el worker entero. Este `finally` cierra
+                # cualquier causa de fallo del reporte, no solo el planId faltante,
                 # incluidas las que todavia no se nos ocurrieron).
                 #
                 # Perder el mensaje es preferible a congelar el servicio: el fallo
@@ -340,11 +372,10 @@ async def _revisar_timeouts(publisher: RabbitMqEventosPublisher) -> list[str]:
     esto testeable sin relojes de por medio.
 
     Por cada plan atascado PUBLICA el rechazo y RECIEN DESPUES lo marca
-    `error`. Ese orden es el punto de S3-HU-06.1, no un detalle: si se marcara
-    primero y el broker estuviera caido, el plan saldria de `procesando` sin
-    que nadie se enterara y el proximo ciclo ya no lo encontraria - NEXO se
-    quedaria en `procesando` para siempre, que es exactamente el hueco que
-    esta issue cierra. Publicando primero, un fallo del broker deja el plan
+    `error`. Ese orden no es un detalle: si se marcara primero y el broker
+    estuviera caido, el plan saldria de `procesando` sin que nadie se
+    enterara y el proximo ciclo ya no lo encontraria - NEXO se quedaria en
+    `procesando` para siempre. Publicando primero, un fallo del broker deja el plan
     como estaba y el proximo ciclo reintenta. El costo es la posibilidad de un
     rechazo duplicado (si el proceso muere entre publicar y marcar), inofensivo
     porque el consumer de NEXO solo vuelve a poner `Estado = "error"`. Es el
@@ -366,7 +397,7 @@ async def _revisar_timeouts(publisher: RabbitMqEventosPublisher) -> list[str]:
             # nunca pasan por `marcar_procesando`, asi que el vigilante no los
             # alcanza. INVARIANTE A SOSTENER: si algun comando nuevo empieza a
             # marcar `procesando` con un correlationId distinto del planId (hoy
-            # ninguno de los 8 de S3-HU-02 lo hace), hay que guardar ese
+            # ninguno de los 8 comandos de escritura lo hace), hay que guardar ese
             # correlationId en la fila del plan y leerlo aqui.
             await publisher.publicar_cubicacion_rechazada(plan_id, CODIGO_RECHAZO_TIMEOUT, mensaje)
             await planes.marcar_error(plan_id, mensaje)

@@ -1,9 +1,8 @@
 # Diagnóstico y fix — el matching normal de SICE-TAC descarta rutas que sí existen
 
 **Estado:** implementado, pendiente verificación con datos reales · **Fecha:** 2026-09-18
-**Issues:** #175 (diagnóstico), #176 (fix), #177 (remedición) — S4-HU-07
 
-## El síntoma (dado por la HU)
+## El síntoma
 
 Auto-costeo real: 58 de 451 líneas (12,9%), muy por debajo de la meta de 80%. Caso
 reproducible: la ruta Medellín-Guarne no recibe flete propuesto automáticamente, pero
@@ -13,7 +12,7 @@ instante — es decir, la ruta siempre fue encontrable.
 ## Causa raíz
 
 `PropuestaTarifaAdapter.ProponerLineaAsync`
-(`src/CabinaFletes.Infrastructure/Biblioteca/Adaptadores/PropuestaTarifaAdapter.cs`)
+(`src/Nexo.Infrastructure/Biblioteca/Adaptadores/PropuestaTarifaAdapter.cs`)
 tiene dos caminos completamente distintos para resolver el piso SICE-TAC de una línea,
 y el que corre automáticamente (cuando hay `ClaseViaje` capturado y hay conexión SAP —
 o sea, casi siempre) es mucho más estricto que el que corre cuando alguien fuerza
@@ -33,6 +32,14 @@ misma función `Normalizar` — el texto de la ruta en sí casi nunca es el prob
 problema son los 5 filtros adicionales exclusivos del camino "oficial", cualquiera de
 los cuales puede descartar una fila que en realidad existe y tiene tarifa vigente.
 
+**Actualización — la ruta se compara por código DANE.** Con los dos municipios de la línea resueltos, el camino oficial
+compara la ruta exacta por código (`ORIGEN`/`DESTINO` de `tblRutasSicetac`, sin el cero a la izquierda), igual que el
+camino «Solo SICE-TAC»; el patrón `LIKE` queda solo como respaldo cuando falta alguno de los dos códigos. Con texto,
+`%YUMBO%-%CALI%` también coincide con `YUMBO - CALIMA` y, al tomar el valor más alto, el camino oficial elegía la ciudad
+equivocada (`CARTAGENA - CIENAGA DE ORO`, de Córdoba, en vez de `CIENAGA`, del Magdalena). El criterio del candidato lo deja
+a la vista: termina en `ruta DANE <origen>-<destino>`. Con los dos códigos y sin fila para esa ruta no hay piso oficial, y
+decide el selector de respaldo, que también compara por DANE.
+
 Medellín-Guarne es un corredor corto e intrarregional — el perfil típico de una ruta
 sin fila `VIAESTANDAR='SI'` en SICE-TAC (verificación con datos reales pendiente, ver
 `tests/QA/s4-hu-07-matching-sicetac-oficial/verify-medellin-guarne.sql`).
@@ -50,7 +57,7 @@ resolución de `Configuracion` (por rango de peso para Contenedor, por código d
 vehículo para Cupo) está probada contra datos reales y no se toca. Reemplazarla por
 completo arriesgaba romper esos casos ya verificados.
 
-## Fix (issue #176)
+## Fix
 
 `PropuestaTarifaAdapter.ProponerLineaAsync`: si el camino oficial no encuentra piso
 (`oficial.SicetacOficial is null` — ya sea por el gate de `ClaseViaje`, por el filtro
@@ -75,7 +82,7 @@ implementada, solo nunca recibía un `sicetac` no-nulo para los casos afectados.
 
 ## Limitación de la verificación
 
-No existe proyecto de tests para `CabinaFletes.Infrastructure` (los adaptadores hablan
+No existe proyecto de tests para `Nexo.Infrastructure` (los adaptadores hablan
 con SQL Server real vía EF, sin mocks — limitación preexistente, no de este fix). No se
 pudo verificar contra datos reales desde el entorno de desarrollo (sin conectividad a
 las bases corporativas desde el sandbox). Verificación pendiente, con las queries en
@@ -84,11 +91,11 @@ las bases corporativas desde el sandbox). Verificación pendiente, con las queri
 1. Confirmar con `verify-medellin-guarne.sql` cuál de los 5 filtros descartaba
    exactamente la ruta.
 2. Confirmar con `verify-otros-2-casos-cargasuelta.sql` que hay líneas reales
-   `CargaSuelta`/`Extradimensionado` (casos adicionales del issue #175).
+   `CargaSuelta`/`Extradimensionado` (casos adicionales detectados en el diagnóstico).
 3. Desplegar el fix y repetir el pliego de prueba contra `GET /api/metricas/kpis-piloto`
-   (issue #177) — ver plantilla abajo.
+   — ver plantilla abajo.
 
-## Remedición (issue #177) — plantilla para completar con el resultado real
+## Remedición — plantilla para completar con el resultado real
 
 | | Antes del fix | Después del fix |
 |---|---|---|
@@ -103,8 +110,8 @@ fix (y podrían explicar una brecha remanente):
 - Rutas capturadas con formato de ciudad inconsistente (ej. `"Medellín (ANT)"` en el
   catálogo propio vs `"MEDELLIN ANTIOQUIA"` en SICE-TAC) — el `LIKE` no calza en
   ningún camino, ni el normal ni el tolerante, cuando el sufijo de departamento
-  difiere tanto. Fuera de alcance de #176 (es un problema de captura/normalización de
-  texto, no de qué selector se usa). Candidato a issue aparte si la brecha remanente
-  es grande.
+  difiere tanto. Fuera de alcance de este fix (es un problema de captura/normalización de
+  texto, no de qué selector se usa). Candidato a atender aparte si la brecha
+  remanente es grande.
 - Líneas sin plaza SAP vigente NI piso SICE-TAC para su ruta real (dato faltante, no
   bug de matching) — estas correctamente requieren atención manual (RN inviolable 6).

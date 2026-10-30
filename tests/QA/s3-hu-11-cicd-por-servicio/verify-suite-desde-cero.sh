@@ -24,10 +24,10 @@ docker compose -f docker-compose.ci.yml run --rm -e TEST_DB_MIGRATE_ON_STARTUP=t
 
 echo ""
 echo "Esperado:"
-echo "  1) Api.Tests: 69 de 162 fallan (SqlException, la base 'CabinaFletes_Test'"
+echo "  1) Api.Tests: 69 de 162 fallan (SqlException, la base 'Nexo_Test'"
 echo "     nunca llega a crearse)."
 echo "  2) Api.Tests: baja a 1 sola falla -condicion de carrera real entre"
 echo "     ApiFixture y OutboxConsistenciaTests migrando la misma base nueva al"
-echo "     mismo tiempo ('Database CabinaFletes_Test already exists')- no las 69."
+echo "     mismo tiempo ('Database Nexo_Test already exists')- no las 69."
 
 docker compose -f docker-compose.ci.yml down -v

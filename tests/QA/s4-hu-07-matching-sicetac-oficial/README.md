@@ -39,7 +39,7 @@ límite de siempre en esta sesión: sin conectividad a las bases corporativas de
 
 ## Fix (issue #176)
 
-`src/CabinaFletes.Infrastructure/Biblioteca/Adaptadores/PropuestaTarifaAdapter.cs`,
+`src/Nexo.Infrastructure/Biblioteca/Adaptadores/PropuestaTarifaAdapter.cs`,
 método `ProponerLineaAsync`: cuando el camino oficial no encuentra piso SICE-TAC
 (`oficial.SicetacOficial is null`), ahora se reintenta con el MISMO selector tolerante
 que ya usa "Solo SICE-TAC" (`CandidatoSicetacAsync`), antes de rendirse. El camino
@@ -48,7 +48,7 @@ encuentra algo, para no arriesgar los casos ya verificados con datos reales en
 `tests/QA/hu-13.4-verificacion-reglas-negocio-datos-reales/README.md` (8/12 líneas de
 un pliego real, confirmadas 1:1 contra un PDF de cotización real).
 
-No hay proyecto de tests para `CabinaFletes.Infrastructure` (adaptadores EF contra
+No hay proyecto de tests para `Nexo.Infrastructure` (adaptadores EF contra
 SQL Server real, sin mocks) — no se pudo agregar una prueba automatizada para este
 fix. Verificación manual pendiente: correr el pliego de prueba de la HU-04.7/S4-HU-07.3
 contra la app real con el fix desplegado y confirmar que Medellín-Guarne (y los casos

@@ -2,7 +2,7 @@
 
 S2-HU-13.4 (issue #43). Verificación de la Regla 1 (regla del mayor) y Regla
 2 (piso inviolable) contra la app real, usando un pliego de 15 líneas reales
-subido de verdad a CabinaFletes. Documenta: qué se esperaba, qué salió
+subido de verdad a Nexo. Documenta: qué se esperaba, qué salió
 realmente (`cotizacion-agencia-de-aduanas-jf-asociados-s-a-s-nivel-1-7667da46.pdf`),
 los errores propios cometidos en el camino (para que quede la trazabilidad),
 y las 2 desviaciones reales encontradas.
@@ -92,7 +92,7 @@ parte en esta versión de la tabla — ver sección 5 para el detalle completo.
 
 ### 4.1 Piso SICE-TAC — `SicetacOficialAsync`
 
-(ver `src/CabinaFletes.Infrastructure/Biblioteca/Adaptadores/TarifarioSapAdapter.cs`,
+(ver `src/Nexo.Infrastructure/Biblioteca/Adaptadores/TarifarioSapAdapter.cs`,
 líneas 322-373): para Clase de Viaje = Contenedor, resuelve el vehículo por
 rango de peso del contenedor (`ConfigPorRangoPesoAsync`, tabla
 `tblContenedorRangoPeso`/`tblRangoPeso`), no por el vehículo declarado en la
@@ -145,18 +145,42 @@ al piso SICE-TAC que la app terminó usando:
 | 11 | $2.400.000 | $705.417 | ~3,4x |
 
 La regla del mayor dice que debe proponerse el valor MÁS ALTO. La app
-propuso el más bajo (Sicetac). **No se confirmó la causa raíz**: es posible
-que el buscador real de plaza (`BuscarConZonasAsync`, con su propia
-resolución de zona/vehículo) no encuentre esas mismas filas que sí se
-encontraron por SQL directo — sería consistente con el mismo patrón de la
-Desviación del mecanismo (sección 4), donde el vehículo de la línea tampoco
-se usa tal cual para SICE-TAC.
+propuso el más bajo (Sicetac).
 
-**Recomendación:** abrir un issue contra el milestone de esta HU pidiendo a
-desarrollo que confirme, con logging o depuración directa, si
-`PropuestaTarifaAdapter`/`TarifarioSapAdapter` está encontrando la tarifa de
-plaza para estas 4 rutas y, si la encuentra, por qué no ganó. Sin `gh` CLI
-en este entorno, no se creó automáticamente.
+#### Causa raíz (S5-HU-19.4 / #284)
+
+Se reprodujo con una prueba temporal contra la base real (`dbSolucionesTI` +
+`dbInformesAutomatizados_Pruebas`): las 4 rutas, con 4 clases de contenedor (sin clase,
+CNT20.ST, CNT40.HC, CNT20.IT) y con/sin `ClaseViaje`, sobre el código anterior a
+S5-HU-19 y sobre el actual. La prueba temporal se borró. Hallazgos:
+
+1. **Esta QA es anterior al matching por municipio** (#254/S5-HU-16.1 y
+   #256/S5-HU-16.3, desde el 2026-09-26). En ese código la zona SAP de cada ciudad se
+   resolvía solo con `tblSAPZonaTarificacion.Transporte.Contains(ciudad)`: "Medellín" no
+   contiene "VABURRA" (la zona SAP de Medellín) y "Puerto …" no contiene "PTO …", así que
+   no había zona, ni plaza, y la propuesta caía al piso. Ese estado del código ya no
+   existe y no se puede reproducir tal cual.
+2. **En el código previo a S5-HU-19 el defecto cambió de forma y seguía violando la regla
+   del mayor:** `tbl_tarifas_plaza` (propia) se consultaba primero y, si devolvía algo,
+   **SAP ni se miraba**. Para las líneas 1, 2 y 11 la propia daba $5.800.000 / $4.800.000 /
+   $2.300.000 y SAP tenía vigente $6.000.000 / $5.000.000 / $2.400.000: ganaba la propia
+   por orden, no por valor. Se corrige en #281/#282 (SAP primero, luego la propia; ver
+   `CONTRATO.md`, `tablaOrigen`).
+3. **Línea 3 (Medellín→Buenaventura, devolución):** la fila SAP de $2.454.000 tiene
+   vigencia 2026-10-12; al 2026-10-13 está **vencida**. No es un defecto del motor: el día
+   de la QA estaba vigente, hoy ya no, y la propuesta usa el histórico.
+4. **Hipótesis descartadas:** el filtro exacto de `ClaseContenedor` no descarta las filas
+   (con las 4 clases la plaza se encuentra igual), y que `ClaseViaje` venga nula tampoco
+   cambia el resultado en las líneas 1, 2 y 11 (entra por el selector tolerante).
+5. **Resultado hoy (S5-HU-19):** líneas 1, 2 y 11 → `PlazaVigenteMayor` con $6.000.000 /
+   $5.000.000 / $2.400.000 (SAP); línea 3 → `ConsultaCompleta` con histórico $3.474.131
+   (plaza vencida $2.454.000).
+
+**Hallazgo aparte (no es Desviación 1):** una ruta sin `OrigenMunicipioId`/
+`DestinoMunicipioId` (captura que no resolvió el municipio) sale **sin plaza y sin piso**
+en el motor previo a S5-HU-19. Es el caso conocido de #254; conviene vigilar que la
+captura siempre resuelva ambos municipios.
+
 
 ### Desviación 2 — 3 líneas con piso disponible que no aparecieron en la cotización (líneas 8, 13, 15)
 
@@ -190,7 +214,7 @@ las descarta sin ninguna traza visible para el usuario.
   ninguna propuesta quedó por debajo del piso SICE-TAC (de hecho, todas
   fueron exactamente el piso).
 - **Regla 3 (solo SICE-TAC):** consultada la Parte C contra `reglas_solo_sicetac`
-  (base de la app, `dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba`) —
+  (base de la app, `dbInformesAutomatizados_Pruebas.db_NEXO`) —
   existen 3 reglas configuradas (Medellín→Bogotá 3S3; Cali→Medellín 3S3;
   Barranquilla→Pereira 2S3, estas 2 últimas creadas el mismo día). Ninguna
   coincide con las 15 líneas del pliego ya subido, así que **no se pudo

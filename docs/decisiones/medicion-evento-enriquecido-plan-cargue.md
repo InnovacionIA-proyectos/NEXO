@@ -1,6 +1,7 @@
 # Medición — tamaño real del evento `plan-de-cargue.generado` enriquecido
 
-**Estado:** aceptada · **Fecha:** 2026-09-09 · **Issue:** #109 (S3-HU-03.1) · **Bloquea a:** #110, #111 (no se escribe el consumer hasta cerrar esto)
+**Estado:** aceptada · **Fecha:** 2026-09-09 · **Bloquea a:** la escritura
+del consumer, que no arranca hasta cerrar esto
 
 ## Qué se pidió
 
@@ -18,7 +19,7 @@ sintéticos, corrido contra el motor real (`domain/motor`, sin mocks) para que
 la geometría y el shape del resultado sean idénticos a los de un plan real:
 
 - **Caso peor (techo de validación)**: 2.000 unidades físicas — el tope duro
-  de una sola `importar_items` (issue #104/#105, `ValidationFailedException`
+  de una sola `importar_items` (`ValidationFailedException`
   por encima de esto) — repartidas en 20 tipos de ítem, contra el vehículo
   más grande del catálogo (Tractocamión furgón 13.6 m). El motor optimizó de
   verdad: 940 cargadas, 1.060 rechazadas (todas aparecen en `colocaciones`,
@@ -26,7 +27,7 @@ la geometría y el shape del resultado sean idénticos a los de un plan real:
 - **Caso grande pero típico**: 150 unidades en 10 tipos de ítem, mismo
   vehículo, las 150 cargadas.
 
-El payload medido en ambos casos es el propuesto para #110: el `resultado`
+El payload medido en ambos casos es el propuesto para el evento enriquecido: el `resultado`
 completo (`items`, `colocaciones`, `metricas`, `incidencias`,
 `pesoTotalKg`/`volumenUtilizadoM3`/`utilizacionVolumen`/`utilizacionPiso`) —
 ver el shape exacto en `docs/mensajeria/CUBICACION.md` §7. El script queda en
@@ -45,8 +46,8 @@ la mayor parte del peso es la lista de `colocaciones`, no `items`.
 
 ## Decisión
 
-**Se acepta el payload enriquecido tal cual, sin paginar ni comprimir, para
-este sprint.**
+**Se acepta el payload enriquecido tal cual, sin paginar ni comprimir, por
+ahora.**
 
 Razones, con la medición como evidencia:
 
@@ -76,11 +77,10 @@ revisar esto (abajo), en vez de decidirlo una sola vez y olvidarlo.
   excepción) al techo de 2.000 unidades — es decir, si el "peor caso" de hoy
   se vuelve el caso común.
 - Si se mide un mensaje enriquecido por encima de ~5 MB en producción.
-- Si el tiempo de procesamiento del consumer (issue #111, escritura de
+- Si el tiempo de procesamiento del consumer (escritura de
   Items/Colocaciones vía EF) se vuelve un cuello de botella medible — la
   primera palanca ahí NO es el tamaño del mensaje sino el `SaveChangesAsync`
-  de cientos/miles de filas en una sola transacción (ver nota de
-  implementación en #111).
+  de cientos/miles de filas en una sola transacción.
 
 ## Qué se haría si hubiera que resolverlo
 
@@ -95,7 +95,7 @@ revisar esto (abajo), en vez de decidirlo una sola vez y olvidarlo.
   lado de NEXO y manejo de fallos parciales. No se justifica con la evidencia
   de hoy.
 
-## Alternativas descartadas (para este sprint)
+## Alternativas descartadas
 
 **Paginar de una vez, "por si acaso".** Es la opción más cara en complejidad
 y esta medición no encontró evidencia de que haga falta — el criterio del

@@ -1,6 +1,6 @@
-# Topología de mensajería (issue #13, S2-HU-041)
+# Topología de mensajería
 
-Documento de cierre del criterio "topología documentada" de la HU. No es
+Documento de referencia del criterio "topología documentada". No es
 teoría: cada tabla de este documento se verificó contra un broker RabbitMQ
 real (`docker compose up`, API de administración en `:15672`) — ver
 `tests/QA/13-s2-hu-041-aprovisionar-rabbitmq-y-topologia-de-mensajeria/README.md`
@@ -12,8 +12,8 @@ para el registro completo de esa verificación.
   `build/Dockerfile.rabbit`, con el plugin `rabbitmq_delayed_message_exchange`
   — lo necesita el planificador de timeouts del Saga, no viene en la imagen
   oficial).
-- Un solo proceso (`CabinaFletes.Api`) es hoy API y worker a la vez — todos
-  los consumers viven en el mismo `AddMensajeria()` (`src/CabinaFletes.
+- Un solo proceso (`Nexo.Api`) es hoy API y worker a la vez — todos
+  los consumers viven en el mismo `AddMensajeria()` (`src/Nexo.
   Infrastructure/Common/Mensajeria/MensajeriaDependencyInjection.cs`). Si en
   el futuro se separa un proceso de workers, ambos deben llamar al mismo
   método — está pensado para eso desde su comentario de cabecera.
@@ -72,8 +72,8 @@ estado (`EstadoAutoCosteo`).
 | `AvisarTrabajo` | `AvisarTrabajoConsumer` | `TrabajoActualizado` | Sí |
 | `PliegoRepartido`, `LineaCosteada`, `LineaFalloTecnico`, `LineaRequiereTarifaManual`, `RepartirLineasDeCosteo`, `RecostearLineaSolicitada`, `TarifasActualizadas`, `TrabajoActualizado`, `ExpiracionAutoCosteo` | `AlertaDeFalloConsumer<T>` (uno por tipo) | `Fault<T>` | — (solo escucha fallos) |
 
-**Por qué la lista de `AlertaDeFalloConsumer<T>` es explícita y no automática**
-(issue #13): MassTransit 8.5 no soporta registrar un `IConsumer<Fault<T>>`
+**Por qué la lista de `AlertaDeFalloConsumer<T>` es explícita y no automática:**
+MassTransit 8.5 no soporta registrar un `IConsumer<Fault<T>>`
 genérico ABIERTO contra `IRegistrationConfigurator` — se intentó
 `x.AddConsumer(typeof(AlertaDeFalloConsumer<>))` y falló en runtime con
 `Type.ContainsGenericParameters is true` (verificado, no es una suposición).
@@ -94,7 +94,7 @@ convenciones conviven:
   nombre corto del mensaje (`CostearLineaSolicitada`).
 - **Evento de Saga** (`Event(() => X, ...)` dentro de un
   `MassTransitStateMachine`): exchange con el nombre **completo** (namespace
-  incluido) del mensaje (`CabinaFletes.Mensajes.Solicitudes:
+  incluido) del mensaje (`Nexo.Mensajes.Solicitudes:
   AutoCosteoSolicitado`), que alimenta el exchange/cola del Saga
   (`EstadoAutoCosteo`).
 
@@ -108,9 +108,9 @@ propiedad del tipo del mensaje, no del consumer. Por esto
 `AlertaDeFalloConsumer<T>` recibe el fallo sin importar si su propia cola
 "normal" quedó con nombre corto o completo.
 
-## 5. Alerta al equipo (issue #13, lo nuevo de esta HU)
+## 5. Alerta al equipo
 
-`AlertaDeFalloConsumer<T>` (`src/CabinaFletes.Infrastructure/Common/
+`AlertaDeFalloConsumer<T>` (`src/Nexo.Infrastructure/Common/
 Mensajeria/AlertaDeFalloConsumer.cs`):
 
 1. Recibe `Fault<T>` (cualquier tipo, ver tabla de arriba).
@@ -124,7 +124,7 @@ Mensajeria/AlertaDeFalloConsumer.cs`):
 4. Envía un correo por destinatario vía `ICorreoPort`/`SmtpCorreoAdapter` —
    el mismo adaptador que ya usa Cotizaciones, movido a `Application/Common/
    Ports` porque ahora lo consume más de un módulo (mismo criterio ya usado
-   con `IPropuestaTarifaPort`/`IAuditoriaPort`, ver `MIGRACION.md`).
+   con `IPropuestaTarifaPort`/`IAuditoriaPort`).
 
 No reemplaza a `FalloDeCosteoConsumer` (que sigue existiendo, específico de
 `CostearLineaSolicitada`, y convierte el fallo en un desenlace de NEGOCIO

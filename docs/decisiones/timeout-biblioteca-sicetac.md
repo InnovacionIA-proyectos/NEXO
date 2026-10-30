@@ -1,19 +1,18 @@
 # Diagnóstico — timeout real de GET /api/biblioteca-sicetac
 
-**Estado:** aceptada (mitigación aplicada; causa raíz pendiente del equipo de DW) · **Fecha:** 2026-09-18 · **Issue:** #167 (S4-HU-02)
+**Estado:** aceptada (mitigación aplicada; causa raíz pendiente del equipo de DW) · **Fecha:** 2026-09-18
 
 ## Qué se reportó
 
 Sin filtros: 33 segundos para traer solo 3 filas. Filtrando por origen/destino o
 incluso solo por periodo: timeout completo (500, "Execution Timeout Expired").
-Tabla `DWSice.dbo.tblRutasSicetac`, ~2.14 millones de filas (medido en vivo,
-issue #156).
+Tabla `DWSice.dbo.tblRutasSicetac`, ~2.14 millones de filas (medido en vivo).
 
 ## Causa raíz
 
 **`DwSiceDbContext` no tiene NINGÚN índice declarado** sobre `Periodo`,
 `NombreRuta`, `Configuracion` ni `NombreUnidadTransporte` (`HasIndex` no
-aparece ni una sola vez en `src/CabinaFletes.Infrastructure/External/
+aparece ni una sola vez en `src/Nexo.Infrastructure/External/
 DwSiceDbContext.cs`) — solo existe la clave primaria sobre `Id`. Sin ese
 índice:
 
@@ -35,8 +34,9 @@ DwSiceDbContext.cs`) — solo existe la clave primaria sobre `Id`. Sin ese
 Migrations propia, con `SaveChanges*` bloqueados explícitamente
 (`throw ReadOnly()`). La tabla la mantiene el proceso ETL del Data Warehouse
 corporativo, un sistema fuera del alcance de NEXO. Es exactamente el mismo
-patrón que el issue #164 (Dokploy): el fix real es una petición al equipo
-dueño de la infraestructura, no un cambio de código acá.
+patrón que otros problemas de infraestructura ya vistos (por ejemplo, el
+disco lleno en Dokploy): el fix real es una petición al equipo dueño de la
+infraestructura, no un cambio de código acá.
 
 ## Petición para el equipo de Data Warehouse (SICE-TAC)
 
@@ -70,7 +70,7 @@ Ninguna de estas resuelve la causa raíz — bajan el impacto mientras se
 gestiona el índice con el equipo de DW:
 
 1. **`CommandTimeout` explícito de 90s** para `DwSiceDbContext`
-   (`src/CabinaFletes.Infrastructure/DependencyInjection.cs`) — el default de
+   (`src/Nexo.Infrastructure/DependencyInjection.cs`) — el default de
    SqlClient es 30s, que coincide exactamente con el síntoma reportado. Con
    90s, una consulta legítimamente lenta (sin índice) tiene más margen antes
    de devolver 500, sin pretender que quede "rápida".

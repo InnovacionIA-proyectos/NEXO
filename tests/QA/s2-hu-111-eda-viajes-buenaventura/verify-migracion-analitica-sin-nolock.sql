@@ -1,17 +1,17 @@
 -- QA — S2-HU-11.1 (PR #140): verifica que la migracion corregida
 -- (20260910231344_QuitarNolockVistasAnaliticaDboNexoPrueba) deja las 13 vistas
--- `analitica.*` apuntando al esquema correcto (dbo_NEXO_prueba) y sin WITH (NOLOCK).
+-- `analitica.*` apuntando al esquema correcto (db_NEXO) y sin WITH (NOLOCK).
 --
 -- Uso: aplicar TODAS las migraciones de la rama (incluida esta) contra una base
 -- limpia con:
---   dotnet ef database update --project src/CabinaFletes.Infrastructure \
---     --startup-project src/CabinaFletes.Api --context CabinaFletesDbContext \
+--   dotnet ef database update --project src/Nexo.Infrastructure \
+--     --startup-project src/Nexo.Api --context NexoDbContext \
 --     --connection "<connection-string>"
 -- y despues correr este script contra esa misma base.
 --
 -- La version original de esta migracion (commit cd17068, antes de la correccion)
 -- fallaba al aplicarse con "Invalid object name 'dbo.clientes'" porque todavia
--- apuntaba al esquema `dbo` de antes del rename a `dbo_NEXO_prueba` (PR #90/#93/#95).
+-- apuntaba al esquema `dbo` de antes del rename a `db_NEXO` (PR #90/#93/#95).
 
 -- 1) Las 13 vistas deben existir y ser consultables sin error.
 SELECT

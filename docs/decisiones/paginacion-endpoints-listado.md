@@ -1,10 +1,10 @@
 # Decisión — paginación en los 8 endpoints de listado candidatos
 
-**Estado:** aceptada · **Fecha:** 2026-09-18 · **Issue:** #156 · **Relacionada:** `administracion_embarqa_nexo#122` (frontend, agrega los controles de paginación en las pantallas que lo necesiten según esta decisión)
+**Estado:** aceptada · **Fecha:** 2026-09-18 · **Relacionada:** trabajo en el frontend (agrega los controles de paginación en las pantallas que lo necesiten según esta decisión)
 
 ## Qué se pidió
 
-Frontend (`administracion_embarqa_nexo#122`) identificó 8 pantallas de listado
+El frontend identificó 8 pantallas de listado
 que cargan todo el resultado en un solo request, sin ningún parámetro de
 paginación en el contrato. Frontend no tiene visibilidad del volumen real de
 datos ni de su tasa de crecimiento — se pidió a este lado revisar los 8 con

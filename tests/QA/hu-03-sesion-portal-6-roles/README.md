@@ -40,13 +40,13 @@ petición. Verificación hecha antes de aprobar/mergear. Sin conflictos de merge
 
 ```
 docker compose -f docker-compose.ci.yml run --rm pruebas \
-  dotnet test tests/CabinaFletes.Api.Tests --filter FullyQualifiedName~SesionTests
+  dotnet test tests/Nexo.Api.Tests --filter FullyQualifiedName~SesionTests
 ```
 
 ```
-Passed CabinaFletes.Api.Tests.SesionTests.Con_identidad_pero_sin_rol_de_Nexo_queda_sin_permiso
-Passed CabinaFletes.Api.Tests.SesionTests.Con_rol_valido_devuelve_la_sesion_resuelta
-Passed CabinaFletes.Api.Tests.SesionTests.Sin_identidad_del_portal_no_entra
+Passed Nexo.Api.Tests.SesionTests.Con_identidad_pero_sin_rol_de_Nexo_queda_sin_permiso
+Passed Nexo.Api.Tests.SesionTests.Con_rol_valido_devuelve_la_sesion_resuelta
+Passed Nexo.Api.Tests.SesionTests.Sin_identidad_del_portal_no_entra
 ```
 
 **Confirmado: sí pasan contra el arnés Docker real.**

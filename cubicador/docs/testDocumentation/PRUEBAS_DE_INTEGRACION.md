@@ -21,7 +21,7 @@ memoria, sin necesidad de un servidor corriendo.
 |---|---|
 | `test_health` | `GET /health` responde 200. |
 | `test_flujo_completo_crear_optimizar` | El flujo de negocio completo: listar vehículos (dispara la siembra de los 9 presets) → crear plan → agregar 3 unidades de un ítem que sabemos que cabe → `POST /optimizar` (verifica 202 + `estado: "procesando"` + que quedó publicado en el `_PublisherFalso`) → simula al worker llamando `optimizar_plan` directo contra la misma base → `GET /resultado` (verifica que las 3 unidades quedaron cargadas y el estado pasó a `optimizado`) → ajustar manualmente una colocación (bloquearla, verifica que el estado pase a `ajustado`). |
-| `test_cubicacion_rapida` | `POST /api/cubicacion` evalúa contra las 9 unidades del catálogo y devuelve una sugerencia. |
+| ~~`test_cubicacion_rapida`~~ | `POST /api/cubicacion` se retiró en S5-HU-17.4. Lo reemplaza `POST /recomendaciones`, cubierto por `tests/api/test_contrato_recomendaciones.py` y por `scripts/verificar_contrato.py` contra el servicio real. |
 | `test_sin_api_key_es_rechazado` | Una petición sin `Authorization: Bearer` recibe 401. |
 
 **Detalle técnico que vale la pena recordar** si estos tests empiezan a fallar
@@ -67,7 +67,7 @@ está en la sección 2.8.
 | `test_mover_a_dlq_dispara_la_alerta` | `worker/main.py::_mover_a_dlq` llama a `alertar_mensaje_en_dlq(tipo, error, intentos)` con los valores correctos, y publica el mensaje crudo a `cubicacion.dlq` con los headers esperados — publisher y mensaje son dobles de prueba. |
 | `test_alertar_mensaje_en_dlq_degrada_sin_smtp_configurado` | `alertar_mensaje_en_dlq` no lanza excepción (solo loggea un warning) si `ALERTAS_SMTP_HOST` está vacío — un correo que no sale no debe tumbar el worker. |
 
-## 1.3 Los 3 bugs de QA (S3-HU-10, issues #131/#132/#133)
+## 1.3 Los 3 bugs de QA
 
 Guardas de regresión de los 3 bugs que la verificación de QA de los PR #122/#126
 encontró. Para los tres se escribió el test primero y **se comprobó que fallara**
@@ -76,7 +76,7 @@ fallaron 7 tests.
 
 | Archivo | Qué verifica |
 |---|---|
-| `tests/worker/test_mensaje_malformado.py` (8) | Que un mensaje malformado **se ackee** — el síntoma del bug no era la excepción, era el mensaje sin confirmar que ocupa un hueco del `prefetch_count=2` para siempre. Cubre el caso de la issue (sin `planId`) y los 4 que fallaban *antes* del bloque de manejo de errores: body ilegible, JSON que no es un objeto, sin `correlationId`, cabecera `x-intentos` corrupta. Más el escenario del bloqueo: dos mensajes seguidos, ninguno sin ackear. |
+| `tests/worker/test_mensaje_malformado.py` (8) | Que un mensaje malformado **se ackee** — el síntoma del bug no era la excepción, era el mensaje sin confirmar que ocupa un hueco del `prefetch_count=2` para siempre. Cubre el caso original (sin `planId`) y los 4 que fallaban *antes* del bloque de manejo de errores: body ilegible, JSON que no es un objeto, sin `correlationId`, cabecera `x-intentos` corrupta. Más el escenario del bloqueo: dos mensajes seguidos, ninguno sin ackear. |
 | `tests/api/test_item_sin_sku.py` (7) | Que un `"sku": null` **explícito** se acepte y se normalice a `""`, y que el plan no quede en `error`. Cubre por separado "clave ausente" y "clave presente en null": esa distinción **es** el bug (el default de Pydantic solo aplica si la clave falta). |
 | `tests/worker/test_eliminar_plan_optimizado.py` (4) | Que borrar un plan **ya optimizado** no deje filas huérfanas, ni por `eliminar()` ni por `eliminar_planes_de_linea()`. |
 
@@ -190,7 +190,13 @@ caso (arrancar Cubicador antes que el `rabbit` de NEXO, sin que existiera
 todavía), la conexión se logró en el intento 4 de 30 una vez el broker quedó
 listo.
 
-### 2.2 Flujo REST completo contra Postgres real
+### 2.2 Flujo REST completo contra SQL Server real
+
+> **Actualizado el 2026-10-09 (S5-HU-17.1).** Esta seccion se verifico en su dia
+> contra Postgres. El motor cambio a SQL Server y el recorrido se repitio
+> completo: `scripts/verificar_integracion_mssql.py`, **9 de 9 verificaciones**,
+> incluido el flujo asincrono de punta a punta. Lo de abajo describe el mismo
+> flujo; donde dice Postgres, hoy es SQL Server.
 
 Se ejecutó, contra `http://localhost:8000` con el stack de arriba levantado:
 
@@ -295,7 +301,7 @@ reales configurados (`TIMEOUT_PROCESANDO_MINUTOS`):
    tener que esperar) → devolvió `marcados: 1`.
 4. `GET /{id}` confirmó `estado: "error"` en el plan.
 
-> **Actualizado en S3-HU-06.1.** Ese método ya no existe: se partió en
+> **Actualización posterior.** Ese método ya no existe: se partió en
 > `obtener_atascados(limite)` (solo consulta) más el `marcar_error` que ya
 > había, y el vigilante ahora además **publica `cubicacion.rechazada` con
 > `codigo: "TIMEOUT_PROCESAMIENTO"` antes** de marcar el plan (ver CONTRATO.md
@@ -528,7 +534,7 @@ separado de la sesión del portal, Bearer contra `Cubicador3D:InboundApiKey`).
 (`CapturarSolicitudCommand`/`PosicionCargaDto` en NEXO) — no hizo falta
 ningún cambio de captura, solo el endpoint de lectura.
 
-**Verificado con tests de integración HTTP reales** (`tests/CabinaFletes
+**Verificado con tests de integración HTTP reales** (`tests/Nexo
 .Api.Tests/Cubicacion/LineasSolicitudCubicacionControllerTests.cs`, contra
 SQL Server real, no simulado): `200` con posiciones/ruta correctas, lista
 vacía sin posiciones, `404` con línea inexistente, `401` sin Bearer, `401`
@@ -573,7 +579,7 @@ docker compose up -d --build --wait
 
 # Sembrar Dimensiones de prueba en una línea existente (ejemplo)
 docker exec nexo-db-1 /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P '<MSSQL_SA_PASSWORD>' \
-  -d CabinaFletes -Q "UPDATE lineas_solicitud SET Dimensiones = '[{\"descripcion\":\"Pallet\",\"cantidad\":3,\"largoCm\":120,\"anchoCm\":100,\"altoCm\":100,\"pesoKg\":500}]' WHERE Id = '<lineaSolicitudId>'"
+  -d Nexo -Q "UPDATE lineas_solicitud SET Dimensiones = '[{\"descripcion\":\"Pallet\",\"cantidad\":3,\"largoCm\":120,\"anchoCm\":100,\"altoCm\":100,\"pesoKg\":500}]' WHERE Id = '<lineaSolicitudId>'"
 
 # cubicador/.env: NEXO_CALLBACK_API_KEY debe ser IDÉNTICA a
 # Cubicador3D__InboundApiKey del .env de NEXO, y NEXO_BASE_URL debe usar el
@@ -597,8 +603,8 @@ el runner de CI no tiene o una topología más compleja de simular:
 
 - **El vigilante de timeout, de punta a punta** (sección 2.4, punto c):
   requiere detener el contenedor `worker` a mitad de un mensaje y llamar a
-  `_revisar_timeouts` directo contra la base — sigue siendo manual. Desde
-  S3-HU-06.1 su *lógica* sí está automatizada con dobles de prueba
+  `_revisar_timeouts` directo contra la base — sigue siendo manual. Su
+  *lógica* sí está automatizada con dobles de prueba
   (`tests/worker/test_vigilante_timeouts.py`), incluido el caso de RabbitMQ
   caído; lo que queda manual es el recorrido real contra los dos contenedores.
 - **`crear_plan_desde_linea` de punta a punta contra NEXO real** (secciones

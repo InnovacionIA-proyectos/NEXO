@@ -17,9 +17,12 @@ appsettings.*.local.json
 .env
 .env.*
 !.env.example
+!.env.dokploy
+!.env.githubSECRETS
 
-# Configuración local de Claude Code (permisos, hosts internos) — no versionar
-.claude/settings.json
+# Configuración local de Claude Code (permisos, hosts internos, launch.json
+# del panel de previsualización) — es de cada máquina, no se versiona.
+.claude/
 
 # Override local de Docker Compose (puertos/ajustes propios de una máquina) — no versionar
 docker-compose.override.yml
@@ -27,19 +30,23 @@ docker-compose.override.yml
 # Logs y temporales
 *.log
 *.tmp
+diagnostico.txt
+
+# Resultados de `dotnet test` (artefactos de build, uno por corrida local)
+TestResults/
 
 # OS
 Thumbs.db
 .DS_Store
 
 # Documentos de trabajo local, no se versionan
-docs/analisis-dw-sap-baseline-cubicador.md
-docs/captura-prueba-rutas-reales.xlsx
-docs/diccionario-datos-cabinafletes.md
-docs/ejemplo_licitacion.xlsx
-docs/hallazgos-requisitos-estudio-bd.md
-docs/hallazgos-requisitos.md
-docs/propuesta-bd-nexo.md
+docs/documentacion/analisis-dw-sap-baseline-cubicador.md
+docs/pruebas/captura-prueba-rutas-reales.xlsx
+docs/diccionario-datos-nexo.md
+docs/pruebas/ejemplo_licitacion.xlsx
+docs/documentacion/hallazgos-requisitos-estudio-bd.md
+docs/documentacion/hallazgos-requisitos.md
+docs/Database/propuesta-bd-nexo.md
 
 # Histórico oficial de SICE-TAC (excels ~100-180 MB c/u) — cada archivo supera
 # el límite de 100 MB de GitHub. Pendiente: manifiesto + almacenamiento externo
@@ -49,3 +56,27 @@ docs/propuesta-bd-nexo.md
 analitica/00-fuentes/Historicos_SICE/
 analitica/00-fuentes/historico-sicetac/*.xlsx
 **/SICETAC_*.xlsx
+
+# Excels de licitaciones/RFQ de clientes reales (datos comerciales, nunca al repo público)
+docs/docs_raw/1_Formulario de licitación-2026Inboun-RFQ-BoteroSoto-1015261554.xlsx
+docs/docs_raw/Bellota hoja de trabajo (1) (1).xlsx
+docs/docs_raw/EPM FORMULARIO DE PRECIOS-TRANS NACIONAL 2020 -2021 (2).xlsx
+docs/docs_raw/INFORMACIÓN LICITACIÓN LH MASIVO TOLHUCA 1 - COSTEADA.xlsx
+docs/docs_raw/Plantilla_Licitacion_Transp_Colombia_123.xlsx
+docs/docs_raw/rangos de peso contenedores.xlsx
+docs/documentacion/RANGOS-PESO-CONTENEDORES-NORMALIZADO.xlsx
+docs/Database/seeder/Libro1.xlsx
+
+# Archivos temporales de Office (se crean mientras un Excel/Word está abierto)
+~$*
+
+# Exports crudos de tablas reales (SICE-TAC, plaza, tarifas) para verificación puntual — nunca al repo público
+docs/tbl*.csv
+
+# Dataset dorado (#353): de qué Excel real sale cada caso — los nombres de archivo y hoja identifican al cliente
+tests/evaluacion-ia/dataset/fuentes.local.json
+
+# Precios de venta (S6-HU-38/#407): nunca al repo público. El CSV con precios se genera
+# en local con docs/Database/seeder/generar_precios_venta_local.py
+docs/Database/seeder/*.local.csv
+docs/docs_raw/*PRECIOS DE VENTA*

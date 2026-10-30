@@ -35,8 +35,8 @@ Consolida en un solo documento todo lo que se identificó como necesario a lo la
 
 | Qué falta mapear | Detalle |
 |---|---|
-| Código de vehículo de EDA-1 (`ID Medio Transporte FO`, ej. `TC-3S2`) → `tblSAPTiposVehiculoTarifario` | El esquema de nombres es distinto al de CabinaFletes (`2S3` sin el prefijo `TC-`/`FP-`) — no es un cruce automático, hay que resolverlo antes de poder correr la validación de §7 a escala de EDA-1 |
-| Código de equipo de EDA-1 (`Clase Equipo FOP`) → `tblSAPTiposCarroseria`/`tblSAPClaseContenedor` | Mismo problema — nombres propios de EDA-1, no necesariamente iguales a los de CabinaFletes |
+| Código de vehículo de EDA-1 (`ID Medio Transporte FO`, ej. `TC-3S2`) → `tblSAPTiposVehiculoTarifario` | El esquema de nombres es distinto al de Nexo (`2S3` sin el prefijo `TC-`/`FP-`) — no es un cruce automático, hay que resolverlo antes de poder correr la validación de §7 a escala de EDA-1 |
+| Código de equipo de EDA-1 (`Clase Equipo FOP`) → `tblSAPTiposCarroseria`/`tblSAPClaseContenedor` | Mismo problema — nombres propios de EDA-1, no necesariamente iguales a los de Nexo |
 
 ---
 
@@ -86,7 +86,7 @@ Todo lo que sigue son **conversaciones, no extracciones de datos** — se resuel
 | Extracción | Ampliación propuesta |
 |---|---|
 | `FactFWOFUFO` (base de la EDA-1) | Ampliar más allá del corredor de Buenaventura — confirmado como correcto por el usuario. Resuelve además la representatividad nacional (L-05 EDA-1) |
-| `v1.0.0-piloto` (CabinaFletes propio) | Repetir la extracción cuando exista producción real (no antes) — hoy son 13 solicitudes de prueba manual sin intención de representatividad (L-06 EDA-2) |
+| `v1.0.0-piloto` (Nexo propio) | Repetir la extracción cuando exista producción real (no antes) — hoy son 13 solicitudes de prueba manual sin intención de representatividad (L-06 EDA-2) |
 
 ---
 
@@ -94,9 +94,9 @@ Todo lo que sigue son **conversaciones, no extracciones de datos** — se resuel
 
 Esto **no es un modelo predictivo** — es una verificación, y se documenta acá (no en `propuesta_modelos.md`) por esa razón.
 
-**El planteamiento:** el motor de CabinaFletes (`ReglaDeCosteo`) ya automatiza una regla de negocio confirmada por el usuario — el precio se fija como **MAX(piso SICE-TAC vigente, tarifa SAP vigente)** para esa ruta+vehículo+peso. Esa regla se validó contra 32-12 cotizaciones de prueba de CabinaFletes (87,5% y 100% de coincidencia exacta, H-005 EDA-2) — pero CabinaFletes **nunca se ha probado contra la operación real de la empresa**, porque no tiene producción todavía. `FactFWOFUFO` sí es esa operación real (41.237 filas históricas).
+**El planteamiento:** el motor de Nexo (`ReglaDeCosteo`) ya automatiza una regla de negocio confirmada por el usuario — el precio se fija como **MAX(piso SICE-TAC vigente, tarifa SAP vigente)** para esa ruta+vehículo+peso. Esa regla se validó contra 32-12 cotizaciones de prueba de Nexo (87,5% y 100% de coincidencia exacta, H-005 EDA-2) — pero Nexo **nunca se ha probado contra la operación real de la empresa**, porque no tiene producción todavía. `FactFWOFUFO` sí es esa operación real (41.237 filas históricas).
 
-**Por qué vale la pena antes de que CabinaFletes entre en producción:** esa misma regla está a punto de gobernar **todas** las cotizaciones futuras del negocio. Si al aplicarla a escala completa de `FactFWOFUFO` resulta que coincide casi siempre → confirma que la regla ya automatizada refleja la realidad del negocio (y de paso, esa misma reconstrucción sirve como calculadora/auditoría para viajes que no pasan por CabinaFletes). Si coincide poco → es una alerta importante que hay que resolver **antes** de confiar en la regla para todo el negocio, no después.
+**Por qué vale la pena antes de que Nexo entre en producción:** esa misma regla está a punto de gobernar **todas** las cotizaciones futuras del negocio. Si al aplicarla a escala completa de `FactFWOFUFO` resulta que coincide casi siempre → confirma que la regla ya automatizada refleja la realidad del negocio (y de paso, esa misma reconstrucción sirve como calculadora/auditoría para viajes que no pasan por Nexo). Si coincide poco → es una alerta importante que hay que resolver **antes** de confiar en la regla para todo el negocio, no después.
 
 ### Qué incluiría esta validación
 
@@ -105,7 +105,7 @@ Esto **no es un modelo predictivo** — es una verificación, y se documenta ac�
    - Coincide con SICE-TAC → se etiqueta **SICE-TAC**.
    - No coincide con ninguno → probablemente manual, o no reconstruible por falta de vigencia histórica — se documenta como tal, no se fuerza una clasificación.
 2. **Prerrequisitos de dato** (ya cubiertos en §2-3 de este documento): vigencia histórica real de SAP y SICE-TAC, mapeo de los códigos de vehículo/equipo propios de EDA-1 a los catálogos SAP reales.
-3. **Reportar el % de coincidencia a escala completa**, comparado contra el 87,5%/100% de la muestra chica de CabinaFletes — con la advertencia de que probablemente sea menor, no porque esos viajes no siguieran la regla, sino porque no hay vigencia histórica para confirmarlo tan atrás en el tiempo.
+3. **Reportar el % de coincidencia a escala completa**, comparado contra el 87,5%/100% de la muestra chica de Nexo — con la advertencia de que probablemente sea menor, no porque esos viajes no siguieran la regla, sino porque no hay vigencia histórica para confirmarlo tan atrás en el tiempo.
 4. **Solo si**, después de resolver los huecos de dato, sigue habiendo una diferencia sistemática sin explicar (no solo ruido por datos faltantes) — ahí, y solo ahí, valdría la pena considerar un modelo residual pequeño (Gradient Boosting o regresión regularizada) sobre esa diferencia. No se propone de entrada.
 
 ### Preguntas de negocio que esta validación necesitaría resolver

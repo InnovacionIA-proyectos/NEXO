@@ -1,5 +1,9 @@
-# Ver DECISIONES_TECNICAS.md #9: la base de datos es propia (db, Postgres),
-# pero el broker de mensajeria YA NO lo es - se conecta al `rabbit` compartido
+# Base de datos: SQL Server. En QA el Cubicador usa la base `dbCubicador_Pruebas`,
+# esquema `dbo`. Este compose levanta un SQL Server LOCAL con la misma
+# base y el mismo esquema (otro host) para desarrollo y para el smoke test de CI.
+#
+# Ver DECISIONES_TECNICAS.md #9: el broker de mensajeria tampoco es propio -
+# se conecta al `rabbit` compartido
 # del docker-compose.yml raiz de NEXO via un nombre de red EXTERNO
 # (nexo_internal, fijado por el `name:` de ese archivo). Requiere que el
 # stack raiz de NEXO ya tenga corriendo (o corra) el servicio `rabbit`:
@@ -11,34 +15,111 @@
 
 services:
   db:
-    image: postgres:16-alpine
+    # 2019 para igualar la instancia real de QA. OJO: docker-compose.ci.yml de
+    # la raiz (pruebas .NET) usa 2022 - son instancias distintas, no un
+    # descuido, pero conviene saberlo si algo se comporta diferente.
+    image: mcr.microsoft.com/mssql/server:2019-latest
     environment:
-      POSTGRES_DB: cubicador
-      POSTGRES_USER: cubicador
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?definir en .env}
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?definir en .env}
+      MSSQL_PID: Developer
     volumes:
-      - db_data:/var/lib/postgresql/data
+      # Volumen PROPIO de SQL Server. `db_data` NO se reutiliza: todavia tiene
+      # los datos de PostgreSQL (uid 70), que hay que MIGRAR, no perder. Ademas
+      # SQL Server corre con otro usuario y no puede escribir en ese directorio:
+      # el contenedor entra en bucle de reinicio con "Permission denied".
+      - db_data_mssql:/var/opt/mssql
     ports:
-      - "5433:5432"  # puerto distinto de 5432 por si corre junto a otro Postgres local
+      - "1434:1433"  # puerto distinto de 1433 por si corre junto a otro SQL Server local
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U cubicador -d cubicador"]
-      interval: 3s
-      timeout: 3s
-      retries: 10
+      # La imagen 2019 trae sqlcmd en /opt/mssql-tools; las mas nuevas en
+      # /opt/mssql-tools18 (que exige -C para aceptar el certificado propio).
+      # Se prueban los dos para no depender de la version exacta del tag.
+      test:
+        - CMD-SHELL
+        - >
+          (/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$$MSSQL_SA_PASSWORD" -C -Q "SELECT 1"
+          || /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P "$$MSSQL_SA_PASSWORD" -Q "SELECT 1")
+          > /dev/null 2>&1
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s  # SQL Server tarda bastante mas que Postgres en quedar listo
     restart: unless-stopped
+
+  # Crea la base y el esquema una sola vez y termina. El DDL de
+  # database/esquema/ESQUEMA_CUBICADOR.sql crea las tablas, pero no la BASE: sin
+  # este paso el primer arranque falla con "Cannot open database".
+  # En QA/produccion no existe - la base y el esquema ya estan.
+  db-init:
+    image: mcr.microsoft.com/mssql/server:2019-latest
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?definir en .env}
+      CUBICADOR_DB_ESQUEMA: ${CUBICADOR_DB_ESQUEMA:-dbo}
+    entrypoint:
+      - /bin/bash
+      - -c
+      - |
+        set -e
+        if [ -x /opt/mssql-tools18/bin/sqlcmd ]; then
+          SQLCMD="/opt/mssql-tools18/bin/sqlcmd -C"
+        else
+          SQLCMD="/opt/mssql-tools/bin/sqlcmd"
+        fi
+        $$SQLCMD -S db -U sa -P "$$MSSQL_SA_PASSWORD" -b -Q \
+          "IF DB_ID('dbCubicador_Pruebas') IS NULL CREATE DATABASE [dbCubicador_Pruebas];"
+        $$SQLCMD -S db -U sa -P "$$MSSQL_SA_PASSWORD" -b -d dbCubicador_Pruebas -Q \
+          "IF SCHEMA_ID('$$CUBICADOR_DB_ESQUEMA') IS NULL EXEC('CREATE SCHEMA [$$CUBICADOR_DB_ESQUEMA]');"
+        echo "Base y esquema $$CUBICADOR_DB_ESQUEMA listos."
+        # Las 16 tablas (catalogo, recomendacion y motor 3D) las crea el DDL unico de
+        # database/esquema/ESQUEMA_CUBICADOR.sql: desde que se retiro Alembic (S5-HU-17.2) nada las
+        # crea solo, y sin ellas GET /api/planes-cargue/vehiculos responde 503 ("Invalid object name
+        # 'dbo.vehiculos_cubicacion'") y el smoke de CI nunca pasa. Se aplica SOLO si la
+        # tabla no existe: el DDL no es idempotente y este servicio corre en cada `docker compose up`.
+        # En QA/produccion este servicio no existe: ahi las tablas ya estan.
+        EXISTE=$$($$SQLCMD -S db -U sa -P "$$MSSQL_SA_PASSWORD" -h -1 -W -d dbCubicador_Pruebas -Q \
+          "SET NOCOUNT ON; SELECT COUNT(*) FROM sys.tables t JOIN sys.schemas s ON s.schema_id = t.schema_id WHERE s.name = '$$CUBICADOR_DB_ESQUEMA' AND t.name = 'vehiculos_cubicacion'" | tr -d '[:space:]')
+        if [ "$$EXISTE" = "0" ]; then
+          $$SQLCMD -S db -U sa -P "$$MSSQL_SA_PASSWORD" -b -d dbCubicador_Pruebas -i /sql/esquema_cubicador.sql
+          echo "Tablas del Cubicador creadas."
+        else
+          echo "Tablas del Cubicador ya existen."
+        fi
+    volumes:
+      - ./database/esquema/ESQUEMA_CUBICADOR.sql:/sql/esquema_cubicador.sql:ro
+    restart: "no"
 
   api:
     build:
       context: .
       dockerfile: Dockerfile
     environment:
-      DATABASE_URL: postgresql+asyncpg://cubicador:${POSTGRES_PASSWORD}@db:5432/cubicador
+      # Apunta al SQL Server LOCAL de este compose, no a la base compartida.
+      # `sa` solo existe aca: en QA/produccion se define DATABASE_URL entera
+      # como variable de entorno (ver .env.dokploy).
+      DATABASE_URL: mssql+aioodbc://sa:${MSSQL_SA_PASSWORD}@db:1433/dbCubicador_Pruebas?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes
+      CUBICADOR_DB_ESQUEMA: ${CUBICADOR_DB_ESQUEMA:-dbo}
       CUBICADOR_API_KEY: ${CUBICADOR_API_KEY:?definir en .env}
+      # Llave por sistema: de aca sale el origenSistema verificado de
+      # POST /recomendaciones (ver .env.example).
+      CUBICADOR_API_KEY_NEXO: ${CUBICADOR_API_KEY_NEXO:-}
+      CUBICADOR_API_KEY_COTIFLY: ${CUBICADOR_API_KEY_COTIFLY:-}
       # rabbit compartido de NEXO (mismas credenciales que su .env raiz) - ver
       # comentario de cabecera de este archivo.
       CUBICADOR_RABBITMQ_URL: amqp://${RABBITMQ_USER:?definir en .env}:${RABBITMQ_PASSWORD:?definir en .env}@rabbit:5672/
       NEXO_BASE_URL: ${NEXO_BASE_URL:?definir en .env}
       NEXO_CALLBACK_API_KEY: ${NEXO_CALLBACK_API_KEY:?definir en .env}
+      # Modo sombra de la IA (apagado por defecto; ver .env.example). Solo lo usa la api.
+      IA_SOMBRA_HABILITADA: ${IA_SOMBRA_HABILITADA:-false}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_WORKSPACE_ID: ${ANTHROPIC_WORKSPACE_ID:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-5-5}
+      ANTHROPIC_EFFORT: ${ANTHROPIC_EFFORT:-high}
+      IA_SOMBRA_MUESTREO: ${IA_SOMBRA_MUESTREO:-1.0}
+      IA_SOMBRA_TOPE_TOKENS_DIA: ${IA_SOMBRA_TOPE_TOKENS_DIA:-1000000}
     ports:
       # El contenedor sigue escuchando en 8000 puertas adentro (Dockerfile);
       # solo cambia el puerto publicado al host, para no chocar con el 8080
@@ -48,6 +129,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      db-init:
+        condition: service_completed_successfully
     networks:
       - default
       - nexo_shared
@@ -64,11 +147,15 @@ services:
       context: .
       dockerfile: Dockerfile.worker
     environment:
-      DATABASE_URL: postgresql+asyncpg://cubicador:${POSTGRES_PASSWORD}@db:5432/cubicador
+      # Apunta al SQL Server LOCAL de este compose, no a la base compartida.
+      # `sa` solo existe aca: en QA/produccion se define DATABASE_URL entera
+      # como variable de entorno (ver .env.dokploy).
+      DATABASE_URL: mssql+aioodbc://sa:${MSSQL_SA_PASSWORD}@db:1433/dbCubicador_Pruebas?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes
+      CUBICADOR_DB_ESQUEMA: ${CUBICADOR_DB_ESQUEMA:-dbo}
       CUBICADOR_RABBITMQ_URL: amqp://${RABBITMQ_USER:?definir en .env}:${RABBITMQ_PASSWORD:?definir en .env}@rabbit:5672/
       NEXO_BASE_URL: ${NEXO_BASE_URL:?definir en .env}
       NEXO_CALLBACK_API_KEY: ${NEXO_CALLBACK_API_KEY:?definir en .env}
-      # Vigilante de timeouts (S3-HU-06.1, ver CONTRATO.md 6.4): un plan que
+      # Vigilante de timeouts (ver CONTRATO.md 6.4): un plan que
       # lleve mas de TIMEOUT minutos en 'procesando' se da por perdido - se
       # publica cubicacion.rechazada (TIMEOUT_PROCESAMIENTO) y se marca 'error'.
       # Solo aplican al worker: la api no corre el vigilante.
@@ -87,6 +174,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      db-init:
+        condition: service_completed_successfully
     networks:
       - default
       - nexo_shared
@@ -104,4 +193,8 @@ networks:
     external: true
 
 volumes:
+  # Datos de SQL Server (el motor actual).
+  db_data_mssql:
+  # Datos viejos de PostgreSQL. Se conservan hasta migrarlos (S5-HU-17.1):
+  # aqui estan los planes de cargue que ya existen. No borrar antes de eso.
   db_data:

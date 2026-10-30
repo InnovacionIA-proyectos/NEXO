@@ -1,12 +1,12 @@
 # ADR — El ajuste manual de colocaciones pasa a comando async
 
-**Estado:** aceptada e implementada · **Fecha:** 2026-09-09 · **Issue:** #101 (S3-HU-01.1) · **Implementado en:** #104/#105 (S3-HU-02)
+**Estado:** aceptada e implementada · **Fecha:** 2026-09-09
 
 ## Contexto
 
-Hasta S3-HU-02, `PATCH /api/planes-cargue/{id}/colocaciones/{colocacionId}` solo
+Antes de este cambio, `PATCH /api/planes-cargue/{id}/colocaciones/{colocacionId}` solo
 existía en Cubicador (`cubicador/api/routers/planes_cargue.py`) y era **siempre
-síncrono** — así lo documentaba `cubicador/CONTRATO.md` §3.2 antes de esta HU
+síncrono** — así lo documentaba `cubicador/CONTRATO.md` §3.2
 ("ajuste manual — siempre síncrono, nunca pasa por cola"). El navegador le
 hablaba directo al motor 3D para mover, rotar, bloquear, retirar o reinsertar
 una unidad ya colocada.
@@ -14,12 +14,12 @@ una unidad ya colocada.
 Eso rompía el principio que ya regía `optimizar`/`crear_desde_linea`: toda
 escritura del plan de cargue pasa por el mismo camino auditable de colas
 (mismo exchange, mismos reintentos 1s/5s/15s/60s, mismo DLQ, misma alerta). El
-ajuste manual era la única excepción, y S3-HU-02 (criterio 3) la cierra.
+ajuste manual era la única excepción, y este cambio (criterio 3) la cierra.
 
 ## Decisión
 
 El ajuste manual deja de ser un PATCH síncrono contra Cubicador. Pasa a ser
-`ajustar_colocacion`, uno de los 8 comandos async de S3-HU-02:
+`ajustar_colocacion`, uno de los 8 comandos async del plan de cargue:
 
 - El endpoint vive en **NEXO** (`PATCH /api/planes-cargue/{id}/colocaciones/{colocacionId}`,
   `AjustarColocacionCommand.cs`) — nunca una URL de Cubicador.
@@ -33,7 +33,7 @@ El ajuste manual deja de ser un PATCH síncrono contra Cubicador. Pasa a ser
 
 ### UI optimista
 
-El frontend (consumidor en S3-HU-04, sprint futuro) aplica el ajuste de
+El frontend (consumidor, todavía pendiente) aplica el ajuste de
 inmediato en pantalla al recibir el 202, sin esperar confirmación — es una
 interacción interactiva de arrastrar/soltar en un visor 3D, y esperar un
 round-trip completo por cola la haría inutilizable.
@@ -64,7 +64,7 @@ rechazo que ya estaba verificado en producción para `optimizar`.
 ## Por qué se acepta
 
 - Cierra el único hueco que quedaba en "toda escritura pasa por la cola" —
-  sin esto, S3-HU-02 habría sido incompleta a propósito.
+  sin esto, este cambio habría quedado incompleto a propósito.
 - No agrega superficie nueva de fallo: reutiliza el evento
   `cubicacion.rechazada` y el consumer que ya existían, verificados en
   producción para `optimizar` (ver `docs/mensajeria/CUBICACION.md` §3).
@@ -79,7 +79,7 @@ rechazo que ya estaba verificado en producción para `optimizar`.
   confirmado" genera ediciones concurrentes conflictivas sobre la misma
   colocación — hoy no hay bloqueo optimista por versión, solo reconciliación
   después del hecho.
-- Si el frontend (S3-HU-04) necesita distinguir "todavía procesando" de
+- Si el frontend necesita distinguir "todavía procesando" de
   "confirmado" en la propia colocación (hoy el aviso es a nivel de plan, no
   de colocación individual).
 
@@ -93,5 +93,5 @@ timeouts, duplicando lo que la cola ya resuelve.
 
 **Bloqueo optimista por versión (ETag/versión de la colocación).** Cerraría el
 hueco de ediciones concurrentes mencionado arriba, pero es complejidad que
-esta HU no pidió y que el frontend (todavía sin construir) no tiene forma de
+este cambio no pidió y que el frontend (todavía sin construir) no tiene forma de
 aprovechar hoy. Queda anotado como el primer punto de "cuándo revisar esto".

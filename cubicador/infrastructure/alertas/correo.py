@@ -1,6 +1,6 @@
 """Alerta por correo cuando un mensaje agota reintentos y cae a
-`cubicacion.dlq` (criterio de cierre de la HU: "Reintentos + DLQ + alerta
-ante fallos repetidos del motor" - ver worker/main.py::_mover_a_dlq).
+`cubicacion.dlq` (agregada para cubrir "Reintentos + DLQ + alerta ante
+fallos repetidos del motor" - ver worker/main.py::_mover_a_dlq).
 
 SMTP directo, sin depender de que NEXO este arriba: si el motor de
 Cubicador falla, tiene que poder avisar solo, sin llamar de vuelta a otro
@@ -27,8 +27,8 @@ SMTP_REMITENTE = os.environ.get("ALERTAS_SMTP_REMITENTE", "cubicador@local")
 SMTP_USUARIO = os.environ.get("ALERTAS_SMTP_USUARIO", "")
 SMTP_CLAVE = os.environ.get("ALERTAS_SMTP_CLAVE", "")
 
-# Mismo equipo que ya recibe la alerta equivalente del lado de NEXO (#13,
-# Alertas:EquipoTecnico en appsettings.json) - no son secretos, van
+# Mismo equipo que ya recibe la alerta equivalente del lado de NEXO
+# (Alertas:EquipoTecnico en appsettings.json) - no son secretos, van
 # committeados como default; ALERTAS_EQUIPO_TECNICO permite sobreescribirlos.
 DESTINATARIOS_DEFAULT = [
     "scalderon@boterosoto.com.co", "dguerra@boterosoto.com.co", "jpvelez@boterosoto.com.co",

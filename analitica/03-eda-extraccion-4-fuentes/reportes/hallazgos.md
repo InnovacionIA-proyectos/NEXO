@@ -41,7 +41,7 @@ Dimensión:     Consistencia / Cobertura de cruce
 Evidencia:     lineas_solicitud guarda texto ("Andino", "Contenedor"), SAP guarda código numérico ("7", "1"). Comparación directa de texto = 0% de match. La traducción correcta existe como diccionario fijo en el backend (TarifarioSapAdapter.cs): LineaNegocio {Andino=7, DevolucionContenedor=6, Nacional=4, PuertoAInterior=1, InteriorAPuerto=2, Licitaciones=8}; ClaseViaje {Contenedor=1, Cupo=2, CargaSuelta=4, Extradimensionado=5}. Con la traducción, ClaseViaje sube a 100% (5/5) y LineaNegocio a 25% (1/4). **Actualización (notebook 06, Paso 3c):** `tblSAPClaseContenedor` ya se consiguió — los 2 valores no nulos de `ClaseContenedor` en `lineas_solicitud` (`CNT20.IT`, `CNT20.ST`) traducen exacto a sus ID SAP (13 y 8) y ambos códigos existen con volumen real en `tarifa-plaza` (171 y 1.641 filas). Las 3 traducciones de este hallazgo quedan verificadas al 100%, ya no solo "confirmadas en código".
 Ejemplo:       lineas_solicitud con LineaNegocio="Andino" vs. tarifa-plaza.lineanegocio="7"; ClaseContenedor="CNT20.IT" vs. tarifa-plaza.clasecontenedor="13".
 Hipótesis:     N/A — confirmado en el código fuente del backend y, para ClaseContenedor, también contra el catálogo real y los datos.
-Verificación:  Lectura directa de src/CabinaFletes.Infrastructure/Biblioteca/Adaptadores/TarifarioSapAdapter.cs. 🔎 ClaseContenedor verificado además con `tblSAPClaseContenedor_202609142051.csv`, notebook 06 Paso 3c.
+Verificación:  Lectura directa de src/Nexo.Infrastructure/Biblioteca/Adaptadores/TarifarioSapAdapter.cs. 🔎 ClaseContenedor verificado además con `tblSAPClaseContenedor_202609142051.csv`, notebook 06 Paso 3c.
 Severidad:     Baja (ya resuelto)
 Impacto:       diccionario-y-linaje.md (HU-10.3) afirma que estas columnas son "la misma llave" — en la práctica es incorrecto/incompleto sin esta traducción, aunque ya está resuelta y documentada. `ClaseContenedor` ya no es "no verificable con este set" — se cerró con el catálogo real (ver limitaciones.md L-03).
 Recomendación: Corregir diccionario-y-linaje.md para aclarar que se necesita traducción (ya no falta ninguna tabla para hacerlo).
@@ -66,7 +66,7 @@ Recomendación: Ya resuelto — las 2 tablas se consiguieron y se usaron. tblSAP
 
 ```
 ID:            H-005 🔎
-Título:        Ni SAP ni SICE-TAC muestran que CabinaFletes cotice mal: las 32 líneas Tarifario y las 12 Sicetac quedan explicadas — 28+12 por el algoritmo real de cada motor, 4 por captura manual confirmada
+Título:        Ni SAP ni SICE-TAC muestran que Nexo cotice mal: las 32 líneas Tarifario y las 12 Sicetac quedan explicadas — 28+12 por el algoritmo real de cada motor, 4 por captura manual confirmada
 Dimensión:     Exactitud / Cruce bivariado (§7.1/§7.2 del plan)
 Evidencia:
 Este hallazgo empezó con un +30,6% de sobreprecio contra SAP (punto 1) y un "0 de 12 sin candidato" contra SICE-TAC (punto 4, muestra chica). Los puntos 2-3 y 5-7 muestran que ninguno de los dos era lo que parecía:
@@ -154,14 +154,14 @@ Recomendación: Documentar como columnas sin información útil en este snapshot
 
 ```
 ID:            H-010
-Título:        historico-sap (tblSAPTarifasLog) es una auditoría de ediciones — y así mismo la usa CabinaFletes, como tarifa histórica dentro de su motor de precios
+Título:        historico-sap (tblSAPTarifasLog) es una auditoría de ediciones — y así mismo la usa Nexo, como tarifa histórica dentro de su motor de precios
 Dimensión:     Granularidad
-Evidencia:     Solo 8.135 de 23.020 tarifas vigentes (35%) tienen alguna versión en el histórico; de esas, la mediana es 2 versiones. El 65% de las tarifas activas nunca aparece en el histórico — patrón inconsistente con "cada vez que se aplicó la tarifa" (se esperaría que una tarifa activa se "aplicara" muchas veces). **Confirmado por el usuario:** es auditoría de ediciones, no historial de uso — y CabinaFletes la usa precisamente así, como su fuente de "tarifa histórica" dentro del motor de precios (coincide con el código: `PropuestaTarifaAdapter` consulta esta tabla como candidato "historico_sap", junto a SICE-TAC y plaza, ver H-005).
+Evidencia:     Solo 8.135 de 23.020 tarifas vigentes (35%) tienen alguna versión en el histórico; de esas, la mediana es 2 versiones. El 65% de las tarifas activas nunca aparece en el histórico — patrón inconsistente con "cada vez que se aplicó la tarifa" (se esperaría que una tarifa activa se "aplicara" muchas veces). **Confirmado por el usuario:** es auditoría de ediciones, no historial de uso — y Nexo la usa precisamente así, como su fuente de "tarifa histórica" dentro del motor de precios (coincide con el código: `PropuestaTarifaAdapter` consulta esta tabla como candidato "historico_sap", junto a SICE-TAC y plaza, ver H-005).
 Ejemplo:       Notebook 02, Paso 4.
 Hipótesis:     N/A — confirmado.
 Verificación:  Confirmado por el usuario. Consistente con el código real (`PropuestaTarifaAdapter.CandidatoSapAsync`, ver H-005), que trata esta tabla como una fuente más de tarifa, no como registro de aplicaciones.
 Severidad:     Baja (ya resuelto)
-Impacto:       Sí se puede usar tblSAPTarifasLog como "tarifa histórica" para el futuro modelo — es exactamente el uso que le da el propio CabinaFletes, no un mal uso de un log de auditoría.
+Impacto:       Sí se puede usar tblSAPTarifasLog como "tarifa histórica" para el futuro modelo — es exactamente el uso que le da el propio Nexo, no un mal uso de un log de auditoría.
 Recomendación: Documentar esta semántica en diccionario-y-linaje.md; ninguna acción adicional pendiente.
 ```
 
@@ -277,6 +277,6 @@ Recomendación: Ninguna acción adicional — incluir `tblSAPTiposCarroseria` co
 | 4 | Declarar Fuente=Sicetac como "no verificable" en vez de "falla" | La muestra de 151 filas de piso-sicetac no fue diseñada para incluir las rutas de las 13 solicitudes de prueba | Baja — es una limitación estructural del extracto, no de metodología |
 | 5 | No conformarse con "0 casos por código de negocio" — reintentar el cruce bivariado propio↔mercado (§7.1/7.2) usando ruta normalizada en vez de LineaNegocio/ClaseViaje | El cruce por LineaNegocio/ClaseViaje dio 0 casos limpios (contaminados por ruido conocido); una vez resuelta la ruta con rapidfuzz (notebook 06), sí fue posible cruzar por ruta — ver H-005 | Alta — el resultado quedó reproducible en el notebook 05, Pasos 1b-1c |
 | 6 | Fuente×Resultado declarado sin señal de negocio | El usuario confirmó que también marcó Resultado a mano durante pruebas, no refleja decisión real de cliente | Baja — confirmado directamente por el usuario |
-| 7 | historico-sap tratado como "auditoría de ediciones", usada por CabinaFletes como tarifa histórica | Evidencia indirecta (65% de tarifas activas sin ninguna versión en el log) + confirmado directamente por el usuario | Alta — confirmado, ya no depende de evidencia indirecta |
+| 7 | historico-sap tratado como "auditoría de ediciones", usada por Nexo como tarifa histórica | Evidencia indirecta (65% de tarifas activas sin ninguna versión en el log) + confirmado directamente por el usuario | Alta — confirmado, ya no depende de evidencia indirecta |
 | 8 | H-005: para las 8/32 líneas Tarifario sin ningún candidato SAP dentro de su rango de peso, usar como fallback la mediana solo-ruta (Paso 1b) en vez de descartarlas | Bucaramanga↔Bogotá (21.000 kg) y Bogotá↔Cúcuta (15.000 kg) no tienen ninguna tarifa configurada en tarifa-plaza cuyo rango de peso las cubra exactamente; descartarlas sesgaría la mediana final hacia las rutas que sí tienen cobertura fina | Alta — documentado explícitamente por línea en el notebook (columna `metodo`), no es un descarte silencioso |
 | 9 | H-005 (Paso 1e): no perseguir el 100% de reproducción exacta del algoritmo real (quedó en 20/32) ni usar `historico-sap` como fuente adicional pese a que el motor real también lo consulta | Sumar `historico-sap` (deduplicado por `idTarifa` a su última versión) empeoró el resultado (12/32 en vez de 20/32) — probable porque no hay forma de reconstruir su estado exacto a la fecha de cada cotización sin una foto histórica; las 12 líneas restantes se explican por limitaciones ya conocidas (L-02, L-13), no por una causa nueva sin investigar | Alta — la comparación con y sin histórico quedó documentada en el notebook (Paso 1e), no es una decisión oculta |

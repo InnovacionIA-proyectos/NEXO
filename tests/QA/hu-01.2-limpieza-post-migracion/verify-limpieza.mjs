@@ -44,11 +44,11 @@ if (grep.length > 0) {
 // 3) Los 4 tipos que vivían ahí siguen existiendo en su ubicación definitiva
 //    (según PENDIENTES.md) — no se perdió nada, solo se movieron antes.
 const reubicados = [
-  "src/CabinaFletes.Application/Common/Ports/IAuditoriaPort.cs",
-  "src/CabinaFletes.Application/Common/Ports/IPropuestaTarifaPort.cs",
-  "src/CabinaFletes.Application/Common/Dtos/PropuestaTarifaDtos.cs",
-  "src/CabinaFletes.Infrastructure/Adapters/PropuestaTarifaAdapter.cs",
-  "src/CabinaFletes.Infrastructure/Adapters/TarifarioSapAdapter.cs",
+  "src/Nexo.Application/Common/Ports/IAuditoriaPort.cs",
+  "src/Nexo.Application/Common/Ports/IPropuestaTarifaPort.cs",
+  "src/Nexo.Application/Common/Dtos/PropuestaTarifaDtos.cs",
+  "src/Nexo.Infrastructure/Adapters/PropuestaTarifaAdapter.cs",
+  "src/Nexo.Infrastructure/Adapters/TarifarioSapAdapter.cs",
 ];
 for (const ruta of reubicados) {
   if (!existsSync(ruta)) fail(`no existe la ubicación definitiva: ${ruta}`);
