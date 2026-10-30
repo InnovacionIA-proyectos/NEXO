@@ -17,7 +17,7 @@ namespace Nexo.Application.CasosDeUso.ServiciosConexos;
 public sealed record clsCrearServicioConexoCommand(
     string CodigoServicio, string TipoServicio, string? Origen, string? Destino, string? Puerto,
     string? Ruta, string? TipoMaquina, decimal CostoUnitario, string Unidad, DateOnly Vigencia,
-    string? Categoria, bool Activo)
+    string? Categoria, bool Activo, decimal? PrecioVenta = null)
     : ICommand<clsServicioConexoDto>;
 
 public sealed class clsCrearServicioConexoCommandHandler(
@@ -51,6 +51,7 @@ public sealed class clsCrearServicioConexoCommandHandler(
             Ruta = ruta,
             TipoMaquina = tipoMaquina,
             CostoUnitario = command.CostoUnitario,
+            PrecioVenta = command.PrecioVenta is { } pv ? Math.Round(pv, 2, MidpointRounding.AwayFromZero) : null,
             Unidad = command.Unidad.Trim(),
             Vigencia = command.Vigencia,
             Categoria = clsServicioConexoCategoria.Validada(command.Categoria),

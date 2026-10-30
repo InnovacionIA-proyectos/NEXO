@@ -41,6 +41,7 @@ public record clsCrearRecomendacionRequest(
 public class clsCubicacionController(
     ICommandHandler<clsCrearRecomendacionCommand, clsRecomendacionDto> crear,
     IQueryHandler<clsConsultarRecomendacionQuery, clsRecomendacionDto> consultar,
+    IQueryHandler<clsObtenerExplicacionRecomendacionQuery, clsExplicacionRecomendacionDto> explicacion,
     ICurrentUserPort usuarioActual) : ControllerBase
 {
     /// <summary>
@@ -81,5 +82,25 @@ public class clsCubicacionController(
                 "PARAMETROS_REQUERIDOS", "idLineaSolicitud y origenSistema son obligatorios.");
 
         return Ok(await consultar.Handle(new clsConsultarRecomendacionQuery(idLineaSolicitud, origenSistema), ct));
+    }
+
+    /// <summary>
+    /// Por qué el Cubicador eligió esa flota, en lenguaje natural. Se pide DESPUÉS de pintar los números de la recomendación: el modelo tarda
+    /// varios segundos. Mismos parámetros, validación y roles que <see cref="Consultar"/>. <b>Siempre 200</b> con <c>{ "explicacion": texto | null }</c>:
+    /// es un texto opcional, así que un Cubicador caído, sin configurar, sin responder, sin recomendación para la línea o sin explicación
+    /// también dan <c>null</c> y la pantalla simplemente no muestra el bloque. Por aquí no pasa ninguna tarifa ni valor comercial.
+    /// </summary>
+    [Authorize(Roles = "Comercial,AdminBiblioteca,AdminTarifas,Admin")]
+    [HttpGet("explicacion")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<clsExplicacionRecomendacionDto>> Explicacion(
+        [FromQuery] string? idLineaSolicitud, [FromQuery] string? origenSistema, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(idLineaSolicitud) || string.IsNullOrWhiteSpace(origenSistema))
+            throw new clsValidationFailedException(
+                "PARAMETROS_REQUERIDOS", "idLineaSolicitud y origenSistema son obligatorios.");
+
+        return Ok(await explicacion.Handle(new clsObtenerExplicacionRecomendacionQuery(idLineaSolicitud, origenSistema), ct));
     }
 }

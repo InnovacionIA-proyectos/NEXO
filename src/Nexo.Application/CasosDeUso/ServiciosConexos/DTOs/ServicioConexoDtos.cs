@@ -8,7 +8,7 @@ namespace Nexo.Application.CasosDeUso.ServiciosConexos.DTOs;
 public record clsServicioConexoDto(
     Guid Id, string CodigoServicio, string TipoServicio,
     string Origen, string Destino, string Puerto, string Ruta, string TipoMaquina,
-    decimal CostoUnitario, string Unidad, DateOnly Vigencia, string Categoria, bool Activo);
+    decimal CostoUnitario, string Unidad, DateOnly Vigencia, string Categoria, bool Activo, decimal? PrecioVenta = null);
 
 /// <summary>Página del catálogo de servicios: los ítems de la página y el total que cumple el filtro.</summary>
 public record clsPaginaServiciosDto(IReadOnlyList<clsServicioConexoDto> Items, int Total);

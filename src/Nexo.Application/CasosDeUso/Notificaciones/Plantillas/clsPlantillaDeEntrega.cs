@@ -55,7 +55,7 @@ public static class clsPlantillaDeEntrega
 
         var subtotalFletes = c.Lineas.Sum(l =>
             l.ValorFlete + (l.ValorAprovisionamiento ?? 0) + (l.ValorRetornoContenedor ?? 0));
-        var subtotalConexos = c.Conexos.Sum(x => x.ValorAplicado);
+        var subtotalConexos = c.Conexos.Sum(x => x.ValorVenta);
 
         // Diseño alineado al resto de correos transaccionales de Botero Soto (barra de
         // marca arriba, título en caja azul, cuerpo, pie gris con disclaimer). Todo con

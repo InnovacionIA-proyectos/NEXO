@@ -8,5 +8,6 @@ public static class clsDependencyInjection
 {
     public static IServiceCollection AddCubicacionUseCases(this IServiceCollection services) => services
         .AddScoped<ICommandHandler<clsCrearRecomendacionCommand, clsRecomendacionDto>, clsCrearRecomendacionCommandHandler>()
-        .AddScoped<IQueryHandler<clsConsultarRecomendacionQuery, clsRecomendacionDto>, clsConsultarRecomendacionQueryHandler>();
+        .AddScoped<IQueryHandler<clsConsultarRecomendacionQuery, clsRecomendacionDto>, clsConsultarRecomendacionQueryHandler>()
+        .AddScoped<IQueryHandler<clsObtenerExplicacionRecomendacionQuery, clsExplicacionRecomendacionDto>, clsObtenerExplicacionRecomendacionQueryHandler>();
 }

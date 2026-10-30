@@ -102,6 +102,8 @@ public class clsRolesPorEndpointTests(clsApiFixture fx)
             // ---- cubicación rápida: AdminBiblioteca la conserva
             new("cubicacion POST", HttpMethod.Post, "/api/cubicacion", ["Comercial", "AdminBiblioteca", "AdminTarifas", "Admin"],
                 new { idLineaSolicitud = "LIN-ROLES", mercancias = Array.Empty<object>() }),
+            new("cubicacion GET /explicacion", HttpMethod.Get, "/api/cubicacion/explicacion?idLineaSolicitud=LIN-ROLES&origenSistema=NEXO",
+                ["Comercial", "AdminBiblioteca", "AdminTarifas", "Admin"]),
 
             // ---- Biblioteca: AdminBiblioteca SÍ entra
             new("Tarifas Plaza GET", HttpMethod.Get, "/api/tarifas-plaza", Biblioteca),

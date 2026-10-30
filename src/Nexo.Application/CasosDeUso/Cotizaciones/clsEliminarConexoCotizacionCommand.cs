@@ -41,7 +41,7 @@ public sealed class clsEliminarConexoCotizacionCommandHandler(
             ?? throw new clsNotFoundException("CONEXO_NO_ENCONTRADO", "El servicio conexo no existe en esta cotización.");
 
         var quitado = new clsConexoCambiado(
-            conexo.clsServicioConexo?.TipoServicio ?? "Servicio conexo", conexo.Cantidad, conexo.ValorAplicado);
+            conexo.clsServicioConexo?.TipoServicio ?? "Servicio conexo", conexo.Cantidad, conexo.ValorVenta);
 
         c.Conexos.Remove(conexo);
         clsCotizacionCalculos.Recalcular(c);

@@ -257,6 +257,93 @@ public class clsCotizacionesTests
         Assert.Equal(0, (await resp.Json()).GetProperty("conexos").GetArrayLength());
     }
 
+    // 8) S6-HU-38.2/#408 — el conexo se cotiza a su precio de venta; el costo (valorAplicado) queda aparte.
+
+    private async Task<Guid> ServicioConPrecio(decimal costo, decimal? precioVenta)
+    {
+        var resp = await _fx.Client("Admin").PostJson("/api/servicios-conexos", new
+        {
+            codigoServicio = $"PV_{Guid.NewGuid():N}"[..20], tipoServicio = "Precio de venta", costoUnitario = costo, precioVenta,
+            unidad = "Por unidad", vigencia = "2026-12-31",
+        });
+        Assert.Equal(HttpStatusCode.Created, resp.StatusCode);
+        return (await resp.Json()).GetProperty("id").GetGuid();
+    }
+
+    [Fact]
+    public async Task Un_conexo_con_precio_de_venta_se_cotiza_a_ese_precio_el_total_suma_la_venta_y_no_cambia_si_la_biblioteca_cambia()
+    {
+        var cli = _fx.Client();
+        var (cid, lineaId) = await NuevaCotizacionConLinea();
+        var servicioId = await ServicioConPrecio(costo: 50_000, precioVenta: 80_000);
+
+        var resp = await cli.PostJson($"/api/cotizaciones/{cid}/conexos", new { items = new[] { new { lineaId, servicioConexoId = servicioId, cantidad = 2 } } });
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        var dto = await resp.Json();
+        var conexo = dto.GetProperty("conexos")[0];
+        Assert.Equal((80_000m, 160_000m, 100_000m), (conexo.GetProperty("precioVentaUnitario").GetDecimal(), conexo.GetProperty("valorVenta").GetDecimal(), conexo.GetProperty("valorAplicado").GetDecimal()));
+        Assert.Equal(1_160_000m, dto.GetProperty("total").GetDecimal());   // 1.000.000 de flete + la venta, no el costo
+
+        // La biblioteca cambia: el conexo ya agregado conserva el precio con el que se agregó.
+        Assert.Equal(HttpStatusCode.OK, (await _fx.Client("Admin").PatchJson($"/api/servicios-conexos/{servicioId}", new { precioVenta = 200_000 })).StatusCode);
+        var conexoId = conexo.GetProperty("id").GetGuid();
+        var editado = await (await cli.PatchJson($"/api/cotizaciones/{cid}/conexos/{conexoId}", new { cantidad = 3 })).Json();
+        var despues = editado.GetProperty("conexos")[0];
+        Assert.Equal((80_000m, 240_000m), (despues.GetProperty("precioVentaUnitario").GetDecimal(), despues.GetProperty("valorVenta").GetDecimal()));
+        Assert.Equal(1_240_000m, editado.GetProperty("total").GetDecimal());
+
+        var leida = await (await cli.GetAsync($"/api/cotizaciones/{cid}")).Json();
+        Assert.Equal(240_000m, leida.GetProperty("conexos")[0].GetProperty("valorVenta").GetDecimal());
+        Assert.Equal(1_240_000m, leida.GetProperty("total").GetDecimal());
+    }
+
+    [Fact]
+    public async Task Un_conexo_sin_precio_de_venta_se_cotiza_a_su_costo_y_un_valorAplicado_no_cambia_la_venta()
+    {
+        var cli = _fx.Client();
+        var (cid, lineaId) = await NuevaCotizacionConLinea();
+        var sinPrecio = await ServicioConPrecio(costo: 50_000, precioVenta: null);
+        var conPrecio = await ServicioConPrecio(costo: 50_000, precioVenta: 80_000);
+
+        var resp = await cli.PostJson($"/api/cotizaciones/{cid}/conexos", new
+        {
+            items = new object[]
+            {
+                new { lineaId, servicioConexoId = sinPrecio, cantidad = 1 },
+                new { lineaId, servicioConexoId = conPrecio, cantidad = 1, valorAplicado = 12_345 },
+            },
+        });
+        var conexos = (await resp.Json()).GetProperty("conexos").EnumerateArray().ToList();
+
+        var delSinPrecio = conexos.Single(c => c.GetProperty("servicioConexoId").GetGuid() == sinPrecio);
+        Assert.Equal((50_000m, 50_000m), (delSinPrecio.GetProperty("precioVentaUnitario").GetDecimal(), delSinPrecio.GetProperty("valorVenta").GetDecimal()));
+        var delConPrecio = conexos.Single(c => c.GetProperty("servicioConexoId").GetGuid() == conPrecio);
+        Assert.Equal((12_345m, 80_000m), (delConPrecio.GetProperty("valorAplicado").GetDecimal(), delConPrecio.GetProperty("valorVenta").GetDecimal()));
+    }
+
+    [Fact]
+    public async Task El_Excel_de_la_cotizacion_muestra_el_valor_de_venta_del_conexo_y_no_su_costo()
+    {
+        var cli = _fx.Client();
+        var (cid, lineaId) = await NuevaCotizacionConLinea();
+        var servicioId = await ServicioConPrecio(costo: 50_000, precioVenta: 80_000);
+        await cli.PostJson($"/api/cotizaciones/{cid}/conexos", new { items = new[] { new { lineaId, servicioConexoId = servicioId, cantidad = 2 } } });
+
+        var resp = await cli.GetAsync($"/api/cotizaciones/{cid}/exportar-excel");
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+
+        using var wb = new ClosedXML.Excel.XLWorkbook(new MemoryStream(await resp.Content.ReadAsByteArrayAsync()));
+        var numeros = wb.Worksheets.First().CellsUsed().Where(c => c.DataType == ClosedXML.Excel.XLDataType.Number).Select(c => c.GetDouble()).ToList();
+        Assert.Contains(160_000d, numeros);
+        Assert.DoesNotContain(100_000d, numeros);
+    }
+
+    [Fact]
+    public void Ningun_conexo_guardado_tiene_el_precio_de_venta_en_cero_mientras_su_costo_es_mayor_que_cero()
+    {
+        Assert.Equal(0, _fx.WithDb(db => db.CotizacionConexos.Count(c => c.PrecioVentaUnitario <= 0 && c.ValorAplicado > 0)));
+    }
+
     [Fact]
     public async Task Eliminar_conexo_inexistente_devuelve_404()
     {

@@ -13,7 +13,7 @@ public sealed class clsExportadorServiciosConexosExcelAdapter : IExportadorServi
     private static readonly string[] Encabezados =
     [
         "CODIGO", "TIPO SERVICIO", "ORIGEN", "DESTINO", "PUERTO", "RUTA", "TIPO MAQUINA",
-        "COSTO UNITARIO", "UNIDAD", "VIGENCIA", "CATEGORIA", "ACTIVO",
+        "COSTO UNITARIO", "PRECIO VENTA", "UNIDAD", "VIGENCIA", "CATEGORIA", "ACTIVO",
     ];
 
     public (byte[] Contenido, string NombreArchivo) Generar(IReadOnlyList<clsServicioConexoDto> servicios)
@@ -36,10 +36,11 @@ public sealed class clsExportadorServiciosConexosExcelAdapter : IExportadorServi
             ws.Cell(fila, 6).Value = s.Ruta;
             ws.Cell(fila, 7).Value = s.TipoMaquina;
             ws.Cell(fila, 8).Value = s.CostoUnitario;
-            ws.Cell(fila, 9).Value = s.Unidad;
-            ws.Cell(fila, 10).Value = s.Vigencia.ToString("yyyy-MM-dd");
-            ws.Cell(fila, 11).Value = s.Categoria;
-            ws.Cell(fila, 12).Value = s.Activo ? "SI" : "NO";
+            if (s.PrecioVenta is { } precioVenta) ws.Cell(fila, 9).Value = precioVenta;
+            ws.Cell(fila, 10).Value = s.Unidad;
+            ws.Cell(fila, 11).Value = s.Vigencia.ToString("yyyy-MM-dd");
+            ws.Cell(fila, 12).Value = s.Categoria;
+            ws.Cell(fila, 13).Value = s.Activo ? "SI" : "NO";
             fila++;
         }
 

@@ -26,10 +26,10 @@ ni se pueblan por migración de EF Core** (este proyecto no usa migraciones — 
    2. `docs/Database/379_rangos_peso_contenedor.sql` (`rangos_peso_contenedor.csv`),
       siempre después del 377, porque tiene llave foránea hacia el mapeo.
 
-Los demás scripts de `docs/Database/` (`304_*`, `352_*`, `356_*`, `361_*`) son
-para bases que ya existían antes de esas tablas. En una base nueva no hacen
-falta, porque `ESQUEMA_NEXO.sql` ya las crea; si se corren igual, no hacen nada
-porque son idempotentes. `307_*` es un cambio de datos de roles que no aplica a
+Los demás scripts de `docs/Database/` (`304_*`, `352_*`, `356_*`, `361_*`,
+`407_*`) son para bases que ya existían antes de esas tablas o columnas. En una
+base nueva no hacen falta, porque `ESQUEMA_NEXO.sql` ya las crea; si se corren
+igual, no hacen nada porque son idempotentes. `307_*` es un cambio de datos de roles que no aplica a
 una base nueva.
 
 Verificado el 2026-10-27 en un SQL Server 2019 vacío (mismo nivel de
@@ -228,10 +228,18 @@ Excel de costos 2026 cambia (nueva ciudad, nuevo puerto, nueva ruta), este CSV
   departamentos, ej. "Rionegro" en Antioquia y Santander) resuelto guardando
   solo el nombre del municipio sin desambiguar departamento (no aplica aquí
   porque no es FK).
+- **`PrecioVenta` (S6-HU-38.1/#407):** última columna del CSV, vacía en todas
+  las filas. El Excel de costos no trae precio de venta; se llena después desde
+  la biblioteca (pantalla o importación de Excel). Vacío = el servicio no tiene
+  precio de venta todavía y la cotización usa el costo.
 - **Cómo cargarlo en una base nueva:** después de correr `ESQUEMA_NEXO.sql`,
   cargar `servicios_conexos.csv` con `BULK INSERT` (o el método de carga
   masiva que prefiera quien administre esa base) contra
-  `db_NEXO.tbl_servicios_conexos`.
+  `db_NEXO.tbl_servicios_conexos`. El CSV no trae todas las columnas de la
+  tabla (`ActualizadoPor`, `CreatedAt`, `UpdatedAt` toman su valor por
+  defecto y `PrecioVenta` va al final de la tabla), así que la carga debe
+  emparejar las columnas por nombre (por ejemplo, con un archivo de formato o
+  cargando primero a una tabla temporal), no por posición.
 
 ## `alias_elementos.csv`
 

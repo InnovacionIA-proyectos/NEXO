@@ -11,11 +11,12 @@ using Nexo.Application.Common.Exceptions;
 using Nexo.Application.Common.Ports;
 using Nexo.Domain.Catalogos.Entidades;
 using Nexo.Domain.Common;
+using Nexo.Domain.Enums;
 
 namespace Nexo.Application.CasosDeUso.MapeoExcel.Normalizacion;
 
 /// <summary>
-/// Normaliza los textos libres distintos de un Excel (tipo de vehículo, carrocería y ciudad) a los valores oficiales de NEXO. No persiste nada: el
+/// Normaliza los textos libres distintos de un Excel (tipo de vehículo, carrocería, línea de negocio y ciudad) a los valores oficiales de NEXO. No persiste nada: el
 /// usuario revisa el resultado y la captura sigue como siempre (lo que no se resuelva se envía tal cual y la captura lo manda a la cuarentena de
 /// vehículos).
 /// </summary>
@@ -26,10 +27,10 @@ public sealed record clsNormalizarValoresQuery(Guid? ClienteId, IReadOnlyList<cl
 /// <summary>
 /// El orden de las cosas:
 /// 1) Reglas exactas, sin IA: el diccionario del cliente, el de alias de vehículos, el catálogo oficial (código o descripción idénticos) y, para
-///    las ciudades, un código DANE o un nombre de municipio con las mismas palabras (sin tildes, puntuación ni «D.C.»), usando el departamento
+///    la línea de negocio, los pocos sinónimos inequívocos (impo/importación, expo/exportación); para las ciudades, un código DANE o un nombre de municipio con las mismas palabras (sin tildes, puntuación ni «D.C.»), usando el departamento
 ///    si el texto lo trae («Santa Rosa, Cauca»).
 /// 2) Con lo que queda sin resolver, UNA sola llamada a la IA por todos los textos distintos (no una por fila), solo con textos que no traen datos
-///    sensibles y con listas cerradas: el catálogo oficial para vehículos y carrocerías, y un puñado de municipios parecidos para cada ciudad.
+///    sensibles y con listas cerradas: el catálogo oficial para vehículos y carrocerías, las seis líneas de negocio de NEXO, y un puñado de municipios parecidos para cada ciudad.
 /// 3) Nada se asigna por lo que diga el modelo: su respuesta solo vale si la clave elegida está en la lista que se le dio para ese texto y su
 ///    confianza llega al mínimo. Lo demás queda sin resolver.
 /// Si la IA falla o está apagada se devuelve igual lo que resolvieron las reglas. Un tope de uso superado (429) sí se informa.
@@ -46,8 +47,9 @@ public sealed class clsNormalizarValoresQueryHandler(
 {
     public const string CampoVehiculo = "tipoVehiculo";
     public const string CampoCarroceria = "carroceria";
+    public const string CampoLineaNegocio = "lineaNegocio";
     public const string CampoCiudad = "ciudad";
-    public static readonly IReadOnlyList<string> Campos = [CampoVehiculo, CampoCarroceria, CampoCiudad];
+    public static readonly IReadOnlyList<string> Campos = [CampoVehiculo, CampoCarroceria, CampoLineaNegocio, CampoCiudad];
 
     public const string Resuelto = "resuelto";
     public const string Ambiguo = "ambiguo";
@@ -97,13 +99,14 @@ public sealed class clsNormalizarValoresQueryHandler(
             {
                 CampoVehiculo => ReglasDeVehiculo(e.Normalizado, valoresDelCliente, aliasVehiculo, catalogoVehiculos),
                 CampoCarroceria => ReglasDeCarroceria(e.Normalizado, valoresDelCliente, carrocerias),
+                CampoLineaNegocio => ReglasDeLineaNegocio(e.Normalizado, valoresDelCliente),
                 _ => ReglasDeCiudad(e.Texto, catalogoCiudades!),
             };
             porClave[clave] = resolucion;
             if (resolucion.Estado != SinResolver) continue;
 
             // 2) Lo que sigue sin resolver puede ir a la IA, si hay una lista cerrada de dónde elegir y el texto no trae datos sensibles.
-            var tieneLista = e.Campo switch { CampoVehiculo => catalogoVehiculos.Count > 0, CampoCarroceria => carrocerias.Count > 0, _ => candidatosCiudad is { Count: > 0 } };
+            var tieneLista = e.Campo switch { CampoVehiculo => catalogoVehiculos.Count > 0, CampoCarroceria => carrocerias.Count > 0, CampoLineaNegocio => true, _ => candidatosCiudad is { Count: > 0 } };
             if (!tieneLista) continue;
             if (clsEnmascaradorDeCeldas.Celda(e.Texto, null) != e.Texto)
             {
@@ -249,6 +252,43 @@ public sealed class clsNormalizarValoresQueryHandler(
             : (Resolucion.Sin(), null, null);
     }
 
+    /// <summary>
+    /// Los únicos textos que se traducen sin preguntar. «Inbound», «Outbound» y similares no están a propósito: cada cliente los usa distinto, así
+    /// que salen del diccionario del cliente o de la IA (con confianza baja si no hay de dónde apoyarse).
+    /// </summary>
+    private static readonly Dictionary<string, LineaNegocio> SinonimosDeLineaNegocio = new()
+    {
+        ["IMPO"] = LineaNegocio.PuertoAInterior,
+        ["IMPORTACION"] = LineaNegocio.PuertoAInterior,
+        ["EXPO"] = LineaNegocio.InteriorAPuerto,
+        ["EXPORTACION"] = LineaNegocio.InteriorAPuerto,
+    };
+
+    private static string Compacto(string normalizado) => normalizado.Replace(" ", string.Empty);
+
+    private static Resolucion DeLineaNegocio(LineaNegocio valor, string origen, double confianza = 1, string? nota = null)
+    {
+        var linea = clsLineasDeNegocio.De(valor);
+        return new(Resuelto, linea.Codigo, linea.Nombre, null, origen, confianza, nota);
+    }
+
+    private static (Resolucion, IReadOnlyList<clsPromptNormalizacion.Opcion>?, IReadOnlyList<clsMunicipio>?) ReglasDeLineaNegocio(
+        string normalizado, Dictionary<(string Campo, string Termino), string> valoresDelCliente)
+    {
+        // Lo que el cliente guardó vale si es una de las seis líneas; un concepto que no lo es no se usa (el diccionario no lo valida al guardarlo).
+        if (valoresDelCliente.TryGetValue((CampoLineaNegocio, normalizado), out var delCliente) && clsLineasDeNegocio.Reconocer(delCliente) is { } deDiccionario)
+            return (DeLineaNegocio(deDiccionario, "diccionario"), null, null);
+
+        var compacto = Compacto(normalizado);
+        var oficial = clsLineasDeNegocio.Todas.FirstOrDefault(l =>
+            Compacto(clsResolucionDeCatalogos.Normalizar(l.Nombre)) == compacto || Compacto(clsResolucionDeCatalogos.Normalizar(l.Codigo)) == compacto);
+        if (oficial is not null) return (DeLineaNegocio(oficial.Valor, "catalogo"), null, null);
+
+        return SinonimosDeLineaNegocio.TryGetValue(normalizado, out var sinonimo)
+            ? (DeLineaNegocio(sinonimo, "regla"), null, null)
+            : (Resolucion.Sin(), null, null);
+    }
+
     private static readonly Regex SeparadoresDeDepartamento = new(@"[,()/\-]", RegexOptions.Compiled);
     private static readonly Regex CodigoDane = new(@"^\d{5}$|^\d{8}$", RegexOptions.Compiled);
 
@@ -305,11 +345,14 @@ public sealed class clsNormalizarValoresQueryHandler(
         var opcionesCarroceria = pendientes.Any(p => p.Campo == CampoCarroceria)
             ? carrocerias.Values.Take(MaxOpcionesDeCatalogo).Select(c => new clsPromptNormalizacion.Opcion(c, c)).ToList()
             : [];
+        var opcionesLinea = pendientes.Any(p => p.Campo == CampoLineaNegocio)
+            ? clsLineasDeNegocio.Todas.Select(l => new clsPromptNormalizacion.Opcion(l.Codigo, l.Nombre)).ToList()
+            : [];
 
         return new clsPeticionIa(
             clsFuncionIa.ImportacionExcel,
             clsPromptNormalizacion.Instrucciones(),
-            [new clsMensajeIa(clsMensajeIa.RolUsuario, clsPromptNormalizacion.Mensaje(valores, opcionesVehiculo, opcionesCarroceria))],
+            [new clsMensajeIa(clsMensajeIa.RolUsuario, clsPromptNormalizacion.Mensaje(valores, opcionesVehiculo, opcionesCarroceria, opcionesLinea))],
             clsPromptNormalizacion.EsquemaDeSalida(),
             UsuarioId: usuarioActual.Id);
     }
@@ -349,6 +392,8 @@ public sealed class clsNormalizarValoresQueryHandler(
                 ? new(Resuelto, t.Codigo, t.Descripcion, null, "ia", e.Confianza, e.Nota) : null,
             CampoCarroceria => carrocerias.Values.FirstOrDefault(c => c.Equals(e.Clave, StringComparison.OrdinalIgnoreCase)) is { } c
                 ? new(Resuelto, c, null, null, "ia", e.Confianza, e.Nota) : null,
+            CampoLineaNegocio => clsLineasDeNegocio.Todas.FirstOrDefault(l => l.Codigo.Equals(e.Clave, StringComparison.OrdinalIgnoreCase)) is { } l
+                ? DeLineaNegocio(l.Valor, "ia", e.Confianza, e.Nota) : null,
             _ => int.TryParse(e.Clave, NumberStyles.None, CultureInfo.InvariantCulture, out var id) && p.Municipios!.FirstOrDefault(m => m.Id == id) is { } m
                 ? new(Resuelto, m.CodigoDane, $"{m.Municipio}, {m.Departamento}", m.Id, "ia", e.Confianza, e.Nota) : null,
         };

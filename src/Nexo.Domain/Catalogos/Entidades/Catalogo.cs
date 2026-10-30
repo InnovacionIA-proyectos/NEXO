@@ -114,6 +114,13 @@ public class clsServicioConexo : IAuditable
     [Required, Range(typeof(decimal), "0", "9999999999999.99", ParseLimitsInInvariantCulture = true)]
     public decimal CostoUnitario { get; set; }
 
+    /// <summary>
+    /// Precio al cliente del servicio, con su margen ya incluido. Null = el servicio todavía no tiene precio de venta: al cotizarlo se usa el
+    /// costo. <see cref="CostoUnitario"/> es solo para el personal interno y nunca sale hacia el cliente.
+    /// </summary>
+    [Range(typeof(decimal), "0", "9999999999999.99", ParseLimitsInInvariantCulture = true)]
+    public decimal? PrecioVenta { get; set; }
+
     /// <summary>Unidad de cobro real ("Por estiba" en Almacenamiento/ITR, "Por unidad" en el resto)
     /// — el front la muestra junto a la cantidad para que quede claro qué se está contando.</summary>
     [Required, MaxLength(30)]

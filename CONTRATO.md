@@ -384,7 +384,10 @@ interface CotizacionLineaDto {
 }
 interface CotizacionConexoDto {
   id: UUID; cotizacionLineaId: UUID; servicioConexoId: UUID | null; nombre: string | null; categoria: string
-  cantidad: Decimal; valorAplicado: Decimal
+  cantidad: Decimal
+  valorAplicado: Decimal            // el COSTO del conexo (uso interno; nunca va al cliente ni al correo/Excel de la cotización)
+  precioVentaUnitario: Decimal      // S6-HU-38.2/#408: precio de venta de UNA unidad, fijado al agregar el conexo (el de la biblioteca o, si no tenía, su costo)
+  valorVenta: Decimal               // lo que se cotiza: precioVentaUnitario × cantidad, a 2 decimales. Nunca null. El `total` suma este valor, no el costo
   origen: "individual" | "general" // S5-HU-18/#262: cómo se agregó — "general" = el usuario pidió agregarlo a todas las líneas de una vez (igual crea una fila por línea)
   servicio: ServicioConexoDto | null // S5-HU-18/#262: el servicio completo (dimensiones incluidas), para no tener que bajar el catálogo completo
 }
@@ -450,6 +453,7 @@ interface ServicioConexoDto {
   id: UUID; codigoServicio: string; tipoServicio: string
   origen: string; destino: string; puerto: string; ruta: string; tipoMaquina: string // "NO APLICA" si no aplica a este servicio
   costoUnitario: Decimal; unidad: string; vigencia: Fecha; categoria: string; activo: boolean
+  precioVenta: Decimal | null       // S6-HU-38.2/#408: precio al cliente con su margen. null = sin precio de venta: al cotizar el servicio se usa su costo
 }
 interface ImportarServiciosResultDto {
   filas: number; creadas: number; actualizadas: number; duplicadas: number; invalidas: number
@@ -820,6 +824,7 @@ no se esconde**: responde `429 IA_TOPE_DIARIO` (§3.22 si el módulo de IA está
 | Body | | Tipo | Restricción |
 |---|---|---|---|
 | `clienteId` | *opcional* | UUID | El cliente dueño del archivo. Sin él solo se usa el diccionario general |
+| `clienteNit` | *opcional* | string | máx. 30. Alternativa a `clienteId`: el NIT del cliente o prospecto (ver «Cliente por NIT»); si vienen los dos, manda `clienteId`. **Solo busca** el cliente local; si no existe se responde como sin cliente |
 | `encabezados` | **requerido** | string[] | 1 a 100 columnas, en el orden del archivo |
 | `filas` | *opcional* | string[][] | Las filas de la misma hoja (máx. 1000; solo se usan las primeras 20) |
 
@@ -850,6 +855,15 @@ interface ColumnaMapeadaDto {
   `dividir_origen_destino` con `origen`/`destino`, `numero_coma_decimal` con un campo numérico, `fecha` con `deadline`; una columna `ignorar` siempre lleva `ninguna`.
 - **→** `200 SugerenciaMapeoDto`
 - **Errores**: `400 VALIDATION_ERROR` (sin encabezados, o más de 100) · `400 ENCABEZADOS_REQUERIDOS` · `400 DEMASIADAS_COLUMNAS` · `429 IA_TOPE_DIARIO`
+
+#### Cliente por NIT (`clienteNit`)
+Con el DW configurado, `GET /clientes` devuelve `clienteId = null` (el cliente puede no existir aún en NEXO), así que `sugerir-mapeo`, `aplicar-mapeo`, `normalizar-valores`, `PUT plantillas-mapeo` y
+`GET plantillas-mapeo` aceptan el **NIT** como alternativa a `clienteId` (también el de un prospecto). Si vienen los dos, manda `clienteId`.
+- **Formato**: se compara sin puntos, espacios ni dígito de verificación (lo que va después del primer guion): `900.123.456-7`, `900 123 456` y `900123456` son el mismo cliente.
+- **Lecturas** (`sugerir-mapeo`, `aplicar-mapeo`, `normalizar-valores`, `GET plantillas-mapeo`): buscan el cliente local por NIT y **nunca crean** uno. Si no existe se comportan como sin cliente
+  (solo diccionario general, sin plantilla; el `GET` responde lista vacía).
+- **`PUT plantillas-mapeo`**: si el NIT no tiene cliente local, lo **crea** con nombre y NIT del catálogo de clientes del DW o, si no está, de la tabla de prospectos. Nunca duplica por NIT: un
+  prospecto que luego es cliente real sigue siendo el mismo cliente local. `400 CLIENTE_NIT_INVALIDO` si el NIT no es de ningún cliente ni prospecto (un NIT en blanco es `400 CLIENTE_REQUERIDO`).
 
 #### `/api/captura-solicitudes/plantillas-mapeo` — plantillas de mapeo por cliente
 El mapeo que el usuario **confirmó** para el Excel de un cliente se guarda como su plantilla (`tbl_plantillas_mapeo_cliente`). Cuando llega otro archivo del cliente con
@@ -883,12 +897,13 @@ Las columnas se guardan con una **versión** (`{ "version": 1, "columnas": [...]
 
 | Body | | Tipo | Restricción |
 |---|---|---|---|
-| `clienteId` | **requerido** | UUID | Debe existir |
+| `clienteId` | condicional | UUID | **Requerido si no viene `clienteNit`**; debe existir. Si vienen los dos, manda este |
+| `clienteNit` | condicional | string | máx. 30. **Requerido si no viene `clienteId`**. Si no tiene cliente local, se crea con los datos del DW (ver «Cliente por NIT»); `400 CLIENTE_NIT_INVALIDO` si no es de ningún cliente ni prospecto |
 | `nombre` | *opcional* | string | máx. 100 |
 | `encabezados` | **requerido** | string[] | 1 a 100, en el orden del archivo; cada uno máx. 200 caracteres |
 | `columnas` | **requerido** | `{ indice, campo, transformacion? }[]` | El mismo mapeo de `aplicar-mapeo` (una entrada por columna; las que no se usan, `ignorar`). Se valida igual: campos y conversiones de las listas, sin campos repetidos y con origen y destino; `indice` < cantidad de encabezados |
 
-**`GET /api/captura-solicitudes/plantillas-mapeo?clienteId=`** — las plantillas del cliente (sin `clienteId`, las de todos).
+**`GET /api/captura-solicitudes/plantillas-mapeo?clienteId=`** (o **`?clienteNit=`**) — las plantillas del cliente (sin ninguno de los dos, las de todos). Con un NIT que aún no tiene cliente local responde `200 []` y no crea nada.
 **`DELETE /api/captura-solicitudes/plantillas-mapeo/{id}`** — la borra (`204`); el siguiente archivo con esos encabezados se vuelve a sugerir.
 
 ```ts
@@ -923,6 +938,7 @@ peso requerido y coherente con la carga. Lo que sale en `lineas` la captura lo a
 | Body | | Tipo | Restricción |
 |---|---|---|---|
 | `clienteId` | *opcional* | UUID | El cliente dueño del archivo; su diccionario traduce los valores |
+| `clienteNit` | *opcional* | string | máx. 30. Alternativa a `clienteId`: el NIT del cliente o prospecto (ver «Cliente por NIT»); si vienen los dos, manda `clienteId`. **Solo busca** el cliente local; si no existe se responde como sin cliente |
 | `columnas` | **requerido** | `{ indice, campo, transformacion? }[]` | 1 a 100. `campo` es uno de `sugerir-mapeo` o `ignorar`; `transformacion` una de su lista (vacía = `ninguna`). Debe haber una columna de `origen` y una de `destino` (o una `dividir_origen_destino`); dos columnas no pueden apuntar al mismo campo |
 | `filas` | **requerido** | string[][] | Hasta 5000 filas, sin el encabezado |
 | `primeraFila` | *opcional* | int | El número que tiene en el archivo la primera fila enviada (2 por defecto: un solo encabezado), para que los errores digan la fila de Excel |
@@ -959,17 +975,21 @@ interface ErrorDeFilaDto {
 - **Errores** (el mapeo mismo es inválido): `400 VALIDATION_ERROR` · `400 MAPEO_REQUERIDO` · `400 DEMASIADAS_COLUMNAS` · `400 DEMASIADAS_FILAS` · `400 COLUMNA_INVALIDA` · `400 CAMPO_INVALIDO` · `400 TRANSFORMACION_INVALIDA` · `400 TRANSFORMACION_NO_APLICA` · `400 CAMPO_DUPLICADO` · `400 CAMPO_REQUERIDO`
 
 #### `POST /api/captura-solicitudes/normalizar-valores`
-Lleva los textos libres **distintos** de un Excel (tipo de vehículo, carrocería y ciudad) a los valores oficiales de NEXO. No persiste nada: el usuario
+Lleva los textos libres **distintos** de un Excel (tipo de vehículo, carrocería, línea de negocio y ciudad) a los valores oficiales de NEXO. No persiste nada: el usuario
 revisa el resultado y la captura sigue como siempre. Se llama con los valores distintos de las columnas ya mapeadas (los de `aplicar-mapeo`), no fila por fila.
 
 Cómo se resuelve, en este orden:
 1. **Reglas exactas, sin IA.** `tipoVehiculo`: el diccionario del cliente (§3.19.1, `valor` con contexto `tipoVehiculo`) → el alias global de vehículos (§3.19) → el
    catálogo oficial (código o descripción idénticos). `carroceria`: el diccionario del cliente → las carrocerías de las configuraciones oficiales no descartadas.
+   `lineaNegocio`: el diccionario del cliente (`valor` con contexto `lineaNegocio`; su `concepto` debe ser una de las seis líneas, si no se ignora) → una de las seis líneas de NEXO escrita
+   como tal (`Puerto a interior`, `puertoAInterior`…) → los únicos sinónimos inequívocos: `impo`/`importación` = Puerto a interior y `expo`/`exportación` = Interior a puerto.
+   **«Inbound», «Outbound» y similares no tienen regla**: cada cliente los usa distinto, así que salen del diccionario del cliente o de la IA.
    `ciudad`: un **código DANE** (5 dígitos, o los 8 del catálogo) → un **nombre de municipio de Colombia con las mismas palabras** (sin tildes, puntuación ni «D.C.»;
    `Bogota D.C.` = `Bogotá, D.C.`), usando el departamento si el texto lo trae (`Santa Rosa, Cauca`, `Santa Rosa (Antioquia)`). Lo del cliente manda sobre lo general;
    sin `clienteId` solo valen los generales.
 2. **Una sola llamada a la IA** por todos los textos distintos que siguen sin resolver (nunca una por fila), solo si hay una lista cerrada de dónde elegir: el catálogo
-   oficial de vehículos, las carrocerías oficiales, o los **hasta 8 municipios más parecidos** de ese texto. Un texto con datos sensibles (correo, NIT, número largo) no sale hacia
+   oficial de vehículos, las carrocerías oficiales, **las seis líneas de negocio de NEXO** o los **hasta 8 municipios más parecidos** de ese texto. Sin el apoyo de un diccionario, la
+   IA responde con confianza baja a «Inbound»/«Outbound», así que quedan `sin_resolver`. Un texto con datos sensibles (correo, NIT, número largo) no sale hacia
    la IA. Máximo 150 textos por llamada a la IA; el resto queda `sin_resolver` con una nota.
 3. **Nada se asigna porque lo diga el modelo.** El modelo no escribe un valor: elige una `clave` de la lista que se le dio (o `NINGUNA`). Su elección solo se acepta si la clave
    **está en esa lista** y la **confianza es ≥ 0.7**; si no, el texto queda `sin_resolver`. Un texto que intente dar órdenes no cambia nada.
@@ -983,7 +1003,8 @@ proveedor; `SIN_PENDIENTES` si las reglas resolvieron todo o lo que falta no tie
 | Body | | Tipo | Restricción |
 |---|---|---|---|
 | `clienteId` | *opcional* | UUID | El cliente dueño del archivo; su diccionario manda |
-| `valores` | **requerido** | `{ campo, valor }[]` | 1 a 1000. `campo`: `tipoVehiculo` · `carroceria` · `ciudad` (origen, destino y demás ciudades). `valor`: máx. 150 caracteres; los vacíos se saltan |
+| `clienteNit` | *opcional* | string | máx. 30. Alternativa a `clienteId`: el NIT del cliente o prospecto (ver «Cliente por NIT»); si vienen los dos, manda `clienteId`. **Solo busca** el cliente local; si no existe se responde como sin cliente |
+| `valores` | **requerido** | `{ campo, valor }[]` | 1 a 1000. `campo`: `tipoVehiculo` · `carroceria` · `lineaNegocio` · `ciudad` (origen, destino y demás ciudades). `valor`: máx. 150 caracteres; los vacíos se saltan |
 
 ```ts
 interface ResultadoNormalizacionDto {
@@ -995,10 +1016,10 @@ interface ResultadoNormalizacionDto {
 interface ValorNormalizadoDto {
   campo: string; valor: string      // el texto tal como llegó
   estado: "resuelto" | "ambiguo" | "sin_resolver"
-  codigo: string | null             // tipoVehiculo: el código · carroceria: el nombre del catálogo · ciudad: el código DANE
-  descripcion: string | null        // la del tipo de vehículo, o «Municipio, Departamento»
+  codigo: string | null             // tipoVehiculo: el código · carroceria: el nombre del catálogo · lineaNegocio: "nacional" | "puertoAInterior" | "interiorAPuerto" | "devolucionContenedor" | "andino" | "licitaciones" · ciudad: el código DANE
+  descripcion: string | null        // la del tipo de vehículo, el nombre de la línea de negocio («Puerto a interior») o «Municipio, Departamento»
   municipioId: number | null        // solo ciudad resuelta (tbl_municipios.Id)
-  origen: "diccionario" | "alias" | "catalogo" | "dane" | "ia" | "ninguno"
+  origen: "diccionario" | "alias" | "catalogo" | "regla" | "dane" | "ia" | "ninguno"   // "regla" = sinónimo inequívoco de la línea de negocio (impo, expo)
   confianza: number                 // 1 si lo resolvió una regla; la del modelo con "ia"; 0 sin resolver
   nota: string | null
   candidatos: { municipioId: number, codigoDane: string, municipio: string, departamento: string }[] | null  // solo "ambiguo" (máx. 8)
@@ -1014,6 +1035,10 @@ Casos:
 | `3S3` · `Tractocamion 3S3` (idénticos al catálogo) | tipoVehiculo | `resuelto`, `catalogo` |
 | `Tractomula` (nadie lo mapeó) | tipoVehiculo | a la IA con el catálogo; si elige `3S3` con confianza ≥ 0.7 → `resuelto`, `ia`; si no → `sin_resolver` (en la captura, cuarentena) |
 | `furgon` (carrocería oficial `Furgón`) | carroceria | `resuelto`, `catalogo` |
+| `Outbound` (término del cliente → Interior a puerto) | lineaNegocio | `resuelto`, `diccionario`, `codigo = interiorAPuerto` (solo con su `clienteId`) |
+| `IMPO` · `Importación` · `EXPO` · `Exportación` | lineaNegocio | `resuelto`, `regla` (Puerto a interior / Interior a puerto) |
+| `Nacional` · `Puerto a interior` · `Andino`… (idénticos a las seis) | lineaNegocio | `resuelto`, `catalogo` |
+| `Inbound` (nadie lo mapeó) | lineaNegocio | a la IA con las seis líneas; con confianza < 0.7 → `sin_resolver` |
 | `76001` · `76001000` | ciudad | `resuelto`, `dane` (solo municipios de Colombia; si no existe → `sin_resolver`) |
 | `Bogota D.C.` · `medellin` · `Sta   Marta` | ciudad | `resuelto`, `catalogo` |
 | `Santa Rosa, Cauca` | ciudad | `resuelto`, `catalogo` (el departamento desempata) |
@@ -1069,7 +1094,7 @@ tal como llegó (limpio de espacios).
 | `tipoVehiculo` | *opcional* | string | máx. 100 |
 | `carroceria` | *opcional* | string | máx. 100 |
 | `tipologia` | *opcional* | string | `TipologiaCarga` |
-| `lineaNegocio` | *opcional* | string | máx. 100 |
+| `lineaNegocio` | *opcional* | string | máx. 100. Una de las seis: `Nacional`, `Puerto a interior`, `Interior a puerto`, `Devolución de contenedor`, `Andino`, `Licitaciones` (también como `puertoAInterior`, mayúsculas o con guiones). Vacío = sin línea de negocio. **Cualquier otro texto es `400 LINEA_NEGOCIO_INVALIDO`** (con el número de línea y el valor recibido; antes se guardaba en blanco sin avisar). `normalizar-valores` traduce el texto del cliente al valor de NEXO |
 | `claseViaje` | *opcional* | string | máx. 50 |
 | `claseContenedor` | *opcional* | string | máx. 20 |
 | `exclusivo`, `consolidado`, `retornaContenedor`, `levanteContenedorDiferente` | *opcional* | boolean | #300: `retornaContenedor` agrega el tramo vacío de retorno (1 h + 1 h, aparte) y **ya no cambia las horas de la línea** (RN-03) |
@@ -1115,7 +1140,7 @@ Ejemplo: `peso` 1000 con una posición de 100 kg → `201`; posiciones que suman
 `POST /api/solicitudes/{id}/lineas:bulk` no valida la suma.
 
 - **→** `201 CapturaResultDto`, header `Location: /api/solicitudes/{id}`
-- **Errores**: `400 CLIENTE_REQUERIDO` · `400 CLIENTE_INVALIDO` · `400 CLIENTE_BP_INVALIDO` · `400 DWCUBOS_NO_CONFIGURADO` (se usó `clienteBp` y el DW no está configurado en el ambiente) · `400 ENUM_INVALIDO` · `400 LINEA_INCOMPLETA` · `400 PESO_REQUERIDO` · `400 PESO_INCONSISTENTE` · `400 CUBICACION_DEMASIADO_GRANDE` (#304: más de 10.000 unidades en las posiciones de una línea). Una posición sin `pesoKg`, con `pesoKg` 0 o con `cantidad` > 10000 sale como `400 VALIDATION_ERROR` (validación de campos)
+- **Errores**: `400 LINEA_NEGOCIO_INVALIDO` · `400 CLIENTE_REQUERIDO` · `400 CLIENTE_INVALIDO` · `400 CLIENTE_BP_INVALIDO` · `400 DWCUBOS_NO_CONFIGURADO` (se usó `clienteBp` y el DW no está configurado en el ambiente) · `400 ENUM_INVALIDO` · `400 LINEA_INCOMPLETA` · `400 PESO_REQUERIDO` · `400 PESO_INCONSISTENTE` · `400 CUBICACION_DEMASIADO_GRANDE` (#304: más de 10.000 unidades en las posiciones de una línea). Una posición sin `pesoKg`, con `pesoKg` 0 o con `cantidad` > 10000 sale como `400 VALIDATION_ERROR` (validación de campos)
 
 **Preguntas del contrato de captura (S6-HU-29.3/#313).** Tres preguntas del informe del front de Nexo, con su respuesta:
 
@@ -1369,9 +1394,11 @@ Sobre una cotización `Entregada` deja `modificadaTrasEntregaAt` (sin tocar `est
 | `lineaId` | **requerido** | UUID | id de la línea DE LA COTIZACIÓN (no de la solicitud) a la que aplica — S4-HU-15.4/#250, ya no existe el conexo "general" sin línea |
 | `servicioConexoId` | **requerido** | UUID | servicio existente y activo |
 | `cantidad` | *opcional* | decimal | 0.01–999999.99, máx. 2 decimales, def. 1 |
-| `valorAplicado` | *opcional* | decimal | monetario. Si falta: `costoUnitario × cantidad` |
+| `valorAplicado` | *opcional* | decimal | monetario. Es el **costo** del conexo; si falta: `costoUnitario × cantidad`. **No cambia lo que se cotiza** |
 | `origen` | *opcional* | string | S5-HU-18/#262. `individual` (def.) \| `general` — si el usuario pidió agregarlo a TODAS las líneas de una vez (igual manda un item por línea) |
 
+- **Lo que se cotiza** (S6-HU-38.2/#408): el conexo guarda `precioVentaUnitario` = `precioVenta` del servicio o, si no tiene, su `costoUnitario`; `valorVenta = precioVentaUnitario × cantidad` y `total` suma el `valorVenta`. El precio
+  queda **fijo**: si después cambia la biblioteca, el conexo no cambia. El valor de venta **no se escribe a mano**: sale siempre de la biblioteca.
 - **→** `200 CotizacionDto`
 - **Errores**: `400 SERVICIO_INVALIDO` · `400 SERVICIO_INACTIVO` · `400 LINEA_INVALIDA` · `400 CANTIDAD_INVALIDA` · `400 ORIGEN_INVALIDO` · `404 COTIZACION_NO_ENCONTRADA` · `409 COTIZACION_CERRADA`
 
@@ -1384,7 +1411,9 @@ de cantidad no se podía deshacer, solo compensar agregando otra fila.
 | Body | | Tipo | Restricción |
 |---|---|---|---|
 | `cantidad` | **requerido** | decimal | 0.01–999999.99, máx. 2 decimales |
-| `valorAplicado` | *opcional* | decimal | monetario. Si falta: `costoUnitario × cantidad` |
+| `valorAplicado` | *opcional* | decimal | monetario. Es el **costo**; si falta: `costoUnitario × cantidad`. No cambia el precio de venta |
+
+Al cambiar la cantidad, `valorVenta` se recalcula con el `precioVentaUnitario` que quedó guardado al agregar el conexo.
 
 - **→** `200 CotizacionDto`
 - **Errores**: `400 CANTIDAD_INVALIDA` · `400 VALOR_REQUERIDO` (sin servicio para recalcular y sin `valorAplicado`) · `404 COTIZACION_NO_ENCONTRADA` · `404 CONEXO_NO_ENCONTRADO` · `409 COTIZACION_NO_EDITABLE`
@@ -1601,6 +1630,7 @@ archivo se puede editar y reimportar: las reglas que ya existen se reportan como
 | `tipoServicio` | **requerido** | string | máx. 120 |
 | `origen`, `destino`, `puerto`, `ruta`, `tipoMaquina` | *opcional* | string | la dimensión que no aplique a este servicio se guarda como `"NO APLICA"` — máx. 150 (origen/destino), 50 (puerto/ruta), 60 (tipoMaquina) |
 | `costoUnitario` | **requerido** | decimal | ≥ 0 |
+| `precioVenta` | *opcional* | decimal | ≥ 0, redondeado a 2 decimales. Sin él el servicio se cotiza a su costo. Puede ser menor que el costo (el front avisa) |
 | `unidad` | **requerido** | string | máx. 30 |
 | `vigencia` | **requerido** | fecha | solo fecha `"2026-12-31"` |
 | `categoria` | *opcional* | string | `logistico` \| `adicional`, def. `logistico` |
@@ -1613,19 +1643,23 @@ archivo se puede editar y reimportar: las reglas que ya existen se reportan como
 Actualización parcial: solo cambian los campos enviados y no nulos.
 
 - **Roles**: `ServiciosLogisticos`, `AdminTarifas`, `Admin`.
-- **Body**: los mismos campos que el POST, todos *opcionales*, mismas restricciones.
+- **Body**: los mismos campos que el POST, todos *opcionales*, mismas restricciones. Un `precioVenta` ausente o `null` **no se toca**; para **borrarlo** (dejar el servicio sin precio de venta) se envía
+  `"limpiarPrecioVenta": true`. Cada cambio del precio de venta queda en `tbl_audit_log` (`servicios_conexos`, `editar`) con el valor de antes y de después; crear también lo registra.
 - **→** `200 ServicioConexoDto`
-- **Errores**: `400 CATEGORIA_INVALIDA` · `404 SERVICIO_NO_ENCONTRADO`
+- **Errores**: `400 CATEGORIA_INVALIDA` · `400 PRECIO_VENTA_AMBIGUO` (`precioVenta` y `limpiarPrecioVenta` a la vez) · `404 SERVICIO_NO_ENCONTRADO`
 
 #### `POST /api/servicios-conexos/importar-excel`
 Columnas: Codigo, Tipo Servicio, Origen, Destino, Puerto, Ruta, Tipo Maquina, Costo
-Unitario, Unidad, Vigencia, Categoria, Activo — detección de encabezado tolerante (no
+Unitario, Precio Venta, Unidad, Vigencia, Categoria, Activo — detección de encabezado tolerante (no
 importa el orden ni si falta alguna columna opcional). Hace **upsert** por las 6
 dimensiones (código, origen, destino, puerto, ruta, tipo de máquina): una fila cuya
 combinación ya existe ACTUALIZA ese servicio en vez de crear uno nuevo — así el mismo
 archivo sirve para exportar, editar y recargar. La comparación de esa llave ignora
 mayúsculas y la forma Unicode de composición de tildes (S5-HU-19/#261); sigue
 distinguiendo acentos (`café` ≠ `cafe`).
+
+**Precio de venta** (S6-HU-38.2/#408): una columna cuyo encabezado contiene «VENTA» (`PRECIO VENTA`, `VALOR VENTA`) es el precio de venta y **no** se toma como costo, aunque diga «VALOR». Un archivo sin esa
+columna, o con la celda vacía, **no borra** el precio de venta que ya tenga el servicio (para borrarlo se usa el PATCH). Un precio ilegible, negativo o de más de 16 dígitos enteros invalida solo esa fila.
 
 Una fila inválida (campo obligatorio vacío, texto que excede el máximo de su columna,
 costo negativo o con más de 16 dígitos enteros) **nunca descarta el archivo completo**:
@@ -1638,7 +1672,7 @@ de las filas se sigue procesando.
 - **Errores**: `400 ARCHIVO_REQUERIDO` · `400 FORMATO_NO_SOPORTADO` · `400 EXCEL_INVALIDO` · `400 EXCEL_SIN_DATOS` · `400 SERVICIO_DUPLICADO` (choque residual contra la base, no detectado en memoria — caso raro, ver nota de #261 abajo)
 
 #### `GET /api/servicios-conexos/exportar-excel`
-Descarga el catálogo a Excel con las mismas 12 columnas que lee el importador — el mismo
+Descarga el catálogo a Excel con las mismas 13 columnas (incluye `PRECIO VENTA`, justo después de `COSTO UNITARIO`) que lee el importador — el mismo
 archivo sirve para editar y reimportar como actualización. S5-HU-19/#261: admite los
 mismos filtros que el listado.
 
@@ -1653,7 +1687,7 @@ mismos filtros que el listado.
 
 #### `GET /api/servicios-conexos/plantilla-excel/{tipo}`
 Plantilla de Excel descargable por tipo de servicio — cada una trae SOLO las columnas
-que ese tipo necesita (S5-HU-19/#261, corrige #249: antes las 4 traían las mismas 12).
+que ese tipo necesita (S5-HU-19/#261, corrige #249: antes las 4 traían las mismas 12); todas incluyen `PRECIO VENTA` después de `COSTO UNITARIO`.
 Sin fila de datos de ejemplo cargable: la fila 2 solo pre-llena las columnas
 verdaderamente fijas de ese tipo (p. ej. `unidad`/`categoria`); subida sin editar, no
 crea ningún registro.
@@ -1838,6 +1872,26 @@ La última recomendación de una línea.
 - **Errores**: `400 PARAMETROS_REQUERIDOS` · **`404 RECOMENDACION_NO_ENCONTRADA`** (S6-HU-29.2/#312: el Cubicador no tiene una
   recomendación para esa línea; antes salía como `503 CUBICADOR_ERROR` y el front no podía distinguir "todavía no hay" de una caída) ·
   mismos 503 que el POST. El `503` queda solo para fallas reales del Cubicador.
+
+#### `GET /api/cubicacion/explicacion` — por qué se eligió esa flota
+S6-HU-35.6/#419: reenvía al Cubicador su `GET /recomendaciones/explicacion` (S6-HU-35.4/#369) con la llave de NEXO (`Cubicador3D:RecomendacionesApiKey`) y devuelve el texto en lenguaje
+natural que explica la recomendación. El portal **no** habla con el Cubicador: solo con esta ruta. **Se pide DESPUÉS de pintar los números** de la recomendación; el modelo tarda varios segundos.
+
+- **Roles**: los mismos que `GET /api/cubicacion` — `Comercial`, `AdminBiblioteca`, `AdminTarifas`, `Admin`.
+
+| Query | | Tipo | Restricción |
+|---|---|---|---|
+| `idLineaSolicitud` | **requerido** | string | |
+| `origenSistema` | **requerido** | string | `NEXO` \| `COTIFLY`, como en `GET /api/cubicacion`: el Cubicador lee la misma corrida por la pareja línea + origen |
+
+- **→** `200 { "explicacion": string | null }`
+- **Siempre `200`.** El texto es opcional: con el Cubicador sin configurar, caído, sin responder (tiempo agotado), que rechaza la llave, sin recomendación para la línea, que devuelve `null` o una respuesta que no
+  se entiende, NEXO responde `{ "explicacion": null }` (la falla queda en el log) y el front simplemente no muestra el bloque. Un 5xx obligaría a tratar un caso normal como error.
+- **Errores**: `400 PARAMETROS_REQUERIDOS` (falta `idLineaSolicitud` u `origenSistema`) · `401` · `403`.
+- **Tiempo de espera propio**: `Cubicador3D:ExplicacionTimeoutSegundos` (def. 30, entre 5 y 120), mayor que el de la recomendación (`Cubicador3D:OutboundTimeoutSegundos`, def. 15) porque el texto lo escribe un modelo.
+- **Por aquí no pasa ninguna tarifa ni valor comercial**: NEXO solo reenvía el texto que el Cubicador ya verificó contra las cifras del motor.
+- **Despliegue**: la ruta depende del endpoint del Cubicador (S6-HU-35.4). Puede desplegarse antes que el Cubicador (responde `explicacion: null` mientras no exista: el 404 del Cubicador se trata como «sin explicación»),
+  pero el texto solo aparece cuando el Cubicador con S6-HU-35.4 está desplegado y tiene configurada su llave del modelo.
 
 #### `GET /api/lineas-solicitud/{id}/cubicacion` — solo servicio a servicio
 - **Auth**: `Authorization: Bearer <clave de servicio>` (§1.2). No acepta la
@@ -2382,7 +2436,7 @@ interface ResultadoHerramientaDto {
 | `consultar_tarifa_plaza_nexo` | `GET /api/tarifas-plaza` | AdminBiblioteca, AdminTarifas, Admin | al menos uno de `q`, `lineaNegocio`, `tipoVehiculo`; `top` |
 | `consultar_aprovisionamiento` | `GET /api/captura-solicitudes/aprovisionamiento` | Comercial, Admin | `ciudadLevante`, `origen`; opcional `configuracion`, `carroceria` |
 | `consultar_propuesta_linea` | `GET /api/solicitudes/{id}/propuesta-tarifa`, una línea | Comercial (solo las suyas), AdminTarifas, ServiciosLogisticos, LiderProceso, Admin | `solicitudId`, `lineaId` |
-| `consultar_servicios_conexos` | `GET /api/servicios-conexos` (solo activos) | todos | opcional `q`, `categoria`, `top` |
+| `consultar_servicios_conexos` | `GET /api/servicios-conexos` (solo activos) | todos | opcional `q`, `categoria`, `top`. Devuelve costo y `precioVenta` (uso interno del personal) |
 | `buscar_ciudades_dane` | `GET /api/captura-solicitudes/ciudades` | todos | al menos uno de `q`, `departamento`; `top` |
 
 **Herramientas que proponen cambios** (solo AdminTarifas y Admin; ver §3.24.1). Ninguna escribe: dejan una acción pendiente que la persona confirma.
@@ -2555,7 +2609,7 @@ abiertos a los 6 roles.
 | `POST /api/solicitudes/{id}/lineas:bulk` (#307, D5: solo Admin) | | | | | | ✅ |
 | `POST /api/solicitudes/{id}/rechazar` | ✅ | | | | | ✅ |
 | `POST /api/solicitudes/{id}/recalcular-score` (#307, D5: solo Admin) | | | | | | ✅ |
-| `POST /api/cubicacion` · `GET /api/cubicacion` (#300 + AdminTarifas; #307: AdminBiblioteca lo conserva) | ✅ | ✅ | ✅ | | | ✅ |
+| `POST /api/cubicacion` · `GET /api/cubicacion` · `GET /api/cubicacion/explicacion` (#300 + AdminTarifas; #307: AdminBiblioteca lo conserva) | ✅ | ✅ | ✅ | | | ✅ |
 | **Cotizaciones, lecturas**: `GET /api/cotizaciones/{id}` · `por-solicitud/{id}` · `exportar-excel` (#307) | ✅ | | ✅ | ✅ | ✅ | ✅ |
 | `POST /api/cotizaciones` · `aplicar-propuestas` | ✅ | | ✅ | | | ✅ |
 | `POST /api/cotizaciones/{id}/resultado` | ✅ | | | | | ✅ |

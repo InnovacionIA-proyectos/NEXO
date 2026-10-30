@@ -127,9 +127,10 @@ public sealed class clsExportadorCotizacionExcelClosedXml : IExportadorCotizacio
             {
                 ws.Cell(f, 1).Value = nombre(x);
                 ws.Cell(f, 2).Value = x.Cantidad;
-                ws.Cell(f, 3).Value = x.ValorAplicado;
+                // Lo que se muestra es el valor de venta: el costo del servicio es solo para el personal interno.
+                ws.Cell(f, 3).Value = x.ValorVenta;
                 ws.Cell(f, 3).Style.NumberFormat.Format = FormatoMoneda;
-                subtotal += x.ValorAplicado;
+                subtotal += x.ValorVenta;
                 f++;
             }
         }
