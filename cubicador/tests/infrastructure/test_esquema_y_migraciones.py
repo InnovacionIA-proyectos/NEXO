@@ -67,7 +67,7 @@ def test_sqlserver_cae_a_dbo_cubicador_por_defecto(monkeypatch):
 
 
 def test_crear_tablas_no_hace_nada_contra_sqlserver(monkeypatch):
-    """El esquema de SQL Server lo gobiernan los scripts de `docs/Database/`:
+    """El esquema de SQL Server lo gobierna `database/esquema/ESQUEMA_CUBICADOR.sql`:
     `create_all` ahi crearia tablas fuera de esa fuente de verdad, en un
     esquema que ademas se comparte con Cotifly."""
     import asyncio

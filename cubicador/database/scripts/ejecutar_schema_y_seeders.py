@@ -1,22 +1,21 @@
 # -*- coding: utf-8 -*-
-"""Aplica ESQUEMA_CUBICADOR.sql contra un SQL Server 2019 y carga los 7 CSV
-de seeder/ en orden (respetando dependencias de FK).
+"""Crea las tablas del Cubicador y carga su catálogo inicial.
 
-Uso:
-    py ejecutar_schema_y_seeders.py --server <host[,puerto]> [--solo-schema] [--solo-datos]
+Aplica esquema/ESQUEMA_CUBICADOR.sql (tablas en el esquema dbo) y después carga los 7 CSV de seeder/ en el
+orden que exigen las llaves foráneas.
 
-Requiere sqlcmd en el PATH y autenticacion de Windows (-E) contra el server
-indicado -- mismo criterio ya usado en todo el proyecto NEXO. Si el server
-usa otra autenticacion, ajustar CMD_BASE abajo.
+Uso (desde cubicador/database/):
+    py scripts/ejecutar_schema_y_seeders.py --server <host[,puerto]> [--solo-schema] [--solo-datos]
 
-El esquema (--solo-schema) sigue sin ser idempotente: ESQUEMA_CUBICADOR.sql
-solo crea la base si no existe, pero las 9 tablas fallan si ya existen --
-correr esa parte una sola vez contra una base vacia, igual que ESQUEMA_NEXO.sql.
+    --solo-schema  solo crea las tablas
+    --solo-datos   solo carga los CSV (las tablas ya existen)
 
-La carga de datos (--solo-datos) SI es idempotente: los Id del seeder son
-deterministicos (ver seeder/_generar_seeders.py), asi que correr esta parte
-de nuevo nunca duplica filas ni pisa una fila que ya exista (por ejemplo,
-una corregida a mano por un futuro CRUD) -- solo inserta lo que falta.
+Requisitos: sqlcmd en el PATH y autenticación de Windows contra el servidor, con un
+usuario que pueda crear tablas en la base NOMBRE_BD.
+
+El esquema se aplica una sola vez, contra una base vacía: si las tablas ya existen,
+falla. La carga de datos sí se puede repetir: los Id del seeder son fijos, así que
+solo inserta las filas que faltan y nunca modifica las que ya existen.
 """
 import argparse
 import csv
@@ -30,14 +29,12 @@ ESQUEMA_SQL = DATABASE / "esquema" / "ESQUEMA_CUBICADOR.sql"
 SEEDER = DATABASE / "seeder"
 TAMANO_LOTE = 100
 
-# Base de datos COMPARTIDA de NEXO (no una base propia del Cubicador) --
-# las 9 tablas viven ahi, bajo su propio esquema, para no mezclarse con el
-# resto de tablas de esa base.
-NOMBRE_BD = "dbTarifario_Nexo_Pruebas"
-NOMBRE_ESQUEMA_SQL = "dbo_cubicador"  # el esquema SQL dentro de NOMBRE_BD, no confundir con ESQUEMA_SQL (la ruta al .sql)
+# Base y esquema destino. Para otro ambiente, cambiar NOMBRE_BD.
+NOMBRE_BD = "dbCubicador_Pruebas"
+NOMBRE_ESQUEMA_SQL = "dbo"  # esquema SQL dentro de la base (ESQUEMA_SQL es la ruta del archivo .sql)
 
-# Orden de carga: respeta las FK (categoria/carroceria/vehiculo antes que lo
-# que depende de ellas; recomendacionVehiculo* se deja vacio, no trae seeder).
+# Orden de carga: primero las tablas de las que dependen las demás. Las tablas de
+# recomendación y del motor 3D no tienen datos iniciales.
 ARCHIVOS_EN_ORDEN = [
     "tiposCarroceria.csv",
     "categoriaMercancia.csv",
@@ -48,8 +45,7 @@ ARCHIVOS_EN_ORDEN = [
     "parametrosMotor.csv",
 ]
 
-# Mapa archivo CSV -> tabla real. La mayoria coincide con el nombre del
-# archivo (sin .csv); TiposCarroceria lleva mayuscula inicial en la tabla.
+# Tabla destino de cada CSV (TiposCarroceria es la única con mayúscula inicial).
 TABLA_POR_ARCHIVO = {
     "tiposCarroceria.csv": "TiposCarroceria",
     "categoriaMercancia.csv": "categoriaMercancia",
@@ -75,23 +71,18 @@ def aplicar_schema(server):
     correr(cmd, f"Aplicando {ESQUEMA_SQL.name} contra {server}/{NOMBRE_BD}")
 
 
-# Columnas que son REALMENTE numericas (decimal) en ESQUEMA_CUBICADOR.sql.
-# Todo lo que no esta aqui se manda siempre como string (N'...'), aunque el
-# texto "parezca" numero -- CodigoVehiculo='2' o parametrosMotor.Valor='4'
-# son nvarchar en el esquema real. Adivinar el tipo por el contenido del
-# texto (como se hacia antes) rompe el INSERT multi-fila: SQL Server infiere
-# un solo tipo por columna para toda la lista VALUES, asi que una fila con
-# '2' sin comillas en esa posicion fuerza a convertir TODAS las filas de esa
-# columna a int, y revienta con la primera que no es numero (ej. '2L2').
+# Columnas numéricas (decimal) del esquema; se envían sin comillas. Todo lo demás
+# se envía como texto (N'...') aunque parezca un número: CodigoVehiculo o
+# parametrosMotor.Valor son nvarchar. El tipo se declara aquí y no se deduce del
+# contenido porque, en un INSERT de varias filas, SQL Server toma un solo tipo por
+# columna y un valor como '2' sin comillas haría fallar a '2L2'.
 COLUMNAS_NUMERICAS = {
     "vehiculos": {"LargoCm", "AnchoCm", "AlturaMaximaReglamentariaCm", "CapacidadMaxima"},
     "relacionVehiculosCarroceria": {"CapacidadMaximaEspecifica"},
 }
 
-# Columnas bit -- se mandan como 1/0 sin comillas (N'true' no es seguro en
-# todas las configuraciones), nunca como el numero "adivinado". Apilable,
-# Fragil y RotacionLibre son bit NULL -- valor_sql ya manda NULL para
-# celdas vacias antes de llegar aqui, no hace falta distinguirlas.
+# Columnas bit: el CSV trae true/false y se envían como 1/0. Una celda vacía se
+# envía como NULL.
 COLUMNAS_BOOLEANAS = {
     "vehiculos": {"Activo"},
     "TiposCarroceria": {"Activo"},
@@ -102,9 +93,7 @@ COLUMNAS_BOOLEANAS = {
 
 
 def valor_sql(tabla, columna, texto):
-    """Formatea un valor de celda CSV como literal T-SQL, segun el tipo
-    REAL de la columna en el esquema (ver COLUMNAS_NUMERICAS/BOOLEANAS) --
-    no adivinando por el contenido del texto."""
+    """Convierte una celda del CSV en un literal T-SQL según el tipo de su columna."""
     if texto is None or texto == "":
         return "NULL"
     if columna in COLUMNAS_BOOLEANAS.get(tabla, ()):
@@ -115,12 +104,9 @@ def valor_sql(tabla, columna, texto):
 
 
 def ids_existentes(server, tabla):
-    """Los Id de _generar_seeders.py son deterministicos (uuid5 sobre la
-    clave de negocio, ej. CodigoVehiculo) -- el mismo vehiculo/categoria/etc
-    SIEMPRE genera el mismo Id, se corra el generador hoy o en un año. Por
-    eso basta con mirar que Id ya existen en la tabla real para saber que
-    filas son "nuevas de este seeder" y cuales ya estan (sembradas antes, o
-    ya editadas a mano por un CRUD) -- a esas no se les toca nada."""
+    """Id que ya existen en la tabla. Como los Id del seeder son fijos, una fila
+    cuyo Id ya está se considera cargada y no se toca (aunque se haya editado
+    después desde la aplicación)."""
     query = f"SET NOCOUNT ON; SELECT CAST([Id] AS nvarchar(36)) FROM [{NOMBRE_ESQUEMA_SQL}].[{tabla}];"
     cmd = ["sqlcmd", "-S", server, "-d", NOMBRE_BD, "-E", "-C", "-h", "-1", "-Q", query]
     r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")

@@ -64,7 +64,7 @@ cubicador/
       externos.py                # Protocols: ILineaSolicitudPort (NEXO), IEventosPort (RabbitMQ)
   infrastructure/
     persistence/
-      db.py                     # engine/sesion SQLAlchemy async (esquema dbo_cubicador)
+      db.py                     # engine/sesion SQLAlchemy async (esquema de CUBICADOR_DB_ESQUEMA)
       modelos.py                 # las 5 tablas del motor 3D - DDL en docs/Database/
       modelos_catalogo.py         # las 10 tablas del catalogo (S5-HU-17.2). MetaData
                                    # PROPIO: las administra el equipo de Datos, el
@@ -111,7 +111,8 @@ scripts/
                                           # --recrear lo rehace cuando cambia el modelo)
   verificar_integracion_mssql.py        # humo end-to-end contra SQL Server real
   verificar_aislamiento.sql              # confirma que no tocamos dbo ni dbo_cotifly
-docs/Database/ESQUEMA_CUBICADOR.sql   # DDL del motor 3D, fuente de verdad, se aplica a mano
+database/esquema/ESQUEMA_CUBICADOR.sql  # DDL único (16 tablas: catálogo, recomendación y motor 3D), se aplica a mano
+database/seeder/                        # CSV del catálogo, cargados por database/scripts/ejecutar_schema_y_seeders.py
 docker-compose.yml                    # api + worker + SQL Server local (RabbitMQ es el compartido de NEXO, ver DECISIONES_TECNICAS.md #9)
 ```
 

@@ -1,10 +1,6 @@
-# S5-HU-17.1: la base paso de Postgres propio a SQL Server. En QA y produccion
-# el Cubicador NO tiene base propia - vive en el esquema `dbo_cubicador` de
-# `dbTarifario_Nexo_Pruebas`, que COMPARTE CON COTIFLY (`dbo_cotifly`). NEXO
-# no esta ahi: usa su propia base `Nexo`. Este compose levanta un SQL Server
-# LOCAL que imita
-# esa forma (misma base, mismo esquema, otro host) para desarrollo y para el
-# smoke test de CI; ahi no se toca la base compartida.
+# Base de datos: SQL Server. En QA el Cubicador usa la base `dbCubicador_Pruebas`,
+# esquema `dbo`. Este compose levanta un SQL Server LOCAL con la misma
+# base y el mismo esquema (otro host) para desarrollo y para el smoke test de CI.
 #
 # Ver DECISIONES_TECNICAS.md #9: el broker de mensajeria tampoco es propio -
 # se conecta al `rabbit` compartido
@@ -52,9 +48,9 @@ services:
     restart: unless-stopped
 
   # Crea la base y el esquema una sola vez y termina. El DDL de
-  # docs/Database/ESQUEMA_CUBICADOR.sql crea tablas, pero no la BASE ni el
-  # esquema: sin este paso el primer arranque falla con "Cannot open
-  # database". En QA/produccion no existe - la base y el esquema ya estan.
+  # database/esquema/ESQUEMA_CUBICADOR.sql crea las tablas, pero no la BASE: sin
+  # este paso el primer arranque falla con "Cannot open database".
+  # En QA/produccion no existe - la base y el esquema ya estan.
   db-init:
     image: mcr.microsoft.com/mssql/server:2019-latest
     depends_on:
@@ -62,7 +58,7 @@ services:
         condition: service_healthy
     environment:
       MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?definir en .env}
-      CUBICADOR_DB_ESQUEMA: ${CUBICADOR_DB_ESQUEMA:-dbo_cubicador}
+      CUBICADOR_DB_ESQUEMA: ${CUBICADOR_DB_ESQUEMA:-dbo}
     entrypoint:
       - /bin/bash
       - -c
@@ -74,26 +70,26 @@ services:
           SQLCMD="/opt/mssql-tools/bin/sqlcmd"
         fi
         $$SQLCMD -S db -U sa -P "$$MSSQL_SA_PASSWORD" -b -Q \
-          "IF DB_ID('dbTarifario_Nexo_Pruebas') IS NULL CREATE DATABASE [dbTarifario_Nexo_Pruebas];"
-        $$SQLCMD -S db -U sa -P "$$MSSQL_SA_PASSWORD" -b -d dbTarifario_Nexo_Pruebas -Q \
+          "IF DB_ID('dbCubicador_Pruebas') IS NULL CREATE DATABASE [dbCubicador_Pruebas];"
+        $$SQLCMD -S db -U sa -P "$$MSSQL_SA_PASSWORD" -b -d dbCubicador_Pruebas -Q \
           "IF SCHEMA_ID('$$CUBICADOR_DB_ESQUEMA') IS NULL EXEC('CREATE SCHEMA [$$CUBICADOR_DB_ESQUEMA]');"
         echo "Base y esquema $$CUBICADOR_DB_ESQUEMA listos."
-        # Las 5 tablas del motor 3D (vehiculos_cubicacion, planes_cargue...) las crea el DDL de
-        # docs/Database/ESQUEMA_CUBICADOR.sql: desde que se retiro Alembic (S5-HU-17.2) nada las crea
-        # solo, y sin ellas GET /api/planes-cargue/vehiculos responde 503 ("Invalid object name
-        # 'dbo_cubicador.vehiculos_cubicacion'") y el smoke de CI nunca pasa. Se aplica SOLO si la
+        # Las 16 tablas (catalogo, recomendacion y motor 3D) las crea el DDL unico de
+        # database/esquema/ESQUEMA_CUBICADOR.sql: desde que se retiro Alembic (S5-HU-17.2) nada las
+        # crea solo, y sin ellas GET /api/planes-cargue/vehiculos responde 503 ("Invalid object name
+        # 'dbo.vehiculos_cubicacion'") y el smoke de CI nunca pasa. Se aplica SOLO si la
         # tabla no existe: el DDL no es idempotente y este servicio corre en cada `docker compose up`.
         # En QA/produccion este servicio no existe: ahi las tablas ya estan.
-        EXISTE=$$($$SQLCMD -S db -U sa -P "$$MSSQL_SA_PASSWORD" -h -1 -W -d dbTarifario_Nexo_Pruebas -Q \
+        EXISTE=$$($$SQLCMD -S db -U sa -P "$$MSSQL_SA_PASSWORD" -h -1 -W -d dbCubicador_Pruebas -Q \
           "SET NOCOUNT ON; SELECT COUNT(*) FROM sys.tables t JOIN sys.schemas s ON s.schema_id = t.schema_id WHERE s.name = '$$CUBICADOR_DB_ESQUEMA' AND t.name = 'vehiculos_cubicacion'" | tr -d '[:space:]')
         if [ "$$EXISTE" = "0" ]; then
-          $$SQLCMD -S db -U sa -P "$$MSSQL_SA_PASSWORD" -b -d dbTarifario_Nexo_Pruebas -i /sql/esquema_motor3d.sql
-          echo "Tablas del motor 3D creadas."
+          $$SQLCMD -S db -U sa -P "$$MSSQL_SA_PASSWORD" -b -d dbCubicador_Pruebas -i /sql/esquema_cubicador.sql
+          echo "Tablas del Cubicador creadas."
         else
-          echo "Tablas del motor 3D ya existen."
+          echo "Tablas del Cubicador ya existen."
         fi
     volumes:
-      - ./docs/Database/ESQUEMA_CUBICADOR.sql:/sql/esquema_motor3d.sql:ro
+      - ./database/esquema/ESQUEMA_CUBICADOR.sql:/sql/esquema_cubicador.sql:ro
     restart: "no"
 
   api:
@@ -104,8 +100,8 @@ services:
       # Apunta al SQL Server LOCAL de este compose, no a la base compartida.
       # `sa` solo existe aca: en QA/produccion se define DATABASE_URL entera
       # como variable de entorno (ver .env.dokploy).
-      DATABASE_URL: mssql+aioodbc://sa:${MSSQL_SA_PASSWORD}@db:1433/dbTarifario_Nexo_Pruebas?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes
-      CUBICADOR_DB_ESQUEMA: ${CUBICADOR_DB_ESQUEMA:-dbo_cubicador}
+      DATABASE_URL: mssql+aioodbc://sa:${MSSQL_SA_PASSWORD}@db:1433/dbCubicador_Pruebas?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes
+      CUBICADOR_DB_ESQUEMA: ${CUBICADOR_DB_ESQUEMA:-dbo}
       CUBICADOR_API_KEY: ${CUBICADOR_API_KEY:?definir en .env}
       # Llave por sistema: de aca sale el origenSistema verificado de
       # POST /recomendaciones (ver .env.example).
@@ -154,8 +150,8 @@ services:
       # Apunta al SQL Server LOCAL de este compose, no a la base compartida.
       # `sa` solo existe aca: en QA/produccion se define DATABASE_URL entera
       # como variable de entorno (ver .env.dokploy).
-      DATABASE_URL: mssql+aioodbc://sa:${MSSQL_SA_PASSWORD}@db:1433/dbTarifario_Nexo_Pruebas?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes
-      CUBICADOR_DB_ESQUEMA: ${CUBICADOR_DB_ESQUEMA:-dbo_cubicador}
+      DATABASE_URL: mssql+aioodbc://sa:${MSSQL_SA_PASSWORD}@db:1433/dbCubicador_Pruebas?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes
+      CUBICADOR_DB_ESQUEMA: ${CUBICADOR_DB_ESQUEMA:-dbo}
       CUBICADOR_RABBITMQ_URL: amqp://${RABBITMQ_USER:?definir en .env}:${RABBITMQ_PASSWORD:?definir en .env}@rabbit:5672/
       NEXO_BASE_URL: ${NEXO_BASE_URL:?definir en .env}
       NEXO_CALLBACK_API_KEY: ${NEXO_CALLBACK_API_KEY:?definir en .env}

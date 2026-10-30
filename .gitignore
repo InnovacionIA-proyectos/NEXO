@@ -71,3 +71,11 @@ docs/Database/seeder/Libro1.xlsx
 
 # Exports crudos de tablas reales (SICE-TAC, plaza, tarifas) para verificación puntual — nunca al repo público
 docs/tbl*.csv
+
+# Dataset dorado (#353): de qué Excel real sale cada caso — los nombres de archivo y hoja identifican al cliente
+tests/evaluacion-ia/dataset/fuentes.local.json
+
+# Precios de venta (S6-HU-38/#407): nunca al repo público. El CSV con precios se genera
+# en local con docs/Database/seeder/generar_precios_venta_local.py
+docs/Database/seeder/*.local.csv
+docs/docs_raw/*PRECIOS DE VENTA*

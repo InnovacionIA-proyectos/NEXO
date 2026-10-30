@@ -1,13 +1,23 @@
 # -*- coding: utf-8 -*-
+"""Genera los 7 CSV del catálogo inicial del Cubicador.
+
+Uso (desde esta carpeta):
+    py _generar_seeders.py
+
+Los datos del catálogo están definidos aquí, tabla por tabla. Para cambiar el
+catálogo inicial se edita este archivo y se vuelve a correr; los CSV no se
+editan a mano. El origen de cada dato y las reglas aplicadas están en
+../documentacion/ORIGEN-Y-DECISIONES-SEEDER.md.
+
+Cada fila recibe un Id determinístico (uuid5 sobre su clave de negocio): el
+mismo registro produce siempre el mismo Id, en cualquier equipo y cualquier día.
+Así todas las bases cargadas con estos CSV comparten los mismos Id, y
+ejecutar_schema_y_seeders.py puede correr varias veces sin duplicar filas.
+"""
 import csv, uuid
 
-# Namespace fijo propio del proyecto, para generar Id DETERMINISTICOS (no
-# aleatorios): el mismo texto de "seed" siempre produce el mismo Id, en
-# cualquier maquina, cualquier dia que se corra este script. Esto es lo que
-# permite que cargar el seeder dos veces contra la misma BD no duplique
-# filas ni pise una correccion hecha a mano por el CRUD -- el script de
-# carga (ejecutar_schema_y_seeders.py) simplemente salta cualquier Id que
-# ya exista en la tabla destino.
+# Namespace fijo del proyecto para los Id determinísticos. No cambiarlo: cambiaría
+# todos los Id del catálogo.
 _NAMESPACE_CUBICADOR = uuid.UUID("c9b1b1a0-6f3e-4b1a-9c2d-a1b2c3d40001")
 
 def nid(seed: str) -> str:
@@ -15,18 +25,12 @@ def nid(seed: str) -> str:
 
 OUT = "."
 
-# ---------- Tabla 1: vehiculos ----------
-# "Tractomula Furgon 3S3" ya NO es una fila aparte -- es el mismo 3S3 (el
-# codigo debe quedar unico para el matching con SICE-TAC/tarifario). La
-# diferencia de capacidad con Furgon (30000 vs 34000 kg) se resuelve en
-# relacionVehiculosCarroceria (ver mas abajo), no duplicando el vehiculo.
-# Medidas en cm (cruzado con el seeder de Brayan -- coinciden exacto con las
-# nuestras convertidas). Codigos C2/C3 tal como estan en el Excel (Brayan
-# confirma lo mismo). La altura NO es un default fijo -- es el limite LEGAL
-# de altura para ese tipo de vehiculo segun la reglamentacion de transito
-# (asi la nombra el seeder de Brayan: "AlturaMaximaLegalCm"), no una medida
-# cualquiera del fabricante. Ambos seeders coinciden en que no cambia segun
-# carroceria, asi que es propiedad del vehiculo, no de la combinacion.
+# ---------- vehiculos ----------
+# Medidas en centímetros. El código es único porque se usa para cruzar con
+# SICE-TAC y el tarifario; una capacidad distinta según la carrocería se define en
+# relacionVehiculosCarroceria, no con un vehículo repetido. La altura es el límite
+# legal de altura del tipo de vehículo (reglamentación de tránsito) y no depende de
+# la carrocería.
 vehiculos = [
     # codigo, nombre, largo_cm, ancho_cm, altura_maxima_reglamentaria_cm, capacidad_kg
     ("2L2", "Turbo 2L2", 450, 220, 230, 4000),
@@ -44,13 +48,10 @@ with open(f"{OUT}/vehiculos.csv", "w", newline="", encoding="utf-8") as f:
         vehiculo_ids[codigo] = vid
         w.writerow([vid, codigo, nombre, l, a, h, cap, "true", "seeder"])
 
-# ---------- Tabla 2: TiposCarroceria ----------
-# Catalogo SIN fusionar sinonimos: Plataforma y Planchon quedan separados
-# (la matriz los usa como alternativas entre si, ej. filas "Vigas" y "Bobinas de
-# acero"), y Furgon refrigerado / climatizado / ventilado tambien quedan
-# separados (son necesidades distintas, no el mismo codigo). Estructura
-# Codigo+Nombre cruzada con el seeder de Brayan, pero el catalogo sigue
-# siendo el nuestro (mas granular que el de el).
+# ---------- TiposCarroceria ----------
+# Catálogo sin fusionar sinónimos: Plataforma y Planchón son códigos distintos (la
+# matriz los usa como alternativas entre sí), y Furgón refrigerado, climatizado y
+# ventilado también (son necesidades distintas).
 carrocerias = [
     ("FURGON", "Furgon"),
     ("FURGON_REFRIGERADO", "Furgon refrigerado"),
@@ -62,16 +63,10 @@ carrocerias = [
     ("PORTAVIDRIOS", "Estructura portavidrios"),
     ("CONTENEDOR_SECO", "Contenedor seco"),
     ("CONTENEDOR_REFRIGERADO", "Contenedor refrigerado"),
-    # Rescatadas del catalogo viejo de cubicacion rapida (9 arquetipos
-    # hardcodeados): CAMA_BAJA y PORTACONTENEDORES no estaban en los
-    # Excel nuevos, pero si existian antes y se decidio mantenerlas.
+    # Del catálogo anterior del motor de cubicación rápida.
     ("CAMA_BAJA", "Cama baja"),
     ("PORTACONTENEDORES", "Portacontenedores"),
-    # Cruzadas contra el catalogo real de SAP (tblSAPTiposCarroseria) --
-    # existen en SAP pero no teniamos ninguna fila para ellas. Igual que
-    # CAMA_BAJA/PORTACONTENEDORES: se agregan al catalogo SIN relacion en
-    # relacionVehiculosCarroceria (con que vehiculo(s) empareja cada una lo
-    # decide el Administrador de Fletes desde el CRUD, no se infiere aqui).
+    # Del catálogo de carrocerías de SAP (tblSAPTiposCarroseria).
     ("TANQUE", "Tanque"),
     ("TOLVA", "Tolva"),
     ("VOLCO", "Volco"),
@@ -87,14 +82,11 @@ with open(f"{OUT}/tiposCarroceria.csv", "w", newline="", encoding="utf-8") as f:
         carroceria_ids[c] = cid
         w.writerow([cid, c, nombre, "true", "seeder"])
 
-# ---------- Tabla 4: relacionVehiculosCarroceria ----------
-# La hoja "Dimensiones y Peso" solo habla de Estacas/Furgon/Plancha en
-# terminos genericos (no distingue refrigerado/climatizado/ventilado ni
-# Planchon de Plataforma) -- "Plancha" ahi se interpreta como PLATAFORMA.
-# Cada carrocería va con (usa_capacidad_vehiculo, capacidad_especifica).
-# Por defecto usa la capacidad del vehiculo (true, 0 -- no se lee).
-# 3S3 + FURGON es la unica excepcion real detectada en el Excel: con Furgon
-# carga 30000 kg en vez de los 34000 normales del 3S3 con Estacas/Plataforma.
+# ---------- relacionVehiculosCarroceria ----------
+# Qué carrocerías acepta cada vehículo, según el Excel «Dimensiones y Peso por
+# vehículo» («Plancha» en el Excel corresponde a PLATAFORMA).
+# Cada entrada: (carrocería, usa la capacidad del vehículo, capacidad específica).
+# Única excepción: el 3S3 con Furgón carga 30.000 kg en vez de 34.000.
 rel = {
     "2L2": [("ESTACAS", True, 0), ("FURGON", True, 0), ("PLATAFORMA", True, 0)],
     "C2": [("ESTACAS", True, 0), ("FURGON", True, 0), ("PLATAFORMA", True, 0)],
@@ -102,22 +94,18 @@ rel = {
     "2S2": [("ESTACAS", True, 0), ("FURGON", True, 0), ("PLATAFORMA", True, 0)],
     "3S3": [("ESTACAS", True, 0), ("PLATAFORMA", True, 0), ("FURGON", False, 30000)],
 }
-# Las variantes de Furgon (refrigerado/climatizado/ventilado) aplican a los
-# mismos vehiculos que llevan FURGON liso, con la misma regla de capacidad
-# que ya tenia ese vehiculo con Furgon (mismo chasis, solo cambia el
-# acondicionamiento de la caja) -- C3 no tiene ninguna porque no lleva
-# Furgon en el Excel.
+# Las variantes de Furgón (refrigerado, climatizado, ventilado) van en los mismos
+# vehículos que llevan Furgón y con su misma capacidad: es el mismo chasis, solo
+# cambia el acondicionamiento de la caja. El C3 no lleva Furgón.
 for vcod, cs in list(rel.items()):
     for c, usa_cap, cap_especifica in cs:
         if c == "FURGON":
             for variante in ("FURGON_REFRIGERADO", "FURGON_CLIMATIZADO", "FURGON_VENTILADO"):
                 rel[vcod].append((variante, usa_cap, cap_especifica))
             break
-# CAMA_BAJA y PORTACONTENEDORES (arriba, Tabla 2) NO llevan fila en esta
-# relacion -- a proposito. Solo se emparejan aqui las carrocerias que salen
-# del Excel "Dimensiones y Peso por vehiculo". Esas 2 son un rescate del
-# catalogo viejo que todavia no tiene emparejamiento real confirmado con
-# ningun vehiculo de este Excel -- queda pendiente de decidir, no se infiere.
+# Las carrocerías que no salen de ese Excel (CAMA_BAJA, PORTACONTENEDORES, TANQUE,
+# TOLVA, VOLCO, GRUA, NINERA) no llevan relación: se asignan a un vehículo desde la
+# administración del catálogo cuando haya un emparejamiento confirmado.
 with open(f"{OUT}/relacionVehiculosCarroceria.csv", "w", newline="", encoding="utf-8") as f:
     w = csv.writer(f)
     w.writerow(["Id", "IdTipoVehiculo", "IdCarroceria",
@@ -128,11 +116,8 @@ with open(f"{OUT}/relacionVehiculosCarroceria.csv", "w", newline="", encoding="u
             w.writerow([fila_id, vehiculo_ids[vcod], carroceria_ids[c],
                         "true" if usa_cap else "false", cap_especifica, "seeder"])
 
-# ---------- Tabla 5: categoriaMercancia ----------
-# Catalogo cruzado con el seeder de Brayan (13 categorias, se adoptan las de
-# el -- separa MATERIAL_INFLAMABLE/CARBURANTE donde antes teniamos un solo
-# COMBUSTIBLE, y METALICO/CONSTRUCCION donde antes teniamos un solo
-# METALICO_CONSTRUCCION; agrega QUIMICO_OXIDANTE y QUIMICO_CORROSIVO).
+# ---------- categoriaMercancia ----------
+# Nivel al que se definen las incompatibilidades entre mercancías.
 categorias = ["GENERAL", "ALIMENTOS", "FARMACEUTICO", "PERECEDERO_NO_ALIMENTO", "FERTILIZANTE",
               "MATERIAL_INFLAMABLE", "CARBURANTE", "METALICO", "CONSTRUCCION", "VIDRIO",
               "GAS_INDUSTRIAL", "QUIMICO_OXIDANTE", "QUIMICO_CORROSIVO"]
@@ -145,12 +130,9 @@ with open(f"{OUT}/categoriaMercancia.csv", "w", newline="", encoding="utf-8") as
         categoria_ids[c] = cid
         w.writerow([cid, c, "seeder"])
 
-# ---------- Tabla 6: reglasIncompatibilidad ----------
-# Reglas cruzadas con el seeder de Brayan -- se adoptan las 3 de el (la
-# propia, Combustible x Alimentos, ya no aplica tal cual porque esa
-# categoria se partio en MATERIAL_INFLAMABLE/CARBURANTE, ver Tabla 5).
-# Pendiente de completar con operaciones (ver brecha #4 de
-# propuesta-seleccion-vehiculos.md, seccion 3.3).
+# ---------- reglasIncompatibilidad ----------
+# Pares de categorías que no pueden viajar en el mismo vehículo. Son las reglas
+# confirmadas hasta hoy; las demás se agregan desde la administración del catálogo.
 reglas_incompatibilidad = [
     ("FERTILIZANTE", "ALIMENTOS", "Riesgo de contaminacion de alimentos por fertilizante ensacado."),
     ("QUIMICO_OXIDANTE", "MATERIAL_INFLAMABLE", "Riesgo de reaccion / incendio sin separacion certificada."),
@@ -161,18 +143,15 @@ with open(f"{OUT}/reglasIncompatibilidad.csv", "w", newline="", encoding="utf-8"
     w.writerow(["Id", "IdCategoria1", "IdCategoria2", "Motivo", "CreadoPor"])
     for c1, c2, motivo in reglas_incompatibilidad:
         fila_id = nid(f"regla:{c1}:{c2}")
-        w.writerow([fila_id, categoria_ids[c1], categoria_ids[c2], motivo, "seeder"])
+        # El par se guarda con el Id menor primero (comparado como texto), igual que
+        # lo hace la aplicación: así el UNIQUE impide la misma regla en los dos sentidos.
+        id1, id2 = sorted([categoria_ids[c1], categoria_ids[c2]])
+        w.writerow([fila_id, id1, id2, motivo, "seeder"])
 
-# ---------- Tabla 3: tiposMercancia ----------
-# Contenido cruzado con el seeder de Brayan (41 filas: nuestras 31
-# originales + 10 "no cubicables" que el agrega -- granel, cemento,
-# concreto, combustibles, asfalto, vehiculos en unidad, ingenieria
-# especial). Carrocerias principal/secundaria siguen siendo las NUESTRAS
-# (mas granulares); se resolvieron cruzando el generico de Brayan
-# (FURGON/CONTENEDOR) con su propio campo ControlAmbientalRequerido --
-# ej. FURGON + REFRIGERADO (sin condicional) -> FURGON_REFRIGERADO. Cuando
-# el control es "_CONDICIONAL" o alternativo ("_O_"), se dejo la misma
-# resolucion ya usada en la version anterior de esta tabla.
+# ---------- tiposMercancia ----------
+# Las 31 mercancías de la Matriz cubicador. La carrocería se elige según el control
+# ambiental: por ejemplo, una mercancía refrigerada va en FURGON_REFRIGERADO.
+# Apilable, Fragil y RotacionLibre en None toman su valor por defecto (ver _tri).
 # campos: codigo, nombre, categoria, cubicable, condicionada,
 #         carroceria_principal, carroceria_secundaria, secundaria_condicionada,
 #         control_ambiental, apilable, fragil, rotacion_libre, comentario
@@ -270,10 +249,6 @@ filas = [
     ("CARGA_CONTENERIZADA", "Carga contenerizada en cajas o pallets", "GENERAL", True, False,
      "CONTENEDOR_SECO", "FURGON", True, "NINGUNO", None, None, None,
      "El contenedor es unidad de transporte; la cubicacion interna depende de medidas utiles y limites de carga."),
-    # Nota: el seeder de Brayan trae 10 filas adicionales de carga NO
-    # cubicable (granel, cemento, concreto, combustibles, asfalto, etc.) --
-    # a proposito no se agregaron aqui, se dejaron fuera por decision
-    # explicita (quedan solo las 31 de la Matriz/Excel).
 ]
 
 def _b(valor):
@@ -283,9 +258,8 @@ def _b(valor):
     return "true" if valor else "false"
 
 def _tri(valor, default):
-    """Para Apilable/Fragil/RotacionLibre: None toma el default de negocio
-    (ya no quedan en NULL); un True/False explicito en la fila se respeta
-    tal cual, el default solo aplica cuando no se dijo nada puntual."""
+    """Apilable, Fragil y RotacionLibre: None toma el valor por defecto; un
+    True/False explícito en la fila se respeta."""
     if valor is None:
         valor = default
     return "true" if valor else "false"
@@ -306,7 +280,9 @@ with open(f"{OUT}/tiposMercancia.csv", "w", newline="", encoding="utf-8") as f:
                     _tri(apil, True), _tri(frag, False), _tri(rot, True),
                     "true", "seeder"])
 
-# ---------- Tabla 9: parametrosMotor ----------
+# ---------- parametrosMotor ----------
+# k_max = 25: con 10 se rechazaban cargas con solución (600 piezas de 1 m necesitan
+# 13 vehículos) y con 25 el cálculo sigue tardando centésimas de segundo.
 params = [
     ("k_max", "25", "Tope de vehiculos por grupo antes de sin seleccion automatica"),
     ("factor_vol_util", "0.90", "Fraccion del volumen util aprovechable en la practica"),
