@@ -1,6 +1,0 @@
-Alcance,"Matriz orientada al cubicador: mercancía empacada, en unidades, pallets o piezas con dimensiones identificables."
-Excluir del cubicador convencional,"Graneles sólidos o líquidos, combustibles, químicos a granel, cemento a granel, concreto, residuos a granel, asfalto caliente, vehículos transportados como unidad, y cargas cuyo cálculo dependa de ingeniería de carga especial."
-Tratar por flujo especializado,"Sobredimensionados, maquinaria pesada, bobinas, vidrio en bastidor, cilindros de gas y cargas con centro de gravedad o sujeción crítica."
-Regla de uso,"La carrocería indicada es una guía de compatibilidad, no una autorización automática. Confirmar dimensiones, peso, distribución, puntos de amarre, embalaje, restricciones de ruta y requisitos de producto."
-Cubicación,"Calcular con dimensiones exteriores de la unidad logística (caja, bulto, pallet o pieza) y patrón real de estiba; no asumir que el volumen geométrico equivale al volumen aprovechable."
-Nota,"Se retiraron tipologías cuyo transporte se define principalmente por volumen a granel, bombeo, descarga por volteo o equipos especializados, en lugar de cubicación convencional."

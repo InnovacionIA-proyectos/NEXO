@@ -26,7 +26,7 @@ pyodbc>=5.2
 # Sin alembic a proposito (S5-HU-17.2): su `--autogenerate` lee la base entera
 # y propone borrar lo que sus modelos no conocen. Contra la base real genero 36
 # `op.drop_table` sobre tablas de Cotifly, que comparte `dbTarifario_Nexo_Pruebas`.
-# El esquema del motor 3D vive en docs/Database/ESQUEMA_CUBICADOR.sql y se aplica
+# El esquema vive en database/esquema/ESQUEMA_CUBICADOR.sql y se aplica
 # a mano, mismo criterio que ESQUEMA_NEXO.sql en la raiz de NEXO.
 
 # dev

@@ -245,7 +245,8 @@ Excel de costos 2026 cambia (nueva ciudad, nuevo puerto, nueva ruta), este CSV
 
 **Poblado UNA SOLA VEZ, sobre la tabla nueva `tbl_alias_elementos`
 (S6-HU-27.1/#315, DATA-2) — sin sincronización periódica.** Extraído de
-`cubicador/database/datos_raw/diccionario_configuraciones_vehiculo_RAW.csv`
+el Excel de negocio «Diccionario de Configuraciones de vehiculos para Nexo»
+(fuera del repo; su volcado a CSV vivió en `cubicador/database/datos_raw/` hasta #327)
 (diccionario de negocio con 7 columnas: 5 tipos de vehículo y 2 tamaños de
 contenedor, cada una con las variantes de texto libre que se han visto en
 captura real). Cada celda no vacía se convirtió en una fila de alias, con el

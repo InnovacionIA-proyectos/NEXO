@@ -272,6 +272,16 @@ Server **local**, para desarrollo y para el smoke de CI, que imita esa forma
 lo gobierna `docs/Database/ESQUEMA_CUBICADOR.sql`, que se aplica a mano, no
 `create_all` ni migraciones automaticas.
 
+**Actualizado en S6-HU-31.2 (#327, 2026-10-29)**: se preparó la **base propia** del
+Cubicador, `dbCubicador_Pruebas` (mismo servidor), con las tablas en el esquema `dbo`,
+para dejar de compartir base con Cotifly. Se creó con el esquema completo y el catálogo
+del seeder (`database/scripts/ejecutar_schema_y_seeders.py`); el historial de la base
+compartida eran pruebas y no se copia. El esquema se comparó contra la base real
+(columnas, valores por defecto, CHECK, llaves e índices) y el catálogo quedó idéntico
+al de QA. El esquema quedó en **un solo archivo**, `database/esquema/ESQUEMA_CUBICADOR.sql`
+(16 tablas), y el seeder en `database/seeder/`. QA sigue en la base compartida hasta el
+cambio de configuración y de esquema por defecto (S6-HU-31.3, #423).
+
 **Decisión vigente**: RabbitMQ SÍ se comparte: `api`
 y `worker` se conectan al `rabbit` del `docker-compose.yml` raíz de NEXO
 (proyecto Compose separado — no se fusionaron los archivos, siguen siendo dos

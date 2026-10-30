@@ -1,4 +1,0 @@
-﻿Id,IdCategoria1,Categoria1,IdCategoria2,Categoria2,Motivo,CreadoPor
-4c03fad3-822d-4f7c-9159-c959daa72b29,b9864cef-459a-476d-979b-7c6700483e09,FERTILIZANTE,dd6981af-bedf-499d-a868-cbc24a180e63,ALIMENTOS,Riesgo de contaminacion de alimentos por fertilizante ensacado.,seeder
-169d3444-9810-4d7d-8d90-e67d43e1a84b,e47ec7d6-0f15-4f13-88fd-511403198b70,QUIMICO_OXIDANTE,513af6d9-8f6f-43a4-9b29-115b2913d3b9,MATERIAL_INFLAMABLE,Riesgo de reaccion / incendio sin separacion certificada.,seeder
-66636563-35d7-4632-891a-d8703115d789,81aeed61-8abb-4d03-9a90-65373d16d222,QUIMICO_CORROSIVO,dd6981af-bedf-499d-a868-cbc24a180e63,ALIMENTOS,Riesgo de contaminacion de alimentos.,seeder
