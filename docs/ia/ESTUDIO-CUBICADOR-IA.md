@@ -76,7 +76,7 @@ Para evaluar la IA se escribe un adaptador con la forma de `adaptador_motor` (re
 
 ## 5. Línea base del motor actual
 
-Medida el 2026-10-27 sobre la **semilla sintética** (22 casos, 50 repeticiones), en un equipo de desarrollo. Informe completo en `evaluacion-ia/cubicador/informe_linea_base_semilla.md`.
+Medida sobre la **semilla sintética** (22 casos, 50 repeticiones), en un equipo de desarrollo; repetida el 2026-10-30 sobre la versión versionada del dataset (huella `78884e7c8037`, la misma con la que se midió la IA en la sección 8), con los mismos aciertos. Informe completo en `evaluacion-ia/cubicador/informe_linea_base_semilla.md`.
 
 | Métrica | Resultado |
 |---|---|
@@ -86,7 +86,7 @@ Medida el 2026-10-27 sobre la **semilla sintética** (22 casos, 50 repeticiones)
 | Flota mínima (cantidad exacta) | 100 % (20/20) |
 | Exceso medio de vehículos | 0 |
 | Respeta el peso / el volumen / conserva las unidades | 100 % (20/20) en las tres |
-| Latencia en proceso p50 / p95 / máx | 0,5 / 10,1 / 130 ms |
+| Latencia en proceso p50 / p95 / máx | 1,6 / 25,7 / 390 ms (varía entre corridas; siempre en milisegundos) |
 | Costo por cubicación | 0 USD (0 tokens) |
 
 **Cómo leerlo.**
@@ -163,3 +163,7 @@ WHERE TokensEntrada > 0;
 ```
 
 La latencia es la del modelo (su propia llamada), no la de la API del Cubicador: esa no cambia. Una fila con `Estado` distinto de `OK` cuenta como intento fallido (límite del proveedor, tiempo agotado, respuesta que no cumple el contrato) y entra en la tasa de fallos, no en el acuerdo.
+
+## 8. La IA contra el dataset dorado
+
+Con `evaluacion-ia/cubicador/evaluar_ia.py` la IA del modo sombra (mismo prompt, mismo esquema y misma validación que en producción) se midió sobre los mismos 22 casos y con las mismas métricas de la sección 5. Iguala al motor en todo menos en flota mínima (95 %): en el caso S-19 propone una Minimula donde hacen falta dos, y lo repite en cada corrida. Es justo el acomodo en el piso que se describe en la sección 5. Informe: `evaluacion-ia/cubicador/informe_ia_semilla.md`. La decisión que sale de aquí está en [`ACTA-DECISION-IA-CUBICADOR.md`](ACTA-DECISION-IA-CUBICADOR.md).

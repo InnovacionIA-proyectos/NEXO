@@ -2,7 +2,7 @@
 
 Mide el motor de selección de flota (`cubicador/domain/motor/seleccion_flota.py`) contra un dataset dorado, para tener la línea base con la que se compara la IA. El diseño del estudio, las métricas y los resultados están en [`docs/ia/ESTUDIO-CUBICADOR-IA.md`](../../docs/ia/ESTUDIO-CUBICADOR-IA.md).
 
-**No es parte del servicio ni del CI**: está fuera de `cubicador/` a propósito (un cambio aquí no redespliega el Cubicador) y no toca base de datos ni red. Corre el motor real, sin reescribirlo.
+**No es parte del servicio ni del CI**: está fuera de `cubicador/` a propósito (un cambio aquí no redespliega el Cubicador) y no toca base de datos. Corre el motor real, sin reescribirlo. Solo `evaluar_ia.py` y `evaluar_interpretacion.py` llaman al modelo (con tope de llamadas y tokens).
 
 | Archivo | Para qué |
 |---|---|
@@ -13,7 +13,9 @@ Mide el motor de selección de flota (`cubicador/domain/motor/seleccion_flota.py
 | `extraer_cargas_reales.sql` | SELECT de solo lectura que saca las cargas reales |
 | `importar_cargas_reales.py` | Convierte ese resultado en casos por validar |
 | `informe_linea_base_semilla.md` | Línea base del motor sobre la semilla |
-| `tests/` | Pruebas de las cuentas, del dataset y del importador |
+| `evaluar_ia.py` | Corre la IA del modo sombra (mismo prompt y validación que en producción) sobre los mismos casos y métricas |
+| `informe_ia_semilla.md` | Resultado de la IA sobre la semilla (insumo del acta de decisión) |
+| `tests/` | Pruebas de las cuentas, del dataset, del importador y del adaptador de la IA |
 
 ## Uso
 
@@ -26,6 +28,16 @@ python -m pytest evaluacion-ia/cubicador --noconftest
 ```
 
 El evaluador lee todos los `*.json` de `casos/` y **solo cuenta los casos con `etiquetaValidada: true`** (`--incluir-sin-validar` los suma, no usarlo para decidir).
+
+## IA contra el mismo dataset
+
+```
+python evaluacion-ia/cubicador/evaluar_ia.py --simular          # gratis: arma los mensajes sin llamar al modelo
+python evaluacion-ia/cubicador/evaluar_ia.py --salida-md evaluacion-ia/cubicador/informe_ia_semilla.md
+python evaluacion-ia/cubicador/evaluar_ia.py --solo S-19 --repeticiones 3
+```
+
+Necesita `ANTHROPIC_API_KEY` (y `ANTHROPIC_WORKSPACE_ID` si la llave es de organización) en el entorno o en `cubicador/.env`, y las dependencias de `cubicador/requirements.txt`. La corrida completa son 22 llamadas, unos US$0,24. La decisión que salió de esta medición está en [`docs/ia/ACTA-DECISION-IA-CUBICADOR.md`](../../docs/ia/ACTA-DECISION-IA-CUBICADOR.md).
 
 ## Dataset real
 
