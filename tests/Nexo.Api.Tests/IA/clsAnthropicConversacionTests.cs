@@ -135,7 +135,8 @@ public class clsAnthropicConversacionTests
         var raiz = cuerpo.RootElement;
         Assert.True(raiz.GetProperty("stream").GetBoolean());
         Assert.Equal("claude-sonnet-5-5", raiz.GetProperty("model").GetString());
-        Assert.Equal("high", raiz.GetProperty("output_config").GetProperty("effort").GetString());
+        // `medium` desde #363: lo recomienda la evaluacion del mapeo de Excel. Ver clsOpcionesAnthropic.
+        Assert.Equal("medium", raiz.GetProperty("output_config").GetProperty("effort").GetString());
         Assert.Equal("adaptive", raiz.GetProperty("thinking").GetProperty("type").GetString());
         Assert.Equal(1024, raiz.GetProperty("max_tokens").GetInt32());
         Assert.Contains("Eres el asistente.", raiz.GetProperty("system").ToString());
