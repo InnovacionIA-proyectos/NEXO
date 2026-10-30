@@ -103,6 +103,6 @@ En Dokploy, app `cubicador-api` (pestaña Environment). Nada de esto va al repos
 | `IA_SOMBRA_TOPE_TOKENS_DIA` | `1000000` | Tope de tokens (entrada + salida) por día, hora de Colombia; al alcanzarlo no se compara hasta el día siguiente. `0` lo desactiva. Va **además** del límite mensual de la *workspace*, que es el que de verdad corta el gasto. |
 | `IA_SOMBRA_TIMEOUT_SEGUNDOS`, `IA_SOMBRA_MAX_CONCURRENTES`, `IA_SOMBRA_MAX_PENDIENTES`, `IA_SOMBRA_MAX_TOKENS_SALIDA` | `60`, `2`, `20`, `4096` | Solo para cambiarlos. Con más comparaciones esperando que `MAX_PENDIENTES`, las nuevas se descartan: la API nunca se encola detrás del modelo. |
 
-**Antes de encenderlo** hay que aplicar `cubicador/database/esquema/367_ia_sombra.sql` (tabla `dbo_cubicador.iaSombra`). Cada comparación, o intento que falla, deja una fila con el motivo en `Estado`; el contenido enviado al modelo no se guarda.
+**Antes de encenderlo** tiene que existir la tabla `dbo.iaSombra`. En la base del Cubicador (`dbCubicador_Pruebas`) ya viene en `cubicador/database/esquema/ESQUEMA_CUBICADOR.sql`. Cada comparación, o intento que falla, deja una fila con el motivo en `Estado`; el contenido enviado al modelo no se guarda.
 
 **Apagarlo** es poner `IA_SOMBRA_HABILITADA=false` (o vaciar la llave) y redesplegar `cubicador-api`; la respuesta al usuario es la misma encendido o apagado. **Verificar la salida** a `api.anthropic.com` desde el contenedor con §5a y §5b (la imagen del Cubicador no trae `curl`: usar `python -c` con `httpx`, o probar desde el contenedor de NEXO que sí lo trae).

@@ -1,5 +1,9 @@
 # Propuesta de BD — Motor de selección de tipo y cantidad de vehículos
 
+> **Documento de diseño original (9 tablas).** La definición vigente del esquema está en
+> `cubicador/database/esquema/ESQUEMA_CUBICADOR.sql` y la descripción de cada tabla y columna en
+> `cubicador/database/documentacion/DICCIONARIO-DATOS.md`.
+
 Diseño de tablas para el nuevo motor descrito en `propuesta-seleccion-vehiculos.md`
 (§4 "Modelo de datos"). Vive en su propio esquema SQL, `dbo_cubicador`,
 dentro de la base compartida `dbTarifario_Nexo_Pruebas` — no en `db_NEXO`
@@ -9,7 +13,7 @@ Documento vivo — se va ajustando tabla por tabla a medida que se revisa cada
 una. **Actualizado 2026-10-08** cruzando esta propuesta contra un seeder
 real enviado por un colega (Brayan) y contra el catálogo real de SAP
 (`tblSAPTiposCarroseria`) — ver
-`cubicador/database/seeder/ORIGEN-Y-DECISIONES.md` para el detalle completo
+`cubicador/database/documentacion/ORIGEN-Y-DECISIONES-SEEDER.md` para el detalle completo
 de qué cambió y por qué en cada tabla.
 
 ---
@@ -43,7 +47,7 @@ de qué cambió y por qué en cada tabla.
   externo la llama "altura máxima legal", un límite normativo de
   reglamentación de tránsito, no una medida física arbitraria del
   fabricante; el nombre anterior (`AltoVehiculoCm`) no dejaba eso claro.
-  Ver `ORIGEN-Y-DECISIONES.md` para el detalle de cómo se confirmó.
+  Ver `ORIGEN-Y-DECISIONES-SEEDER.md` para el detalle de cómo se confirmó.
 - Se agregó `DEFAULT (440)` a la columna — no cambia ninguno de los 5
   vehículos actuales (cada uno trae su valor propio explícito), es solo
   un respaldo para cuando se cree un vehículo nuevo por CRUD sin
@@ -283,7 +287,7 @@ documentos no queden contradictorios:
    siempre se valida, pero **no** con un default fijo de 4.4 m — es
    `AlturaMaximaReglamentariaCm`, el límite legal de altura por
    reglamentación de tránsito, que **varía por vehículo** (230/240/260
-   cm). Ver `ORIGEN-Y-DECISIONES.md`.
+   cm). Ver `ORIGEN-Y-DECISIONES-SEEDER.md`.
 
 2. **§4.3 queda desactualizado.** Dice *"alto_m decimal, opcional (vacío en
    Plataforma → no se valida alto)"* — ya no aplica, el alto nunca es

@@ -418,7 +418,7 @@ Antes de desplegar, correr el motor sobre 50–100 despachos ya ejecutados y com
    es el límite legal de altura por reglamentación de tránsito para ese
    tipo de vehículo, no una medida física inventada, y varía por vehículo
    (no hay un default único de 4.4 m). Ver
-   `cubicador/database/seeder/ORIGEN-Y-DECISIONES.md`.
+   `cubicador/database/documentacion/ORIGEN-Y-DECISIONES-SEEDER.md`.
 3. **Alternativa de carrocería.** `usar_alternativa` arranca en `solo_respaldo` porque la matriz las marca como condicionadas. Confirmar.  
 4. **Carrocerías refrigeradas y contenedores.** Agregar configuraciones o excluir de esta versión.  
 5. **Límite `k_max`.** Propuesto 4\. Confirmar con operaciones cuál es el máximo razonable de vehículos que el sistema debe proponer por sí solo.

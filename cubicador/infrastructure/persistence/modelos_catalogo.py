@@ -5,7 +5,7 @@ scripts. Mapearlas aca no las convierte en tablas que el Cubicador cree o
 altere: solo le da una forma de leerlas.
 
 Van en un modulo aparte de `modelos.py` a proposito. Ese tiene las 5 tablas del
-motor 3D, cuyo DDL esta en `docs/Database/ESQUEMA_CUBICADOR.sql`; mezclarlas
+motor 3D (su DDL esta en la Parte 2 de `database/esquema/ESQUEMA_CUBICADOR.sql`); mezclarlas
 haria facil perder de vista cual es cual.
 
 **Convencion de nombres.** El esquema usa camelCase para las tablas (con

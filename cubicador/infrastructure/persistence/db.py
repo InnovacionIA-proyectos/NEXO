@@ -58,9 +58,9 @@ class Base(DeclarativeBase):
 async def crear_tablas() -> None:
     """Crea las tablas que falten. SOLO para SQLite (pruebas y arranque local).
 
-    Contra SQL Server no hace nada a proposito: el esquema lo gobiernan los
-    scripts de `docs/Database/` (ver ESQUEMA_CUBICADOR.sql), que son la fuente
-    de verdad y se aplican con `scripts/aplicar_sql.py`. Dejar que `create_all`
+    Contra SQL Server no hace nada a proposito: el esquema lo gobierna
+    `database/esquema/ESQUEMA_CUBICADOR.sql`, que es la fuente de verdad y se
+    aplica a mano. Dejar que `create_all`
     corra ahi al arrancar seria danino, no solo inutil:
 
     - `create_all` crea tablas nuevas pero NUNCA altera una existente, asi que

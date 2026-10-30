@@ -1,130 +1,95 @@
-# Base de datos del motor de selección de vehículo — Cubicador
+# Base de datos del Cubicador
 
-Esquema y datos iniciales para las 9 tablas descritas en
-`cubicador/docs/PROPUESTA-BD-MOTOR-SELECCION-VEHICULOS.md`.
+Definición de la base de datos del Cubicador y su catálogo inicial.
 
-**No es una base dedicada.** Vive como su propio esquema SQL,
-**`dbo_cubicador`**, dentro de la base **compartida** `dbTarifario_Nexo_Pruebas`
-(servidor `10.10.40.85,1433`) — ahí conviven otras tablas de NEXO que no
-tienen nada que ver con esto (`CorreoDestinatarios`, `Correos`,
-`MargenAjustes`, etc.), separadas por el esquema. No es `db_NEXO` ni la BD
-de Cotifly. Ya está aplicado y cargado contra esa base real.
-
-## Contenido de esta carpeta
-
-| Archivo/carpeta | Qué es |
+| | |
 |---|---|
-| `DICCIONARIO-DATOS.md` | Para qué sirve cada tabla, en lenguaje llano — qué representa, por qué existe, cómo se relaciona con las demás. |
-| `esquema/ESQUEMA_CUBICADOR.sql` | Fuente de la verdad del esquema — crea el esquema `dbo_cubicador` (si no existe) y las 9 tablas dentro de él, con sus FK, `CHECK` e índices. |
-| `scripts/ejecutar_schema_y_seeders.py` | Aplica el `.sql` de arriba y carga los 7 CSV de `seeder/` en el orden correcto, contra `dbTarifario_Nexo_Pruebas`/`dbo_cubicador`. |
-| `seeder/` | Los 7 CSV con los datos iniciales (vehículos, carrocerías, mercancías, etc.), el script que los generó, y `ORIGEN-Y-DECISIONES.md` (de dónde salió cada dato y qué se decidió). |
-| `datos_raw/` | Los 3 Excel fuente originales, más un volcado crudo de cada hoja a CSV, sin normalizar — para auditar contra qué datos reales se tomó cada decisión de `seeder/`. |
+| Servidor | `10.10.40.85,1433` (SQL Server 2019) |
+| Base | `dbCubicador_Pruebas` |
+| Esquema | `dbo` |
+| Tablas | 16: catálogo, recomendación y motor 3D |
 
-## Prerrequisitos
+## Contenido de la carpeta
 
-- **SQL Server 2019+** accesible desde donde corras el script. Contra el
-  real ya se probó y funciona: `10.10.40.85,1433`, base
-  `dbTarifario_Nexo_Pruebas`.
-- **`sqlcmd`** instalado y en el `PATH` (versión usada aquí: 17.0.1000.7).
-- **Autenticación de Windows** contra ese servidor (el script usa `-E -C`,
-  igual que el resto del proyecto NEXO). Si el servidor que vas a usar
-  requiere usuario/clave SQL en vez de Windows, hay que ajustar los
-  argumentos de `sqlcmd` dentro de `scripts/ejecutar_schema_y_seeders.py`
-  (agregar `-U`/`-P`).
-- **Python 3** con la librería estándar (no usa nada externo, solo `csv`,
-  `subprocess`, `argparse`, `pathlib`).
-- Si vas a apuntar a una base/esquema distinto al ya configurado, ajusta
-  `NOMBRE_BD`/`NOMBRE_ESQUEMA_SQL` al inicio de
-  `scripts/ejecutar_schema_y_seeders.py`.
+| Ruta | Qué es |
+|---|---|
+| `esquema/ESQUEMA_CUBICADOR.sql` | DDL de las 16 tablas: columnas, llaves, `CHECK` e índices. Es la única definición del esquema. |
+| `seeder/` | Catálogo inicial: 7 CSV (uno por tabla) y `_generar_seeders.py`, el script que los genera. |
+| `scripts/ejecutar_schema_y_seeders.py` | Crea las tablas y carga los CSV en una base vacía. |
+| `documentacion/DICCIONARIO-DATOS.md` | Cada tabla: utilidad, de dónde salen sus datos, si tiene seeder y sus columnas (tipo, nulos, valor por defecto, origen y descripción). |
+| `documentacion/ORIGEN-Y-DECISIONES-SEEDER.md` | De dónde sale cada dato del catálogo inicial y qué reglas se aplicaron. |
 
-## Cómo correrlo
+## Requisitos
 
-Primera vez, contra una base vacía (crea el esquema **y** carga los datos):
+- Acceso al servidor desde el equipo donde se ejecuta (red de la empresa o VPN).
+- `sqlcmd` en el `PATH`.
+- Autenticación de Windows con un usuario que pueda crear tablas en la base.
+- Python 3 (solo librería estándar).
 
-```bash
-py scripts/ejecutar_schema_y_seeders.py --server <host>
-# ejemplo: py scripts/ejecutar_schema_y_seeders.py --server localhost
-# ejemplo con puerto: py scripts/ejecutar_schema_y_seeders.py --server localhost,1433
-```
+## Crear la base
 
-Solo el esquema, sin tocar datos (por ejemplo, para revisar que las tablas quedaron bien antes de cargar):
+Se hace una sola vez, contra una base vacía. Desde `cubicador/database/`:
 
 ```bash
-py scripts/ejecutar_schema_y_seeders.py --server <host> --solo-schema
+py scripts/ejecutar_schema_y_seeders.py --server 10.10.40.85,1433
 ```
 
-Solo cargar los CSV, si el esquema ya existe (por ejemplo, reconstruiste a mano o volviste a correr después de vaciar las tablas):
+El script:
 
-```bash
-py scripts/ejecutar_schema_y_seeders.py --server <host> --solo-datos
-```
+1. Aplica `esquema/ESQUEMA_CUBICADOR.sql`: crea las 16 tablas vacías en el esquema `dbo`.
+2. Carga los 7 CSV de `seeder/` en el orden de sus llaves foráneas: carrocerías, categorías,
+   vehículos, mercancías, relación vehículo-carrocería, reglas de incompatibilidad y parámetros
+   del motor.
 
-(Los comandos de arriba se corren desde `cubicador/database/`, la carpeta raíz de este README — no desde dentro de `scripts/`.)
+Las tablas de recomendación y del motor 3D quedan vacías. Los vehículos del motor 3D
+(`vehiculos_cubicacion`) los crea la aplicación la primera vez que arranca.
 
-## Si necesitas regenerar los CSV del seeder
+Opciones:
 
-Si cambia algo en los Excel fuente o en las reglas de normalización
-(categorías, catálogo de carrocerías, etc.), no se edita el CSV a mano —
-se ajusta `seeder/_generar_seeders.py` y se vuelve a correr:
+| Opción | Uso |
+|---|---|
+| `--solo-schema` | Solo crea las tablas. |
+| `--solo-datos` | Solo carga los CSV, sobre tablas ya creadas. Se puede repetir: los Id son fijos, así que solo inserta las filas que faltan y no modifica las existentes. |
+
+Para usar otra base, cambie `NOMBRE_BD` al inicio de `scripts/ejecutar_schema_y_seeders.py`.
+
+## Conectar la aplicación
+
+La aplicación (API y worker) lee dos variables de entorno:
+
+| Variable | Valor |
+|---|---|
+| `DATABASE_URL` | `mssql+aioodbc://<usuario>:<clave>@10.10.40.85:1433/dbCubicador_Pruebas?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes` |
+| `CUBICADOR_DB_ESQUEMA` | `dbo`. Es obligatoria: si falta, la aplicación usa `dbo_cubicador`. |
+
+Si la clave tiene `@ : / # ?`, debe ir codificada (`urllib.parse.quote_plus`).
+
+El usuario de la aplicación solo necesita leer y escribir datos (`db_datareader` y
+`db_datawriter`). El esquema lo aplica una persona, no la aplicación.
+
+## Cambiar el catálogo inicial
+
+Los CSV de `seeder/` no se editan a mano. Se edita `seeder/_generar_seeders.py` y se vuelve a
+generar:
 
 ```bash
 cd seeder
 py _generar_seeders.py
 ```
 
-Esto reescribe los 7 CSV desde cero. Los Id son **determinísticos**
-(`uuid5` sobre la clave de negocio, ver `ORIGEN-Y-DECISIONES.md`) — el
-mismo vehículo/carrocería/mercancía siempre genera el mismo Id, así que
-`ejecutar_schema_y_seeders.py --solo-datos` se puede volver a correr sobre
-una base ya cargada sin duplicar filas (salta cualquier Id que ya exista).
+Cada fila recibe un Id fijo calculado a partir de su clave de negocio (por ejemplo, el código
+del vehículo), así que regenerar no cambia los Id de las filas existentes.
 
-**Ojo:** esa idempotencia es solo para **filas nuevas**. Si cambiaste el
-*contenido* de una fila que ya existía (ej. le cambiaste la categoría o
-agregaste una columna nueva a la tabla), el Id sigue siendo el mismo y el
-script la salta sin actualizarla — para ese caso hay que recrear las
-tablas desde cero (ver "Cambios de estructura" abajo).
+Esto solo afecta a las bases que se creen después. En una base que ya está en uso, el catálogo
+se modifica desde la administración de la aplicación.
 
-Para regenerar los volcados crudos de `datos_raw/` (si cambian los Excel
-fuente):
+## Cambiar la estructura
 
-```bash
-cd datos_raw
-py _extraer_raw.py
-```
+El esquema no tiene migraciones. Para un cambio de estructura:
 
-## Cambios de estructura (columnas nuevas, tablas que ya tienen datos)
+1. Edite `esquema/ESQUEMA_CUBICADOR.sql` para que siga describiendo el esquema completo.
+2. Escriba el `ALTER` equivalente, de forma que se pueda ejecutar más de una vez sin error (por
+   ejemplo, con `IF COL_LENGTH(...) IS NULL`).
+3. Aplique ese `ALTER` a mano en cada base existente.
 
-El esquema no es incremental (mismo criterio que `ESQUEMA_NEXO.sql`): si
-las tablas ya existen, `--solo-schema` falla al intentar crearlas de
-nuevo. Si vas a cambiar la estructura de una tabla que ya tiene datos
-reales cargados, lo más simple (y lo que se hizo la última vez) es:
-
-1. Borrar las 9 tablas de `dbo_cubicador` en orden que respete las FK
-   (hijas antes que padres: `recomendacionVehiculoMercancia`,
-   `recomendacionVehiculo`, `relacionVehiculosCarroceria`,
-   `reglasIncompatibilidad`, `tiposMercancia`, `categoriaMercancia`,
-   `TiposCarroceria`, `vehiculos`, `parametrosMotor`), con
-   `DROP TABLE IF EXISTS [dbo_cubicador].[tabla];` por cada una.
-2. Editar `esquema/ESQUEMA_CUBICADOR.sql` con la estructura nueva.
-3. `py scripts/ejecutar_schema_y_seeders.py --server <host> --solo-schema`
-4. Revisar los CSV regenerados (ver sección de arriba) antes de cargarlos.
-5. `py scripts/ejecutar_schema_y_seeders.py --server <host> --solo-datos`
-
-Esto es seguro mientras las tablas solo tengan data semilla (como ahora) —
-si en el futuro ya hay recomendaciones reales guardadas, borrar deja de
-ser una opción sin pensarlo dos veces.
-
-## Notas de la primera carga real (confirmado 2026-10-08)
-
-Ya se aplicó y cargó contra el servidor real
-(`10.10.40.85,1433`/`dbTarifario_Nexo_Pruebas`/`dbo_cubicador`), sin
-problemas de encoding con tildes/ñ (se probó explícitamente con "Niñera").
-Un problema real que sí apareció y ya está corregido: `valor_sql()` en
-`scripts/ejecutar_schema_y_seeders.py` adivinaba si un valor era numérico
-mirando el texto (`float(texto)`) — códigos de negocio que son puros
-dígitos (ej. `CodigoVehiculo="2"`) se mandaban sin comillas, y al mezclarse
-en el mismo `INSERT` con filas de texto real (`"2L2"`), SQL Server forzaba
-toda la columna a `int` y tronaba. Se corrigió declarando explícitamente
-qué columnas son numéricas por tabla (`COLUMNAS_NUMERICAS`/
-`COLUMNAS_BOOLEANAS`) en vez de adivinar por contenido — ver el comentario
-en esa función para el detalle.
+No borre y recree tablas que ya tengan datos reales de recomendaciones o planes de cargue.
