@@ -3,15 +3,51 @@ using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text.Json;
 using ClosedXML.Excel;
+using Microsoft.EntityFrameworkCore;
 using Nexo.Api.Tests.Infra;
 
 namespace Nexo.Api.Tests;
 
 [Collection("api")]
-public class clsServiciosConexosTests
+public class clsServiciosConexosTests : IDisposable
 {
     private readonly clsApiFixture _fx;
+    private readonly List<string> _codigos = [];
+    private readonly DateTimeOffset _inicio = DateTimeOffset.UtcNow.AddMinutes(-1);
+
     public clsServiciosConexosTests(clsApiFixture fx) => _fx = fx;
+
+    /// <summary>Un código único para un servicio de esta prueba. Queda registrado y <see cref="Dispose"/> borra el servicio (y su auditoría) al terminar.</summary>
+    private string Cod(string prefijo, int largo)
+    {
+        var codigo = $"{prefijo}_{Guid.NewGuid():N}"[..largo];
+        lock (_codigos) _codigos.Add(codigo);
+        return codigo;
+    }
+
+    /// <summary>
+    /// Borra lo que crearon las pruebas de esta clase. Antes quedaba todo en la base compartida (más de mil filas «Precinto») y el listado
+    /// paginado dejaba de mostrar las filas nuevas. Es de mejor esfuerzo: un bloqueo ajeno no debe tumbar una prueba que ya pasó.
+    /// </summary>
+    public void Dispose()
+    {
+        string[] codigos;
+        lock (_codigos) codigos = [.. _codigos];
+        try
+        {
+            _fx.WithDb(db =>
+            {
+                // Cada importación deja un solo registro de auditoría sin servicio (EntidadId vacío): las de esta clase son las de su ventana.
+                db.AuditLogs.Where(a => a.Entidad == "servicios_conexos" && a.Accion == "importar_excel" && a.CreatedAt >= _inicio).ExecuteDelete();
+                var ids = db.ServiciosConexos.Where(x => codigos.Contains(x.CodigoServicio)).Select(x => x.Id).ToList();
+                db.AuditLogs.Where(a => a.Entidad == "servicios_conexos" && ids.Contains(a.EntidadId!.Value)).ExecuteDelete();
+                db.ServiciosConexos.Where(x => ids.Contains(x.Id)
+                    && !db.CotizacionConexos.Any(c => c.ServicioConexoId == x.Id)).ExecuteDelete();
+                return 0;
+            });
+        }
+        catch (Microsoft.Data.SqlClient.SqlException) { }
+    }
 
     // Payload mínimo válido (S4-HU-15.1/#223): las dimensiones (origen/destino/puerto/
     // ruta/tipoMaquina) son opcionales, se normalizan a "NO APLICA" si no vienen.
@@ -49,7 +85,7 @@ public class clsServiciosConexosTests
     public async Task Crear_servicio_valido_devuelve_201()
     {
         var resp = await _fx.Client("ServiciosLogisticos").PostJson("/api/servicios-conexos",
-            PayloadValido($"COD_{Guid.NewGuid():N}"[..20]));
+            PayloadValido(Cod("COD", 20)));
         Assert.Equal(HttpStatusCode.Created, resp.StatusCode);
         var dto = await resp.Json();
         Assert.Equal("NO APLICA", dto.GetProperty("origen").GetString());
@@ -69,7 +105,7 @@ public class clsServiciosConexosTests
     public async Task Crear_con_categoria_invalida_devuelve_400_con_forma_uniforme()
     {
         var resp = await _fx.Client("Admin").PostJson("/api/servicios-conexos",
-            PayloadValido($"CAT_{Guid.NewGuid():N}"[..20], categoria: "opcional"));
+            PayloadValido(Cod("CAT", 20), categoria: "opcional"));
         Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
         var err = await resp.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal("CATEGORIA_INVALIDA", err.GetProperty("code").GetString());
@@ -104,7 +140,7 @@ public class clsServiciosConexosTests
     [Fact] // misma combinación de las 6 dimensiones -> 409
     public async Task Crear_servicio_duplicado_devuelve_409()
     {
-        var codigo = $"DUP_{Guid.NewGuid():N}"[..20];
+        var codigo = Cod("DUP", 20);
         await _fx.Client("Admin").PostJson("/api/servicios-conexos", PayloadValido(codigo));
         var resp = await _fx.Client("Admin").PostJson("/api/servicios-conexos", PayloadValido(codigo));
         Assert.Equal(HttpStatusCode.Conflict, resp.StatusCode);
@@ -114,7 +150,7 @@ public class clsServiciosConexosTests
     [Fact] // PATCH parcial: solo actualiza los campos enviados
     public async Task Editar_parcial_actualiza_solo_lo_enviado()
     {
-        var crear = await _fx.Client("Admin").PostJson("/api/servicios-conexos", PayloadValido($"EDIT_{Guid.NewGuid():N}"[..20], costo: 100));
+        var crear = await _fx.Client("Admin").PostJson("/api/servicios-conexos", PayloadValido(Cod("EDIT", 20), costo: 100));
         var id = (await crear.Json()).GetProperty("id").GetGuid();
         var resp = await _fx.Client("Admin").PatchJson($"/api/servicios-conexos/{id}", new { activo = false });
         Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
@@ -127,7 +163,7 @@ public class clsServiciosConexosTests
 
     private async Task<(Guid Id, string Codigo)> CrearConPrecio(decimal costo, decimal? precioVenta)
     {
-        var codigo = $"PV_{Guid.NewGuid():N}"[..20];
+        var codigo = Cod("PV", 20);
         var resp = await _fx.Client("Admin").PostJson("/api/servicios-conexos", new
         {
             codigoServicio = codigo, tipoServicio = "Precinto", costoUnitario = costo, precioVenta, unidad = "Por unidad", vigencia = "2026-12-31",
@@ -141,13 +177,18 @@ public class clsServiciosConexosTests
     [Fact]
     public async Task Crear_con_precio_de_venta_lo_devuelve_y_sin_el_queda_vacio()
     {
-        var (conPrecio, _) = await CrearConPrecio(1000, 1500);
-        var (sinPrecio, _) = await CrearConPrecio(1000, null);
+        var (conPrecio, codigoConPrecio) = await CrearConPrecio(1000, 1500);
+        var (sinPrecio, codigoSinPrecio) = await CrearConPrecio(1000, null);
 
-        var lista = await _fx.Client().GetFromJsonAsync<JsonElement>("/api/servicios-conexos?pageSize=200&q=Precinto");
-        var items = lista.GetProperty("items").EnumerateArray().ToList();
-        Assert.Equal(1500m, items.Single(i => i.GetProperty("id").GetGuid() == conPrecio).GetProperty("precioVenta").GetDecimal());
-        Assert.Equal(JsonValueKind.Null, items.Single(i => i.GetProperty("id").GetGuid() == sinPrecio).GetProperty("precioVenta").ValueKind);
+        // Cada uno se busca por su código exacto: no depende del tamaño de la página ni del orden del listado.
+        async Task<JsonElement> Listado(string codigo, Guid id)
+        {
+            var lista = await _fx.Client().GetFromJsonAsync<JsonElement>($"/api/servicios-conexos?q={codigo}");
+            return lista.GetProperty("items").EnumerateArray().Single(i => i.GetProperty("id").GetGuid() == id);
+        }
+
+        Assert.Equal(1500m, (await Listado(codigoConPrecio, conPrecio)).GetProperty("precioVenta").GetDecimal());
+        Assert.Equal(JsonValueKind.Null, (await Listado(codigoSinPrecio, sinPrecio)).GetProperty("precioVenta").ValueKind);
     }
 
     [Fact]
@@ -155,7 +196,7 @@ public class clsServiciosConexosTests
     {
         var resp = await _fx.Client("Admin").PostJson("/api/servicios-conexos", new
         {
-            codigoServicio = $"PV_{Guid.NewGuid():N}"[..20], tipoServicio = "Precinto", costoUnitario = 1000, precioVenta = -1, unidad = "Por unidad", vigencia = "2026-12-31",
+            codigoServicio = Cod("PV", 20), tipoServicio = "Precinto", costoUnitario = 1000, precioVenta = -1, unidad = "Por unidad", vigencia = "2026-12-31",
         });
         Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
     }
@@ -191,7 +232,7 @@ public class clsServiciosConexosTests
     public async Task ImportarExcel_lee_PRECIO_VENTA_y_una_columna_VALOR_VENTA_no_se_confunde_con_el_costo()
     {
         var existente = await CrearConPrecio(1000, null);
-        var nuevo = $"PVN_{Guid.NewGuid():N}"[..20];
+        var nuevo = Cod("PVN", 20);
         var archivo = ArchivoExcel(["CODIGO", "TIPO SERVICIO", "VALOR VENTA", "COSTO UNITARIO", "UNIDAD"],
         [
             [existente.Codigo, "Precinto", "1800", "1200", "Por unidad"], // actualiza
@@ -223,9 +264,9 @@ public class clsServiciosConexosTests
     [Fact]
     public async Task Un_PRECIO_VENTA_ilegible_o_negativo_invalida_solo_esa_fila()
     {
-        var bueno = $"PVB_{Guid.NewGuid():N}"[..20];
-        var malo = $"PVM_{Guid.NewGuid():N}"[..20];
-        var negativo = $"PVG_{Guid.NewGuid():N}"[..20];
+        var bueno = Cod("PVB", 20);
+        var malo = Cod("PVM", 20);
+        var negativo = Cod("PVG", 20);
         var archivo = ArchivoExcel(["CODIGO", "TIPO SERVICIO", "COSTO UNITARIO", "PRECIO VENTA", "UNIDAD"],
         [
             [bueno, "Precinto", "1000", "1500", "Por unidad"],
@@ -332,11 +373,11 @@ public class clsServiciosConexosTests
     public async Task ImportarExcel_fila_existente_actualiza_fila_nueva_crea()
     {
         var admin = _fx.Client("Admin");
-        var codigoExistente = $"UPSERT_{Guid.NewGuid():N}"[..20];
+        var codigoExistente = Cod("UPSERT", 20);
         var crear = await admin.PostJson("/api/servicios-conexos", PayloadValido(codigoExistente, costo: 1000));
         Assert.Equal(HttpStatusCode.Created, crear.StatusCode);
 
-        var codigoNuevo = $"NUEVO_{Guid.NewGuid():N}"[..20];
+        var codigoNuevo = Cod("NUEVO", 20);
         var encabezados = new[] { "CODIGO", "TIPO SERVICIO", "COSTO UNITARIO", "UNIDAD", "VIGENCIA", "CATEGORIA" };
         var archivo = ArchivoExcel(encabezados,
         [
@@ -358,7 +399,7 @@ public class clsServiciosConexosTests
     [Fact]
     public async Task ImportarExcel_fila_repetida_en_el_archivo_cuenta_como_duplicada()
     {
-        var codigo = $"FILEDUP_{Guid.NewGuid():N}"[..20];
+        var codigo = Cod("FILEDUP", 20);
         var encabezados = new[] { "CODIGO", "TIPO SERVICIO", "COSTO UNITARIO", "UNIDAD" };
         var archivo = ArchivoExcel(encabezados,
         [
@@ -381,7 +422,7 @@ public class clsServiciosConexosTests
     public async Task ImportarExcel_mismo_codigo_con_distintas_mayusculas_actualiza_no_falla()
     {
         var admin = _fx.Client("Admin");
-        var codigo = $"MAY_{Guid.NewGuid():N}"[..15];
+        var codigo = Cod("MAY", 15);
         var crear = await admin.PostJson("/api/servicios-conexos", PayloadValido(codigo.ToUpperInvariant(), costo: 1000));
         Assert.Equal(HttpStatusCode.Created, crear.StatusCode);
 
@@ -400,11 +441,11 @@ public class clsServiciosConexosTests
     public async Task ImportarExcel_texto_largo_queda_invalida_con_detalle_no_500()
     {
         var textoLargo = new string('A', 121);
-        var codigoValido = $"OK_{Guid.NewGuid():N}"[..15];
+        var codigoValido = Cod("OK", 15);
         var encabezados = new[] { "CODIGO", "TIPO SERVICIO", "COSTO UNITARIO", "UNIDAD" };
         var archivo = ArchivoExcel(encabezados,
         [
-            [$"LARGO_{Guid.NewGuid():N}"[..15], textoLargo, "1000", "Por unidad"],
+            [Cod("LARGO", 15), textoLargo, "1000", "Por unidad"],
             [codigoValido, "Precinto", "1000", "Por unidad"],
         ]);
 
@@ -423,7 +464,7 @@ public class clsServiciosConexosTests
     {
         var encabezados = new[] { "CODIGO", "TIPO SERVICIO", "COSTO UNITARIO", "UNIDAD" };
         var archivo = ArchivoExcel(encabezados,
-            [[$"MONTO_{Guid.NewGuid():N}"[..15], "Precinto", "99999999999999999", "Por unidad"]]);
+            [[Cod("MONTO", 15), "Precinto", "99999999999999999", "Por unidad"]]);
 
         var resp = await _fx.Client("Admin").PostAsync("/api/servicios-conexos/importar-excel", archivo);
         Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
@@ -434,7 +475,7 @@ public class clsServiciosConexosTests
     public async Task ImportarExcel_costo_negativo_queda_invalida()
     {
         var encabezados = new[] { "CODIGO", "TIPO SERVICIO", "COSTO UNITARIO", "UNIDAD" };
-        var archivo = ArchivoExcel(encabezados, [[$"NEG_{Guid.NewGuid():N}"[..15], "Precinto", "-500", "Por unidad"]]);
+        var archivo = ArchivoExcel(encabezados, [[Cod("NEG", 15), "Precinto", "-500", "Por unidad"]]);
 
         var resp = await _fx.Client("Admin").PostAsync("/api/servicios-conexos/importar-excel", archivo);
         Assert.Equal(1, (await resp.Json()).GetProperty("invalidas").GetInt32());
@@ -445,7 +486,7 @@ public class clsServiciosConexosTests
     public async Task ImportarExcel_activo_vacio_en_actualizacion_no_toca_el_estado_existente()
     {
         var admin = _fx.Client("Admin");
-        var codigo = $"ACT_{Guid.NewGuid():N}"[..15];
+        var codigo = Cod("ACT", 15);
         var crear = await admin.PostJson("/api/servicios-conexos", PayloadValido(codigo));
         var id = (await crear.Json()).GetProperty("id").GetGuid();
         await admin.PatchJson($"/api/servicios-conexos/{id}", new { activo = false });
@@ -502,7 +543,7 @@ public class clsServiciosConexosTests
     public async Task Listar_busca_por_dimensiones_del_servicio()
     {
         var admin = _fx.Client("Admin");
-        var codigo = $"QDIM_{Guid.NewGuid():N}"[..15];
+        var codigo = Cod("QDIM", 15);
         var ruta = $"RutaUnica-{Guid.NewGuid():N}"[..20];
         var crear = await admin.PostJson("/api/servicios-conexos", new
         {

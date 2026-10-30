@@ -1,15 +1,43 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
 using Nexo.Api.Tests.Infra;
 
 namespace Nexo.Api.Tests;
 
 [Collection("api")]
-public class clsCotizacionesTests
+public class clsCotizacionesTests : IDisposable
 {
     private readonly clsApiFixture _fx;
+    private readonly DateTimeOffset _inicio = DateTimeOffset.UtcNow.AddMinutes(-1);
+    private readonly List<Guid> _solicitudes = [];
+    private readonly List<Guid> _servicios = [];
+
     public clsCotizacionesTests(clsApiFixture fx) => _fx = fx;
+
+    /// <summary>
+    /// Borra lo que crearon las pruebas de esta clase: las solicitudes (con sus líneas y cotizaciones) y los servicios de precio de venta. Es de
+    /// mejor esfuerzo: un bloqueo ajeno de la base compartida no debe tumbar una prueba que ya pasó.
+    /// </summary>
+    public void Dispose()
+    {
+        var datos = new clsDatosDePrueba(_fx);
+        Guid[] solicitudes, servicios;
+        lock (_solicitudes) { solicitudes = [.. _solicitudes]; servicios = [.. _servicios]; }
+        foreach (var id in solicitudes) datos.Eliminar(id, _inicio);
+        if (servicios.Length == 0) return;
+        try
+        {
+            _fx.WithDb(db =>
+            {
+                db.AuditLogs.Where(a => a.Entidad == "servicios_conexos" && servicios.Contains(a.EntidadId!.Value)).ExecuteDelete();
+                db.ServiciosConexos.Where(x => servicios.Contains(x.Id) && !db.CotizacionConexos.Any(c => c.ServicioConexoId == x.Id)).ExecuteDelete();
+                return 0;
+            });
+        }
+        catch (Microsoft.Data.SqlClient.SqlException) { }
+    }
 
     /// <summary>Crea una solicitud spot con una línea y devuelve (solicitudId, lineaId).</summary>
     private async Task<(Guid solicitud, Guid linea)> NuevaSolicitudConLinea()
@@ -22,6 +50,7 @@ public class clsCotizacionesTests
             linea = new { tipologia = "CargaSeca", peso = 10000 }
         });
         var sid = (await crear.Json()).GetProperty("id").GetGuid();
+        lock (_solicitudes) _solicitudes.Add(sid);
         var detalle = await cli.GetFromJsonAsync<JsonElement>($"/api/solicitudes/{sid}");
         var lid = detalle.GetProperty("lineas")[0].GetProperty("lineaId").GetGuid();
         return (sid, lid);
@@ -267,7 +296,9 @@ public class clsCotizacionesTests
             unidad = "Por unidad", vigencia = "2026-12-31",
         });
         Assert.Equal(HttpStatusCode.Created, resp.StatusCode);
-        return (await resp.Json()).GetProperty("id").GetGuid();
+        var id = (await resp.Json()).GetProperty("id").GetGuid();
+        lock (_solicitudes) _servicios.Add(id);
+        return id;
     }
 
     [Fact]

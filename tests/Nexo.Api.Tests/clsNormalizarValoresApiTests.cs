@@ -185,7 +185,7 @@ public class clsNormalizarValoresApiTests(clsApiFixture fx)
             Assert.Equal(HttpStatusCode.Created, creado.StatusCode);
 
             var resp = await admin.PostAsJsonAsync(Ruta, Cuerpo(
-                [V("lineaNegocio", $"{marca} outbound"), V("lineaNegocio", "IMPO"), V("lineaNegocio", $"{marca} vacios")], cliente));
+                [V("lineaNegocio", $"{marca} outbound"), V("lineaNegocio", "IMPO"), V("lineaNegocio", "Retorno de contenedores vacios")], cliente));
 
             var valores = (await resp.Json()).GetProperty("valores").EnumerateArray().ToList();
             Assert.Equal(
