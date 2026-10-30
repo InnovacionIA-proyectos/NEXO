@@ -84,6 +84,6 @@ donde vive Dokploy, y sí llega a DWSice sin problema.
 |---|---|
 | `Named Pipes Provider, error 40` / timeout de conexión | `TEST_DB_CONNECTION` no llegó al proceso de `dotnet test` (fallback a `localhost`) — usar el bloque de PowerShell completo de arriba, en una sola consola. |
 | Error de red al conectar a `10.10.40.85` | VPN corporativa desconectada. Verificar con `Test-NetConnection -ComputerName 10.10.40.85 -Port 1433`. |
-| `Invalid object name 'db_NEXO.tbl_...'` | El esquema/tabla todavía no existe en la base real — ver `docs/Database/MIGRACION-PREFIJO-TBL.md`. |
+| `Invalid object name '<esquema>.tbl_...'` | La tabla no existe en la base o `Database__Esquema` apunta a otro esquema — ver `docs/Database/README.md`. |
 | Timeout solo dentro de Docker (Opción 2), pero el host sí conecta | La VPN puede hacer split-tunneling que excluye la red virtual de Docker — confirmar conectividad desde dentro del contenedor. |
 | `500 Internal Server Error` al abrir/costear una solicitud con ruta real, solo en Docker (Opción 2) | DWSice no completa el TLS handshake con el cliente .NET Linux del contenedor — ver "Limitación conocida" arriba. Usar Opción 1. |

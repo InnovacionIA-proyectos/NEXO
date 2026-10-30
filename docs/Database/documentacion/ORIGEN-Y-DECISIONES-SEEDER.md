@@ -1,396 +1,177 @@
-# Decisiones técnicas por seeder
+# Origen y decisiones del seeder
 
-Este archivo documenta el **razonamiento** detrás de cada seeder de
-`docs/Database/seeder/` — qué se normalizó, cómo se resolvió cada caso
-ambiguo, y por qué se tomó cada decisión. El `README.md` de esta misma carpeta
-documenta el "qué es" y "cómo se carga" de cada CSV; este archivo documenta el
-"por qué quedó así".
+De dónde sale cada dato inicial de NEXO (`../seeder/`) y qué reglas se aplicaron. Qué guarda
+cada tabla está en `DICCIONARIO-DATOS.md`.
 
----
+Los datos iniciales se calcularon una vez, con consultas directas a las fuentes, y quedaron
+fijos en los archivos del seeder. No hay ningún proceso que los mantenga sincronizados: si una
+fuente cambia (una ciudad nueva en el DW, un costo nuevo en el Excel), hay que regenerar el
+archivo a mano. Los Excel de negocio se guardan fuera del repositorio.
 
-## `municipios.csv`
+## Resumen
 
-**Decisión: `Id` autoincremental como llave primaria, no `CodigoDane`.**
-El código DANE por sí solo no es único — choca entre Venezuela y Ecuador
-(ambos países reusan rangos de código). La llave natural real es
-`(CodigoDane, Pais)`, pero se dejó `Id` como PK para que el resto del sistema
-(FKs de `tbl_tarifas_plaza`, etc.) no tenga que cargar con una clave
-compuesta.
-
-**Decisión: sin sincronización automática.** El cruce contra `tblSAPDANE` +
-`tblZonasTarificacionRelacion` + `tblSAPTarifas`/`tblSAPTarifasLog` se corrió
-una vez, a mano, con consultas SQL directas contra el datacenter corporativo
-(`dbSolucionesTI`) — no hay ningún adaptador de la app que lo mantenga
-actualizado. Si el DW agrega una ciudad nueva, este CSV no se entera solo.
-
----
-
-## `pesos.csv`
-
-**Decisión: no es un catálogo cerrado.** Se partió de las 7 bandas de negocio
-ya conocidas (`RANGOS PESOS APP ABRIL 26 2025.xlsx`/`FLETES PLAZA.xlsx`), pero
-al verificar contra el sistema externo en vivo apareció una tarifa real
-(Cartagena→Medellín) con un rango (14001-20000) que no calzaba con ninguna de
-las 7. En vez de forzarla dentro de una banda existente, se agregó como banda
-8. Conclusión de diseño: el CRUD de `tbl_pesos` que construya backend debe
-esperar que se agreguen bandas nuevas con el tiempo, no asumir que siempre
-serán las mismas 8.
-
----
-
-## `reglas_solo_sicetac.csv`
-
-**Decisión original: `Origen`/`Destino` como código DANE, no texto de
-ciudad.** Es un cambio de convención respecto al resto del sistema (que usa
-texto libre de ciudad para esta misma tabla) — se hizo a propósito para
-alinear con `tbl_municipios`, con la advertencia de que el matching de reglas
-contra una solicitud real probablemente sigue comparando por texto, así que
-backend debe revisar si ese matching necesita cambiar.
-
-**Corrección 2026-10-01 — códigos de vehículo mal asignados en la carga
-inicial:**
-
-- **`C2` → `2`.** Las filas de Turbo/Sencillo se habían cargado con el código
-  de **SAP Tarifario** (`C2` = "Rígidos, Turbo o Sencillo" en
-  `tblSAPTiposVehiculoTarifario`), pero esta tabla es específicamente para
-  reglas de **SICE-TAC** (de ahí el nombre `reglas_solo_sicetac`) — y en la
-  nomenclatura de SICE-TAC, Turbo/Sencillo corresponden al código `2`, no
-  `C2`. Se verificó que no había colisión de llave única `(Origen, Destino,
-  TipoVehiculo)` contra las filas que ya usaban `2` para otro caso (camión
-  dos ejes PBV +10500 kg) antes de aplicar el cambio — ninguna ruta tenía
-  ambos casos a la vez.
-- **`PBV 7500-8000` → `2L3`.** Este valor se había dejado como texto literal
-  (no un código de catálogo) porque al armar el seeder original no calzaba
-  claro con ningún código — se había probado `2L1` sin confirmar. Confirmado
-  ahora: el equivalente real para comparar contra SICE-TAC es `2L3` (el
-  equivalente contra SAP Tarifario, para referencia, sería `2L2` — distinto
-  código en cada catálogo, consistente con que SICE-TAC y SAP Tarifario no
-  comparten exactamente la misma taxonomía de vehículos).
-- **Se quitaron las 88 filas de contenedor (`CNT20/Consolidado`,
-  `CNT20/Exclusivo`, `CNT40/Consolidado`, `CNT40/Exclusivo`).** Estas filas
-  nunca fueron un tipo de vehículo real — venían de la hoja "Devolución de
-  contenedor vacío" del Excel original, y se habían cargado en la columna
-  `TipoVehiculo` solo porque no había dónde más ponerlas. Se decidió que no
-  pertenecen a esta tabla de reglas de vehículo y se eliminaron por completo
-  (del CSV y de la base real) en vez de mantenerlas como un caso especial.
-- **Filas finales: 260** (348 originales − 88 de contenedor, con `C2` y `PBV
-  7500-8000` renombrados en las que quedaron, no removidas).
-- Aplicado contra `dbInformesAutomatizados_Pruebas.db_NEXO`: tabla vaciada y
-  recargada completa desde el CSV corregido (no fue un `UPDATE` selectivo),
-  para no arrastrar ninguna fila vieja con el código incorrecto.
-
-**Nombre original en el Excel (`FLETES PLAZA.xlsx` / `fletes-plaza-normalizado-sice.csv`) → código final en el CSV:**
-
-| Nombre/etiqueta original en el Excel | `TipoVehiculo` final |
-|---|---|
-| "Camion dos ejes PBV- mas de 10500 kg" | `2` |
-| "TURBO" | `2` *(era `C2`, corregido)* |
-| "SENCILLO" | `2` *(era `C2`, corregido)* |
-| "Camion dos ejes livianos PBV 7500 a 8000 kg" | `2L3` *(era el texto literal `"PBV 7500-8000"`, corregido)* |
-| "Tracto camion dos ejes con semiremolque dos ejes hasta 15000 kg" | `2S2` |
-| "Tracto camion dos ejes con semiremolque dos ejes desde 15001-18000 kg" | `2S2` |
-| "MINI MULA" | `2S2` |
-| "Tracto camion dos ejes con semiremolque tres hasta 23000 kg" | `2S3` |
-| "Tracto camion tres ejes con semiremolque dos hasta 30000 kg" | `3S2` |
-| "MULA" | `3S3` |
-| "Tracto camion tres ejes con semiremolque tres hasta 34000 kg" | `3S3` |
-| *(hoja "Devolucion cont vacios", categoría "Devolución Contenedor Vacío")* | — eliminadas (no son tipo de vehículo) |
-
----
-
-## `tarifas_plaza.csv`
-
-**Decisión: FK real a `tbl_municipios.Id`, a diferencia de
-`reglas_solo_sicetac.csv`.** Aquí `OrigenMunicipioId`/`DestinoMunicipioId` sí
-son FK declaradas contra el `Id` autoincremental de `tbl_municipios` (no el
-código DANE como texto) — si este seeder se recarga en otra base, hay que
-resolver contra el `Id` que tenga esa base en ese momento, no reusar los
-números de este CSV tal cual.
-
-**Decisión: dos "familias" de fila con dimensiones distintas** (por eso
-`ClaseContenedor`/`PesoId`/`TipoVehiculo` son todas nullable — nunca se usan
-las tres a la vez): 97 filas de importación por contenedor (usan `PesoId` +
-`TipoVehiculo` derivado de la banda de peso) y 174 filas nacionales por tipo
-de vehículo (usan solo `TipoVehiculo`).
-
-**Corrección 2026-10-01 — 82 filas de `TURBO`/`SENCILLO` eran en realidad
-solo-SICE, no tarifas reales de Plaza.** Estas filas venían de una sección
-del Excel literalmente llamada **"Nacional y Expo - sección 'SICE'"** — un
-valor de referencia/comparación contra SICE-TAC, no un precio real de Plaza.
-Se confirmó contra la hoja "PLAZA" original (captura de pantalla del
-negocio) que esas mismas rutas exactas (Bogotá→Medellín, Bogotá→Cali,
-Bogotá→Cartagena, etc.) están marcadas como `"sice"` ahí — es decir, nunca
-debieron cargarse en `tarifas_plaza.csv` con un valor numérico. Se verificó
-que las 82 rutas ya estaban cubiertas en `reglas_solo_sicetac.csv` (código
-`2`, tras su propia corrección) antes de borrarlas, para no perder el dato de
-que esas rutas resuelven por SICE-TAC. **Filas finales: 189** (271 − 82).
-
-También se corrigió **`PBV 7500-8000` → `2L3`** (1 fila), mismo criterio que
-en `reglas_solo_sicetac.csv`.
-
-**Corrección 2026-10-01 (segunda ronda) — las 82 filas de "Carga Suelta"
-restantes (Mini Mula `2S2` + Mula `3S3`) tenían el mismo problema.** Al
-revisar más a fondo se confirmó que **toda** la hoja "Fletes Nacional y
-Expo" (de donde salían Turbo/Sencillo/Mini Mula/Mula) y toda la hoja
-"Devolución cont vacíos" son solo-SICE — ninguna de las dos tiene un precio
-real de Plaza, sin excepción. Se verificó que las 82 rutas de Mini Mula/Mula
-también están duplicadas como `"sice"` en `reglas_solo_sicetac.csv`
-(código `2S2`/`3S3`), confirmando que tampoco debían estar aquí. Se
-eliminaron del seeder. **`tarifas_plaza.csv` queda únicamente con la hoja
-"Fletes puertos"** (`ClaseViaje = "Contenedor"`, la que realmente tiene
-precio) — **filas finales: 107** (189 − 82).
-
-Regla general para este seeder, de ahora en adelante: **`tarifas_plaza.csv`
-solo debe contener filas de la hoja "Fletes puertos" con precio real** —
-nada de "Devolución cont vacíos" ni "Fletes Nacional y Expo", porque ambas
-hojas son 100% solo-SICE.
-
-**Por qué quedan 107 filas y no 97 (el total exacto de la hoja "Fletes
-puertos"):** no es un error ni un duplicado — 5 de las 97 filas originales
-traían el destino combinado en una sola celda, `"CAJICA-ZIPAQUIRA-TOCANCIPA"`
-(mismo caso que en `reglas_solo_sicetac.csv`), y se separaron en una fila por
-cada municipio real (Cajicá, Zipaquirá, Tocancipá) — 5 filas combinadas se
-convirtieron en 15 (5 bandas de peso × 3 municipios). Cuenta: 97 (fuente) −
-5 (combinadas) + 15 (separadas) = **107**. Verificado contra el CSV final:
-hay exactamente 15 filas `Buenaventura → {Cajicá, Zipaquirá, Tocancipá}` (5
-por cada destino), en vez de 5 filas hacia un destino que no existe como
-municipio único.
-
-**Nombre original en el Excel (hoja "Fletes puertos", la primera del libro `FLETES PLAZA.xlsx`) → código final en el CSV** — estas son las 97 filas de importación por contenedor, donde `TipoVehiculo` se deriva de la banda de peso (`PesoId`):
-
-| Nombre/etiqueta original en el Excel | `TipoVehiculo` final |
-|---|---|
-| "Camion dos ejes PBV- mas de 10500 kg" | `2` |
-| "Camion dos ejes livianos PBV 7500 a 8000 kg" | `2L3` *(era el texto literal `"PBV 7500-8000"`, corregido)* |
-| "Tracto camion dos ejes con semiremolque dos ejes hasta 15000 kg" | `2S2` |
-| "Tracto camion dos ejes con semiremolque dos ejes desde 15001-18000 kg" | `2S2` |
-| "Tracto camion dos ejes con semiremolque tres hasta 23000 kg" | `2S3` |
-| "Tracto camion tres ejes con semiremolque dos hasta 30000 kg" | `3S2` |
-| "Tracto camion tres ejes con semiremolque tres hasta 34000 kg" | `3S3` |
-
-(La hoja "Fletes Nacional y Expo" completa — "TURBO", "SENCILLO", "MINI MULA" y "MULA" — se eliminó del seeder: las 164 filas resultaron ser solo-SICE, no tarifa real de Plaza, ver corrección de arriba. `tarifas_plaza.csv` solo contiene filas de "Fletes puertos".)
-
-**Decisión: `LineaNegocio`/`ClaseViaje`/`ClaseContenedor` guardan el nombre
-completo, no el `ID` numérico** de las tablas SAP correspondientes
-(`dbSolucionesTI`) — ese `ID` vive en otra base de datos, en otro servidor,
-sin FK real posible desde Nexo, así que guardar el texto deja la fila legible
-sin depender de consultar el catálogo externo.
-
-**Decisión: `Vigencia` fija en `2026-09-30` para las 271 filas.** El Excel
-original es una foto fija de ~abril 2025 sin fecha por fila — se usó una
-fecha de referencia única, pendiente de que backend/negocio confirme si sigue
-teniendo sentido antes de usar estas tarifas en producción real.
-
----
-
-## `servicios_conexos.csv`
-
-**Decisión: una sola tabla reestructurada in-place**, no un catálogo padre +
-tabla(s) hija de variantes — para no duplicar `Id`/`Activo`/`CreatedAt`/etc.
-entre dos tablas y mantener el modelo más simple.
-
-**Decisión: se eliminó `ReglaCobro` y `RowVersion`.** `CostoUnitario` +
-`Unidad` alcanza para los 4 tipos de servicio sin necesitar una fórmula JSON
-libre; `RowVersion` no se estaba usando para control de concurrencia real.
-
-**Decisión: `CodigoServicio` usa el código real del Excel cuando existe**
-(`PRE_BSAT`, `AVT_AUTO`, etc.); cuando el servicio no trae uno propio
-(Almacenamiento, ITR, y los 10 de valor único preexistentes), se usa el mismo
-valor de `TipoServicio` como código, para no dejarlo vacío.
-
-**Decisión: `Origen`/`Destino`/`Puerto`/`Ruta`/`TipoMaquina` son texto plano
-(`NOT NULL DEFAULT 'NO APLICA'`), no FK a `tbl_municipios`.** Se intentó
-primero como FK estricto (incluso solo para los servicios logísticos), pero
-se abandonó al encontrar casos reales sin equivalente único en
-`tbl_municipios`: "Eje Cafetero" (región, no municipio, en Almacenamiento) y
-~36% de las filas de acompañamiento vehicular con peajes/corredores viales en
-vez de ciudades (ej. "Peaje De Occidente", "Cali - Yumbo", "Ye De Cienaga").
-Un FK real habría bloqueado la carga de esas filas.
-
-**Decisión: regla de resolución de nombres de ciudad.** Se normaliza el
-nombre (sin tildes, mayúsculas, espacios de más) y se compara contra
-`tbl_municipios.Municipio`; si cruza, se guarda el nombre canónico tal como
-está en `tbl_municipios`; si no cruza, se guarda el texto tal cual vino del
-Excel. Diccionario de alias manuales para casos donde el Excel usa un nombre
-coloquial que no cruza por normalización simple: `Bogota`/`Bogota
-D.C.`→`BOGOTA, D.C.`, `Cartagena`→`CARTAGENA DE INDIAS`,
-`Santamarta`→`SANTA MARTA`, `Medellin (Normal)`→`MEDELLIN`,
-`Guachancipa`→`GACHANCIPA` (probable typo), `Pto Tejada`→`PUERTO TEJADA`,
-`Carmen De Bolivar`→`EL CARMEN DE BOLIVAR`, `El Bagre
-(Zaragoza)`→`EL BAGRE`, `Granada (Meta)`→`GRANADA`, `Buga`→`GUADALAJARA DE
-BUGA`.
-
-**Decisión: ciudades con nombre ambiguo no se desambiguan por
-departamento.** Cuando el mismo nombre existe en 2+ departamentos de
-`tbl_municipios` (ej. "Rionegro" en Antioquia y Santander, "Armenia" en
-Antioquia y Quindío), se guarda el nombre del municipio sin elegir
-departamento — como el campo es texto libre (no FK), el texto es idéntico en
-ambos casos y la ambigüedad no afecta el dato guardado.
-
-**Decisión: `TipoMaquina` combina "tipo de máquina" + "tipo de movimiento"**
-del Excel en una sola columna de texto (ej. `"Maquina 3.5 - 2 Movimientos"`),
-en vez de 2 columnas separadas, porque ambos datos juntos son los que
-determinan el precio de una fila de ITR.
-
-**Decisión: `Unidad` es un campo nuevo que no viene del Excel.** Se asignó
-`'Por estiba'` para los servicios logísticos (Almacenamiento, ITR) y `'Por
-unidad'` para todo lo demás (adicionales y los 10 de valor único), como
-placeholder de negocio hasta que se defina algo más preciso.
-
-**Decisión: los 10 servicios de valor único preexistentes (Cargue,
-Descargue, Stand-by, etc.) se sacaron del seeder.** Son datos ficticios de
-demostración de `clsDataSeeder.cs` (no vienen del Excel real de costos), así
-que no pertenecen a un seeder de datos de negocio reales — quedan fuera a
-propósito.
-
-### Mapeo de columnas por tipo de servicio (Excel → `tbl_servicios_conexos`)
-
-**Logísticos → Almacenamiento (por ciudad):** `TIPO DE SERVICIO` → `CodigoServicio`+`TipoServicio` · `CIUDAD` → `Origen` · `COSTO 2026` → `CostoUnitario` · `VIGENCIA` → `Vigencia` · `Unidad` fija `'Por estiba'` · `Destino`/`Puerto`/`Ruta`/`TipoMaquina` = `'NO APLICA'`.
-
-**Logísticos → ITR (por puerto + máquina + movimiento):** `TIPO DE SERVICIO` → `CodigoServicio`+`TipoServicio` · `CIUDAD` → `Origen` · `PUERTO` → `Puerto` · `TIPO DE MAQUINA`+`TIPO DE MOVIMIENTO` → `TipoMaquina` (combinados) · `COSTO 2026` → `CostoUnitario` · `VIGENCIA` → `Vigencia` · `Unidad` fija `'Por estiba'` · `Destino`/`Ruta` = `'NO APLICA'`.
-
-**Adicionales → Precinto/Barra Satelital (por ruta):** `CODIGO SERVICIO` → `CodigoServicio` · `DESCRIPCIÓN SERVICIO` → `TipoServicio` · `RUTA` → `Ruta` · `COSTO 2026` → `CostoUnitario` · `VIGENCIA` → `Vigencia` · `Unidad` fija `'Por unidad'` · `Origen`/`Destino`/`Puerto`/`TipoMaquina` = `'NO APLICA'`.
-
-**Adicionales → Acompañamiento vehicular (por origen-destino):** `CODIGO SERVICIO` → `CodigoServicio` · `DESCRIPCIÓN SERVICIO` → `TipoServicio` · `ORIGEN` → `Origen` · `DESTINO` → `Destino` · `COSTO 2026` → `CostoUnitario` · `VIGENCIA` → `Vigencia` · `Unidad` fija `'Por unidad'` · `Puerto`/`Ruta`/`TipoMaquina` = `'NO APLICA'`.
-
----
-
-## `alias_elementos.csv`
-
-**Decisión D6 (issue DATA-2/#315): `Codigo` es texto libre, no una FK a
-`tbl_configuraciones_vehiculo`.** El nombre sugerido original de la columna
-era `ConfiguracionVehiculoId` (uniqueidentifier), pero al revisar la tabla
-real contra `dbInformesAutomatizados_Pruebas.db_NEXO` se encontró que no sirve
-como catálogo limpio para apuntar: tiene 1.463 filas, muchas con
-`TipoVehiculo` repetido en decenas de combinaciones de `Carroceria`/`RangoPeso`
-distintas, mezcladas con texto libre sin normalizar (`ResolverVehiculo` en
-`clsResolucionDeCatalogos.cs` crea una fila nueva en cuarentena cada vez que
-el texto no calza exacto con una ya existente — por eso la tabla crece así).
-Y el código `2L2` (Turbo) no tenía, al momento de esta verificación, ninguna
-fila marcada `EsCatalogoOficial = 1`. Guardar el código como texto evita
-depender de una fila específica que puede no existir, y es el mismo valor que
-ya usa `clsConfiguracionVehiculo.TipoVehiculo` — Nexo y el Cubicador comparten
-este vocabulario de códigos (confirmado contra
-`cubicador/database/seeder/vehiculos.csv`: `2L2`=Turbo, `C2`=Sencillo,
-`C3`=Dobletroque, `2S2`=Minimula, `3S3`=Tractomula).
-
-**Decisión D6, ampliada: un solo diccionario para vehículo y contenedor, con
-`TipoElemento` como discriminador.** El archivo original
-(`diccionario_configuraciones_vehiculo_RAW.csv`) trae 7 columnas: 5 de tipo de
-vehículo y 2 de tamaño de contenedor ("Contenedor 40 HC", "Contenedor 20").
-Los dos tamaños de contenedor NO son un tipo de vehículo — igual que ya se
-había decidido para `reglas_solo_sicetac.csv` (ver esa sección arriba: "nunca
-fueron un tipo de vehículo real") — pero en vez de descartarlos, aquí se
-incluyen en la misma tabla con su propio código, porque conviene tener un solo
-diccionario de alias para toda la Captura. Mapeo confirmado contra
-`tblSAPClaseContenedor` (el mismo catálogo del endpoint
-`GET /api/catalogos/clases-contenedor`): "Contenedor 40 HC" → `CNT40.HC`,
-"Contenedor 20" → `CNT20.ST`.
-
-**Decisión: `AliasNormalizado` se calculó con el mismo algoritmo que ya usa
-el backend** (`clsResolucionDeCatalogos.Normalizar`), no uno nuevo — para que
-este diccionario use exactamente la misma noción de "mismo texto" que ya usa
-`ResolverVehiculo`/`ResolverRuta` al capturar.
-
-**Decisión: se mantienen 2 alias ambiguos del Excel original, "40" y "20" a
-secas** (sin "HC"/"STD"), porque así vienen en el diccionario de negocio
-original y no corresponden a ningún otro tipo de vehículo o contenedor en las
-demás columnas (sin choque verificado).
-
-**Verificación de colisiones:** se normalizaron las 7 columnas completas y se
-confirmó que ningún `AliasNormalizado` se repite entre dos columnas distintas
-— 71 filas finales (48 de vehículo + 23 de contenedor), sin duplicados dentro
-de cada columna (el nombre "bonito" de la columna y su primera fila de datos
-suelen repetir el mismo texto, ej. "Turbo"/"Turbo" — se dejó una sola vez).
-
-**Nota fuera de alcance (aclarada con Sara, 2026-10-20):** en el Excel de
-licitación real, "tipo de vehículo" y "carrocería" llegan en dos columnas
-separadas. Este diccionario solo resuelve la columna de tipo de vehículo; la
-carrocería sigue viajando tal cual (solo con la normalización de
-tildes/mayúsculas que ya existe), y `ResolverVehiculo` sigue buscando la fila
-exacta en `tbl_configuraciones_vehiculo` con el código ya resuelto + esa
-carrocería — eso no cambia con esta tabla. Conectar este diccionario con la
-Captura real (código C#) es trabajo de otra issue, no de esta.
-
-**Valor único (los 10 preexistentes, fuera del seeder pero documentado por si se vuelven a necesitar):** `Nombre` → `CodigoServicio`+`TipoServicio` · `ValorBase` → `CostoUnitario` · `VigenteHasta` → `Vigencia` · `Categoria`/`Activo` se conservan · `ReglaCobro` eliminado · todas las columnas de dimensión = `'NO APLICA'`.
-
-
-## `mapeo_vehiculos.csv`
-
-**Decisión (S6-HU-37.1/#377): una tabla explícita de traducción, en vez de
-asumir que NEXO, SICE-TAC y Plaza/SAP usan el mismo código de vehículo.** Hasta
-ahora NEXO consultaba SICE-TAC (`CONFIGURACION` de `tblRutasSicetac`) y Plaza/SAP
-con el mismo código de `TipoVehiculo`. Cuando la fuente usaba otro código, no
-encontraba filas y el camino tolerante tomaba la ruta con cualquier vehículo y
-se quedaba con la más barata, sin avisar. Así salió el Sencillo cotizado con
-precio de camioneta (`CA_`) en el análisis del Excel de un cliente
-(2026-10-26).
-
-**Decisión: `TipoVehiculo` es la llave y es el código de NEXO**, el que queda
-después de resolver los alias (`tbl_alias_elementos`). La tabla parte de ahí y
-dice con qué código buscar en cada fuente. Es global, no por cliente: lo propio
-de un cliente vive en `tbl_diccionario_cliente`.
-
-**Decisión: una sola columna para Plaza/SAP (`CodigoPlazaSap`)**, porque
-`tblSAPTarifas` y `tbl_tarifas_plaza` usan el mismo vocabulario. Se guarda el
-código en texto y no el ID numérico de SAP: `tbl_tarifas_plaza` compara por
-texto, y para `tblSAPTarifas` el backend ya convierte el código en ID con el
-catálogo de tipos de vehículo.
-
-**Decisiones de datos (2026-10-27):**
-- **Sencillo (`C2`) → `2`** en SICE-TAC y en Plaza/SAP. En las tarifas de plaza
-  hay unas 5.000 filas con `2` y solo 14, todas vencidas, con `C2`.
-- **Turbo:** en Plaza/SAP, `2L1`, `2L2` y `2L3` se tarifan como `2L2`; en
-  SICE-TAC cada uno conserva su código. El `2_7` del análisis del 2026-10-26 fue
-  una excepción puntual, confirmada con el Administrador de Tarifas.
-- **Dobletroque (`C3`) → `3`** en SICE-TAC y `C3` en Plaza/SAP.
-- Las configuraciones que solo existen en SICE-TAC (`2_5`, `2_7`, `3S2`, `CA_`,
-  `V2`, `V3`, `V4`) quedan con `CodigoPlazaSap` vacío.
-
-**Pendiente:** `tarifas_plaza.csv` usa `3S2` y `2L3`, que no coinciden con el
-código de plaza del mapeo (vacío y `2L2`). Hay que decidir si se corrige
-`tbl_tarifas_plaza` o si se separa la columna en dos (ver
-`docs/backlog/2026-10-27_PENDIENTES-MAPEO-VEHICULO.md`).
-
-**Decisión: se carga con script (`MERGE`) y no con `BULK INSERT`**, para que el
-mismo archivo cree la tabla, cargue los datos y se pueda volver a correr sin
-duplicar si cambia algún código.
-
-## `rangos_peso_contenedor.csv`
-
-**Decisión (S6-HU-37.3/#379): `TipoVehiculo` usa el código de NEXO, el mismo
-de `tbl_mapeo_vehiculo_tarifario`, con llave foránea hacia el índice único del
-mapeo.** El documento de negocio trae el camión de dos ejes como `"2"`, que es
-el código de SICE-TAC; en el seeder quedó como `C2`, y el mapeo hace la
-traducción (`C2` → `2`). La llave foránea impide guardar un vehículo que no esté
-mapeado.
-
-**Decisión: se descartó la fila del camión de dos ejes en contenedor de 40
-pies**, porque el documento original no le pone tope de peso. Quedan 10 filas
-(5 de 40 pies y 5 de 20 pies).
-
-**Decisión: solo peso máximo, sin peso mínimo.** La regla es tomar, entre las
-filas del tamaño de contenedor, la de menor `PesoMaximo` que alcance para el
-peso. En cada tamaño los topes van subiendo sin repetirse, así que no hace falta
-un mínimo. Por encima del tope más alto (34.000 kg en 40 pies, 30.000 kg en 20
-pies) ningún vehículo aplica.
-
-**Decisión: el seeder solo trae `Contenedor`, `TipoVehiculo` y `PesoMaximo`.**
-El nombre del vehículo ya está en el mapeo, y las notas del documento original
-explicaban justo la fila descartada.
-
-**Contexto para el backend (#381):** hoy NEXO lee los rangos de las tablas de SAP
-`tblRangoPeso` y `tblContenedorRangoPeso` (`ConfigPorRangoPesoAsync` en
-`clsTarifarioSapAdapter.cs`) y usa el código resultante directo como
-`CONFIGURACION` de SICE-TAC. Con esta tabla, el vehículo que sale del rango
-tiene que pasar por el mapeo antes de buscar en SICE-TAC o en plaza.
-
-**Decisión (2026-10-27): se mantienen estos rangos y no los de SAP.** Hoy NEXO lee los rangos de las tablas de SAP
-`tblRangoPeso` y `tblContenedorRangoPeso` (dbSolucionesTI). Se compararon y no coinciden:
-
-| Contenedor | Vehículo | SAP | Esta tabla |
+| Archivo | Tabla | Filas | Fuente |
 |---|---|---|---|
-| 20 | Camión dos ejes (`2` / `C2`) | 0 a 8.500 | 0 a 8.000 |
+| `datos_base_nexo.sql` | `tbl_usuarios`, `tbl_mapeo_rol_portal`, `tbl_parametros_score` | 1 + 9 + 1 | Datos que el modelo del backend declara con `HasData` |
+| `municipios.csv` | `tbl_municipios` | 3.804 | DW corporativo: `tblSAPDANE`, `tblZonasTarificacionRelacion`, `tblSAPTarifas` |
+| `pesos.csv` | `tbl_pesos` | 8 | Bandas de negocio (`RANGOS PESOS APP`, `FLETES PLAZA.xlsx`) |
+| `reglas_solo_sicetac.csv` | `tbl_reglas_solo_sicetac` | 260 | `FLETES PLAZA.xlsx`, celdas marcadas «sice» |
+| `tarifas_plaza.csv` | `tbl_tarifas_plaza` | 107 | `FLETES PLAZA.xlsx`, hoja «Fletes puertos» |
+| `servicios_conexos.csv` | `tbl_servicios_conexos` | 1.336 | Excel de costos de conexos 2026 |
+| `alias_elementos.csv` | `tbl_alias_elementos` | 71 | Diccionario de configuraciones de vehículo de negocio |
+| `mapeo_vehiculos.csv` | `tbl_mapeo_vehiculo_tarifario` | 15 | Revisión de cada vehículo contra SICE-TAC y Plaza/SAP |
+| `rangos_peso_contenedor.csv` | `tbl_rangos_peso_contenedor` | 10 | Rangos de peso de contenedores de negocio |
+| `tipos_carroceria_catalogo.csv` | `tbl_tipos_carroceria_catalogo` | 17 | Catálogo de carrocerías del Cubicador (mismos Id) |
+
+## Datos base (`datos_base_nexo.sql`)
+
+Filas sin las que una base nueva no funciona. El modelo del backend las declara con `HasData`,
+pero como el proyecto no usa migraciones, nunca se insertan solas.
+
+- **Usuario de sistema** (`Sistema (placeholder)`, Id `...0001`): autor de lo que NEXO hace por sí
+  solo.
+- **9 mapeos de rol del portal a rol de NEXO.** Los 3 primeros traducen el rol por su nombre; los
+  demás, por el Id del rol en el portal (`IDROLES` de `tblSAPRoles`). El rol de portal 49 conserva
+  el nombre «CoordinadorFletesNEXO» y se traduce a `AdminBiblioteca`. Sin estos mapeos, quien entra
+  desde el portal se autentica pero queda sin rol.
+- **Parámetros del score de prioridad** (fila única, Id 1).
+
+## Municipios (`municipios.csv`)
+
+- 3.804 municipios: Colombia 1.128, Venezuela 1.424 y Ecuador 1.252.
+- Cruce de `tblSAPDANE` (códigos DANE/DIVIPOLA), `tblZonasTarificacionRelacion` y
+  `tblSAPTarifas`/`tblSAPTarifasLog` (`dbSolucionesTI`).
+- La llave es un `Id` autoincremental y no `CodigoDane`: el código DANE se repite entre Venezuela y
+  Ecuador. La llave natural es `(CodigoDane, Pais)`, pero con `Id` las demás tablas (por ejemplo,
+  `tbl_tarifas_plaza`) no cargan una llave compuesta.
+- `CodigoDane` es texto (conserva los ceros a la izquierda).
+
+## Bandas de peso (`pesos.csv`)
+
+- 8 bandas: las 7 de negocio (3-15.000, 15.001-18.000, 18.001-23.000, 23.001-30.000,
+  30.001-34.000, PBV 7.500-8.000 y PBV más de 10.500 kg) y una banda real del sistema externo
+  (14.001-20.000) que no calzaba con ninguna de las 7.
+- No es un catálogo cerrado: se pueden agregar bandas desde la aplicación.
+- `PesoMaximo` vacío significa banda abierta, sin tope.
+
+## Reglas Solo-SICETAC (`reglas_solo_sicetac.csv`)
+
+- Cada celda de `FLETES PLAZA.xlsx` con el valor «sice» es una regla: para ese origen, destino y
+  tipo de vehículo, la tarifa se resuelve solo con SICE-TAC.
+- `Origen` y `Destino` son **códigos DANE** (por ejemplo, `76109000` = Buenaventura), alineados con
+  `tbl_municipios`.
+- `TipoVehiculo` usa la nomenclatura de **SICE-TAC**: Turbo y Sencillo son `2` (no `C2`, que es el
+  código de SAP Tarifario), y el camión liviano PBV 7.500-8.000 kg es `2L3`.
+- Las filas de «Devolución de contenedor vacío» no son un tipo de vehículo y no forman parte de esta
+  tabla.
+- 260 reglas, sin repetir la llave `(Origen, Destino, TipoVehiculo)`.
+
+| Etiqueta en el Excel | `TipoVehiculo` |
+|---|---|
+| Camión dos ejes PBV más de 10.500 kg; TURBO; SENCILLO | `2` |
+| Camión dos ejes livianos PBV 7.500 a 8.000 kg | `2L3` |
+| Tractocamión dos ejes con semirremolque dos ejes (hasta 15.000 y 15.001-18.000 kg); MINI MULA | `2S2` |
+| Tractocamión dos ejes con semirremolque tres ejes hasta 23.000 kg | `2S3` |
+| Tractocamión tres ejes con semirremolque dos ejes hasta 30.000 kg | `3S2` |
+| Tractocamión tres ejes con semirremolque tres ejes hasta 34.000 kg; MULA | `3S3` |
+
+## Tarifas de plaza (`tarifas_plaza.csv`)
+
+- Solo filas de la hoja «Fletes puertos», que es la que tiene precio real. Las hojas «Fletes
+  Nacional y Expo» y «Devolución cont vacíos» son solo-SICE: sus rutas están en las reglas
+  Solo-SICETAC, no aquí.
+- Todas son importación por contenedor: `LineaNegocio` «Oferta de Expedición Puerto a interior»,
+  `ClaseViaje` «Contenedor» y `ClaseContenedor` «CNT40.HC».
+- `PesoId` apunta a `tbl_pesos` y `TipoVehiculo` se deriva de esa banda: 1 y 2 → `2S2`, 3 → `2S3`,
+  4 → `3S2`, 5 → `3S3`, 6 → `2L3`, 7 → `2`.
+- `OrigenMunicipioId` y `DestinoMunicipioId` son el `Id` de `tbl_municipios` (por ejemplo, `1012` =
+  Buenaventura), no el código DANE. Si se carga en una base con otros Id de municipio, hay que
+  resolverlos de nuevo.
+- `LineaNegocio`, `ClaseViaje` y `ClaseContenedor` guardan el nombre completo del catálogo SAP, no
+  su Id numérico: ese Id pertenece a otra base y no tiene llave foránea posible.
+- 107 filas: las 97 de la hoja menos 5 que tenían un destino combinado
+  («CAJICA-ZIPAQUIRA-TOCANCIPA»), separadas en una fila por municipio (15).
+- `Vigencia`: el Excel no trae fecha por fila; se usó `2026-09-30` como fecha de referencia.
+- `DetallesTarifa`: la nota del Excel cuando existe; si no, un texto genérico.
+- `tbl_tarifas_plaza_historico` no se carga: la llena el trigger `TRG_tarifas_plaza_historico`
+  cuando se modifica una tarifa.
+
+## Servicios conexos (`servicios_conexos.csv`)
+
+- Cruce del Excel de costos de conexos 2026 contra `tbl_municipios`. Cuatro tipos de servicio:
+  Almacenamiento por ciudad (9), ITR por puerto, máquina y movimiento (21), Precinto por ruta (5) y
+  Acompañamiento vehicular por origen-destino (1.301).
+- Una sola tabla con columnas de dimensión (`Origen`, `Destino`, `Puerto`, `Ruta`, `TipoMaquina`);
+  la que no aplica a un servicio vale `NO APLICA`.
+- `CodigoServicio` es el código del Excel cuando existe (`PRE_BSAT`, `AVT_AUTO`...); si no, el
+  mismo `TipoServicio`.
+- `Origen` y `Destino` son texto, no llave foránea: el Excel mezcla ciudades con peajes y
+  corredores viales («Peaje De Occidente», «Cali - Yumbo»). Si el nombre cruza con
+  `tbl_municipios` (sin tildes ni mayúsculas, con un diccionario de alias como «Bogota» →
+  «BOGOTA, D.C.» o «Cartagena» → «CARTAGENA DE INDIAS»), se guarda el nombre del catálogo; si no,
+  el texto del Excel. Los nombres que existen en varios departamentos («Rionegro») se guardan sin
+  departamento.
+- `TipoMaquina` combina tipo de máquina y tipo de movimiento («Maquina 3.5 - 2 Movimientos»),
+  porque juntos determinan el precio del ITR.
+- `Unidad`: «Por estiba» para Almacenamiento e ITR y «Por unidad» para los demás.
+- `PrecioVenta` va vacío en el repositorio: los precios de venta no se versionan. Para cargarlos,
+  se genera en local `servicios_conexos_precios.local.csv` (con
+  `generar_precios_venta_local.py`, que lee los Excel de precios); el script de carga lo usa en
+  lugar de `servicios_conexos.csv` si existe. Un servicio sin precio de venta cotiza con su costo.
+
+| Tipo | Columnas del Excel → tabla |
+|---|---|
+| Almacenamiento | Tipo de servicio → `CodigoServicio` y `TipoServicio`; Ciudad → `Origen`; Costo 2026 → `CostoUnitario`; Vigencia → `Vigencia` |
+| ITR | Además: Puerto → `Puerto`; Tipo de máquina + Tipo de movimiento → `TipoMaquina` |
+| Precinto / barra satelital | Código → `CodigoServicio`; Descripción → `TipoServicio`; Ruta → `Ruta` |
+| Acompañamiento vehicular | Código → `CodigoServicio`; Descripción → `TipoServicio`; Origen → `Origen`; Destino → `Destino` |
+
+## Alias de vehículos y contenedores (`alias_elementos.csv`)
+
+- Cada variante de texto libre del diccionario de negocio (por ejemplo, «Turbo», «TB») es una fila
+  con el código oficial de su columna.
+- Un solo diccionario para vehículo y contenedor, con `TipoElemento` para distinguirlos.
+- `Codigo` es texto, no llave foránea. Para vehículo es el código que comparten NEXO y el Cubicador
+  (`2L2` Turbo, `C2` Sencillo, `C3` Dobletroque, `2S2` Minimula, `3S3` Tractomula); para contenedor,
+  el de `tblSAPClaseContenedor` (`CNT40.HC`, `CNT20.ST`).
+- `AliasNormalizado` es la clave de comparación (única): mayúsculas, sin tildes, `_` y `-` como
+  espacio, con el mismo algoritmo que usa el backend al capturar.
+- 71 alias (48 de vehículo y 23 de contenedor), sin choques entre columnas. Se conservan «40» y «20»
+  a secas porque así vienen en el diccionario.
+
+## Mapeo de vehículos (`mapeo_vehiculos.csv`)
+
+SICE-TAC y Plaza/SAP nombran el mismo vehículo con códigos distintos. Esta tabla dice, por cada
+tipo de vehículo de NEXO, con qué código se busca en cada fuente. Sin ella, una búsqueda con el
+código equivocado no encuentra filas.
+
+- `TipoVehiculo` es el código de NEXO (el que queda después de resolver los alias) y la llave.
+- `CodigoSicetac` es el valor de `CONFIGURACION` en `DWSice.dbo.tblRutasSicetac`.
+- `CodigoPlazaSap` es el código en `tblSAPTarifas` y en `tbl_tarifas_plaza` (usan el mismo
+  vocabulario). Vacío significa que el vehículo no tiene tarifa de plaza.
+- `Verificacion` explica de dónde salió cada código.
+
+| Vehículo | Regla |
+|---|---|
+| Sencillo (`C2`) | `2` en SICE-TAC y en Plaza/SAP (en Plaza hay unas 5.000 tarifas con `2` y solo 14, vencidas, con `C2`) |
+| Turbo (`2L1`, `2L2`, `2L3`) | `2L2` en Plaza/SAP; cada uno conserva su código en SICE-TAC |
+| Dobletroque (`C3`) | `3` en SICE-TAC, `C3` en Plaza/SAP |
+| `2_5`, `2_7`, `3S2`, `CA_`, `V2`, `V3`, `V4` | Solo existen en SICE-TAC: sin código de Plaza |
+
+## Rangos de peso de contenedor (`rangos_peso_contenedor.csv`)
+
+- Qué vehículo corresponde a un contenedor de 20 o 40 pies según su peso.
+- `TipoVehiculo` es el código de NEXO, con llave foránea al mapeo de vehículos (por eso el camión de
+  dos ejes es `C2` y no `2`).
+- Se toma, entre las filas del tamaño de contenedor, la de menor `PesoMaximo` que alcance para el
+  peso. Por encima del tope (34.000 kg en 40 pies, 30.000 kg en 20 pies) ningún vehículo aplica.
+- No hay fila para el camión de dos ejes en 40 pies: el documento de negocio no le pone tope.
+- Estos rangos son distintos de los de SAP (`tblRangoPeso`, `tblContenedorRangoPeso`). Se usan estos
+  porque salen del documento de negocio y cuadran con `tbl_pesos` y las tarifas de plaza.
+
+| Contenedor | Vehículo | SAP | Este seeder |
+|---|---|---|---|
+| 20 | Camión dos ejes | 0 a 8.500 | 0 a 8.000 |
 | 20 | 2S2 | 8.501 a 14.000 | 8.001 a 14.000 |
 | 20 | 2S3 | 14.001 a 20.000 | 14.001 a 18.000 |
 | 20 | 3S2 | no existe | 18.001 a 25.000 |
@@ -401,8 +182,27 @@ tiene que pasar por el mapeo antes de buscar en SICE-TAC o en plaza.
 | 40 | 3S2 | no existe | 23.001 a 30.000 |
 | 40 | 3S3 | 22.001 a 34.000 | 30.001 a 34.000 |
 
-En SAP los rangos solo dependen del tamaño (todas las clases de 20 pies, y todas las de 40, tienen los mismos). Se mantiene
-esta tabla porque sale del documento de negocio y cuadra con las bandas de `tbl_pesos` y con las tarifas de plaza de NEXO,
-que usan los mismos cortes (incluidos 3S2 y 2L3). **Efecto:** cuando el backend pase a usar esta tabla (#381), algunos pesos
-van a dar otro vehículo. Por ejemplo, en 40 pies: 25.000 kg pasa de 3S3 a 3S2; 22.500 kg, de 3S3 a 2S3; 5.000 kg, de 2S2 a
-2L3. En 20 pies, 8.200 kg pasa de camión de dos ejes a 2S2.
+## Catálogo de carrocerías (`tipos_carroceria_catalogo.csv`)
+
+- Es la copia en NEXO del catálogo de carrocerías del Cubicador. En operación la mantiene
+  sincronizada la aplicación con los eventos que publica el Cubicador al crear, editar o borrar una
+  carrocería.
+- El Cubicador no reenvía las carrocerías que ya existen, así que una base nueva la necesita
+  cargada desde el inicio. Son las 17 del seeder del Cubicador, con los mismos Id.
+
+## Tablas sin datos iniciales
+
+- **Las llena la aplicación al trabajar:** `tbl_rutas` y `tbl_configuraciones_vehiculo` (al capturar
+  solicitudes), `tbl_clientes` (copia local del DW al cotizar), `tbl_usuarios` (al entrar desde el
+  portal), `tbl_cadena_priorizacion` (al arrancar), `tbl_tipos_mercancia_catalogo` (eventos del
+  Cubicador) y `tbl_vehiculos_cubicacion` (planes de cargue).
+- **Historial de operación:** solicitudes, cotizaciones, auditoría, tarifas históricas, planes de
+  cargue, asistente, uso de IA y mensajería.
+
+## Preguntas abiertas
+
+- `tarifas_plaza.csv` usa `3S2` y `2L3`, que no coinciden con el código de plaza del mapeo de
+  vehículos (vacío y `2L2`). Falta decidir si se corrige la tarifa o el mapeo.
+- La vigencia `2026-09-30` de las tarifas de plaza es una fecha de referencia; falta confirmarla
+  antes de usarlas en producción.
+- `Unidad` de los servicios conexos es provisional hasta que negocio la defina.

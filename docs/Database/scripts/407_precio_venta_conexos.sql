@@ -1,6 +1,10 @@
 -- =============================================================================
 -- Precio de venta de los servicios conexos (S6-HU-38.1, #407)
 -- =============================================================================
+-- SOLO PARA LA BASE ANTERIOR (dbInformesAutomatizados_Pruebas.db_NEXO), que existía antes de estas columnas.
+-- La base nueva ya las crea con ../esquema/ESQUEMA_NEXO.sql. La parte B sigue pendiente en la base anterior;
+-- cuando se aplique, este archivo se borra.
+--
 -- Qué cambia: dos columnas nuevas. No cambia ninguna columna existente ni el valor de ninguna cotización.
 --   tbl_servicios_conexos.PrecioVenta          : precio al cliente del servicio, con su margen ya incluido. Puede quedar
 --                                                vacío (NULL): el servicio todavía no tiene precio de venta.

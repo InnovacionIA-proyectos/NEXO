@@ -1,11 +1,10 @@
-# Diccionario de datos — Base de datos de NEXO (esquema `db_NEXO`)
+# Diccionario de datos de NEXO
 
-Qué guarda cada una de las 40 tablas del esquema de NEXO, qué significa cada columna, sus llaves e índices, y de dónde salen sus datos.
+Qué guarda cada una de las 45 tablas de la base de NEXO (`dbTarifario_Nexo_Pruebas`, esquema `dbo`), qué significa cada columna, sus llaves e índices y de dónde salen sus datos.
 
-- **Fuente:** `docs/Database/ESQUEMA_NEXO.sql`, verificado el 2026-10-27 contra la base de pruebas (`dbInformesAutomatizados_Pruebas.db_NEXO`, SQL Server 2019). Tipos, nulos, defaults, índices y CHECK salen de la estructura real de esa base.
-- **El esquema es configurable:** `db_NEXO` es el nombre por defecto; el real sale de la variable `Database__Esquema`.
-- **Sin migraciones:** el esquema se crea con `ESQUEMA_NEXO.sql` y los catálogos se pueblan con `docs/Database/seeder/README.md`. Los datos que el modelo declara con `HasData` (usuario de sistema, mapeo de roles del portal, parámetros del score) no se crean solos: en una base nueva se insertan con `docs/Database/datos_base_nexo.sql`.
-- **Llaves foráneas:** se documentan las de `ESQUEMA_NEXO.sql`, que son las del diseño y del modelo del backend. La base de pruebas no tiene 8 de ellas; se marcan con ⚠️.
+- **Fuente:** `../esquema/ESQUEMA_NEXO.sql`. Tipos, nulos, valores por defecto, índices y `CHECK` corresponden a ese archivo.
+- **Esquema:** la aplicación lo lee de la variable `Database__Esquema` (`dbo`).
+- **Sin migraciones:** el esquema se crea con `ESQUEMA_NEXO.sql` y los datos iniciales se cargan desde `../seeder/` (ver `ORIGEN-Y-DECISIONES-SEEDER.md`). Las filas que el modelo declara con `HasData` (usuario de sistema, mapeo de roles del portal, parámetros del score) se insertan con `../seeder/datos_base_nexo.sql`.
 - **Sin datos reales:** el repositorio es público; aquí solo hay estructura y significado.
 
 ---
@@ -65,14 +64,19 @@ Qué guarda cada una de las 40 tablas del esquema de NEXO, qué significa cada c
 
 **I. Inteligencia artificial**
 36. [`tbl_ia_uso`](#36-tbl_ia_uso)
+37. [`tbl_asistente_conversaciones`](#37-tbl_asistente_conversaciones)
+38. [`tbl_asistente_mensajes`](#38-tbl_asistente_mensajes)
+39. [`tbl_asistente_herramientas_uso`](#39-tbl_asistente_herramientas_uso)
+40. [`tbl_asistente_acciones`](#40-tbl_asistente_acciones)
+41. [`tbl_asistente_preferencias`](#41-tbl_asistente_preferencias)
 
 **J. Mensajería e infraestructura**
-37. [`InboxState`](#37-inboxstate)
-38. [`OutboxMessage`](#38-outboxmessage)
-39. [`OutboxState`](#39-outboxstate)
-40. [`__EFMigrationsHistory`](#40-__efmigrationshistory)
+42. [`InboxState`](#42-inboxstate)
+43. [`OutboxMessage`](#43-outboxmessage)
+44. [`OutboxState`](#44-outboxstate)
+45. [`__EFMigrationsHistory`](#45-__efmigrationshistory)
 
-**[Restos en la base de pruebas](#restos-en-la-base-de-pruebas)** · **[Apéndice: enums](#apéndice-enums)**
+**[Apéndice: enums](#apéndice-enums)**
 
 ---
 
@@ -89,19 +93,18 @@ Qué guarda cada una de las 40 tablas del esquema de NEXO, qué significa cada c
 | `Email` | `nvarchar(256)` | No |  | Correo corporativo, único |
 | `Rol` | `nvarchar(40)` | No |  | Uno de `RolUsuario` (ver apéndice), guardado como texto |
 | `Activo` | `bit` | No | `1` | Si el registro está vigente; los inactivos no se usan |
-| `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset()` | Fecha de creación (auditoría) |
-| `UpdatedAt` | `datetimeoffset` | No | `sysdatetimeoffset()` | Fecha de última modificación (auditoría) |
+| `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de creación (auditoría) |
+| `UpdatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de última modificación (auditoría) |
 | `IdentidadPortalId` | `bigint` | Sí |  | Id de la persona en el portal. `NULL` = usuario que todavía no ha entrado por el portal (ej. el usuario de sistema). Único cuando no es `NULL` |
 
 **Llaves e índices:** PK `PK_usuarios` (Id); Único `IX_usuarios_Email` (Email); Único `IX_usuarios_IdentidadPortalId` (IdentidadPortalId) — filtrado `WHERE [IdentidadPortalId] IS NOT NULL`.
 
 **FK salientes:** ninguna.  
-**FK entrantes:** `tbl_audit_log.UsuarioId` (NO ACTION); `tbl_ia_uso.UsuarioId` (NO ACTION); `tbl_cotizaciones.EntregadaPor` (NO ACTION); `tbl_servicios_conexos.ActualizadoPor` (NO ACTION); `tbl_solicitudes.CreadoPor` (NO ACTION) ⚠️ falta en la base de pruebas.
+**FK entrantes:** `tbl_audit_log.UsuarioId` (NO ACTION); `tbl_ia_uso.UsuarioId` (NO ACTION); `tbl_cotizaciones.EntregadaPor` (NO ACTION); `tbl_servicios_conexos.ActualizadoPor` (NO ACTION); `tbl_solicitudes.CreadoPor` (NO ACTION); `tbl_asistente_conversaciones.UsuarioId`, `tbl_asistente_acciones.UsuarioId`, `tbl_asistente_preferencias.UsuarioId` (NO ACTION).
 
 **De dónde salen los datos:**
 - **Automático en el primer ingreso:** `clsResolverIdentidadPortalAdapter` crea la fila la primera vez que una persona entra por el portal, con el rol que resulte de `tbl_mapeo_rol_portal`.
-- **Usuario de sistema** (`Sistema (placeholder)`, rol `Admin`): declarado en el modelo (`HasData` en `clsNexoDbContext`) para que las FK tengan a quién apuntar en procesos sin persona. Como el proyecto no usa migraciones, en una base nueva **no se crea solo**: lo inserta `docs/Database/datos_base_nexo.sql`.
-- `docs/Database/307_roles_coordinadorfletes_a_adminbiblioteca.sql` renombró el rol `CoordinadorFletes` a `AdminBiblioteca` en las filas existentes.
+- **Usuario de sistema** (`Sistema (placeholder)`, rol `Admin`): declarado en el modelo (`HasData` en `clsNexoDbContext`) para que las FK tengan a quién apuntar en procesos sin persona. Como el proyecto no usa migraciones, en una base nueva **no se crea solo**: lo inserta `../seeder/datos_base_nexo.sql`.
 - `clsDataSeeder.cs` siembra usuarios de demostración solo en ambientes locales (`Database__SeedOnStartup`, siempre `false` en producción).
 
 ---
@@ -124,8 +127,7 @@ Qué guarda cada una de las 40 tablas del esquema de NEXO, qué significa cada c
 **FK entrantes:** ninguna.
 
 **De dónde salen los datos:**
-- Declarado en el modelo (`HasData` en `clsNexoDbContext`): 9 filas (3 por texto y 6 por id de portal, del 48 al 53). Como el proyecto no usa migraciones, en una base nueva **no se crean solas**: las inserta `docs/Database/datos_base_nexo.sql`.
-- `docs/Database/307_roles_coordinadorfletes_a_adminbiblioteca.sql` cambió `CoordinadorFletes` por `AdminBiblioteca`.
+- Declarado en el modelo (`HasData` en `clsNexoDbContext`): 9 filas (3 por texto y 6 por id de portal, del 48 al 53). Como el proyecto no usa migraciones, en una base nueva **no se crean solas**: las inserta `../seeder/datos_base_nexo.sql`.
 - No hay endpoint para editarla.
 
 ---
@@ -143,13 +145,13 @@ Qué guarda cada una de las 40 tablas del esquema de NEXO, qué significa cada c
 | `Nit` | `nvarchar(20)` | No |  | NIT, único |
 | `RazonSocial` | `nvarchar(250)` | Sí |  | Razón social completa |
 | `Telefonos` | `nvarchar(max)` | Sí |  | Lista de teléfonos en JSON |
-| `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset()` | Fecha de creación (auditoría) |
-| `UpdatedAt` | `datetimeoffset` | No | `sysdatetimeoffset()` | Fecha de última modificación (auditoría) |
+| `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de creación (auditoría) |
+| `UpdatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de última modificación (auditoría) |
 
 **Llaves e índices:** PK `PK_clientes` (Id); Único `IX_clientes_Nit` (Nit).
 
 **FK salientes:** ninguna.  
-**FK entrantes:** `tbl_solicitudes.ClienteId` (NO ACTION) ⚠️ falta en la base de pruebas; `tbl_diccionario_cliente.ClienteId` (NO ACTION); `tbl_plantillas_mapeo_cliente.ClienteId` (NO ACTION).
+**FK entrantes:** `tbl_solicitudes.ClienteId` (NO ACTION); `tbl_diccionario_cliente.ClienteId` (NO ACTION); `tbl_plantillas_mapeo_cliente.ClienteId` (NO ACTION).
 
 **De dónde salen los datos:**
 - **Se crea al capturar una solicitud** (`clsResolucionDeCliente`): si el cliente no existe por NIT, se trae del Data Warehouse corporativo (`clsClientesDwAdapter`, solo lectura) y se copia aquí.
@@ -167,15 +169,15 @@ Qué guarda cada una de las 40 tablas del esquema de NEXO, qué significa cada c
 | `Id` | `uniqueidentifier` | No |  | PK |
 | `Origen` | `nvarchar(150)` | No |  | Origen en texto |
 | `Destino` | `nvarchar(150)` | No |  | Destino en texto |
-| `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset()` | Fecha de creación (auditoría) |
-| `UpdatedAt` | `datetimeoffset` | No | `sysdatetimeoffset()` | Fecha de última modificación (auditoría) |
-| `OrigenMunicipioId` | `int` | Sí |  | Municipio de origen en `tbl_municipios` (S5-HU-16.1/#254). `NULL` en rutas anteriores o cuyo texto no resolvió contra el catálogo |
+| `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de creación (auditoría) |
+| `UpdatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de última modificación (auditoría) |
+| `OrigenMunicipioId` | `int` | Sí |  | Municipio de origen en `tbl_municipios`. `NULL` en rutas anteriores o cuyo texto no resolvió contra el catálogo |
 | `DestinoMunicipioId` | `int` | Sí |  | Municipio de destino, misma regla |
 
 **Llaves e índices:** PK `PK_rutas` (Id); Único `IX_rutas_Origen_Destino` (Origen, Destino).
 
 **FK salientes:** `OrigenMunicipioId` → `tbl_municipios.Id` (NO ACTION); `DestinoMunicipioId` → `tbl_municipios.Id` (NO ACTION).  
-**FK entrantes:** `tbl_lineas_solicitud.RutaId` (NO ACTION); `tbl_tarifas_historicas.RutaId` (NO ACTION) ⚠️ falta en la base de pruebas.
+**FK entrantes:** `tbl_lineas_solicitud.RutaId` (NO ACTION); `tbl_tarifas_historicas.RutaId` (NO ACTION).
 
 **De dónde salen los datos:**
 - **Se crea al capturar una solicitud** (`clsResolucionDeCatalogos`) cuando el origen/destino no coincide con una ruta existente.
@@ -193,15 +195,15 @@ Qué guarda cada una de las 40 tablas del esquema de NEXO, qué significa cada c
 | `TipoVehiculo` | `nvarchar(100)` | No |  | Código del vehículo (ej. `C2`, `2L2`, `3S3`), ya resuelto por `tbl_alias_elementos` cuando aplica |
 | `Carroceria` | `nvarchar(100)` | Sí |  | Estacas, Furgón, Plataforma, etc. |
 | `RangoPeso` | `nvarchar(50)` | Sí |  | Rango de peso en texto libre |
-| `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset()` | Fecha de creación (auditoría) |
-| `UpdatedAt` | `datetimeoffset` | No | `sysdatetimeoffset()` | Fecha de última modificación (auditoría) |
-| `EsCatalogoOficial` | `bit` | No | `0` | S5-HU-18.4/#276: la fila calza con un código canónico del catálogo. `0` = quedó en cuarentena para la bandeja de normalización |
-| `Descartada` | `bit` | No | `0` | S6-HU-27.3/#322: alguien la descartó en la bandeja de normalización. Sale de la bandeja pero no se borra |
+| `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de creación (auditoría) |
+| `UpdatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de última modificación (auditoría) |
+| `EsCatalogoOficial` | `bit` | No | `0` | la fila calza con un código canónico del catálogo. `0` = quedó en cuarentena para la bandeja de normalización |
+| `Descartada` | `bit` | No | `0` | alguien la descartó en la bandeja de normalización. Sale de la bandeja pero no se borra |
 
 **Llaves e índices:** PK `PK_configuraciones_vehiculo` (Id).
 
 **FK salientes:** ninguna.  
-**FK entrantes:** `tbl_lineas_solicitud.ConfigVehiculoId` (NO ACTION); `tbl_tarifas_historicas.ConfigVehiculoId` (NO ACTION) ⚠️ falta en la base de pruebas.
+**FK entrantes:** `tbl_lineas_solicitud.ConfigVehiculoId` (NO ACTION); `tbl_tarifas_historicas.ConfigVehiculoId` (NO ACTION).
 
 **De dónde salen los datos:**
 - **Se crea al capturar una solicitud** (`clsResolucionDeCatalogos`) si el vehículo no existe; si el texto no calza con el catálogo oficial queda con `EsCatalogoOficial = 0`.
@@ -212,7 +214,7 @@ Qué guarda cada una de las 40 tablas del esquema de NEXO, qué significa cada c
 
 ## 6. `tbl_alias_elementos`
 
-**Entidad:** `clsAliasElemento` — **Para qué sirve:** Diccionario GLOBAL de apodos y variantes de texto libre (S6-HU-27.1/#315): traduce lo que la gente escribe ("TMULA", "40HC") al código oficial de vehículo o de clase de contenedor. Aplica a todos los clientes; lo propio de un cliente va en `tbl_diccionario_cliente`.
+**Entidad:** `clsAliasElemento` — **Para qué sirve:** Diccionario GLOBAL de apodos y variantes de texto libre: traduce lo que la gente escribe ("TMULA", "40HC") al código oficial de vehículo o de clase de contenedor. Aplica a todos los clientes; lo propio de un cliente va en `tbl_diccionario_cliente`.
 
 | Columna | Tipo | Nullable | Default | Descripción |
 |---|---|---|---|---|
@@ -222,7 +224,7 @@ Qué guarda cada una de las 40 tablas del esquema de NEXO, qué significa cada c
 | `TipoElemento` | `nvarchar(20)` | No |  | `Vehiculo` o `Contenedor`: dice a qué catálogo pertenece `Codigo` |
 | `Codigo` | `nvarchar(20)` | No |  | Código oficial en texto, no FK (ej. `2L2`, `CNT40.HC`) |
 | `Activo` | `bit` | No | `1` | Si el registro está vigente; los inactivos no se usan |
-| `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset()` | Fecha de creación (auditoría) |
+| `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de creación (auditoría) |
 
 **Llaves e índices:** PK `PK_alias_elementos` (Id); Único `UQ_alias_elementos_AliasNormalizado` (AliasNormalizado).
 
@@ -230,14 +232,14 @@ Qué guarda cada una de las 40 tablas del esquema de NEXO, qué significa cada c
 **FK entrantes:** ninguna.
 
 **De dónde salen los datos:**
-- Carga inicial: `docs/Database/seeder/alias_elementos.csv` (71 filas).
+- Carga inicial: `../seeder/alias_elementos.csv` (71 filas).
 - Se amplía desde la API (`clsAliasCommands`) y desde la bandeja de normalización de vehículos.
 
 ---
 
 ## 7. `tbl_diccionario_cliente`
 
-**Entidad:** `clsTerminoCliente` — **Para qué sirve:** Términos que usa cada cliente en sus archivos y a qué concepto de NEXO corresponden (#356). Sirve de pista a la IA cuando llega un formato de Excel sin plantilla. Complementa a `tbl_alias_elementos`: lo de aquí es propio de un cliente y `Concepto` no se valida contra el catálogo oficial (el Turbo de un cliente puede ser `2_7`).
+**Entidad:** `clsTerminoCliente` — **Para qué sirve:** Términos que usa cada cliente en sus archivos y a qué concepto de NEXO corresponden. Sirve de pista a la IA cuando llega un formato de Excel sin plantilla. Complementa a `tbl_alias_elementos`: lo de aquí es propio de un cliente y `Concepto` no se valida contra el catálogo oficial (el Turbo de un cliente puede ser `2_7`).
 
 | Columna | Tipo | Nullable | Default | Descripción |
 |---|---|---|---|---|
@@ -250,7 +252,7 @@ Qué guarda cada una de las 40 tablas del esquema de NEXO, qué significa cada c
 | `Contexto` | `nvarchar(50)` | Sí |  | Solo para `Tipo = valor`: de qué campo es el valor (obligatorio en ese caso, `NULL` en los demás) |
 | `Ejemplo` | `nvarchar(500)` | Sí |  | Ejemplo de uso |
 | `Activo` | `bit` | No | `1` | Si el registro está vigente; los inactivos no se usan |
-| `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset()` | Fecha de creación (auditoría) |
+| `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de creación (auditoría) |
 | `UpdatedAt` | `datetimeoffset` | Sí |  | Fecha de última modificación (auditoría) |
 
 **Llaves e índices:** PK `PK_diccionario_cliente` (Id); Único `IX_diccionario_cliente_Unico` (ClienteId, TerminoNormalizado, Tipo, Contexto); Índice `IX_diccionario_cliente_ClienteId_Tipo` (ClienteId, Tipo).
@@ -263,16 +265,15 @@ Qué guarda cada una de las 40 tablas del esquema de NEXO, qué significa cada c
 **FK entrantes:** ninguna.
 
 **De dónde salen los datos:**
-- Script para una base existente: `docs/Database/356_diccionario_cliente.sql`.
 - CRUD en `/api/diccionario-cliente` (`clsDiccionarioClienteCasosDeUso`).
-- Carga inicial pendiente (#357): no hay todavía una lista armada de términos por cliente.
-- Confirmar un mapeo de Excel **no** agrega términos aquí automáticamente (decisión del #365).
+- Carga inicial pendiente: no hay todavía una lista armada de términos por cliente.
+- Confirmar un mapeo de Excel **no** agrega términos aquí automáticamente.
 
 ---
 
 ## 8. `tbl_plantillas_mapeo_cliente`
 
-**Entidad:** (backend del #365, fuera de esta rama) — **Para qué sirve:** Mapeo de columnas ya confirmado para un formato de Excel de un cliente (#361). Si llega un Excel con la misma firma de encabezados se aplica la plantilla sin llamar a la IA. Si hay plantilla, manda la plantilla y no se consulta `tbl_diccionario_cliente`.
+**Entidad:** `clsPlantillaMapeoCliente` — **Para qué sirve:** Mapeo de columnas ya confirmado para un formato de Excel de un cliente. Si llega un Excel con la misma firma de encabezados se aplica la plantilla sin llamar a la IA. Si hay plantilla, manda la plantilla y no se consulta `tbl_diccionario_cliente`.
 
 | Columna | Tipo | Nullable | Default | Descripción |
 |---|---|---|---|---|
@@ -282,7 +283,7 @@ Qué guarda cada una de las 40 tablas del esquema de NEXO, qué significa cada c
 | `FirmaEncabezados` | `nvarchar(64)` | No |  | SHA-256 (64 caracteres hex) de los encabezados normalizados y en orden. Es lo que se busca |
 | `Encabezados` | `nvarchar(max)` | No |  | JSON con los encabezados tal como venían |
 | `Columnas` | `nvarchar(max)` | No |  | JSON con el mapeo confirmado de cada columna al campo de NEXO |
-| `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset()` | Fecha de creación (auditoría) |
+| `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de creación (auditoría) |
 | `UpdatedAt` | `datetimeoffset` | Sí |  | Fecha de última modificación (auditoría) |
 
 **Llaves e índices:** PK `PK_plantillas_mapeo_cliente` (Id); Único `IX_plantillas_mapeo_cliente_Firma` (ClienteId, FirmaEncabezados).
@@ -295,14 +296,13 @@ Qué guarda cada una de las 40 tablas del esquema de NEXO, qué significa cada c
 **FK entrantes:** ninguna.
 
 **De dónde salen los datos:**
-- Script para una base existente: `docs/Database/361_plantillas_mapeo_cliente.sql`.
-- La escribe el backend al confirmar un mapeo y la reutiliza al reconocer la firma (#365). Si el cliente cambia el orden o los encabezados, la firma cambia y se vuelve a sugerir.
+- La escribe el backend al confirmar un mapeo y la reutiliza al reconocer la firma. Si el cliente cambia el orden o los encabezados, la firma cambia y se vuelve a sugerir.
 
 ---
 
 ## 9. `tbl_mapeo_vehiculo_tarifario`
 
-**Entidad:** (sin entidad todavía; la consumirá el backend en #380) — **Para qué sirve:** Código con el que se busca cada tipo de vehículo de NEXO en cada fuente de tarifa (#377). SICE-TAC y Plaza/SAP nombran el mismo vehículo con códigos distintos; antes NEXO usaba el mismo código para todo y, si no encontraba filas, tomaba el vehículo más barato de la ruta sin avisar. Es global, no por cliente, y parte del `TipoVehiculo` ya resuelto por `tbl_alias_elementos`.
+**Entidad:** `clsMapeoVehiculoTarifario` — **Para qué sirve:** Código con el que se busca cada tipo de vehículo de NEXO en cada fuente de tarifa. SICE-TAC y Plaza/SAP nombran el mismo vehículo con códigos distintos; antes NEXO usaba el mismo código para todo y, si no encontraba filas, tomaba el vehículo más barato de la ruta sin avisar. Es global, no por cliente, y parte del `TipoVehiculo` ya resuelto por `tbl_alias_elementos`.
 
 | Columna | Tipo | Nullable | Default | Descripción |
 |---|---|---|---|---|
@@ -314,7 +314,7 @@ Qué guarda cada una de las 40 tablas del esquema de NEXO, qué significa cada c
 | `NombreTarifasPlaza` | `nvarchar(100)` | Sí |  | Cómo se le dice en Plaza/SAP (SENCILLO, TURBO, Minimula…) |
 | `Verificacion` | `nvarchar(500)` | Sí |  | De dónde salió el código y cómo se confirmó |
 | `Activo` | `bit` | No | `1` | Si el registro está vigente; los inactivos no se usan |
-| `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset()` | Fecha de creación (auditoría) |
+| `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de creación (auditoría) |
 | `UpdatedAt` | `datetimeoffset` | Sí |  | Fecha de última modificación (auditoría) |
 
 **Llaves e índices:** PK `PK_mapeo_vehiculo_tarifario` (Id); Único `IX_mapeo_vehiculo_tarifario_TipoVehiculo` (TipoVehiculo).
@@ -323,7 +323,7 @@ Qué guarda cada una de las 40 tablas del esquema de NEXO, qué significa cada c
 **FK entrantes:** `tbl_rangos_peso_contenedor.TipoVehiculo` (NO ACTION).
 
 **De dónde salen los datos:**
-- Script con la carga inicial: `docs/Database/377_mapeo_vehiculo_tarifario.sql` (seeder `mapeo_vehiculos.csv`, 15 filas, 8 con código de plaza).
+- Script con la carga inicial: `../seeder/mapeo_vehiculos.csv` (seeder `mapeo_vehiculos.csv`, 15 filas, 8 con código de plaza).
 - Decisiones: Sencillo `C2` -> `2` en SICE-TAC y en plaza; Turbo `2L1`/`2L2`/`2L3` -> `2L2` en plaza (en SICE-TAC cada uno conserva su código); Dobletroque `C3` -> `3` en SICE-TAC y `C3` en plaza.
 - Pendiente: el seeder de `tbl_tarifas_plaza` usa `3S2` y `2L3`, que no coinciden con `CodigoPlazaSap` de esos dos vehículos.
 
@@ -331,7 +331,7 @@ Qué guarda cada una de las 40 tablas del esquema de NEXO, qué significa cada c
 
 ## 10. `tbl_rangos_peso_contenedor`
 
-**Entidad:** (sin entidad todavía; la consumirá el backend en #381) — **Para qué sirve:** Qué vehículo lleva un contenedor de 20 o 40 pies según su peso (#379). Reemplazará la lectura de las tablas de SAP `tblRangoPeso`/`tblContenedorRangoPeso`. Regla: entre las filas del tamaño de contenedor, la de menor `PesoMaximo` que alcance para el peso; por encima del tope más alto ningún vehículo aplica.
+**Entidad:** `clsRangoPesoContenedor` — **Para qué sirve:** Qué vehículo lleva un contenedor de 20 o 40 pies según su peso. Reemplazará la lectura de las tablas de SAP `tblRangoPeso`/`tblContenedorRangoPeso`. Regla: entre las filas del tamaño de contenedor, la de menor `PesoMaximo` que alcance para el peso; por encima del tope más alto ningún vehículo aplica.
 
 | Columna | Tipo | Nullable | Default | Descripción |
 |---|---|---|---|---|
@@ -340,7 +340,7 @@ Qué guarda cada una de las 40 tablas del esquema de NEXO, qué significa cada c
 | `TipoVehiculo` | `nvarchar(20)` | No |  | Código de NEXO, el mismo de `tbl_mapeo_vehiculo_tarifario.TipoVehiculo` (FK). Para buscar en SICE-TAC o plaza se traduce con el mapeo (ej. `C2` -> `2`) |
 | `PesoMaximo` | `int` | No |  | Peso máximo del contenedor (kg) que puede llevar ese vehículo |
 | `Activo` | `bit` | No | `1` | Si el registro está vigente; los inactivos no se usan |
-| `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset()` | Fecha de creación (auditoría) |
+| `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de creación (auditoría) |
 | `UpdatedAt` | `datetimeoffset` | Sí |  | Fecha de última modificación (auditoría) |
 
 **Llaves e índices:** PK `PK_rangos_peso_contenedor` (Id); Único `IX_rangos_peso_contenedor_Contenedor_TipoVehiculo` (Contenedor, TipoVehiculo).
@@ -353,14 +353,14 @@ Qué guarda cada una de las 40 tablas del esquema de NEXO, qué significa cada c
 **FK entrantes:** ninguna.
 
 **De dónde salen los datos:**
-- Script con la carga inicial: `docs/Database/379_rangos_peso_contenedor.sql` (seeder `rangos_peso_contenedor.csv`, 10 filas: 5 de 40 pies y 5 de 20 pies). Hay que correrlo después del 377.
+- Script con la carga inicial: `../seeder/rangos_peso_contenedor.csv` (seeder `rangos_peso_contenedor.csv`, 10 filas: 5 de 40 pies y 5 de 20 pies). Hay que correrlo después del 377.
 - La fila del camión de dos ejes en 40 pies, sin tope de peso en el documento original, se descartó.
 
 ---
 
 ## 11. `tbl_municipios`
 
-**Entidad:** `clsMunicipio` — **Para qué sirve:** Catálogo propio de municipios (Colombia, Venezuela, Ecuador) para el desplegable de Origen/Destino en la captura (S4-HU-09.1). Foto fija, sin sincronización periódica.
+**Entidad:** `clsMunicipio` — **Para qué sirve:** Catálogo propio de municipios (Colombia, Venezuela, Ecuador) para el desplegable de Origen/Destino en la captura. Foto fija, sin sincronización periódica.
 
 | Columna | Tipo | Nullable | Default | Descripción |
 |---|---|---|---|---|
@@ -378,14 +378,14 @@ Qué guarda cada una de las 40 tablas del esquema de NEXO, qué significa cada c
 **FK entrantes:** `tbl_rutas.OrigenMunicipioId` (NO ACTION); `tbl_rutas.DestinoMunicipioId` (NO ACTION); `tbl_tarifas_plaza.OrigenMunicipioId` (NO ACTION); `tbl_tarifas_plaza.DestinoMunicipioId` (NO ACTION).
 
 **De dónde salen los datos:**
-- Carga única: `docs/Database/seeder/municipios.csv` (3.804 filas), calculado una vez cruzando `tblSAPDANE`, `tblZonasTarificacionRelacion` y `tblSAPTarifas`/`tblSAPTarifasLog` de `dbSolucionesTI`.
+- Carga única: `../seeder/municipios.csv` (3.804 filas), calculado una vez cruzando `tblSAPDANE`, `tblZonasTarificacionRelacion` y `tblSAPTarifas`/`tblSAPTarifasLog` de `dbSolucionesTI`.
 - Se lee con `GET /api/captura-solicitudes/municipios`. No hay CRUD.
 
 ---
 
 ## 12. `tbl_pesos`
 
-**Entidad:** `clsRangoPeso` — **Para qué sirve:** Catálogo de bandas de peso (kg) para el formulario de Tarifas de Plaza (S4-HU-10.1). No es un catálogo cerrado: se pueden agregar bandas.
+**Entidad:** `clsRangoPeso` — **Para qué sirve:** Catálogo de bandas de peso (kg) para el formulario de Tarifas de Plaza. No es un catálogo cerrado: se pueden agregar bandas.
 
 | Columna | Tipo | Nullable | Default | Descripción |
 |---|---|---|---|---|
@@ -399,7 +399,7 @@ Qué guarda cada una de las 40 tablas del esquema de NEXO, qué significa cada c
 **FK entrantes:** `tbl_tarifas_plaza.PesoId` (NO ACTION).
 
 **De dónde salen los datos:**
-- Carga inicial: `docs/Database/seeder/pesos.csv` (8 bandas).
+- Carga inicial: `../seeder/pesos.csv` (8 bandas).
 - CRUD en `/api/pesos` (`clsCrearRangoPesoCommand`, `clsEditarRangoPesoCommand`).
 
 ---
@@ -425,13 +425,13 @@ Qué guarda cada una de las 40 tablas del esquema de NEXO, qué significa cada c
 | `ToleranciaParedesMm` | `decimal(12,2)` | No |  | Holgura contra las paredes (mm) |
 | `ToleranciaEntreUnidadesMm` | `decimal(12,2)` | No |  | Holgura entre unidades (mm) |
 | `EsPreset` | `bit` | No |  | `1` = vehículo predefinido del sistema; `0` = creado por un usuario |
-| `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset()` | Fecha de creación (auditoría) |
-| `UpdatedAt` | `datetimeoffset` | No | `sysdatetimeoffset()` | Fecha de última modificación (auditoría) |
+| `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de creación (auditoría) |
+| `UpdatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de última modificación (auditoría) |
 
 **Llaves e índices:** PK `PK_vehiculos_cubicacion` (Id).
 
 **FK salientes:** ninguna.  
-**FK entrantes:** `tbl_planes_cargue.VehiculoId` (NO ACTION) ⚠️ falta en la base de pruebas.
+**FK entrantes:** `tbl_planes_cargue.VehiculoId` (NO ACTION).
 
 **De dónde salen los datos:**
 - Se crea o actualiza con los resultados del Cubicador (`clsPlanDeCargueGeneradoConsumer`) y desde la API de planes de cargue (`/api/vehiculos`, `/api/planes-cargue`).
@@ -440,7 +440,7 @@ Qué guarda cada una de las 40 tablas del esquema de NEXO, qué significa cada c
 
 ## 14. `tbl_tipos_mercancia_catalogo`
 
-**Entidad:** `clsTipoMercanciaCatalogo` — **Para qué sirve:** Proyección local del catálogo de tipos de mercancía del Cubicador (S5-HU-18.5/#277), mantenida por eventos. `Id` es el texto que asigna el Cubicador y viaja como `idTipoMercancia` por toda la captura (§3.14 de `CONTRATO.md`).
+**Entidad:** `clsTipoMercanciaCatalogo` — **Para qué sirve:** Proyección local del catálogo de tipos de mercancía del Cubicador, mantenida por eventos. `Id` es el texto que asigna el Cubicador y viaja como `idTipoMercancia` por toda la captura (§3.14 de `CONTRATO.md`).
 
 | Columna | Tipo | Nullable | Default | Descripción |
 |---|---|---|---|---|
@@ -460,7 +460,7 @@ Qué guarda cada una de las 40 tablas del esquema de NEXO, qué significa cada c
 | `ComentarioCondicion` | `nvarchar(500)` | Sí |  | Comentario sobre las condiciones |
 | `Activo` | `bit` | No |  | Si el registro está vigente; los inactivos no se usan |
 | `Version` | `int` | No |  | Versión del evento aplicado (descarta eventos viejos) |
-| `UpdatedAt` | `datetimeoffset` | No | `sysdatetimeoffset()` | Fecha de última modificación (auditoría) |
+| `UpdatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de última modificación (auditoría) |
 
 **Llaves e índices:** PK `PK_tipos_mercancia_catalogo` (Id).
 
@@ -474,7 +474,7 @@ Qué guarda cada una de las 40 tablas del esquema de NEXO, qué significa cada c
 
 ## 15. `tbl_tipos_carroceria_catalogo`
 
-**Entidad:** `clsTipoCarroceriaCatalogo` — **Para qué sirve:** Proyección local del catálogo de tipos de carrocería del Cubicador (S5-HU-18.5/#277), mantenida por eventos.
+**Entidad:** `clsTipoCarroceriaCatalogo` — **Para qué sirve:** Proyección local del catálogo de tipos de carrocería del Cubicador, mantenida por eventos.
 
 | Columna | Tipo | Nullable | Default | Descripción |
 |---|---|---|---|---|
@@ -483,7 +483,7 @@ Qué guarda cada una de las 40 tablas del esquema de NEXO, qué significa cada c
 | `NombreCarroceria` | `nvarchar(150)` | No |  | Nombre |
 | `Activo` | `bit` | No |  | Si el registro está vigente; los inactivos no se usan |
 | `Version` | `int` | No |  | Versión del evento aplicado (descarta eventos viejos) |
-| `UpdatedAt` | `datetimeoffset` | No | `sysdatetimeoffset()` | Fecha de última modificación (auditoría) |
+| `UpdatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de última modificación (auditoría) |
 
 **Llaves e índices:** PK `PK_tipos_carroceria_catalogo` (Id).
 
@@ -497,7 +497,7 @@ Qué guarda cada una de las 40 tablas del esquema de NEXO, qué significa cada c
 
 ## 16. `tbl_servicios_conexos`
 
-**Entidad:** `clsServicioConexo` — **Para qué sirve:** Catálogo de servicios adicionales al flete (cargue, descargue, ITR, almacenamiento, acompañamiento vehicular, etc.). Reestructurada en S4-HU-15.1 para unificar dos categorías con dimensiones de precio distintas; las dimensiones que no aplican a un servicio llevan `NO APLICA`.
+**Entidad:** `clsServicioConexo` — **Para qué sirve:** Catálogo de servicios adicionales al flete (cargue, descargue, ITR, almacenamiento, acompañamiento vehicular, etc.). Reestructurada para unificar dos categorías con dimensiones de precio distintas; las dimensiones que no aplican a un servicio llevan `NO APLICA`.
 
 | Columna | Tipo | Nullable | Default | Descripción |
 |---|---|---|---|---|
@@ -515,9 +515,9 @@ Qué guarda cada una de las 40 tablas del esquema de NEXO, qué significa cada c
 | `Categoria` | `nvarchar(20)` | No | `'logistico'` | `logistico` o `adicional` |
 | `Activo` | `bit` | No | `1` | Si el registro está vigente; los inactivos no se usan |
 | `ActualizadoPor` | `uniqueidentifier` | Sí |  | Usuario que lo modificó por última vez |
-| `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset()` | Fecha de creación (auditoría) |
-| `UpdatedAt` | `datetimeoffset` | No | `sysdatetimeoffset()` | Fecha de última modificación (auditoría) |
-| `PrecioVenta` | `decimal(18,2)` | Sí |  | S6-HU-38.1/#407: precio al cliente, con su margen ya incluido. Vacío = el servicio todavía no tiene precio de venta y la cotización usa el costo |
+| `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de creación (auditoría) |
+| `UpdatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de última modificación (auditoría) |
+| `PrecioVenta` | `decimal(18,2)` | Sí |  | precio al cliente, con su margen ya incluido. Vacío = el servicio todavía no tiene precio de venta y la cotización usa el costo |
 
 **Llaves e índices:** PK `PK_servicios_conexos` (Id); Único `UQ_servicios_conexos_dimensiones` (CodigoServicio, Origen, Destino, Puerto, Ruta, TipoMaquina); Índice `IX_servicios_conexos_ActualizadoPor` (ActualizadoPor); Índice `IX_servicios_conexos_CodigoServicio` (CodigoServicio); Check `CK_servicios_conexos_PrecioVenta` (vacío o ≥ 0).
 
@@ -525,7 +525,7 @@ Qué guarda cada una de las 40 tablas del esquema de NEXO, qué significa cada c
 **FK entrantes:** `tbl_cotizacion_conexos.ServicioConexoId` (NO ACTION).
 
 **De dónde salen los datos:**
-- Carga inicial: `docs/Database/seeder/servicios_conexos.csv` (1.346 filas).
+- Carga inicial: `../seeder/servicios_conexos.csv` (1.346 filas).
 - CRUD e importación desde Excel en `/api/servicios-conexos`; cada cambio queda en `tbl_audit_log`.
 
 ---
@@ -549,13 +549,13 @@ Qué guarda cada una de las 40 tablas del esquema de NEXO, qué significa cada c
 | `ScorePrioridad` | `decimal(6,2)` | No | `0.0` | Puntaje de prioridad, calculado (ver `tbl_parametros_score`) |
 | `Estado` | `nvarchar(20)` | No | `'Pendiente'` | `EstadoSolicitud` |
 | `CreadoPor` | `uniqueidentifier` | No |  | Usuario que la capturó |
-| `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset()` | Fecha de creación (auditoría) |
-| `UpdatedAt` | `datetimeoffset` | No | `sysdatetimeoffset()` | Fecha de última modificación (auditoría) |
+| `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de creación (auditoría) |
+| `UpdatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de última modificación (auditoría) |
 | `RowVersion` | `rowversion` | Sí |  | Control de concurrencia optimista: si dos personas guardan a la vez, la segunda recibe 409 |
 
 **Llaves e índices:** PK `PK_solicitudes` (Id); Índice `IX_solicitudes_ClienteId` (ClienteId); Índice `IX_solicitudes_CreadoPor` (CreadoPor); Índice `IX_solicitudes_Deadline` (Deadline); Índice `IX_solicitudes_Estado_ScorePrioridad` (Estado, ScorePrioridad).
 
-**FK salientes:** `ClienteId` → `tbl_clientes.Id` (NO ACTION) ⚠️ falta en la base de pruebas; `CreadoPor` → `tbl_usuarios.Id` (NO ACTION) ⚠️ falta en la base de pruebas.  
+**FK salientes:** `ClienteId` → `tbl_clientes.Id` (NO ACTION); `CreadoPor` → `tbl_usuarios.Id` (NO ACTION).  
 **FK entrantes:** `tbl_cotizaciones.SolicitudId` (NO ACTION); `tbl_lineas_solicitud.SolicitudId` (ON DELETE CASCADE).
 
 **De dónde salen los datos:**
@@ -580,8 +580,8 @@ Qué guarda cada una de las 40 tablas del esquema de NEXO, qué significa cada c
 | `Dimensiones` | `nvarchar(max)` | Sí |  | JSON con las posiciones de carga (descripción, cantidad, medidas, peso); alimenta la Mesa de Costeo y el Cubicador |
 | `ValorMercancia` | `decimal(18,2)` | Sí |  | Valor de la mercancía |
 | `EstadoLinea` | `nvarchar(20)` | No | `'PorCostear'` | `EstadoLinea`: `PorCostear`, `AutoResuelta`, `Revisada` o `Rechazada` |
-| `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset()` | Fecha de creación (auditoría) |
-| `UpdatedAt` | `datetimeoffset` | No | `sysdatetimeoffset()` | Fecha de última modificación (auditoría) |
+| `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de creación (auditoría) |
+| `UpdatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de última modificación (auditoría) |
 | `ClaseContenedor` | `nvarchar(20)` | Sí |  | Clase de contenedor (catálogo SAP, ej. `CNT40.HC`) |
 | `ClaseViaje` | `nvarchar(20)` | Sí |  | `ClaseViaje` (catálogo SAP TM) |
 | `Exclusivo` | `bit` | No | `0` | Vehículo exclusivo para el cliente |
@@ -593,12 +593,12 @@ Qué guarda cada una de las 40 tablas del esquema de NEXO, qué significa cada c
 | `Consolidado` | `bit` | No | `0` | Carga consolidada |
 | `RetornaContenedor` | `bit` | No | `0` | Incluye devolver el contenedor vacío |
 | `MotivoPendiente` | `nvarchar(500)` | Sí |  | Por qué quedó sin costear sola |
-| `HorasCargue` | `decimal(6,2)` | Sí |  | S4-HU-15.5/#251: horas de cargue efectivas de la línea |
+| `HorasCargue` | `decimal(6,2)` | Sí |  | horas de cargue efectivas de la línea |
 | `HorasDescargue` | `decimal(6,2)` | Sí |  | Horas de descargue efectivas |
-| `GrupoRutaId` | `uniqueidentifier` | Sí |  | S5-HU-18.3/#275: agrupa líneas de una misma ruta heterogénea (lo pone Cotifly) |
-| `NumeroLinea` | `int` | Sí |  | S5-HU-18.3/#275: orden de captura dentro de la solicitud |
-| `IdRecomendacionVehiculo` | `nvarchar(64)` | Sí |  | S5-HU-18.2/#274: recomendación del Cubicador usada para la línea |
-| `MotivoRechazo` | `nvarchar(500)` | Sí |  | S6-HU-24.2/#314: por qué el Administrador de Tarifas la rechazó |
+| `GrupoRutaId` | `uniqueidentifier` | Sí |  | agrupa líneas de una misma ruta heterogénea (lo pone Cotifly) |
+| `NumeroLinea` | `int` | Sí |  | orden de captura dentro de la solicitud |
+| `IdRecomendacionVehiculo` | `nvarchar(64)` | Sí |  | recomendación del Cubicador usada para la línea |
+| `MotivoRechazo` | `nvarchar(500)` | Sí |  | por qué el Administrador de Tarifas la rechazó |
 | `RechazadaPor` | `uniqueidentifier` | Sí |  | Quién la rechazó |
 | `RechazadaAt` | `datetimeoffset` | Sí |  | Cuándo se rechazó |
 
@@ -626,8 +626,8 @@ Qué guarda cada una de las 40 tablas del esquema de NEXO, qué significa cada c
 | `Tipo` | `nvarchar(20)` | No |  | `TipoPendienteDeCosteo`: `Tecnica` (falló una fuente, se reintenta) o `Manual` (no hay tarifa válida, espera al Administrador de Tarifas) |
 | `Motivo` | `nvarchar(500)` | No |  | Por qué quedó pendiente |
 | `ResueltaEn` | `datetimeoffset` | Sí |  | Cuándo se resolvió. `NULL` = sigue pendiente (índice filtrado sobre estas) |
-| `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset()` | Fecha de creación (auditoría) |
-| `UpdatedAt` | `datetimeoffset` | No | `sysdatetimeoffset()` | Fecha de última modificación (auditoría) |
+| `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de creación (auditoría) |
+| `UpdatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de última modificación (auditoría) |
 
 **Llaves e índices:** PK `PK_lineas_pendientes_de_costeo` (Id); Índice `IX_lineas_pendientes_de_costeo_SolicitudId` (SolicitudId) — filtrado `WHERE [ResueltaEn] IS NULL`; Índice `IX_lineas_pendientes_de_costeo_TrabajoId_LineaSolicitudId_Tipo` (TrabajoId, LineaSolicitudId, Tipo).
 
@@ -684,16 +684,16 @@ Qué guarda cada una de las 40 tablas del esquema de NEXO, qué significa cada c
 | `Total` | `decimal(18,2)` | No | `0.0` | Suma de fletes, aprovisionamiento, retorno de contenedor y conexos |
 | `EntregadaPor` | `uniqueidentifier` | Sí |  | Quién la entregó |
 | `EntregadaAt` | `datetimeoffset` | Sí |  | Cuándo se entregó |
-| `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset()` | Fecha de creación (auditoría) |
-| `UpdatedAt` | `datetimeoffset` | No | `sysdatetimeoffset()` | Fecha de última modificación (auditoría) |
+| `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de creación (auditoría) |
+| `UpdatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de última modificación (auditoría) |
 | `RowVersion` | `rowversion` | Sí |  | Control de concurrencia optimista: si dos personas guardan a la vez, la segunda recibe 409 |
-| `EsAutoCosteo` | `bit` | No | `0` | S4-HU-15.6/#252: la armó el auto-costeo; nunca pasa por `/entregar` |
-| `ModificadaTrasEntregaAt` | `datetimeoffset` | Sí |  | S5-HU-20.1/#286: último cambio de conexos después de entregar. No mueve `Estado` ni `EntregadaAt` |
+| `EsAutoCosteo` | `bit` | No | `0` | la armó el auto-costeo; nunca pasa por `/entregar` |
+| `ModificadaTrasEntregaAt` | `datetimeoffset` | Sí |  | último cambio de conexos después de entregar. No mueve `Estado` ni `EntregadaAt` |
 
 **Llaves e índices:** PK `PK_cotizaciones` (Id); Índice `IX_cotizaciones_EntregadaPor` (EntregadaPor); Índice `IX_cotizaciones_SolicitudId` (SolicitudId).
 
 **FK salientes:** `SolicitudId` → `tbl_solicitudes.Id` (NO ACTION); `EntregadaPor` → `tbl_usuarios.Id` (NO ACTION).  
-**FK entrantes:** `tbl_cotizacion_conexos.CotizacionId` (ON DELETE CASCADE); `tbl_cotizacion_lineas.CotizacionId` (ON DELETE CASCADE); `tbl_tarifas_historicas.CotizacionId` (NO ACTION) ⚠️ falta en la base de pruebas.
+**FK entrantes:** `tbl_cotizacion_conexos.CotizacionId` (ON DELETE CASCADE); `tbl_cotizacion_lineas.CotizacionId` (ON DELETE CASCADE); `tbl_tarifas_historicas.CotizacionId` (NO ACTION).
 
 **De dónde salen los datos:**
 - Se crea, entrega y marca con resultado desde `/api/cotizaciones`, o la arma el auto-costeo.
@@ -712,8 +712,8 @@ Qué guarda cada una de las 40 tablas del esquema de NEXO, qué significa cada c
 | `LineaSolicitudId` | `uniqueidentifier` | Sí |  | Línea de solicitud costeada (`NULL` = flete manual sin línea) |
 | `ValorFlete` | `decimal(18,2)` | No |  | Valor del flete |
 | `Fuente` | `nvarchar(20)` | No |  | `FuenteFlete`: de dónde salió el valor |
-| `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset()` | Fecha de creación (auditoría) |
-| `UpdatedAt` | `datetimeoffset` | No | `sysdatetimeoffset()` | Fecha de última modificación (auditoría) |
+| `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de creación (auditoría) |
+| `UpdatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de última modificación (auditoría) |
 | `ValorAprovisionamiento` | `decimal(18,2)` | Sí |  | Costo de traer el contenedor vacío (suma al total) |
 | `ValorRetornoContenedor` | `decimal(18,2)` | Sí |  | Costo de devolver el contenedor vacío (suma al total) |
 
@@ -737,14 +737,14 @@ Qué guarda cada una de las 40 tablas del esquema de NEXO, qué significa cada c
 | `CotizacionId` | `uniqueidentifier` | No |  | Cotización |
 | `ServicioConexoId` | `uniqueidentifier` | Sí |  | Servicio del catálogo |
 | `Cantidad` | `decimal(12,2)` | No |  | Cantidad (toneladas, horas, puntos…) |
-| `ValorAplicado` | `decimal(18,2)` | No |  | Costo del conexo (costo unitario × cantidad). Desde S6-HU-38 lo que se cotiza es `PrecioVentaUnitario × Cantidad` |
-| `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset()` | Fecha de creación (auditoría) |
-| `UpdatedAt` | `datetimeoffset` | No | `sysdatetimeoffset()` | Fecha de última modificación (auditoría) |
-| `CotizacionLineaId` | `uniqueidentifier` | No |  | S4-HU-15.4/#250: línea de la cotización a la que se liga |
-| `Origen` | `nvarchar(20)` | No | `'individual'` | S5-HU-18/#262: `individual` (se agregó a esta línea) o `general` (se pidió para todas las líneas; igual crea una fila por línea) |
-| `PrecioVentaUnitario` | `decimal(18,2)` | No (*) |  | S6-HU-38.1/#407: precio de venta del servicio al agregarlo a la cotización (queda fijo aunque cambie la biblioteca); si el servicio no tenía precio de venta, el costo. Las filas anteriores al cambio se llenaron con su costo (`ValorAplicado / Cantidad`) |
+| `ValorAplicado` | `decimal(18,2)` | No |  | Costo del conexo (costo unitario × cantidad). Lo que se cotiza es `PrecioVentaUnitario × Cantidad` |
+| `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de creación (auditoría) |
+| `UpdatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de última modificación (auditoría) |
+| `CotizacionLineaId` | `uniqueidentifier` | No |  | línea de la cotización a la que se liga |
+| `Origen` | `nvarchar(20)` | No | `'individual'` | `individual` (se agregó a esta línea) o `general` (se pidió para todas las líneas; igual crea una fila por línea) |
+| `PrecioVentaUnitario` | `decimal(18,2)` | No (*) |  | precio de venta del servicio al agregarlo a la cotización (queda fijo aunque cambie la biblioteca); si el servicio no tenía precio de venta, el costo. Las filas anteriores al cambio se llenaron con su costo (`ValorAplicado / Cantidad`) |
 
-(*) En una base existente la columna queda permitiendo vacío hasta que se despliega S6-HU-38.2 y se corre la parte B de `407_precio_venta_conexos.sql`; en una base nueva (`ESQUEMA_NEXO.sql`) nace `NOT NULL`.
+(*) En la base anterior la columna permite vacío hasta que se corra la parte B de `../scripts/407_precio_venta_conexos.sql`; en una base nueva (`ESQUEMA_NEXO.sql`) nace `NOT NULL`.
 
 **Llaves e índices:** PK `PK_cotizacion_conexos` (Id); Índice `IX_cotizacion_conexos_CotizacionId` (CotizacionId); Índice `IX_cotizacion_conexos_CotizacionLineaId` (CotizacionLineaId); Índice `IX_cotizacion_conexos_ServicioConexoId` (ServicioConexoId); Check `CK_cotizacion_conexos_PrecioVentaUnitario` (≥ 0).
 
@@ -771,12 +771,12 @@ Qué guarda cada una de las 40 tablas del esquema de NEXO, qué significa cada c
 | `Valor` | `decimal(18,2)` | No |  | Valor cobrado |
 | `Fecha` | `date` | No |  | Fecha de la tarifa |
 | `CotizacionId` | `uniqueidentifier` | Sí |  | Cotización ganada de origen. `NULL` = tarifa legada sin cotización |
-| `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset()` | Fecha de creación (auditoría) |
-| `UpdatedAt` | `datetimeoffset` | No | `sysdatetimeoffset()` | Fecha de última modificación (auditoría) |
+| `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de creación (auditoría) |
+| `UpdatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de última modificación (auditoría) |
 
 **Llaves e índices:** PK `PK_tarifas_historicas` (Id); Índice `IX_tarifas_historicas_ConfigVehiculoId` (ConfigVehiculoId); Índice `IX_tarifas_historicas_CotizacionId` (CotizacionId); Índice `IX_tarifas_historicas_RutaId_ConfigVehiculoId_Tipologia` (RutaId, ConfigVehiculoId, Tipologia).
 
-**FK salientes:** `ConfigVehiculoId` → `tbl_configuraciones_vehiculo.Id` (NO ACTION) ⚠️ falta en la base de pruebas; `CotizacionId` → `tbl_cotizaciones.Id` (NO ACTION) ⚠️ falta en la base de pruebas; `RutaId` → `tbl_rutas.Id` (NO ACTION) ⚠️ falta en la base de pruebas.  
+**FK salientes:** `ConfigVehiculoId` → `tbl_configuraciones_vehiculo.Id` (NO ACTION); `CotizacionId` → `tbl_cotizaciones.Id` (NO ACTION); `RutaId` → `tbl_rutas.Id` (NO ACTION).  
 **FK entrantes:** ninguna.
 
 **De dónde salen los datos:**
@@ -796,8 +796,8 @@ Qué guarda cada una de las 40 tablas del esquema de NEXO, qué significa cada c
 | `Destino` | `nvarchar(150)` | No |  | Destino, misma regla |
 | `TipoVehiculo` | `nvarchar(40)` | No |  | Código de vehículo (las filas del seeder usan el código de SICE-TAC, ej. `2` para el Sencillo) |
 | `CreadoPor` | `uniqueidentifier` | Sí |  | Usuario que la creó |
-| `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset()` | Fecha de creación (auditoría) |
-| `UpdatedAt` | `datetimeoffset` | No | `sysdatetimeoffset()` | Fecha de última modificación (auditoría) |
+| `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de creación (auditoría) |
+| `UpdatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de última modificación (auditoría) |
 
 **Llaves e índices:** PK `PK_reglas_solo_sicetac` (Id); Único `IX_reglas_solo_sicetac_Origen_Destino_TipoVehiculo` (Origen, Destino, TipoVehiculo).
 
@@ -805,7 +805,7 @@ Qué guarda cada una de las 40 tablas del esquema de NEXO, qué significa cada c
 **FK entrantes:** ninguna.
 
 **De dónde salen los datos:**
-- Carga inicial: `docs/Database/seeder/reglas_solo_sicetac.csv` (260 filas).
+- Carga inicial: `../seeder/reglas_solo_sicetac.csv` (260 filas).
 - CRUD e importación desde Excel en `/api/reglas-solo-sicetac`.
 
 ---
@@ -822,8 +822,8 @@ Qué guarda cada una de las 40 tablas del esquema de NEXO, qué significa cada c
 | `VigenciaOriginal` | `datetime2` | Sí |  | Vigencia de SAP al momento del ajuste |
 | `Motivo` | `nvarchar(300)` | Sí |  | Motivo del ajuste |
 | `AjustadoPor` | `uniqueidentifier` | Sí |  | Usuario que lo ajustó (sin FK) |
-| `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset()` | Fecha de creación (auditoría) |
-| `UpdatedAt` | `datetimeoffset` | No | `sysdatetimeoffset()` | Fecha de última modificación (auditoría) |
+| `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de creación (auditoría) |
+| `UpdatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de última modificación (auditoría) |
 
 **Llaves e índices:** PK `PK_ajustes_vigencia_plaza` (Id); Único `IX_ajustes_vigencia_plaza_TarifaPlazaId` (TarifaPlazaId).
 
@@ -837,7 +837,7 @@ Qué guarda cada una de las 40 tablas del esquema de NEXO, qué significa cada c
 
 ## 27. `tbl_tarifas_plaza`
 
-**Entidad:** `clsTarifaPlaza` — **Para qué sirve:** Tarifa de plaza gobernada por NEXO (S4-HU-10.1): recrea el formulario de captura del sistema externo. No es una copia de `tblSAPTarifas`. Única por sus 7 dimensiones; `Valor`, `Vigencia` y `DetallesTarifa` son lo que cambia con el tiempo.
+**Entidad:** `clsTarifaPlaza` — **Para qué sirve:** Tarifa de plaza gobernada por NEXO: recrea el formulario de captura del sistema externo. No es una copia de `tblSAPTarifas`. Única por sus 7 dimensiones; `Valor`, `Vigencia` y `DetallesTarifa` son lo que cambia con el tiempo.
 
 | Columna | Tipo | Nullable | Default | Descripción |
 |---|---|---|---|---|
@@ -853,8 +853,8 @@ Qué guarda cada una de las 40 tablas del esquema de NEXO, qué significa cada c
 | `Vigencia` | `date` | No |  | Fecha de vigencia |
 | `DetallesTarifa` | `nvarchar(2000)` | No |  | Condiciones en texto libre (obligatorio) |
 | `CreadoPor` | `uniqueidentifier` | Sí |  | Usuario que la creó |
-| `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset()` | Fecha de creación (auditoría) |
-| `UpdatedAt` | `datetimeoffset` | No | `sysdatetimeoffset()` | Fecha de última modificación (auditoría) |
+| `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de creación (auditoría) |
+| `UpdatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de última modificación (auditoría) |
 
 **Llaves e índices:** PK `PK_tarifas_plaza` (Id); Único `UQ_tarifas_plaza_dimensiones` (LineaNegocio, ClaseViaje, OrigenMunicipioId, DestinoMunicipioId, ClaseContenedor, PesoId, TipoVehiculo); Índice `IX_tarifas_plaza_DestinoMunicipioId` (DestinoMunicipioId); Índice `IX_tarifas_plaza_OrigenMunicipioId` (OrigenMunicipioId); Índice `IX_tarifas_plaza_PesoId` (PesoId).
 
@@ -864,7 +864,7 @@ Qué guarda cada una de las 40 tablas del esquema de NEXO, qué significa cada c
 **Trigger:** `TRG_tarifas_plaza_historico` (`AFTER UPDATE`): si cambió `Valor`, `Vigencia` o `DetallesTarifa`, copia la fila anterior completa a `tbl_tarifas_plaza_historico`. Opera sobre todas las filas de la sentencia.
 
 **De dónde salen los datos:**
-- Carga inicial: `docs/Database/seeder/tarifas_plaza.csv` (107 filas).
+- Carga inicial: `../seeder/tarifas_plaza.csv` (107 filas).
 - CRUD en `/api/tarifas-plaza` (`clsCrearTarifaPlazaCommand`); cada cambio queda en `tbl_audit_log`.
 - El trigger `TRG_tarifas_plaza_historico` archiva el valor anterior en cada actualización de `Valor`, `Vigencia` o `DetallesTarifa`.
 
@@ -890,7 +890,7 @@ Qué guarda cada una de las 40 tablas del esquema de NEXO, qué significa cada c
 | `DetallesTarifa` | `nvarchar(2000)` | No |  | Valor anterior; igual que en `tbl_tarifas_plaza` |
 | `CreadoPor` | `uniqueidentifier` | Sí |  | Valor anterior; igual que en `tbl_tarifas_plaza` |
 | `CreatedAt` | `datetimeoffset` | No |  | Fecha de creación original de la tarifa |
-| `ReemplazadoAt` | `datetimeoffset` | No | `sysdatetimeoffset()` | Cuándo se archivó (cuándo se hizo el `UPDATE`) |
+| `ReemplazadoAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Cuándo se archivó (cuándo se hizo el `UPDATE`) |
 
 **Llaves e índices:** PK `PK_tarifas_plaza_historico` (Id); Índice `IX_tarifas_plaza_historico_TarifaPlazaId` (TarifaPlazaId).
 
@@ -947,8 +947,8 @@ Qué guarda cada una de las 40 tablas del esquema de NEXO, qué significa cada c
 | `PuntajeSpot` | `float` | No |  | Puntaje del tipo spot |
 | `ValorPorDefectoSinValor` | `float` | No |  | Valor por defecto si la solicitud no trae valor |
 | `ProbabilidadPorDefecto` | `float` | No |  | Probabilidad por defecto |
-| `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset()` | Fecha de creación (auditoría) |
-| `UpdatedAt` | `datetimeoffset` | No | `sysdatetimeoffset()` | Fecha de última modificación (auditoría) |
+| `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de creación (auditoría) |
+| `UpdatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de última modificación (auditoría) |
 | `RowVersion` | `rowversion` | Sí |  | Control de concurrencia optimista: si dos personas guardan a la vez, la segunda recibe 409 |
 
 **Llaves e índices:** PK `PK_parametros_score` (Id).
@@ -957,7 +957,7 @@ Qué guarda cada una de las 40 tablas del esquema de NEXO, qué significa cada c
 **FK entrantes:** ninguna.
 
 **De dónde salen los datos:**
-- La fila se declara en el modelo (`HasData` en `clsNexoDbContext`, valores por defecto de `clsParametrosScore`). Como el proyecto no usa migraciones, en una base nueva **no se crea sola**: la inserta `docs/Database/datos_base_nexo.sql`.
+- La fila se declara en el modelo (`HasData` en `clsNexoDbContext`, valores por defecto de `clsParametrosScore`). Como el proyecto no usa migraciones, en una base nueva **no se crea sola**: la inserta `../seeder/datos_base_nexo.sql`.
 - Se lee y se edita en `/api/priorizacion/parametros` (solo Admin); un cambio dispara el recálculo de puntajes.
 
 ---
@@ -984,15 +984,15 @@ Qué guarda cada una de las 40 tablas del esquema de NEXO, qué significa cada c
 | `UtilizacionPiso` | `decimal(6,2)` | No |  | Porcentaje de piso usado |
 | `Puntaje` | `decimal(6,2)` | No |  | Puntaje del plan |
 | `IncidenciasJson` | `nvarchar(max)` | No |  | JSON con incidencias (rechazos, advertencias) |
-| `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset()` | Fecha de creación (auditoría) |
-| `UpdatedAt` | `datetimeoffset` | No | `sysdatetimeoffset()` | Fecha de última modificación (auditoría) |
+| `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de creación (auditoría) |
+| `UpdatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de última modificación (auditoría) |
 | `LineaSolicitudId` | `uniqueidentifier` | Sí |  | Línea de solicitud de la que salió (vínculo lógico, sin FK) |
 | `NumeroVehiculo` | `int` | No | `0` | Posición dentro de una flota (1, 2, 3…) |
 | `MetricasJson` | `nvarchar(max)` | Sí |  | JSON con métricas adicionales |
 
 **Llaves e índices:** PK `PK_planes_cargue` (Id); Índice `IX_planes_cargue_LineaSolicitudId` (LineaSolicitudId); Índice `IX_planes_cargue_VehiculoId` (VehiculoId).
 
-**FK salientes:** `VehiculoId` → `tbl_vehiculos_cubicacion.Id` (NO ACTION) ⚠️ falta en la base de pruebas.  
+**FK salientes:** `VehiculoId` → `tbl_vehiculos_cubicacion.Id` (NO ACTION).  
 **FK entrantes:** `tbl_colocaciones_cargue.PlanCargueId` (ON DELETE CASCADE); `tbl_items_plan_cargue.PlanCargueId` (ON DELETE CASCADE).
 
 **De dónde salen los datos:**
@@ -1002,14 +1002,14 @@ Qué guarda cada una de las 40 tablas del esquema de NEXO, qué significa cada c
 
 ## 32. `tbl_rechazos_cubicacion_linea`
 
-**Entidad:** `clsRechazoCubicacionLinea` — **Para qué sirve:** #304: por qué el Cubicador rechazó "crear plan desde línea" para una línea. Una fila por línea: un rechazo nuevo reemplaza al anterior y pedir el plan otra vez la borra.
+**Entidad:** `clsRechazoCubicacionLinea` — **Para qué sirve:** por qué el Cubicador rechazó "crear plan desde línea" para una línea. Una fila por línea: un rechazo nuevo reemplaza al anterior y pedir el plan otra vez la borra.
 
 | Columna | Tipo | Nullable | Default | Descripción |
 |---|---|---|---|---|
 | `LineaSolicitudId` | `uniqueidentifier` | No |  | PK y FK a la línea |
 | `Codigo` | `nvarchar(60)` | No |  | Código del rechazo |
 | `Mensaje` | `nvarchar(1000)` | No |  | Mensaje del rechazo |
-| `RechazadoAt` | `datetimeoffset` | No | `sysdatetimeoffset()` | Cuándo se rechazó |
+| `RechazadoAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Cuándo se rechazó |
 
 **Llaves e índices:** PK `PK_rechazos_cubicacion_linea` (LineaSolicitudId).
 
@@ -1017,7 +1017,7 @@ Qué guarda cada una de las 40 tablas del esquema de NEXO, qué significa cada c
 **FK entrantes:** ninguna.
 
 **De dónde salen los datos:**
-- La escribe `clsRechazoCubicacionLineaAdapter` al recibir el rechazo del Cubicador. Script: `docs/Database/304_rechazo_cubicacion_por_linea.sql`.
+- La escribe `clsRechazoCubicacionLineaAdapter` al recibir el rechazo del Cubicador.
 
 ---
 
@@ -1053,8 +1053,8 @@ Qué guarda cada una de las 40 tablas del esquema de NEXO, qué significa cada c
 | `Refrigerado` | `bit` | No |  | Si es refrigerado |
 | `GrupoCompatibilidad` | `nvarchar(40)` | Sí |  | Grupo de compatibilidad con otros ítems |
 | `Observaciones` | `nvarchar(300)` | Sí |  | Observaciones |
-| `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset()` | Fecha de creación (auditoría) |
-| `UpdatedAt` | `datetimeoffset` | No | `sysdatetimeoffset()` | Fecha de última modificación (auditoría) |
+| `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de creación (auditoría) |
+| `UpdatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de última modificación (auditoría) |
 
 **Llaves e índices:** PK `PK_items_plan_cargue` (Id); Índice `IX_items_plan_cargue_PlanCargueId` (PlanCargueId).
 
@@ -1094,8 +1094,8 @@ Qué guarda cada una de las 40 tablas del esquema de NEXO, qué significa cada c
 | `AjusteManual` | `bit` | No |  | El usuario la movió |
 | `CodigoRechazo` | `nvarchar(30)` | Sí |  | Código si no se cargó |
 | `RazonRechazo` | `nvarchar(500)` | Sí |  | Motivo si no se cargó |
-| `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset()` | Fecha de creación (auditoría) |
-| `UpdatedAt` | `datetimeoffset` | No | `sysdatetimeoffset()` | Fecha de última modificación (auditoría) |
+| `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de creación (auditoría) |
+| `UpdatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de última modificación (auditoría) |
 
 **Llaves e índices:** PK `PK_colocaciones_cargue` (Id); Índice `IX_colocaciones_cargue_ItemPlanCargueId` (ItemPlanCargueId); Índice `IX_colocaciones_cargue_PlanCargueId_Cargada` (PlanCargueId, Cargada).
 
@@ -1137,7 +1137,7 @@ Qué guarda cada una de las 40 tablas del esquema de NEXO, qué significa cada c
 
 ## 36. `tbl_ia_uso`
 
-**Entidad:** `clsUsoIa` — **Para qué sirve:** Una fila por cada llamada a un modelo de lenguaje (Claude), con éxito o con error (#352). Sirve para el gasto por función y por mes, el tope por usuario y por día, y la auditoría. **No guarda el contenido enviado ni la respuesta** (regla de seguridad de la IA): solo cifras y resultado.
+**Entidad:** `clsUsoIa` — **Para qué sirve:** Una fila por cada llamada a un modelo de lenguaje (Claude), con éxito o con error. Sirve para el gasto por función y por mes, el tope por usuario y por día, y la auditoría. **No guarda el contenido enviado ni la respuesta** (regla de seguridad de la IA): solo cifras y resultado.
 
 | Columna | Tipo | Nullable | Default | Descripción |
 |---|---|---|---|---|
@@ -1152,7 +1152,7 @@ Qué guarda cada una de las 40 tablas del esquema de NEXO, qué significa cada c
 | `CostoEstimadoUsd` | `decimal(12,6)` | Sí |  | Costo estimado con el precio vigente al momento de la llamada; no se recalcula. `NULL` si no se pudo estimar |
 | `LatenciaMs` | `int` | No | `0` | Duración de la llamada (ms) |
 | `Resultado` | `nvarchar(40)` | No |  | `ok` o el código de error (`IA_LIMITE_PROVEEDOR`, `IA_TIEMPO_AGOTADO`…) |
-| `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset()` | Fecha de creación (auditoría) |
+| `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de creación (auditoría) |
 
 **Llaves e índices:** PK `PK_ia_uso` (Id); Índice `IX_ia_uso_Funcion_CreatedAt` (Funcion, CreatedAt) — incluye Modelo, TokensEntrada, TokensSalida, CostoEstimadoUsd, Resultado; Índice `IX_ia_uso_UsuarioId_CreatedAt` (UsuarioId, CreatedAt) — incluye Funcion, TokensEntrada, TokensSalida, CostoEstimadoUsd.
 
@@ -1162,14 +1162,145 @@ Qué guarda cada una de las 40 tablas del esquema de NEXO, qué significa cada c
 **FK entrantes:** ninguna.
 
 **De dónde salen los datos:**
-- Script para una base existente: `docs/Database/352_ia_uso.sql`.
 - La escribe `clsAsistenteIaConRegistro` después de cada llamada; el gasto se consulta en `/api/ia/uso`.
+
+---
+
+## 37. `tbl_asistente_conversaciones`
+
+**Entidad:** `clsConversacionAsistente` — **Para qué sirve:** Una conversación con el asistente de cotización, de quien la inicia. Sus mensajes van en `tbl_asistente_mensajes`.
+
+| Columna | Tipo | Nullable | Default | Descripción |
+|---|---|---|---|---|
+| `Id` | `uniqueidentifier` | No |  | PK |
+| `UsuarioId` | `uniqueidentifier` | No |  | Quién inició la conversación |
+| `Titulo` | `nvarchar(120)` | No |  | Título de la conversación |
+| `Turnos` | `int` | No | `0` | Cantidad de turnos (pregunta y respuesta) |
+| `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de creación |
+| `UpdatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de la última actividad |
+
+**Llaves e índices:** PK `PK_asistente_conversaciones` (Id); Índice `IX_asistente_conversaciones_UsuarioId_UpdatedAt` (UsuarioId, UpdatedAt).
+
+**CHECK** `CK_asistente_conversaciones_turnos`: `([Turnos]>=(0))`
+
+**FK salientes:** `UsuarioId` → `tbl_usuarios.Id` (NO ACTION).
+**FK entrantes:** `tbl_asistente_mensajes.ConversacionId`, `tbl_asistente_herramientas_uso.ConversacionId`, `tbl_asistente_acciones.ConversacionId`, `tbl_asistente_preferencias.ConversacionId` (NO ACTION).
+
+**De dónde salen los datos:** la escribe la aplicación cuando alguien conversa con el asistente. Sin datos iniciales.
+
+---
+
+## 38. `tbl_asistente_mensajes`
+
+**Entidad:** `clsMensajeAsistente` — **Para qué sirve:** Los mensajes de cada conversación, en orden.
+
+| Columna | Tipo | Nullable | Default | Descripción |
+|---|---|---|---|---|
+| `Id` | `uniqueidentifier` | No |  | PK |
+| `ConversacionId` | `uniqueidentifier` | No |  | Conversación a la que pertenece |
+| `Orden` | `int` | No |  | Posición del mensaje dentro de la conversación |
+| `Rol` | `nvarchar(10)` | No |  | `user` (la persona) o `assistant` (el asistente) |
+| `Contenido` | `nvarchar(max)` | No | `''` | Texto del mensaje |
+| `Estado` | `nvarchar(20)` | No |  | `en_curso`, `completo`, `incompleto` o `descartado` |
+| `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de creación |
+
+**Llaves e índices:** PK `PK_asistente_mensajes` (Id); Índice único `IX_asistente_mensajes_ConversacionId_Orden` (ConversacionId, Orden).
+
+**CHECK** `CK_asistente_mensajes_rol`: `([Rol] IN ('user','assistant'))`; `CK_asistente_mensajes_estado`: `([Estado] IN ('en_curso','completo','incompleto','descartado'))`
+
+**FK salientes:** `ConversacionId` → `tbl_asistente_conversaciones.Id` (NO ACTION).
+**FK entrantes:** `tbl_asistente_herramientas_uso.MensajeId`, `tbl_asistente_acciones.MensajeId` (NO ACTION).
+
+**De dónde salen los datos:** la escribe la aplicación. Sin datos iniciales.
+
+---
+
+## 39. `tbl_asistente_herramientas_uso`
+
+**Entidad:** `clsUsoHerramientaAsistente` — **Para qué sirve:** Una fila por cada herramienta que usó el asistente para responder: qué consultó, qué obtuvo y de qué fuente. Es la prueba de dónde salió cada valor que mostró.
+
+| Columna | Tipo | Nullable | Default | Descripción |
+|---|---|---|---|---|
+| `Id` | `uniqueidentifier` | No |  | PK |
+| `ConversacionId` | `uniqueidentifier` | No |  | Conversación |
+| `MensajeId` | `uniqueidentifier` | No |  | Mensaje del asistente que usó la herramienta |
+| `Herramienta` | `nvarchar(60)` | No |  | Nombre de la herramienta |
+| `Entrada` | `nvarchar(max)` | No |  | Parámetros de la consulta, en JSON |
+| `Salida` | `nvarchar(max)` | Sí |  | Resultado, en JSON |
+| `Encontrado` | `bit` | Sí |  | Si la herramienta encontró datos |
+| `Fuente` | `nvarchar(200)` | Sí |  | Fuente del dato (por ejemplo, SICE-TAC o tarifa de plaza) |
+| `Resultado` | `nvarchar(40)` | No |  | `ok` o el código de error |
+| `LatenciaMs` | `int` | No | `0` | Duración de la consulta (ms) |
+| `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de creación |
+
+**Llaves e índices:** PK `PK_asistente_herramientas_uso` (Id); Índice `IX_asistente_herramientas_uso_ConversacionId_CreatedAt` (ConversacionId, CreatedAt); Índice `IX_asistente_herramientas_uso_MensajeId` (MensajeId).
+
+**CHECK** `CK_asistente_herramientas_uso_entrada_json`: `(isjson([Entrada])=(1))`; `CK_asistente_herramientas_uso_salida_json`: `([Salida] IS NULL OR isjson([Salida])=(1))`
+
+**FK salientes:** `ConversacionId` → `tbl_asistente_conversaciones.Id`; `MensajeId` → `tbl_asistente_mensajes.Id` (NO ACTION).
+**FK entrantes:** ninguna.
+
+**De dónde salen los datos:** la escribe la aplicación. Sin datos iniciales.
+
+---
+
+## 40. `tbl_asistente_acciones`
+
+**Entidad:** `clsAccionAsistente` — **Para qué sirve:** Cambios que el asistente propone y la persona confirma o cancela: agregar o editar un flete, agregar conexos, rechazar una línea, cambiar el vehículo o guardar una preferencia. El asistente nunca escribe por su cuenta; cada fila es también la auditoría del cambio.
+
+| Columna | Tipo | Nullable | Default | Descripción |
+|---|---|---|---|---|
+| `Id` | `uniqueidentifier` | No |  | PK |
+| `ConversacionId` | `uniqueidentifier` | No |  | Conversación |
+| `MensajeId` | `uniqueidentifier` | No |  | Mensaje del asistente que propuso el cambio |
+| `UsuarioId` | `uniqueidentifier` | No |  | Quién debe confirmarlo |
+| `Tipo` | `nvarchar(40)` | No |  | `agregar_flete`, `editar_flete`, `agregar_conexos`, `rechazar_linea`, `cambiar_vehiculo` o `guardar_preferencia` |
+| `Parametros` | `nvarchar(max)` | No |  | Datos del cambio, en JSON |
+| `Resumen` | `nvarchar(500)` | No |  | Descripción del cambio para la persona |
+| `Estado` | `nvarchar(20)` | No | `'pendiente'` | `pendiente`, `ejecutando`, `ejecutada`, `fallida`, `cancelada` o `vencida` |
+| `VenceAt` | `datetimeoffset` | No |  | Hasta cuándo se puede confirmar |
+| `ResueltaAt` | `datetimeoffset` | Sí |  | Cuándo se confirmó, canceló o venció |
+| `ResultadoCodigo` | `nvarchar(60)` | Sí |  | Código del resultado |
+| `ResultadoMensaje` | `nvarchar(500)` | Sí |  | Mensaje del resultado |
+| `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de creación |
+
+**Llaves e índices:** PK `PK_asistente_acciones` (Id); Índice `IX_asistente_acciones_ConversacionId_CreatedAt` (ConversacionId, CreatedAt); Índice `IX_asistente_acciones_MensajeId` (MensajeId).
+
+**CHECK** `CK_asistente_acciones_tipo` (valores de `Tipo`); `CK_asistente_acciones_estado` (valores de `Estado`); `CK_asistente_acciones_parametros_json`: `(isjson([Parametros])=(1))`
+
+**FK salientes:** `ConversacionId` → `tbl_asistente_conversaciones.Id`; `MensajeId` → `tbl_asistente_mensajes.Id`; `UsuarioId` → `tbl_usuarios.Id` (NO ACTION).
+**FK entrantes:** ninguna.
+
+**De dónde salen los datos:** la escribe la aplicación. Sin datos iniciales.
+
+---
+
+## 41. `tbl_asistente_preferencias`
+
+**Entidad:** `clsPreferenciaAsistente` — **Para qué sirve:** Reglas y preferencias propias de cada persona para el asistente. El asistente las recibe al inicio de sus conversaciones y nunca reemplazan las reglas del sistema.
+
+| Columna | Tipo | Nullable | Default | Descripción |
+|---|---|---|---|---|
+| `Id` | `uniqueidentifier` | No |  | PK |
+| `UsuarioId` | `uniqueidentifier` | No |  | Dueño de la preferencia |
+| `Texto` | `nvarchar(300)` | No |  | La preferencia (mínimo 5 caracteres) |
+| `ConversacionId` | `uniqueidentifier` | Sí |  | Conversación donde se guardó |
+| `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de creación |
+
+**Llaves e índices:** PK `PK_asistente_preferencias` (Id); Índice `IX_asistente_preferencias_UsuarioId_CreatedAt` (UsuarioId, CreatedAt).
+
+**CHECK** `CK_asistente_preferencias_texto`: `(len(ltrim(rtrim([Texto])))>=(5))`
+
+**FK salientes:** `UsuarioId` → `tbl_usuarios.Id`; `ConversacionId` → `tbl_asistente_conversaciones.Id` (NO ACTION).
+**FK entrantes:** ninguna.
+
+**De dónde salen los datos:** la escribe la aplicación. Sin datos iniciales.
 
 ---
 
 # J. Mensajería e infraestructura
 
-## 37. `InboxState`
+## 42. `InboxState`
 
 **Entidad:** (MassTransit, `AddInboxStateEntity`) — **Para qué sirve:** Deduplicación de mensajes entrantes por consumidor: evita procesar dos veces un mensaje que el broker reentrega. Vive en esta base porque la atomicidad depende de guardar el mensaje y los datos en la misma transacción.
 
@@ -1190,14 +1321,14 @@ Qué guarda cada una de las 40 tablas del esquema de NEXO, qué significa cada c
 **Llaves e índices:** PK `PK_InboxState` (Id); Único `AK_InboxState_MessageId_ConsumerId` (MessageId, ConsumerId); Índice `IX_InboxState_Delivered` (Delivered).
 
 **FK salientes:** ninguna.  
-**FK entrantes:** `OutboxMessage.InboxMessageId, InboxConsumerId` (NO ACTION) ⚠️ falta en la base de pruebas.
+**FK entrantes:** `OutboxMessage.InboxMessageId, InboxConsumerId` (NO ACTION).
 
 **De dónde salen los datos:**
 - La administra MassTransit (Transactional Inbox). No se edita a mano.
 
 ---
 
-## 38. `OutboxMessage`
+## 43. `OutboxMessage`
 
 **Entidad:** (MassTransit, `AddOutboxMessageEntity`) — **Para qué sirve:** Cola transaccional de mensajes salientes: se escriben en la misma transacción del caso de uso y un proceso aparte los publica al broker.
 
@@ -1227,7 +1358,7 @@ Qué guarda cada una de las 40 tablas del esquema de NEXO, qué significa cada c
 
 **Llaves e índices:** PK `PK_OutboxMessage` (SequenceNumber); Único `IX_OutboxMessage_InboxMessageId_InboxConsumerId_SequenceNumber` (InboxMessageId, InboxConsumerId, SequenceNumber) — filtrado `WHERE [InboxMessageId] IS NOT NULL AND [InboxConsumerId] IS NOT NULL`; Único `IX_OutboxMessage_OutboxId_SequenceNumber` (OutboxId, SequenceNumber) — filtrado `WHERE [OutboxId] IS NOT NULL`; Índice `IX_OutboxMessage_EnqueueTime` (EnqueueTime); Índice `IX_OutboxMessage_ExpirationTime` (ExpirationTime).
 
-**FK salientes:** `InboxMessageId, InboxConsumerId` → `InboxState.MessageId, ConsumerId` (NO ACTION) ⚠️ falta en la base de pruebas; `OutboxId` → `OutboxState.OutboxId` (NO ACTION) ⚠️ falta en la base de pruebas.  
+**FK salientes:** `InboxMessageId, InboxConsumerId` → `InboxState.MessageId, ConsumerId` (NO ACTION); `OutboxId` → `OutboxState.OutboxId` (NO ACTION).  
 **FK entrantes:** ninguna.
 
 **De dónde salen los datos:**
@@ -1235,7 +1366,7 @@ Qué guarda cada una de las 40 tablas del esquema de NEXO, qué significa cada c
 
 ---
 
-## 39. `OutboxState`
+## 44. `OutboxState`
 
 **Entidad:** (MassTransit, `AddOutboxStateEntity`) — **Para qué sirve:** Un outbox por unidad lógica de trabajo (por ejemplo una saga): agrupa y ordena sus `OutboxMessage`.
 
@@ -1251,14 +1382,14 @@ Qué guarda cada una de las 40 tablas del esquema de NEXO, qué significa cada c
 **Llaves e índices:** PK `PK_OutboxState` (OutboxId); Índice `IX_OutboxState_Created` (Created).
 
 **FK salientes:** ninguna.  
-**FK entrantes:** `OutboxMessage.OutboxId` (NO ACTION) ⚠️ falta en la base de pruebas.
+**FK entrantes:** `OutboxMessage.OutboxId` (NO ACTION).
 
 **De dónde salen los datos:**
 - La administra MassTransit. No se edita a mano.
 
 ---
 
-## 40. `__EFMigrationsHistory`
+## 45. `__EFMigrationsHistory`
 
 **Entidad:** (EF Core) — **Para qué sirve:** Libro de control de EF Core. El proyecto no usa migraciones (el esquema es `ESQUEMA_NEXO.sql`), pero la tabla existe en la base y el script la crea para que EF no intente migrar.
 
@@ -1277,34 +1408,20 @@ Qué guarda cada una de las 40 tablas del esquema de NEXO, qué significa cada c
 
 ---
 
-# Restos en la base de pruebas
-
-Estas tablas existen en `dbInformesAutomatizados_Pruebas.db_NEXO` pero **no forman parte del esquema**: `ESQUEMA_NEXO.sql` no las crea y una base nueva no debe tenerlas. Limpiarlas es una decisión pendiente; no se usan en el código.
-
-| Tabla | Qué es |
-|---|---|
-| `tbl_tarifas_sicetac` | Caché manual del piso SICE-TAC (importación de Excel), retirada: el piso se consulta en vivo contra `DWSice.dbo.tblRutasSicetac` (#179). El código ya no la referencia |
-| `__EFMigrationsHistory_backup_20260926` | Copia de respaldo de `__EFMigrationsHistory` |
-| `tbl_lineas_solicitud_bak_20261019` | Copia de respaldo de `tbl_lineas_solicitud` |
-| `tbl_mapeo_rol_portal_bak_20261019` | Copia de respaldo de `tbl_mapeo_rol_portal` |
-| `tbl_usuarios_bak_20261019` | Copia de respaldo de `tbl_usuarios` |
-
----
-
 # Apéndice: enums
 
 Todos se guardan como texto (el nombre del valor), no como número.
 
 | Enum | Valores | Dónde se usa |
 |---|---|---|
-| `RolUsuario` | `AdminBiblioteca`, `LiderProceso`, `ServiciosLogisticos`, `Admin`, `Comercial`, `AdminTarifas` | `tbl_usuarios.Rol`, `tbl_mapeo_rol_portal.Rol`. Comercial y AdminTarifas son los roles de negocio; Admin es el superusuario técnico. `AdminBiblioteca` reemplazó a `CoordinadorFletes` (script 307) |
+| `RolUsuario` | `AdminBiblioteca`, `LiderProceso`, `ServiciosLogisticos`, `Admin`, `Comercial`, `AdminTarifas` | `tbl_usuarios.Rol`, `tbl_mapeo_rol_portal.Rol`. Comercial y AdminTarifas son los roles de negocio; Admin es el superusuario técnico. `AdminBiblioteca` reemplazó a `CoordinadorFletes` |
 | `TipoSolicitud` | `Spot`, `Licitacion` | `tbl_solicitudes.Tipo` |
 | `ModalidadSolicitud` | `Importacion`, `Exportacion`, `Nacional`, `Extradimensionada`, `CargaGeneral` | `tbl_solicitudes.Modalidad` |
 | `EstadoSolicitud` | `Pendiente`, `EnCosteo`, `Entregada`, `Descartada` | `tbl_solicitudes.Estado` |
 | `TipologiaCarga` | `Contenedor`, `CargaSuelta`, `GranelSolido`, `GranelLiquido`, `Alimentos`, `Refrigerados`, `CargaSeca` | `tbl_lineas_solicitud.Tipologia`, `tbl_tarifas_historicas.Tipologia` |
 | `LineaNegocio` | `PuertoAInterior`, `InteriorAPuerto`, `Nacional`, `DevolucionContenedor`, `Andino`, `Licitaciones` | `tbl_lineas_solicitud.LineaNegocio` (catálogo SAP TM) |
 | `ClaseViaje` | `Contenedor`, `Cupo`, `CargaSuelta`, `Extradimensionado` | `tbl_lineas_solicitud.ClaseViaje` (catálogo SAP TM) |
-| `EstadoLinea` | `PorCostear`, `AutoResuelta`, `Revisada`, `Rechazada` | `tbl_lineas_solicitud.EstadoLinea`. `Rechazada` (S6-HU-24.3/#320): el Administrador de Tarifas la dejó sin costear a propósito, con motivo |
+| `EstadoLinea` | `PorCostear`, `AutoResuelta`, `Revisada`, `Rechazada` | `tbl_lineas_solicitud.EstadoLinea`. `Rechazada`: el Administrador de Tarifas la dejó sin costear a propósito, con motivo |
 | `TipoPendienteDeCosteo` | `Tecnica`, `Manual` | `tbl_lineas_pendientes_de_costeo.Tipo`. `Tecnica` se reintenta y tiene reloj; `Manual` espera al Administrador de Tarifas, sin reloj |
 | `CondicionCarga` | `Cargado`, `Vacio` | Consultas a SICE-TAC (ya no hay tabla local) |
 | `FuenteFlete` | `Sicetac`, `Historica`, `Manual`, `Tarifario` | `tbl_cotizacion_lineas.Fuente` |

@@ -1,30 +1,35 @@
 -- =============================================================================
--- Datos base de NEXO — filas sin las que una base nueva no funciona
+-- Datos base de NEXO: filas sin las que una base nueva no funciona
 -- =============================================================================
--- Qué es: las filas que el modelo del backend declara con HasData en clsNexoDbContext. Como este proyecto NO usa
--- migraciones de EF Core, HasData nunca se ejecuta solo: en una base nueva hay que insertarlas con este script.
---   * tbl_usuarios: el usuario "Sistema (placeholder)" (Id ...0001). Es el autor de lo que hace el sistema por sí solo.
---   * tbl_mapeo_rol_portal: los 9 mapeos de rol del portal -> rol de NEXO. Sin ellos, quien entra desde el portal se
---     autentica pero queda sin rol (403).
---   * tbl_parametros_score: la fila única (Id 1) con los pesos y constantes del score de prioridad.
--- Los valores son los de la base de pruebas al 2026-10-27, iguales a los del HasData.
+-- Son las filas que el modelo del backend declara con HasData. Como el proyecto no usa
+-- migraciones de EF Core, HasData no se ejecuta solo: en una base nueva se insertan con
+-- este script.
+--   * tbl_usuarios: el usuario «Sistema (placeholder)» (Id ...0001), autor de lo que el
+--     sistema hace por sí solo.
+--   * tbl_mapeo_rol_portal: los 9 mapeos de rol del portal a rol de NEXO. Sin ellos, quien
+--     entra desde el portal se autentica pero queda sin rol (403).
+--   * tbl_parametros_score: la fila única (Id 1) con los pesos y constantes del score de
+--     prioridad.
 --
--- ORDEN: después de ESQUEMA_NEXO.sql y antes de cargar los catálogos (ver docs/Database/seeder/README.md).
--- Es idempotente: inserta solo lo que falta y no modifica filas que ya existan (por ejemplo, parámetros del score que un
--- Admin ya haya ajustado). Reemplazar db_NEXO por el valor de Database__Esquema del ambiente si es otro.
+-- Se ejecuta después de ../esquema/ESQUEMA_NEXO.sql y antes de los CSV del catálogo (lo hace
+-- ../scripts/ejecutar_schema_y_seeders.py). Se puede repetir: inserta solo lo que falta y no
+-- modifica filas existentes (por ejemplo, parámetros del score que un Admin ya ajustó).
 -- =============================================================================
 
 SET NOCOUNT ON;
+-- tbl_usuarios tiene índices filtrados, que exigen estas opciones (sqlcmd no las trae activas).
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
 
-IF NOT EXISTS (SELECT 1 FROM [db_NEXO].[tbl_usuarios] WHERE [Id] = '00000000-0000-0000-0000-000000000001')
-    INSERT INTO [db_NEXO].[tbl_usuarios] ([Id], [Nombre], [Email], [Rol], [Activo], [CreatedAt], [UpdatedAt], [IdentidadPortalId])
+IF NOT EXISTS (SELECT 1 FROM [dbo].[tbl_usuarios] WHERE [Id] = '00000000-0000-0000-0000-000000000001')
+    INSERT INTO [dbo].[tbl_usuarios] ([Id], [Nombre], [Email], [Rol], [Activo], [CreatedAt], [UpdatedAt], [IdentidadPortalId])
     VALUES ('00000000-0000-0000-0000-000000000001', N'Sistema (placeholder)', N'system@boterosoto.com.co', N'Admin', 1,
             '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00', NULL);
 
 -- Los 3 primeros traducen el rol por su nombre (IdRolPortal NULL); los demás, por el ID real del rol en el portal
--- (IDROLES de tblSAPRoles, dbSolucionesTI). El rol del portal 49 conserva el nombre "CoordinadorFletesNEXO" y se traduce a
--- AdminBiblioteca (#307).
-MERGE [db_NEXO].[tbl_mapeo_rol_portal] AS t
+-- (IDROLES de tblSAPRoles, dbSolucionesTI). El rol del portal 49 conserva el nombre «CoordinadorFletesNEXO» y se traduce a
+-- AdminBiblioteca.
+MERGE [dbo].[tbl_mapeo_rol_portal] AS t
 USING (VALUES
     ('00000000-0000-0000-0001-000000000001', NULL, N'TarifasComercial',        N'Comercial',           '2026-01-01T00:00:00+00:00'),
     ('00000000-0000-0000-0001-000000000002', NULL, N'TarifasAdministrador',    N'AdminTarifas',        '2026-01-01T00:00:00+00:00'),
@@ -41,19 +46,19 @@ WHEN NOT MATCHED BY TARGET
     THEN INSERT ([Id], [IdRolPortal], [DescripcionRolPortal], [Rol], [CreatedAt])
          VALUES (s.[Id], s.[IdRolPortal], s.[DescripcionRolPortal], s.[Rol], s.[CreatedAt]);
 
-IF NOT EXISTS (SELECT 1 FROM [db_NEXO].[tbl_parametros_score] WHERE [Id] = 1)
+IF NOT EXISTS (SELECT 1 FROM [dbo].[tbl_parametros_score] WHERE [Id] = 1)
 BEGIN
-    SET IDENTITY_INSERT [db_NEXO].[tbl_parametros_score] ON;
-    INSERT INTO [db_NEXO].[tbl_parametros_score] (
+    SET IDENTITY_INSERT [dbo].[tbl_parametros_score] ON;
+    INSERT INTO [dbo].[tbl_parametros_score] (
         [Id], [PesoUrgencia], [PesoValor], [PesoProbabilidad], [PesoTipo], [HorizonteHoras], [ValorReferencia],
         [PuntajeLicitacion], [PuntajeSpot], [ValorPorDefectoSinValor], [ProbabilidadPorDefecto], [CreatedAt], [UpdatedAt])
     VALUES (1, 0.4, 0.3, 0.2, 0.1, 240, 100000000.00, 100, 50, 30, 50,
             '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00');
-    SET IDENTITY_INSERT [db_NEXO].[tbl_parametros_score] OFF;
+    SET IDENTITY_INSERT [dbo].[tbl_parametros_score] OFF;
 END;
 
 -- Verificación (solo lectura): debe devolver 1 usuario de sistema, 9 mapeos de rol y 1 fila de parámetros.
 SELECT
-    (SELECT COUNT(*) FROM [db_NEXO].[tbl_usuarios] WHERE [Id] = '00000000-0000-0000-0000-000000000001') AS usuario_sistema,
-    (SELECT COUNT(*) FROM [db_NEXO].[tbl_mapeo_rol_portal]) AS mapeos_rol,
-    (SELECT COUNT(*) FROM [db_NEXO].[tbl_parametros_score]) AS parametros_score;
+    (SELECT COUNT(*) FROM [dbo].[tbl_usuarios] WHERE [Id] = '00000000-0000-0000-0000-000000000001') AS usuario_sistema,
+    (SELECT COUNT(*) FROM [dbo].[tbl_mapeo_rol_portal]) AS mapeos_rol,
+    (SELECT COUNT(*) FROM [dbo].[tbl_parametros_score]) AS parametros_score;
