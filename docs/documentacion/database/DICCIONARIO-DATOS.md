@@ -89,13 +89,13 @@ Qué guarda cada una de las 45 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 | Columna | Tipo | Nullable | Default | Descripción |
 |---|---|---|---|---|
 | `Id` | `uniqueidentifier` | No |  | PK |
+| `IdentidadPortalId` | `bigint` | Sí |  | Id de la persona en el portal. `NULL` = usuario que todavía no ha entrado por el portal (ej. el usuario de sistema). Único cuando no es `NULL` |
 | `Nombre` | `nvarchar(200)` | No |  | Nombre completo |
 | `Email` | `nvarchar(256)` | No |  | Correo corporativo, único |
 | `Rol` | `nvarchar(40)` | No |  | Uno de `RolUsuario` (ver apéndice), guardado como texto |
 | `Activo` | `bit` | No | `1` | Si el registro está vigente; los inactivos no se usan |
 | `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de creación (auditoría) |
 | `UpdatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de última modificación (auditoría) |
-| `IdentidadPortalId` | `bigint` | Sí |  | Id de la persona en el portal. `NULL` = usuario que todavía no ha entrado por el portal (ej. el usuario de sistema). Único cuando no es `NULL` |
 
 **Llaves e índices:** PK `PK_usuarios` (Id); Único `IX_usuarios_Email` (Email); Único `IX_usuarios_IdentidadPortalId` (IdentidadPortalId) — filtrado `WHERE [IdentidadPortalId] IS NOT NULL`.
 
@@ -168,11 +168,11 @@ Qué guarda cada una de las 45 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 |---|---|---|---|---|
 | `Id` | `uniqueidentifier` | No |  | PK |
 | `Origen` | `nvarchar(150)` | No |  | Origen en texto |
+| `OrigenMunicipioId` | `int` | Sí |  | Municipio de origen en `tbl_municipios`. `NULL` en rutas anteriores o cuyo texto no resolvió contra el catálogo |
 | `Destino` | `nvarchar(150)` | No |  | Destino en texto |
+| `DestinoMunicipioId` | `int` | Sí |  | Municipio de destino, misma regla |
 | `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de creación (auditoría) |
 | `UpdatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de última modificación (auditoría) |
-| `OrigenMunicipioId` | `int` | Sí |  | Municipio de origen en `tbl_municipios`. `NULL` en rutas anteriores o cuyo texto no resolvió contra el catálogo |
-| `DestinoMunicipioId` | `int` | Sí |  | Municipio de destino, misma regla |
 
 **Llaves e índices:** PK `PK_rutas` (Id); Único `IX_rutas_Origen_Destino` (Origen, Destino).
 
@@ -504,20 +504,20 @@ Qué guarda cada una de las 45 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 | `Id` | `uniqueidentifier` | No |  | PK |
 | `CodigoServicio` | `nvarchar(30)` | No |  | Código corto del servicio (ej. `PRE_BSAT`) |
 | `TipoServicio` | `nvarchar(120)` | No |  | Nombre del servicio |
+| `Categoria` | `nvarchar(20)` | No | `'logistico'` | `logistico` o `adicional` |
 | `Origen` | `nvarchar(150)` | No | `'NO APLICA'` | Ciudad (logísticos) u origen (adicionales). Texto plano, no FK: nombre canónico de `tbl_municipios` si cruza, texto del Excel si es un peaje o corredor |
 | `Destino` | `nvarchar(150)` | No | `'NO APLICA'` | Solo acompañamiento vehicular; misma regla que `Origen` |
 | `Puerto` | `nvarchar(50)` | No | `'NO APLICA'` | Terminal del puerto (solo ITR) |
 | `Ruta` | `nvarchar(50)` | No | `'NO APLICA'` | Tipo de ruta (solo servicios por ruta) |
 | `TipoMaquina` | `nvarchar(60)` | No | `'NO APLICA'` | Máquina y movimientos (solo ITR) |
-| `CostoUnitario` | `decimal(18,2)` | No |  | Valor unitario |
 | `Unidad` | `nvarchar(30)` | No |  | Unidad de cobro |
-| `Vigencia` | `date` | No |  | Fecha de vigencia del valor |
-| `Categoria` | `nvarchar(20)` | No | `'logistico'` | `logistico` o `adicional` |
-| `Activo` | `bit` | No | `1` | Si el registro está vigente; los inactivos no se usan |
-| `ActualizadoPor` | `uniqueidentifier` | Sí |  | Usuario que lo modificó por última vez |
-| `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de creación (auditoría) |
-| `UpdatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de última modificación (auditoría) |
+| `CostoUnitario` | `decimal(18,2)` | No |  | Valor unitario |
 | `PrecioVenta` | `decimal(18,2)` | Sí |  | precio al cliente, con su margen ya incluido. Vacío = el servicio todavía no tiene precio de venta y la cotización usa el costo |
+| `Vigencia` | `date` | No |  | Fecha de vigencia del valor |
+| `Activo` | `bit` | No | `1` | Si el registro está vigente; los inactivos no se usan |
+| `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de creación (auditoría) |
+| `ActualizadoPor` | `uniqueidentifier` | Sí |  | Usuario que lo modificó por última vez |
+| `UpdatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de última modificación (auditoría) |
 
 **Llaves e índices:** PK `PK_servicios_conexos` (Id); Único `UQ_servicios_conexos_dimensiones` (CodigoServicio, Origen, Destino, Puerto, Ruta, TipoMaquina); Índice `IX_servicios_conexos_ActualizadoPor` (ActualizadoPor); Índice `IX_servicios_conexos_CodigoServicio` (CodigoServicio); Check `CK_servicios_conexos_PrecioVenta` (vacío o ≥ 0).
 
@@ -573,34 +573,34 @@ Qué guarda cada una de las 45 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 |---|---|---|---|---|
 | `Id` | `uniqueidentifier` | No |  | PK |
 | `SolicitudId` | `uniqueidentifier` | No |  | Solicitud a la que pertenece |
+| `NumeroLinea` | `int` | Sí |  | orden de captura dentro de la solicitud |
 | `RutaId` | `uniqueidentifier` | Sí |  | Ruta |
+| `GrupoRutaId` | `uniqueidentifier` | Sí |  | agrupa líneas de una misma ruta heterogénea (lo pone Cotifly) |
 | `ConfigVehiculoId` | `uniqueidentifier` | Sí |  | Vehículo comercial |
+| `IdRecomendacionVehiculo` | `nvarchar(64)` | Sí |  | recomendación del Cubicador usada para la línea |
+| `LineaNegocio` | `nvarchar(30)` | Sí |  | `LineaNegocio` (catálogo SAP TM) |
+| `ClaseViaje` | `nvarchar(20)` | Sí |  | `ClaseViaje` (catálogo SAP TM) |
 | `Tipologia` | `nvarchar(30)` | Sí |  | `TipologiaCarga` |
 | `Peso` | `decimal(18,2)` | Sí |  | Peso declarado (kg) |
 | `Dimensiones` | `nvarchar(max)` | Sí |  | JSON con las posiciones de carga (descripción, cantidad, medidas, peso); alimenta la Mesa de Costeo y el Cubicador |
 | `ValorMercancia` | `decimal(18,2)` | Sí |  | Valor de la mercancía |
-| `EstadoLinea` | `nvarchar(20)` | No | `'PorCostear'` | `EstadoLinea`: `PorCostear`, `AutoResuelta`, `Revisada` o `Rechazada` |
-| `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de creación (auditoría) |
-| `UpdatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de última modificación (auditoría) |
-| `ClaseContenedor` | `nvarchar(20)` | Sí |  | Clase de contenedor (catálogo SAP, ej. `CNT40.HC`) |
-| `ClaseViaje` | `nvarchar(20)` | Sí |  | `ClaseViaje` (catálogo SAP TM) |
 | `Exclusivo` | `bit` | No | `0` | Vehículo exclusivo para el cliente |
-| `LevanteContenedorDiferente` | `bit` | No | `0` | El contenedor se recoge en otra ciudad |
-| `LineaNegocio` | `nvarchar(30)` | Sí |  | `LineaNegocio` (catálogo SAP TM) |
-| `CiudadLevanteContenedor` | `nvarchar(150)` | Sí |  | Dónde se recoge el contenedor |
-| `ValorAprovisionamiento` | `decimal(18,2)` | Sí |  | Costo de traer el contenedor vacío hasta el origen |
-| `CiudadDevolucionContenedor` | `nvarchar(150)` | Sí |  | Dónde se devuelve el contenedor |
 | `Consolidado` | `bit` | No | `0` | Carga consolidada |
+| `ClaseContenedor` | `nvarchar(20)` | Sí |  | Clase de contenedor (catálogo SAP, ej. `CNT40.HC`) |
+| `CiudadLevanteContenedor` | `nvarchar(150)` | Sí |  | Dónde se recoge el contenedor |
+| `LevanteContenedorDiferente` | `bit` | No | `0` | El contenedor se recoge en otra ciudad |
+| `CiudadDevolucionContenedor` | `nvarchar(150)` | Sí |  | Dónde se devuelve el contenedor |
 | `RetornaContenedor` | `bit` | No | `0` | Incluye devolver el contenedor vacío |
-| `MotivoPendiente` | `nvarchar(500)` | Sí |  | Por qué quedó sin costear sola |
+| `ValorAprovisionamiento` | `decimal(18,2)` | Sí |  | Costo de traer el contenedor vacío hasta el origen |
 | `HorasCargue` | `decimal(6,2)` | Sí |  | horas de cargue efectivas de la línea |
 | `HorasDescargue` | `decimal(6,2)` | Sí |  | Horas de descargue efectivas |
-| `GrupoRutaId` | `uniqueidentifier` | Sí |  | agrupa líneas de una misma ruta heterogénea (lo pone Cotifly) |
-| `NumeroLinea` | `int` | Sí |  | orden de captura dentro de la solicitud |
-| `IdRecomendacionVehiculo` | `nvarchar(64)` | Sí |  | recomendación del Cubicador usada para la línea |
+| `EstadoLinea` | `nvarchar(20)` | No | `'PorCostear'` | `EstadoLinea`: `PorCostear`, `AutoResuelta`, `Revisada` o `Rechazada` |
+| `MotivoPendiente` | `nvarchar(500)` | Sí |  | Por qué quedó sin costear sola |
 | `MotivoRechazo` | `nvarchar(500)` | Sí |  | por qué el Administrador de Tarifas la rechazó |
 | `RechazadaPor` | `uniqueidentifier` | Sí |  | Quién la rechazó |
 | `RechazadaAt` | `datetimeoffset` | Sí |  | Cuándo se rechazó |
+| `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de creación (auditoría) |
+| `UpdatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de última modificación (auditoría) |
 
 **Llaves e índices:** PK `PK_lineas_solicitud` (Id); Índice `IX_lineas_solicitud_ConfigVehiculoId` (ConfigVehiculoId); Índice `IX_lineas_solicitud_RutaId` (RutaId); Índice `IX_lineas_solicitud_SolicitudId` (SolicitudId).
 
@@ -682,13 +682,13 @@ Qué guarda cada una de las 45 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 | `Estado` | `nvarchar(20)` | No | `'Borrador'` | `EstadoCotizacion`: `Borrador` o `Entregada` |
 | `Resultado` | `nvarchar(20)` | No | `'SinDefinir'` | `ResultadoCotizacion`: `SinDefinir`, `Ganada` o `Perdida` |
 | `Total` | `decimal(18,2)` | No | `0.0` | Suma de fletes, aprovisionamiento, retorno de contenedor y conexos |
+| `EsAutoCosteo` | `bit` | No | `0` | la armó el auto-costeo; nunca pasa por `/entregar` |
 | `EntregadaPor` | `uniqueidentifier` | Sí |  | Quién la entregó |
 | `EntregadaAt` | `datetimeoffset` | Sí |  | Cuándo se entregó |
+| `ModificadaTrasEntregaAt` | `datetimeoffset` | Sí |  | último cambio de conexos después de entregar. No mueve `Estado` ni `EntregadaAt` |
 | `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de creación (auditoría) |
 | `UpdatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de última modificación (auditoría) |
 | `RowVersion` | `rowversion` | Sí |  | Control de concurrencia optimista: si dos personas guardan a la vez, la segunda recibe 409 |
-| `EsAutoCosteo` | `bit` | No | `0` | la armó el auto-costeo; nunca pasa por `/entregar` |
-| `ModificadaTrasEntregaAt` | `datetimeoffset` | Sí |  | último cambio de conexos después de entregar. No mueve `Estado` ni `EntregadaAt` |
 
 **Llaves e índices:** PK `PK_cotizaciones` (Id); Índice `IX_cotizaciones_EntregadaPor` (EntregadaPor); Índice `IX_cotizaciones_SolicitudId` (SolicitudId).
 
@@ -711,11 +711,11 @@ Qué guarda cada una de las 45 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 | `CotizacionId` | `uniqueidentifier` | No |  | Cotización |
 | `LineaSolicitudId` | `uniqueidentifier` | Sí |  | Línea de solicitud costeada (`NULL` = flete manual sin línea) |
 | `ValorFlete` | `decimal(18,2)` | No |  | Valor del flete |
+| `ValorAprovisionamiento` | `decimal(18,2)` | Sí |  | Costo de traer el contenedor vacío (suma al total) |
+| `ValorRetornoContenedor` | `decimal(18,2)` | Sí |  | Costo de devolver el contenedor vacío (suma al total) |
 | `Fuente` | `nvarchar(20)` | No |  | `FuenteFlete`: de dónde salió el valor |
 | `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de creación (auditoría) |
 | `UpdatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de última modificación (auditoría) |
-| `ValorAprovisionamiento` | `decimal(18,2)` | Sí |  | Costo de traer el contenedor vacío (suma al total) |
-| `ValorRetornoContenedor` | `decimal(18,2)` | Sí |  | Costo de devolver el contenedor vacío (suma al total) |
 
 **Llaves e índices:** PK `PK_cotizacion_lineas` (Id); Índice `IX_cotizacion_lineas_CotizacionId` (CotizacionId); Índice `IX_cotizacion_lineas_LineaSolicitudId` (LineaSolicitudId).
 
@@ -735,16 +735,15 @@ Qué guarda cada una de las 45 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 |---|---|---|---|---|
 | `Id` | `uniqueidentifier` | No |  | PK |
 | `CotizacionId` | `uniqueidentifier` | No |  | Cotización |
+| `CotizacionLineaId` | `uniqueidentifier` | No |  | línea de la cotización a la que se liga |
 | `ServicioConexoId` | `uniqueidentifier` | Sí |  | Servicio del catálogo |
+| `Origen` | `nvarchar(20)` | No | `'individual'` | `individual` (se agregó a esta línea) o `general` (se pidió para todas las líneas; igual crea una fila por línea) |
 | `Cantidad` | `decimal(12,2)` | No |  | Cantidad (toneladas, horas, puntos…) |
 | `ValorAplicado` | `decimal(18,2)` | No |  | Costo del conexo (costo unitario × cantidad). Lo que se cotiza es `PrecioVentaUnitario × Cantidad` |
+| `PrecioVentaUnitario` | `decimal(18,2)` | No |  | precio de venta del servicio al agregarlo a la cotización (queda fijo aunque cambie la biblioteca); si el servicio no tenía precio de venta, el costo. Las filas anteriores al cambio se llenaron con su costo (`ValorAplicado / Cantidad`) |
 | `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de creación (auditoría) |
 | `UpdatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de última modificación (auditoría) |
-| `CotizacionLineaId` | `uniqueidentifier` | No |  | línea de la cotización a la que se liga |
-| `Origen` | `nvarchar(20)` | No | `'individual'` | `individual` (se agregó a esta línea) o `general` (se pidió para todas las líneas; igual crea una fila por línea) |
-| `PrecioVentaUnitario` | `decimal(18,2)` | No (*) |  | precio de venta del servicio al agregarlo a la cotización (queda fijo aunque cambie la biblioteca); si el servicio no tenía precio de venta, el costo. Las filas anteriores al cambio se llenaron con su costo (`ValorAplicado / Cantidad`) |
 
-(*) En la base anterior la columna permite vacío hasta que se corra la parte B de `../scripts/407_precio_venta_conexos.sql`; en una base nueva (`ESQUEMA_NEXO.sql`) nace `NOT NULL`.
 
 **Llaves e índices:** PK `PK_cotizacion_conexos` (Id); Índice `IX_cotizacion_conexos_CotizacionId` (CotizacionId); Índice `IX_cotizacion_conexos_CotizacionLineaId` (CotizacionLineaId); Índice `IX_cotizacion_conexos_ServicioConexoId` (ServicioConexoId); Check `CK_cotizacion_conexos_PrecioVentaUnitario` (≥ 0).
 
@@ -767,10 +766,10 @@ Qué guarda cada una de las 45 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 | `Id` | `uniqueidentifier` | No |  | PK |
 | `RutaId` | `uniqueidentifier` | Sí |  | Ruta |
 | `ConfigVehiculoId` | `uniqueidentifier` | Sí |  | Vehículo |
+| `CotizacionId` | `uniqueidentifier` | Sí |  | Cotización ganada de origen. `NULL` = tarifa legada sin cotización |
 | `Tipologia` | `nvarchar(30)` | Sí |  | `TipologiaCarga` |
 | `Valor` | `decimal(18,2)` | No |  | Valor cobrado |
 | `Fecha` | `date` | No |  | Fecha de la tarifa |
-| `CotizacionId` | `uniqueidentifier` | Sí |  | Cotización ganada de origen. `NULL` = tarifa legada sin cotización |
 | `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de creación (auditoría) |
 | `UpdatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de última modificación (auditoría) |
 
@@ -818,8 +817,8 @@ Qué guarda cada una de las 45 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 |---|---|---|---|---|
 | `Id` | `uniqueidentifier` | No |  | PK |
 | `TarifaPlazaId` | `int` | No |  | Id de la fila de `tblSAPTarifas` a la que aplica. Único. No es FK (otra base) |
-| `VigenciaAjustada` | `datetime2` | No |  | Nueva vigencia efectiva |
 | `VigenciaOriginal` | `datetime2` | Sí |  | Vigencia de SAP al momento del ajuste |
+| `VigenciaAjustada` | `datetime2` | No |  | Nueva vigencia efectiva |
 | `Motivo` | `nvarchar(300)` | Sí |  | Motivo del ajuste |
 | `AjustadoPor` | `uniqueidentifier` | Sí |  | Usuario que lo ajustó (sin FK) |
 | `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de creación (auditoría) |
@@ -971,24 +970,24 @@ Qué guarda cada una de las 45 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 | Columna | Tipo | Nullable | Default | Descripción |
 |---|---|---|---|---|
 | `Id` | `uniqueidentifier` | No |  | PK |
-| `Nombre` | `nvarchar(150)` | No |  | Nombre del plan |
+| `LineaSolicitudId` | `uniqueidentifier` | Sí |  | Línea de solicitud de la que salió (vínculo lógico, sin FK) |
+| `NumeroVehiculo` | `int` | No | `0` | Posición dentro de una flota (1, 2, 3…) |
 | `VehiculoId` | `uniqueidentifier` | No |  | Vehículo (`tbl_vehiculos_cubicacion`) |
+| `Nombre` | `nvarchar(150)` | No |  | Nombre del plan |
 | `Estado` | `nvarchar(20)` | No |  | Estado del plan |
 | `Estrategia` | `nvarchar(40)` | No |  | Estrategia de orden |
-| `PonderacionesJson` | `nvarchar(max)` | Sí |  | JSON con ponderaciones del puntaje |
 | `Algoritmo` | `nvarchar(10)` | No |  | Algoritmo usado |
 | `Semilla` | `int` | Sí |  | Semilla del algoritmo |
+| `PonderacionesJson` | `nvarchar(max)` | Sí |  | JSON con ponderaciones del puntaje |
 | `PesoTotalKg` | `decimal(12,2)` | No |  | Peso total cargado (kg) |
 | `VolumenUtilizadoM3` | `decimal(12,3)` | No |  | Volumen usado (m³) |
 | `UtilizacionVolumen` | `decimal(6,2)` | No |  | Porcentaje de volumen usado |
 | `UtilizacionPiso` | `decimal(6,2)` | No |  | Porcentaje de piso usado |
 | `Puntaje` | `decimal(6,2)` | No |  | Puntaje del plan |
+| `MetricasJson` | `nvarchar(max)` | Sí |  | JSON con métricas adicionales |
 | `IncidenciasJson` | `nvarchar(max)` | No |  | JSON con incidencias (rechazos, advertencias) |
 | `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de creación (auditoría) |
 | `UpdatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de última modificación (auditoría) |
-| `LineaSolicitudId` | `uniqueidentifier` | Sí |  | Línea de solicitud de la que salió (vínculo lógico, sin FK) |
-| `NumeroVehiculo` | `int` | No | `0` | Posición dentro de una flota (1, 2, 3…) |
-| `MetricasJson` | `nvarchar(max)` | Sí |  | JSON con métricas adicionales |
 
 **Llaves e índices:** PK `PK_planes_cargue` (Id); Índice `IX_planes_cargue_LineaSolicitudId` (LineaSolicitudId); Índice `IX_planes_cargue_VehiculoId` (VehiculoId).
 
@@ -1283,8 +1282,8 @@ Qué guarda cada una de las 45 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 |---|---|---|---|---|
 | `Id` | `uniqueidentifier` | No |  | PK |
 | `UsuarioId` | `uniqueidentifier` | No |  | Dueño de la preferencia |
-| `Texto` | `nvarchar(300)` | No |  | La preferencia (mínimo 5 caracteres) |
 | `ConversacionId` | `uniqueidentifier` | Sí |  | Conversación donde se guardó |
+| `Texto` | `nvarchar(300)` | No |  | La preferencia (mínimo 5 caracteres) |
 | `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de creación |
 
 **Llaves e índices:** PK `PK_asistente_preferencias` (Id); Índice `IX_asistente_preferencias_UsuarioId_CreatedAt` (UsuarioId, CreatedAt).
