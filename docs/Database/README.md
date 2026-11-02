@@ -1,6 +1,7 @@
 # Base de datos de NEXO
 
-Definición de la base de datos de NEXO y sus datos iniciales.
+Definición de la base de datos de NEXO y sus datos iniciales. La documentación de las tablas está
+en [`docs/documentacion/database/`](../documentacion/database/).
 
 | | |
 |---|---|
@@ -16,9 +17,13 @@ Definición de la base de datos de NEXO y sus datos iniciales.
 | `esquema/ESQUEMA_NEXO.sql` | DDL de las 45 tablas: columnas, llaves, `CHECK`, índices y trigger. Es la única definición del esquema. |
 | `seeder/` | Datos iniciales: `datos_base_nexo.sql` (usuario de sistema, roles del portal y parámetros del score) y un CSV por cada catálogo. |
 | `scripts/ejecutar_schema_y_seeders.py` | Crea las tablas y carga los datos iniciales en una base vacía. |
-| `scripts/407_precio_venta_conexos.sql` | Cambio pendiente solo para la base anterior; se borra cuando se aplique. |
-| `documentacion/DICCIONARIO-DATOS.md` | Cada tabla: para qué sirve, sus columnas, llaves e índices y de dónde salen sus datos. |
-| `documentacion/ORIGEN-Y-DECISIONES-SEEDER.md` | De dónde sale cada dato inicial y qué reglas se aplicaron. |
+
+## Documentación
+
+| Documento | Qué es |
+|---|---|
+| [`DICCIONARIO-DATOS.md`](../documentacion/database/DICCIONARIO-DATOS.md) | Cada tabla: para qué sirve, sus columnas, llaves e índices y de dónde salen sus datos. |
+| [`ORIGEN-Y-DECISIONES-SEEDER.md`](../documentacion/database/ORIGEN-Y-DECISIONES-SEEDER.md) | De dónde sale cada dato inicial y qué reglas se aplicaron. |
 
 ## Requisitos
 
@@ -60,7 +65,7 @@ Para usar otra base, cambie `NOMBRE_BD` al inicio de `scripts/ejecutar_schema_y_
 
 **Precios de venta de los servicios conexos.** No se versionan: `servicios_conexos.csv` trae la
 columna `PrecioVenta` vacía. Si existe `seeder/servicios_conexos_precios.local.csv` (archivo local,
-ignorado por git), el script lo carga en su lugar. Ver `documentacion/ORIGEN-Y-DECISIONES-SEEDER.md`.
+ignorado por git), el script lo carga en su lugar. Ver [`ORIGEN-Y-DECISIONES-SEEDER.md`](../documentacion/database/ORIGEN-Y-DECISIONES-SEEDER.md).
 
 ## Conectar la aplicación
 
@@ -77,11 +82,13 @@ El usuario de la aplicación solo necesita leer y escribir datos (`db_datareader
 ## Cambiar un catálogo inicial
 
 Se edita el CSV correspondiente de `seeder/` (o `datos_base_nexo.sql`) y se documenta el cambio en
-`documentacion/ORIGEN-Y-DECISIONES-SEEDER.md`. Esto solo afecta a las bases que se creen después;
+[`ORIGEN-Y-DECISIONES-SEEDER.md`](../documentacion/database/ORIGEN-Y-DECISIONES-SEEDER.md). Esto solo afecta a las bases que se creen después;
 en una base en uso, el catálogo se modifica desde la aplicación o con un script puntual.
 
-`mapeo_vehiculos.csv` y `rangos_peso_contenedor.csv` también los leen las pruebas del backend:
-conserve sus columnas y su orden.
+Los CSV van en UTF-8 sin BOM y con las columnas en el mismo orden que su tabla en
+`ESQUEMA_NEXO.sql`. La excepción es `mapeo_vehiculos.csv`: lo leen las pruebas del backend por
+posición, igual que `rangos_peso_contenedor.csv`, así que en esos dos se conservan las columnas y su
+orden actual.
 
 ## Cambiar la estructura
 
@@ -90,5 +97,9 @@ El esquema no tiene migraciones. Para un cambio de estructura:
 1. Edite `esquema/ESQUEMA_NEXO.sql` para que siga describiendo el esquema completo.
 2. Escriba el `ALTER` equivalente, de forma que se pueda ejecutar más de una vez sin error.
 3. Aplique ese `ALTER` a mano en cada base existente.
+
+En `ESQUEMA_NEXO.sql` la columna nueva va en el lugar que le corresponde por lógica; en una base
+existente el `ALTER` la agrega al final de la tabla. La aplicación lee las columnas por nombre, así
+que esa diferencia de orden no la afecta.
 
 No borre y recree tablas que ya tengan datos de operación.

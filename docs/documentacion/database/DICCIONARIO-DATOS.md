@@ -2,9 +2,9 @@
 
 Qué guarda cada una de las 45 tablas de la base de NEXO (`dbTarifario_Nexo_Pruebas`, esquema `dbo`), qué significa cada columna, sus llaves e índices y de dónde salen sus datos.
 
-- **Fuente:** `../esquema/ESQUEMA_NEXO.sql`. Tipos, nulos, valores por defecto, índices y `CHECK` corresponden a ese archivo.
+- **Fuente:** `docs/Database/esquema/ESQUEMA_NEXO.sql`. Tipos, nulos, valores por defecto, índices y `CHECK` corresponden a ese archivo.
 - **Esquema:** la aplicación lo lee de la variable `Database__Esquema` (`dbo`).
-- **Sin migraciones:** el esquema se crea con `ESQUEMA_NEXO.sql` y los datos iniciales se cargan desde `../seeder/` (ver `ORIGEN-Y-DECISIONES-SEEDER.md`). Las filas que el modelo declara con `HasData` (usuario de sistema, mapeo de roles del portal, parámetros del score) se insertan con `../seeder/datos_base_nexo.sql`.
+- **Sin migraciones:** el esquema se crea con `ESQUEMA_NEXO.sql` y los datos iniciales se cargan desde `docs/Database/seeder/` (ver `ORIGEN-Y-DECISIONES-SEEDER.md`). Las filas que el modelo declara con `HasData` (usuario de sistema, mapeo de roles del portal, parámetros del score) se insertan con `docs/Database/seeder/datos_base_nexo.sql`.
 - **Sin datos reales:** el repositorio es público; aquí solo hay estructura y significado.
 
 ---
@@ -104,7 +104,7 @@ Qué guarda cada una de las 45 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 
 **De dónde salen los datos:**
 - **Automático en el primer ingreso:** `clsResolverIdentidadPortalAdapter` crea la fila la primera vez que una persona entra por el portal, con el rol que resulte de `tbl_mapeo_rol_portal`.
-- **Usuario de sistema** (`Sistema (placeholder)`, rol `Admin`): declarado en el modelo (`HasData` en `clsNexoDbContext`) para que las FK tengan a quién apuntar en procesos sin persona. Como el proyecto no usa migraciones, en una base nueva **no se crea solo**: lo inserta `../seeder/datos_base_nexo.sql`.
+- **Usuario de sistema** (`Sistema (placeholder)`, rol `Admin`): declarado en el modelo (`HasData` en `clsNexoDbContext`) para que las FK tengan a quién apuntar en procesos sin persona. Como el proyecto no usa migraciones, en una base nueva **no se crea solo**: lo inserta `docs/Database/seeder/datos_base_nexo.sql`.
 - `clsDataSeeder.cs` siembra usuarios de demostración solo en ambientes locales (`Database__SeedOnStartup`, siempre `false` en producción).
 
 ---
@@ -127,7 +127,7 @@ Qué guarda cada una de las 45 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 **FK entrantes:** ninguna.
 
 **De dónde salen los datos:**
-- Declarado en el modelo (`HasData` en `clsNexoDbContext`): 9 filas (3 por texto y 6 por id de portal, del 48 al 53). Como el proyecto no usa migraciones, en una base nueva **no se crean solas**: las inserta `../seeder/datos_base_nexo.sql`.
+- Declarado en el modelo (`HasData` en `clsNexoDbContext`): 9 filas (3 por texto y 6 por id de portal, del 48 al 53). Como el proyecto no usa migraciones, en una base nueva **no se crean solas**: las inserta `docs/Database/seeder/datos_base_nexo.sql`.
 - No hay endpoint para editarla.
 
 ---
@@ -232,7 +232,7 @@ Qué guarda cada una de las 45 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 **FK entrantes:** ninguna.
 
 **De dónde salen los datos:**
-- Carga inicial: `../seeder/alias_elementos.csv` (71 filas).
+- Carga inicial: `docs/Database/seeder/alias_elementos.csv` (71 filas).
 - Se amplía desde la API (`clsAliasCommands`) y desde la bandeja de normalización de vehículos.
 
 ---
@@ -323,7 +323,7 @@ Qué guarda cada una de las 45 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 **FK entrantes:** `tbl_rangos_peso_contenedor.TipoVehiculo` (NO ACTION).
 
 **De dónde salen los datos:**
-- Script con la carga inicial: `../seeder/mapeo_vehiculos.csv` (seeder `mapeo_vehiculos.csv`, 15 filas, 8 con código de plaza).
+- Carga inicial: `docs/Database/seeder/mapeo_vehiculos.csv` (15 filas, 8 con código de plaza).
 - Decisiones: Sencillo `C2` -> `2` en SICE-TAC y en plaza; Turbo `2L1`/`2L2`/`2L3` -> `2L2` en plaza (en SICE-TAC cada uno conserva su código); Dobletroque `C3` -> `3` en SICE-TAC y `C3` en plaza.
 - Pendiente: el seeder de `tbl_tarifas_plaza` usa `3S2` y `2L3`, que no coinciden con `CodigoPlazaSap` de esos dos vehículos.
 
@@ -353,7 +353,7 @@ Qué guarda cada una de las 45 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 **FK entrantes:** ninguna.
 
 **De dónde salen los datos:**
-- Script con la carga inicial: `../seeder/rangos_peso_contenedor.csv` (seeder `rangos_peso_contenedor.csv`, 10 filas: 5 de 40 pies y 5 de 20 pies). Hay que correrlo después del 377.
+- Carga inicial: `docs/Database/seeder/rangos_peso_contenedor.csv` (10 filas: 5 de 40 pies y 5 de 20 pies). Se carga después de `tbl_mapeo_vehiculo_tarifario`, porque su `TipoVehiculo` apunta ahí.
 - La fila del camión de dos ejes en 40 pies, sin tope de peso en el documento original, se descartó.
 
 ---
@@ -378,7 +378,7 @@ Qué guarda cada una de las 45 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 **FK entrantes:** `tbl_rutas.OrigenMunicipioId` (NO ACTION); `tbl_rutas.DestinoMunicipioId` (NO ACTION); `tbl_tarifas_plaza.OrigenMunicipioId` (NO ACTION); `tbl_tarifas_plaza.DestinoMunicipioId` (NO ACTION).
 
 **De dónde salen los datos:**
-- Carga única: `../seeder/municipios.csv` (3.804 filas), calculado una vez cruzando `tblSAPDANE`, `tblZonasTarificacionRelacion` y `tblSAPTarifas`/`tblSAPTarifasLog` de `dbSolucionesTI`.
+- Carga única: `docs/Database/seeder/municipios.csv` (3.804 filas), calculado una vez cruzando `tblSAPDANE`, `tblZonasTarificacionRelacion` y `tblSAPTarifas`/`tblSAPTarifasLog` de `dbSolucionesTI`.
 - Se lee con `GET /api/captura-solicitudes/municipios`. No hay CRUD.
 
 ---
@@ -399,7 +399,7 @@ Qué guarda cada una de las 45 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 **FK entrantes:** `tbl_tarifas_plaza.PesoId` (NO ACTION).
 
 **De dónde salen los datos:**
-- Carga inicial: `../seeder/pesos.csv` (8 bandas).
+- Carga inicial: `docs/Database/seeder/pesos.csv` (8 bandas).
 - CRUD en `/api/pesos` (`clsCrearRangoPesoCommand`, `clsEditarRangoPesoCommand`).
 
 ---
@@ -525,7 +525,7 @@ Qué guarda cada una de las 45 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 **FK entrantes:** `tbl_cotizacion_conexos.ServicioConexoId` (NO ACTION).
 
 **De dónde salen los datos:**
-- Carga inicial: `../seeder/servicios_conexos.csv` (1.346 filas).
+- Carga inicial: `docs/Database/seeder/servicios_conexos.csv` (1.336 filas).
 - CRUD e importación desde Excel en `/api/servicios-conexos`; cada cambio queda en `tbl_audit_log`.
 
 ---
@@ -804,7 +804,7 @@ Qué guarda cada una de las 45 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 **FK entrantes:** ninguna.
 
 **De dónde salen los datos:**
-- Carga inicial: `../seeder/reglas_solo_sicetac.csv` (260 filas).
+- Carga inicial: `docs/Database/seeder/reglas_solo_sicetac.csv` (260 filas).
 - CRUD e importación desde Excel en `/api/reglas-solo-sicetac`.
 
 ---
@@ -863,7 +863,7 @@ Qué guarda cada una de las 45 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 **Trigger:** `TRG_tarifas_plaza_historico` (`AFTER UPDATE`): si cambió `Valor`, `Vigencia` o `DetallesTarifa`, copia la fila anterior completa a `tbl_tarifas_plaza_historico`. Opera sobre todas las filas de la sentencia.
 
 **De dónde salen los datos:**
-- Carga inicial: `../seeder/tarifas_plaza.csv` (107 filas).
+- Carga inicial: `docs/Database/seeder/tarifas_plaza.csv` (107 filas).
 - CRUD en `/api/tarifas-plaza` (`clsCrearTarifaPlazaCommand`); cada cambio queda en `tbl_audit_log`.
 - El trigger `TRG_tarifas_plaza_historico` archiva el valor anterior en cada actualización de `Valor`, `Vigencia` o `DetallesTarifa`.
 
@@ -956,7 +956,7 @@ Qué guarda cada una de las 45 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 **FK entrantes:** ninguna.
 
 **De dónde salen los datos:**
-- La fila se declara en el modelo (`HasData` en `clsNexoDbContext`, valores por defecto de `clsParametrosScore`). Como el proyecto no usa migraciones, en una base nueva **no se crea sola**: la inserta `../seeder/datos_base_nexo.sql`.
+- La fila se declara en el modelo (`HasData` en `clsNexoDbContext`, valores por defecto de `clsParametrosScore`). Como el proyecto no usa migraciones, en una base nueva **no se crea sola**: la inserta `docs/Database/seeder/datos_base_nexo.sql`.
 - Se lee y se edita en `/api/priorizacion/parametros` (solo Admin); un cambio dispara el recálculo de puntajes.
 
 ---

@@ -16,6 +16,8 @@
 --
 -- Orden del archivo:
 --   1. Tablas, agrupadas por módulo, cada una con un comentario de su objetivo.
+--      Las columnas van en orden lógico (llave, referencias, datos, estado y auditoría),
+--      no en el orden en que se fueron agregando. La aplicación las lee por nombre.
 --   2. Índices. Van antes que las llaves foráneas porque algunas apuntan a un índice
 --      único y no a la llave primaria (OutboxMessage -> InboxState(MessageId,
 --      ConsumerId), tbl_rangos_peso_contenedor -> tbl_mapeo_vehiculo_tarifario
@@ -46,13 +48,13 @@ GO
 -- uno de los 6 roles de Nexo y (si vino del portal real) su IdentidadPortalId.
 CREATE TABLE [dbo].[tbl_usuarios] (
     [Id] uniqueidentifier NOT NULL,
+    [IdentidadPortalId] bigint NULL,
     [Nombre] nvarchar(200) NOT NULL,
     [Email] nvarchar(256) NOT NULL,
     [Rol] nvarchar(40) NOT NULL,
     [Activo] bit NOT NULL DEFAULT (CONVERT([bit],(1))),
     [CreatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset()),
-    [UpdatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset()),
-    [IdentidadPortalId] bigint NULL
+    [UpdatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset())
     , CONSTRAINT [PK_usuarios] PRIMARY KEY ([Id])
 );
 
@@ -88,13 +90,13 @@ CREATE TABLE [dbo].[tbl_clientes] (
 CREATE TABLE [dbo].[tbl_rutas] (
     [Id] uniqueidentifier NOT NULL,
     [Origen] nvarchar(150) NOT NULL,
-    [Destino] nvarchar(150) NOT NULL,
-    [CreatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset()),
-    [UpdatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset()),
     -- Código DANE real del Origen/Destino (FK a tbl_municipios), NULL en
     -- rutas creadas antes de esta issue o cuyo texto no resolvió contra el catálogo.
     [OrigenMunicipioId] int NULL,
-    [DestinoMunicipioId] int NULL
+    [Destino] nvarchar(150) NOT NULL,
+    [DestinoMunicipioId] int NULL,
+    [CreatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset()),
+    [UpdatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset())
     , CONSTRAINT [PK_rutas] PRIMARY KEY ([Id])
 );
 
@@ -317,22 +319,22 @@ CREATE TABLE [dbo].[tbl_servicios_conexos] (
     [Id] uniqueidentifier NOT NULL,
     [CodigoServicio] nvarchar(30) NOT NULL,
     [TipoServicio] nvarchar(120) NOT NULL,
+    [Categoria] nvarchar(20) NOT NULL DEFAULT (N'logistico'),
     [Origen] nvarchar(150) NOT NULL DEFAULT (N'NO APLICA'),
     [Destino] nvarchar(150) NOT NULL DEFAULT (N'NO APLICA'),
     [Puerto] nvarchar(50) NOT NULL DEFAULT (N'NO APLICA'),
     [Ruta] nvarchar(50) NOT NULL DEFAULT (N'NO APLICA'),
     [TipoMaquina] nvarchar(60) NOT NULL DEFAULT (N'NO APLICA'),
-    [CostoUnitario] decimal(18,2) NOT NULL,
     [Unidad] nvarchar(30) NOT NULL,
-    [Vigencia] date NOT NULL,
-    [Categoria] nvarchar(20) NOT NULL DEFAULT (N'logistico'),
-    [Activo] bit NOT NULL DEFAULT (CONVERT([bit],(1))),
-    [ActualizadoPor] uniqueidentifier NULL,
-    [CreatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset()),
-    [UpdatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset()),
+    [CostoUnitario] decimal(18,2) NOT NULL,
     -- Precio al cliente, con su margen ya incluido. NULL = el servicio todavía no tiene
     -- precio de venta (la cotización usa el costo). Al final de la tabla, igual que en las bases existentes.
-    [PrecioVenta] decimal(18,2) NULL
+    [PrecioVenta] decimal(18,2) NULL,
+    [Vigencia] date NOT NULL,
+    [Activo] bit NOT NULL DEFAULT (CONVERT([bit],(1))),
+    [CreatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset()),
+    [ActualizadoPor] uniqueidentifier NULL,
+    [UpdatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset())
     , CONSTRAINT [PK_servicios_conexos] PRIMARY KEY ([Id])
     , CONSTRAINT [UQ_servicios_conexos_dimensiones] UNIQUE ([CodigoServicio], [Origen], [Destino], [Puerto], [Ruta], [TipoMaquina])
     , CONSTRAINT [CK_servicios_conexos_PrecioVenta] CHECK ([PrecioVenta] IS NULL OR [PrecioVenta] >= 0)
@@ -367,34 +369,34 @@ CREATE TABLE [dbo].[tbl_solicitudes] (
 CREATE TABLE [dbo].[tbl_lineas_solicitud] (
     [Id] uniqueidentifier NOT NULL,
     [SolicitudId] uniqueidentifier NOT NULL,
+    [NumeroLinea] int NULL, -- Orden de captura dentro de la solicitud
     [RutaId] uniqueidentifier NULL,
+    [GrupoRutaId] uniqueidentifier NULL, -- Lo pone Cotifly, agrupa líneas de una misma ruta heterogénea
     [ConfigVehiculoId] uniqueidentifier NULL,
+    [IdRecomendacionVehiculo] nvarchar(64) NULL, -- Recomendación del Cubicador usada para esta línea
+    [LineaNegocio] nvarchar(30) NULL,
+    [ClaseViaje] nvarchar(20) NULL,
     [Tipologia] nvarchar(30) NULL,
     [Peso] decimal(18,2) NULL,
     [Dimensiones] nvarchar(max) NULL,
     [ValorMercancia] decimal(18,2) NULL,
-    [EstadoLinea] nvarchar(20) NOT NULL DEFAULT (N'PorCostear'),
-    [CreatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset()),
-    [UpdatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset()),
-    [ClaseContenedor] nvarchar(20) NULL,
-    [ClaseViaje] nvarchar(20) NULL,
     [Exclusivo] bit NOT NULL DEFAULT (CONVERT([bit],(0))),
-    [LevanteContenedorDiferente] bit NOT NULL DEFAULT (CONVERT([bit],(0))),
-    [LineaNegocio] nvarchar(30) NULL,
-    [CiudadLevanteContenedor] nvarchar(150) NULL,
-    [ValorAprovisionamiento] decimal(18,2) NULL,
-    [CiudadDevolucionContenedor] nvarchar(150) NULL,
     [Consolidado] bit NOT NULL DEFAULT (CONVERT([bit],(0))),
+    [ClaseContenedor] nvarchar(20) NULL,
+    [CiudadLevanteContenedor] nvarchar(150) NULL,
+    [LevanteContenedorDiferente] bit NOT NULL DEFAULT (CONVERT([bit],(0))),
+    [CiudadDevolucionContenedor] nvarchar(150) NULL,
     [RetornaContenedor] bit NOT NULL DEFAULT (CONVERT([bit],(0))),
-    [MotivoPendiente] nvarchar(500) NULL,
+    [ValorAprovisionamiento] decimal(18,2) NULL,
     [HorasCargue] decimal(6,2) NULL, -- Horas efectivas de ESTA línea, resueltas al capturar
     [HorasDescargue] decimal(6,2) NULL,
-    [GrupoRutaId] uniqueidentifier NULL, -- Lo pone Cotifly, agrupa líneas de una misma ruta heterogénea
-    [NumeroLinea] int NULL, -- Orden de captura dentro de la solicitud
-    [IdRecomendacionVehiculo] nvarchar(64) NULL, -- Recomendación del Cubicador usada para esta línea
+    [EstadoLinea] nvarchar(20) NOT NULL DEFAULT (N'PorCostear'),
+    [MotivoPendiente] nvarchar(500) NULL,
     [MotivoRechazo] nvarchar(500) NULL, -- Rechazo de línea en la Mesa de Costeo
     [RechazadaPor] uniqueidentifier NULL,
-    [RechazadaAt] datetimeoffset NULL
+    [RechazadaAt] datetimeoffset NULL,
+    [CreatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset()),
+    [UpdatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset())
     , CONSTRAINT [PK_lineas_solicitud] PRIMARY KEY ([Id])
 );
 
@@ -448,13 +450,13 @@ CREATE TABLE [dbo].[tbl_cotizaciones] (
     [Estado] nvarchar(20) NOT NULL DEFAULT (N'Borrador'),
     [Resultado] nvarchar(20) NOT NULL DEFAULT (N'SinDefinir'),
     [Total] decimal(18,2) NOT NULL DEFAULT ((0.0)),
+    [EsAutoCosteo] bit NOT NULL CONSTRAINT [DF_cotizaciones_EsAutoCosteo] DEFAULT ((0)), -- Auto-costeada nunca pasa por /entregar
     [EntregadaPor] uniqueidentifier NULL,
     [EntregadaAt] datetimeoffset NULL,
+    [ModificadaTrasEntregaAt] datetimeoffset NULL, -- Último cambio de conexos tras entregar; NO mueve Estado ni EntregadaAt (SLA/métricas)
     [CreatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset()),
     [UpdatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset()),
-    [RowVersion] timestamp NULL,
-    [EsAutoCosteo] bit NOT NULL CONSTRAINT [DF_cotizaciones_EsAutoCosteo] DEFAULT ((0)), -- Auto-costeada nunca pasa por /entregar
-    [ModificadaTrasEntregaAt] datetimeoffset NULL -- Último cambio de conexos tras entregar; NO mueve Estado ni EntregadaAt (SLA/métricas)
+    [RowVersion] timestamp NULL
     , CONSTRAINT [PK_cotizaciones] PRIMARY KEY ([Id])
 );
 
@@ -465,11 +467,11 @@ CREATE TABLE [dbo].[tbl_cotizacion_lineas] (
     [CotizacionId] uniqueidentifier NOT NULL,
     [LineaSolicitudId] uniqueidentifier NULL,
     [ValorFlete] decimal(18,2) NOT NULL,
+    [ValorAprovisionamiento] decimal(18,2) NULL,
+    [ValorRetornoContenedor] decimal(18,2) NULL,
     [Fuente] nvarchar(20) NOT NULL,
     [CreatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset()),
-    [UpdatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset()),
-    [ValorAprovisionamiento] decimal(18,2) NULL,
-    [ValorRetornoContenedor] decimal(18,2) NULL
+    [UpdatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset())
     , CONSTRAINT [PK_cotizacion_lineas] PRIMARY KEY ([Id])
 );
 
@@ -478,20 +480,19 @@ CREATE TABLE [dbo].[tbl_cotizacion_lineas] (
 CREATE TABLE [dbo].[tbl_cotizacion_conexos] (
     [Id] uniqueidentifier NOT NULL,
     [CotizacionId] uniqueidentifier NOT NULL,
-    [ServicioConexoId] uniqueidentifier NULL,
-    [Cantidad] decimal(12,2) NOT NULL,
-    [ValorAplicado] decimal(18,2) NOT NULL,
-    [CreatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset()),
-    [UpdatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset()),
     [CotizacionLineaId] uniqueidentifier NOT NULL, -- Conexo ligado a UNA línea, ya no "general"
+    [ServicioConexoId] uniqueidentifier NULL,
     -- 'individual' | 'general' — trazabilidad de si el usuario lo agregó a
     -- esta línea puntual o pidió agregarlo a todas las líneas de una sola vez (que de
     -- todas formas crea una fila por línea, cada una CON su CotizacionLineaId).
     [Origen] nvarchar(20) NOT NULL CONSTRAINT [DF_cotizacion_conexos_Origen] DEFAULT (N'individual'),
+    [Cantidad] decimal(12,2) NOT NULL,
+    [ValorAplicado] decimal(18,2) NOT NULL,
     -- Precio de venta del servicio al agregarlo (queda fijo); si el servicio no tenía, el
     -- costo. Lo que se cotiza es PrecioVentaUnitario × Cantidad; ValorAplicado sigue siendo el costo.
-    -- En la base anterior queda NOT NULL con la parte B de ../scripts/407_precio_venta_conexos.sql.
-    [PrecioVentaUnitario] decimal(18,2) NOT NULL
+    [PrecioVentaUnitario] decimal(18,2) NOT NULL,
+    [CreatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset()),
+    [UpdatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset())
     , CONSTRAINT [PK_cotizacion_conexos] PRIMARY KEY ([Id])
     , CONSTRAINT [CK_cotizacion_conexos_PrecioVentaUnitario] CHECK ([PrecioVentaUnitario] >= 0)
 );
@@ -510,10 +511,10 @@ CREATE TABLE [dbo].[tbl_tarifas_historicas] (
     [Id] uniqueidentifier NOT NULL,
     [RutaId] uniqueidentifier NULL,
     [ConfigVehiculoId] uniqueidentifier NULL,
+    [CotizacionId] uniqueidentifier NULL,
     [Tipologia] nvarchar(30) NULL,
     [Valor] decimal(18,2) NOT NULL,
     [Fecha] date NOT NULL,
-    [CotizacionId] uniqueidentifier NULL,
     [CreatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset()),
     [UpdatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset())
     , CONSTRAINT [PK_tarifas_historicas] PRIMARY KEY ([Id])
@@ -537,8 +538,8 @@ CREATE TABLE [dbo].[tbl_reglas_solo_sicetac] (
 CREATE TABLE [dbo].[tbl_ajustes_vigencia_plaza] (
     [Id] uniqueidentifier NOT NULL,
     [TarifaPlazaId] int NOT NULL,
-    [VigenciaAjustada] datetime2 NOT NULL,
     [VigenciaOriginal] datetime2 NULL,
+    [VigenciaAjustada] datetime2 NOT NULL,
     [Motivo] nvarchar(300) NULL,
     [AjustadoPor] uniqueidentifier NULL,
     [CreatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset()),
@@ -659,24 +660,24 @@ CREATE TABLE [dbo].[tbl_parametros_score] (
 -- utilización lograda y las incidencias encontradas.
 CREATE TABLE [dbo].[tbl_planes_cargue] (
     [Id] uniqueidentifier NOT NULL,
-    [Nombre] nvarchar(150) NOT NULL,
+    [LineaSolicitudId] uniqueidentifier NULL,
+    [NumeroVehiculo] int NOT NULL DEFAULT ((0)),
     [VehiculoId] uniqueidentifier NOT NULL,
+    [Nombre] nvarchar(150) NOT NULL,
     [Estado] nvarchar(20) NOT NULL,
     [Estrategia] nvarchar(40) NOT NULL,
-    [PonderacionesJson] nvarchar(max) NULL,
     [Algoritmo] nvarchar(10) NOT NULL,
     [Semilla] int NULL,
+    [PonderacionesJson] nvarchar(max) NULL,
     [PesoTotalKg] decimal(12,2) NOT NULL,
     [VolumenUtilizadoM3] decimal(12,3) NOT NULL,
     [UtilizacionVolumen] decimal(6,2) NOT NULL,
     [UtilizacionPiso] decimal(6,2) NOT NULL,
     [Puntaje] decimal(6,2) NOT NULL,
+    [MetricasJson] nvarchar(max) NULL,
     [IncidenciasJson] nvarchar(max) NOT NULL,
     [CreatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset()),
-    [UpdatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset()),
-    [LineaSolicitudId] uniqueidentifier NULL,
-    [NumeroVehiculo] int NOT NULL DEFAULT ((0)),
-    [MetricasJson] nvarchar(max) NULL
+    [UpdatedAt] datetimeoffset NOT NULL DEFAULT (sysdatetimeoffset())
     , CONSTRAINT [PK_planes_cargue] PRIMARY KEY ([Id])
 );
 
@@ -860,8 +861,8 @@ CREATE TABLE [dbo].[tbl_asistente_acciones] (
 CREATE TABLE [dbo].[tbl_asistente_preferencias] (
     [Id] uniqueidentifier NOT NULL,
     [UsuarioId] uniqueidentifier NOT NULL,
-    [Texto] nvarchar(300) NOT NULL,
     [ConversacionId] uniqueidentifier NULL,
+    [Texto] nvarchar(300) NOT NULL,
     [CreatedAt] datetimeoffset NOT NULL CONSTRAINT [DF_asistente_preferencias_CreatedAt] DEFAULT (sysdatetimeoffset())
     , CONSTRAINT [PK_asistente_preferencias] PRIMARY KEY ([Id])
     , CONSTRAINT [CK_asistente_preferencias_texto] CHECK (LEN(LTRIM(RTRIM([Texto]))) >= 5)

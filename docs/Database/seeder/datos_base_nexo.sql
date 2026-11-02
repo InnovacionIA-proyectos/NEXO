@@ -22,9 +22,9 @@ SET ANSI_NULLS ON;
 SET QUOTED_IDENTIFIER ON;
 
 IF NOT EXISTS (SELECT 1 FROM [dbo].[tbl_usuarios] WHERE [Id] = '00000000-0000-0000-0000-000000000001')
-    INSERT INTO [dbo].[tbl_usuarios] ([Id], [Nombre], [Email], [Rol], [Activo], [CreatedAt], [UpdatedAt], [IdentidadPortalId])
-    VALUES ('00000000-0000-0000-0000-000000000001', N'Sistema (placeholder)', N'system@boterosoto.com.co', N'Admin', 1,
-            '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00', NULL);
+    INSERT INTO [dbo].[tbl_usuarios] ([Id], [IdentidadPortalId], [Nombre], [Email], [Rol], [Activo], [CreatedAt], [UpdatedAt])
+    VALUES ('00000000-0000-0000-0000-000000000001', NULL, N'Sistema (placeholder)', N'system@boterosoto.com.co', N'Admin', 1,
+            '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00');
 
 -- Los 3 primeros traducen el rol por su nombre (IdRolPortal NULL); los demás, por el ID real del rol en el portal
 -- (IDROLES de tblSAPRoles, dbSolucionesTI). El rol del portal 49 conserva el nombre «CoordinadorFletesNEXO» y se traduce a

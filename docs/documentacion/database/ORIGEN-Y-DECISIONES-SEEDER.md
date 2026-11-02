@@ -1,6 +1,6 @@
 # Origen y decisiones del seeder
 
-De dónde sale cada dato inicial de NEXO (`../seeder/`) y qué reglas se aplicaron. Qué guarda
+De dónde sale cada dato inicial de NEXO (`docs/Database/seeder/`) y qué reglas se aplicaron. Qué guarda
 cada tabla está en `DICCIONARIO-DATOS.md`.
 
 Los datos iniciales se calcularon una vez, con consultas directas a las fuentes, y quedaron
@@ -206,3 +206,6 @@ código equivocado no encuentra filas.
 - La vigencia `2026-09-30` de las tarifas de plaza es una fecha de referencia; falta confirmarla
   antes de usarlas en producción.
 - `Unidad` de los servicios conexos es provisional hasta que negocio la defina.
+- La tarifa Barranquilla → Cúcuta, contenedor `CNT40.HC`, banda de peso 1, `2S2`, vale
+  $498.000.010 en el Excel de origen, mientras que las demás bandas de la misma ruta valen entre
+  $4.800.000 y $6.500.000. Se carga tal como viene; falta que negocio confirme el valor.
