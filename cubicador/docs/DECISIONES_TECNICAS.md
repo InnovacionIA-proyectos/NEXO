@@ -870,7 +870,7 @@ un campo al otro para llamar a este servicio, teniendo los dos a la mano.
 
 **No se revirtió por riesgo, y conviene dejarlo claro para que nadie repita el
 argumento equivocado.** Los ids del catálogo **no** son aleatorios: son `uuid5`
-deterministas, sembrados por `database/seeder/_generar_seeders.py` con el
+deterministas, sembrados por los CSV de `database/seeder/` con el
 namespace `c9b1b1a0-6f3e-4b1a-9c2d-a1b2c3d40001` sobre la semilla
 `mercancia:{codigo}`. Un reseed los reproduce idénticos —se verificó contra las
 71 filas reales—, así que el id es **tan estable como el código**. El cambio es
@@ -1145,7 +1145,7 @@ dejar de enumerar combinaciones, que es otro trabajo.
 **Vive en cuatro sitios y manda el primero:** la fila `k_max` de
 `parametrosMotor` —editable por `PUT /parametros-motor/k_max`, sin desplegar—,
 el respaldo en `ParametrosMotor.k_max` por si la fila falta, la semilla
-(`_generar_seeders.py` y `parametrosMotor.csv`) para que un entorno nuevo nazca
+(`database/seeder/parametrosMotor.csv`) para que un entorno nuevo nazca
 en 25, y el fixture de pruebas. **Cambiar solo la fila deja los otros tres en
 10**, y un entorno nuevo volvería a nacer con el tope viejo.
 

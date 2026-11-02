@@ -1,10 +1,10 @@
 # Diccionario de datos del Cubicador
 
-Las 16 tablas de la base `dbCubicador_Pruebas` (esquema `dbo`): para qué sirve cada una, de dónde salen sus datos y qué guarda cada columna. Tipos, nulos y valores por defecto corresponden a `../esquema/ESQUEMA_CUBICADOR.sql`.
+Las 16 tablas de la base `dbCubicador_Pruebas` (esquema `dbo`): para qué sirve cada una, de dónde salen sus datos y qué guarda cada columna. Tipos, nulos y valores por defecto corresponden a `cubicador/database/esquema/ESQUEMA_CUBICADOR.sql`.
 
 **Origen de cada columna:**
 
-- **Seeder**: viene del catálogo inicial (`../seeder/`) y después se puede editar desde la aplicación.
+- **Seeder**: viene del catálogo inicial (`cubicador/database/seeder/`) y después se puede editar desde la aplicación.
 - **Aplicación**: la escribe la aplicación del Cubicador.
 - **Motor**: la escribe el motor al calcular una recomendación o un plan de cargue.
 - **Base de datos**: la llena SQL Server con su valor por defecto.

@@ -79,10 +79,9 @@ Observación clave: dentro de cada carrocería, la configuración más grande do
 
 Principio: **todo es dato, el algoritmo es fijo.** El motor no conoce ningún nombre de mercancía, carrocería ni vehículo. Lee cuatro tablas y un conjunto de parámetros. Agregar un vehículo o una mercancía es insertar filas, no tocar código.
 
-> **Nota (2026-10-06):** el diseño real de BD se resolvió en
-> `PROPUESTA-BD-MOTOR-SELECCION-VEHICULOS.md`, en la misma carpeta, y en
-> varios puntos difiere o resuelve cosas que acá seguían abiertas. Ver la
-> nota al final de ese documento para el detalle completo de los ajustes.
+> **Nota (2026-10-06):** el diseño real de BD se resolvió después y en
+> varios puntos difiere o resuelve cosas que acá seguían abiertas. El diseño
+> vigente está en `database/DICCIONARIO-DATOS.md`, en esta misma carpeta.
 
 ### 4.1 Catálogo de carrocerías
 
@@ -418,7 +417,7 @@ Antes de desplegar, correr el motor sobre 50–100 despachos ya ejecutados y com
    es el límite legal de altura por reglamentación de tránsito para ese
    tipo de vehículo, no una medida física inventada, y varía por vehículo
    (no hay un default único de 4.4 m). Ver
-   `cubicador/database/documentacion/ORIGEN-Y-DECISIONES-SEEDER.md`.
+   `cubicador/docs/database/ORIGEN-Y-DECISIONES-SEEDER.md`.
 3. **Alternativa de carrocería.** `usar_alternativa` arranca en `solo_respaldo` porque la matriz las marca como condicionadas. Confirmar.  
 4. **Carrocerías refrigeradas y contenedores.** Agregar configuraciones o excluir de esta versión.  
 5. **Límite `k_max`.** Propuesto 4\. Confirmar con operaciones cuál es el máximo razonable de vehículos que el sistema debe proponer por sí solo.

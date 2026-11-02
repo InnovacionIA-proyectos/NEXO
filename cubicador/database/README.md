@@ -1,6 +1,7 @@
 # Base de datos del Cubicador
 
-Definición de la base de datos del Cubicador y su catálogo inicial.
+Definición de la base de datos del Cubicador y su catálogo inicial. La documentación de las
+tablas está en [`../docs/database/`](../docs/database/).
 
 | | |
 |---|---|
@@ -14,10 +15,15 @@ Definición de la base de datos del Cubicador y su catálogo inicial.
 | Ruta | Qué es |
 |---|---|
 | `esquema/ESQUEMA_CUBICADOR.sql` | DDL de las 16 tablas: columnas, llaves, `CHECK` e índices. Es la única definición del esquema. |
-| `seeder/` | Catálogo inicial: 7 CSV (uno por tabla) y `_generar_seeders.py`, el script que los genera. |
+| `seeder/` | Catálogo inicial: 7 CSV, uno por tabla. |
 | `scripts/ejecutar_schema_y_seeders.py` | Crea las tablas y carga los CSV en una base vacía. |
-| `documentacion/DICCIONARIO-DATOS.md` | Cada tabla: utilidad, de dónde salen sus datos, si tiene seeder y sus columnas (tipo, nulos, valor por defecto, origen y descripción). |
-| `documentacion/ORIGEN-Y-DECISIONES-SEEDER.md` | De dónde sale cada dato del catálogo inicial y qué reglas se aplicaron. |
+
+## Documentación
+
+| Documento | Qué es |
+|---|---|
+| [`docs/database/DICCIONARIO-DATOS.md`](../docs/database/DICCIONARIO-DATOS.md) | Cada tabla: utilidad, de dónde salen sus datos, si tiene seeder y sus columnas (tipo, nulos, valor por defecto, origen y descripción). |
+| [`docs/database/ORIGEN-Y-DECISIONES-SEEDER.md`](../docs/database/ORIGEN-Y-DECISIONES-SEEDER.md) | De dónde sale cada dato del catálogo inicial, qué reglas se aplicaron y cómo se calcula el Id de cada fila. |
 
 ## Requisitos
 
@@ -69,16 +75,11 @@ El usuario de la aplicación solo necesita leer y escribir datos (`db_datareader
 
 ## Cambiar el catálogo inicial
 
-Los CSV de `seeder/` no se editan a mano. Se edita `seeder/_generar_seeders.py` y se vuelve a
-generar:
-
-```bash
-cd seeder
-py _generar_seeders.py
-```
-
-Cada fila recibe un Id fijo calculado a partir de su clave de negocio (por ejemplo, el código
-del vehículo), así que regenerar no cambia los Id de las filas existentes.
+Se editan directamente los CSV de `seeder/`. Una fila nueva lleva un Id calculado con la
+fórmula de [`ORIGEN-Y-DECISIONES-SEEDER.md`](../docs/database/ORIGEN-Y-DECISIONES-SEEDER.md)
+(«Id de las filas»), para que todas las bases sigan teniendo los mismos Id. Las filas
+existentes no cambian de Id, y si se cambia un dato del catálogo se actualizan también los dos
+documentos de `docs/database/`.
 
 Esto solo afecta a las bases que se creen después. En una base que ya está en uso, el catálogo
 se modifica desde la administración de la aplicación.
