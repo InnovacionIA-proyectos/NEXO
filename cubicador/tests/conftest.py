@@ -38,9 +38,21 @@ from infrastructure.persistence.db import Base, engine
 
 
 @pytest.fixture(autouse=True)
-async def base_limpia():
+async def base_limpia(request):
     """Esquema recreado antes de cada test. `autouse` a proposito: el aislamiento
-    no debe depender de que cada autor se acuerde de pedirlo."""
+    no debe depender de que cada autor se acuerde de pedirlo.
+
+    Con `@pytest.mark.sin_base` no se recrea nada y no se abre conexion. Hace
+    falta porque `autouse` tambien alcanza a las pruebas que NO usan base, y
+    ahi la conexion no es gratis: en el host `DATABASE_URL` no esta definida y
+    cae a SQLite en memoria, pero DENTRO DEL CONTENEDOR apunta a SQL Server, y
+    entonces una prueba que solo compila SQL termina abriendo una conexion de
+    red. Si otra prueba con aioodbc ya cerro el bucle de evento, esta revienta
+    en su preparacion con "Event loop is closed" sin tener nada que ver.
+    """
+    if request.node.get_closest_marker("sin_base"):
+        yield
+        return
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)

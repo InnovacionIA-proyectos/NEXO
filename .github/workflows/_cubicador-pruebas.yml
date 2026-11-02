@@ -89,6 +89,32 @@ jobs:
         working-directory: cubicador
         run: docker compose up -d --build --wait --wait-timeout 180
 
+      # Las pruebas de `unit-tests` corren contra SQLite, que es mas permisivo
+      # que SQL Server: `columna IS 0` es sintaxis valida ahi y el error 102 en
+      # SQL Server. Toda esa familia de fallos es invisible para ese job (#344:
+      # el plan de cargue 3D llevaba meses roto en QA con la suite en verde).
+      #
+      # Este paso es el unico que ejecuta SQL contra el motor de produccion, y
+      # va DENTRO del contenedor porque es el que trae el ODBC Driver 18.
+      # `CUBICADOR_EXIGIR_MSSQL=1` convierte el salto en FALLO. Sin eso, un
+      # typo en el nombre del servicio o una clave cambiada harian que esta
+      # prueba desapareciera sola con el job en verde - la misma forma de
+      # fallo que origino la issue.
+      #
+      # La clave sale del .env que escribio el paso de arriba, no repetida
+      # aca: con dos copias, cambiar una y olvidar la otra da justamente ese
+      # salto silencioso.
+      - name: "pytest: las consultas del plan de cargue, contra el SQL Server del stack"
+        working-directory: cubicador
+        run: |
+          # Por `grep` y no por `source`: el .env lleva comentarios con
+          # espacios y sourcearlo los ejecuta como comandos.
+          CLAVE=$(grep '^MSSQL_SA_PASSWORD=' .env | cut -d= -f2-)
+          docker compose exec -T \
+            -e MSSQL_SA_PASSWORD="$CLAVE" \
+            -e CUBICADOR_EXIGIR_MSSQL=1 \
+            api python -m pytest tests/infrastructure/test_plan_cargue_repo_contra_sqlserver.py -v
+
       - name: Flujo async (optimizar) + reintentos/Dead-Letter Queue contra el stack real
         working-directory: cubicador
         env:

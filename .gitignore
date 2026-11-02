@@ -20,8 +20,9 @@ appsettings.*.local.json
 !.env.dokploy
 !.env.githubSECRETS
 
-# Configuración local de Claude Code (permisos, hosts internos) — no versionar
-.claude/settings.json
+# Configuración local de Claude Code (permisos, hosts internos, launch.json
+# del panel de previsualización) — es de cada máquina, no se versiona.
+.claude/
 
 # Override local de Docker Compose (puertos/ajustes propios de una máquina) — no versionar
 docker-compose.override.yml

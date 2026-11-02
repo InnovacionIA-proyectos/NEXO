@@ -306,11 +306,29 @@ async def _procesar(mensaje: aio_pika.IncomingMessage, publisher: RabbitMqEvento
                     await _mover_a_dlq(
                         mensaje, publisher, cuerpo.get("tipo", "desconocido"), str(exc), intentos_previos + 1,
                     )
+                    # Lo que sale de aca lo LEE EL USUARIO: NEXO guarda este
+                    # mensaje por linea y el front lo muestra tal cual (#344).
+                    # `str(exc)` de un error de SQLAlchemy trae la consulta
+                    # entera, asi que en QA se vio "... cargada IS 0 GROUP BY
+                    # item_plan_cargue_id" en pantalla, seguido de "revisa las
+                    # medidas y los pesos" - que ademas desorienta, porque los
+                    # datos de la linea estaban bien.
+                    #
+                    # El detalle no se pierde: `logger.exception` de arriba ya
+                    # lo dejo completo, y la DLQ tambien lo lleva. Aca va el
+                    # correlation_id para poder encontrarlo en el log.
+                    #
+                    # Los errores de NEGOCIO no pasan por aca: los atiende el
+                    # `except AppException`, con su codigo y su mensaje, que si
+                    # son para el usuario.
+                    detalle = (
+                        f"Fallo interno del Cubicador tras {MAX_INTENTOS} intentos. "
+                        f"El detalle quedo en el log del servicio (correlacion {correlation_id}).")
                     # `.get` por lo mismo que arriba - es la linea que el
                     # mensaje sin planId de ci_docker_smoke.py hacia estallar
                     # en cada corrida, justo antes del ack.
-                    await planes.marcar_error(cuerpo.get("planId"), f"Fallo tras {MAX_INTENTOS} intentos: {exc}")
-                    await publisher.publicar_cubicacion_rechazada(correlation_id, "ERROR_INTERNO", str(exc))
+                    await planes.marcar_error(cuerpo.get("planId"), detalle)
+                    await publisher.publicar_cubicacion_rechazada(correlation_id, "ERROR_INTERNO", detalle)
                 else:
                     await _reencolar(mensaje, publisher, intentos_previos + 1)
             except Exception:  # noqa: BLE001 - ver el comentario del `finally`

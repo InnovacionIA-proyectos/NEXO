@@ -13,8 +13,8 @@ datos, la red ni ningun servicio: el motor es puro y el catalogo es el de QA
     python evaluacion-ia/cubicador/evaluar.py
     python evaluacion-ia/cubicador/evaluar.py --casos otra/carpeta --repeticiones 20
 
-Para evaluar otro candidato (la IA) se escribe un adaptador con la forma de
-`adaptador_motor`: recibe un `Caso` y devuelve una `Respuesta`.
+Otro candidato se evalua con un adaptador de la misma forma que
+`adaptador_motor` (recibe un `Caso` y devuelve una `Respuesta`): el de la IA esta en `evaluar_ia.py`.
 """
 
 from __future__ import annotations
@@ -81,8 +81,13 @@ def leer_casos(ruta: Path, incluir_sin_validar: bool = False) -> tuple[list[m.Ca
     huella = hashlib.sha256()
     for archivo in archivos:
         contenido = archivo.read_bytes()
+        datos = json.loads(contenido.decode("utf-8"))["casos"]
+        # En la carpeta conviven otros datasets (por ejemplo, el de interpretacion de texto libre):
+        # solo cuentan los de recomendacion, que traen la decision correcta.
+        if ruta.is_dir() and not all("decisionCorrecta" in c for c in datos):
+            continue
         huella.update(contenido)
-        casos.extend(leer_caso(c) for c in json.loads(contenido.decode("utf-8"))["casos"])
+        casos.extend(leer_caso(c) for c in datos)
     ids = [c.id for c in casos]
     if len(ids) != len(set(ids)):
         raise ValueError("Hay ids de caso repetidos en el dataset.")

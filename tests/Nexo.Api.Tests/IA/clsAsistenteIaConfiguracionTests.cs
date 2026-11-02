@@ -109,7 +109,8 @@ public class clsAsistenteIaConfiguracionTests(clsApiFixture fx)
         var o = new clsOpcionesAnthropic();
 
         Assert.Equal("claude-sonnet-5-5", o.ModeloEfectivo);
-        Assert.Equal("high", o.Effort);
+        // `medium` desde #363: lo recomienda la evaluacion del mapeo de Excel. Ver clsOpcionesAnthropic.
+        Assert.Equal("medium", o.Effort);
         Assert.False(o.Configurada);
         Assert.All(Enum.GetValues<clsFuncionIa>(), f => Assert.False(o.FuncionEncendida(f)));
     }

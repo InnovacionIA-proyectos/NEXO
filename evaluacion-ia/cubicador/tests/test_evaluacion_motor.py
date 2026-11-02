@@ -205,6 +205,15 @@ def semilla():
     return casos
 
 
+def test_la_carpeta_de_casos_ignora_los_datasets_que_no_son_de_recomendacion():
+    """`casos/` tambien guarda el dataset de interpretacion de texto libre, que no trae
+    decision correcta: leer la carpeta no puede fallar por el ni mezclar sus casos."""
+    assert (HERRAMIENTA / "casos" / "interpretacion_sintetica.json").exists()
+    casos, _ = leer_casos(HERRAMIENTA / "casos")
+    solo_semilla, _ = leer_casos(HERRAMIENTA / "casos" / "semilla_sintetica.json")
+    assert [c.id for c in casos] == [c.id for c in solo_semilla]
+
+
 def test_el_dataset_semilla_carga_y_tiene_casos_de_cada_tipo(semilla):
     assert len(semilla) >= 20
     assert any(c.resultado_esperado == m.SIN_SELECCION for c in semilla)

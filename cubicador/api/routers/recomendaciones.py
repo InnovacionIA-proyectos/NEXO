@@ -17,6 +17,7 @@ from decimal import Decimal
 from fastapi import APIRouter, Depends, Query
 
 from api.dependencias import (
+    obtener_servicio_explicacion,
     exigir_origen_declarado,
     obtener_catalogo_repo,
     obtener_parametros_repo,
@@ -25,6 +26,7 @@ from api.dependencias import (
     verificar_origen_sistema,
 )
 from api.dtos.recomendaciones import (
+    ExplicacionDto,
     CrearRecomendacionDto,
     ExtradimensionDto,
     MedidasEstandarDto,
@@ -153,6 +155,38 @@ async def consultar(
     guardada = await cu.consultar_recomendacion(
         recomendacion_repo, id_linea_solicitud, origen_sistema_consultado.strip().upper())
     return _a_dto(guardada)
+
+
+@router.get("/explicacion", response_model=ExplicacionDto)
+async def explicacion(
+    id_linea_solicitud: str = Query(alias="idLineaSolicitud"),
+    origen_sistema_consultado: str = Query(alias="origenSistema"),
+    _: str = Depends(verificar_origen_sistema),
+    recomendacion_repo=Depends(obtener_recomendacion_repo),
+    servicio=Depends(obtener_servicio_explicacion),
+):
+    """Por que se eligio esa flota, en dos o tres frases (#369).
+
+    **Aparte del POST a proposito.** El motor responde en decimas y el modelo
+    tarda segundos: meterla en `POST /recomendaciones` volveria lenta una
+    respuesta rapida por un texto que es un agregado. Asi la pantalla pinta los
+    numeros al instante y pide esto despues.
+
+    Toma la linea y el origen igual que `GET /recomendaciones`, porque es la
+    misma corrida que la pantalla acaba de mostrar y el repositorio -append-only
+    por diseno- lee por esa pareja, no por id.
+
+    **Siempre responde 200.** `explicacion: null` cuando no hay llave, cuando el
+    proveedor fallo o cuando el texto traia una cifra que no era del motor. Que
+    la pantalla funcione sin ella es el segundo criterio de la issue, y un 503
+    la obligaria a tratar un caso normal como un error.
+    """
+    guardada = await cu.consultar_recomendacion(
+        recomendacion_repo, id_linea_solicitud, origen_sistema_consultado.strip().upper())
+    if servicio is None:
+        return ExplicacionDto()
+    resultado = await servicio.explicar(guardada)
+    return ExplicacionDto(explicacion=resultado.texto if resultado else None)
 
 
 @router.get("/{id_recomendacion_vehiculo}/mercancias", response_model=list[MercanciaDeVehiculoDto])

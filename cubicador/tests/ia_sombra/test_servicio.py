@@ -234,6 +234,29 @@ async def test_cerrar_espera_las_comparaciones_en_curso_y_cancela_las_que_no_ter
     servicio.programar(recomendacion(("2L2", "FURGON")), [linea()], None)
 
     await servicio.cerrar(timeout=0.05)
-    await asyncio.sleep(0.05)
 
     assert servicio.pendientes == 0
+
+
+async def test_cerrar_no_deja_tareas_a_medio_cancelar():
+    """Que al volver de `cerrar` las tareas esten TERMINADAS, no solo avisadas.
+
+    `cancel()` pide la cancelacion y regresa en el acto. Sin esperar despues,
+    `cerrar` devolvia el control con tareas vivas: en produccion el ciclo de
+    vida de la API seguia su camino y una comparacion podia quedar cortada a
+    mitad de su escritura; en las pruebas, pytest-asyncio se quedaba esperando
+    esa tarea al cerrar su bucle y la suite se colgaba 3 de cada 5 corridas.
+
+    Mirar `pendientes == 0` no bastaba para verlo: ese contador lo vacia el
+    `done_callback`, que corre cuando la tarea termina, no cuando se la cancela.
+    Por eso aca se guardan las tareas antes y se revisa `done()` en cada una,
+    que es la propiedad que de verdad se rompia.
+    """
+    servicio = _servicio(ClienteIaFalso(json_ia(vehiculos=[vehiculo_ia()]), demora=30))
+    servicio.programar(recomendacion(("2L2", "FURGON")), [linea()], None)
+    tareas = set(servicio._pendientes)  # noqa: SLF001 - no hay otra forma de mirarlas desde fuera
+    assert tareas, "la comparacion quedo agendada"
+
+    await servicio.cerrar(timeout=0.01)
+
+    assert all(t.done() for t in tareas), "cerrar volvio con tareas todavia vivas"

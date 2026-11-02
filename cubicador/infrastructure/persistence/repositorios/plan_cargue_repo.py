@@ -1,7 +1,22 @@
 """Implementa IPlanCargueRepository con SQLAlchemy. La clave de dominio
 "itemPlanCargueId#indice" que usa el motor para correlacionar unidades
 fisicas se arma y se deshace UNICAMENTE aqui - ni application ni el motor
-conocen el formato del id real de una fila."""
+conocen el formato del id real de una fila.
+
+**Los booleanos se filtran con `Modelo.campo` y `~Modelo.campo`, no con
+`.is_(True)` / `.is_(False)`** (#344). SQLAlchemy compila `.is_(True)` a
+`columna IS 1` y SQL Server no acepta esa forma: responde el error 102,
+"Incorrect syntax near '1'". Las dos que si acepta son `= 1` y `= 0`, que es
+a lo que compilan `Modelo.campo` y `~Modelo.campo`.
+
+El patron venia del Cubicador original, de la epoca de PostgreSQL -que si
+acepta `IS true`- y sobrevivio a la migracion a SQL Server (S5-HU-17.1). Los
+siete sitios de este archivo estaban rotos y nadie lo noto, porque **SQLite
+tambien acepta `IS 0`** y toda la suite corre contra SQLite: el plan de cargue
+3D desde una linea fallaba en QA con ERROR_INTERNO mientras las pruebas pasaban
+en verde. La guarda contra eso esta en
+`tests/infrastructure/test_sql_valido_en_sqlserver.py`.
+"""
 
 from __future__ import annotations
 
@@ -120,8 +135,8 @@ class SqlPlanCargueRepository:
         filas = (await self._s.execute(
             select(ColocacionCargueModel).where(
                 ColocacionCargueModel.plan_cargue_id == plan_id,
-                ColocacionCargueModel.bloqueada.is_(True),
-                ColocacionCargueModel.cargada.is_(True),
+                ColocacionCargueModel.bloqueada,
+                ColocacionCargueModel.cargada,
             )
         )).scalars().all()
         return [_colocacion_a_entidad(f) for f in filas]
@@ -277,7 +292,7 @@ class SqlPlanCargueRepository:
         plan = await self._s.get(PlanCargueModel, plan_id)
         assert plan is not None
         cargadas = (await self._s.execute(
-            select(ColocacionCargueModel).where(ColocacionCargueModel.plan_cargue_id == plan_id, ColocacionCargueModel.cargada.is_(True))
+            select(ColocacionCargueModel).where(ColocacionCargueModel.plan_cargue_id == plan_id, ColocacionCargueModel.cargada)
         )).scalars().all()
         for c in cargadas:
             clave = mapeos.clave(c.item_plan_cargue_id, c.indice_unidad)
@@ -313,7 +328,7 @@ class SqlPlanCargueRepository:
     async def obtener_sobrantes(self, plan_id: str) -> list[tuple[str, int]]:
         filas = (await self._s.execute(
             select(ColocacionCargueModel.item_plan_cargue_id, func.count())
-            .where(ColocacionCargueModel.plan_cargue_id == plan_id, ColocacionCargueModel.cargada.is_(False))
+            .where(ColocacionCargueModel.plan_cargue_id == plan_id, ~ColocacionCargueModel.cargada)
             .group_by(ColocacionCargueModel.item_plan_cargue_id)
         )).all()
         return [(item_id, cantidad) for item_id, cantidad in filas]
@@ -321,7 +336,7 @@ class SqlPlanCargueRepository:
     async def cargo_algo(self, plan_id: str) -> bool:
         fila = (await self._s.execute(
             select(ColocacionCargueModel.id).where(
-                ColocacionCargueModel.plan_cargue_id == plan_id, ColocacionCargueModel.cargada.is_(True),
+                ColocacionCargueModel.plan_cargue_id == plan_id, ColocacionCargueModel.cargada,
             ).limit(1)
         )).first()
         return fila is not None
@@ -353,7 +368,7 @@ class SqlPlanCargueRepository:
                 select(
                     ColocacionCargueModel.plan_cargue_id, func.count(),
                 ).where(
-                    ColocacionCargueModel.plan_cargue_id.in_(ids), ColocacionCargueModel.cargada.is_(True),
+                    ColocacionCargueModel.plan_cargue_id.in_(ids), ColocacionCargueModel.cargada,
                 ).group_by(ColocacionCargueModel.plan_cargue_id)
             )).all()
         ) if ids else {}
@@ -383,7 +398,7 @@ class SqlPlanCargueRepository:
         )).all())
         cargadas_por_plan = dict((await self._s.execute(
             select(ColocacionCargueModel.plan_cargue_id, func.count())
-            .where(ColocacionCargueModel.plan_cargue_id.in_(ids), ColocacionCargueModel.cargada.is_(True))
+            .where(ColocacionCargueModel.plan_cargue_id.in_(ids), ColocacionCargueModel.cargada)
             .group_by(ColocacionCargueModel.plan_cargue_id)
         )).all())
 

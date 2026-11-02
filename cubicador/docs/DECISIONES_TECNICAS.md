@@ -1153,3 +1153,50 @@ Tiene consecuencia operativa, no solo técnica: por #217 cada vehículo
 recomendado crea una línea de solicitud, así que este tope decide cuántas
 líneas puede producir una sola captura. Con 25, una carga grande puede generar
 25 líneas con sus 25 líneas de cotización.
+
+## 22. Cerrar el modo sombra espera a que las tareas mueran, no solo lo pide (#367)
+
+`ServicioSombra.cerrar()` cancelaba las comparaciones en curso y regresaba en
+el acto:
+
+```python
+for t in list(self._pendientes):
+    t.cancel()
+```
+
+**`cancel()` solo pide la cancelación.** Marca la tarea y vuelve; la tarea sigue
+viva hasta que su bucle la planifica y el `CancelledError` sube por su pila. Así
+que `cerrar` devolvía el control con tareas a las que se les había pedido parar
+y que todavía no habían parado.
+
+Eso costaba en dos sitios.
+
+**En producción.** `cerrar_servicio_sombra()` corre en el `finally` del ciclo de
+vida de la API (`api/main.py`). El proceso seguía su camino sin esperarlas, así
+que una comparación podía quedar cortada a mitad de su escritura en
+`dbo_cubicador.iaSombra`.
+
+**En las pruebas.** La tarea sobrevivía al final del test y pytest-asyncio se
+quedaba esperándola al cerrar su bucle, en `_cancel_all_tasks`. Medido: la suite
+se colgaba **3 de cada 5 corridas**, siempre después de
+`test_la_respuesta_no_espera_al_modelo` —la que cierra con un modelo falso de 3
+segundos todavía en curso—. No era lentitud: el proceso quedaba bloqueado con
+21 s de CPU en 56 minutos. Se localizó con `py-spy dump`, que señaló la pila
+exacta; a ojo era indistinguible de «las pruebas están lentas».
+
+Ahora `cerrar` espera con `asyncio.gather(*tareas, return_exceptions=True)`
+después de cancelar. `return_exceptions=True` porque ahí se recogen, no se
+propagan: terminan con `CancelledError` y cualquier otro fallo ya quedó en el
+log de `_ejecutar`. Verificado: **0 cuelgues en 10 corridas del archivo y 6 de
+la suite completa**, que pasó a tardar 28 s estables.
+
+**Por qué `pendientes == 0` no lo detectaba.** Ese contador lo vacía el
+`done_callback`, que corre cuando la tarea termina —no cuando se la cancela—,
+así que la prueba que ya existía lo veía en cero y pasaba. Lo que de verdad se
+rompía es que las tareas quedaran sin terminar, y eso es lo que mira
+`test_cerrar_no_deja_tareas_a_medio_cancelar`: guarda las tareas antes de cerrar
+y comprueba `done()` en cada una. Con el `gather` revertido, falla.
+
+De paso se quitó el `await asyncio.sleep(0.05)` que la prueba anterior tenía
+después de `cerrar`: existía para darle tiempo a la cancelación, que es
+exactamente el síntoma. Ahora `cerrar` lo garantiza y la espera sobra.
