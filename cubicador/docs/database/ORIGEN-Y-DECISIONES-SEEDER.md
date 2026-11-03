@@ -1,6 +1,6 @@
 # Origen y decisiones del seeder
 
-De dónde sale cada dato del catálogo inicial (`../seeder/`) y qué reglas se aplicaron. Qué
+De dónde sale cada dato del catálogo inicial (`cubicador/database/seeder/`) y qué reglas se aplicaron. Qué
 guarda cada tabla está en `DICCIONARIO-DATOS.md`.
 
 ## Fuentes
@@ -84,12 +84,30 @@ Los Excel de negocio se guardan fuera del repositorio.
 
 ## Id de las filas
 
-Cada Id se calcula con `uuid5` a partir de la clave de negocio de la fila (por ejemplo,
-`vehiculo:C2`, `carroceria:FURGON`, `mercancia:CAJAS_CARTON`). La misma fila produce siempre
+Cada Id se calcula con `uuid5` sobre el namespace fijo
+`c9b1b1a0-6f3e-4b1a-9c2d-a1b2c3d40001` y una semilla con la clave de negocio de la fila:
+
+| Tabla | Semilla | Ejemplo |
+|---|---|---|
+| `vehiculos` | `vehiculo:{CodigoVehiculo}` | `vehiculo:C2` |
+| `TiposCarroceria` | `carroceria:{CodigoCarroceria}` | `carroceria:FURGON` |
+| `categoriaMercancia` | `categoria:{NombreCategoria}` | `categoria:ALIMENTOS` |
+| `tiposMercancia` | `mercancia:{CodigoMercancia}` | `mercancia:CAJAS_CARTON` |
+| `relacionVehiculosCarroceria` | `relacion:{CodigoVehiculo}:{CodigoCarroceria}` | `relacion:C2:FURGON` |
+| `reglasIncompatibilidad` | `regla:{categoría}:{categoría}`, en el orden en que se escribió la regla (en el CSV las columnas van con el Id menor primero) | `regla:FERTILIZANTE:ALIMENTOS` |
+| `parametrosMotor` | `parametro:{Clave}` | `parametro:k_max` |
+
+Para una fila nueva:
+
+```python
+import uuid
+uuid.uuid5(uuid.UUID("c9b1b1a0-6f3e-4b1a-9c2d-a1b2c3d40001"), "vehiculo:C2")
+```
+
+El namespace no se cambia: cambiaría todos los Id del catálogo. La misma fila produce siempre
 el mismo Id, así que:
 
 - todas las bases cargadas con estos CSV tienen los mismos Id;
-- regenerar los CSV no cambia los Id de las filas existentes;
 - la carga se puede repetir sin duplicar filas.
 
 ## Preguntas abiertas

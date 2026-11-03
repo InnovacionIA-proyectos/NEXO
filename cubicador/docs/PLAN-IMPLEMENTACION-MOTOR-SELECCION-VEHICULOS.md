@@ -1,6 +1,6 @@
 # Qué falta construir — Motor de selección de tipo y cantidad de vehículos
 
-Sigue de `PROPUESTA-BD-MOTOR-SELECCION-VEHICULOS.md` (diseño de tablas, ya
+Sigue del diseño de tablas (hoy en `database/DICCIONARIO-DATOS.md`, ya
 cerrado) y `propuesta-seleccion-vehiculos.md` (el flujo del motor). Este
 documento es el plan de implementación: qué pantallas/CRUD, qué endpoints,
 y qué falta para que Cotifly (u otro consumidor) pueda usarlo.
@@ -14,7 +14,7 @@ que hoy no existen en código, solo en estos documentos de diseño:
 
 ### 1.1 Crear las 9 tablas como modelos reales
 
-Las tablas de `PROPUESTA-BD-MOTOR-SELECCION-VEHICULOS.md` hoy son solo
+Las tablas del diseño (hoy en `database/DICCIONARIO-DATOS.md`) hoy son solo
 markdown — no hay modelos SQLAlchemy, no hay nada en
 `infrastructure/persistence/modelos.py`. Hace falta:
 - Un modelo SQLAlchemy por tabla (siguiendo el mismo patrón que ya existe
@@ -100,7 +100,7 @@ para la Tabla 4. **Ajustado:** cada carrocería ya no es solo un id suelto —
 va con las 2 columnas nuevas de la Tabla 4
 (`UsaCapacidadMaximaDelVehiculo`/`CapacidadMaximaEspecifica`), para poder
 resolver el caso Tractomula/Tractomula Furgón sin duplicar el código del
-vehículo (ver nota de la Tabla 4 en `PROPUESTA-BD-MOTOR-SELECCION-VEHICULOS.md`).
+vehículo (ver `relacionVehiculosCarroceria` en `database/DICCIONARIO-DATOS.md`).
 Ejemplo de body:
 
 ```json

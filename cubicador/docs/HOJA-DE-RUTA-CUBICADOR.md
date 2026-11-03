@@ -118,7 +118,7 @@ release que lo publica.
 > el id sigue siendo la llave para unir contra el catálogo.
 >
 > Los dos son igual de estables: los ids del catálogo son `uuid5` deterministas
-> sembrados por `database/seeder/_generar_seeders.py`, así que un reseed los reproduce
+> sembrados por los CSV de `database/seeder/`, así que un reseed los reproduce
 > idénticos. El cambio es por coherencia, no por riesgo. Ver `DECISIONES_TECNICAS.md` #17.
 
 ### 2.3 Respuesta — caso asignado
