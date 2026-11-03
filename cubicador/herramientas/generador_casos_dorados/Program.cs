@@ -1,4 +1,4 @@
-// Genera los 26 "casos dorados" (S2-HU-07.3) ejecutando el motor C# REAL de
+// Genera los 26 "casos dorados" ejecutando el motor C# REAL de
 // cabinaFletes (via ProjectReference, ver GeneradorCasosDorados.csproj) y
 // grabando su salida exacta en JSON. Estos JSON son el "esperado" que la
 // suite de paridad en Python (tests/paridad/) compara contra su propio

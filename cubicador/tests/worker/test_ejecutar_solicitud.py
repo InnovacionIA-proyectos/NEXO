@@ -23,9 +23,48 @@ from application.excepciones import ConflictException
 from application.ports.externos import LineaParaCubicacion, PosicionCarga
 from application.plan_cargue.optimizar import ParametrosOptimizacionInput, optimizar_plan
 from domain.entidades.entidades import ItemPlanCargue
-from infrastructure.persistence.db import crear_tablas, SessionLocal
+from infrastructure.persistence import modelos_catalogo as mc
+from infrastructure.persistence.db import crear_tablas, engine, SessionLocal
+from infrastructure.persistence.repositorios.catalogo_repo import SqlCatalogoRepository
+from infrastructure.persistence.repositorios.parametros_repo import SqlParametrosCubicacionRepository
 from infrastructure.persistence.repositorios.plan_cargue_repo import SqlPlanCargueRepository
 from infrastructure.persistence.repositorios.vehiculo_repo import SqlVehiculoCubicacionRepository
+
+
+async def _sembrar_catalogo(sesion) -> None:
+    """Lo minimo para que el motor de seleccion pueda recomendar: un vehiculo,
+    su carroceria y una mercancia que la use."""
+    from datetime import datetime, timezone
+    from decimal import Decimal
+
+    from sqlalchemy import select
+
+    async with engine.begin() as conn:
+        await conn.run_sync(mc.BaseCatalogo.metadata.create_all)
+    if (await sesion.execute(select(mc.Vehiculo.id).limit(1))).scalars().first():
+        return
+
+    ahora = datetime.now(timezone.utc)
+    a = {"creado_por": "prueba", "created_at": ahora, "updated_at": ahora}
+    sesion.add(mc.TipoCarroceria(id="c-furgon", codigo="FURGON", nombre="Furgon",
+                                 activo=True, **a))
+    sesion.add(mc.Vehiculo(id="v-3s3", codigo="3S3", nombre="Tractomula 3S3",
+                           largo_cm=Decimal(1220), ancho_cm=Decimal(240),
+                           alto_util_cm=Decimal(260), capacidad_kg=Decimal(34000),
+                           activo=True, **a))
+    sesion.add(mc.RelacionVehiculoCarroceria(
+        id="r-1", vehiculo_id="v-3s3", carroceria_id="c-furgon",
+        usa_capacidad_del_vehiculo=False, capacidad_especifica_kg=Decimal(30000), **a))
+    sesion.add(mc.CategoriaMercancia(id="cat-gen", nombre="GENERAL", **a))
+    sesion.add(mc.TipoMercancia(
+        id="m-beb", codigo="BEBIDAS", nombre="Bebidas", categoria_id="cat-gen",
+        cubicable=True, condicionada=False, comentario_condicion=None,
+        carroceria_principal_id="c-furgon", carroceria_secundaria_id=None,
+        secundaria_condicionada=False, control_ambiental="NINGUNO", apilable=True,
+        fragil=False, rotacion_libre=True, activo=True, **a))
+    sesion.add(mc.ParametroMotor(id="p-k", clave="k_max", valor="10",
+                                 descripcion="Tope", **a))
+    await sesion.commit()
 
 
 def _cuerpo_publicado(plan_id: str, tipo: str, solicitud: dict) -> dict:
@@ -72,10 +111,17 @@ class _MensajeFalso:
 
 
 @pytest.fixture
-async def repos():
+async def sesion_worker():
+    """La sesion viva, para las pruebas que ademas necesitan el catalogo."""
     await crear_tablas()
     async with SessionLocal() as sesion:
-        yield SqlPlanCargueRepository(sesion), SqlVehiculoCubicacionRepository(sesion), _PublisherFalso()
+        yield sesion
+
+
+@pytest.fixture
+async def repos(sesion_worker):
+    yield (SqlPlanCargueRepository(sesion_worker),
+           SqlVehiculoCubicacionRepository(sesion_worker), _PublisherFalso())
 
 
 async def test_ejecutar_solicitud_optimizar_desempaca_solicitud_anidada(repos):
@@ -97,8 +143,14 @@ async def test_ejecutar_solicitud_optimizar_desempaca_solicitud_anidada(repos):
     assert actualizado.estado == "optimizado"
 
 
-async def test_ejecutar_solicitud_crear_desde_linea_desempaca_solicitud_anidada(repos, monkeypatch):
+async def test_ejecutar_solicitud_crear_desde_linea_desempaca_solicitud_anidada(
+    repos, sesion_worker, monkeypatch,
+):
+    """El puente ahora consume la recomendacion del motor de seleccion
+    (S5-HU-17.6), asi que necesita el catalogo sembrado y que cada posicion
+    declare su tipo de mercancia."""
     planes, vehiculos, publisher = repos
+    await _sembrar_catalogo(sesion_worker)
 
     class _ClientePortFalso:
         def __init__(self, base_url: str, api_key: str) -> None:
@@ -107,7 +159,9 @@ async def test_ejecutar_solicitud_crear_desde_linea_desempaca_solicitud_anidada(
         async def obtener(self, linea_solicitud_id: str) -> LineaParaCubicacion:
             return LineaParaCubicacion(
                 linea_id=linea_solicitud_id,
-                posiciones=[PosicionCarga(descripcion="Pallet", cantidad=2, largo_cm=120, ancho_cm=100, alto_cm=100, peso_kg=300)],
+                posiciones=[PosicionCarga(
+                    descripcion="Pallet", cantidad=2, largo_cm=120, ancho_cm=100,
+                    alto_cm=100, peso_kg=300, codigo_mercancia="BEBIDAS")],
                 origen="Origen", destino="Destino",
             )
 
@@ -115,7 +169,9 @@ async def test_ejecutar_solicitud_crear_desde_linea_desempaca_solicitud_anidada(
 
     linea_id = "11111111-1111-1111-1111-111111111111"
     cuerpo = _cuerpo_publicado(linea_id, "crear_desde_linea", {"lineaSolicitudId": linea_id})
-    plan_id = await worker_main._ejecutar_solicitud(cuerpo, planes, vehiculos, publisher)
+    plan_id = await worker_main._ejecutar_solicitud(
+        cuerpo, planes, vehiculos, publisher,
+        SqlCatalogoRepository(sesion_worker), SqlParametrosCubicacionRepository(sesion_worker))
 
     plan = await planes.obtener(plan_id)
     assert plan.linea_solicitud_id == linea_id

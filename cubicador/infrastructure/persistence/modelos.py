@@ -136,8 +136,50 @@ class ParametrosCubicacionModel(Base):
     __tablename__ = "parametros_cubicacion"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    # Los del vehiculo mas grande que no es extradimensionado (#304) - ver
+    # `ParametrosCubicacion` en domain/entidades/entidades.py.
     largo_max_cm: Mapped[float] = mapped_column(Float, default=1220.0)
-    ancho_max_cm: Mapped[float] = mapped_column(Float, default=260.0)
-    alto_max_cm: Mapped[float] = mapped_column(Float, default=300.0)
+    ancho_max_cm: Mapped[float] = mapped_column(Float, default=240.0)
+    alto_max_cm: Mapped[float] = mapped_column(Float, default=260.0)
     peso_max_kg: Mapped[float] = mapped_column(Float, default=34000.0)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_ahora, onupdate=_ahora)
+
+
+class IaSombraModel(Base):
+    """Diferencias entre el motor y el modelo de lenguaje en modo sombra.
+
+    Una fila por recomendacion comparada (o por intento que no se pudo comparar:
+    `Estado` trae el codigo del problema). Solo se agrega, nunca se actualiza.
+    No guarda el contenido que se envia al modelo; `IdRecomendacion` une contra
+    la recomendacion del motor.
+    """
+
+    __tablename__ = "iaSombra"
+
+    id: Mapped[str] = mapped_column("Id", String(36), primary_key=True)
+    id_recomendacion: Mapped[str] = mapped_column("IdRecomendacion", String(36), index=True)
+    id_linea_solicitud: Mapped[str] = mapped_column("IdLineaSolicitud", String(100))
+    origen_sistema: Mapped[str] = mapped_column("OrigenSistema", String(20))
+    estado: Mapped[str] = mapped_column("Estado", String(40))
+    modelo: Mapped[str | None] = mapped_column("Modelo", String(100), nullable=True)
+    esfuerzo: Mapped[str | None] = mapped_column("Esfuerzo", String(10), nullable=True)
+    resultado_motor: Mapped[str] = mapped_column("ResultadoMotor", String(40))
+    resultado_ia: Mapped[str | None] = mapped_column("ResultadoIa", String(40), nullable=True)
+    motivo_motor: Mapped[str | None] = mapped_column("MotivoMotor", String(40), nullable=True)
+    motivo_ia: Mapped[str | None] = mapped_column("MotivoIa", String(40), nullable=True)
+    cantidad_motor: Mapped[int] = mapped_column("CantidadMotor", Integer)
+    cantidad_ia: Mapped[int | None] = mapped_column("CantidadIa", Integer, nullable=True)
+    flota_motor: Mapped[str] = mapped_column("FlotaMotor", Text)
+    flota_ia: Mapped[str | None] = mapped_column("FlotaIa", Text, nullable=True)
+    coincide_resultado: Mapped[bool | None] = mapped_column("CoincideResultado", Boolean, nullable=True)
+    coincide_flota: Mapped[bool | None] = mapped_column("CoincideFlota", Boolean, nullable=True)
+    coincide_configuracion: Mapped[bool | None] = mapped_column("CoincideConfiguracion", Boolean, nullable=True)
+    ia_respeta_peso: Mapped[bool | None] = mapped_column("IaRespetaPeso", Boolean, nullable=True)
+    ia_respeta_volumen: Mapped[bool | None] = mapped_column("IaRespetaVolumen", Boolean, nullable=True)
+    ia_conserva_unidades: Mapped[bool | None] = mapped_column("IaConservaUnidades", Boolean, nullable=True)
+    violaciones: Mapped[str | None] = mapped_column("Violaciones", Text, nullable=True)
+    explicacion: Mapped[str | None] = mapped_column("Explicacion", String(500), nullable=True)
+    tokens_entrada: Mapped[int] = mapped_column("TokensEntrada", Integer, default=0)
+    tokens_salida: Mapped[int] = mapped_column("TokensSalida", Integer, default=0)
+    latencia_ia_ms: Mapped[int | None] = mapped_column("LatenciaIaMs", Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column("CreatedAt", DateTime(timezone=True), default=_ahora, index=True)

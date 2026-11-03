@@ -7,7 +7,7 @@
 -- de $9.000.000 y $3.900.000 con el mismo puntaje.
 --
 -- Esta consulta reproduce en SQL la fórmula de ScorePrioridadCalculator.Calcular
--- (src/CabinaFletes.Domain/Priorizacion/Reglas/ScorePrioridadCalculator.cs) contra las
+-- (src/Nexo.Domain/Priorizacion/Reglas/ScorePrioridadCalculator.cs) contra las
 -- solicitudes reales, usando los parámetros vigentes en parametros_score (Id=1). Solo
 -- devuelve AGREGADOS (conteos por score, no filas por cliente) para minimizar los datos
 -- expuestos -- no hace falta ver solicitud por solicitud para confirmar que el empate

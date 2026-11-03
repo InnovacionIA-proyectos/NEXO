@@ -80,11 +80,11 @@ class ItemPlanCargueDto(ApiModel):
 
 class GuardarItemPlanCargueInput(ApiModel):
     id: str | None = None
-    # S3-HU-10.2 (issue #132): un item sin SKU es un caso de negocio legitimo, y
-    # `GuardarItemRequest.Sku` en NEXO es `string?`. Cuando no lo tiene, NEXO manda
-    # la clave con null EXPLICITO - y en Pydantic el default solo aplica si la clave
-    # FALTA, asi que el null se rechazaba contra `str`: el item fallaba 3 veces,
-    # caia en la DLQ y marcaba TODO el plan en error.
+    # Un item sin SKU es un caso de negocio legitimo, y `GuardarItemRequest.Sku`
+    # en NEXO es `string?`. Cuando no lo tiene, NEXO manda la clave con null
+    # EXPLICITO - y en Pydantic el default solo aplica si la clave FALTA, asi
+    # que el null se rechazaba contra `str`: el item fallaba 3 veces, caia en
+    # la DLQ y marcaba TODO el plan en error.
     #
     # Se normaliza a "" en vez de declarar `str | None`: la columna `sku` no es
     # nullable (modelos.py: Mapped[str], default "") y la entidad tambien usa "" como

@@ -25,7 +25,7 @@ Es documentación, no comportamiento en runtime nuevo — pero con una particula
 node tests/QA/hu-02.1-contrato-integracion-portal/verify-contrato.mjs
 ```
 
-Extrae todos los `[Authorize(Roles=...)]` reales de `src/CabinaFletes.Api/Controllers/*.cs` y los compara contra los controladores que la sección 3 del contrato cubre. **2 controladores con restricción de rol real no aparecen en la tabla:**
+Extrae todos los `[Authorize(Roles=...)]` reales de `src/Nexo.Api/Controllers/*.cs` y los compara contra los controladores que la sección 3 del contrato cubre. **2 controladores con restricción de rol real no aparecen en la tabla:**
 
 - **`TarifasPlazaVigenciaController`** (`PATCH /api/biblioteca-sap-plaza/{id}/vigencia` y ajuste masivo/quitar vigencia) — requiere `AdminTarifas, CoordinadorFletes, Admin`.
 - **`TarifasSicetacController.Importar`** (`POST /api/tarifas-sicetac/importar`) — requiere `CoordinadorFletes, Admin`.

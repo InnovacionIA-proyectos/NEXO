@@ -10,6 +10,6 @@
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.0" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="../../../src/CabinaFletes.Mensajes/CabinaFletes.Mensajes.csproj" />
+    <ProjectReference Include="../../../src/Nexo.Mensajes/Nexo.Mensajes.csproj" />
   </ItemGroup>
 </Project>

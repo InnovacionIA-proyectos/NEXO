@@ -1,6 +1,6 @@
 name: CI/CD RabbitMQ
 
-# S3-HU-11.4 (issue #137): RabbitMQ no tiene código fuente propio en este repo
+# RabbitMQ no tiene código fuente propio en este repo
 # — su definición completa vive en el docker-compose.yml de la raíz (servicio
 # `rabbit`) + build/Dockerfile.rabbit (imagen propia: RabbitMQ oficial + el
 # plugin de retardo que MassTransit necesita para los timeouts de saga). No
@@ -10,13 +10,13 @@ name: CI/CD RabbitMQ
 # 2 archivos, no con cualquier cambio del repo.
 on:
   push:
-    branches: [main, Pre-Despliegue-BACKEND]
+    branches: [main, DEPLOY]
     paths:
       - "docker-compose.yml"
       - "build/Dockerfile.rabbit"
       - ".github/workflows/ci-cd-rabbitmq.yml"
   pull_request:
-    branches: [main, Pre-Despliegue-BACKEND]
+    branches: [main, DEPLOY]
     paths:
       - "docker-compose.yml"
       - "build/Dockerfile.rabbit"
@@ -39,7 +39,7 @@ jobs:
 
   deploy:
     needs: build
-    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/Pre-Despliegue-BACKEND') && github.event_name == 'push'
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/DEPLOY') && github.event_name == 'push'
     runs-on: [self-hosted, dokploy_]
     steps:
       - name: Mostrar información del deploy
@@ -57,9 +57,9 @@ jobs:
             -H "X-GitHub-Event: push" ^
             -d "{\"ref\":\"${{ github.ref }}\",\"repository\":{\"full_name\":\"${{ github.repository }}\"}}"
 
-  # Smoke test POST-DEPLOY (issue #137, criterio de cierre): conexión al broker
-  # + verificación de que el exchange y los 7 bindings esperados (los 9
-  # comandos de S3-HU-02/optimizar despachados por UN solo binding compartido,
+  # Smoke test POST-DEPLOY: conexión al broker + verificación de que el
+  # exchange y los 7 bindings esperados (los 9 comandos de escritura del plan
+  # de cargue/optimizar despachados por UN solo binding compartido,
   # más los 3 eventos de catálogo de vehículo, más los 2 eventos de resultado
   # ya existentes) siguen declarados tras el despliegue. Corre en el mismo
   # runner self-hosted que el deploy: es la única red desde la que se alcanza

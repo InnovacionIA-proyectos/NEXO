@@ -1,0 +1,241 @@
+{
+  "caso": "caso_01_cliente_a_importacion",
+  "archivo": "casos/caso_01_cliente_a_importacion.xlsx",
+  "hoja": "Datos",
+  "cliente": "A",
+  "formato": "vehiculo_en_encabezado",
+  "descripcion": "Importación desde puerto: una fila por ruta; el volumen y la tarifa vienen en una columna por clase de viaje y vehículo.",
+  "filaEncabezado": 6,
+  "filaSubEncabezado": 7,
+  "totalFilas": 21,
+  "limitaciones": [
+    "El vehículo y la clase de viaje vienen en el encabezado de cada columna de volumen (requiere despivotar)."
+  ],
+  "columnas": [
+    {
+      "indice": 0,
+      "columna": "Item Name",
+      "campo": "referencia",
+      "transformacion": "ninguna",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [],
+      "nota": "Consecutivo del cliente (Item-001...)."
+    },
+    {
+      "indice": 1,
+      "columna": "Origen",
+      "campo": "origen",
+      "transformacion": "ninguna",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [],
+      "nota": null
+    },
+    {
+      "indice": 2,
+      "columna": "Destino",
+      "campo": "destino",
+      "transformacion": "ninguna",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [],
+      "nota": null
+    },
+    {
+      "indice": 3,
+      "columna": "Volumen · CONTENEDOR 20",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": true,
+      "alternativasAceptadas": [],
+      "nota": "Volumen de viajes para la clase/vehículo del encabezado: no hay campo para el volumen y el vehículo viene en el encabezado."
+    },
+    {
+      "indice": 4,
+      "columna": "Volumen · CONTENEDOR 40",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": true,
+      "alternativasAceptadas": [],
+      "nota": "Volumen de viajes para la clase/vehículo del encabezado: no hay campo para el volumen y el vehículo viene en el encabezado."
+    },
+    {
+      "indice": 5,
+      "columna": "Volumen · CARGA SUELTA TURBO",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": true,
+      "alternativasAceptadas": [],
+      "nota": "Volumen de viajes para la clase/vehículo del encabezado: no hay campo para el volumen y el vehículo viene en el encabezado."
+    },
+    {
+      "indice": 6,
+      "columna": "Volumen · CARGA SUELTA SENCILLO",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": true,
+      "alternativasAceptadas": [],
+      "nota": "Volumen de viajes para la clase/vehículo del encabezado: no hay campo para el volumen y el vehículo viene en el encabezado."
+    },
+    {
+      "indice": 7,
+      "columna": "Volumen · CARGA SUELTA PATINETA",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": true,
+      "alternativasAceptadas": [],
+      "nota": "Volumen de viajes para la clase/vehículo del encabezado: no hay campo para el volumen y el vehículo viene en el encabezado."
+    },
+    {
+      "indice": 8,
+      "columna": "Volumen · CARGA SUELTA MULA",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": true,
+      "alternativasAceptadas": [],
+      "nota": "Volumen de viajes para la clase/vehículo del encabezado: no hay campo para el volumen y el vehículo viene en el encabezado."
+    },
+    {
+      "indice": 9,
+      "columna": "CONTENEDOR 202",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [],
+      "nota": "Tarifa que diligencia el transportador."
+    },
+    {
+      "indice": 10,
+      "columna": "TARIFA FLETE COP · CONTENEDOR 403",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [],
+      "nota": "Tarifa que diligencia el transportador."
+    },
+    {
+      "indice": 11,
+      "columna": "TARIFA FLETE COP · DEVOLUCIÓN CONSOLIDADA CONT 20",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [],
+      "nota": "Tarifa que diligencia el transportador."
+    },
+    {
+      "indice": 12,
+      "columna": "TARIFA FLETE COP · DEVOLUCIÓN CONSOLIDADA CONT 40",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [],
+      "nota": "Tarifa que diligencia el transportador."
+    },
+    {
+      "indice": 13,
+      "columna": "TARIFA FLETE COP · DEVOLUCIÓN EXPRESA CONT 20",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [],
+      "nota": "Tarifa que diligencia el transportador."
+    },
+    {
+      "indice": 14,
+      "columna": "TARIFA FLETE COP · DEVOLUCIÓN EXPRESA CONT 40",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [],
+      "nota": "Tarifa que diligencia el transportador."
+    },
+    {
+      "indice": 15,
+      "columna": "TARIFA FLETE COP · CARGA SUELTA TURBO4",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [],
+      "nota": "Tarifa que diligencia el transportador."
+    },
+    {
+      "indice": 16,
+      "columna": "TARIFA FLETE COP · CARGA SUELTA SENCILLO5",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [],
+      "nota": "Tarifa que diligencia el transportador."
+    },
+    {
+      "indice": 17,
+      "columna": "TARIFA FLETE COP · CARGA SUELTA PATINETA6",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [],
+      "nota": "Tarifa que diligencia el transportador."
+    },
+    {
+      "indice": 18,
+      "columna": "TARIFA FLETE COP · CARGA SUELTA MULA7",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [],
+      "nota": "Tarifa que diligencia el transportador."
+    },
+    {
+      "indice": 19,
+      "columna": "TIEMPOS DE TRÁNSITO *NO EXCLUIR SABADOS Y DOMINGOS · CONTENEDOR 208",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [],
+      "nota": "Tiempo de tránsito que diligencia el transportador."
+    },
+    {
+      "indice": 20,
+      "columna": "TIEMPOS DE TRÁNSITO *NO EXCLUIR SABADOS Y DOMINGOS · CONTENEDOR 409",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [],
+      "nota": "Tiempo de tránsito que diligencia el transportador."
+    },
+    {
+      "indice": 21,
+      "columna": "TIEMPOS DE TRÁNSITO *NO EXCLUIR SABADOS Y DOMINGOS · CARGA SUELTA",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [],
+      "nota": "Tiempo de tránsito que diligencia el transportador."
+    },
+    {
+      "indice": 22,
+      "columna": "TIEMPOS DE TRÁNSITO *NO EXCLUIR SABADOS Y DOMINGOS · DEVOLUCION CONT 20",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [],
+      "nota": "Tiempo de tránsito que diligencia el transportador."
+    },
+    {
+      "indice": 23,
+      "columna": "TIEMPOS DE TRÁNSITO *NO EXCLUIR SABADOS Y DOMINGOS · DEVOLUCION CONT 40",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [],
+      "nota": "Tiempo de tránsito que diligencia el transportador."
+    },
+    {
+      "indice": 24,
+      "columna": "TARIFA GENSET (para contenedores refrigerados)",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [],
+      "nota": "Tarifa genset que diligencia el transportador."
+    }
+  ]
+}

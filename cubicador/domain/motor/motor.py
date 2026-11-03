@@ -14,7 +14,6 @@ from .dominio import (
     IncidenciaValidacion,
     ItemCarga,
     ParametrosOptimizacion,
-    Rechazo,
     ResultadoCubicacion,
 )
 from .optimizadores import obtener_optimizador

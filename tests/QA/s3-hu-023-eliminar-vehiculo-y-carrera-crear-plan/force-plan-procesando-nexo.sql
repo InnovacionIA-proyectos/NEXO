@@ -8,8 +8,8 @@
 
 DECLARE @PlanId UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000000'; -- reemplazar
 
-UPDATE [dbo_NEXO_prueba].[planes_cargue]
+UPDATE [db_NEXO].[planes_cargue]
 SET Estado = 'procesando'
 WHERE Id = @PlanId;
 
-SELECT Id, Estado FROM [dbo_NEXO_prueba].[planes_cargue] WHERE Id = @PlanId;
+SELECT Id, Estado FROM [db_NEXO].[planes_cargue] WHERE Id = @PlanId;

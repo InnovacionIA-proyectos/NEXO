@@ -1,13 +1,12 @@
 # ============================================================================
-# CabinaFletes (Clean Architecture) — arnés de compilación y pruebas
+# Nexo (Clean Architecture) — arnés de compilación y pruebas
 #
 # Este archivo NO produce la imagen que va a producción: de eso se encarga
-# src/CabinaFletes.Api/Dockerfile, que publica únicamente el proyecto Api.
+# src/Nexo.Api/Dockerfile, que publica únicamente el proyecto Api.
 #
 # Aquí se compila la SOLUCIÓN COMPLETA — las 4 capas más los 3 proyectos de
-# test — para que el criterio de cierre de la issue #1 ("dotnet build termina
-# sin errores") sea verificable por cualquiera del equipo sin depender del SDK
-# instalado en su máquina.
+# test — para verificar que "dotnet build termina sin errores" sin depender
+# del SDK instalado en la máquina de quien lo corre.
 #
 # Contexto de build esperado: la RAÍZ del repositorio.
 #   docker compose -f docker-compose.ci.yml build
@@ -24,27 +23,26 @@ WORKDIR /src
 
 # La solución y los 7 .csproj van primero: mientras solo cambie código, Docker
 # reutiliza la capa del restore y no vuelve a bajar los paquetes de NuGet.
-COPY ["CabinaFletes.Clean.sln", "./"]
-COPY ["src/CabinaFletes.Domain/CabinaFletes.Domain.csproj",                         "src/CabinaFletes.Domain/"]
-COPY ["src/CabinaFletes.Mensajes/CabinaFletes.Mensajes.csproj",                     "src/CabinaFletes.Mensajes/"]
-COPY ["src/CabinaFletes.Application/CabinaFletes.Application.csproj",               "src/CabinaFletes.Application/"]
-COPY ["src/CabinaFletes.Infrastructure/CabinaFletes.Infrastructure.csproj",         "src/CabinaFletes.Infrastructure/"]
-COPY ["src/CabinaFletes.Api/CabinaFletes.Api.csproj",                               "src/CabinaFletes.Api/"]
-COPY ["tests/CabinaFletes.Domain.Tests/CabinaFletes.Domain.Tests.csproj",           "tests/CabinaFletes.Domain.Tests/"]
-COPY ["tests/CabinaFletes.Application.Tests/CabinaFletes.Application.Tests.csproj", "tests/CabinaFletes.Application.Tests/"]
-COPY ["tests/CabinaFletes.Api.Tests/CabinaFletes.Api.Tests.csproj",                 "tests/CabinaFletes.Api.Tests/"]
+COPY ["Nexo.Clean.sln", "./"]
+COPY ["src/Nexo.Domain/Nexo.Domain.csproj",                         "src/Nexo.Domain/"]
+COPY ["src/Nexo.Mensajes/Nexo.Mensajes.csproj",                     "src/Nexo.Mensajes/"]
+COPY ["src/Nexo.Application/Nexo.Application.csproj",               "src/Nexo.Application/"]
+COPY ["src/Nexo.Infrastructure/Nexo.Infrastructure.csproj",         "src/Nexo.Infrastructure/"]
+COPY ["src/Nexo.Api/Nexo.Api.csproj",                               "src/Nexo.Api/"]
+COPY ["tests/Nexo.Domain.Tests/Nexo.Domain.Tests.csproj",           "tests/Nexo.Domain.Tests/"]
+COPY ["tests/Nexo.Application.Tests/Nexo.Application.Tests.csproj", "tests/Nexo.Application.Tests/"]
+COPY ["tests/Nexo.Api.Tests/Nexo.Api.Tests.csproj",                 "tests/Nexo.Api.Tests/"]
 
-RUN dotnet restore "CabinaFletes.Clean.sln"
+RUN dotnet restore "Nexo.Clean.sln"
 
 # El código fuente. El restore ya quedó resuelto en la capa anterior.
 COPY src/       src/
 COPY tests/     tests/
 COPY docs/      docs/
-# ContratoMessageTypeTests.cs (S3-HU-06.2/#121) lee cubicador/infrastructure/
-# mensajeria/rabbitmq.py y cubicador/worker/main.py directo del disco para
-# derivar el messageType/tipo real que publica Cubicador — sin esta carpeta,
-# esos 5 tests fallan con FileNotFoundException dentro de este contenedor
-# (hallazgo de QA en NEXO#128, S3-HU-11.1/#134). No hace falta para compilar
+# ContratoMessageTypeTests.cs lee cubicador/infrastructure/mensajeria/rabbitmq.py
+# y cubicador/worker/main.py directo del disco para derivar el messageType/tipo
+# real que publica Cubicador — sin esta carpeta, esos 5 tests fallan con
+# FileNotFoundException dentro de este contenedor. No hace falta para compilar
 # ni para correr el resto de la suite: solo para que ESTOS tests encuentren
 # su fuente de verdad Python.
 COPY cubicador/ cubicador/
@@ -57,4 +55,4 @@ COPY cubicador/ cubicador/
 #
 # El comando se puede sobrescribir para correr otra cosa con el mismo entorno:
 #   docker compose -f docker-compose.ci.yml run --rm build dotnet test ...
-CMD ["dotnet", "build", "CabinaFletes.Clean.sln", "-c", "Release", "--no-restore"]
+CMD ["dotnet", "build", "Nexo.Clean.sln", "-c", "Release", "--no-restore"]

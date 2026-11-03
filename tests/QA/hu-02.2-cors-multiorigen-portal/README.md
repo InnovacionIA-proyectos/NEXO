@@ -22,12 +22,12 @@ Verificación hecha antes de aprobar/mergear el PR #75. Sin conflictos de merge.
 
 ```
 docker compose -f docker-compose.ci.yml run --rm pruebas \
-  dotnet test tests/CabinaFletes.Api.Tests --filter FullyQualifiedName~CorsTests
+  dotnet test tests/Nexo.Api.Tests --filter FullyQualifiedName~CorsTests
 ```
 
 ```
-Passed CabinaFletes.Api.Tests.CorsTests.Un_origen_fuera_de_la_lista_no_recibe_el_encabezado_de_CORS [204 ms]
-Passed CabinaFletes.Api.Tests.CorsTests.Un_origen_de_la_lista_recibe_el_encabezado_de_CORS [23 ms]
+Passed Nexo.Api.Tests.CorsTests.Un_origen_fuera_de_la_lista_no_recibe_el_encabezado_de_CORS [204 ms]
+Passed Nexo.Api.Tests.CorsTests.Un_origen_de_la_lista_recibe_el_encabezado_de_CORS [23 ms]
 ```
 
 **Confirmado: sí pasan contra el arnés Docker real.**

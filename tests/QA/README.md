@@ -31,16 +31,16 @@ contra cualquier rama futura.
 
 ### Baseline de `QA` (antes de #51)
 ```
-dotnet test CabinaFletes.Clean.sln
+dotnet test Nexo.Clean.sln
 ```
-- `CabinaFletes.Domain.Tests`: 40/40 ✅
-- `CabinaFletes.Application.Tests`: **no compila** (CS0246 `ICurrentUserPort`, 4 archivos)
-- `CabinaFletes.Api.Tests`: **no compila** (CS0308/CS0103/CS1061 en cascada, 6 archivos)
+- `Nexo.Domain.Tests`: 40/40 ✅
+- `Nexo.Application.Tests`: **no compila** (CS0246 `ICurrentUserPort`, 4 archivos)
+- `Nexo.Api.Tests`: **no compila** (CS0308/CS0103/CS1061 en cascada, 6 archivos)
 
 ### Después del fix de #51
-- `CabinaFletes.Domain.Tests`: 40/40 ✅
-- `CabinaFletes.Application.Tests`: 41/43 (2 fallas preexistentes, no causadas por #51 — ver "Bugs encontrados")
-- `CabinaFletes.Api.Tests`: compila, pero no ejecutable en este entorno (requiere la BD SQL Server corporativa de pruebas — issue #3/#4). Falla local por `SqlException` de red, no por código.
+- `Nexo.Domain.Tests`: 40/40 ✅
+- `Nexo.Application.Tests`: 41/43 (2 fallas preexistentes, no causadas por #51 — ver "Bugs encontrados")
+- `Nexo.Api.Tests`: compila, pero no ejecutable en este entorno (requiere la BD SQL Server corporativa de pruebas — issue #3/#4). Falla local por `SqlException` de red, no por código.
 
 ### PR #48 (rama `25-s2-hu-072-...`)
 ```
@@ -97,6 +97,6 @@ Objetivo: demostrar que un cambio que rompe una regla de negocio real queda bloq
 ## Hallazgos de proceso
 
 - **Gate de CI corregido:** `cubicador-ci.yml` solo disparaba contra `main`; se corrigió en las ramas de #48/#49 para incluir `QA`. Antes del fix, el CI nunca había corrido en ninguno de los dos. Ya verificado en producción con la prueba de arriba (issue #6).
-- **El gate solo cubre `cubicador/` (Python).** El trigger de `cubicador-ci.yml` tiene `paths: ["cubicador/**"]` — el backend .NET (`src/`, `tests/CabinaFletes.*`) **no tiene ningún workflow de CI configurado todavía** (ver issue #4). Un PR que rompa una regla de negocio en el backend C# no sería bloqueado automáticamente hoy, solo por revisión manual (así se verificaron #51 y #53, sin CI).
+- **El gate solo cubre `cubicador/` (Python).** El trigger de `cubicador-ci.yml` tiene `paths: ["cubicador/**"]` — el backend .NET (`src/`, `tests/Nexo.*`) **no tiene ningún workflow de CI configurado todavía** (ver issue #4). Un PR que rompa una regla de negocio en el backend C# no sería bloqueado automáticamente hoy, solo por revisión manual (así se verificaron #51 y #53, sin CI).
 - **Branch protection no disponible:** `GET /repos/.../branches/QA/protection` devuelve 403 ("Upgrade to GitHub Pro or make this repository public"). En el plan actual no se puede exigir 1 revisor + CI verde a nivel de plataforma; el cumplimiento depende hoy de disciplina de equipo, no de una regla técnica.
 - **Ramas de compañeros desactualizadas respecto a `QA`.** Al revisar las ramas remotas sin PR abierto (`1-s2-hu-011-...`, `2-s2-hu-012-...`, `7-s2-hu-021-...`, `14-s2-hu-042-...`, `15-s2-hu-043-...`, `50-s2-hu-017-...`), las 6 están **20 commits detrás de `QA`** (partieron de antes de esta sesión). La rama de la HU-01.1 (`1-s2-hu-011-...`) ya trae, de forma independiente, el mismo fix de `using` en `Program.cs` y los 2 controladores de Excel que este PR — verificado que el contenido es idéntico byte a byte, así que no hay conflicto ahí. Sí conviene que quien las tenga asignadas actualice (`merge`/`rebase`) contra `QA` antes de seguir, para no acumular más desfase.

@@ -1,0 +1,133 @@
+{
+  "caso": "caso_02_cliente_a_exportacion",
+  "archivo": "casos/caso_02_cliente_a_exportacion.xlsx",
+  "hoja": "Datos",
+  "cliente": "A",
+  "formato": "vehiculo_en_encabezado",
+  "descripcion": "Exportación terrestre: una fila por ruta; volumen y tarifa en una columna por vehículo. Destinos con sufijo -DTAI.",
+  "filaEncabezado": 7,
+  "filaSubEncabezado": null,
+  "totalFilas": 14,
+  "limitaciones": [
+    "El vehículo viene en el encabezado de cada columna de volumen (requiere despivotar)."
+  ],
+  "columnas": [
+    {
+      "indice": 0,
+      "columna": "Item Name",
+      "campo": "referencia",
+      "transformacion": "ninguna",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [],
+      "nota": "Consecutivo del cliente."
+    },
+    {
+      "indice": 1,
+      "columna": "Origen",
+      "campo": "origen",
+      "transformacion": "ninguna",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [],
+      "nota": null
+    },
+    {
+      "indice": 2,
+      "columna": "Destino",
+      "campo": "destino",
+      "transformacion": "ninguna",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [],
+      "nota": "Algunos destinos traen el sufijo -DTAI (tránsito aduanero)."
+    },
+    {
+      "indice": 3,
+      "columna": "TURBO",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": true,
+      "alternativasAceptadas": [],
+      "nota": "Volumen por vehículo: el vehículo viene en el encabezado."
+    },
+    {
+      "indice": 4,
+      "columna": "SENCILLO",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": true,
+      "alternativasAceptadas": [],
+      "nota": "Volumen por vehículo: el vehículo viene en el encabezado."
+    },
+    {
+      "indice": 5,
+      "columna": "PATINETA",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": true,
+      "alternativasAceptadas": [],
+      "nota": "Volumen por vehículo: el vehículo viene en el encabezado."
+    },
+    {
+      "indice": 6,
+      "columna": "MULA",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": true,
+      "alternativasAceptadas": [],
+      "nota": "Volumen por vehículo: el vehículo viene en el encabezado."
+    },
+    {
+      "indice": 7,
+      "columna": "TURBO2",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [],
+      "nota": "Tarifa que diligencia el transportador."
+    },
+    {
+      "indice": 8,
+      "columna": "SENCILLO3",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [],
+      "nota": "Tarifa que diligencia el transportador."
+    },
+    {
+      "indice": 9,
+      "columna": "PATINETA4",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [],
+      "nota": "Tarifa que diligencia el transportador."
+    },
+    {
+      "indice": 10,
+      "columna": "MULA5",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [],
+      "nota": "Tarifa que diligencia el transportador."
+    },
+    {
+      "indice": 11,
+      "columna": "TIEMPOS DE TRÁNSITO *NO EXCLUIR SABADOS Y DOMINGOS",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [],
+      "nota": "Tiempo de tránsito que diligencia el transportador."
+    },
+    {
+      "indice": 12,
+      "columna": "Describir todas las actividades que incluye el tiempo de tránsito",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [],
+      "nota": "Descripción de actividades que diligencia el transportador."
+    }
+  ]
+}

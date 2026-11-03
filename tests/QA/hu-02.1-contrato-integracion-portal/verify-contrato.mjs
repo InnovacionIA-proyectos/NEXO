@@ -16,7 +16,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-const CONTROLLERS_DIR = "src/CabinaFletes.Api/Controllers";
+const CONTROLLERS_DIR = "src/Nexo.Api/Controllers";
 
 // Controladores que la sección 3 del README SÍ describe explícitamente
 // (por nombre de operación, no por nombre de clase — mapeados a mano

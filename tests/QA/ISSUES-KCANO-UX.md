@@ -14,7 +14,7 @@ el trabajo de esta sesión (u otra) cambie el estado de alguna.
 
 | Issue | Título | Estado | Bloqueo |
 |---|---|---|---|
-| [#3](https://github.com/InnovacionIA-proyectos/NEXO/issues/3) | Poner en verde las 3 suites contra la BD de pruebas corporativa | 🟡 2/3 suites verdes (`Domain.Tests` 40/40, `Application.Tests` 43/43). `TEST_DB_CONNECTION` documentada — checkbox marcado | `Api.Tests` necesita acceso real a la BD SQL Server corporativa (host + credenciales SQL + confirmar `CabinaFletes_Test`) |
+| [#3](https://github.com/InnovacionIA-proyectos/NEXO/issues/3) | Poner en verde las 3 suites contra la BD de pruebas corporativa | 🟡 2/3 suites verdes (`Domain.Tests` 40/40, `Application.Tests` 43/43). `TEST_DB_CONNECTION` documentada — checkbox marcado | `Api.Tests` necesita acceso real a la BD SQL Server corporativa (host + credenciales SQL + confirmar `Nexo_Test`) |
 | [#12](https://github.com/InnovacionIA-proyectos/NEXO/issues/12) | Suite de seguridad automatizada rol×endpoint | 🔴 0/3 criterios — trabajo nuevo, no iniciado | Ninguno ya — su dependencia (contrato S2-HU-02.1) se resolvió con el PR #59. Ojo: agregar `TarifasPlazaVigenciaController` y `TarifasSicetacController.Importar` a la matriz (no están en el contrato, hallazgo de la HU-02.1) |
 | [#23](https://github.com/InnovacionIA-proyectos/NEXO/issues/23) | QA del flujo de notificación interna | 🔴 Sin avance posible | Depende de #21 y #22 (ambas abiertas, sin PR) |
 | [#34](https://github.com/InnovacionIA-proyectos/NEXO/issues/34) | QA de reglas con fuente provisional | 🔴 Sin avance posible | Depende de #32 y #33 (ambas abiertas, sin PR) |

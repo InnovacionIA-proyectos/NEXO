@@ -7,6 +7,7 @@ presets + 11 creados por cola) contra 13 en la proyeccion de NEXO.
 
 from __future__ import annotations
 
+from application.plan_cargue.vehiculos import presets
 from infrastructure.persistence.db import SessionLocal
 from infrastructure.persistence.repositorios.vehiculo_repo import SqlVehiculoCubicacionRepository
 
@@ -26,7 +27,7 @@ async def test_listar_con_siembra_publica_vehiculo_creado_por_cada_preset_nuevo(
 
         catalogo = await repo.listar_con_siembra()
 
-        assert len(catalogo) == 9  # los 9 presets, base limpia (conftest.py)
+        assert len(catalogo) == len(presets())  # todos los presets, base limpia (conftest.py)
         assert set(publisher.publicados) == {v.id for v in catalogo}
 
 
@@ -50,19 +51,19 @@ async def test_sin_publisher_la_siembra_sigue_funcionando_igual_que_antes():
 
         catalogo = await repo.listar_con_siembra()
 
-        assert len(catalogo) == 9
+        assert len(catalogo) == len(presets())
 
 
 async def test_republicar_todos_republica_el_catalogo_completo():
     publisher = _PublisherFalso()
     async with SessionLocal() as sesion:
         repo = SqlVehiculoCubicacionRepository(sesion, publisher)
-        await repo.listar_con_siembra()  # siembra inicial, ya publico los 9
+        await repo.listar_con_siembra()  # siembra inicial, ya publico todos
         publisher.publicados.clear()
 
         catalogo = await repo.republicar_todos()
 
         # TODOS los vehiculos, no solo los "nuevos" (aqui no hay ninguno nuevo
         # que sembrar) - es el reparo manual de una desincronizacion existente.
-        assert len(catalogo) == 9
+        assert len(catalogo) == len(presets())
         assert set(publisher.publicados) == {v.id for v in catalogo}

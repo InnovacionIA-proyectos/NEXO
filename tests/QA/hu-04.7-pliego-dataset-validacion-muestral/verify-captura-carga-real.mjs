@@ -1,5 +1,5 @@
 // Integración/carga real para la HU-04.7 (PR #69): somete el dataset real de 320
-// líneas (tests/CabinaFletes.Domain.Tests/TestData/pliego-300-lineas.json) contra
+// líneas (tests/Nexo.Domain.Tests/TestData/pliego-300-lineas.json) contra
 // POST /api/captura-solicitudes de la app REALMENTE levantada -- exactamente lo que
 // el propio autor declaró "fuera de alcance" por falta de BD corporativa. Usamos la
 // BD local de Docker como sustituto (mismo patrón ya usado en toda esta sesión de QA).
@@ -17,7 +17,7 @@ import fs from "fs";
 
 async function main() {
   const dataset = JSON.parse(fs.readFileSync(
-    "tests/CabinaFletes.Domain.Tests/TestData/pliego-300-lineas.json", "utf8"));
+    "tests/Nexo.Domain.Tests/TestData/pliego-300-lineas.json", "utf8"));
   const lineas = dataset.lineas;
   console.log(`Dataset cargado: ${lineas.length} líneas.`);
 

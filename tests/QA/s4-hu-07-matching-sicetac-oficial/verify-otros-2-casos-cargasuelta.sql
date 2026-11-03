@@ -17,14 +17,14 @@ SELECT TOP 10
     r.Origen, r.Destino,
     l.ClaseViaje, l.LineaNegocio, l.Tipologia, l.Peso,
     l.EstadoLinea
-FROM dbo_NEXO_prueba.lineas_solicitud l
-JOIN dbo_NEXO_prueba.rutas r ON r.Id = l.RutaId
+FROM db_NEXO.lineas_solicitud l
+JOIN db_NEXO.rutas r ON r.Id = l.RutaId
 WHERE l.ClaseViaje IN ('CargaSuelta', 'Extradimensionado')
 ORDER BY l.CreatedAt DESC;
 
 -- Cuántas líneas en total caen en esta categoría (candidatas a "nunca tuvieron piso
 -- automático posible", más allá de las que además fallan por texto de ruta):
 SELECT l.ClaseViaje, COUNT(*) AS Cantidad
-FROM dbo_NEXO_prueba.lineas_solicitud l
+FROM db_NEXO.lineas_solicitud l
 WHERE l.ClaseViaje IN ('CargaSuelta', 'Extradimensionado')
 GROUP BY l.ClaseViaje;

@@ -1,0 +1,4 @@
+casos/reales*.json
+casos/*.csv
+*.csv
+__pycache__/

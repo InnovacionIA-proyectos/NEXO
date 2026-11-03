@@ -46,8 +46,8 @@ Probado con `docker compose -f docker-compose.ci.yml down -v` antes de cada corr
 
 | Corrida | Resultado |
 |---|---|
-| Sin el flag | **69 de 162** pruebas de `Api.Tests` fallan con `SqlException: Cannot open database "CabinaFletes_Test"` |
-| Con `TEST_DB_MIGRATE_ON_STARTUP=true` | Baja a **1 sola falla**: `OutboxConsistenciaTests` revienta con `Database 'CabinaFletes_Test' already exists` — condición de carrera real entre esa clase y `ApiFixture`, que migran la misma base nueva al mismo tiempo (xUnit corre clases de test en paralelo por defecto) |
+| Sin el flag | **69 de 162** pruebas de `Api.Tests` fallan con `SqlException: Cannot open database "Nexo_Test"` |
+| Con `TEST_DB_MIGRATE_ON_STARTUP=true` | Baja a **1 sola falla**: `OutboxConsistenciaTests` revienta con `Database 'Nexo_Test' already exists` — condición de carrera real entre esa clase y `ApiFixture`, que migran la misma base nueva al mismo tiempo (xUnit corre clases de test en paralelo por defecto) |
 
 Detalle completo y la corrección sugerida para dejarlo resuelto del todo: comentario
 en el PR.

@@ -1,6 +1,6 @@
 # Diccionario reconciliado — Lado propio (`bd-propia`)
 
-Diccionario de las 13 tablas del lado propio (CabinaFletes) del set `v1.0.0-piloto`, cruzando la definición oficial (`diccionario-y-linaje.md` y `DICCIONARIO_DATOS.md`, ambos de HU-10.3) con lo que confirmó el análisis a lo largo de los 8 notebooks de este EDA. Ver [`diccionario_reconciliado_fuentes_corporativas.md`](diccionario_reconciliado_fuentes_corporativas.md) para el lado externo (SICE-TAC, SAP, clientes SAP), `hallazgos.md` para el detalle completo de cada hallazgo referenciado (H-0xx) y `limitaciones.md` para las preguntas que este set no puede responder (L-0x).
+Diccionario de las 13 tablas del lado propio (Nexo) del set `v1.0.0-piloto`, cruzando la definición oficial (`diccionario-y-linaje.md` y `DICCIONARIO_DATOS.md`, ambos de HU-10.3) con lo que confirmó el análisis a lo largo de los 8 notebooks de este EDA. Ver [`diccionario_reconciliado_fuentes_corporativas.md`](diccionario_reconciliado_fuentes_corporativas.md) para el lado externo (SICE-TAC, SAP, clientes SAP), `hallazgos.md` para el detalle completo de cada hallazgo referenciado (H-0xx) y `limitaciones.md` para las preguntas que este set no puede responder (L-0x).
 
 **Nombres de columna en código:** mismo criterio que el EDA-1 — camelCase, sin tildes ni espacios (notebook `00`, Paso 4).
 
@@ -15,7 +15,7 @@ Diccionario de las 13 tablas del lado propio (CabinaFletes) del set `v1.0.0-pilo
 | `Id` | `id` | Identificador de la solicitud | GUID | `CE7F580A-9997-4954-B358-0CC0BDA17461` | Confiable |
 | `ClienteId` | `clienteId` | FK a `catalogo_clientes` | GUID | `1A239191-8A7D-46EF-AD79-69E83E89547F` | Confiable |
 | `Tipo` | `tipo` | `Spot` / `Licitacion` | categórico | `Spot` | Confiable |
-| `Modalidad` | `modalidad` | `Importacion`/`Exportacion`/`Nacional`/`Extradimensionada`/`CargaGeneral` | categórico | `Nacional` | **92,3% vacía** (12 de 13 solicitudes) — hueco conocido de la fase piloto de CabinaFletes, no un bug de este EDA (L-11) |
+| `Modalidad` | `modalidad` | `Importacion`/`Exportacion`/`Nacional`/`Extradimensionada`/`CargaGeneral` | categórico | `Nacional` | **92,3% vacía** (12 de 13 solicitudes) — hueco conocido de la fase piloto de Nexo, no un bug de este EDA (L-11) |
 | `Deadline` | `deadline` | Fecha límite de respuesta (SLA) | fecha/hora | `2026-09-10 12:21:49` | Sin hallazgos relevantes |
 | `ProbabilidadCierre` | `probabilidadCierre` | Probabilidad estimada de ganar | % (0–100) | `50.0000` | **92,3% vacía** (L-11) |
 | `ValorEstimado` | `valorEstimado` | Valor económico estimado | COP | `40000000.00` | **92,3% vacía** (L-11) |

@@ -10,13 +10,13 @@
          carpeta hermana de NEXO (Documents/cabinaFletes + Documents/NEXO,
          igual que en la maquina donde se escribio esto). Si tu clon vive en
          otro lado, sobreescribe con:
-           dotnet run -p:CabinaFletesApiProj="C:\ruta\a\CabinaFletes.Api.csproj"
+           dotnet run -p:NexoApiProj="C:\ruta\a\CabinaFletes.Api.csproj"
          Ver README.md de esta carpeta. -->
-    <CabinaFletesApiProj Condition="'$(CabinaFletesApiProj)' == ''">$(MSBuildThisFileDirectory)..\..\..\..\cabinaFletes\src\CabinaFletes.Api\CabinaFletes.Api.csproj</CabinaFletesApiProj>
+    <NexoApiProj Condition="'$(NexoApiProj)' == ''">$(MSBuildThisFileDirectory)..\..\..\..\cabinaFletes\src\CabinaFletes.Api\CabinaFletes.Api.csproj</NexoApiProj>
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="$(CabinaFletesApiProj)" />
+    <ProjectReference Include="$(NexoApiProj)" />
   </ItemGroup>
 
 </Project>

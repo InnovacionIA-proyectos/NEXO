@@ -13,17 +13,34 @@ dependencies = [
     "asyncpg>=0.30",
     "aio-pika>=9.4",
     "httpx>=0.27",
+    "anthropic>=2.3,<3",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=8.3",
     "pytest-asyncio>=0.24",
+    # Saca la pila de un proceso que ya esta corriendo, sin tocarlo ni
+    # reiniciarlo: `py-spy dump --pid <pid>`.
+    #
+    # Esta aca por un caso concreto (#367). La suite se colgaba 3 de cada 5
+    # corridas y por fuera parecia lentitud: el proceso seguia vivo, sin error
+    # y sin terminar. Lo que lo delato fue que llevaba 21 segundos de CPU en 56
+    # minutos -o sea, esperando, no calculando-, y la pila de py-spy senalo el
+    # sitio exacto: `_cancel_all_tasks` de pytest-asyncio, aguardando una tarea
+    # que nadie espero despues de cancelarla.
+    #
+    # Sin esa pila quedaba adivinar entre 369 pruebas. Por eso vale tenerlo a
+    # mano antes de necesitarlo: cuando algo se cuelga, no hay nada que leer.
+    "py-spy>=0.4",
 ]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+markers = [
+  "sin_base: la prueba no toca ninguna base; exime del fixture autouse `base_limpia`",
+]
 
 [build-system]
 requires = ["setuptools>=68"]

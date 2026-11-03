@@ -1,6 +1,6 @@
 # Diccionario reconciliado — Lado externo (`fuentes-corporativas`)
 
-Diccionario de las 4 tablas del lado externo (SICE-TAC, SAP Tarifario, SAP histórico, clientes SAP) del set `v1.0.0-piloto`, cruzando la definición oficial (`diccionario-y-linaje.md` y `DICCIONARIO_DATOS.md`, ambos de HU-10.3) con lo que confirmó el análisis a lo largo de los 8 notebooks de este EDA. Ver [`diccionario_reconciliado_bd_propia.md`](diccionario_reconciliado_bd_propia.md) para el lado propio (CabinaFletes), `hallazgos.md` para el detalle completo de cada hallazgo referenciado (H-0xx) y `limitaciones.md` para las preguntas que este set no puede responder (L-0x).
+Diccionario de las 4 tablas del lado externo (SICE-TAC, SAP Tarifario, SAP histórico, clientes SAP) del set `v1.0.0-piloto`, cruzando la definición oficial (`diccionario-y-linaje.md` y `DICCIONARIO_DATOS.md`, ambos de HU-10.3) con lo que confirmó el análisis a lo largo de los 8 notebooks de este EDA. Ver [`diccionario_reconciliado_bd_propia.md`](diccionario_reconciliado_bd_propia.md) para el lado propio (Nexo), `hallazgos.md` para el detalle completo de cada hallazgo referenciado (H-0xx) y `limitaciones.md` para las preguntas que este set no puede responder (L-0x).
 
 **Nombres de columna en código:** mismo criterio que el EDA-1 — camelCase, sin tildes ni espacios (notebook `00`, Paso 4).
 

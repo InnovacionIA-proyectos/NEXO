@@ -4,7 +4,7 @@ Rama: `14-s2-hu-042-masstransit-outbox-202` (se apila sobre HU-01.1/01.2/02.1/01
 Verificación hecha situándose en esa rama, antes de aprobar/mergear el PR #61.
 
 ## Qué trae el PR
-- **`CabinaFletes.Mensajes`**: proyecto nuevo sin referencias, con los contratos de mensajes (`AutoCosteoSolicitado`) y sus validadores (`IValidadorDeMensaje<T>`).
+- **`Nexo.Mensajes`**: proyecto nuevo sin referencias, con los contratos de mensajes (`AutoCosteoSolicitado`) y sus validadores (`IValidadorDeMensaje<T>`).
 - **`IPublicadorDeMensajes`** (puerto, Application) + **`PublicadorValidado`** (Decorator que valida y falla cerrado si un mensaje no declara validador) + **`MassTransitPublicador`** (adaptador, Infrastructure).
 - **Outbox transaccional** vía `AddEntityFrameworkOutbox` + `UseBusOutbox()`: publicar escribe en la misma transacción que los datos.
 - **`CargarLineasBulkCommand`** ahora responde `202 Accepted` con `{trabajoId, estado, consultarEn}` en vez de costear en la petición.
@@ -23,7 +23,7 @@ Verificación hecha situándose en esa rama, antes de aprobar/mergear el PR #61.
 
 | Tipo | ¿Aplica? | Resultado |
 |---|---|---|
-| **Smoke** | Sí | ✅ `Build succeeded`, 0 errores — compila `CabinaFletes.Mensajes` + todo lo demás |
+| **Smoke** | Sí | ✅ `Build succeeded`, 0 errores — compila `Nexo.Mensajes` + todo lo demás |
 | **Regresión** | Sí | `Domain.Tests` 40/40 ✅. `Application.Tests` **58/58** ✅ (subió de 43 con los tests nuevos de mensajería) |
 | **Integración** | Sí — verificado de verdad, no solo leído | Ver "Los 3 tests de consistencia" abajo |
 | **Carga y estrés** | Sí | Ver "Prueba de carga" abajo — 30 publicaciones concurrentes, ~700 ms, sin pérdidas ni deadlock |
@@ -55,7 +55,7 @@ concurrentes, cada una en su propia transacción, contra el mismo SQL Server rea
 
 ## ⚠️ Hallazgo real de esta PR (no bloqueante, pero sí a corregir)
 
-Al correr la suite completa de `CabinaFletes.Api.Tests` contra SQL Server real, until ahora nunca lo había podido hacer nadie del equipo — se encontró:
+Al correr la suite completa de `Nexo.Api.Tests` contra SQL Server real, until ahora nunca lo había podido hacer nadie del equipo — se encontró:
 
 **`SolicitudesTests.Cargar_lineas_bulk_en_licitacion`** — test preexistente que espera `200 OK` con `{"agregadas": 2}` (el formato **síncrono viejo**). Con el cambio de esta PR, el endpoint ahora responde `202 Accepted` con `{trabajoId, estado, consultarEn}`. El test no se actualizó para el nuevo contrato. Es una falla determinística, 100% reproducible, causada directamente por el cambio de esta PR — no un artefacto de infraestructura.
 
@@ -70,7 +70,7 @@ Assert.True((await resp.Json()).TryGetProperty("trabajoId", out _));
 
 Correr la suite completa de `Api.Tests` contra una BD real —algo que nadie había podido hacer antes por el bloqueo de acceso a la BD corporativa (issue #3)— destapó 3 problemas de infraestructura de pruebas ajenos a esta PR, ninguno toca archivos de este diff:
 
-1. **Condición de carrera en `ApiFixture`**: con el paralelismo por defecto de xUnit, varias clases de test intentan crear la misma base `CabinaFletesClean_Test` a la vez y chocan (`Database already exists`). Con paralelismo desactivado (`xunit.runner.json` de prueba, no committeado) el problema desaparece. Recomendación: agregar un `xunit.runner.json` permanente con `parallelizeTestCollections: false` al proyecto — o rediseñar `ApiFixture` para una base por corrida.
+1. **Condición de carrera en `ApiFixture`**: con el paralelismo por defecto de xUnit, varias clases de test intentan crear la misma base `NexoClean_Test` a la vez y chocan (`Database already exists`). Con paralelismo desactivado (`xunit.runner.json` de prueba, no committeado) el problema desaparece. Recomendación: agregar un `xunit.runner.json` permanente con `parallelizeTestCollections: false` al proyecto — o rediseñar `ApiFixture` para una base por corrida.
 2. **`HealthTests.Health_responde_200_y_healthy`**: el endpoint `/health` devuelve texto plano ("Healthy"), pero el test espera JSON con una propiedad `status`. No forma parte de esta PR (`HealthTests.cs` no está en el diff). Requiere o un `ResponseWriter` JSON en `MapHealthChecks`, o ajustar el test.
 3. **3 fallas en `CotizacionesTests`** (`Marcar_ganada_realimenta_biblioteca`, `Entregar_dos_veces_devuelve_409`, `Flujo_completo_cotizacion`): tampoco están en el diff de esta PR. Con el paralelismo corregido, el patrón de fallas es consistente con contaminación de estado entre tests que comparten una única `ApiFixture`/BD sembrada una sola vez, sin aislamiento por test. No se investigó a fondo la causa exacta — queda fuera del alcance de esta PR puntual.
 
@@ -84,8 +84,8 @@ docker run -d --name sqltest-outbox --network nexo-ci_default --network-alias sq
   mcr.microsoft.com/mssql/server:2022-latest
 
 docker compose -f docker-compose.ci.yml run --rm \
-  -e TEST_DB_CONNECTION="Server=sqltest;Database=CabinaFletesClean_Test;User Id=sa;Password=<clave>;TrustServerCertificate=True;" \
-  build dotnet test tests/CabinaFletes.Api.Tests --filter "FullyQualifiedName~OutboxConsistencia"
+  -e TEST_DB_CONNECTION="Server=sqltest;Database=NexoClean_Test;User Id=sa;Password=<clave>;TrustServerCertificate=True;" \
+  build dotnet test tests/Nexo.Api.Tests --filter "FullyQualifiedName~OutboxConsistencia"
 ```
 El contenedor de SQL Server se une a la misma red que crea `docker-compose.ci.yml` (`nexo-ci_default`), así que el contenedor del arnés lo alcanza por el nombre `sqltest`. No requiere BD corporativa ni sale de la máquina local. No resuelve la issue #3 (que pide la BD corporativa específicamente), pero sirve para validar que el código es correcto mientras se gestiona ese acceso.
 

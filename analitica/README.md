@@ -31,7 +31,7 @@ analitica/
 ├── 00-fuentes/                     Extracción cruda, inmutable. Nunca se
 │   │                               sobreescribe: cada corrida nueva se
 │   │                               agrega con su propia fecha.
-│   ├── bd-propia/                  BD transaccional CabinaFletes (S2-HU-10.1, issue #35)
+│   ├── bd-propia/                  BD transaccional Nexo (S2-HU-10.1, issue #35)
 │   └── fuentes-corporativas/       Los 4 DW externos de solo lectura (S2-HU-10.2, issue #36)
 │
 ├── 01-set-final/                   Snapshot autocontenido que UNE ambas fuentes

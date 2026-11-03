@@ -1,6 +1,6 @@
-# Contrato de integración — Nexo (Cabina de Fletes) ↔ Portal de la Administración
+# Contrato de integración — Nexo (Nexo) ↔ Portal de la Administración
 
-**Versión 1.6.0** · Sprint 2 · Issues #7, #15, #16, #17, #19, #20 y #21
+**Versión 1.6.0**
 
 Este documento manda. El módulo `cabina-fletes` del portal está en desarrollo y no
 es la referencia: lo que hoy tenga construido se adapta a lo que diga aquí, no al
@@ -27,7 +27,7 @@ nombre.
 | D7 | Trabajos pesados con aceptado + identificador | Definida | Backend |
 | D8 | Avisos por SignalR con consulta de respaldo | Definida | Backend |
 | D9 | Forma única de error | Definida | Backend |
-| P1 | Opciones de Cabina de Fletes en la tabla de permisos | Pendiente | TI |
+| P1 | Opciones de Nexo en la tabla de permisos | Pendiente | TI |
 | P2 | Equivalencia de los roles del portal a los 6 de Nexo | Pendiente | Negocio |
 | P3 | Precedencia cuando un usuario tiene varios roles | Pendiente | Negocio |
 | P4 | Token de sesión verificable | Pendiente | Equipo del portal, sin fecha |
@@ -38,7 +38,7 @@ nombre.
 
 ### Cómo llega
 
-El módulo de Cabina de Fletes solo es alcanzable después de que la persona ya
+El módulo de Nexo solo es alcanzable después de que la persona ya
 inició sesión en el portal. Nexo no pide credenciales, no emite tokens y no
 guarda sesión propia.
 
@@ -49,6 +49,12 @@ El portal deja los datos de la persona en el navegador. De ahí el frontend toma
 GET /api/sesion/actual HTTP/1.1
 X-Portal-Usuario-Id: 10123
 ```
+
+> ⚠️ **Discrepancia abierta:** el backend hoy lee el header
+> `X-Portal-clsUsuario-Id` (constante `HeaderIdUsuario` en
+> `clsIdentidadPortalAuthenticationHandler`), no `X-Portal-Usuario-Id`. Hasta que
+> se corrija, un cliente que siga este documento recibe `401`. Estado y resto de
+> discrepancias: [`CONTRATO.md` §7](../../CONTRATO.md#7-discrepancias-conocidas-entre-código-y-contrato).
 
 ### Qué NO se envía y por qué
 
@@ -64,21 +70,21 @@ Consecuencia directa: **falsificar un rol editando el navegador no funciona.** E
 es el escenario que la auditoría de QA dejó como criterio vigente.
 
 Lo que sí sigue siendo posible es cambiar el identificador por el de otra persona
-y recibir sus permisos. La identidad no viaja firmada. Está aceptado a conciencia
-para este sprint y está escrito en [`ADR-001`](ADR-001-identidad-sin-token.md) con
-las condiciones que obligan a revisarlo.
+y recibir sus permisos. La identidad no viaja firmada. Está aceptado a conciencia y está escrito en
+[`ADR-001`](ADR-001-identidad-sin-token.md) con las condiciones que obligan a
+revisarlo.
 
 ### Qué valida el backend
 
 En **cada** petición, sin caché de sesión:
 
 1. Que el identificador exista en la tabla de usuarios de la administración.
-2. Que esa persona tenga permiso sobre Cabina de Fletes.
+2. Que esa persona tenga permiso sobre Nexo.
 3. Que su permiso corresponda a alguno de los 6 roles de Nexo.
 
 Si cualquiera de los tres falla, la petición se rechaza. **No hay rol por
 defecto.** No existe un modo permisivo, ni siquiera en desarrollo: el esquema
-`X-Rol` del prototipo se retira en la issue #11.
+`X-Rol` del prototipo ya fue retirado.
 
 ### Endpoint de sesión
 
@@ -101,7 +107,7 @@ X-Portal-Usuario-Id: 10123
 |---|---|---|
 | `200` | Sesión válida | Entrar al módulo |
 | `401` | El identificador no existe en la tabla | Devolver a la persona al portal |
-| `403` | Existe, pero sin permiso sobre Cabina de Fletes | Mensaje y salida al portal |
+| `403` | Existe, pero sin permiso sobre Nexo | Mensaje y salida al portal |
 
 Un `401` **nunca** significa "muestra una pantalla de acceso de Nexo", porque esa
 pantalla no existe. Significa que la sesión del portal no sirve y la persona tiene
@@ -118,7 +124,7 @@ la pantalla es solo cortesía visual.
 Nexo trabaja con seis roles y solo seis:
 
 ```
-CoordinadorFletes · LiderProceso · ServiciosLogisticos · Admin · Comercial · AdminTarifas
+AdminBiblioteca · LiderProceso · ServiciosLogisticos · Admin · Comercial · AdminTarifas
 ```
 
 La administración tiene su propio catálogo, mucho más amplio y con otros nombres.
@@ -134,7 +140,7 @@ Hoy solo hay dos correspondencias con candidato evidente:
 | `TarifasComercial` | `Comercial` | Alta, por nombre |
 | `TarifasAdministrador` | `AdminTarifas` | Alta, por nombre |
 | `Administracion` | `Admin` | Media, revisar alcance |
-| — | `CoordinadorFletes` | Sin candidato |
+| `CoordinadorFletesNEXO` (id 49) | `AdminBiblioteca` | Alta, por nombre (S6-HU-25.1/#307: el rol de Nexo cambió de nombre; el del portal conserva el suyo) |
 | — | `LiderProceso` | Sin candidato |
 | — | `ServiciosLogisticos` | Sin candidato |
 
@@ -146,7 +152,7 @@ contra roles existentes o si se pide crearlos.
 La unidad de acceso en la administración no es el rol sino la **opción**: cada
 permiso es un par de rol y opción, y es la opción la que abre una pantalla.
 
-Por eso conviene pedir a TI las **opciones de Cabina de Fletes** y que las cuelgue
+Por eso conviene pedir a TI las **opciones de Nexo** y que las cuelgue
 de los roles que ya existen, en vez de pedir tres roles nuevos. Es una solicitud
 más pequeña, no ensucia el catálogo con roles que solo usa un módulo, y deja la
 asignación de personas donde ya la administran.
@@ -160,7 +166,7 @@ un orden de precedencia.
 Propuesta a confirmar por negocio, del que más manda al que menos:
 
 ```
-Admin > CoordinadorFletes > AdminTarifas > Comercial > LiderProceso > ServiciosLogisticos
+Admin > AdminTarifas > AdminBiblioteca > Comercial > LiderProceso > ServiciosLogisticos
 ```
 
 Sale de qué tan a menudo aparece cada rol autorizando operaciones de escritura en
@@ -178,13 +184,15 @@ decide qué mostrar.
 | Operación | Roles admitidos |
 |---|---|
 | `POST /api/captura-solicitudes` y todo el módulo de captura | `Comercial`, `Admin` |
-| `POST /api/solicitudes` · carga masiva de líneas · recalcular score | `CoordinadorFletes`, `Admin` |
-| `POST /api/solicitudes/{id}/rechazar` | `Comercial`, `CoordinadorFletes`, `Admin` |
-| `POST /api/cotizaciones` · aplicar propuestas · registrar resultado | `Comercial`, `AdminTarifas`, `CoordinadorFletes`, `Admin` |
-| `POST /api/cotizaciones/{id}/lineas` · entregar | `AdminTarifas`, `CoordinadorFletes`, `Admin` |
-| `POST /api/cotizaciones/{id}/conexos` | `Comercial`, `CoordinadorFletes`, `Admin` |
+| `GET /api/solicitudes` (Bandeja) · `GET /api/solicitudes/{id}` (Mesa) · `GET /api/cotizaciones/*` | `Comercial`, `AdminTarifas`, `ServiciosLogisticos`, `LiderProceso`, `Admin` (#307: `AdminBiblioteca` no entra) |
+| `POST /api/solicitudes` · carga masiva de líneas · recalcular score | `Admin` (#307, decisión D5) |
+| `POST /api/solicitudes/{id}/rechazar` | `Comercial`, `Admin` |
+| `POST /api/cotizaciones` · aplicar propuestas | `Comercial`, `AdminTarifas`, `Admin` |
+| `POST /api/cotizaciones/{id}/resultado` | `Comercial`, `Admin` |
+| `POST /api/cotizaciones/{id}/lineas` · `PUT .../lineas/{id}` · entregar | `AdminTarifas`, `Admin` |
+| `POST /api/cotizaciones/{id}/conexos` | `Comercial`, `AdminTarifas`, `Admin` |
 | Servicios conexos: crear, editar, importar | `ServiciosLogisticos`, `AdminTarifas`, `Admin` |
-| Reglas solo SICE-TAC (todo) | `AdminTarifas`, `Admin` |
+| Reglas solo SICE-TAC, Tarifas Plaza y rangos de peso (todo) | `AdminTarifas`, `AdminBiblioteca`, `Admin` |
 | Métricas de cumplimiento | `LiderProceso`, `AdminTarifas`, `Admin` |
 | `GET` y `PUT /api/priorizacion/parametros` | `Admin` |
 | Hubs `/hubs/trabajos` y `/hubs/bandeja` | Cualquier rol autenticado |
@@ -453,9 +461,9 @@ pantalla, es política de operación.
 }
 ```
 
-### Los 4 pesos mueven el puntaje (fix issue #173)
+### Los 4 pesos mueven el puntaje
 
-Hasta issue #173 el puntaje total era exclusivamente la urgencia por deadline y los
+Antes, el puntaje total era exclusivamente la urgencia por deadline y los
 pesos eran configuración dormida (ver
 `docs/decisiones/score-prioridad-4-pesos-vs-solo-urgencia.md`). Eso ya no es así: el
 total es la suma ponderada de los 4 componentes, así que mover cualquier peso sí cambia
@@ -529,9 +537,8 @@ la entrega responde en **~100 ms** con la salida de correo caída.
 
 ### La notificación es interna
 
-Va al correo corporativo de quien pidió la consulta de flete. **Nunca al cliente.** La
-HU-06.2 (#22) deriva el destinatario de la sesión y deja una prueba automatizada de que
-ninguna dirección de cliente puede ser destinataria.
+Va al correo corporativo de quien pidió la consulta de flete. **Nunca al cliente.** El backend deriva el destinatario de la sesión y deja una prueba automatizada de
+que ninguna dirección de cliente puede ser destinataria.
 
 ### Si el correo falla
 
@@ -542,6 +549,41 @@ equipo.
 Con una distinción que importa: lo que **no tiene arreglo** —un adjunto que pesa más de lo
 permitido, un correo que el relay rechaza por su forma— no se reintenta. Va derecho a la
 cola de error, así que la alerta llega al primer intento en vez de noventa segundos después.
+
+---
+
+## 5.5 Cambiar los servicios conexos de una cotización ya entregada
+
+```http
+POST   /api/cotizaciones/{id}/conexos
+DELETE /api/cotizaciones/{id}/conexos/{conexoId}
+```
+
+S5-HU-20.1/#286 (HU-B23/B24). Un servicio omitido se descubre justo **después** de entregar,
+así que agregar y quitar conexos ya no exige `Borrador`: se admite mientras la cotización no
+tenga resultado (`resultado == "SinDefinir"`), es decir `Borrador` **o** `Entregada`. Con
+`Ganada`/`Perdida` responde `409 COTIZACION_CERRADA` y no cambia nada.
+
+**Qué cambia en la respuesta (`CotizacionDto`):** un campo nuevo, `modificadaTrasEntregaAt`
+(`null` si nunca se tocó tras la entrega). Se llena cuando el cambio se hace sobre una
+cotización `Entregada`, y **no** mueve `estado` ni `entregadaAt`: el SLA y las métricas siguen
+midiendo la entrega original.
+
+**El aviso al comercial.** Si la cotización estaba `Entregada` y quien hace el cambio **no**
+es quien creó la solicitud, esa persona recibe un correo "Cotización actualizada: se agregó /
+se quitó *servicio* x *cantidad*; nuevo total *$X*". No se envía nada si:
+
+- la cotización es `Borrador` (todavía no hay nada entregado que corregir), o
+- quien cambia es el mismo creador de la solicitud (no se le avisa lo que acaba de hacer).
+
+Mismo patrón que la entrega (§5.3): el evento `clsConexosCotizacionCambiados` se publica por
+el Outbox, en la **misma transacción** que el cambio, y el correo sale en segundo plano desde
+un consumidor — el front no espera al correo y la respuesta no dice si salió. Es interno
+(nunca al cliente) y un fallo de la salida de correo **sube al bus** (se reintenta y, si no
+tiene arreglo, va a la cola de error): no se traga.
+
+Una petición = un aviso. "Agregar a todas las líneas" ya llega como **una** petición con N
+ítems y produce **un** correo. Agrupar peticiones sucesivas en un solo correo queda por decidir.
 
 ---
 
@@ -611,5 +653,5 @@ de parche.
 |---|---|
 | `README.md` | Este documento |
 | `openapi.yaml` | La superficie del contrato, ejecutable |
-| `escenarios.feature` | Los escenarios que implementan las issues #9, #10 y #11 |
+| `escenarios.feature` | Los escenarios que implementan el contrato |
 | `ADR-001-identidad-sin-token.md` | Por qué la identidad no viaja firmada |

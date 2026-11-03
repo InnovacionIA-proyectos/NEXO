@@ -1,0 +1,725 @@
+{
+  "version": "1",
+  "casos": [
+    {
+      "id": "S-01",
+      "origen": "sintetico",
+      "etiquetaValidada": true,
+      "etiquetaMetodo": "cotas fisicas: el vehiculo mas pequeno que cumple peso, volumen y medidas",
+      "descripcion": "Carga liviana: 1.000 kg y 4 m3 caben en el vehiculo mas pequeno.",
+      "claseViaje": null,
+      "mercancias": [
+        {
+          "codigo": "BEBIDAS",
+          "cantidad": 50,
+          "largoCm": 50,
+          "anchoCm": 40,
+          "altoCm": 40,
+          "pesoKg": 20
+        }
+      ],
+      "decisionCorrecta": {
+        "resultado": "ASIGNADO",
+        "motivo": null,
+        "flotas": [
+          [
+            {
+              "vehiculo": "2L2",
+              "carroceria": "FURGON"
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "id": "S-02",
+      "origen": "sintetico",
+      "etiquetaValidada": true,
+      "etiquetaMetodo": "cotas fisicas: el vehiculo mas pequeno que cumple peso, volumen y medidas",
+      "descripcion": "Pesa mas que un Turbo (7.500 kg) pero ocupa poco volumen.",
+      "claseViaje": null,
+      "mercancias": [
+        {
+          "codigo": "BEBIDAS",
+          "cantidad": 300,
+          "largoCm": 40,
+          "anchoCm": 30,
+          "altoCm": 30,
+          "pesoKg": 25
+        }
+      ],
+      "decisionCorrecta": {
+        "resultado": "ASIGNADO",
+        "motivo": null,
+        "flotas": [
+          [
+            {
+              "vehiculo": "C2",
+              "carroceria": "FURGON"
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "id": "S-03",
+      "origen": "sintetico",
+      "etiquetaValidada": true,
+      "etiquetaMetodo": "cotas fisicas: el vehiculo mas pequeno que cumple peso, volumen y medidas",
+      "descripcion": "17.500 kg: solo la Minimula o la Tractomula la llevan en un viaje; la Minimula queda al 97 % del peso.",
+      "claseViaje": null,
+      "mercancias": [
+        {
+          "codigo": "BEBIDAS",
+          "cantidad": 700,
+          "largoCm": 40,
+          "anchoCm": 30,
+          "altoCm": 30,
+          "pesoKg": 25
+        }
+      ],
+      "decisionCorrecta": {
+        "resultado": "ASIGNADO",
+        "motivo": null,
+        "flotas": [
+          [
+            {
+              "vehiculo": "2S2",
+              "carroceria": "FURGON"
+            }
+          ],
+          [
+            {
+              "vehiculo": "3S3",
+              "carroceria": "FURGON"
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "id": "S-04",
+      "origen": "sintetico",
+      "etiquetaValidada": true,
+      "etiquetaMetodo": "cotas fisicas: el vehiculo mas pequeno que cumple peso, volumen y medidas",
+      "descripcion": "25.000 kg en furgon: solo la Tractomula (30.000 kg con furgon).",
+      "claseViaje": null,
+      "mercancias": [
+        {
+          "codigo": "BEBIDAS",
+          "cantidad": 1000,
+          "largoCm": 40,
+          "anchoCm": 30,
+          "altoCm": 30,
+          "pesoKg": 25
+        }
+      ],
+      "decisionCorrecta": {
+        "resultado": "ASIGNADO",
+        "motivo": null,
+        "flotas": [
+          [
+            {
+              "vehiculo": "3S3",
+              "carroceria": "FURGON"
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "id": "S-05",
+      "origen": "sintetico",
+      "etiquetaValidada": true,
+      "etiquetaMetodo": "cotas fisicas: el vehiculo mas pequeno que cumple peso, volumen y medidas",
+      "descripcion": "35.000 kg: ningun furgon los lleva solo, hacen falta dos vehiculos.",
+      "claseViaje": null,
+      "mercancias": [
+        {
+          "codigo": "BEBIDAS",
+          "cantidad": 1400,
+          "largoCm": 40,
+          "anchoCm": 30,
+          "altoCm": 30,
+          "pesoKg": 25
+        }
+      ],
+      "decisionCorrecta": {
+        "resultado": "ASIGNADO",
+        "motivo": null,
+        "flotas": [
+          [
+            {
+              "vehiculo": "2S2",
+              "carroceria": "FURGON"
+            },
+            {
+              "vehiculo": "2S2",
+              "carroceria": "FURGON"
+            }
+          ],
+          [
+            {
+              "vehiculo": "3S3",
+              "carroceria": "FURGON"
+            },
+            {
+              "vehiculo": "C2",
+              "carroceria": "FURGON"
+            }
+          ],
+          [
+            {
+              "vehiculo": "3S3",
+              "carroceria": "FURGON"
+            },
+            {
+              "vehiculo": "2S2",
+              "carroceria": "FURGON"
+            }
+          ],
+          [
+            {
+              "vehiculo": "3S3",
+              "carroceria": "FURGON"
+            },
+            {
+              "vehiculo": "3S3",
+              "carroceria": "FURGON"
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "id": "S-06",
+      "origen": "sintetico",
+      "etiquetaValidada": true,
+      "etiquetaMetodo": "cotas fisicas: el vehiculo mas pequeno que cumple peso, volumen y medidas",
+      "descripcion": "Voluminosa y liviana: 48 m3 y 3.200 kg, el limite es el volumen.",
+      "claseViaje": null,
+      "mercancias": [
+        {
+          "codigo": "CAJAS_CARTON",
+          "cantidad": 400,
+          "largoCm": 60,
+          "anchoCm": 40,
+          "altoCm": 50,
+          "pesoKg": 8
+        }
+      ],
+      "decisionCorrecta": {
+        "resultado": "ASIGNADO",
+        "motivo": null,
+        "flotas": [
+          [
+            {
+              "vehiculo": "2S2",
+              "carroceria": "FURGON"
+            }
+          ],
+          [
+            {
+              "vehiculo": "3S3",
+              "carroceria": "FURGON"
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "id": "S-07",
+      "origen": "sintetico",
+      "etiquetaValidada": true,
+      "etiquetaMetodo": "cotas fisicas: el vehiculo mas pequeno que cumple peso, volumen y medidas",
+      "descripcion": "Una pieza de 6 m de largo: no entra en el Turbo (4,5 m), si en el Sencillo.",
+      "claseViaje": null,
+      "mercancias": [
+        {
+          "codigo": "CAJAS_CARTON",
+          "cantidad": 1,
+          "largoCm": 600,
+          "anchoCm": 100,
+          "altoCm": 100,
+          "pesoKg": 500
+        }
+      ],
+      "decisionCorrecta": {
+        "resultado": "ASIGNADO",
+        "motivo": null,
+        "flotas": [
+          [
+            {
+              "vehiculo": "C2",
+              "carroceria": "FURGON"
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "id": "S-08",
+      "origen": "sintetico",
+      "etiquetaValidada": true,
+      "etiquetaMetodo": "cotas fisicas: el vehiculo mas pequeno que cumple peso, volumen y medidas",
+      "descripcion": "Una pieza de 13 m de largo supera lo que lleva cualquier vehiculo: extradimensionada.",
+      "claseViaje": null,
+      "mercancias": [
+        {
+          "codigo": "CAJAS_CARTON",
+          "cantidad": 1,
+          "largoCm": 1300,
+          "anchoCm": 100,
+          "altoCm": 100,
+          "pesoKg": 800
+        }
+      ],
+      "decisionCorrecta": {
+        "resultado": "SIN_SELECCION_AUTOMATICA",
+        "motivo": "EXTRADIMENSIONADO",
+        "flotas": []
+      }
+    },
+    {
+      "id": "S-09",
+      "origen": "sintetico",
+      "etiquetaValidada": true,
+      "etiquetaMetodo": "cotas fisicas: el vehiculo mas pequeno que cumple peso, volumen y medidas",
+      "descripcion": "Carnicos: exigen furgon refrigerado.",
+      "claseViaje": null,
+      "mercancias": [
+        {
+          "codigo": "CARNICOS",
+          "cantidad": 80,
+          "largoCm": 40,
+          "anchoCm": 30,
+          "altoCm": 30,
+          "pesoKg": 15
+        }
+      ],
+      "decisionCorrecta": {
+        "resultado": "ASIGNADO",
+        "motivo": null,
+        "flotas": [
+          [
+            {
+              "vehiculo": "2L2",
+              "carroceria": "FURGON_REFRIGERADO"
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "id": "S-10",
+      "origen": "sintetico",
+      "etiquetaValidada": true,
+      "etiquetaMetodo": "cotas fisicas: el vehiculo mas pequeno que cumple peso, volumen y medidas",
+      "descripcion": "Fertilizante y alimentos no pueden ir juntos: un vehiculo para cada uno.",
+      "claseViaje": null,
+      "mercancias": [
+        {
+          "codigo": "FERTILIZANTES_ENSACADOS",
+          "cantidad": 100,
+          "largoCm": 50,
+          "anchoCm": 40,
+          "altoCm": 30,
+          "pesoKg": 25
+        },
+        {
+          "codigo": "ALIMENTOS_SECOS",
+          "cantidad": 100,
+          "largoCm": 40,
+          "anchoCm": 30,
+          "altoCm": 30,
+          "pesoKg": 10
+        }
+      ],
+      "decisionCorrecta": {
+        "resultado": "ASIGNADO",
+        "motivo": null,
+        "flotas": [
+          [
+            {
+              "vehiculo": "2L2",
+              "carroceria": "FURGON"
+            },
+            {
+              "vehiculo": "2L2",
+              "carroceria": "FURGON"
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "id": "S-11",
+      "origen": "sintetico",
+      "etiquetaValidada": true,
+      "etiquetaMetodo": "cotas fisicas: el vehiculo mas pequeno que cumple peso, volumen y medidas",
+      "descripcion": "Vidrio plano: su estructura propia no existe en la flota, va en plataforma.",
+      "claseViaje": null,
+      "mercancias": [
+        {
+          "codigo": "VIDRIO_PLANO",
+          "cantidad": 10,
+          "largoCm": 250,
+          "anchoCm": 150,
+          "altoCm": 10,
+          "pesoKg": 40
+        }
+      ],
+      "decisionCorrecta": {
+        "resultado": "ASIGNADO",
+        "motivo": null,
+        "flotas": [
+          [
+            {
+              "vehiculo": "2L2",
+              "carroceria": "PLATAFORMA"
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "id": "S-12",
+      "origen": "sintetico",
+      "etiquetaValidada": true,
+      "etiquetaMetodo": "cotas fisicas: el vehiculo mas pequeno que cumple peso, volumen y medidas",
+      "descripcion": "Bobinas de acero (15.000 kg, no apilables): plataforma, el Dobletroque es el mas ajustado.",
+      "claseViaje": null,
+      "mercancias": [
+        {
+          "codigo": "BOBINAS_ACERO",
+          "cantidad": 5,
+          "largoCm": 120,
+          "anchoCm": 120,
+          "altoCm": 100,
+          "pesoKg": 3000
+        }
+      ],
+      "decisionCorrecta": {
+        "resultado": "ASIGNADO",
+        "motivo": null,
+        "flotas": [
+          [
+            {
+              "vehiculo": "C3",
+              "carroceria": "PLATAFORMA"
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "id": "S-13",
+      "origen": "sintetico",
+      "etiquetaValidada": true,
+      "etiquetaMetodo": "cotas fisicas: el vehiculo mas pequeno que cumple peso, volumen y medidas",
+      "descripcion": "Dos mercancias compatibles: 4.800 kg y 28 m3 juntas, mas de lo que carga un Turbo.",
+      "claseViaje": null,
+      "mercancias": [
+        {
+          "codigo": "BEBIDAS",
+          "cantidad": 200,
+          "largoCm": 50,
+          "anchoCm": 40,
+          "altoCm": 40,
+          "pesoKg": 20
+        },
+        {
+          "codigo": "CAJAS_CARTON",
+          "cantidad": 100,
+          "largoCm": 60,
+          "anchoCm": 40,
+          "altoCm": 50,
+          "pesoKg": 8
+        }
+      ],
+      "decisionCorrecta": {
+        "resultado": "ASIGNADO",
+        "motivo": null,
+        "flotas": [
+          [
+            {
+              "vehiculo": "C2",
+              "carroceria": "FURGON"
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "id": "S-14",
+      "origen": "sintetico",
+      "etiquetaValidada": true,
+      "etiquetaMetodo": "cotas fisicas: el vehiculo mas pequeno que cumple peso, volumen y medidas",
+      "descripcion": "Una sola pieza de 40.000 kg supera el peso maximo por pieza: extradimensionada.",
+      "claseViaje": null,
+      "mercancias": [
+        {
+          "codigo": "CAJAS_CARTON",
+          "cantidad": 1,
+          "largoCm": 200,
+          "anchoCm": 100,
+          "altoCm": 100,
+          "pesoKg": 40000
+        }
+      ],
+      "decisionCorrecta": {
+        "resultado": "SIN_SELECCION_AUTOMATICA",
+        "motivo": "EXTRADIMENSIONADO",
+        "flotas": []
+      }
+    },
+    {
+      "id": "S-15",
+      "origen": "sintetico",
+      "etiquetaValidada": true,
+      "etiquetaMetodo": "cotas fisicas: el vehiculo mas pequeno que cumple peso, volumen y medidas",
+      "descripcion": "Justo debajo del limite del Turbo: 3.900 kg de 4.000.",
+      "claseViaje": null,
+      "mercancias": [
+        {
+          "codigo": "BEBIDAS",
+          "cantidad": 195,
+          "largoCm": 50,
+          "anchoCm": 40,
+          "altoCm": 40,
+          "pesoKg": 20
+        }
+      ],
+      "decisionCorrecta": {
+        "resultado": "ASIGNADO",
+        "motivo": null,
+        "flotas": [
+          [
+            {
+              "vehiculo": "2L2",
+              "carroceria": "FURGON"
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "id": "S-16",
+      "origen": "sintetico",
+      "etiquetaValidada": true,
+      "etiquetaMetodo": "cotas fisicas: el vehiculo mas pequeno que cumple peso, volumen y medidas",
+      "descripcion": "Justo encima del limite del Turbo: 4.100 kg de 4.000, pasa al Sencillo.",
+      "claseViaje": null,
+      "mercancias": [
+        {
+          "codigo": "BEBIDAS",
+          "cantidad": 205,
+          "largoCm": 50,
+          "anchoCm": 40,
+          "altoCm": 40,
+          "pesoKg": 20
+        }
+      ],
+      "decisionCorrecta": {
+        "resultado": "ASIGNADO",
+        "motivo": null,
+        "flotas": [
+          [
+            {
+              "vehiculo": "C2",
+              "carroceria": "FURGON"
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "id": "S-17",
+      "origen": "sintetico",
+      "etiquetaValidada": true,
+      "etiquetaMetodo": "cotas fisicas: el vehiculo mas pequeno que cumple peso, volumen y medidas",
+      "descripcion": "Rollos de papel (6.000 kg): mercancia condicionada, el vehiculo es el mismo.",
+      "claseViaje": null,
+      "mercancias": [
+        {
+          "codigo": "PAPEL_ROLLOS",
+          "cantidad": 20,
+          "largoCm": 100,
+          "anchoCm": 100,
+          "altoCm": 120,
+          "pesoKg": 300
+        }
+      ],
+      "decisionCorrecta": {
+        "resultado": "ASIGNADO",
+        "motivo": null,
+        "flotas": [
+          [
+            {
+              "vehiculo": "C2",
+              "carroceria": "FURGON"
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "id": "S-18",
+      "origen": "sintetico",
+      "etiquetaValidada": true,
+      "etiquetaMetodo": "cotas fisicas: el vehiculo mas pequeno que cumple peso, volumen y medidas",
+      "descripcion": "Dos posiciones del mismo producto con medidas distintas: no se pisan, 210 kg en total.",
+      "claseViaje": null,
+      "mercancias": [
+        {
+          "codigo": "BEBIDAS",
+          "cantidad": 10,
+          "largoCm": 100,
+          "anchoCm": 50,
+          "altoCm": 50,
+          "pesoKg": 20
+        },
+        {
+          "codigo": "BEBIDAS",
+          "cantidad": 5,
+          "largoCm": 30,
+          "anchoCm": 30,
+          "altoCm": 30,
+          "pesoKg": 2
+        }
+      ],
+      "decisionCorrecta": {
+        "resultado": "ASIGNADO",
+        "motivo": null,
+        "flotas": [
+          [
+            {
+              "vehiculo": "2L2",
+              "carroceria": "FURGON"
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "id": "S-19",
+      "origen": "sintetico",
+      "etiquetaValidada": true,
+      "etiquetaMetodo": "rejilla exacta: unidades por capa en piso y altura, sin apilar lo no apilable",
+      "descripcion": "33 estibas de 120x100x150: el volumen cabe en una Minimula (59 de 76 m3), pero el piso, girando las estibas y apilando dos alturas, solo admite 32.",
+      "claseViaje": null,
+      "mercancias": [
+        {
+          "codigo": "CAJAS_CARTON",
+          "cantidad": 33,
+          "largoCm": 120,
+          "anchoCm": 100,
+          "altoCm": 150,
+          "pesoKg": 400
+        }
+      ],
+      "decisionCorrecta": {
+        "resultado": "ASIGNADO",
+        "motivo": null,
+        "flotas": [],
+        "cantidadMinima": 2
+      }
+    },
+    {
+      "id": "S-20",
+      "origen": "sintetico",
+      "etiquetaValidada": true,
+      "etiquetaMetodo": "rejilla exacta: unidades por capa en piso y altura, sin apilar lo no apilable",
+      "descripcion": "32 estibas de 120x100x150: llenan exactamente una Minimula, giradas con el lado de 100 cm hacia arriba y en dos alturas.",
+      "claseViaje": null,
+      "mercancias": [
+        {
+          "codigo": "CAJAS_CARTON",
+          "cantidad": 32,
+          "largoCm": 120,
+          "anchoCm": 100,
+          "altoCm": 150,
+          "pesoKg": 400
+        }
+      ],
+      "decisionCorrecta": {
+        "resultado": "ASIGNADO",
+        "motivo": null,
+        "flotas": [
+          [
+            {
+              "vehiculo": "2S2",
+              "carroceria": "FURGON"
+            }
+          ],
+          [
+            {
+              "vehiculo": "3S3",
+              "carroceria": "FURGON"
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "id": "S-21",
+      "origen": "sintetico",
+      "etiquetaValidada": true,
+      "etiquetaMetodo": "rejilla exacta: unidades por capa en piso y altura, sin apilar lo no apilable",
+      "descripcion": "40 cajas de 1 m3 apilables a dos alturas: en la Minimula caben 48, en el Sencillo solo 24.",
+      "claseViaje": null,
+      "mercancias": [
+        {
+          "codigo": "CAJAS_CARTON",
+          "cantidad": 40,
+          "largoCm": 100,
+          "anchoCm": 100,
+          "altoCm": 100,
+          "pesoKg": 150
+        }
+      ],
+      "decisionCorrecta": {
+        "resultado": "ASIGNADO",
+        "motivo": null,
+        "flotas": [
+          [
+            {
+              "vehiculo": "2S2",
+              "carroceria": "FURGON"
+            }
+          ],
+          [
+            {
+              "vehiculo": "3S3",
+              "carroceria": "FURGON"
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "id": "S-22",
+      "origen": "sintetico",
+      "etiquetaValidada": true,
+      "etiquetaMetodo": "rejilla exacta: unidades por capa en piso y altura, sin apilar lo no apilable",
+      "descripcion": "30 bobinas de 1 m3 no apilables: el piso admite 24 en la flota mas grande, hacen falta dos vehiculos.",
+      "claseViaje": null,
+      "mercancias": [
+        {
+          "codigo": "BOBINAS_ACERO",
+          "cantidad": 30,
+          "largoCm": 100,
+          "anchoCm": 100,
+          "altoCm": 100,
+          "pesoKg": 500
+        }
+      ],
+      "decisionCorrecta": {
+        "resultado": "ASIGNADO",
+        "motivo": null,
+        "flotas": [],
+        "cantidadMinima": 2
+      }
+    }
+  ]
+}

@@ -160,7 +160,7 @@ def validar_apilamiento(
         if soporte.item.fragil and item.peso_kg > soporte.item.peso_kg:
             return f"'{soporte.item.descripcion}' es fragil y no debe cargar una unidad mas pesada que ella"
 
-        # Issue #154: el peso tambien baja hacia los ancestros INDIRECTOS de la
+        # El peso tambien baja hacia los ancestros INDIRECTOS de la
         # pila (2+ niveles debajo) - `_acumular_peso_encima` ya se lo suma a toda
         # la cadena via `soporte_id`, pero antes solo se comparaba contra
         # `max_peso_encima_kg` del soporte DIRECTO. Con 3 niveles A-B-C, colocar C
@@ -303,7 +303,7 @@ def anotar_accesibilidad(colocadas: list[Colocacion], cont: Contenedor) -> list[
         violaciones = [b for b in bloqueadores if b.item.secuencia_entrega > c.item.secuencia_entrega]
         c.accesibilidad = "bloqueada" if violaciones else "parcialmente_bloqueada"
         if violaciones:
-            # Issue #153: UNA sola incidencia consolidada por colocacion bloqueada,
+            # UNA sola incidencia consolidada por colocacion bloqueada,
             # aunque la tapen varios bloqueadores a la vez (caso realista: varias
             # cajas apiladas/adyacentes en el corredor) - antes se agregaba una
             # IncidenciaValidacion POR CADA bloqueador, duplicando la misma

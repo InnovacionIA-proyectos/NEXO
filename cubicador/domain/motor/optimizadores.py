@@ -18,6 +18,7 @@ from .dominio import (
     Contenedor,
     EstrategiaOptimizacion,
     ItemCarga,
+    Orientacion,
     ParametrosOptimizacion,
     PuntoExtremo,
     Rechazo,
@@ -64,7 +65,7 @@ class OptimizadorExtremePoints(ABC):
     ) -> tuple[list[Colocacion], list[Rechazo]]:
         colocadas: list[Colocacion] = list(fijas or [])
         rechazos: list[Rechazo] = []
-        # Issue #158: el punto extremo inicial es la primera esquina candidata
+        # El punto extremo inicial es la primera esquina candidata
         # que `dentro_de_limites` puede aceptar. Esa funcion exige x >= t / y >= t
         # (tolerancia_paredes_mm) - sembrar el origen en (0,0,0) cuando t > 0 deja
         # ese punto SIEMPRE invalido, y como ningun item llega a colocarse nunca se
@@ -134,13 +135,23 @@ class OptimizadorExtremePoints(ABC):
     ) -> Colocacion | None:
         """Elige (punto, orientacion) para el item; None si no hay posicion valida."""
 
+    def _orientaciones(self, item: ItemCarga, cont: Contenedor) -> list[Orientacion]:
+        """En que orden se prueban las orientaciones del item.
+
+        Por defecto el de `orientaciones_de`, que empieza por la original: es
+        el comportamiento historico de FFD y BFD y no se toca, porque hay 27
+        casos dorados de paridad con el motor C# que dependen de el. DBLF lo
+        sobreescribe (ver esa clase)."""
+        return orientaciones_de(item)
+
     def _candidatos(
         self, item: ItemCarga, cont: Contenedor, p: ParametrosOptimizacion,
         colocadas: list[Colocacion], puntos: list[PuntoExtremo],
     ) -> Iterator[tuple[Colocacion, float]]:
         """Candidatos validos (punto x orientacion) con su puntuacion heuristica."""
+        orientaciones = self._orientaciones(item, cont)
         for punto in puntos:
-            for o in orientaciones_de(item):
+            for o in orientaciones:
                 if not v.dentro_de_limites(punto.x, punto.y, punto.z, o, cont):
                     continue
                 if v.colisiona_con_alguna(punto.x, punto.y, punto.z, o, colocadas, cont.tolerancia_entre_unidades_mm):
@@ -214,8 +225,8 @@ def _acumular_peso_encima(soportes, peso_kg: float, colocadas: list[Colocacion])
 
 
 def _cabe_en_alguna_orientacion(item: ItemCarga, cont: Contenedor) -> bool:
-    """Issue #152: ¿alguna orientacion del item entra en las dimensiones internas
-    del vehiculo, sin importar colocadas/tolerancias? Si NINGUNA entra, el
+    """¿Alguna orientacion del item entra en las dimensiones internas del
+    vehiculo, sin importar colocadas/tolerancias? Si NINGUNA entra, el
     rechazo no tiene nada que ver con fragmentacion - el item no cabria ni en
     un vehiculo completamente vacio."""
     return any(
@@ -261,6 +272,64 @@ class FirstFitDecreasing(OptimizadorExtremePoints):
         return None
 
 
+class DeepestBottomLeftFill(OptimizadorExtremePoints):
+    """Deepest Bottom-Left-Fill: primer candidato valido tomando los puntos
+    desde el FONDO del vehiculo hacia la puerta.
+
+    Es el mismo mecanismo de puntos extremos que FFD y cambia una sola cosa:
+    el orden en que se recorren. FFD ordena `(z, x, y)` - llena el piso
+    completo antes de subir. DBLF ordena `(x, z, y)` - llena la rebanada mas
+    profunda de pared a pared y de piso a techo antes de avanzar hacia la
+    puerta.
+
+    Con el origen en la esquina opuesta a la puerta trasera (ver dominio.py),
+    menor `x` es MAS profundo. El frente de carga queda plano, que es lo que
+    hace util el resultado para decidir cuantos vehiculos hacen falta: el
+    hueco que sobra queda junto a la puerta, en una sola pieza, en vez de
+    repartido en una capa delgada bajo el techo.
+
+    Oraculo de empaquetado de la seleccion de flota (S5-HU-17.3): ahi no
+    interesa la secuencia de cargue sino si la carga ENTRA, y para eso el
+    criterio de proximidad a la puerta de `_puntuar_posicion` no aporta.
+    """
+
+    nombre = "dblf"
+
+    def _elegir_posicion(self, item, cont, p, colocadas, puntos):
+        puntos.sort(key=lambda pt: (pt.x, pt.z, pt.y))
+        for col, _ in self._candidatos(item, cont, p, colocadas, puntos):
+            return col
+        return None
+
+    def _orientaciones(self, item: ItemCarga, cont: Contenedor) -> list[Orientacion]:
+        """Primero la orientacion que mejor embaldosa el vehiculo vacio.
+
+        Medido antes de agregar esto: tomando la orientacion original primero,
+        DBLF quedaba **6 puntos porcentuales por debajo** del optimo de rejilla
+        en promedio, y hasta 28,8 puntos en el peor caso - una estiba de
+        120x100x150 en un Sencillo daba 48,1% en vez de 76,9%, que es pedir dos
+        camiones donde alcanza uno.
+
+        El hueco no era fragmentacion del espacio vacio, que es lo que
+        resolveria Maximal Empty Spaces: era que 120 cm a lo largo de un
+        vehiculo de 650 deja 50 cm muertos y 100 cm dejan 50 tambien, pero
+        girada entran 6 por fila en vez de 5. Ordenar las orientaciones por
+        cuantas unidades entrarian en el vehiculo vacio cuesta una division
+        entera por orientacion y recupera casi todo.
+
+        Es una preferencia, no una imposicion: el primer ajuste valido sigue
+        decidiendo, con las mismas validaciones de colision, soporte y
+        apilamiento.
+        """
+        def caben(o: Orientacion) -> int:
+            return int(
+                (cont.largo_mm // o.largo_mm) * (cont.ancho_mm // o.ancho_mm)
+                * (cont.alto_mm // o.alto_mm)
+            ) if o.largo_mm and o.ancho_mm and o.alto_mm else 0
+
+        return sorted(orientaciones_de(item), key=lambda o: (-caben(o), o.indice))
+
+
 class BestFitDecreasing(OptimizadorExtremePoints):
     """Best Fit Decreasing: evalua todos los candidatos y toma el de mayor puntaje."""
 
@@ -300,3 +369,4 @@ def obtener_optimizador(nombre: str) -> Optimizador:
 
 registrar_optimizador("ffd", FirstFitDecreasing)
 registrar_optimizador("bfd", BestFitDecreasing)
+registrar_optimizador("dblf", DeepestBottomLeftFill)

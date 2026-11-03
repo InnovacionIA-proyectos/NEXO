@@ -30,7 +30,7 @@ entrar en conflicto con nada — ver el hallazgo del punto 0.
 
 ## 1. Qué trae este PR
 
-- **`AlertaDeFalloConsumer<T>`** (`src/CabinaFletes.Infrastructure/Common/
+- **`AlertaDeFalloConsumer<T>`** (`src/Nexo.Infrastructure/Common/
   Mensajeria/AlertaDeFalloConsumer.cs`): consumer de `Fault<T>` que envía un
   correo al equipo técnico cuando un mensaje agota reintentos. Registrado
   como 11 tipos cerrados (`AddConsumer<AlertaDeFalloConsumer<CostearLineaSolicitada>>()`,
@@ -79,7 +79,7 @@ pide el criterio 3"*), así que una línea inexistente produce un
 ```
 15:03:00 fail: AlertaDeFalloConsumer[0] Mensaje CostearLineaSolicitada cayó
   a la cola de error tras agotar reintentos (..., 15:03:00). Motivo:
-  CabinaFletes.Application.Common.Exceptions.NotFoundException:
+  Nexo.Application.Common.Exceptions.NotFoundException:
   Línea de solicitud no encontrada.
 15:03:01 dbug: Declare queue: name: CostearLinea_error, ...
 15:03:01 dbug: RECEIVE .../FalloDeCosteo ... Fault<CostearLineaSolicitada>
@@ -120,8 +120,8 @@ correo real a los 6 destinatarios.
 
 | Tipo | Resultado |
 |---|---|
-| Smoke | ✅ `dotnet build CabinaFletes.Clean.sln` — 0 errores |
-| Regresión | ✅ `dotnet test CabinaFletes.Clean.sln` — **190/190**: `Domain.Tests` 61/61, `Application.Tests` 75/75, `Api.Tests` 54/54. `Api.Tests` necesita `TEST_DB_CONNECTION` apuntando al SQL Server real (el `db` del compose no publica el puerto al host, a propósito) — corrida desde un contenedor `dotnet/sdk:10.0` unido a `nexo_internal`, igual patrón que el publicador desechable de la sección 3 |
+| Smoke | ✅ `dotnet build Nexo.Clean.sln` — 0 errores |
+| Regresión | ✅ `dotnet test Nexo.Clean.sln` — **190/190**: `Domain.Tests` 61/61, `Application.Tests` 75/75, `Api.Tests` 54/54. `Api.Tests` necesita `TEST_DB_CONNECTION` apuntando al SQL Server real (el `db` del compose no publica el puerto al host, a propósito) — corrida desde un contenedor `dotnet/sdk:10.0` unido a `nexo_internal`, igual patrón que el publicador desechable de la sección 3 |
 | Integración | ✅ Ver sección 3 — RabbitMQ real, correo real (a un catcher), 3 fuentes de evidencia independientes |
 | Carga y estrés | No aplica a esta HU — `AlertaDeFalloConsumer<T>` es un consumer de bajo volumen por diseño (solo dispara cuando algo YA falló 4 veces), la carga del bus en sí ya se verificó en HU-04.2/04.3-04.4 |
 
@@ -183,7 +183,7 @@ nada se rompió:
   mismos 4 reintentos escalonados → `CostearLinea_error` con 1 mensaje → 6
   correos confirmados de nuevo en un capturador SMTP desechable
   (`rowCount=6`, los 6 destinatarios de `Alertas:EquipoTecnico`).
-- `dotnet test CabinaFletes.Clean.sln` completo: **190/190** (Domain 61,
+- `dotnet test Nexo.Clean.sln` completo: **190/190** (Domain 61,
   Application 75, Api 54) — sin regresiones.
 - Confirmado además que Cubicador comparte el broker sin colisión de
   nombres: su propia topología (`cubicador.eventos`, `cubicador.optimizar`,
@@ -207,7 +207,7 @@ existen hoy en `.github/workflows/`) — fuera de alcance de esta HU.
 
 ## Verificación QA independiente (Kevin Cano, situado en esta rama antes de aprobar el PR #70)
 
-Reproducido, no solo leído: build (0 errores), `dotnet test CabinaFletes.Clean.sln`
+Reproducido, no solo leído: build (0 errores), `dotnet test Nexo.Clean.sln`
 completo — **190/190** (`Domain.Tests` 61/61, `Application.Tests` 75/75, `Api.Tests`
 54/54), y `pytest` de Cubicador — **70/70**. Coincide exacto con lo que afirma el PR.
 

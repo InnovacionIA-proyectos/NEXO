@@ -1,0 +1,33 @@
+using System.Net;
+using System.Net.Http.Json;
+using Microsoft.EntityFrameworkCore;
+using Nexo.Api.Tests.Infra;
+using Xunit.Abstractions;
+
+namespace Nexo.Api.Tests;
+
+// DIAGNOSTICO TEMPORAL DE QA (PR #389): se descarta tras confirmar como responde la API ante creaciones simultaneas del mismo termino.
+[Collection("api")]
+public class zzDiagnosticoQaDuplicadoConcurrenteTests(clsApiFixture fx, ITestOutputHelper salida)
+{
+    [Fact]
+    public async Task Que_responde_la_API_si_llegan_a_la_vez_N_creaciones_del_mismo_termino()
+    {
+        var marca = $"T358{Guid.NewGuid():N}"[..14];
+        using var admin = fx.Client("Admin");
+        try
+        {
+            const int n = 8;
+            var cuerpo = new { clienteId = (Guid?)null, termino = marca + " concurrente", tipo = "unidad", concepto = "kg", contexto = (string?)null, ejemplo = (string?)null, activo = true };
+            var respuestas = await Task.WhenAll(Enumerable.Range(0, n).Select(_ => admin.PostAsJsonAsync("/api/diccionario-cliente", cuerpo)));
+
+            var porEstado = respuestas.GroupBy(r => (int)r.StatusCode).OrderBy(g => g.Key).Select(g => $"{g.Key}x{g.Count()}");
+            salida.WriteLine("ESTADOS=" + string.Join(", ", porEstado));
+            foreach (var r in respuestas.Where(r => !r.IsSuccessStatusCode).GroupBy(r => (int)r.StatusCode).Select(g => g.First()))
+                salida.WriteLine($"CODIGO_ERROR_{(int)r.StatusCode}=" + await r.ErrorCode());
+            var filas = fx.WithDb(db => db.TerminosCliente.Count(t => t.Termino.StartsWith(marca)));
+            salida.WriteLine("FILAS_EN_BD=" + filas);
+        }
+        finally { fx.WithDb(db => db.TerminosCliente.Where(t => t.Termino.StartsWith(marca)).ExecuteDelete()); }
+    }
+}

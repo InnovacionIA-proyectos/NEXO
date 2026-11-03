@@ -1,6 +1,10 @@
 """Implementa ILineaSolicitudPort: GET /api/lineas-solicitud/{id}/cubicacion
 en NEXO (ver CONTRATO.md seccion 7). NEXO es quien debe exponer este
-endpoint - ver docs/DECISIONES_TECNICAS.md #8."""
+endpoint - ver docs/DECISIONES_TECNICAS.md #8.
+
+El tipo de mercancia de cada posicion llega en `codigoTipoMercancia` (el nombre
+con el que NEXO captura y devuelve la posicion); internamente es el
+`codigo_mercancia` de `PosicionCarga`."""
 
 from __future__ import annotations
 
@@ -29,7 +33,8 @@ class NexoLineaSolicitudClient:
             posiciones=[
                 PosicionCarga(
                     descripcion=p.get("descripcion"), cantidad=p["cantidad"],
-                    largo_cm=p["largoCm"], ancho_cm=p["anchoCm"], alto_cm=p["altoCm"], peso_kg=p.get("pesoKg"),
+                    largo_cm=p["largoCm"], ancho_cm=p["anchoCm"], alto_cm=p["altoCm"],
+                    peso_kg=p.get("pesoKg"), codigo_mercancia=p.get("codigoTipoMercancia"),
                 )
                 for p in data.get("posiciones", [])
             ],

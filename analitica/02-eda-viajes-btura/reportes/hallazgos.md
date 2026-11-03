@@ -203,7 +203,7 @@ Toda decisión tomada ante ambigüedad en este EDA, con su justificación y qué
 
 ## Recomendaciones al negocio
 
-**(a) Campos a agregar en la próxima extracción** — fuente de cada uno, verificada 2026-09-14 contra el inventario completo de columnas de `FactFWOFUFO` y el código del backend de CabinaFletes:
+**(a) Campos a agregar en la próxima extracción** — fuente de cada uno, verificada 2026-09-14 contra el inventario completo de columnas de `FactFWOFUFO` y el código del backend de Nexo:
 
 | Campo | Estado | Dónde se consigue |
 |---|---|---|

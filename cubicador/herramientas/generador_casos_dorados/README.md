@@ -1,4 +1,4 @@
-# Generador de casos dorados (S2-HU-07.3)
+# Generador de casos dorados
 
 Herramienta de un solo propósito: corre el motor de cubicación **C# real**
 de `cabinaFletes` (no una reescritura, no una descripción — las clases
@@ -31,7 +31,7 @@ Si tu clon de `cabinaFletes` vive en otro lado, no hace falta moverlo:
 sobreescribe la ruta al compilar/correr:
 
 ```bash
-dotnet run -p:CabinaFletesApiProj="C:\ruta\completa\a\cabinaFletes\src\CabinaFletes.Api\CabinaFletes.Api.csproj"
+dotnet run -p:NexoApiProj="C:\ruta\completa\a\cabinaFletes\src\CabinaFletes.Api\CabinaFletes.Api.csproj"
 ```
 
 ## Cómo correrlo
@@ -43,7 +43,7 @@ dotnet run
 ```
 
 Esto:
-1. Compila referenciando `CabinaFletes.Api.csproj` de verdad (primera vez
+1. Compila referenciando `Nexo.Api.csproj` de verdad (primera vez
    tarda más — trae su cadena de dependencias de ASP.NET Core/EF Core solo
    para compilar, no las usa en tiempo de ejecución).
 2. Ejecuta cada uno de los 26 casos con el motor C# real

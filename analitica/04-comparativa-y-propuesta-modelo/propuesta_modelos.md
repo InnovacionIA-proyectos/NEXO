@@ -2,7 +2,7 @@
 
 Dos propuestas de modelo, cada una con objetivo, grano, features y supuestos — **ningún modelo se construye este sprint**. Cada ficha declara explícitamente sus limitaciones conocidas y qué falta resolver antes de poder entrenar en serio. Ver [`informe_comparativo.md`](informe_comparativo.md) para la comparativa que sustenta estas propuestas, y `hallazgos.md`/`limitaciones.md` de ambos EDA para la evidencia citada (H-0xx/L-0x).
 
-**Nota:** originalmente se había planteado aquí un modelo para `Flete Producción FO` vía Tarifario SAP, entendido como comparación contra la regla de precio. Al analizarlo más a fondo, esa comparación específica no es un modelo predictivo — es una **verificación** de si la regla que CabinaFletes ya automatiza (`ReglaDeCosteo`, MAX(SICE-TAC, SAP)) también explica el histórico real de la empresa. Esa verificación se movió a [`recomendacion_captura_datos.md`](recomendacion_captura_datos.md) §7, como recomendación de una HU de validación futura, no como propuesta de modelo. Es un objetivo **distinto** del Modelo 2 de abajo: el Modelo 2 no compara contra la regla de precio, predice `Flete Producción FO` directamente a partir de variables operativas del viaje — el objetivo 1 de `informe_comparativo.md` §4, ya declarado viable con el dato de hoy.
+**Nota:** originalmente se había planteado aquí un modelo para `Flete Producción FO` vía Tarifario SAP, entendido como comparación contra la regla de precio. Al analizarlo más a fondo, esa comparación específica no es un modelo predictivo — es una **verificación** de si la regla que Nexo ya automatiza (`ReglaDeCosteo`, MAX(SICE-TAC, SAP)) también explica el histórico real de la empresa. Esa verificación se movió a [`recomendacion_captura_datos.md`](recomendacion_captura_datos.md) §7, como recomendación de una HU de validación futura, no como propuesta de modelo. Es un objetivo **distinto** del Modelo 2 de abajo: el Modelo 2 no compara contra la regla de precio, predice `Flete Producción FO` directamente a partir de variables operativas del viaje — el objetivo 1 de `informe_comparativo.md` §4, ya declarado viable con el dato de hoy.
 
 ---
 
@@ -184,7 +184,7 @@ No se define cuál usar en firme porque el modelo no se construye hasta que exis
 
 ### Supuestos
 
-Requiere producción real de CabinaFletes con volumen suficiente de cotizaciones ganadas/perdidas para aprender un patrón.
+Requiere producción real de Nexo con volumen suficiente de cotizaciones ganadas/perdidas para aprender un patrón.
 
 ### Estado
 

@@ -1,4 +1,4 @@
-// QA — fix traido desde Pre-Despliegue-BACKEND (commit 774de8c, Bran/bquintero,
+// QA — fix traido desde DEPLOY (commit 774de8c, Bran/bquintero,
 // 14-sep-2026): "el reporte de un fallo ya no puede atascar el worker".
 //
 // Causa real: un `guardar_item` contra un plan inexistente revienta con

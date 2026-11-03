@@ -18,11 +18,11 @@ contrasta la ya verificada en ambos EDA.
 
 | | EDA-1 — Viajes-Btura (histórico) | EDA-2 — extracción 4 fuentes (`v1.0.0-piloto`) |
 |---|---|---|
-| **Qué es** | Extracto plano de viajes ya ejecutados, entregado directo por el negocio | Set consolidado de S2-HU-10: BD propia (CabinaFletes) + piso SICE-TAC + plaza SAP + clientes |
-| **Volumen** | 41.237 filas, 13 meses (abril 2025 → abril 2026, último mes parcial) | 13 solicitudes reales de CabinaFletes (prueba manual del usuario, sin intención de representatividad) + ~2 millones de filas de contexto de mercado (SICE-TAC/SAP), pero solo como catálogo, no ligadas a volumen operativo real |
+| **Qué es** | Extracto plano de viajes ya ejecutados, entregado directo por el negocio | Set consolidado de S2-HU-10: BD propia (Nexo) + piso SICE-TAC + plaza SAP + clientes |
+| **Volumen** | 41.237 filas, 13 meses (abril 2025 → abril 2026, último mes parcial) | 13 solicitudes reales de Nexo (prueba manual del usuario, sin intención de representatividad) + ~2 millones de filas de contexto de mercado (SICE-TAC/SAP), pero solo como catálogo, no ligadas a volumen operativo real |
 | **Variable objetivo** | `Flete Producción FO` (precio pagado al transportista) — completa, confiable, foco confirmado del futuro modelo | `ValorFlete` de cotización — solo 13 casos, y no necesariamente el mismo concepto que `Flete Producción FO` (cotización vs. histórico ejecutado) |
 | **Contexto de mercado** | Ninguno — no hay SICE-TAC ni SAP en este extracto | Es su aporte central: piso SICE-TAC y plaza SAP, con la lógica de cruce por ruta ya validada exacta en ambos lados (ver §3) |
-| **Qué NO tiene** | Contexto de mercado, estado de viajes no concluidos, tarifa de venta confiable | Volumen real, y su lado propio no puede crecer mientras CabinaFletes no tenga producción |
+| **Qué NO tiene** | Contexto de mercado, estado de viajes no concluidos, tarifa de venta confiable | Volumen real, y su lado propio no puede crecer mientras Nexo no tenga producción |
 
 **Lectura combinada:** las dos fuentes son complementarias, no sustitutas — EDA-1 tiene volumen y variable objetivo pero sin mercado; EDA-2 tiene la lógica de mercado pero sin volumen. Ninguna de las dos, por separado, alcanza para lo que en última instancia se necesita (variable objetivo + volumen + contexto de mercado, alineados en el tiempo). Ver §4 para el detalle de qué es viable con cada una y con la unión.
 
@@ -63,7 +63,7 @@ Antes de evaluar viabilidad de objetivos, vale aislar qué tan bien funciona el 
 |---|---|---|---|
 | 1 | Predecir `Flete Producción FO` con variables operativas del histórico (peso, zona/distancia, tipo de vehículo, flota, línea de negocio, componente temporal) | **Viable hoy** | EDA-1: 41.237 filas, grano definido (H-001), variable objetivo confiable, relaciones ya exploradas en el bivariado. Matices: solo aplica a viajes que llegan a concluirse (H-004) y solo al corredor Buenaventura (L-05 EDA-1) |
 | 2 | Enriquecer el objetivo 1 con contexto de mercado vigente por fecha (piso SICE-TAC / plaza SAP) | **No viable hoy, pero ya no por el mecanismo** | El cruce con SAP (87,5% por el algoritmo + 4 líneas de captura manual confirmada, 32/32 explicadas, H-005 EDA-2) y con SICE-TAC (100%, H-005 EDA-2) ya se reprodujeron exactos — el mecanismo de cruce está resuelto en ambos lados. Lo que sigue bloqueando este objetivo es puro alcance de datos: de los 27 períodos históricos reales de SICE-TAC ya disponibles (`Historicos_SICE/`), solo se procesó y verificó el de agosto 2026 — falta repetir ese procesamiento en los períodos que cubren los 13 meses de EDA-1 (abril 2025-abril 2026) para tener una serie de contexto de mercado alineable (L-07 EDA-2) |
-| 3 | Predecir o asistir la cotización de CabinaFletes (ej. sugerir `ValorFlete` al vendedor) | **No viable hoy** — el dato no soporta predicción útil | Solo 13 solicitudes de prueba manual, sin intención de representatividad (confirmado por el usuario); `ValorMercancia` y `Peso` tienen valores puestos al azar sin forma de separarlos programáticamente del dato real (H-002 EDA-2) |
+| 3 | Predecir o asistir la cotización de Nexo (ej. sugerir `ValorFlete` al vendedor) | **No viable hoy** — el dato no soporta predicción útil | Solo 13 solicitudes de prueba manual, sin intención de representatividad (confirmado por el usuario); `ValorMercancia` y `Peso` tienen valores puestos al azar sin forma de separarlos programáticamente del dato real (H-002 EDA-2) |
 | 4 | Modelo único que una EDA-1 + EDA-2 (volumen + variable objetivo + contexto de mercado, simultáneos) | **No viable hoy** | El volumen real de EDA-2 (13 casos) no alcanza para entrenar nada, y su `ValorFlete` (cotización) no equivale necesariamente a `Flete Producción FO` (histórico ejecutado) — la unión útil requeriría una extracción nueva (se detalla en el paso de recomendación de captura de datos) |
 
 ---
@@ -98,6 +98,6 @@ Deseable, con el mecanismo ya confirmado en ambos lados (SAP y SICE-TAC, ver §3
 | Alcance geográfico limitado al corredor Buenaventura | EDA-1 | L-05 EDA-1 |
 | `Tarifa Venta al Cliente` / margen no confiables | EDA-1 | H-002 EDA-1 |
 | `Distancia Total` no es medición real, solo de tabla/zona | EDA-1 | H-011 EDA-1, L-06 EDA-1 |
-| Volumen real de CabinaFletes bajísimo y sin intención de representatividad | EDA-2 | L-06 EDA-2, memoria del proyecto |
+| Volumen real de Nexo bajísimo y sin intención de representatividad | EDA-2 | L-06 EDA-2, memoria del proyecto |
 | Vigencia histórica real de tarifa SAP no aplicada (`AjusteVigenciaPlaza` ausente; `vigencia` es mutable, solo se ve el valor actual, no una foto del día de cada cotización) | EDA-2 | L-02 EDA-2 |
 | `ConfigVehiculoId` vacío en el 100% de las cotizaciones `Fuente=Tarifario` — impide filtrar SAP por tipo de vehículo exacto en esas líneas | EDA-2 | L-13 EDA-2 (nuevo) |

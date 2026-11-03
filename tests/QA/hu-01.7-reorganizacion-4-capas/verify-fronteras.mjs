@@ -33,10 +33,10 @@ function archivosQueImportan(carpeta, patrones) {
   }
 }
 
-const domainViolando = archivosQueImportan("src/CabinaFletes.Domain/", [
-  "using CabinaFletes.Application",
-  "using CabinaFletes.Infrastructure",
-  "using CabinaFletes.Api",
+const domainViolando = archivosQueImportan("src/Nexo.Domain/", [
+  "using Nexo.Application",
+  "using Nexo.Infrastructure",
+  "using Nexo.Api",
 ]);
 if (domainViolando.length > 0) {
   ok = false;
@@ -46,9 +46,9 @@ if (domainViolando.length > 0) {
   console.log("OK: Domain no importa ninguna otra capa (0 archivos).");
 }
 
-const applicationViolando = archivosQueImportan("src/CabinaFletes.Application/", [
-  "using CabinaFletes.Infrastructure",
-  "using CabinaFletes.Api",
+const applicationViolando = archivosQueImportan("src/Nexo.Application/", [
+  "using Nexo.Infrastructure",
+  "using Nexo.Api",
 ]);
 if (applicationViolando.length > 0) {
   ok = false;

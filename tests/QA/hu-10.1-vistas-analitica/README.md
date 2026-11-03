@@ -90,7 +90,7 @@ el comentario del código:
 **1) Bloqueos** — transacción de escritura larga en background + lectura
 concurrente por otra sesión. La lectura normal (**sin** `NOLOCK`) tampoco
 quedó bloqueada por la escritura en curso — no gracias al `NOLOCK`, sino
-porque `sys.databases.is_read_committed_snapshot_on = 1` en `CabinaFletes`:
+porque `sys.databases.is_read_committed_snapshot_on = 1` en `Nexo`:
 RCSI ya está encendido a nivel de base de datos, así que las lecturas
 normales ya no bloquean escritores (usan versionado de filas, no locks de
 lectura).

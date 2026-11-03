@@ -41,8 +41,8 @@ router = APIRouter(prefix="/api/planes-cargue", tags=["plan-cargue"], dependenci
 
 # ------------------------------------------------------------- mapeo Pydantic <-> dominio
 #
-# `_vehiculo_de_input`/`_item_de_input` viven en application/plan_cargue/mapeos.py (S3-HU-02,
-# issue #105): el worker de colas los necesita exactamente igual, para no duplicar el mapeo.
+# `_vehiculo_de_input`/`_item_de_input` viven en application/plan_cargue/mapeos.py:
+# el worker de colas los necesita exactamente igual, para no duplicar el mapeo.
 _vehiculo_de_input = mapeos.vehiculo_de_input
 _item_de_input = mapeos.item_de_input
 
@@ -72,7 +72,7 @@ async def eliminar_vehiculo(id: str, repo=Depends(obtener_vehiculo_repo)):
 
 @router.post("/vehiculos/republicar-catalogo", response_model=list[VehiculoCubicacionDto])
 async def republicar_catalogo_vehiculos(repo=Depends(obtener_vehiculo_repo)):
-    """Issue #162: reparo manual, una sola vez, de la desincronizacion entre
+    """Reparo manual, una sola vez, de la desincronizacion entre
     el catalogo de Cubicador y la proyeccion de NEXO (20 vehiculos en
     Cubicador contra 13 en NEXO al momento de reportarse). Republica
     vehiculo.creado para TODO el catalogo actual - seguro de correr mas de

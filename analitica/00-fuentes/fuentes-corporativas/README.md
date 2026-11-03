@@ -2,7 +2,7 @@
 
 Extracción **puntual** (una sola vez, no sincronización) desde los 4 data warehouses
 de solo lectura de la compañía, para dar contexto de mercado al histórico propio de
-CabinaFletes (el otro lado de este cruce es
+Nexo (el otro lado de este cruce es
 `../bd-propia/DICCIONARIO_DATOS.md`, S2-HU-10.1 / issue #35). El EDA de
 S2-HU-11 se hace sobre ambos sets. El set final que une ambos lados vive en
 `../../01-set-final/`.
@@ -186,7 +186,7 @@ la práctica cubre el 100% de ambas tablas, porque ninguna tiene registros
 anteriores a 2024-01-31 (hallazgo ya documentado en la HU-09.2 anterior).
 
 **Vigencia cruda**: se extrajo la columna `VIGENCIA` tal cual la trae SAP, **sin
-aplicar la corrección local** `AjusteVigenciaPlaza` (mecanismo de CabinaFletes que
+aplicar la corrección local** `AjusteVigenciaPlaza` (mecanismo de Nexo que
 sobre-escribe vigencias puntuales conocidas como mal cargadas). Decisión explícita
 del negocio: quien consuma este extracto debe saber que algunas vigencias aquí
 pueden estar mal cargadas en el origen (SAP), tal como se documentó en
@@ -215,7 +215,7 @@ natural — en su mayoría conductores/contactos individuales, sin valor como
 | Dimensión | Cómo cruza | Confiabilidad |
 |---|---|---|
 | **Cliente** | `BUT000.TAXNUM` (NIT) ↔ NIT del catálogo `analitica.clientes` (S2-HU-10.1) | Alta — mismo dato (NIT), sin normalización necesaria |
-| **Vehículo/servicio** | `tblSAPTarifas.LINEANEGOCIO` / `CLASEVIAJE` / `CLASECONTENEDOR` ↔ los mismos campos en `analitica.lineas_solicitud` | Alta — esos campos en CabinaFletes ya se capturan como "catálogo replicado de SAP TM" (confirmado en `../bd-propia/DICCIONARIO_DATOS.md`), son los mismos códigos |
+| **Vehículo/servicio** | `tblSAPTarifas.LINEANEGOCIO` / `CLASEVIAJE` / `CLASECONTENEDOR` ↔ los mismos campos en `analitica.lineas_solicitud` | Alta — esos campos en Nexo ya se capturan como "catálogo replicado de SAP TM" (confirmado en `../bd-propia/DICCIONARIO_DATOS.md`), son los mismos códigos |
 | **Ruta** | `tblSAPTarifas.ORIGEN`/`DESTINO` usa código DANE o texto de zona (`ZC_`/`ZTC_`); `tblRutasSicetac.NOMBRERUTA` es texto libre `"ORIGEN - DESTINO"`; `analitica.rutas` (propio) también es texto libre sin código DANE | Media — no hay atajo: cualquier cruce de ruta necesita la misma normalización de nombre de municipio → código DANE que ya usa `TarifarioSapAdapter.CodigosDaneAsync` en el motor de producción. No se replicó esa lógica aquí (decisión: extraer crudo, documentar, dejar el cruce al EDA) |
 | **Período** | `tblSAPTarifas`/`tblSAPTarifasLog.VIGENCIA` (fecha) vs `tblRutasSicetac.PERIODO` (entero `AAAAMM`, un solo valor: `202608`) vs fechas de `analitica.cotizaciones`/`analitica.tarifas_historicas` | Alta para SAP (fecha real comparable). Limitada para SICE-TAC: solo se puede cruzar contra situaciones de **agosto 2026** exactamente, no contra períodos anteriores |
 

@@ -40,9 +40,9 @@ Criterios de aceptación transversales (idénticos al EDA-1):
 
 | # | Pregunta | Columnas que la responderían | ¿Set suficiente? |
 | :---- | :---- | :---- | :---- |
-| P1 | ¿Qué tan cerca cotiza CabinaFletes respecto al piso SICE-TAC / la plaza SAP vigente en el mismo período? | `cotizacion_lineas.ValorFlete`+`Fuente` vs. `VALORSICECONHORA` (SICE-TAC) o `VALOR` (SAP), cruzados por ruta+período | Parcial — ver §1.3, la cobertura real de cruce es chica |
+| P1 | ¿Qué tan cerca cotiza Nexo respecto al piso SICE-TAC / la plaza SAP vigente en el mismo período? | `cotizacion_lineas.ValorFlete`+`Fuente` vs. `VALORSICECONHORA` (SICE-TAC) o `VALOR` (SAP), cruzados por ruta+período | Parcial — ver §1.3, la cobertura real de cruce es chica |
 | P2 | ¿El motor de costeo realmente usa la fuente que dice usar (`Fuente=Sicetac`/`Tarifario`)? | Ya verificado por HU-10.3 (14/15 casos coinciden exacto) — este EDA solo debe reconfirmarlo con código propio, no es hallazgo nuevo | Sí, ya resuelto — reconfirmar, no reinvestigar |
-| P3 | ¿Qué variación de precio hay en el mercado (SICE-TAC/SAP) para las mismas rutas/líneas de negocio que cotiza CabinaFletes? | `tblRutasSicetac`/`tblSAPTarifas` segmentado por las mismas dimensiones que usa `lineas_solicitud` | Sí para el lado externo solo; el cruce contra lo propio depende de qué tan bien se puedan enlazar (ver §1.3) |
+| P3 | ¿Qué variación de precio hay en el mercado (SICE-TAC/SAP) para las mismas rutas/líneas de negocio que cotiza Nexo? | `tblRutasSicetac`/`tblSAPTarifas` segmentado por las mismas dimensiones que usa `lineas_solicitud` | Sí para el lado externo solo; el cruce contra lo propio depende de qué tan bien se puedan enlazar (ver §1.3) |
 | P4 | ¿El bajo volumen real (13 solicitudes) permite alguna conclusión generalizable? | Todas | No — ya declarado como limitación estructural desde HU-10.3, se hereda tal cual |
 
 ### 1.2 Definiciones — heredadas de HU-10.3, no se re-derivan
@@ -327,7 +327,7 @@ Aunque el cruce directo sea chico, el lado externo por sí solo permite caracter
 
 Preguntas a responder con evidencia (adaptadas del EDA-1 a esta fuente):
 
-1. **Sesgo de volumen — ya declarado por HU-10.3, se hereda.** 13 solicitudes reales no son producción; cualquier conclusión de este EDA sobre "qué tan seguido cotiza bien CabinaFletes" está limitada a esa muestra.
+1. **Sesgo de volumen — ya declarado por HU-10.3, se hereda.** 13 solicitudes reales no son producción; cualquier conclusión de este EDA sobre "qué tan seguido cotiza bien Nexo" está limitada a esa muestra.
 2. **Sesgo de muestreo deliberado en SICE-TAC (§1.5).** La muestra sobre-representa casos extremos a propósito — cualquier "% que tal cosa pasa" calculado sobre el archivo completo (sin separar `nucleo`/`rara_*`) está sesgado y sería un error real, no solo una imprecisión.
 3. **Sesgo de cobertura de llaves de cruce.** Si solo ~11% de `lineas_solicitud` tiene `LineaNegocio`/`ClaseViaje`/`ClaseContenedor` poblado (§3.2), cualquier conclusión de "señal de mercado" solo describe ese subconjunto, no el total de líneas cotizadas.
 4. **Sesgo temporal de la ventana de SICE-TAC.** Un solo período (agosto 2026) — no se puede saber si ese mes fue típico o atípico del mercado.

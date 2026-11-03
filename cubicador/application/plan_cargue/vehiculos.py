@@ -46,8 +46,8 @@ async def listar_vehiculos(repo: IVehiculoCubicacionRepository) -> list[Vehiculo
 
 
 async def republicar_catalogo(repo: IVehiculoCubicacionRepository) -> list[VehiculoCubicacion]:
-    """Issue #162: reparo manual, una sola vez, de la desincronizacion ya
-    existente entre el catalogo de Cubicador y la proyeccion de NEXO."""
+    """Reparo manual, una sola vez, de la desincronizacion ya existente
+    entre el catalogo de Cubicador y la proyeccion de NEXO."""
     return await repo.republicar_todos()
 
 
@@ -77,18 +77,40 @@ def presets() -> list[VehiculoCubicacion]:
             ejes=ejes,
         )
 
+    # Medidas y capacidades CORREGIDAS contra el Excel "Dimenciones y Peso por
+    # configuracion para Cubicaje" (fuente: Operaciones). Antes eran valores
+    # inventados: el Turbo prometia 6,2 m y 6.300 kg cuando el real es 4,5 m y
+    # 4.000 kg. La capacidad del Excel es PAYLOAD, no peso bruto, asi que entra
+    # directo en capacidad_kg (ya no se resta la tara).
+    #
+    # Tres campos NO tienen fuente en el Excel y se dejan como estaban: tara (no
+    # se usa en ningun calculo del motor), puerta y ejes. La puerta solo se
+    # ajusto donde la vieja excedia la seccion interna nueva, porque `_validar`
+    # la rechazaria.
+    #
+    # Los nombres se conservan a proposito: `listar_con_siembra` siembra POR
+    # NOMBRE, asi que renombrar crearia filas duplicadas en las bases que ya
+    # existen. El de "Tractocamion furgon 13.6 m" quedo desfasado (son 12,2 m);
+    # el renombre va por el CRUD, no por aca.
     return [
-        preset("Turbo con estacas", 6200, 2200, 2000, 6300, 4200, 2200, 1950,
-               [EjeVehiculoRow(1000, 3500), EjeVehiculoRow(4600, 7000)]),
-        preset("Plataforma (tractomula)", 12200, 2500, 2800, 27500, 6500, 2500, 2800,
+        preset("Turbo con estacas", 4500, 2200, 2300, 4000, 4200, 2200, 1950,
+               # ejes reubicados: el eje trasero estaba en 4600 mm, fuera del largo nuevo
+               [EjeVehiculoRow(750, 3500), EjeVehiculoRow(3350, 7000)]),
+        preset("Plataforma (tractomula)", 12200, 2400, 2600, 34000, 6500, 2400, 2600,
                [EjeVehiculoRow(1500, 6000), EjeVehiculoRow(8500, 10500), EjeVehiculoRow(10000, 10500)]),
         preset("Cama baja (lowboy)", 12500, 2600, 1600, 39000, 9000, 2600, 1600,
+               # Sin contraparte en el Excel: queda como estaba, pendiente de negocio.
                [EjeVehiculoRow(1500, 6000), EjeVehiculoRow(8500, 10500), EjeVehiculoRow(9900, 10500), EjeVehiculoRow(11300, 10500)]),
-        preset("Camion sencillo (estacas)", 7200, 2350, 2200, 8500, 9000, 2350, 2150,
+        preset("Camion sencillo (estacas)", 6500, 2400, 2400, 8500, 9000, 2350, 2150,
                [EjeVehiculoRow(1200, 6000), EjeVehiculoRow(5800, 11000)]),
-        preset("Camion rigido dobletroque", 7800, 2400, 2300, 17000, 10500, 2400, 2250,
+        preset("Camion rigido dobletroque", 8000, 2400, 2600, 17000, 10500, 2400, 2250,
                [EjeVehiculoRow(1300, 6000), EjeVehiculoRow(6300, 22000)]),
-        preset("Tractocamion furgon 13.6 m", 13600, 2450, 2700, 28000, 7000, 2400, 2650,
+        preset("Minimula 2S2", 12200, 2400, 2600, 18000, 0, 2400, 2600,
+               # Configuracion que faltaba por completo en el catalogo. El Excel no
+               # trae tara ni ejes: la tara va en 0 (no se usa) y la lista de ejes
+               # vacia, que el motor soporta (no estima peso por eje).
+               []),
+        preset("Tractocamion furgon 13.6 m", 12200, 2400, 2600, 30000, 7000, 2400, 2600,
                [EjeVehiculoRow(1500, 8000), EjeVehiculoRow(11000, 22000)]),
         preset("Contenedor 20 pies", 5900, 2350, 2390, 21800, 2200, 2340, 2280,
                [EjeVehiculoRow(1000, 10900), EjeVehiculoRow(4900, 10900)]),

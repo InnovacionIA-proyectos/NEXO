@@ -4,8 +4,11 @@ extraen a un microservicio - son EF/SQLAlchemy puro, igual que en NEXO."""
 
 from __future__ import annotations
 
-from typing import Protocol
+from datetime import datetime
+from typing import TYPE_CHECKING, Protocol
 
+from domain.entidades.catalogo import Catalogo
+from domain.entidades.recomendacion import MercanciaRecomendada, RecomendacionGuardada
 from domain.entidades.entidades import (
     ItemPlanCargue,
     ParametrosCubicacion,
@@ -14,15 +17,19 @@ from domain.entidades.entidades import (
 )
 
 
+if TYPE_CHECKING:
+    from application.ia_sombra.registro import RegistroSombra
+
+
 class IVehiculoCubicacionRepository(Protocol):
     async def listar_con_siembra(self) -> list[VehiculoCubicacion]:
         """Siembra los presets del sistema que aun no existan (por nombre) y devuelve el catalogo completo."""
         ...
 
     async def republicar_todos(self) -> list[VehiculoCubicacion]:
-        """Issue #162: reparo manual - republica vehiculo.creado para TODO el
-        catalogo actual (no solo lo nuevo). Idempotente del lado NEXO (upsert
-        por Id), asi que es seguro correrlo mas de una vez."""
+        """Reparo manual - republica vehiculo.creado para TODO el catalogo
+        actual (no solo lo nuevo). Idempotente del lado NEXO (upsert por Id),
+        asi que es seguro correrlo mas de una vez."""
         ...
 
     async def obtener(self, id: str) -> VehiculoCubicacion | None: ...
@@ -72,9 +79,9 @@ class IPlanCargueRepository(Protocol):
     async def marcar_procesando(self, plan_id: str) -> None: ...
 
     async def marcar_error(self, plan_id: str | None, mensaje: str) -> None:
-        """No-op silencioso si el plan no existe. Acepta None a proposito
-        (S3-HU-10.1): lo llama el manejador de errores del worker, que ante un
-        mensaje malformado puede no tener planId - y ese bloque nunca debe lanzar,
+        """No-op silencioso si el plan no existe. Acepta None a proposito:
+        lo llama el manejador de errores del worker, que ante un mensaje
+        malformado puede no tener planId - y ese bloque nunca debe lanzar,
         porque corre antes del `ack`."""
         ...
 
@@ -122,3 +129,124 @@ class IParametrosCubicacionRepository(Protocol):
     async def obtener(self) -> ParametrosCubicacion: ...
 
     async def guardar(self, parametros: ParametrosCubicacion) -> ParametrosCubicacion: ...
+
+
+class ICatalogoRepository(Protocol):
+    """Lectura del catalogo que administra el equipo de Datos (S5-HU-17.2).
+
+    **Solo lee.** Las 10 tablas de `dbo_cubicador` las crea y mantiene el equipo
+    de Datos con sus propios scripts; el Cubicador las consume. Las escrituras
+    que si le corresponden son las de los CRUD (S5-HU-17.5) y las de
+    recomendaciones, que son append-only y tienen su propio puerto.
+
+    Un solo metodo a proposito: el motor necesita todo el catalogo para evaluar
+    candidatos y lo recorre varias veces en una corrida. Son menos de cien filas
+    entre las cinco tablas, asi que traerlo entero sale mas barato que ir y
+    volver por partes.
+    """
+
+    async def cargar(self) -> Catalogo:
+        """Trae vehiculos con sus carrocerias, mercancias, reglas y parametros."""
+        ...
+
+
+class IRecomendacionRepository(Protocol):
+    """Persistencia de las corridas del motor (S5-HU-17.4).
+
+    **Append-only**: no hay `actualizar` ni `eliminar`, a proposito. Recalcular
+    una ruta crea una corrida nueva; la anterior queda intacta porque Cotifly
+    guardo su `idRecomendacionVehiculo` dentro de una cotizacion y esa fila
+    tiene que seguir diciendo lo mismo dentro de dos anos (seccion 2.9 del
+    contrato). Si algun dia aparece la necesidad de corregir una corrida, la
+    respuesta es otra corrida, no un UPDATE.
+    """
+
+    async def guardar(
+        self,
+        resultado: object,
+        id_linea_solicitud: str,
+        origen_sistema: str,
+        usuario_id: str | None,
+    ) -> RecomendacionGuardada:
+        """Guarda la corrida y devuelve la version con ids.
+
+        `resultado` es la `Recomendacion` del motor. Se tipa laxo para no
+        meter `domain.motor` dentro de los puertos de persistencia: el motor es
+        dominio puro y no tiene por que aparecer en esta frontera.
+        """
+        ...
+
+    async def obtener_por_linea(
+        self, id_linea_solicitud: str, origen_sistema: str,
+    ) -> RecomendacionGuardada | None:
+        """La ULTIMA corrida de esa linea en ese sistema.
+
+        `origen_sistema` es obligatorio: un mismo codigo de linea puede existir
+        en NEXO y en Cotifly, y son rutas distintas.
+        """
+        ...
+
+    async def listar_mercancias(
+        self, id_recomendacion_vehiculo: str,
+    ) -> list[MercanciaRecomendada] | None:
+        """Las mercancias de un camion. None si ese id no existe."""
+        ...
+
+
+class ICatalogoCrudRepository(Protocol):
+    """Escritura de los seis catalogos (S5-HU-17.5).
+
+    Separado de `ICatalogoRepository`, que **solo lee** y es el que usa el
+    motor. Son dos usos distintos de las mismas tablas: el motor las consume
+    enteras en cada corrida, el CRUD toca una fila a la vez y necesita saber de
+    versiones, de referencias y de conflictos. Mezclarlos obligaria al motor a
+    cargar con una interfaz de escritura que nunca usa.
+
+    **Concurrencia optimista**: cada `actualizar` recibe la version que el
+    llamante leyo. Si la fila cambio desde entonces, levanta `StaleDataError`
+    de SQLAlchemy y el borde HTTP responde 409.
+
+    Las operaciones son genericas sobre el modelo porque los seis catalogos
+    tienen la misma forma de persistencia -id, clave de negocio, auditoria y
+    version-; lo que los distingue son las validaciones, y esas viven en los
+    casos de uso.
+    """
+
+    async def listar(self, catalogo: str) -> list[object]:
+        """Todas las filas de un catalogo, ordenadas por su clave de negocio."""
+        ...
+
+    async def obtener(self, catalogo: str, id: str) -> object | None: ...
+
+    async def crear(self, catalogo: str, datos: dict, creado_por: str) -> object:
+        """Inserta y devuelve la fila con su id y su version."""
+        ...
+
+    async def actualizar(
+        self, catalogo: str, id: str, datos: dict, version: int, creado_por: str,
+    ) -> object | None:
+        """Actualiza exigiendo la version. None si el id no existe."""
+        ...
+
+    async def eliminar(self, catalogo: str, id: str, version: int) -> bool:
+        """Borra fisicamente. False si el id no existe."""
+        ...
+
+    async def contar_referencias(self, catalogo: str, id: str) -> dict[str, int]:
+        """Que filas de otras tablas apuntan a esta, por tabla.
+
+        Las llaves foraneas ya impiden el borrado, pero el error 547 de SQL
+        Server no dice cuantas ni de donde: con esto el CRUD responde "3
+        mercancias la referencian" en vez de un conflicto generico.
+        """
+        ...
+
+
+class IIaSombraRepository(Protocol):
+    """Registro de las diferencias entre el motor y el modelo en modo sombra. Solo agrega filas."""
+
+    async def guardar(self, registro: "RegistroSombra") -> None: ...
+
+    async def tokens_desde(self, desde: datetime) -> int:
+        """Tokens (entrada + salida) consumidos desde ese momento: lo que usa el tope diario."""
+        ...

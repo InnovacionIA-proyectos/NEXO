@@ -46,8 +46,8 @@ if (ok) {
 // Linux, sin depender del SDK del host ni de Windows Smart App Control.
 if (ok) {
   const proyectos = [
-    "tests/CabinaFletes.Domain.Tests",
-    "tests/CabinaFletes.Application.Tests",
+    "tests/Nexo.Domain.Tests",
+    "tests/Nexo.Application.Tests",
   ];
   for (const proyecto of proyectos) {
     try {

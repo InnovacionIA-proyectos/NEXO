@@ -1,0 +1,71 @@
+{
+  "caso": "caso_04_cliente_b_escenarios",
+  "archivo": "casos/caso_04_cliente_b_escenarios.xlsx",
+  "hoja": "Datos",
+  "cliente": "B",
+  "formato": "vehiculo_en_encabezado",
+  "descripcion": "Hoja de trabajo con dos escenarios en la misma hoja (dos tablas, la segunda con su propio encabezado dentro de los datos).",
+  "filaEncabezado": 4,
+  "filaSubEncabezado": null,
+  "totalFilas": 43,
+  "limitaciones": [
+    "El vehículo viene en el encabezado de la columna de flete.",
+    "La hoja trae dos tablas: la segunda (ESCENARIO 2) repite su encabezado dentro de los datos."
+  ],
+  "columnas": [
+    {
+      "indice": 0,
+      "columna": "Origen",
+      "campo": "origen",
+      "transformacion": "ninguna",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [],
+      "nota": null
+    },
+    {
+      "indice": 1,
+      "columna": "Zona",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [],
+      "nota": "Zona comercial del destino; algunas filas traen país y vehículo (\"Ecuador Mula\")."
+    },
+    {
+      "indice": 2,
+      "columna": "Destino",
+      "campo": "destino",
+      "transformacion": "ninguna",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [],
+      "nota": null
+    },
+    {
+      "indice": 3,
+      "columna": "Viajes mes",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [],
+      "nota": "Viajes por mes: no hay campo para la frecuencia."
+    },
+    {
+      "indice": 4,
+      "columna": "Flete de pccion Sencillo",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": true,
+      "alternativasAceptadas": [],
+      "nota": "Flete de referencia del cliente; el vehículo (Sencillo) viene en el encabezado."
+    },
+    {
+      "indice": 5,
+      "columna": "Columna F",
+      "campo": "ignorar",
+      "transformacion": "ninguna",
+      "requiereDespivotar": false,
+      "alternativasAceptadas": [],
+      "nota": "Observaciones sin encabezado."
+    }
+  ]
+}

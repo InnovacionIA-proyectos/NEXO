@@ -6,7 +6,7 @@ Entregable propio que exige el criterio de cierre de la HU y el escenario Gherki
 
 ## Objetivos donde el dato no soporta predicción útil
 
-### 1. Predecir o asistir la cotización de CabinaFletes (ej. sugerir `ValorFlete` al vendedor)
+### 1. Predecir o asistir la cotización de Nexo (ej. sugerir `ValorFlete` al vendedor)
 
 **Declarado: no viable — el dato no soporta predicción útil.**
 
@@ -14,7 +14,7 @@ Entregable propio que exige el criterio de cierre de la HU y el escenario Gherki
 - `ValorMercancia` y `Peso` (en `lineas_solicitud`) tienen valores puestos al azar durante esas pruebas, sin relación con magnitudes reales de negocio — y a diferencia de `ValorFlete` (que sí tiene la columna `Fuente` para separar lo manual), estas 2 columnas no tienen ninguna forma programática de distinguir señal real de ruido (H-002 EDA-2).
 - No es un problema de algoritmo ni de features — es que el volumen y la calidad del dato de origen no alcanzan para que cualquier modelo aprenda un patrón de negocio real.
 
-**Qué lo haría viable:** repetir esta extracción cuando CabinaFletes tenga producción real (L-06 EDA-2).
+**Qué lo haría viable:** repetir esta extracción cuando Nexo tenga producción real (L-06 EDA-2).
 
 ---
 

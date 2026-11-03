@@ -1,7 +1,5 @@
 {
   "version": "1.0.0",
-  "hu": "S2-HU-09.2",
-  "issue": 32,
   "fuente": "dbSolucionesTI.dbo.tblSAPTarifas / dbo.tblSAPTarifasLog (consultas documentadas en README.md)",
   "extraidoDe": "servidor tbsdatacenter, base dbSolucionesTI, Windows Authentication",
   "totalNucleo": 150,

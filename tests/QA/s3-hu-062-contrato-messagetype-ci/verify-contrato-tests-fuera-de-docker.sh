@@ -9,7 +9,7 @@ set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 
 echo "=== 1) fuera de Docker (checkout local completo, cubicador/ presente) ==="
-dotnet test tests/CabinaFletes.Api.Tests --filter "FullyQualifiedName~ContratoMessageTypeTests" -c Release
+dotnet test tests/Nexo.Api.Tests --filter "FullyQualifiedName~ContratoMessageTypeTests" -c Release
 
 echo ""
 echo "=== 2) dentro del arnes de CI (docker-compose.ci.yml, sin cubicador/ en la imagen) ==="

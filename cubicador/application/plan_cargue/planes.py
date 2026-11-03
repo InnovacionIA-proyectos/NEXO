@@ -11,9 +11,9 @@ from domain.entidades.entidades import PlanCargue
 async def crear_plan(
     repo: IPlanCargueRepository, nombre: str, vehiculo_id: str, *, id: str | None = None,
 ) -> PlanCargue:
-    # `id`: S3-HU-02 (issue #105) - cuando el comando "crear_plan" viene de NEXO (que
-    # genera el id, ver S3-HU-01.2), la fila se crea con ESE id, nunca uno propio.
-    # Sigue siendo None para el POST sincrono directo contra Cubicador.
+    # `id`: cuando el comando "crear_plan" viene de NEXO (que genera el id),
+    # la fila se crea con ESE id, nunca uno propio. Sigue siendo None para el
+    # POST sincrono directo contra Cubicador.
     if not await repo.vehiculo_existe(vehiculo_id):
         raise ValidationFailedException("VEHICULO_INVALIDO", "El vehiculo indicado no existe.")
     return await repo.crear(nombre.strip(), vehiculo_id, id=id)

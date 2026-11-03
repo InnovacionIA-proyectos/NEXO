@@ -38,12 +38,12 @@ function Write-Section($title) {
 }
 
 # --------------------------------------------------------------- .NET
-$sln = Join-Path $repoRoot "CabinaFletes.Clean.sln"
+$sln = Join-Path $repoRoot "Nexo.Clean.sln"
 if (Test-Path $sln) {
-    Write-Section ".NET: dotnet test CabinaFletes.Clean.sln"
+    Write-Section ".NET: dotnet test Nexo.Clean.sln"
     dotnet test $sln --logger "console;verbosity=normal"
     if ($LASTEXITCODE -ne 0) {
-        $failures += ".NET (dotnet test) — revisa si CabinaFletes.Api.Tests falla por falta de conexion a la BD SQL Server corporativa de pruebas (esperado fuera de un runner con VPN/acceso); cualquier otra falla es real."
+        $failures += ".NET (dotnet test) — revisa si Nexo.Api.Tests falla por falta de conexion a la BD SQL Server corporativa de pruebas (esperado fuera de un runner con VPN/acceso); cualquier otra falla es real."
     }
 } else {
     Write-Output "(sin $sln en esta rama, se omite la parte .NET)"

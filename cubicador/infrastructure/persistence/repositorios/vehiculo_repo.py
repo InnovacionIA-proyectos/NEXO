@@ -19,8 +19,8 @@ if TYPE_CHECKING:
 class SqlVehiculoCubicacionRepository:
     def __init__(self, sesion: AsyncSession, publisher: "RabbitMqEventosPublisher | None" = None) -> None:
         self._s = sesion
-        # Issue #162: opcional a proposito - sin publisher (scripts/tests que
-        # no lo necesitan) la siembra sigue funcionando exactamente igual que
+        # Opcional a proposito - sin publisher (scripts/tests que no lo
+        # necesitan) la siembra sigue funcionando exactamente igual que
         # siempre, solo que no publica nada.
         self._publisher = publisher
 
@@ -32,8 +32,8 @@ class SqlVehiculoCubicacionRepository:
         if faltantes:
             self._s.add_all([_a_modelo(p) for p in faltantes])
             await self._s.commit()
-            # Issue #162: sin esto, un preset sembrado aca nace invisible para
-            # NEXO para siempre - era la UNICA escritura del catalogo que no
+            # Sin esto, un preset sembrado aca nace invisible para NEXO
+            # para siempre - era la UNICA escritura del catalogo que no
             # pasaba por "guardar_vehiculo" (worker/main.py), que si publica
             # vehiculo.creado. El consumer de NEXO (VehiculoCatalogoConsumer)
             # hace upsert por Id, asi que publicar de mas nunca duplica ni
@@ -47,12 +47,11 @@ class SqlVehiculoCubicacionRepository:
         return [_a_entidad(f) for f in filas]
 
     async def republicar_todos(self) -> list[VehiculoCubicacion]:
-        """Issue #162: repara la desincronizacion YA EXISTENTE al momento de
-        reportarse (20 vehiculos en Cubicador - 9 presets + 11 creados por
-        cola - contra 13 en NEXO): republica vehiculo.creado para TODO el
-        catalogo actual, no solo los nuevos. Seguro de correr mas de una vez
-        (el consumer de NEXO hace upsert por Id) - pensado como reparacion
-        manual, no se llama desde ningun flujo automatico."""
+        """Repara una desincronizacion ya existente entre el catalogo de
+        Cubicador y la proyeccion de NEXO: republica vehiculo.creado para
+        TODO el catalogo actual, no solo los nuevos. Seguro de correr mas de
+        una vez (el consumer de NEXO hace upsert por Id) - pensado como
+        reparacion manual, no se llama desde ningun flujo automatico."""
         vehiculos = await self.listar_con_siembra()
         if self._publisher is not None:
             for v in vehiculos:
