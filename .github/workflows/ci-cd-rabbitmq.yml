@@ -70,22 +70,30 @@ jobs:
   # al menos una vez contra este broker para declarar sus colas/bindings — ver
   # el docstring de scripts/rabbitmq_smoke.py para el detalle de esa
   # precondición.
-  smoke-test-post-deploy:
-    needs: deploy
-    runs-on: [self-hosted, dokploy_]
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.14"
-
-      - name: Instalar dependencias (httpx)
-        run: pip install httpx
-
-      - name: Verificar exchange/colas/bindings esperados
-        env:
-          RABBITMQ_MGMT_URL: ${{ secrets.RABBITMQ_MGMT_URL }}
-          RABBITMQ_USER: ${{ secrets.RABBITMQ_USER }}
-          RABBITMQ_PASSWORD: ${{ secrets.RABBITMQ_PASSWORD }}
-        run: python scripts/rabbitmq_smoke.py
+  #
+  # DESHABILITADO: el runner self-hosted [self-hosted, dokploy_] tiene la
+  # ejecución de scripts de PowerShell restringida (ExecutionPolicy), y
+  # actions/setup-python@v5 necesita correr un setup.ps1 para instalar Python
+  # ahí. Falla siempre en ese paso, antes de llegar a correr el smoke test en
+  # sí — no es un fallo del script ni de ningún despliegue real. Queda
+  # comentado hasta que se arregle el runner o se corra este paso sin
+  # setup-python (p. ej. dentro de un contenedor Docker).
+  # smoke-test-post-deploy:
+  #   needs: deploy
+  #   runs-on: [self-hosted, dokploy_]
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #
+  #     - uses: actions/setup-python@v5
+  #       with:
+  #         python-version: "3.14"
+  #
+  #     - name: Instalar dependencias (httpx)
+  #       run: pip install httpx
+  #
+  #     - name: Verificar exchange/colas/bindings esperados
+  #       env:
+  #         RABBITMQ_MGMT_URL: ${{ secrets.RABBITMQ_MGMT_URL }}
+  #         RABBITMQ_USER: ${{ secrets.RABBITMQ_USER }}
+  #         RABBITMQ_PASSWORD: ${{ secrets.RABBITMQ_PASSWORD }}
+  #       run: python scripts/rabbitmq_smoke.py
