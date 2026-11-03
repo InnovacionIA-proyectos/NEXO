@@ -53,6 +53,7 @@ CARGAS = [
     ("mapeo_vehiculos.csv", "tbl_mapeo_vehiculo_tarifario"),
     ("rangos_peso_contenedor.csv", "tbl_rangos_peso_contenedor"),
     ("tipos_carroceria_catalogo.csv", "tbl_tipos_carroceria_catalogo"),
+    ("diccionario_cliente.csv", "tbl_diccionario_cliente"),
 ]
 PRECIOS_LOCAL = "servicios_conexos_precios.local.csv"
 

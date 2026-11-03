@@ -1,0 +1,28 @@
+ClienteId,Termino,TerminoNormalizado,Tipo,Concepto,Contexto,Ejemplo,Activo
+,N° entregas,N° ENTREGAS,columna,ignorar,,,true
+,Km ref.,KM REF.,columna,ignorar,,,true
+,Peajes,PEAJES,columna,ignorar,,,true
+,Costo variable,COSTO VARIABLE,columna,ignorar,,,true
+,Config. SICE-TAC,CONFIG. SICE TAC,columna,ignorar,,,true
+,Capacidad (t),CAPACIDAD (T),columna,ignorar,,,true
+,Tiempo logístico ref. (h),TIEMPO LOGISTICO REF. (H),columna,ignorar,,,true
+,Costo fijo (conducción + descargue; cargue NO se cobra),COSTO FIJO (CONDUCCION + DESCARGUE; CARGUE NO SE COBRA),columna,ignorar,,,true
+,Costo operación ref. SICE-TAC,COSTO OPERACION REF. SICE TAC,columna,ignorar,,,true
+,Intermediación (sin aux.),INTERMEDIACION (SIN AUX.),columna,ignorar,,,true
+,TARIFA SIN AUXILIAR,TARIFA SIN AUXILIAR,columna,ignorar,,,true
+,Costo auxiliares descargue,COSTO AUXILIARES DESCARGUE,columna,ignorar,,,true
+,Intermediación (con aux.),INTERMEDIACION (CON AUX.),columna,ignorar,,,true
+,TARIFA CON AUXILIAR,TARIFA CON AUXILIAR,columna,ignorar,,,true
+,Tarifa con aux. por tonelada,TARIFA CON AUX. POR TONELADA,columna,ignorar,,,true
+,NPR / Turbo,NPR / TURBO,valor,2L2,tipoVehiculo,,true
+,C20 de 0 a 8 Ton,C20 DE 0 A 8 TON,valor,CNT20.ST,claseContenedor,,true
+,C20 de 9 a 11 Ton,C20 DE 9 A 11 TON,valor,CNT20.ST,claseContenedor,,true
+,C20 de 12 a 14 Ton,C20 DE 12 A 14 TON,valor,CNT20.ST,claseContenedor,,true
+,C20 de 14.1 a 16 Ton,C20 DE 14.1 A 16 TON,valor,CNT20.ST,claseContenedor,,true
+,C20 de 16.1 a 20 Ton,C20 DE 16.1 A 20 TON,valor,CNT20.ST,claseContenedor,,true
+,C20 de 21 a 26 Ton,C20 DE 21 A 26 TON,valor,CNT20.ST,claseContenedor,,true
+,C40 de 0 a 16 Ton,C40 DE 0 A 16 TON,valor,CNT40.HC,claseContenedor,,true
+,C40 de 16 a 17 Ton,C40 DE 16 A 17 TON,valor,CNT40.HC,claseContenedor,,true
+,C40 de 18 a 20 Ton,C40 DE 18 A 20 TON,valor,CNT40.HC,claseContenedor,,true
+,C40 de 21 a 25 Ton,C40 DE 21 A 25 TON,valor,CNT40.HC,claseContenedor,,true
+,C40 de 26 a 34 Ton,C40 DE 26 A 34 TON,valor,CNT40.HC,claseContenedor,,true

@@ -12,14 +12,14 @@ Todas las issues, historias y pendientes que se planearon en `docs/backlog/` has
 
 ## Resumen
 
-253 unidades de trabajo: 230 con issue en GitHub (40 abiertas y 190 cerradas) y 23 sin issue.
+254 unidades de trabajo: 230 con issue en GitHub (40 abiertas y 190 cerradas) y 24 sin issue.
 
 | # | Sección | Fecha | Unidades | Con issue | Abiertas | Sin issue |
 |---|---|---|---|---|---|---|
 | 1 | [Reparaciones de la importación de tarifas de plaza](#1-reparaciones-de-la-importación-de-tarifas-de-plaza) | 2026-10-05 | 8 | 7 | 0 | 1 |
 | 2 | [Historias de frontend de la revisión de NEXO](#2-historias-de-frontend-de-la-revisión-de-nexo) | 2026-10-09 | 61 | 56 | 0 | 5 |
 | 3 | [Historias de backend de la revisión de NEXO](#3-historias-de-backend-de-la-revisión-de-nexo) | 2026-10-09 | 31 | 29 | 0 | 2 |
-| 4 | [Propuestas a futuro](#4-propuestas-a-futuro) | 2026-10-09 | 1 | 1 | 0 | 0 |
+| 4 | [Propuestas a futuro](#4-propuestas-a-futuro) | 2026-10-09 | 2 | 1 | 0 | 1 |
 | 5 | [Issues del Sprint 5](#5-issues-del-sprint-5) | 2026-10-12 | 31 | 30 | 4 | 1 |
 | 6 | [Ajustes varios de pantalla](#6-ajustes-varios-de-pantalla) | 2026-10-15 | 1 | 1 | 0 | 0 |
 | 7 | [Issues por repositorio (revisión del 16 de octubre)](#7-issues-por-repositorio-revisión-del-16-de-octubre) | 2026-10-16 | 43 | 39 | 5 | 4 |
@@ -1183,6 +1183,17 @@ Una vez guardado un flete no hay forma de corregirlo en pantalla, y el backend s
 - Sara pidió avanzar directamente (2026-10-12); el detalle quedó en HU-B10 (backend) y HU-15 (frontend).
 - Alternativa más barata planteada: advertir antes de guardar que el valor no podrá editarse.
 
+### Usar el nombre de la hoja del Excel al importar
+
+**Sin issue** · **Fecha:** 2026-11-03 · **Tipo:** Propuesta · **Responsable:** ivasco-dev (backend)
+
+Al importar un Excel, el usuario escoge la hoja, pero el mapeo solo recibe sus encabezados y filas: el nombre de la hoja se pierde. En los formularios de licitación ese nombre suele decir algo de todas las filas. Por ejemplo, «Formulario Oferta Impo y Expo.» indica importación o exportación y «Formulario Oferta Nacional» indica carga nacional. Si NEXO lo leyera, podría proponer `lineaNegocio` o `claseViaje` para todas las filas de la hoja, sin que el usuario lo indique línea por línea.
+
+**Decisiones:**
+
+- Salió al armar la carga inicial del diccionario (S6-HU-33.2, #357). No entra en esa issue porque requiere cambiar el backend.
+- Implicaría que el mapeo reciba el nombre de la hoja y agregar un tipo de término `hoja` a `tbl_diccionario_cliente`. El `CHECK` de `Tipo` hoy solo admite `columna`, `unidad` y `valor`.
+
 ## 5. Issues del Sprint 5
 
 *Documento de planeación del 2026-10-12.* Las issues del Sprint 5, en seis milestones (S5-HU-19 a S5-HU-24). En `administracion` se crearon con la numeración S5-HU-26 a S5-HU-30.
@@ -2238,6 +2249,11 @@ Hoy solo existe el diccionario de alias de vehículo y contenedor; no hay uno de
 **Issue:** [NEXO#357](https://github.com/InnovacionIA-proyectos/NEXO/issues/357) · **Creada:** 2026-10-26 · **Estado:** Abierta · **Responsable:** scalderon-bs
 
 El diccionario nuevo arranca vacío. Debe quedar cargado con los términos y conceptos que ya se tienen por cliente, verificado y sin duplicados.
+
+**Decisiones:**
+
+- (2026-11-03) Primera carga con un solo Excel de licitación (el cliente D del dataset dorado). Ese cliente no existe en la base, así que todos los términos quedan como generales: 27 en `seeder/diccionario_cliente.csv` (15 columnas → `ignorar`, 11 contenedores y «NPR / Turbo»). Se cargaron en las dos bases de pruebas, sin duplicados.
+- No se cargan unidades porque el backend compara los encabezados contra términos de cualquier tipo. Quedan fuera «Ruta», «Tipo de vehículo», «Secuencia de entrega», NHR y C2 liviano. El detalle está en `ORIGEN-Y-DECISIONES-SEEDER.md`.
 
 #### [S7-HU-33.3] CRUD del diccionario en el backend
 

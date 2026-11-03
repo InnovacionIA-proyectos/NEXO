@@ -48,7 +48,7 @@ El script:
    parámetros del score.
 3. Carga los CSV de `seeder/` en el orden de sus llaves foráneas: municipios, bandas de peso, reglas
    Solo-SICETAC, tarifas de plaza, servicios conexos, alias, mapeo de vehículos, rangos de peso de
-   contenedor y catálogo de carrocerías.
+   contenedor, catálogo de carrocerías y los términos generales del diccionario del cliente.
 
 Las tablas de solicitudes, cotizaciones y demás historial quedan vacías. Las tablas que la
 aplicación llena sola (rutas, configuraciones de vehículo, clientes, usuarios) se completan al
@@ -66,7 +66,6 @@ Para usar otra base, cambie `NOMBRE_BD` al inicio de `scripts/ejecutar_schema_y_
 **Precios de venta de los servicios conexos.** No se versionan: `servicios_conexos.csv` trae la
 columna `PrecioVenta` vacía. Si existe `seeder/servicios_conexos_precios.local.csv` (archivo local,
 ignorado por git), el script lo carga en su lugar. Ver [`ORIGEN-Y-DECISIONES-SEEDER.md`](../documentacion/database/ORIGEN-Y-DECISIONES-SEEDER.md).
-
 ## Conectar la aplicación
 
 La aplicación lee dos variables de entorno:
