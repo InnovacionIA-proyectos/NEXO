@@ -351,12 +351,12 @@ arranquen en paralelo, no en secuencia.
 - ✅ La batería de `testDocumentation/PRUEBAS_DE_INTEGRACION.md` corrió contra SQL Server 2019 real: 9 de 9.
 
 **Modelo** — ✅ hecho en S5-HU-17.2, con tres convenciones revisadas
-- ✅ 10 tablas: las 9 del equipo de Datos más la tabla padre `recomendaciones` (una fila por corrida), que se agregó con `docs/seeder/S5-HU-17.2_ajustes_esquema.sql`.
+- ✅ 10 tablas: las 9 del equipo de Datos más la tabla padre `recomendaciones` (una fila por corrida), que se agregó con el script S5-HU-17.2 (hoy incluido en `cubicador/database/esquema/ESQUEMA_CUBICADOR.sql`).
 - ✅ Todo en **centímetros**.
 - ⚠️ `UNIQUEIDENTIFIER` con **`newid()`**, no `NEWSEQUENTIALID()`: así las creó el equipo de Datos. Los ids los genera el código, en mayúsculas, porque SQL Server devuelve ese tipo en mayúsculas y si no el id del POST y el de la reconsulta no serían el mismo texto.
 - ⚠️ Nombres en **camelCase y PascalCase**, no `snake_case`, y collation `Modern_Spanish_CI_AS`: también del equipo de Datos. Los atributos de Python quedan idiomáticos con `mapped_column("NombreReal", ...)`; no se renombró nada en la base.
 - ✅ `version_id_col` en los seis catálogos — `Version INT NOT NULL DEFAULT 1`, agregada en S5-HU-17.5.
-- ⚠️ **No hay seeder de Python.** El catálogo lo creó y lo sembró el equipo de Datos con sus propios scripts, y siete de las diez tablas tienen `UNIQUE` sobre la clave de negocio, así que la idempotencia la garantiza la base. Los CSV de `docs/seeder/` quedan como referencia.
+- ⚠️ **No hay seeder de Python.** El catálogo lo creó y lo sembró el equipo de Datos con sus propios scripts, y siete de las diez tablas tienen `UNIQUE` sobre la clave de negocio, así que la idempotencia la garantiza la base. Los CSV quedan en `cubicador/database/seeder/`.
 - **El Cubicador es el dueño de los códigos canónicos de vehículo** (`2L2`, `C2`, `C3`, `2S2`, `3S3`): son los del Excel, que además son los que entienden SICE-TAC y el tarifario. NEXO no es fuente — converge hacia ellos (sección 4.2).
 
 **Motor** — ✅ hecho en S5-HU-17.3 (`domain/motor/seleccion_flota.py`)
@@ -519,7 +519,7 @@ salta. Las correcciones van por CRUD; solo las filas nuevas entran por seeder.
 
 ## 7. Los datos de siembra
 
-Los 7 CSV viven en `cubicador/docs/seeder/`. **El seeder del equipo es la fuente**; los que
+Los 7 CSV viven en `cubicador/database/seeder/`. **El seeder del equipo es la fuente**; los que
 se generaron aquí fueron un punto de partida y se descartan para que no haya dos versiones.
 
 | Archivo | De dónde sale |
@@ -662,7 +662,7 @@ No son decisiones: son cosas que tienen que estar cuando se implemente, no antes
 
 - **Credenciales del SQL Server 2019 de QA.** ✅ Entregadas. `userTarifarioNexo` con DDL **acotado a `dbo_cubicador`** (`CREATE TABLE`, `ALTER`, `REFERENCES`, `VIEW DEFINITION`); sin acceso a `dbo_cotifly` ni a `dbo`. Alcanzable desde desarrollo; CI usa su propio SQL Server en contenedor.
 - **La llave de Cotifly.** La genera Cotifly. Solo tiene que ser **distinta de la de NEXO**: de ahí sale el `origenSistema` verificado.
-- **El `UPDATE` de las filas de vehículos existentes.** ✅ Aplicado en S5-HU-17.1, con `docs/seeder/corregir_vehiculos_existentes.sql`.
+- **El `UPDATE` de las filas de vehículos existentes.** ✅ Aplicado en S5-HU-17.1, con el script `corregir_vehiculos_existentes.sql`; las medidas corregidas ya vienen en `cubicador/database/seeder/vehiculos.csv`.
 
 **Cerrados desde la primera versión:** el espacio del furgón refrigerado (se usa la medida
 por defecto), cama baja y portacontenedores (entran como carrocerías sin vehículo), las

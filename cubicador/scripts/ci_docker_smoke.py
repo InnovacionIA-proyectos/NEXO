@@ -1,6 +1,6 @@
 """Verificacion de humo contra el stack real de Docker Compose (Postgres +
 RabbitMQ + api + worker) - usado por el job `docker-smoke` de
-.github/workflows/cubicador-ci.yml. Automatiza lo que hasta ahora era el
+.github/workflows/_cubicador-pruebas.yml. Automatiza lo que hasta ahora era el
 procedimiento manual documentado en docs/testDocumentation/
 PRUEBAS_DE_INTEGRACION.md secciones 2.2/2.3/2.4/2.6, INCLUIDO el criterio de
 cierre "trabajo publicado -> resultado recibido por cola" (2.3, ahora también

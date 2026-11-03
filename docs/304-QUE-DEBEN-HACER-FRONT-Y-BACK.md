@@ -175,7 +175,7 @@ suma de `cantidad × pesoKg` de las posiciones"*.
 | §5 `PesoKg` | Documentado como **peso de UNA unidad** en `CapturaRequests.cs`, `CONTRATO.md` y las guías de Cotifly |
 
 **Rechazos del worker (`FLOTA_INSUFICIENTE`, `VEHICULO_SIN_PRESET`, `ERROR_INTERNO`...): resuelto.** `clsCubicacionRechazadaConsumer`
-ahora guarda el rechazo por línea (tabla nueva `tbl_rechazos_cubicacion_linea`, script `docs/Database/304_rechazo_cubicacion_por_linea.sql`
+ahora guarda el rechazo por línea (tabla nueva `tbl_rechazos_cubicacion_linea`, hoy incluida en `docs/Database/esquema/ESQUEMA_NEXO.sql`
 — **aplicarlo antes de desplegar**) y el front lo lee en `GET /api/planes-cargue/por-linea/{lineaId}/estado`
 (`procesando` | `listo` | `rechazado` + `codigo` y `mensaje`). El `GET .../por-linea/{lineaId}` de siempre no cambió de forma, pero **no puede
 avisar un rechazo**: el front debe sondear `/estado`. Volver a pedir el plan borra el rechazo anterior.

@@ -215,15 +215,15 @@ vigente, con la corrección de `GET /vehiculos-catalogo` señalada arriba.
 Un solo script, **aditivo e idempotente**:
 
 ```
-cubicador/docs/Database/S5-HU-17.8_posicion_de_mercancia.sql
+cubicador/database/esquema/ESQUEMA_CUBICADOR.sql
 ```
 
-Agrega `recomendacionVehiculoMercancia.IndicePosicion int NULL` en
+El script S5-HU-17.8, hoy incluido en el esquema único, agrega `recomendacionVehiculoMercancia.IndicePosicion int NULL` en
 `dbo_cubicador`. Nullable a propósito: las corridas anteriores no tienen
 posición y no se rellenan —esas tablas son append-only—. `NULL` significa
 "corrida anterior al cambio".
 
-> **`scripts/aplicar_sql.py` lee `DATABASE_URL` del `.env`, que apunta a QA
+> **`cubicador/scripts/aplicar_sql.py` lee `DATABASE_URL` del `.env`, que apunta a QA
 > corporativo (`10.10.40.85`).** Aplicarlo allá tiene que ser una decisión
 > consciente, no un comando de paso. Mientras no se aplique,
 > `verificar_mapeo_catalogo.py` reporta —correctamente— que el modelo declara
@@ -282,9 +282,9 @@ Contra SQL Server real, con el stack local:
 | | |
 |---|---|
 | Suite del Cubicador | **247** pruebas |
-| `scripts/verificar_contrato.py` | 34/34 |
-| `scripts/verificar_crud_catalogos.py` | 31/31 |
-| `scripts/verificar_mapeo_catalogo.py` | 1 diferencia esperada: el `IndicePosicion` pendiente en QA |
+| `cubicador/scripts/verificar_contrato.py` | 34/34 |
+| `cubicador/scripts/verificar_crud_catalogos.py` | 31/31 |
+| `cubicador/scripts/verificar_mapeo_catalogo.py` | 1 diferencia esperada: el `IndicePosicion` pendiente en QA |
 | DDL | aplicado dos veces seguidas en la base local: crea, y la segunda vez dice que ya existía |
 | Compatibilidad | 43 filas sin posición releídas por la API: vuelven con `indicePosicion: null` y 200 |
 

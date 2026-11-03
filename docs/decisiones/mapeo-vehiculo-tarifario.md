@@ -1,6 +1,6 @@
 # Decisión — con qué código se busca cada vehículo en SICE-TAC y en Plaza/SAP
 
-**Estado:** aplicada · **Tabla:** `tbl_mapeo_vehiculo_tarifario` (`docs/Database/377_mapeo_vehiculo_tarifario.sql`, carga en `docs/Database/seeder/mapeo_vehiculos.csv`)
+**Estado:** aplicada · **Tabla:** `tbl_mapeo_vehiculo_tarifario` (carga inicial en `docs/Database/seeder/mapeo_vehiculos.csv`)
 
 ## El problema
 
@@ -33,7 +33,7 @@ Con la tabla, ya no hace falta quitar la `C` inicial en el camino oficial de SIC
 
 La carga inicial de `tbl_tarifas_plaza` sacó el vehículo con códigos de SICE-TAC (`3S2`: 21 filas, `2L3`: 1 fila), y el mapeo dice que `3S2` no tiene
 código de plaza y que `2L3` se tarifa como `2L2`. Mientras no se decida si se corrige la tabla o se separan las columnas del mapeo (pendiente
-documentado en `docs/backlog/2026-10-27_PENDIENTES-MAPEO-VEHICULO.md`), el emparejamiento acepta **el código de plaza del mapeo y también el
+documentado en `docs/backlog/BACKLOG-NEXO.md`, sección «Pendientes del mapeo de vehículo»), el emparejamiento acepta **el código de plaza del mapeo y también el
 propio del vehículo**. Es una ampliación: nada de lo que antes coincidía deja de coincidir, y esas filas no quedan sin usar.
 
 ## Cómo se verificó
@@ -46,7 +46,7 @@ propio del vehículo**. Es una ampliación: nada de lo que antes coincidía deja
 ## Contenedores: el vehículo sale de `tbl_rangos_peso_contenedor` y la carrocería por defecto es PORTACONTENEDORES
 
 **Qué vehículo.** En una línea de contenedor el vehículo se escoge por el tamaño del contenedor y su peso con `tbl_rangos_peso_contenedor`
-(`docs/Database/379_rangos_peso_contenedor.sql`): entre las filas de ese tamaño, la de menor `PesoMaximo` que alcance para el peso. El tamaño (20 o 40 pies) sale de la clase
+(carga inicial en `docs/Database/seeder/rangos_peso_contenedor.csv`): entre las filas de ese tamaño, la de menor `PesoMaximo` que alcance para el peso. El tamaño (20 o 40 pies) sale de la clase
 de contenedor (`CNT40.HC`, `CNT20.IT`…). El vehículo de la tabla es el de NEXO y se traduce con el mapeo antes de buscar en SICE-TAC (`C2` → `2`). Por encima del tope más alto de
 cada tamaño (34.000 kg en 40 pies, 30.000 kg en 20 pies) ningún vehículo aplica y no hay piso: no se cae en el de otro vehículo. Si la tabla no está disponible o está vacía se usa la regla anterior
 (los rangos de SAP `tblRangoPeso` y `tblContenedorRangoPeso`).

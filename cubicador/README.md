@@ -237,7 +237,7 @@ completo en `cubicador/CONTRATO.md` sección 7.
 
 ## CI
 
-`.github/workflows/cubicador-ci.yml` (raíz del repo NEXO, con
+`.github/workflows/_cubicador-pruebas.yml` (raíz del repo NEXO, con
 `paths: ['cubicador/**']` para no disparar en cambios del backend C#), dos
 jobs en cada push/PR a `QA`/`main`:
 

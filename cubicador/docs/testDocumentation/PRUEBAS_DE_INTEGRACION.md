@@ -4,7 +4,7 @@ Complementa a [`REGLAS_DE_NEGOCIO.md`](./REGLAS_DE_NEGOCIO.md) (que documenta
 las 33 pruebas unitarias del motor). Este documento cubre tres niveles más:
 las pruebas de integración automatizadas (`tests/api/test_smoke.py` +
 `tests/worker/test_ejecutar_solicitud.py`), el smoke test de CI contra
-Docker Compose real (`.github/workflows/ci.yml` + `scripts/ci_docker_smoke.py`,
+Docker Compose real (`.github/workflows/_cubicador-pruebas.yml` + `scripts/ci_docker_smoke.py`,
 automatiza las secciones 2.2-2.4 de abajo en cada push/PR), y la
 verificación manual contra infraestructura real (Docker Compose completo con
 worker parado a propósito, y el repo NEXO real) que sigue sin automatizarse
@@ -416,7 +416,7 @@ dos jobs de CI (`unit-tests` y `docker-smoke`) exactamente como los correría
 el pipeline real, contra el `rabbit` compartido de NEXO real en Docker — no
 una simulación ni una lectura de código.
 
-**Preparación** (equivalente a lo que hace `.github/workflows/cubicador-ci.yml`):
+**Preparación** (equivalente a lo que hace `.github/workflows/_cubicador-pruebas.yml`):
 
 ```bash
 cd .. && docker compose up -d --wait --wait-timeout 60 rabbit   # rabbit compartido de NEXO
@@ -596,7 +596,7 @@ curl "http://localhost:8000/api/planes-cargue/por-linea/<lineaSolicitudId>" \
 ## 3. Qué falta cubrir (honesto, no se ha hecho todavía)
 
 **Actualización**: el ítem que estaba aquí ("tests de integración
-automatizados contra Docker") ya se cerró — ver `.github/workflows/ci.yml` +
+automatizados contra Docker") ya se cerró — ver `.github/workflows/_cubicador-pruebas.yml` +
 `scripts/ci_docker_smoke.py`, que automatizan las secciones 2.2-2.4 en cada
 push/PR. Lo que sigue sin automatizar, porque requiere infraestructura que
 el runner de CI no tiene o una topología más compleja de simular:

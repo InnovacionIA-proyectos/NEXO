@@ -38,7 +38,7 @@ worker crea la fila REAL usando ESE id, nunca uno propio.
 aceptan un `id: str | None = None` — si viene (comando `crear_plan` desde
 NEXO), se usa tal cual; si no (POST síncrono directo, `crear_plan_demo`,
 `crear_desde_linea`), se sigue generando ahí mismo como antes. Cubierto por
-`tests/worker/test_ejecutar_solicitud.py::test_crear_plan_usa_el_planid_que_manda_nexo_no_uno_propio`.
+`cubicador/tests/worker/test_ejecutar_solicitud.py::test_crear_plan_usa_el_planid_que_manda_nexo_no_uno_propio`.
 
 Del lado de NEXO, `CrearPlanCommandHandler` deja además una fila espejo en
 `borrador` en la base propia de NEXO en el MISMO request (antes de publicar,

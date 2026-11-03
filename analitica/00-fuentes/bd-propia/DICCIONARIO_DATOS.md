@@ -2,7 +2,7 @@
 
 Este documento describe las vistas de solo lectura del esquema `analitica`,
 creadas por la migración
-[`20260831194721_VistasAnaliticaSoloLectura`](../../../src/Nexo.Infrastructure/Persistence/Migrations/20260831194721_VistasAnaliticaSoloLectura.cs)
+`20260831194721_VistasAnaliticaSoloLectura` (las migraciones de EF Core se retiraron del repositorio; el archivo queda en el historial de git, antes del commit `5279aa5`)
 sobre la base transaccional `Nexo`.
 
 ## 1. Qué es esto y qué NO es

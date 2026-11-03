@@ -3,10 +3,10 @@
 Nexo no tiene login propio: la identidad y el rol llegan resueltos desde el portal
 de la Administración en cada petición (encabezado `X-Portal-Usuario-Id` según el
 contrato; **hoy el código espera `X-Portal-clsUsuario-Id`**, ver
-[`CONTRATO.md` §1.1](../CONTRATO.md#11-autenticación-de-usuarios-identidad-del-portal)),
-sin caché de sesión — ver [`docs/contrato-integracion/ADR-001-identidad-sin-token.md`](contrato-integracion/ADR-001-identidad-sin-token.md).
+[`CONTRATO.md` §1.1](../../CONTRATO.md#11-autenticación-de-usuarios-identidad-del-portal)),
+sin caché de sesión — ver [`docs/contrato-integracion/ADR-001-identidad-sin-token.md`](../contrato-integracion/ADR-001-identidad-sin-token.md).
 Un usuario tiene **exactamente uno** de los 6 roles siguientes (`RolUsuario`,
-[`src/Nexo.Domain/Enums/Enums.cs`](../src/Nexo.Domain/Enums/Enums.cs)); sin un rol
+[`src/Nexo.Domain/Enums/Enums.cs`](../../src/Nexo.Domain/Enums/Enums.cs)); sin un rol
 válido, la petición se rechaza (403 `SIN_PERMISO_CABINA_FLETES`) aunque la
 identidad sea válida.
 
@@ -26,7 +26,7 @@ sin rol específico. Lo que diferencia a los roles es quién puede **escribir**
 | **LiderProceso** | Supervisa el proceso: solo consulta métricas de cumplimiento. | `verMetricas` |
 | **Admin** | Control total sobre Nexo, incluida la priorización (único rol con acceso) y, desde #307, crear solicitudes, cargar líneas en bloque y recalcular el puntaje. | `*` (todas) |
 
-*(Capacidades tomadas de `CapacidadesPorRol` en [`clsSesionController.cs`](../src/Nexo.Api/Sesion/clsSesionController.cs) — las usa el frontend para decidir qué pinta; la autorización real vive en el backend, en la tabla siguiente. Ojo: las capacidades no cubren todo lo que el backend permite — p. ej. Comercial puede cubicar y crear planes de cargue sin tener una capacidad para eso.)*
+*(Capacidades tomadas de `CapacidadesPorRol` en [`clsSesionController.cs`](../../src/Nexo.Api/Sesion/clsSesionController.cs) — las usa el frontend para decidir qué pinta; la autorización real vive en el backend, en la tabla siguiente. Ojo: las capacidades no cubren todo lo que el backend permite — p. ej. Comercial puede cubicar y crear planes de cargue sin tener una capacidad para eso.)*
 
 ## Qué puede hacer cada uno (además de consultar)
 
@@ -88,7 +88,7 @@ Antes de #307 este rol operaba el flujo de solicitudes y cotizaciones; ahora es 
 
 ## Referencia rápida por endpoint
 
-Matriz rol × endpoint en [`CONTRATO.md` §5](../CONTRATO.md#5-matriz-de-permisos);
+Matriz rol × endpoint en [`CONTRATO.md` §5](../../CONTRATO.md#5-matriz-de-permisos);
 detalle ruta por ruta, con request/response y errores, en el resto de
-[`CONTRATO.md`](../CONTRATO.md). Fuente de la verdad real: los atributos
+[`CONTRATO.md`](../../CONTRATO.md). Fuente de la verdad real: los atributos
 `[Authorize(Roles=...)]` en `src/Nexo.Api/*/cls*Controller.cs`.

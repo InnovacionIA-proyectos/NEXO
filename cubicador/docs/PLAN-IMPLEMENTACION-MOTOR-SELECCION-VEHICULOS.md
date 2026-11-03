@@ -22,7 +22,7 @@ markdown — no hay modelos SQLAlchemy, no hay nada en
 - Repositorios (`IVehiculoRepository`, etc.) y su implementación EF-like
   con SQLAlchemy, igual que `clsEfServiciosConexosRepository` en NEXO o
   `SqlVehiculoCubicacionRepository` aquí mismo en Cubicador.
-- Cargar los 7 CSV de `cubicador/docs/seeder/` como siembra inicial (mismo
+- Cargar los 7 CSV de `cubicador/database/seeder/` como siembra inicial (mismo
   patrón que `presets()` + `listar_con_siembra()` ya usa para
   `tbl_vehiculos_cubicacion`).
 - Como este proyecto no usa Alembic ni migraciones (`Base.metadata.create_all`

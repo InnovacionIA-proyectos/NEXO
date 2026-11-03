@@ -23,7 +23,7 @@ de paridad cross-motor + 4 de integración HTTP/SQLite + 2 de regresión del
 worker + 2 del registro de algoritmos + 2 de la alerta al `cubicacion.dlq`.
 
 Además, verificado contra **Docker Compose real** (SQL Server + api + worker
-propios, RabbitMQ compartido de NEXO): el smoke test de CI (`.github/workflows/cubicador-ci.yml` +
+propios, RabbitMQ compartido de NEXO): el smoke test de CI (`.github/workflows/_cubicador-pruebas.yml` +
 `scripts/ci_docker_smoke.py`) automatiza parte de esto en cada push/PR; el
 resto (vigilante de timeout, puente contra un NEXO real) sigue siendo
 verificación manual — ver `PRUEBAS_DE_INTEGRACION.md` sección 2.
