@@ -70,7 +70,7 @@ Ninguna de estas resuelve la causa raíz — bajan el impacto mientras se
 gestiona el índice con el equipo de DW:
 
 1. **`CommandTimeout` explícito de 90s** para `DwSiceDbContext`
-   (`src/Nexo.Infrastructure/DependencyInjection.cs`) — el default de
+   (`src/Nexo.Infrastructure/clsDependencyInjection.cs`) — el default de
    SqlClient es 30s, que coincide exactamente con el síntoma reportado. Con
    90s, una consulta legítimamente lenta (sin índice) tiene más margen antes
    de devolver 500, sin pretender que quede "rápida".

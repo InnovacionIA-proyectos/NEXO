@@ -2,16 +2,16 @@
 
 Dos piezas separadas, que comparten catálogo pero resuelven preguntas distintas:
 
-1. **Cubicación rápida** (`cubicador/domain/motor/cubicacion_rapida.py`) — sin
-   persistencia, sin posiciones reales: dado un conjunto de bultos (dimensiones +
-   peso), **recomienda qué tipo de vehículo/carrocería/clase de viaje usar**.
-   Es lo que corre durante la captura de una solicitud, antes de que exista
-   ningún Plan de Cargue.
+1. **Selección de flota** (`cubicador/domain/motor/seleccion_flota.py`,
+   `POST /recomendaciones`) — dado un conjunto de mercancías (dimensiones, peso y
+   tipo), **recomienda cuántos vehículos y de qué tipo y carrocería pedir**. Es lo
+   que corre durante la captura de una solicitud, antes de que exista ningún Plan
+   de Cargue. Su resultado se guarda en las tablas de recomendación del Cubicador.
 2. **Plan de Cargue 3D** (`cubicador/domain/motor/`) — con persistencia real en
    Nexo: dado un vehículo YA elegido, calcula la disposición física exacta
    (X/Y/Z de cada unidad) y un puntaje de qué tan buena quedó esa distribución.
 
-La cubicación rápida sugiere el vehículo; el Plan de Cargue 3D es el detalle de
+La selección de flota sugiere los vehículos; el Plan de Cargue 3D es el detalle de
 cómo se acomoda la carga dentro de ese vehículo ya elegido. Son necesarios ambos
 porque resuelven preguntas distintas: "¿qué camión pido?" vs "¿cómo cabe todo
 adentro y qué tan bien quedó armado?".
@@ -20,8 +20,9 @@ adentro y qué tan bien quedó armado?".
 
 ## 1. Tablas de base de datos (todas en `db_NEXO`, esquema de Nexo)
 
-Estas tablas son el **resultado persistido del Plan de Cargue 3D** (la
-cubicación rápida no se persiste — es una respuesta HTTP efímera de Cubicador).
+Estas tablas son el **resultado persistido del Plan de Cargue 3D**. La selección
+de flota guarda su resultado aparte, en las tablas de recomendación de la base del
+Cubicador (ver `cubicador/docs/database/DICCIONARIO-DATOS.md`).
 
 ```
 tbl_vehiculos_cubicacion        (catálogo de contenedores)
@@ -65,7 +66,7 @@ Una fila = una corrida del motor contra un vehículo específico.
 |---|---|---|
 | `Id` | PK | generado |
 | `Nombre` | nombre visible del plan | capturado |
-| `VehiculoId` | FK → `tbl_vehiculos_cubicacion` | elegido por el usuario (o sugerido por cubicación rápida) |
+| `VehiculoId` | FK → `tbl_vehiculos_cubicacion` | elegido por el usuario (o sugerido por la selección de flota) |
 | `Estado` | estado del plan (ej. borrador/confirmado) | gestión de la app |
 | `Estrategia` | una de las 8 estrategias de optimización (ver sección 2) | elegida por el usuario |
 | `PonderacionesJson` | pesos custom por componente, solo si la estrategia es "Combinada" | capturado |
@@ -169,92 +170,32 @@ final es el promedio ponderado, llevado a escala 0-100.
 
 ---
 
-## 3. Fórmulas de la recomendación de vehículo/carrocería/clase de viaje (cubicación rápida)
+## 3. Selección de flota: qué vehículos pedir
 
-Esta es la pregunta "¿qué le recomiendo pedir?", **antes** de que exista un
-Plan de Cargue — se resuelve contra un catálogo fijo de 9 arquetipos
-(`cubicador/domain/motor/cubicacion_rapida.py`, constante `CATALOGO`):
+El motor (`cubicador/domain/motor/seleccion_flota.py`) lee el catálogo de la base
+(vehículos, carrocerías, mercancías, relaciones y reglas de incompatibilidad) y
+resuelve en tres pasos:
 
-| id | Arquetipo | Geometría | Control ambiental | Dimensiones útiles (m) | Peso bruto (kg) | Tara (kg) | Capacidad de carga (kg)* | Ejes (kg) | Config SICE-TAC | Carrocería | Clase de viaje | Clase contenedor |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| `turbo_estacas` | Turbo con estacas | semicerrada | ninguno | 6.20×2.20×2.00 | 10.500 | 4.200 | 6.300 | [3.500, 7.000] | `2L3` | ESTACAS | Carga Suelta | — |
-| `sencillo_estacas` | Sencillo con estacas | semicerrada | ninguno | 7.20×2.35×2.20 | 17.500 | 7.500 | 10.000 | [6.000, 11.000] | `2` | ESTACAS | Carga Suelta | — |
-| `dobletroque_estacas` | Dobletroque con estacas | semicerrada | ninguno | 7.80×2.40×2.30 | 28.000 | 10.500 | 17.500 | [6.000, 22.000] | `3` | ESTACAS | Carga Suelta | — |
-| `furgon_semirremolque` | Semirremolque furgón | cerrada | ninguno | 12.20×2.45×2.70 | 34.000 | 7.000 | 27.000 | [6.000, 10.500, 10.500] | `3S3` | FURGON | Carga Suelta | — |
-| `plataforma_sencilla` | Plataforma (tractomula) | abierta | ninguno | 12.20×2.50×2.80 | 34.000 | 6.500 | 27.500 | [6.000, 10.500, 10.500] | `3S3` | PLATAFORMA | Carga Suelta | — |
-| `cama_baja` | Cama baja (lowboy) | abierta | ninguno | 12.50×2.60×1.60 | 48.000 | 9.000 | 39.000 | [6.000, 10.500, 10.500, 10.500] | `3S3` | CAMABAJA | Extradimensionado | — |
-| `contenedor_seco_20` | Contenedor seco 20 pies | cerrada | ninguno | 5.90×2.35×2.39 | 24.000 | 2.200 | 21.800 | [10.900, 10.900] | `2S2` | PORTACONTENEDORES | Contenedor | CNT20.ST |
-| `contenedor_seco_40` | Contenedor seco 40 pies | cerrada | ninguno | 12.03×2.35×2.39 | 30.480 | 3.800 | 26.680 | [13.340, 13.340] | `3S3` | PORTACONTENEDORES | Contenedor | CNT40.HC |
-| `contenedor_refrigerado_40` | Contenedor refrigerado 40 pies (reefer) | cerrada | **refrigeracion** | 11.56×2.28×2.25 | 29.500 | 4.800 | 24.700 | [12.350, 12.350] | `3S3` | PORTACONTENEDORES | Contenedor | CNT40.RE |
+1. **Filtrar candidatos.** Combinaciones vehículo + carrocería compatibles con
+   todas las mercancías, con medidas que admitan cada pieza en alguna orientación y
+   con capacidad para la pieza más pesada. Si la carrocería principal de una
+   mercancía no tiene vehículos, entra la de respaldo.
+2. **Llenar con DBLF.** Usa el mismo empacador del Plan de Cargue 3D
+   (`DeepestBottomLeftFill` en `optimizadores.py`), con sus validaciones de
+   colisión, soporte y apilamiento. Prefiere la orientación con la que caben más
+   unidades.
+3. **Elegir la flota mínima.** Primero la menor cantidad de vehículos y, a igual
+   cantidad, la combinación más ajustada. La flota puede ser mixta.
 
-*Capacidad de carga = Peso bruto − Tara (propiedad calculada en el código,
-`capacidad_carga_kg`, no un campo guardado aparte).
+Reglas que conviene tener presentes:
 
-Es decir: la recomendación de **TipoVehiculo + Carrocería + ClaseViaje** sale
-directamente de **cuál arquetipo del catálogo resultó elegido** — no hay una
-fórmula separada para cada uno, los 3 datos viajan pegados al arquetipo.
+- **Se decide por `max(%volumen, %peso)`** y se reportan los dos: una carga pesada
+  llena el peso antes que el volumen.
+- **La capacidad es la de la combinación vehículo + carrocería**, no la del chasis.
+- **Las mercancías incompatibles se reparten** en vehículos distintos en lugar de
+  rechazar la carga. La regla es por pares de categorías.
+- **Extradimensión:** si una pieza no cabe en ningún vehículo del catálogo, no hay
+  selección automática y la respuesta trae el motivo.
 
-### Paso 1 — Evaluar cada arquetipo contra la carga: 7 criterios, por VETO
-
-**Nunca se promedia** — un solo criterio de seguridad rechazado descarta el
-arquetipo entero, sin importar qué tan bien le vaya en los demás:
-
-1. **Compatibilidad entre mercancías** (bloqueante de seguridad): clasifica
-   cada ítem por palabras clave (`oxidante`/`hipoclorito`/`peroxido` →
-   químico oxidante; `corrosivo`/`acido` → químico corrosivo;
-   `textil`/`papel`/`carton`/`madera` → combustible; `alimento`/`comestible`
-   → alimentos) y rechaza si hay un par declarado incompatible en la misma
-   carga (químico oxidante + combustible, o químico corrosivo + alimentos).
-2. **Compatibilidad volumétrica** (bloqueante): `Σ(largo×ancho×alto de cada
-   ítem × cantidad) > volumen útil del arquetipo` → rechazado. Si pasa pero
-   usa **>95%** del volumen, queda con advertencia.
-3. **Compatibilidad dimensional** (bloqueante): cada ítem, en su orientación
-   más favorable (las 3 dimensiones ordenadas), debe caber dentro de las 3
-   dimensiones (también ordenadas) del arquetipo — si no, rechazado.
-4. **Compatibilidad por peso** (bloqueante de seguridad): `Σ(peso × cantidad)
-   > capacidad_carga_kg` (= `peso_bruto_permitido − peso_vacío`) → rechazado.
-   Si falta el peso de algún ítem, "no evaluable" (también veta).
-5. **Distribución de peso por eje** (bloqueante de seguridad): asume reparto
-   **uniforme** entre ejes (el mejor caso posible, porque la cubicación
-   rápida no tiene posiciones reales todavía) — `peso_total / N_ejes` contra
-   la capacidad del eje **más débil**. Si ese reparto ya supera el 100% del
-   eje más débil → rechazado. Entre **90% y 100%** → advertencia.
-6. **Compatibilidad ambiental** (bloqueante): si algún ítem menciona
-   "refrigerad…" en su descripción/tipo y el arquetipo no ofrece control
-   ambiental → rechazado.
-7. **Compatibilidad de seguridad** (criterio transversal, el más alto): si
-   **cualquiera** de los 3 criterios marcados "bloqueante_seguridad" (1, 4 o
-   5) quedó rechazado o no evaluable, este criterio también rechaza — es el
-   veto final.
-
-Con los 7 resultados, la banda del arquetipo es:
-`incompatible` (algo rechazado) > `no_evaluable` (algo sin dato) >
-`compatible_con_advertencias` (pasó todo, pero algo tocó un umbral) >
-`compatible` (todo limpio).
-
-### Paso 2 — Elegir el arquetipo recomendado
-
-Entre los arquetipos que SÍ lograron ubicar toda la carga (vía la misma
-heurística de estanterías del Plan 3D, simplificada), se elige por este
-orden de criterios (el primero que desempata gana):
-
-1. Sin advertencias (`compatible` antes que `compatible_con_advertencias`).
-2. Su `ClaseViaje` coincide con la que ya traía la línea de la solicitud (si
-   se indicó una).
-3. **Mayor factor de utilización de volumen** — el arquetipo más ajustado a
-   la carga, no el más grande disponible.
-
-### Si no cabe en ningún arquetipo individual: sugerencia de flota
-
-Si el problema es solo de capacidad (no de seguridad), reparte la carga en
-varias unidades del **mismo tipo** (empaque voraz, hasta 20 vehículos), y
-elige el tipo que necesite **menos vehículos** — empate se rompe primero por
-`ClaseViaje` coincidente, luego por mayor utilización promedio.
-
-### Detección de extradimensión
-
-Independiente de lo anterior: cada pieza se compara contra una medida
-estándar paramétrica (por defecto 1220×260×300 cm, 34.000 kg), en su
-orientación más favorable (planta ordenada por largo/ancho). Si algo excede
-largo, ancho, alto o peso, se marca para tratar como viaje
-**EXTRADIMENSIONADO** (cama baja + permisos), con evidencia fotográfica.
+El porqué de cada decisión, las mediciones y lo que se descartó están en
+`cubicador/docs/DECISIONES_TECNICAS.md`, sección 13.

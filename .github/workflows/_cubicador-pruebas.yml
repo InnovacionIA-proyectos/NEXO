@@ -75,7 +75,7 @@ jobs:
           NEXO_BASE_URL=http://localhost:5080
           EOF
 
-      # cubicador/ ya no trae su propio RabbitMQ (ver docs/DECISIONES_TECNICAS.md
+      # cubicador/ ya no trae su propio RabbitMQ (ver cubicador/docs/DECISIONES_TECNICAS.md
       # #9): se conecta al `rabbit` compartido del docker-compose.yml raiz via la
       # red externa `nexo_internal`. Solo se levanta ese servicio (no toda NEXO:
       # `rabbit` no depende de `db`/`api`, asi que esto no arranca SQL Server ni

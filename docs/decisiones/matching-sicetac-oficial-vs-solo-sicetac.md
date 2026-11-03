@@ -12,7 +12,7 @@ instante — es decir, la ruta siempre fue encontrable.
 ## Causa raíz
 
 `PropuestaTarifaAdapter.ProponerLineaAsync`
-(`src/Nexo.Infrastructure/Biblioteca/Adaptadores/PropuestaTarifaAdapter.cs`)
+(`src/Nexo.Infrastructure/Biblioteca/Adaptadores/clsPropuestaTarifaAdapter.cs`)
 tiene dos caminos completamente distintos para resolver el piso SICE-TAC de una línea,
 y el que corre automáticamente (cuando hay `ClaseViaje` capturado y hay conexión SAP —
 o sea, casi siempre) es mucho más estricto que el que corre cuando alguien fuerza

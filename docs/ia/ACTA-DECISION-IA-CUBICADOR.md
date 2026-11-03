@@ -56,7 +56,7 @@ decir cuánto acertaría con cargas reales.
 
 | | |
 |---|---|
-| Estado al 2026-10-30 | **Apagado.** La tabla `dbo_cubicador.iaSombra` no existe en la base de QA y el Cubicador de QA no tiene llave de Anthropic. |
+| Estado al 2026-11-02 | **Apagado.** La tabla `dbo_cubicador.iaSombra` ya existe en la base de QA (vacía). Falta la llave de Anthropic en el Cubicador de QA. |
 | Prueba local (2026-10-30) | **Funciona de punta a punta** con el modelo real: la app respondió igual que siempre y dejó una fila en `iaSombra` con `Estado = OK`, la misma flota que el motor, 4,8 s y ~2.400 tokens. |
 | Tráfico esperado | QA recibió 134 recomendaciones entre el 2026-10-14 y el 2026-10-29: unas 15 por día hábil. |
 | Ventana | **10 días hábiles** desde el encendido, o **150 comparaciones con `Estado = OK`**, lo que ocurra después. |
@@ -65,9 +65,9 @@ decir cuánto acertaría con cargas reales.
 
 Pasos para encenderlo (detalle en `docs/despliegue/ROTACION-LLAVE-ANTHROPIC.md` §7):
 
-1. Aplicar `cubicador/database/esquema/367_ia_sombra.sql` en la base que usa hoy el Cubicador de
-   QA (`dbTarifario_Nexo_Pruebas`, esquema `dbo_cubicador`). Es una tabla nueva: no toca las
-   existentes.
+1. ~~Crear la tabla `iaSombra` en la base que usa hoy el Cubicador de QA~~ (`dbTarifario_Nexo_Pruebas`,
+   esquema `dbo_cubicador`). **Hecho:** la tabla ya existe. Su definición está en
+   `cubicador/database/esquema/ESQUEMA_CUBICADOR.sql`.
 2. En Dokploy, app `cubicador-api`: `IA_SOMBRA_HABILITADA=true`, `ANTHROPIC_API_KEY` y, si la
    llave es de organización, `ANTHROPIC_WORKSPACE_ID`. Redesplegar.
 3. Pedir una recomendación desde NEXO y comprobar que aparece una fila en `iaSombra` con
@@ -162,7 +162,7 @@ medida).
 
 | Pendiente | Responsable | Para qué |
 |---|---|---|
-| Aplicar `367_ia_sombra.sql` en `dbTarifario_Nexo_Pruebas` | Bryan | Que el modo sombra pueda registrar |
+| ~~Crear la tabla `iaSombra` en `dbTarifario_Nexo_Pruebas`~~ (hecho: ya existe) | Bryan | Que el modo sombra pueda registrar |
 | Definir la llave del Cubicador (workspace propia, o la de organización con `ANTHROPIC_WORKSPACE_ID` mientras tanto), cargarla en Dokploy con `IA_SOMBRA_HABILITADA=true` y redesplegar | Bryan, con quien administre la cuenta de Anthropic y el despliegue | Encender el modo sombra |
 | Correr las consultas de §7 al cerrar la ventana, revisar los casos en que la IA pide menos y completar las secciones 3.2 y 6 | Bryan | Cerrar el acta |
 | Importar y validar cargas reales (`evaluacion-ia/cubicador/importar_cargas_reales.py`) y repetir la evaluación de la IA | Bryan | Medir el acierto con datos reales |

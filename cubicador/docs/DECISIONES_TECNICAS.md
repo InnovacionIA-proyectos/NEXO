@@ -269,7 +269,7 @@ vive en el esquema `dbo_cubicador` de `dbTarifario_Nexo_Pruebas`, una base
 servicio `db` del `docker-compose.yml` sigue existiendo pero ya es un SQL
 Server **local**, para desarrollo y para el smoke de CI, que imita esa forma
 (misma base, mismo esquema, otro host) sin tocar la compartida. El esquema lo
-lo gobierna `docs/Database/ESQUEMA_CUBICADOR.sql`, que se aplica a mano, no
+lo gobierna `cubicador/database/esquema/ESQUEMA_CUBICADOR.sql`, que se aplica a mano, no
 `create_all` ni migraciones automaticas.
 
 **Actualizado en S6-HU-31.2 (#327, 2026-10-29)**: se preparó la **base propia** del
@@ -641,7 +641,7 @@ Darlos juntos cuesta una columna más en el JSON y evita que cada consumidor
 tenga que resolver el otro por su cuenta.
 
 **Dos columnas nuevas en `dbo_cubicador`**
-(`docs/Database/S5-HU-17.4_columnas_recomendacion.sql`), las dos `NOT NULL` con
+(script S5-HU-17.4, hoy incluido en `cubicador/database/esquema/ESQUEMA_CUBICADOR.sql`), las dos `NOT NULL` con
 default según el criterio del equipo de Datos:
 
 - `recomendaciones.MercanciasCondicionadasJson` — no se puede derivar al releer.
@@ -728,7 +728,7 @@ SQL Server no dice cuántas ni de dónde.
 
 **Concurrencia optimista con un entero, no con `ROWVERSION`.** Se agregó
 `Version INT NOT NULL DEFAULT 1` a los seis catálogos
-(`docs/Database/S5-HU-17.5_crud_catalogos.sql`). Un `ROWVERSION` lo llevaría el
+(script S5-HU-17.5, hoy incluido en `cubicador/database/esquema/ESQUEMA_CUBICADOR.sql`). Un `ROWVERSION` lo llevaría el
 motor —más robusto ante escrituras que no pasen por el ORM— pero SQLite no lo
 tiene y las pruebas no podrían verificarlo. El criterio de la issue pide
 `version_id_col` de SQLAlchemy, y con un entero funciona igual en los dos
