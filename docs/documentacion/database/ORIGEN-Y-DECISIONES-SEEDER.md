@@ -22,6 +22,7 @@ archivo a mano. Los Excel de negocio se guardan fuera del repositorio.
 | `mapeo_vehiculos.csv` | `tbl_mapeo_vehiculo_tarifario` | 15 | Revisión de cada vehículo contra SICE-TAC y Plaza/SAP |
 | `rangos_peso_contenedor.csv` | `tbl_rangos_peso_contenedor` | 10 | Rangos de peso de contenedores de negocio |
 | `tipos_carroceria_catalogo.csv` | `tbl_tipos_carroceria_catalogo` | 17 | Catálogo de carrocerías del Cubicador (mismos Id) |
+| `diccionario_cliente.csv` | `tbl_diccionario_cliente` | 27 | Encabezados y valores de un Excel de licitación (términos generales) |
 
 ## Datos base (`datos_base_nexo.sql`)
 
@@ -189,6 +190,49 @@ código equivocado no encuentra filas.
   carrocería.
 - El Cubicador no reenvía las carrocerías que ya existen, así que una base nueva la necesita
   cargada desde el inicio. Son las 17 del seeder del Cubicador, con los mismos Id.
+
+## Diccionario del cliente (`diccionario_cliente.csv`)
+
+Vocabulario que usa un cliente en sus Excel y a qué corresponde en NEXO. Al importar un Excel sin
+plantilla, NEXO resuelve primero con el diccionario y solo le pregunta a la IA lo que falta.
+
+- **Fuente:** un solo Excel de licitación, el que en el dataset dorado (#353) es el cliente D
+  (hojas «Formulario Oferta Nacional» e «Impo y Expo»). Se hizo con un solo Excel a propósito,
+  como primera carga.
+- **Todos los términos son generales** (`ClienteId` vacío). El cliente de ese Excel no existe en
+  `tbl_clientes` y parece un ejercicio, no una empresa real. Ninguno de los términos depende del
+  cliente, así que sirven para todos y no identifican a nadie.
+- **27 términos:**
+  - 15 columnas que no corresponden a ningún campo de la captura → `ignorar`: «N° entregas», «Km
+    ref.», «Peajes», «Costo variable», «Config. SICE-TAC», «Capacidad (t)» y las columnas de
+    costos, intermediación y tarifas.
+  - 11 valores de contenedor con rango de peso: «C20 de 0 a 8 Ton»… → `CNT20.ST` y «C40 de 0 a 16
+    Ton»… → `CNT40.HC`, con `Contexto` `claseContenedor`. El rango de peso no se guarda: el
+    diccionario solo traduce la clase.
+  - 1 valor de vehículo: «NPR / Turbo» → `2L2`, con `Contexto` `tipoVehiculo`.
+- **Carga:** con el resto de los CSV, solo si la tabla está vacía. El 2026-11-03 se cargaron también
+  en las dos bases de pruebas (`dbInformesAutomatizados_Pruebas.db_NEXO` y
+  `dbTarifario_Nexo_Pruebas.dbo`): 27 términos en cada una, sin duplicados.
+- `TerminoNormalizado` se calcula con el mismo algoritmo que `clsResolucionDeCatalogos.Normalizar`
+  del backend.
+- Los términos propios de un cliente se agregan desde la pantalla del diccionario una vez que el
+  cliente existe.
+
+Lo que se dejó fuera y por qué:
+
+- **«Tipo de vehículo»:** en ese Excel significa vehículo en una hoja y contenedor en la otra. El
+  diccionario es por cliente, no por hoja, así que no admite los dos significados. De cada formato
+  se encarga la plantilla de mapeo.
+- **«Secuencia de entrega»:** trae «ORIGEN-DESTINO» en una celda. Un encabezado que resuelve el
+  diccionario se aplica sin transformación, así que quedaría todo como origen.
+- **NHR, «C2 liviano (≤2,5 t)» y «C2 liviano (≤5 t)»:** NEXO no tiene vehículos de esa capacidad.
+  Quedan sin traducir y la captura los manda a cuarentena.
+- **Sencillo, Doble troque, Minimula, Tractomula, C2, C3:** ya los resuelve `tbl_alias_elementos`.
+- **«Ruta» → `referencia`:** en ese Excel es un identificador, pero otro cliente puede poner ahí
+  «BOGOTÁ-CALI». Como término general sería un error.
+- **Unidades (`Ton`, `kg`):** el backend compara los encabezados contra todos los términos del
+  cliente, no solo los de tipo `columna`. Una unidad «Kg» haría que una columna de peso con ese
+  encabezado se mapeara a «kg», que no es un campo.
 
 ## Tablas sin datos iniciales
 

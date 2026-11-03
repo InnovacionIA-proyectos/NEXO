@@ -266,7 +266,7 @@ Qué guarda cada una de las 45 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 
 **De dónde salen los datos:**
 - CRUD en `/api/diccionario-cliente` (`clsDiccionarioClienteCasosDeUso`).
-- Carga inicial pendiente: no hay todavía una lista armada de términos por cliente.
+- Carga inicial (S6-HU-33.2): `docs/Database/seeder/diccionario_cliente.csv`, 27 términos generales (`ClienteId` `NULL`). Ver `ORIGEN-Y-DECISIONES-SEEDER.md`.
 - Confirmar un mapeo de Excel **no** agrega términos aquí automáticamente.
 
 ---
