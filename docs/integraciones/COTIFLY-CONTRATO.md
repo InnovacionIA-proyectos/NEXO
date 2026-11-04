@@ -1,5 +1,7 @@
 # Contrato NEXO ⇄ Cotifly
 
+> **Documento histórico.** El contrato vigente y completo (autenticación, catálogos, captura, importación inteligente de Excel, lectura del costeo y precio de venta de los conexos) está en [`NEXO-CONTRATO-INTEGRACION-COTIFLY.md`](./NEXO-CONTRATO-INTEGRACION-COTIFLY.md). Este archivo se conserva por el detalle de las decisiones de la captura.
+
 Lo que Cotifly **manda a NEXO** y lo que **recibe de vuelta**, con las decisiones ya tomadas por
 negocio. Es el contrato de la *captura de solicitudes*; cómo pedirle la recomendación de vehículo al
 Cubicador está en [`COTIFLY-COMO-CONECTARSE-AL-CUBICADOR.md`](./COTIFLY-COMO-CONECTARSE-AL-CUBICADOR.md).

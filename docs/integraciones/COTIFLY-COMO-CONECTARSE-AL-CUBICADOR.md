@@ -2,7 +2,7 @@
 
 Guía práctica, con **lo que ya existe hoy** en el Cubicador: URL, llave, endpoints, un ejemplo
 completo y los errores. Para qué hacer después con la respuesta en NEXO, ver
-[`COTIFLY-CONTRATO.md`](./COTIFLY-CONTRATO.md).
+[`NEXO-CONTRATO-INTEGRACION-COTIFLY.md`](./NEXO-CONTRATO-INTEGRACION-COTIFLY.md) (el contrato único con NEXO).
 
 > **Fuente de verdad.** El esquema exacto está en `cubicador/docs/openapi.json`; las rutas y errores,
 > en `cubicador/CONTRATO.md` §3.1 y §5. Esta guía las resume y explica el porqué. Si algo no coincide,
@@ -262,7 +262,7 @@ Por cada camión de `vehiculos[]`, Cotifly crea **una línea** en NEXO (decidido
 | `grupoRutaId` | un GUID **que genera Cotifly**, igual en todas las líneas de esta recomendación |
 
 Las reglas completas (orden de líneas, línea sin vehículo, cuarentena de códigos) están en
-[`COTIFLY-CONTRATO.md`](./COTIFLY-CONTRATO.md).
+[`NEXO-CONTRATO-INTEGRACION-COTIFLY.md`](./NEXO-CONTRATO-INTEGRACION-COTIFLY.md).
 
 ## 9. Correcciones a la guía anterior
 
