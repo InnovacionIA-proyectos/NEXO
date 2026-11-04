@@ -79,7 +79,7 @@ en la sección que se indica; la matriz completa de permisos es la §5.
 | `POST` | `/api/solicitudes` | Admin |
 | `POST` | `/api/solicitudes/resolver-catalogos` | Comercial, Admin |
 | `GET` | `/api/solicitudes/{id}` | Comercial, AdminTarifas, ServiciosLogisticos, LiderProceso, Admin |
-| `POST` | `/api/solicitudes/{id}/lineas` | Admin |
+| `POST` | `/api/solicitudes/{id}/lineas:bulk` | Admin |
 | `GET` | `/api/solicitudes/{id}/propuesta-tarifa` | Comercial, AdminTarifas, ServiciosLogisticos, LiderProceso, Admin |
 | `POST` | `/api/solicitudes/{id}/recalcular-score` | Admin |
 | `POST` | `/api/solicitudes/{id}/rechazar` | Comercial, Admin |
@@ -239,6 +239,7 @@ en la sección que se indica; la matriz completa de permisos es la §5.
 | `GET` | `/api/planes-cargue` | Todos |
 | `POST` | `/api/planes-cargue` | Comercial, AdminTarifas, Admin |
 | `POST` | `/api/planes-cargue/demo` | Comercial, AdminTarifas, Admin |
+| `POST` | `/api/planes-cargue/desde-linea/{lineaId}` | Comercial, AdminTarifas, Admin |
 | `GET` | `/api/planes-cargue/por-linea/{lineaId}` | Todos |
 | `GET` | `/api/planes-cargue/por-linea/{lineaId}/estado` | Todos |
 | `DELETE` | `/api/planes-cargue/{id}` | Comercial, AdminTarifas, Admin |
