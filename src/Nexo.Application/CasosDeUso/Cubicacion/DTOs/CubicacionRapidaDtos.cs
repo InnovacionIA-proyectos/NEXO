@@ -1,41 +1,22 @@
 namespace Nexo.Application.CasosDeUso.Cubicacion.DTOs;
 
-/// <summary>
-/// S5-HU-18.1/#273: espejo 1:1 del contrato HTTP de <c>POST /recomendaciones</c> del
-/// Cubicador (<c>cubicador/api/dtos/recomendaciones.py</c>, <c>CONTRATO.md</c> §3.1).
-/// Reemplaza por completo al contrato viejo de <c>POST /api/cubicacion</c> (retirado del
-/// Cubicador en el mismo corte que lo publicó — no hay convivencia de los dos contratos).
-/// A propósito NO hay mapeo de dominio adicional: NEXO reenvía la solicitud y devuelve la
-/// respuesta tal cual — ver <see cref="Interfaces.ICubicacionRapidaPort"/> para por qué
-/// esto es una excepción declarada al patrón "solo colas" del resto de Cubicación.
-/// </summary>
+/// <summary>Espejo 1:1 del contrato HTTP de <c>POST /recomendaciones</c> del Cubicador (CONTRATO.md §3.1); NEXO reenvía y devuelve tal cual, sin mapeo de dominio.</summary>
 public sealed record clsMercanciaSolicitadaInput(
     string CodigoMercancia, int Cantidad, decimal LargoCm, decimal AnchoCm, decimal AltoCm, decimal PesoKg);
 
-/// <summary>
-/// <c>OrigenSistema</c> NO viaja en el body a propósito: el Cubicador lo deriva del Bearer
-/// (<c>api/dependencias.py::verificar_origen_sistema</c>) y responde 401 si el body lo
-/// declara y no coincide (<c>api/routers/recomendaciones.py</c>). NEXO llama con su propia
-/// llave (<c>Cubicador3D:RecomendacionesApiKey</c>) y deja que el Cubicador infiera "NEXO".
-/// </summary>
+/// <summary><c>OrigenSistema</c> no viaja en el body: el Cubicador lo deriva del Bearer y responde 401 si el body lo declara y no coincide.</summary>
 public sealed record clsCrearRecomendacionInput(
     string IdLineaSolicitud, IReadOnlyList<clsMercanciaSolicitadaInput> Mercancias,
     string? ClaseViajeSeleccionada = null, string? UsuarioId = null);
 
 /// <summary>
-/// <paramref name="IndicePosicion"/> (S5-HU-17.8): índice base 0 en el arreglo <c>mercancias</c> del request — una fila por
-/// POSICIÓN, no por código. Dos filas del mismo camión pueden compartir <c>CodigoMercancia</c>: quien agrupe por
-/// código tiene que SUMAR. Llega null al reconsultar una corrida guardada antes de ese cambio (se guardó agrupada
-/// por código): no es un error. La respuesta no devuelve medidas: el llamante ya las tiene, las mandó él.
+/// <paramref name="IndicePosicion"/>: índice base 0 en <c>mercancias</c> del request; una fila por POSICIÓN, no por código, así que quien agrupe por código debe SUMAR.
+/// Null al reconsultar corridas guardadas agrupadas por código (no es error).
 /// </summary>
 public sealed record clsMercanciaDeVehiculoDto(
     int? IndicePosicion, string IdTipoMercancia, string CodigoMercancia, int Cantidad, decimal PesoKg, decimal VolumenM3);
 
-/// <summary>
-/// Cada campo es obligatorio y nunca llega null cuando <c>Resultado == "ASIGNADO"</c>
-/// (doc del Cubicador). <c>PesoTotalKg</c> es el peso que Cotifly declaró al crear la
-/// solicitud — el porcentaje de llenado no sirve para costear.
-/// </summary>
+/// <summary>Cada campo llega no nulo cuando <c>Resultado == "ASIGNADO"</c>. <c>PesoTotalKg</c> es el peso declarado en la solicitud; el porcentaje de llenado no sirve para costear.</summary>
 public sealed record clsVehiculoRecomendadoDto(
     string IdRecomendacionVehiculo, int NumeroVehiculo, string CodigoVehiculo, string NombreVehiculo,
     string CodigoCarroceria, decimal PesoTotalKg, decimal VolumenTotalM3,
@@ -44,20 +25,15 @@ public sealed record clsVehiculoRecomendadoDto(
 
 public sealed record clsMedidasEstandarDto(decimal LargoMaxCm, decimal AnchoMaxCm, decimal AltoMaxCm, decimal PesoMaxKg);
 
-/// <summary><paramref name="IndicePosicion"/>: ver <see cref="clsMercanciaDeVehiculoDto"/> (null en corridas anteriores a S5-HU-17.8).</summary>
+/// <summary><paramref name="IndicePosicion"/>: ver <see cref="clsMercanciaDeVehiculoDto"/>.</summary>
 public sealed record clsPiezaFueraDeMedidaDto(int? IndicePosicion, string IdTipoMercancia, string CodigoMercancia, IReadOnlyList<string> Excesos);
 
 public sealed record clsExtradimensionDto(
     bool HayExtradimension, clsMedidasEstandarDto MedidasEstandar, IReadOnlyList<clsPiezaFueraDeMedidaDto> Piezas);
 
 /// <summary>
-/// S5-HU-18.1/#273: <c>Resultado</c> es <c>"ASIGNADO"</c> | <c>"SIN_SELECCION_AUTOMATICA"</c>
-/// — a propósito <c>string</c> y no un enum: el motor del Cubicador es quien es dueño de
-/// este vocabulario, y un valor nuevo ahí no debe romper la deserialización en NEXO (mismo
-/// criterio que <see cref="MotivoSinSeleccion"/> más abajo). Ambos valores llegan con
-/// <b>200</b> — "lo que antes era error ahora es resultado" (doc del Cubicador):
-/// <c>SIN_SELECCION_AUTOMATICA</c>, <c>Condicionada</c> y <c>Extradimension</c> NO son
-/// fallos, son estados normales de la respuesta.
+/// <c>Resultado</c>: <c>"ASIGNADO"</c> | <c>"SIN_SELECCION_AUTOMATICA"</c>; es string y no enum porque el Cubicador es dueño del vocabulario y un valor nuevo no debe romper la deserialización.
+/// Ambos llegan con 200: SIN_SELECCION_AUTOMATICA, Condicionada y Extradimension son estados normales, no fallos.
 /// </summary>
 public static class MotivoSinSeleccion
 {
@@ -66,11 +42,7 @@ public static class MotivoSinSeleccion
     public const string SuperaKMax = "SUPERA_K_MAX";
     public const string SinCarroceriaCompatible = "SIN_CARROCERIA_COMPATIBLE";
 
-    /// <summary>
-    /// S5-HU-18.1/#273: el buscador se quedó sin intentos de empaque antes de encontrar una
-    /// flota — condición del ALGORITMO, distinta de <see cref="SuperaKMax"/> (no caber en
-    /// k_max vehículos es una condición del NEGOCIO).
-    /// </summary>
+    /// <summary>El buscador se quedó sin intentos de empaque: condición del ALGORITMO, distinta de <see cref="SuperaKMax"/> (condición del NEGOCIO).</summary>
     public const string BusquedaAgotada = "BUSQUEDA_AGOTADA";
 }
 

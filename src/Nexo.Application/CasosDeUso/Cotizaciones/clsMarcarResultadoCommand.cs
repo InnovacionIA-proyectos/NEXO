@@ -49,21 +49,9 @@ public sealed class clsMarcarResultadoCommandHandler(
             throw new clsConflictException("RESULTADO_YA_DEFINIDO",
                 $"La cotización ya está marcada como {c.Resultado} y no puede cambiarse a {resultado}.");
 
-        // Antes este comando permitía marcar el resultado directo desde el borrador,
-        // registrando una "entrega implícita" solo para conservar la trazabilidad. Eso
-        // ponía EntregadaAt sin que nadie hubiera llamado a /entregar de verdad,
-        // contaminando el cumplimiento de SLA y las cotizaciones emitidas del tablero de
-        // KPIs. Por decisión del negocio esa entrega implícita se elimina: SOLO
-        // clsEntregarCotizacionCommand (POST /entregar) puede marcar la entrega, sin
-        // excepciones — PARA COTIZACIONES MANUALES.
-        //
-        // S4-HU-15.6/#252: en auto-costeo, Tarifas/Coordinador (dueños exclusivos de
-        // /entregar) nunca interviene — el paso de Entregar nunca ocurre, y sin él el
-        // Comercial quedaba bloqueado para siempre marcando el resultado. Se salta la
-        // exigencia de Entregada SOLO cuando EsAutoCosteo es true (no abre el hueco para
-        // cotizaciones manuales: esas siguen exigiendo Entregada como siempre). No se
-        // dispara ningún email/PDF de entrega en este camino — justamente porque
-        // clsEntregarCotizacionCommand nunca se llama.
+        // Solo clsEntregarCotizacionCommand (POST /entregar) puede marcar la entrega: no hay entrega implícita desde el borrador, que
+        // contaminaría el SLA y los KPIs. Excepción: en auto-costeo (EsAutoCosteo) nadie interviene en /entregar, así que ahí se salta la exigencia
+        // de Entregada (las manuales la siguen exigiendo) y no se dispara ningún correo/PDF de entrega.
         if (c.Estado != EstadoCotizacion.Entregada && !(c.Estado == EstadoCotizacion.Borrador && c.EsAutoCosteo))
             throw new clsConflictException("COTIZACION_NO_ENTREGADA", "Solo se puede marcar el resultado de una cotización entregada.");
 
@@ -91,9 +79,8 @@ public sealed class clsMarcarResultadoCommandHandler(
             }
         }
 
-        // Realimenta la Biblioteca: las ganadas se vuelven tarifas históricas reutilizables.
-        // Solo al pasar A ganada por primera vez, y verificando que no existan ya para esta
-        // cotización (doble protección contra duplicados en la Biblioteca).
+        // Realimenta la Biblioteca: las ganadas se vuelven tarifas históricas. Solo al pasar A ganada por primera vez y si no existen ya para
+        // esta cotización.
         if (esNuevaGanada && !await tarifasHistoricas.ExistenParaCotizacionAsync(c.Id, ct))
         {
             var hoy = DateOnly.FromDateTime(clock.GetUtcNow().UtcDateTime);
@@ -114,9 +101,7 @@ public sealed class clsMarcarResultadoCommandHandler(
         auditoria.Registrar(usuarioActual.Id, "cotizaciones", c.Id, "marcar_resultado",
             JsonSerializer.Serialize(new { resultado = resultado.ToString(), motivo = command.Motivo, comentario = command.Comentario }));
 
-        // Sección 9 del documento de entendimiento: alerta de urgencia Baja al
-        // Administrador de Reglas. Solo al pasar A ganada por primera vez, igual que la
-        // realimentación de la Biblioteca de arriba.
+        // Alerta de urgencia Baja al Administrador de Reglas; solo al pasar A ganada por primera vez, igual que la realimentación de arriba.
         if (esNuevaGanada)
             await publicador.PublicarAsync(new clsCotizacionMarcadaGanada(c.Id, c.SolicitudId, clock.GetUtcNow()), ct);
 

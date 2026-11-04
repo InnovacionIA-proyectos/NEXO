@@ -7,12 +7,8 @@ using Microsoft.Extensions.Logging;
 
 namespace Nexo.Infrastructure.Notificaciones.Adaptadores;
 
-/// <summary>
-/// Traduce una línea que agotó reintentos en el correo de alerta al Administrador de
-/// Fletes (urgencia Media, sección 9 del documento de entendimiento). Consumidor
-/// independiente del de la saga (clsAutoCosteoSaga también escucha este mismo mensaje):
-/// MassTransit reparte el mismo evento a cada receive endpoint suscrito.
-/// </summary>
+/// <summary>Traduce una línea que agotó reintentos en el correo de alerta al Administrador de Fletes. Consumidor independiente
+/// del de la saga: MassTransit reparte el mismo evento a cada receive endpoint.</summary>
 public sealed class clsNotificarLineaFalloTecnicoConsumer(
     ICommandHandler<clsNotificarLineaFalloTecnicoCommand, clsResultadoDeNotificacionDto> notificar,
     ILogger<clsNotificarLineaFalloTecnicoConsumer> log)

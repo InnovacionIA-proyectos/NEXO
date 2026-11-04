@@ -58,18 +58,9 @@ public sealed class clsEfTarifasPlazaRepository(clsNexoDbContext db, ILineasNego
                 if (!cols.ContainsKey(requerida))
                     throw new clsValidationFailedException("EXCEL_COLUMNAS", $"Falta la columna obligatoria '{requerida}'.");
 
-            // Catálogos en memoria antes de procesar filas: municipios por nombre normalizado
-            // (con Colombia como desempate si el nombre choca entre países — las tarifas de
-            // plaza reales son todas de origen colombiano, ver docs/Database/seeder/README.md),
-            // rangos de peso por su formato de texto ("3-15000" / "10500+"), línea de negocio y
-            // clase de viaje por descripción normalizada.
-            //
-            // S5-HU-22.1/#288: se guardan TODOS los candidatos de cada nombre (no solo el primero):
-            // 68 nombres de municipios colombianos se repiten entre departamentos ("ARMENIA" en
-            // Antioquia y Quindío). Con las columnas opcionales DEPARTAMENTO ORIGEN/DESTINO la fila
-            // elige el candidato exacto; sin ellas se conserva el comportamiento de siempre (el
-            // primero, Colombia antes que el resto, y a igualdad el de menor Id para que no
-            // dependa del orden en que la base devuelva las filas).
+            // Catálogos en memoria antes de procesar filas. Se guardan TODOS los candidatos de cada nombre de municipio (hay nombres
+            // repetidos entre departamentos): con DEPARTAMENTO ORIGEN/DESTINO la fila elige el exacto; sin ellos, el primero
+            // (Colombia antes que el resto y, a igualdad, el de menor Id para no depender del orden de la base).
             var municipiosPorNombre = (await db.Municipios.AsNoTracking().ToListAsync(ct))
                 .GroupBy(m => clsTexto.Normalizar(m.Municipio))
                 .ToDictionary(g => g.Key, g => g.OrderBy(m => m.Pais == "CO" ? 0 : 1).ThenBy(m => m.Id).ToList());
@@ -82,8 +73,7 @@ public sealed class clsEfTarifasPlazaRepository(clsNexoDbContext db, ILineasNego
 
             int insertadas = 0, actualizadas = 0, rechazadas = 0, fila = 1;
             var errores = new List<string>();
-            // Deduplicación DENTRO del mismo Excel: la última fila con la misma llave gana,
-            // no cuenta doble (mismo criterio que clsEfTarifasSicetacRepository).
+            // Deduplicación dentro del mismo Excel: la última fila con la misma llave gana.
             var pendientes = new Dictionary<string, clsTarifaPlaza>();
 
             foreach (var row in ws.RowsUsed().Skip(1))
@@ -101,16 +91,13 @@ public sealed class clsEfTarifasPlazaRepository(clsNexoDbContext db, ILineasNego
                     var depOrigenTxt = ColOpcional(cols, "DEPARTAMENTO ORIGEN") is { } dO ? Str(row, cols, dO) : null;
                     var depDestinoTxt = ColOpcional(cols, "DEPARTAMENTO DESTINO") is { } dD ? Str(row, cols, dD) : null;
                     var valor = Num(row, cols, "VALOR");
-                    // S5-HU-22.1/#288: la celda se lee con el lector compartido (fecha nativa, serial
-                    // de Excel o texto en formatos explícitos), no con GetString()+DateOnly.TryParse
-                    // sin cultura. "Vacía" y "no es una fecha" se distinguen: el segundo error solo
-                    // sale cuando de verdad no hay una fecha reconocible.
+                    // Lector compartido (fecha nativa, serial de Excel o texto): distingue "vacía" de "no es una fecha".
                     var celdaVigencia = row.Cell(cols["VIGENCIA"]);
                     var vigenciaVacia = celdaVigencia.IsEmpty() || string.IsNullOrWhiteSpace(celdaVigencia.GetString());
                     var detalles = Str(row, cols, "DETALLES");
 
                     if (string.IsNullOrWhiteSpace(lineaTxt) && string.IsNullOrWhiteSpace(origenTxt) && valor is null)
-                        continue; // fila vacía: se ignora
+                        continue;
 
                     if (string.IsNullOrWhiteSpace(lineaTxt) || string.IsNullOrWhiteSpace(claseTxt)
                         || string.IsNullOrWhiteSpace(origenTxt) || string.IsNullOrWhiteSpace(destinoTxt)
@@ -131,9 +118,7 @@ public sealed class clsEfTarifasPlazaRepository(clsNexoDbContext db, ILineasNego
                     var tipoVehiculoLimpio = string.IsNullOrWhiteSpace(tipoVehiculo) ? null : tipoVehiculo.Trim();
                     var claseContenedorLimpia = string.IsNullOrWhiteSpace(claseContenedor) ? null : claseContenedor.Trim();
 
-                    // Verificado contra datos reales: las filas de contenedor usan PesoId
-                    // Y TipoVehiculo a la vez; las nacionales usan solo TipoVehiculo. Solo
-                    // es inválido que falten las dos.
+                    // Las filas de contenedor usan PesoId y TipoVehiculo a la vez; las nacionales solo TipoVehiculo. Solo es inválido que falten las dos.
                     if (rango is null && string.IsNullOrWhiteSpace(tipoVehiculoLimpio))
                         throw new InvalidOperationException("indica al menos rango de peso o tipo de vehículo");
 
@@ -208,12 +193,8 @@ public sealed class clsEfTarifasPlazaRepository(clsNexoDbContext db, ILineasNego
     /// <summary>Mismo formato que <c>clsTarifaPlazaMapper.FormatoRango</c> en Application.</summary>
     private static string FormatoRango(clsRangoPeso p) => p.PesoMaximo is { } max ? $"{p.PesoMinimo}-{max}" : $"{p.PesoMinimo}+";
 
-    /// <summary>
-    /// Municipio por nombre y, si la fila trae departamento, por nombre + departamento (ambos
-    /// normalizados: sin tildes ni mayúsculas). Con departamento que no corresponde →
-    /// "'Armenia' no existe en el departamento 'X'". Sin departamento (columna ausente o celda
-    /// vacía) se conserva el comportamiento anterior: el primero por Colombia-primero.
-    /// </summary>
+    /// <summary>Resuelve por nombre y, si la fila trae departamento, por nombre + departamento (normalizados).
+    /// Sin departamento, el primero con Colombia primero.</summary>
     private static clsMunicipio ResolverMunicipio(
         Dictionary<string, List<clsMunicipio>> porNombre, string nombre, string? departamento)
     {
@@ -230,9 +211,7 @@ public sealed class clsEfTarifasPlazaRepository(clsNexoDbContext db, ILineasNego
     private static string? ColOpcional(Dictionary<string, int> cols, string nombre) => cols.ContainsKey(nombre) ? nombre : null;
     private static string Str(IXLRow row, Dictionary<string, int> cols, string col) => row.Cell(cols[col]).GetString().Trim();
 
-    /// <summary>Mismo criterio que clsEfTarifasSicetacRepository (histórico, ver git):
-    /// primero el tipo numérico nativo de la celda, con fallback a clsImporteParser para
-    /// texto con formato heterogéneo (coma o punto decimal).</summary>
+    /// <summary>Tipo numérico nativo de la celda, con fallback a clsImporteParser para texto con coma o punto decimal.</summary>
     private static decimal? Num(IXLRow row, Dictionary<string, int> cols, string col)
     {
         var celda = row.Cell(cols[col]);

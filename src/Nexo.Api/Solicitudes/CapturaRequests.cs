@@ -3,12 +3,7 @@ using Nexo.Domain.Enums;
 
 namespace Nexo.Api.Solicitudes;
 
-/// <summary>
-/// Alta de una solicitud completa (cabecera + líneas) con origen/destino/vehículo
-/// como TEXTO LIBRE: el servicio resuelve o crea las rutas y configuraciones de
-/// vehículo del catálogo. Sirve tanto al formulario manual como a la importación
-/// de Excel (el frontend mapea columnas → líneas antes de enviar).
-/// </summary>
+/// <summary>Alta de una solicitud completa (cabecera + líneas) con origen/destino/vehículo como texto libre: el servicio resuelve o crea las rutas y configuraciones. Sirve al formulario manual y a la importación de Excel.</summary>
 public class clsCapturaSolicitudRequest
 {
     public Guid? ClienteId { get; set; }
@@ -35,8 +30,7 @@ public class clsCapturaSolicitudRequest
     [Range(typeof(decimal), "0", "240", ParseLimitsInInvariantCulture = true)]
     public decimal? HorasDescargue { get; set; }
 
-    /// <summary>Notas u observaciones comerciales (S4-HU-18.10/#227) — distinto de
-    /// <see cref="Referencia"/> (referencia/PO del cliente).</summary>
+    /// <summary>Notas u observaciones comerciales; distinto de <see cref="Referencia"/> (referencia/PO del cliente).</summary>
     [MaxLength(2000)]
     public string? Notas { get; set; }
 
@@ -84,20 +78,14 @@ public class clsCapturaLineaRequest
     [Range(typeof(decimal), "0", "9999999999999.99", ParseLimitsInInvariantCulture = true)]
     public decimal? ValorAprovisionamiento { get; set; }
 
-    /// <summary>
-    /// S4-HU-15.5/#251: horas de cargue/descargue de ESTA línea — sobreescribe el
-    /// default (4h+4h; 1h+1h si la línea ES una devolución de contenedor, lineaNegocio=DevolucionContenedor)
-    /// cuando el Comercial las conoce de antemano. Sin esto, cae al default de la línea. #300: marcar
-    /// RetornaContenedor ya NO cambia estas horas — el tramo vacío de retorno se costea aparte con 1h+1h.
-    /// </summary>
+    /// <summary>Horas de cargue/descargue de esta línea; sobreescriben el default (4h+4h; 1h+1h si la línea es DevolucionContenedor). Marcar RetornaContenedor no las cambia: el tramo vacío de retorno se costea aparte con 1h+1h.</summary>
     [Range(typeof(decimal), "0", "240", ParseLimitsInInvariantCulture = true)]
     public decimal? HorasCargue { get; set; }
 
     [Range(typeof(decimal), "0", "240", ParseLimitsInInvariantCulture = true)]
     public decimal? HorasDescargue { get; set; }
 
-    /// <summary>S5-HU-16.1/#254: Id de tbl_municipios elegido en el buscador de ciudades —
-    /// null si Origen/Destino viene de texto libre (formulario viejo, Excel sin ese dato).</summary>
+    /// <summary>Id de tbl_municipios elegido en el buscador de ciudades; null si Origen/Destino viene de texto libre.</summary>
     public int? OrigenMunicipioId { get; set; }
     public int? DestinoMunicipioId { get; set; }
 
@@ -110,28 +98,15 @@ public class clsCapturaLineaRequest
     [MaxLength(200, ErrorMessage = "Una línea admite máximo 200 posiciones.")]
     public List<clsCapturaPosicionRequest>? Posiciones { get; set; }
 
-    /// <summary>
-    /// S5-HU-18.3/#275: id de la ruta que agrupa esta línea con las demás de la misma
-    /// carga heterogénea (un camión por línea). Lo manda quien crea las líneas del grupo (Cotifly o el
-    /// portal; NEXO lo guarda tal cual y nunca lo genera, S5-HU-17.8) — null si la
-    /// línea nace directo en NEXO (formulario manual, Excel).
-    /// </summary>
+    /// <summary>Id de la ruta que agrupa esta línea con las demás de una misma carga heterogénea (un camión por línea). Lo manda quien crea las líneas del grupo; NEXO lo guarda tal cual y nunca lo genera. Null si la línea nace en NEXO.</summary>
     public Guid? GrupoRutaId { get; set; }
 
-    /// <summary>
-    /// S5-HU-18.2/#274: id de la recomendación de vehículo del Cubicador que se usó para
-    /// capturar esta línea (idRecomendacionVehiculo de POST /api/cubicacion) — permite
-    /// cruzar lo recomendado contra lo realmente despachado más adelante. Null si la línea
-    /// se capturó sin pasar por el Cubicador.
-    /// </summary>
+    /// <summary>Id de la recomendación de vehículo del Cubicador usada para capturar esta línea (idRecomendacionVehiculo de POST /api/cubicacion), para cruzarla con lo despachado. Null si no pasó por el Cubicador.</summary>
     [MaxLength(64)]
     public string? IdRecomendacionVehiculo { get; set; }
 }
 
-/// <summary>
-/// Una línea de texto libre a resolver contra el catálogo (sin crear ninguna solicitud):
-/// entrada de POST /api/solicitudes/resolver-catalogos.
-/// </summary>
+/// <summary>Una línea de texto libre a resolver contra el catálogo, sin crear solicitud: entrada de POST /api/solicitudes/resolver-catalogos.</summary>
 public class clsResolverCatalogoLineaRequest
 {
     [Required, MaxLength(150)]
@@ -153,12 +128,7 @@ public class clsCapturaPosicionRequest
     [MaxLength(200)]
     public string? Descripcion { get; set; }
 
-    /// <summary>
-    /// Unidades de esta posición. #304: tope 10.000 — el MISMO que el Cubicador (10.000 unidades totales por
-    /// petición); antes admitía 100.000 y una posición así se capturaba y se guardaba, y después el Cubicador rechazaba
-    /// la recomendación entera con <c>CUBICACION_DEMASIADO_GRANDE</c>, lejos de donde nació el error. El tope vale
-    /// también para la SUMA de las posiciones de una línea (ver clsCapturarSolicitudValidador).
-    /// </summary>
+    /// <summary>Unidades de esta posición. Tope 10.000, el mismo del Cubicador; vale también para la suma de las posiciones de una línea (ver clsCapturarSolicitudValidador).</summary>
     [Range(1, 10000)]
     public int Cantidad { get; set; } = 1;
 
@@ -172,26 +142,13 @@ public class clsCapturaPosicionRequest
     public decimal AltoCm { get; set; }
 
     /// <summary>
-    /// Peso de UNA SOLA UNIDAD en kg — <b>no el total de la posición</b>. El motor del Cubicador hace
-    /// <c>peso_total = pesoKg × cantidad</c> (y la regla de peso de la captura suma <c>cantidad × pesoKg</c>): si aquí
-    /// llega el total, se multiplica otra vez por la cantidad y se piden camiones de más (100 cajas de 20 kg: mandar
-    /// 2000 en vez de 20 produce 200.000 kg y una flota absurda).
-    ///
-    /// #304: OBLIGATORIO (> 0). Antes era opcional, pero una posición sin peso no sirve para su único consumidor: el
-    /// Cubicador la rechaza (<c>PESO_NO_DECLARADO</c>) porque el peso decide la capacidad del vehículo y ya no se inventa
-    /// 1 kg. Exigirlo aquí da el error donde está el error, no más tarde al generar el plan de cargue. Una línea SIN
-    /// posiciones no se ve afectada (sigue pudiendo capturarse solo con su <c>peso</c> total).
+    /// Peso de UNA unidad en kg, no el total de la posición: el Cubicador calcula peso_total = pesoKg × cantidad, y mandar el total multiplica dos veces (100 cajas de 20 kg: enviar 2000 da 200.000 kg).
+    /// Obligatorio (> 0): el Cubicador rechaza una posición sin peso (PESO_NO_DECLARADO). Una línea sin posiciones puede capturarse solo con su <c>peso</c> total.
     /// </summary>
     [Required, Range(typeof(decimal), "0.01", "999999.99", ParseLimitsInInvariantCulture = true)]
     public decimal? PesoKg { get; set; }
 
-    /// <summary>
-    /// S5-HU-18.2/#274: código del tipo de mercancía (tbl_tipos_mercancia.CodigoMercancia,
-    /// NO el uuid) para ESTA posición — se guarda el código porque es estable, sobrevive un
-    /// reseed del catálogo y es legible en logs. Null = tipo desconocido; no se asigna un
-    /// default (el tipo mueve la carrocería elegida, un default silencioso produciría una
-    /// recomendación con apariencia correcta pero mal fundamentada).
-    /// </summary>
+    /// <summary>Código del tipo de mercancía (tbl_tipos_mercancia.CodigoMercancia, no el uuid): es estable y sobrevive a un reseed. Null = desconocido; no se asigna default porque el tipo mueve la carrocería elegida.</summary>
     [MaxLength(40)]
     public string? CodigoTipoMercancia { get; set; }
 }

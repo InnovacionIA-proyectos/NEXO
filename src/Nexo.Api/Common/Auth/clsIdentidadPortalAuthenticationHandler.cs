@@ -9,19 +9,8 @@ using Microsoft.Extensions.Options;
 namespace Nexo.Api.Common.Auth;
 
 /// <summary>
-/// Valida en CADA petición el artefacto de sesión que define el contrato de
-/// integración con el portal (docs/contrato-integracion, D6) — el encabezado
-/// X-Portal-clsUsuario-Id — y resuelve la identidad real contra
-/// <see cref="IResolverIdentidadPortalPort"/>. Reemplaza a DevAuthenticationHandler
-/// y al esquema JwtBearer de Azure AD: no hay más rol declarado por el cliente
-/// (X-Rol) ni credenciales de ningún tipo pasando por Nexo.
-///
-/// Autenticación vs. autorización, a propósito separadas: esta clase decide si la
-/// IDENTIDAD es válida (401 si no). Que tenga un rol de Nexo válido lo exige la
-/// FallbackPolicy en clsProgram.cs (RequireClaim de rol) — por eso una persona sin permiso
-/// sobre Nexo sí se autentica aquí (sin Claim de rol) pero cae en Forbid,
-/// nunca en Challenge: así el 403 aplica a TODO endpoint, no solo a los que declaran
-/// [Authorize(Roles=...)].
+/// Valida en cada petición el encabezado X-Portal-clsUsuario-Id y resuelve la identidad real con <see cref="IResolverIdentidadPortalPort"/>.
+/// Solo decide si la identidad es válida (401 si no): el rol de Nexo lo exige la FallbackPolicy, así que quien no tiene permiso se autentica sin claim de rol y cae en Forbid (403), nunca en Challenge.
 /// </summary>
 public class clsIdentidadPortalAuthenticationHandler(
     IResolverIdentidadPortalPort resolver,
@@ -33,10 +22,7 @@ public class clsIdentidadPortalAuthenticationHandler(
     public const string SchemeName = "clsIdentidadPortal";
     public const string HeaderIdUsuario = "X-Portal-clsUsuario-Id";
 
-    /// <summary>Claim con el id CRUDO del portal (el del encabezado), distinto del
-    /// NameIdentifier interno (clsUsuario.Id, Guid usado para la FK de auditoría). Lo
-    /// expone /api/sesion/actual: el contrato define ese campo como el id del portal,
-    /// no un id interno de Nexo que el frontend no conoce.</summary>
+    /// <summary>Claim con el id crudo del portal (el del encabezado), distinto del NameIdentifier interno. Lo expone /api/sesion/actual.</summary>
     public const string ClaimIdPortal = "idPortal";
 
     protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
@@ -50,8 +36,7 @@ public class clsIdentidadPortalAuthenticationHandler(
         var identidad = await resolver.ResolverAsync(idPortal);
         if (identidad is null) return AuthenticateResult.NoResult();
 
-        // Sin rol de Nexo válido: SÍ se autentica (para que la FallbackPolicy decida
-        // Forbid, no Challenge — ver el comentario de la clase), pero sin Claim de rol.
+        // Sin rol de Nexo válido sí se autentica (la FallbackPolicy decide Forbid, no Challenge), pero sin claim de rol.
         var claims = new List<Claim>
         {
             new(ClaimTypes.NameIdentifier, identidad.UsuarioId?.ToString() ?? idPortal.ToString()),
@@ -65,15 +50,12 @@ public class clsIdentidadPortalAuthenticationHandler(
         return AuthenticateResult.Success(ticket);
     }
 
-    /// <summary>401: sin identidad utilizable. Nunca dice si el id existe o no en la
-    /// tabla del portal (docs/contrato-integracion, sección 6) — mismo mensaje genérico
-    /// siempre, para no filtrar información del sistema.</summary>
+    /// <summary>401: sin identidad utilizable. Siempre el mismo mensaje genérico, para no revelar si el id existe en la tabla del portal.</summary>
     protected override Task HandleChallengeAsync(AuthenticationProperties properties) =>
         clsErrorHandlingMiddleware.WriteAsync(Context, StatusCodes.Status401Unauthorized,
             "SESION_INVALIDA", "La sesión no es válida. Ingrese nuevamente desde el portal.");
 
-    /// <summary>403: identidad válida, sin permiso sobre Nexo o rol
-    /// insuficiente para la operación.</summary>
+    /// <summary>403: identidad válida sin permiso sobre Nexo o con rol insuficiente para la operación.</summary>
     protected override Task HandleForbiddenAsync(AuthenticationProperties properties) =>
         clsErrorHandlingMiddleware.WriteAsync(Context, StatusCodes.Status403Forbidden,
             "SIN_PERMISO_CABINA_FLETES", "Su usuario no tiene permiso para esta operación en Nexo.");

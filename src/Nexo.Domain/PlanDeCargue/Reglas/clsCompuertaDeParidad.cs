@@ -1,17 +1,9 @@
 namespace Nexo.Domain.PlanDeCargue.Reglas;
 
 /// <summary>
-/// La función de plan de cargue solo se habilita cuando los golden tests de paridad del
-/// motor están 26/26. Función pura: no lee configuración ni hace I/O — solo decide, dados
-/// los tres campos, si la evidencia alcanza. El adaptador que sí lee `IConfiguration`
-/// vive en Infrastructure (clsParidadCubicadorAdapter).
-///
-/// NO es un booleano suelto: <paramref name="verificada"/> por sí solo no habilita nada.
-/// Tiene que venir acompañado de a QUÉ evidencia concreta se refiere
-/// (<paramref name="evidencia"/>: típicamente la corrida de CI de
-/// `cubicador-ci.yml` que confirmó 26/26, o el commit de los golden tests) y CUÁNDO se
-/// confirmó (<paramref name="fecha"/>). Sin los tres, la compuerta queda cerrada — fail
-/// closed, igual criterio que el resto de guardas de Producción de Nexo.
+/// El plan de cargue solo se habilita con los golden tests de paridad del motor en 26/26. No basta un booleano:
+/// <paramref name="verificada"/> debe venir con la evidencia concreta (corrida de CI o commit) y la fecha en que
+/// se confirmó. Sin los tres la compuerta queda cerrada (fail closed).
 /// </summary>
 public static class clsCompuertaDeParidad
 {

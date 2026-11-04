@@ -1,9 +1,8 @@
 namespace Nexo.Domain.Asistente.Entidades;
 
 /// <summary>
-/// Un cambio que el asistente PROPONE y que solo se aplica cuando la persona lo confirma. El modelo nunca escribe en NEXO: deja aquí lo
-/// que quiere hacer, con parámetros fijos que ya no cambian, y la persona decide. Es también la auditoría de cada escritura: quién,
-/// cuándo, qué y cómo terminó.
+/// Un cambio que el asistente propone y que solo se aplica cuando la persona lo confirma: el modelo nunca escribe
+/// en NEXO. Los parámetros quedan fijos y es también la auditoría de cada escritura.
 /// </summary>
 public class clsAccionAsistente
 {

@@ -3,11 +3,7 @@ using Microsoft.AspNetCore.Http;
 
 namespace Nexo.Api.Common.Errors;
 
-/// <summary>
-/// Validación uniforme de archivos Excel subidos: presencia, tamaño y extensión.
-/// Lanza <see cref="clsValidationFailedException"/> (Application) para que el error salga
-/// con la MISMA forma que el resto del API vía el middleware, en vez de objetos ad-hoc.
-/// </summary>
+/// <summary>Validación uniforme de archivos Excel subidos (presencia, tamaño y extensión); lanza <see cref="clsValidationFailedException"/> para salir con la forma de error estándar.</summary>
 public static class clsExcelUpload
 {
     private static readonly string[] ExtensionesPermitidas = { ".xlsx", ".xlsm" };

@@ -5,12 +5,8 @@ using Nexo.Domain.Catalogos.Entidades;
 namespace Nexo.Application.CasosDeUso.MapeoExcel;
 
 /// <summary>
-/// Lo que se le dice al modelo para proponer el mapeo de columnas, y el formato en que debe responder. Todo el texto fijo vive aquí,
-/// versionado, para poder afinarlo y medirlo sin tocar la lógica.
-///
-/// Lo que llega de un Excel de cliente (encabezados y celdas) es DATO, no instrucciones: las instrucciones lo dicen, y además el
-/// formato de salida es un esquema cerrado (campos y transformaciones de listas fijas), así que una celda que pida otra cosa no puede
-/// producir un campo ni una conversión que no existan. Lo que devuelve el modelo se valida igual en el caso de uso antes de usarlo.
+/// Texto fijo y formato de respuesta para proponer el mapeo. El contenido del Excel es DATO, no instrucciones; la salida es un esquema
+/// cerrado y se valida de nuevo en el caso de uso.
 /// </summary>
 public static class clsPromptMapeoExcel
 {

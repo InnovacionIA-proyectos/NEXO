@@ -2,10 +2,7 @@ using Nexo.Domain.Catalogos.Entidades;
 
 namespace Nexo.Application.CasosDeUso.Catalogos.Interfaces;
 
-/// <summary>
-/// S6-HU-27.2/#321: el diccionario de alias de vehículos y de clases de contenedor (<c>tbl_alias_elementos</c>). Lo usa la captura
-/// (ResolverVehiculo y la clase de contenedor), los endpoints de alias y la bandeja de normalización.
-/// </summary>
+/// <summary>Diccionario de alias de vehículos y clases de contenedor (<c>tbl_alias_elementos</c>), usado por la captura, los endpoints de alias y la bandeja.</summary>
 public interface IAliasCatalogoPort
 {
     /// <summary>Sin seguimiento, por tipo (null = todos) y ordenado por código y alias. Incluye los inactivos.</summary>

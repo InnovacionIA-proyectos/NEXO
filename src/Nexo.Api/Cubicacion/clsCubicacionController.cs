@@ -15,13 +15,8 @@ public record clsMercanciaSolicitadaRequest(
 }
 
 /// <summary>
-/// "Mercancias" es obligatorio en negocio (400 MERCANCIAS_REQUERIDAS si falta o viene
-/// vacío) pero se tipa como <c>IReadOnlyList&lt;...&gt;?</c> y no sin "?" a propósito: con
-/// Nullable Reference Types habilitado, [ApiController] trata un parámetro de body
-/// no-nullable como implícitamente [Required] y responde su propio 400 VALIDATION_ERROR
-/// genérico (en inglés, sin pasar por el método) antes de llegar a la validación explícita
-/// de abajo — mismo problema ya documentado y revertido en
-/// <see cref="Api.Solicitudes.clsCapturaSolicitudesController.Aprovisionamiento"/>.
+/// "Mercancias" es obligatorio (400 MERCANCIAS_REQUERIDAS) pero se tipa con "?" a propósito: con Nullable Reference Types, [ApiController] trata un body no-nullable como [Required]
+/// y responde su propio 400 VALIDATION_ERROR genérico antes de llegar a la validación explícita.
 /// </summary>
 public record clsCrearRecomendacionRequest(
     string IdLineaSolicitud, IReadOnlyList<clsMercanciaSolicitadaRequest>? Mercancias, string? ClaseViajeSeleccionada)
@@ -30,12 +25,7 @@ public record clsCrearRecomendacionRequest(
         new(IdLineaSolicitud, Mercancias!.Select(m => m.ADto()).ToList(), ClaseViajeSeleccionada, usuarioId);
 }
 
-/// <summary>
-/// S5-HU-18.1/#273: reemplaza por completo al contrato viejo de <c>cubicar()</c>
-/// (<c>captura-api.service.ts</c>, usado por <c>captura-page</c> y <c>mesa-costeo-page</c>).
-/// Mismos roles que el resto de Cubicación porque las dos pantallas que lo usan pertenecen
-/// a Comercial (captura) y a Coordinación de Fletes (mesa de costeo).
-/// </summary>
+/// <summary>Recomendación de flota del Cubicador para Captura y Mesa de Costeo.</summary>
 [ApiController]
 [Route("api/cubicacion")]
 public class clsCubicacionController(
@@ -45,10 +35,7 @@ public class clsCubicacionController(
     ICurrentUserPort usuarioActual) : ControllerBase
 {
     /// <summary>
-    /// Pide al Cubicador una recomendación de flota para una línea — reemplaza la
-    /// cubicación rápida sin persistencia de antes. <c>SIN_SELECCION_AUTOMATICA</c> y
-    /// <c>condicionada</c> son resultados normales de esta llamada, NO errores: siguen
-    /// devolviendo 200, con el detalle dentro de <c>resultado</c>/<c>motivoSinSeleccion</c>.
+    /// Pide al Cubicador una recomendación de flota para una línea. <c>SIN_SELECCION_AUTOMATICA</c> y <c>condicionada</c> son resultados normales (200), no errores.
     /// </summary>
     [Authorize(Roles = "Comercial,AdminBiblioteca,AdminTarifas,Admin")]
     [HttpPost]
@@ -65,9 +52,7 @@ public class clsCubicacionController(
     }
 
     /// <summary>
-    /// Reconsulta la última recomendación de una línea. <paramref name="origenSistema"/> es
-    /// obligatorio: un mismo código de línea puede existir tanto en NEXO como en Cotifly,
-    /// como rutas distintas, y no se infiere del llamante.
+    /// Reconsulta la última recomendación de una línea. <paramref name="origenSistema"/> es obligatorio: un mismo código de línea puede existir en NEXO y en Cotifly, y no se infiere del llamante.
     /// </summary>
     [Authorize(Roles = "Comercial,AdminBiblioteca,AdminTarifas,Admin")]
     [HttpGet]
@@ -85,10 +70,8 @@ public class clsCubicacionController(
     }
 
     /// <summary>
-    /// Por qué el Cubicador eligió esa flota, en lenguaje natural. Se pide DESPUÉS de pintar los números de la recomendación: el modelo tarda
-    /// varios segundos. Mismos parámetros, validación y roles que <see cref="Consultar"/>. <b>Siempre 200</b> con <c>{ "explicacion": texto | null }</c>:
-    /// es un texto opcional, así que un Cubicador caído, sin configurar, sin responder, sin recomendación para la línea o sin explicación
-    /// también dan <c>null</c> y la pantalla simplemente no muestra el bloque. Por aquí no pasa ninguna tarifa ni valor comercial.
+    /// Por qué el Cubicador eligió esa flota, en lenguaje natural; se pide después de pintar los números (el modelo tarda). Mismos parámetros, validación y roles que <see cref="Consultar"/>.
+    /// Siempre 200 con <c>{ "explicacion": texto | null }</c>: es opcional, así que cualquier fallo del Cubicador da <c>null</c>.
     /// </summary>
     [Authorize(Roles = "Comercial,AdminBiblioteca,AdminTarifas,Admin")]
     [HttpGet("explicacion")]

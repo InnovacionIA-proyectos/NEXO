@@ -19,10 +19,9 @@ public sealed record clsCrearSolicitudCommand(
 
 public sealed record clsCrearLineaInput(
     Guid? RutaId, Guid? ConfigVehiculoId, string? Tipologia, decimal? Peso, decimal? ValorMercancia,
-    /// <summary>S5-HU-17/#263: horas de ESTA línea — null usa el default de la solicitud.</summary>
+    /// <summary>Horas de ESTA línea; null usa el default de la solicitud.</summary>
     decimal? HorasCargue = null, decimal? HorasDescargue = null,
-    /// <summary>S5-HU-18.3/#275: id de ruta que Cotifly usa para agrupar varias líneas de
-    /// una misma carga heterogénea — lo pone SIEMPRE Cotifly, nunca NEXO.</summary>
+    /// <summary>Id de ruta con que Cotifly agrupa las líneas de una misma carga heterogénea; lo pone SIEMPRE Cotifly, nunca NEXO.</summary>
     Guid? GrupoRutaId = null);
 
 public sealed class clsCrearSolicitudCommandHandler(
@@ -32,9 +31,7 @@ public sealed class clsCrearSolicitudCommandHandler(
 {
     public async Task<Guid> Handle(clsCrearSolicitudCommand command, CancellationToken ct = default)
     {
-        // Issue #206: el buscador de clientes nunca traía un clienteId ya resuelto para
-        // un cliente real del catálogo DW — clienteBp resuelve/crea el espejo local por
-        // NIT, mismo mecanismo ya probado en clsCapturarSolicitudCommand.
+        // clienteBp resuelve o crea el espejo local por NIT: el buscador no trae un clienteId para clientes reales del DW.
         var clienteId = await clsResolucionDeCliente.ResolverAsync(command.ClienteId, command.ClienteBp, clientes, clientesDw, ct);
 
         var solicitud = new clsSolicitud
@@ -51,8 +48,7 @@ public sealed class clsCrearSolicitudCommandHandler(
 
         if (command.Linea is { } lr)
         {
-            // S5-HU-17/#263: esta solicitud no serializa CondicionesServicio (no tiene
-            // notas/horas propias), así que el default de horas es siempre 4h+4h.
+            // Esta solicitud no serializa CondicionesServicio, así que el default de horas es siempre 4h+4h.
             var tiempos = clsCondicionesServicioDto.Desde(null).TiemposLogisticos!;
             var (horasCargue, horasDescargue) = clsResolucionHorasLinea.Resolver(
                 lr.HorasCargue, lr.HorasDescargue, esDevolucionContenedor: false, tiempos.HorasCargue, tiempos.HorasDescargue);

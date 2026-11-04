@@ -27,15 +27,8 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Nexo.Infrastructure.Biblioteca.Adaptadores;
 
 /// <summary>
-/// Motor de propuesta de tarifa: por cada línea de la solicitud consulta las tres
-/// fuentes de la Biblioteca —piso SICE-TAC (DWSice), tarifas de plaza SAP e
-/// histórico SAP— y propone el valor MÁS ALTO. Portado 1:1 desde
-/// Nexo.Api/Services/PropuestaTarifaService.cs del proyecto original.
-/// Reemplaza a PropuestaTarifaNoMigradaAdapter: cierra el bloqueo de
-/// "Aplicar propuestas" en Cotizaciones.
-///
-/// Los cargues masivos se procesan en PARALELO con scope propio de DbContext por
-/// trabajador (los contextos no son thread-safe), concurrencia limitada.
+/// Propone por línea el valor más alto entre el piso SICE-TAC (DWSice), las tarifas de plaza SAP y el histórico SAP.
+/// Los cargues masivos se procesan en paralelo con un scope de DbContext por trabajador (los contextos no son thread-safe).
 /// </summary>
 public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuestaDeLineaPort
 {
@@ -77,12 +70,7 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
     }
 
     /// <summary>
-    /// Propuesta de UNA línea. Es el camino que usa el auto-costeo asíncrono.
-    ///
-    /// Reusa la misma maquinaria que el camino por solicitud —las mismas fuentes, la
-    /// misma caché, la misma regla— pero carga una sola línea. Con eso una excepción
-    /// consultando una fuente queda contenida en esa línea en vez de llevarse las 300,
-    /// que es lo que exige la regla inviolable 6.
+    /// Propuesta de una sola línea, usada por el auto-costeo asíncrono: una excepción en una fuente queda contenida en esa línea en vez de llevarse las 300 (regla inviolable 6).
     /// </summary>
     public async Task<clsDecisionDeFlujo> ProponerParaLineaAsync(Guid lineaId, CancellationToken ct = default)
     {
@@ -97,11 +85,7 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
         var ajustes = await _ajustes.MapaAsync(ct);
         var soloSice = await _reglas.ClavesRutaVehiculoAsync(ct);
 
-        // S4-HU-14.1/#221: mismas horas reales que usa el camino por solicitud.
-        // S4-HU-15.5/#251: si ESTA línea ya tiene sus propias horas resueltas (captura
-        // posterior a #251), tienen prioridad sobre las de la solicitud completa —
-        // líneas capturadas ANTES de #251 (HorasCargue/HorasDescargue nulas en la
-        // línea) siguen usando el valor de la solicitud, sin cambio de comportamiento.
+        // Las horas ya resueltas de la propia línea tienen prioridad sobre las de la solicitud completa; si la línea no las tiene, se usa la de la solicitud.
         var tiempos = clsCondicionesServicioDto.Desde(linea.clsSolicitud?.CondicionesServicio).TiemposLogisticos!;
         var horasSolicitud = HorasEfectivasDeLinea(linea, tiempos.HorasCargue + tiempos.HorasDescargue);
 
@@ -124,13 +108,8 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
     }
 
     /// <summary>
-    /// Sección 9 del documento de entendimiento: alerta de urgencia Alta cuando el
-    /// costeo descarta una tarifa de plaza por vencida (RN-02). Solo desde el camino
-    /// por línea (ProponerParaLineaAsync), nunca desde el camino por solicitud
-    /// (ProponerAsync): ese último corre sus grupos en paralelo sobre el MISMO
-    /// DbContext, y el publicador de mensajes escribe en él — hacerlo ahí sería una
-    /// carrera de datos. Deduplicado por día: un pliego con 300 líneas de la misma
-    /// ruta vencida no debe mandar 300 correos.
+    /// Alerta de urgencia Alta cuando el costeo descarta una tarifa de plaza por vencida (RN-02). Solo desde el camino por línea: el camino por solicitud corre grupos
+    /// en paralelo sobre el mismo DbContext donde escribe el publicador (carrera de datos). Deduplicada por día.
     /// </summary>
     private async Task PublicarVencidaSiAplicaAsync(clsPropuestaLineaDto dto, CancellationToken ct)
     {
@@ -162,17 +141,11 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
         var ajustes = await _ajustes.MapaAsync(ct);
         var soloSice = await _reglas.ClavesRutaVehiculoAsync(ct);
 
-        // S4-HU-14.1/#221: horas reales capturadas en la solicitud (Cargue+Descargue),
-        // para recalcular el piso SICE-TAC en vez de asumir las horas pactadas.
-        // S4-HU-15.5/#251: ahora puede variar POR LÍNEA — HorasEfectivasDeLinea prefiere
-        // las de la línea si ya están resueltas (captura posterior a #251), si no cae
-        // al valor de la solicitud completa (líneas viejas, sin cambio de comportamiento).
+        // Horas reales capturadas (Cargue+Descargue) para recalcular el piso SICE-TAC en vez de asumir las pactadas; HorasEfectivasDeLinea prefiere las de la línea si ya están resueltas.
         var tiempos = clsCondicionesServicioDto.Desde(solicitud.CondicionesServicio).TiemposLogisticos!;
         var horasSolicitud = tiempos.HorasCargue + tiempos.HorasDescargue;
 
-        // Horas entra en la huella: dos líneas idénticas en todo lo demás pero con horas
-        // distintas pueden costear distinto (clsPisoConHoras.Calcular) — agruparlas
-        // igual les daría a ambas el piso de UNA sola de las dos.
+        // Horas entra en la huella: dos líneas idénticas salvo por las horas pueden costear distinto (clsPisoConHoras.Calcular) y agruparlas daría a ambas el piso de una sola.
         string Huella(clsLineaSolicitud l) => string.Join('|',
             l.clsRuta?.Origen, l.clsRuta?.Destino, l.clsConfiguracionVehiculo?.TipoVehiculo, l.clsConfiguracionVehiculo?.Carroceria,
             l.Tipologia, l.Peso, l.LineaNegocio, l.ClaseViaje, l.ClaseContenedor,
@@ -189,13 +162,7 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
             try
             {
                 using var scope = _scopes.CreateScope();
-                // S5-HU-18/#262: DbContext propio por tarea en paralelo — antes
-                // ProponerLineaAsync usaba `_db` (el de la instancia, compartido) para
-                // tbl_tarifas_plaza/histórico/rangos de peso, mientras que dw/dc sí tenían
-                // scope propio. EF Core no es thread-safe: con varios grupos corriendo a
-                // la vez, eso producía InvalidOperationException intermitentes ("A second
-                // operation was started on this context instance before a previous
-                // operation completed").
+                // DbContext propio por tarea en paralelo: EF Core no es thread-safe y compartir `_db` entre grupos produce InvalidOperationException intermitentes ("A second operation was started...").
                 var dbGrupo = scope.ServiceProvider.GetRequiredService<clsNexoDbContext>();
                 var dw = _dwConfigurado ? scope.ServiceProvider.GetService<clsDwSiceDbContext>() : null;
                 var dc = _dcConfigurado ? scope.ServiceProvider.GetService<clsDbSolucionesTiDbContext>() : null;
@@ -212,17 +179,9 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
             }
             catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
             {
-                // Regla inviolable 6: un grupo que falla (fuente caída, timeout) NO puede
-                // llevarse los demás. Task.WhenAll falla rápido y descarta hasta los grupos
-                // que ya habían terminado bien si uno solo lanza — por eso el catch va AQUÍ,
-                // por grupo, y no alrededor del WhenAll.
-                //
-                // S5-HU-18/#262: ya NO se interpola ex.Message en la justificación — antes
-                // un fallo técnico (ej. la carrera de DbContext de arriba, o cualquier otra
-                // excepción de infraestructura) se mostraba crudo en la Mesa de Costeo
-                // ("A second operation was started on this context instance..."). Es un
-                // mensaje de negocio fijo; el detalle técnico queda solo para quien revise
-                // logs del servidor, no para el usuario.
+                // Regla inviolable 6: un grupo que falla (fuente caída, timeout) no puede llevarse los demás. Task.WhenAll falla rápido y descarta incluso los grupos ya terminados,
+                // por eso el catch va aquí, por grupo, y no alrededor del WhenAll.
+                // La justificación es un mensaje de negocio fijo: no se interpola ex.Message para no mostrar detalles técnicos al usuario; el detalle queda en los logs.
                 var primera = grupo.First();
                 const string justificacion = "No se pudo consultar la Biblioteca para esta línea. Intente de nuevo o revise manualmente.";
                 return grupo.Select(l => new clsPropuestaLineaDto(
@@ -239,10 +198,7 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
         return new clsPropuestaSolicitudDto(solicitud.Id, resultados, advertencias);
     }
 
-    /// <summary>S4-HU-15.5/#251: prefiere las horas YA RESUELTAS de la línea (persistidas
-    /// al capturar — clsResolucionHorasLinea.Resolver) sobre el valor único de la
-    /// solicitud completa. Si la línea no las tiene (capturada antes de #251), cae al
-    /// valor de la solicitud — mismo comportamiento que antes de este cambio.</summary>
+    /// <summary>Prefiere las horas ya resueltas de la línea (clsResolucionHorasLinea.Resolver) sobre el valor único de la solicitud; si la línea no las tiene, cae al de la solicitud.</summary>
     private static decimal HorasEfectivasDeLinea(clsLineaSolicitud linea, decimal horasSolicitud) =>
         linea.HorasCargue is { } hc && linea.HorasDescargue is { } hd ? hc + hd : horasSolicitud;
 
@@ -268,21 +224,14 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
         var esDevolucion = linea.LineaNegocio == LineaNegocio.DevolucionContenedor;
         var esContenedor = esDevolucion || linea.ClaseViaje == ClaseViaje.Contenedor;
 
-        // S5-HU-20.5/#297: Cupo (o sin clase de viaje) sin vehículo nunca se autocostea — ver
-        // clsReglaDeCosteo.DecidirFlujo. Se calcula una sola vez y gobierna Solo-SICETAC, plaza que
-        // gana sola y el atajo del histórico.
+        // Cupo (o sin clase de viaje) sin vehículo nunca se autocostea (clsReglaDeCosteo.DecidirFlujo). Se calcula una vez y gobierna Solo-SICETAC, la plaza que gana sola y el atajo del histórico.
         var sinVehiculoQueLoExige = clsReglaDeCosteo.LineaSinVehiculoQueExigeConsultaCompleta(linea.ClaseViaje, vehiculo);
 
-        // S5-HU-16.1/#254 + S5-HU-16.2/#255: código DANE real del municipio (tbl_municipios),
-        // cuando la ruta ya resolvió contra el buscador de ciudades — null en rutas viejas
-        // o con texto que no matcheó ningún municipio (ver clsResolucionDeCatalogos).
+        // Código DANE real del municipio (tbl_municipios) cuando la ruta ya resolvió contra el buscador de ciudades; null si el texto no matcheó ninguno (ver clsResolucionDeCatalogos).
         var origenDane = linea.clsRuta.OrigenMunicipio?.CodigoDane;
         var destinoDane = linea.clsRuta.DestinoMunicipio?.CodigoDane;
 
-        // S5-HU-19.2/#282: "hay regla" ahora es solo una BANDERA que entra a DecidirFlujo —
-        // ya no corta temprano por su cuenta. Clave por DANE (tbl_reglas_solo_sicetac.Origen/
-        // Destino SIEMPRE están en código DANE — carga masiva S4-HU-09.2): antes comparaba
-        // contra el nombre de ciudad en texto libre de la ruta y nunca coincidía (#255).
+        // "Hay regla" es solo una bandera que entra a DecidirFlujo. Clave por DANE: tbl_reglas_solo_sicetac.Origen/Destino siempre están en código DANE, no en nombre de ciudad.
         var hayReglaSoloSicetac = clsReglaSoloSicetacDeLinea.Tiene(soloSice, linea.ClaseViaje, origenDane, destinoDane, vehiculo);
 
         clsResultadoTarifarioSap? oficial = null;
@@ -296,18 +245,9 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
                 linea.RetornaContenedor, linea.CiudadDevolucionContenedor, horasSolicitud, origenDane, destinoDane), ct);
         }
 
-        // clsTarifarioSapAdapter.SicetacOficialAsync (réplica 1:1 de la lógica SAP
-        // legada) exige match exacto de Configuracion/TipoCarga/UnidadTransporte/
-        // ViaEstandar sin fallback, y solo aplica a Contenedor/Cupo (nunca a
-        // CargaSuelta/Extradimensionado) - eso deja sin piso automático rutas que sí
-        // existen y son encontrables (reproducido con Medellín-Guarne), obligando a
-        // marcar "Solo SICE-TAC" a mano para que aparezcan (esa marca usa
-        // CandidatoSicetacAsync, el selector tolerante de abajo). Si el camino oficial
-        // no encuentra nada, se reintenta con ESE MISMO selector antes de rendirse.
-        //
-        // S5-HU-19.2/#282: movido ANTES de plaza/histórico a propósito — en modo
-        // SoloSicetac (regla + piso encontrado) ninguno de los dos hace falta, así que se
-        // corta acá sin gastar esas consultas.
+        // clsTarifarioSapAdapter.SicetacOficialAsync exige match exacto de Configuracion/TipoCarga/UnidadTransporte/ViaEstandar sin fallback y solo aplica a Contenedor/Cupo,
+        // lo que dejaría sin piso automático rutas existentes (p. ej. Medellín-Guarne). Si el camino oficial no encuentra nada se reintenta con el selector tolerante
+        // de CandidatoSicetacAsync antes de rendirse. Va antes de plaza/histórico: en modo SoloSicetac (regla + piso) ninguno de los dos hace falta.
         // Devolución de contenedor: el piso es el del viaje VACÍO (con las horas de la línea, 1 h + 1 h por defecto), no el cargado.
         var sicetac = esDevolucion ? null : oficial?.SicetacOficial;
         if (sicetac is null && dw is not null)
@@ -319,9 +259,8 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
                     await VehiculoDeContenedorSinVehiculoAsync(linea, vehiculo, esContenedor, ct) ?? vehiculo,
                     linea.Tipologia, carroceriaLinea ?? CarroceriaPorDefectoDeContenedor(esContenedor), horasSolicitud, ct);
 
-        // #300: si no hay piso SICE-TAC porque el período más reciente cargado no es el del mes actual, se dice
-        // (justificación + motivo de pendiente) en vez de un "sin piso" mudo. Sin piso nunca hay modo automático
-        // (DecidirFlujo exige sicetac para SoloSicetac y PlazaVigenteMayor): la línea queda para validación humana.
+        // Si no hay piso SICE-TAC porque el período más reciente no es el del mes actual, se dice (justificación + motivo de pendiente) en vez de un "sin piso" mudo.
+        // Sin piso nunca hay modo automático (DecidirFlujo exige sicetac para SoloSicetac y PlazaVigenteMayor): la línea queda para validación humana.
         string? motivoSice = null;
         if (sicetac is null && dw is not null)
             motivoSice = clsPeriodoSicetac.MotivoNoVigente(await PeriodoSiceAsync(dw, ct), _clock.GetUtcNow());
@@ -338,8 +277,7 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
                 esDevolucion, esContenedor, ct), ModoDecision.SoloSicetac);
         }
 
-        // S5-HU-19.1/#281: nombre del catálogo externo (NO el enum, NO un Id) que guardan
-        // tbl_tarifas_plaza/tbl_tarifas_plaza_historico — ver clsTarifaPlaza, doc-comment.
+        // Nombre del catálogo externo (no el enum ni un Id) que guardan tbl_tarifas_plaza/tbl_tarifas_plaza_historico.
         var nombreLineaNegocio = await NombreLineaNegocioAsync(lineasNegocio, linea.LineaNegocio, ct);
         var nombreClaseViaje = await NombreClaseViajeAsync(clasesViaje, linea.ClaseViaje, ct);
         var consultaInterna = new clsConsultaTarifaPlazaInterna(
@@ -348,21 +286,10 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
             linea.clsRuta.OrigenMunicipioId, linea.clsRuta.DestinoMunicipioId,
             ClaseContenedorEstricta: esDevolucion);
 
-        // El camino "oficial" (ITarifarioSapPort, ver comentario mas abajo) exige match
-        // exacto de ClaseContenedor/peso/vehiculo sin fallback. Cuando no encuentra nada
-        // (oficial es null, o oficial.Tarifa queda null porque el filtro exacto descarto
-        // todo) se reintenta con el mismo selector tolerante que ya usa el camino "Solo
-        // SICE-TAC" de arriba, antes de rendirse. Mismo patron que ya se aplico para el
-        // piso SICE-TAC (ver sicetac mas abajo) y para el bug gemelo documentado en
-        // docs/decisiones/matching-sicetac-oficial-vs-solo-sicetac.md.
-        //
-        // S5-HU-19.1/#281: orden de fuentes de PLAZA = oficial SAP -> tolerante SAP (por
-        // zona) -> propia de NEXO (tbl_tarifas_plaza), ganando la primera VIGENTE. Antes
-        // de esta issue, "oficial" trayendo una VENCIDA ya dejaba `plaza` no-null y las
-        // otras dos fuentes nunca se intentaban — un bug real: una plaza vigente en SAP
-        // tolerante o en la tabla propia nunca se encontraba si oficial traía algo vencido
-        // primero. Ahora se sigue buscando una vigente en las tres fuentes; la vencida
-        // (si la hay) solo queda como referencia cuando NINGUNA fuente trae una vigente.
+        // El camino "oficial" (ITarifarioSapPort) exige match exacto de ClaseContenedor/peso/vehículo sin fallback; si no encuentra nada (oficial null o su Tarifa null)
+        // se reintenta con el selector tolerante del camino "Solo SICE-TAC" antes de rendirse (ver docs/decisiones/matching-sicetac-oficial-vs-solo-sicetac.md).
+        // Orden de fuentes de plaza: oficial SAP -> tolerante SAP (por zona) -> propia de NEXO (tbl_tarifas_plaza); gana la primera VIGENTE.
+        // Se sigue buscando una vigente en las tres: una vencida de "oficial" no debe impedir hallarla en las otras, y solo queda como referencia si ninguna fuente trae una vigente.
         clsCandidatoTarifaDto? plazaVigente = oficial?.Vencida == false ? oficial.Tarifa : null;
         clsCandidatoTarifaDto? plazaVencidaRef = oficial?.Vencida == true ? oficial.Tarifa : null;
 
@@ -395,17 +322,14 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
             plazaVencidaRef ??= resultadoPlazaInterna.Vencida;
         }
 
-        // S5-HU-19.2/#282, Paso 2 anticipado: si la plaza vigente ya va a ganar sola
-        // (PlazaVigenteMayor), el histórico ni se consulta — DecidirFlujo no lo mira en
-        // ese modo, pedirlo sería una consulta tirada a la basura.
+        // Si la plaza vigente ya va a ganar sola (PlazaVigenteMayor), el histórico ni se consulta: DecidirFlujo no lo mira en ese modo.
         var seriaPlazaVigenteMayor = !sinVehiculoQueLoExige && !hayReglaSoloSicetac && sicetac is { VehiculoRelajado: false } &&
             plazaVigente is { VehiculoRelajado: false } && plazaVigente.Valor > sicetac.Valor;
 
         clsCandidatoTarifaDto? historico = null;
         if (!seriaPlazaVigenteMayor)
         {
-            // S5-HU-19.1/#281: mismo orden que plaza — log externo de SAP primero
-            // (ventana de 3 meses), y solo si no hay nada ahí, el histórico propio de NEXO.
+            // Mismo orden que plaza: log externo de SAP primero (ventana de 3 meses) y, si no hay nada, el histórico propio de NEXO.
             if (dc is not null)
                 historico = await CandidatoSapAsync(
                     dc, dc.TarifasLogSap, "historico_sap", linea.clsRuta.OrigenMunicipio, linea.clsRuta.DestinoMunicipio,
@@ -415,14 +339,8 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
                 historico = await historicoInterno.BuscarAsync(consultaInterna, ct);
         }
 
-        // Conexión SAP nueva (plaza en vivo), todavía no construida por "el equipo de
-        // conexiones". Con SapTarifaFleteEnVivo:Modo en Deshabilitado (default) o
-        // Real-sin-adaptador-todavía, _sapEnVivo.Configurado es false y esta rama
-        // nunca corre — la ruta de arriba (dc.TarifasPlazaSap, la fuente REAL) queda
-        // exactamente igual que antes. Solo con Modo=Mock (u, en el futuro, un
-        // adaptador real) se sustituye la plaza — nunca el piso SICE-TAC ni el
-        // histórico, y "vencida" no aplica a una consulta en vivo (su propio
-        // contrato: la respuesta siempre es la vigente ahora).
+        // Plaza en vivo (conexión SAP nueva): con SapTarifaFleteEnVivo:Modo en Deshabilitado o Real sin adaptador, _sapEnVivo.Configurado es false y esta rama no corre.
+        // Solo sustituye la plaza (nunca el piso SICE-TAC ni el histórico), y "vencida" no aplica: la respuesta en vivo es siempre la vigente.
         if (_sapEnVivo.Configurado)
         {
             var enVivo = await _sapEnVivo.ConsultarPlazaAsync(new clsConsultaTarifarioSap(
@@ -445,10 +363,7 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
         var plaza = plazaVigente ?? plazaVencidaRef;
         var vencida = plazaVigente is null && plazaVencidaRef is not null;
 
-        // Cuando la propuesta final es plaza y ese candidato viene del fallback
-        // conservador (no un match exacto por vehículo/peso), la advertencia se anexa
-        // a la MISMA justificación que ya se le muestra al usuario - no hace falta que
-        // el frontend sepa leer un campo aparte para enterarse.
+        // Si la propuesta final es plaza y el candidato viene del fallback conservador (no un match exacto por vehículo/peso), la advertencia se anexa a la misma justificación que ve el usuario.
         if (fuente == "plaza" && plaza?.Advertencia is { } advertenciaPlaza)
             justificacion += $" ⚠ {advertenciaPlaza}";
 
@@ -477,9 +392,7 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
         return (dto, decision.Modo);
     }
 
-    // La decisión vive en Domain (Costeo/Reglas/clsReglaDeCosteo): son invariantes del
-    // negocio, no de este adaptador. Aquí solo se traen los candidatos y se traducen
-    // los DTO de aplicación a los objetos de valor del dominio.
+    // La decisión vive en Domain (clsReglaDeCosteo): son invariantes del negocio. Aquí solo se traen los candidatos y se traducen los DTO a objetos de valor del dominio.
 
     private static clsCandidatoDeTarifa? ADominio(clsCandidatoTarifaDto? c) =>
         c is null ? null : new clsCandidatoDeTarifa(c.Fuente, c.Valor, c.VehiculoRelajado);
@@ -494,10 +407,8 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
         var dw = scope.ServiceProvider.GetService<clsDwSiceDbContext>();
         if (dw is null) return null;
 
-        // Es un tramo vacío (1 h + 1 h) sin una línea de solicitud detrás: las dos ciudades llegan escritas a mano. Cada una se
-        // resuelve a su municipio y, con los dos códigos DANE, la ruta se compara exacta, igual que al costear una línea; el texto
-        // del nombre de la ruta no sirve de entrada porque SICE-TAC escribe "BOGOTA D. C." y el catálogo "BOGOTA, D.C.". Si alguna
-        // no se resuelve a un único municipio, se busca por texto.
+        // Tramo vacío (1 h + 1 h) sin línea de solicitud detrás: las dos ciudades llegan escritas a mano; cada una se resuelve a su municipio y con los dos códigos DANE
+        // la ruta se compara exacta (el texto no sirve: SICE-TAC escribe "BOGOTA D. C." y el catálogo "BOGOTA, D.C."). Si alguna no se resuelve a un único municipio, se busca por texto.
         var db = scope.ServiceProvider.GetRequiredService<clsNexoDbContext>();
         var levanteResuelto = await ResolverDaneCiudadAsync(db, ciudadLevante, ct);
         var origenResuelto = await ResolverDaneCiudadAsync(db, origen, ct);
@@ -521,8 +432,8 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
     }
 
     /// <summary>
-    /// Retorno del contenedor vacío: piso SICE-TAC de viaje VACÍO desde el destino de la línea hasta la ciudad de devolución, con
-    /// 1 h + 1 h y con el mismo vehículo y la misma carrocería de la línea. Null si no hay piso exacto para esa ruta.
+    /// Retorno del contenedor vacío: piso SICE-TAC de viaje VACÍO del destino de la línea a la ciudad de devolución, con 1 h + 1 h y el mismo vehículo y carrocería.
+    /// Null si no hay piso exacto para esa ruta.
     /// </summary>
     private async Task<clsCandidatoTarifaDto?> RetornoContenedorAsync(
         clsDwSiceDbContext dw, string origenRetorno, string destinoRetorno, string? origenDane, string? destinoDane,
@@ -539,8 +450,7 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
     }
 
     /// <summary>
-    /// Aprovisionamiento (levante del contenedor en una ciudad distinta al origen): piso SICE-TAC de viaje VACÍO desde la ciudad de
-    /// levante hasta el origen de la línea, con 1 h + 1 h y con el mismo vehículo y la misma carrocería de la línea.
+    /// Levante del contenedor (aprovisionamiento): piso SICE-TAC de viaje VACÍO de la ciudad de levante al origen de la línea, con 1 h + 1 h y el mismo vehículo y carrocería.
     /// Null si no hay piso exacto para esa ruta.
     /// </summary>
     private async Task<clsCandidatoTarifaDto?> AprovisionamientoContenedorAsync(
@@ -558,10 +468,8 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
     }
 
     /// <summary>
-    /// Agrega a la propuesta los tramos vacíos que la línea pide: retorno del contenedor y levante (aprovisionamiento). Se aplica a
-    /// los tres caminos de decisión, porque son costos aparte del flete principal. Si la línea pide un tramo y no se encuentra
-    /// su piso exacto, la línea completa queda pendiente (<see cref="clsPropuestaLineaDto.MotivoPendiente"/>) y no se guarda sola.
-    /// Una línea que ES la devolución del contenedor no tiene retorno ni levante propios.
+    /// Agrega los tramos vacíos que pide la línea (retorno y levante) en los tres caminos de decisión, por ser costos aparte del flete. Si pide un tramo y no hay piso exacto,
+    /// la línea queda pendiente (<see cref="clsPropuestaLineaDto.MotivoPendiente"/>) y no se guarda sola. Una línea que ES la devolución no tiene retorno ni levante propios.
     /// </summary>
     private async Task<clsPropuestaLineaDto> ConTramosVaciosAsync(
         clsPropuestaLineaDto dto, clsLineaSolicitud linea, clsNexoDbContext db, clsDwSiceDbContext? dw, string origen, string destino,
@@ -622,8 +530,7 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
         };
     }
 
-    /// <summary>#300: motivo visible cuando el piso SICE-TAC no se usa por período (ver
-    /// <see cref="IPropuestaTarifaPort.MotivoSicetacNoUsadoAsync"/>). Null si DWSice no está configurado.</summary>
+    /// <summary>Motivo visible cuando el piso SICE-TAC no se usa por período (ver <see cref="IPropuestaTarifaPort.MotivoSicetacNoUsadoAsync"/>). Null si DWSice no está configurado.</summary>
     public async Task<string?> MotivoSicetacNoUsadoAsync(CancellationToken ct = default)
     {
         if (!_dwConfigurado) return null;
@@ -644,8 +551,7 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
         var (fila, criterio, vehiculoRelajado) = await ResolverFilaSiceAsync(dw, origen, destino, origenDane, destinoDane, vehiculo, condicionCarga, tipologia, carroceria, ct);
         if (fila is null) return null;
 
-        // S4-HU-14.1/#221: piso recalculado con las horas reales de la solicitud en vez
-        // de asumir las pactadas — ver clsPisoConHoras para el criterio de fallback.
+        // Piso recalculado con las horas reales de la solicitud en vez de las pactadas (criterio de fallback en clsPisoConHoras).
         var valor = clsPisoConHoras.Calcular(fila.Valor, fila.ValorHora, fila.HorasPactadas, fila.ValorSiceConHora, horasSolicitud);
         return new clsCandidatoTarifaDto(
             "sicetac", valor,
@@ -662,9 +568,8 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
     private static string? CarroceriaPorDefectoDeContenedor(bool esContenedor) => esContenedor ? CarroceriaDeContenedor : null;
 
     /// <summary>
-    /// El vehículo que corresponde a una línea de contenedor SIN vehículo, según el tamaño del contenedor y su peso (<c>tbl_rangos_peso_contenedor</c>).
-    /// Sin él, la búsqueda tolerante tomaba la fila más barata de cualquier vehículo de la ruta. Null si la línea ya trae vehículo, no es de contenedor,
-    /// faltan el tamaño o el peso, la tabla no está disponible o ningún vehículo aplica a ese peso.
+    /// Vehículo que corresponde a una línea de contenedor sin vehículo, según tamaño y peso (<c>tbl_rangos_peso_contenedor</c>); sin él la búsqueda tolerante tomaría la fila más barata de cualquier vehículo.
+    /// Null si la línea ya trae vehículo, no es de contenedor, faltan tamaño o peso, la tabla no está disponible o ningún vehículo aplica.
     /// </summary>
     private async Task<string?> VehiculoDeContenedorSinVehiculoAsync(clsLineaSolicitud linea, string? vehiculo, bool esContenedor, CancellationToken ct)
     {
@@ -677,12 +582,8 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
         $"No hay filas del vehículo {vehiculo?.Trim().ToUpper()} para esta ruta: el valor corresponde a otro vehículo y solo sirve de referencia.";
 
     /// <summary>
-    /// Piso SICE-TAC de un viaje VACÍO ("Sin carga"). A diferencia del viaje cargado, cada ruta trae una fila por unidad de
-    /// transporte con valores distintos, así que la fila se elige por la carrocería de la línea (nunca la más barata): sin
-    /// carrocería solo se acepta en una línea de contenedor (PORTACONTENEDORES). Con <paramref name="permitirVehiculoRelajado"/>
-    /// en false el vehículo también tiene que coincidir exacto (retorno y levante); en true, si la ruta no tiene filas de ese
-    /// vehículo se usa otro y el candidato sale marcado como relajado (flete principal de una devolución de contenedor).
-    /// Null si no hay una fila que coincida.
+    /// Piso SICE-TAC de un viaje VACÍO: la fila se elige por la carrocería de la línea (nunca la más barata); sin carrocería solo se acepta en contenedor (PORTACONTENEDORES).
+    /// Con <paramref name="permitirVehiculoRelajado"/> en false el vehículo debe coincidir exacto (retorno y levante); en true se usa otro vehículo y el candidato sale marcado como relajado. Null si nada coincide.
     /// </summary>
     private async Task<clsCandidatoTarifaDto?> CandidatoVacioAsync(
         clsDwSiceDbContext dw, string origen, string destino, string? origenDane, string? destinoDane,
@@ -722,10 +623,8 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
     }
 
     /// <summary>
-    /// Elige entre las filas de un viaje vacío la de la unidad de transporte que corresponde a la carrocería (comparación sin
-    /// tildes ni mayúsculas, con "_" y "-" como espacio). Entre las de esa unidad prefiere la vía estándar, luego las menores
-    /// horas de recorrido y luego el menor valor. Sin carrocería solo elige en una línea de contenedor (PORTACONTENEDORES);
-    /// si la unidad no existe en las filas, devuelve null.
+    /// Elige la fila de la unidad de transporte que corresponde a la carrocería (sin tildes ni mayúsculas, "_" y "-" como espacio); entre ellas prefiere vía estándar, menores horas y menor valor.
+    /// Sin carrocería solo elige en una línea de contenedor (PORTACONTENEDORES); null si la unidad no existe.
     /// </summary>
     internal static clsRutaSicetacDw? SeleccionarSiceVacio(List<clsRutaSicetacDw> filas, string? carroceria, bool esContenedor)
     {
@@ -743,11 +642,7 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
             .FirstOrDefault();
     }
 
-    /// <summary>
-    /// Piso SICE-TAC vigente con desglose de horas para Mesa de Costeo (issue #179):
-    /// misma fuente DWSice que ya usa el motor automático, no la caché local que se
-    /// retiró (import manual de Excel, sin evidencia de uso real y desactualizada).
-    /// </summary>
+    /// <summary>Piso SICE-TAC vigente con desglose de horas para Mesa de Costeo; usa la misma fuente DWSice que el motor automático.</summary>
     public async Task<clsPisoSicetacVigenteDto?> PisoSicetacVigenteAsync(
         string origen, string destino, string? vehiculo, TipologiaCarga? tipologia,
         string? carroceria, CancellationToken ct = default)
@@ -768,18 +663,8 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
     }
 
     /// <summary>
-    /// Resuelve la fila de DWSice: mismo camino para la propuesta automática y para
-    /// Mesa de Costeo (<see cref="PisoSicetacVigenteAsync"/>) — una sola consulta a
-    /// mantener, dos formas distintas de exponer el resultado.
-    /// S5-HU-16.2/#255: con <paramref name="origenDane"/>/<paramref name="destinoDane"/>
-    /// (tbl_municipios.CodigoDane) compara EXACTO contra
-    /// tblRutasSicetac.ORIGEN/DESTINO — confirmado con datos reales que esa tabla
-    /// guarda el mismo código DANE pero SIN el cero a la izquierda del departamento
-    /// (tbl_municipios "05001000" ~ DWSice "5001000"), de ahí el TrimStart('0'). Sin
-    /// DANE (ruta vieja sin backfill, o texto que no resolvió ningún municipio — ver
-    /// #254) cae al LIKE de texto contra NOMBRERUTA, igual que antes de esta issue.
-    /// La tabla tiene ~2.1 millones de filas por periodo: el filtro exacto por DANE,
-    /// además de corregir el match, es muchísimo más barato que el LIKE.
+    /// Resuelve la fila de DWSice, compartida por la propuesta automática y Mesa de Costeo (<see cref="PisoSicetacVigenteAsync"/>). Con <paramref name="origenDane"/>/<paramref name="destinoDane"/> compara EXACTO contra tblRutasSicetac.ORIGEN/DESTINO
+    /// (que guarda el DANE sin el cero a la izquierda del departamento, de ahí el TrimStart('0')); sin DANE cae al LIKE sobre NOMBRERUTA. El filtro exacto es además mucho más barato en ~2.1 M de filas por periodo.
     /// </summary>
     private async Task<(clsRutaSicetacDw? Fila, string Criterio, bool VehiculoRelajado)> ResolverFilaSiceAsync(
         clsDwSiceDbContext dw, string origen, string destino, string? origenDane, string? destinoDane,
@@ -810,9 +695,8 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
     }
 
     /// <summary>
-    /// Arma la consulta de filas SICE-TAC de una ruta y una condición de carga (CARGADO o VACIO) para el período del mes actual:
-    /// por código DANE exacto cuando hay municipios resueltos, y por texto del nombre de la ruta en caso contrario. Devuelve
-    /// null si el período más reciente cargado no es el del mes actual (sin piso ese mes).
+    /// Consulta de filas SICE-TAC de una ruta y condición de carga (CARGADO o VACIO) del período del mes actual: por código DANE exacto si hay municipios resueltos, si no por texto de la ruta.
+    /// Null si el período más reciente cargado no es el del mes actual.
     /// </summary>
     private async Task<(IQueryable<clsRutaSicetacDw> Consulta, string Criterio, string ClaveBase)?> PrepararConsultaSiceAsync(
         clsDwSiceDbContext dw, string origen, string destino, string? origenDane, string? destinoDane,
@@ -865,8 +749,7 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
 
         if (!string.IsNullOrWhiteSpace(carroceria))
         {
-            // La carrocería se compara sin tildes ni mayúsculas y con "_" y "-" como espacio ("Furgón" = "FURGON"): una
-            // comparación literal no encontraba la unidad y el piso salía de otra unidad de transporte.
+            // La carrocería se compara sin tildes ni mayúsculas y con "_" y "-" como espacio ("Furgón" = "FURGON"); una comparación literal no hallaría la unidad.
             var unidad = clsResolucionDeCatalogos.Normalizar(carroceria);
             var porUnidad = cand.Where(r => clsResolucionDeCatalogos.Normalizar(r.NombreUnidadTransporte) == unidad).ToList();
             if (porUnidad.Count > 0) cand = porUnidad;
@@ -896,11 +779,7 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
             return await q.ToListAsync(ct);
         }))!;
 
-    /// <summary>
-    /// Período AAAAMM más reciente cargado en DWSice HASTA el mes actual (0 si no hay ninguno). Un período futuro ya
-    /// cargado no tapa al vigente. La clave de caché lleva el período actual: al cambiar de mes no se reusa el
-    /// valor del mes anterior. Quien lo usa decide si es el vigente (<see cref="clsPeriodoSicetac"/>).
-    /// </summary>
+    /// <summary>Período AAAAMM más reciente cargado en DWSice hasta el mes actual (0 si no hay); un período futuro no tapa al vigente. La clave de caché lleva el período actual para no reusar el del mes anterior.</summary>
     private async Task<int> PeriodoSiceAsync(clsDwSiceDbContext dw, CancellationToken ct)
     {
         var actual = clsPeriodoSicetac.Actual(_clock.GetUtcNow());
@@ -913,11 +792,7 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
 
     // --------------------------------------------- catálogo externo: nombre por enum
 
-    /// <summary>S5-HU-19.1/#281: resuelve el NOMBRE (no el Id, no el enum) que
-    /// tbl_tarifas_plaza/tbl_tarifas_plaza_historico guardan para línea de negocio — vía
-    /// el mismo mapeo enum-&gt;Id SAP que ya usa clsTarifarioSapAdapter para construir su
-    /// propio filtro (CodigoLinea), aplicado sobre el catálogo real (ILineasNegocioPort)
-    /// en vez de comparar contra un Id de otra base de datos.</summary>
+    /// <summary>Resuelve el NOMBRE (no el Id ni el enum) de línea de negocio que guardan tbl_tarifas_plaza/tbl_tarifas_plaza_historico, con el mismo mapeo enum-&gt;Id SAP de clsTarifarioSapAdapter sobre ILineasNegocioPort.</summary>
     private static async Task<string?> NombreLineaNegocioAsync(ILineasNegocioPort port, LineaNegocio? valor, CancellationToken ct)
     {
         if (valor is not { } ln || !clsTarifarioSapAdapter.CodigoLinea.TryGetValue(ln, out var id)) return null;
@@ -934,22 +809,14 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
 
     // ------------------------------------------------------------- SAP (plaza e histórico)
 
-    /// <summary>Códigos de zona SAP (ZC_/ZTC_) de un municipio ya resuelto — ver
-    /// clsMunicipio.NombreTarifasPlaza/ZonaTarificacion. Vacío (nunca matchea nada) si el
-    /// municipio es null o no tiene ninguno de los dos códigos poblados.</summary>
+    /// <summary>Códigos de zona SAP (ZC_/ZTC_) de un municipio ya resuelto (clsMunicipio.NombreTarifasPlaza/ZonaTarificacion). Vacío si el municipio es null o no tiene ninguno.</summary>
     private static IReadOnlyList<string> CodigosZonaSap(clsMunicipio? municipio) =>
         new[] { municipio?.NombreTarifasPlaza, municipio?.ZonaTarificacion }
             .Where(c => !string.IsNullOrWhiteSpace(c)).Select(c => c!).ToList();
 
     /// <summary>
-    /// S5-HU-16.3/#256: Origen/Destino de tblSAPTarifas/tblSAPTarifasLog guardan código
-    /// DIVIPOLA o zona SAP (ZC_/ZTC_) — <see cref="Nexo.Infrastructure.External.clsSapTarifaBase"/>.
-    /// Antes se resolvía un código DANE (tblSAPDANE) y, si no servía, cualquier fila cuyo
-    /// Origen/Destino *contuviera* ese texto como substring (LIKE) — ninguno de los dos es
-    /// el criterio real. Ahora compara EXACTO contra los códigos ZC_/ZTC_ ya cruzados en
-    /// tbl_municipios (seeder S4-HU-09.1). Sin municipio resuelto para alguno de los dos
-    /// lados (#254), o sin ningún código de zona poblado, no hay match posible — se
-    /// devuelve null (la fuente no aplica), nunca se adivina.
+    /// Origen/Destino de tblSAPTarifas/tblSAPTarifasLog guardan código DIVIPOLA o zona SAP (<see cref="Nexo.Infrastructure.External.clsSapTarifaBase"/>): se compara EXACTO contra los códigos ZC_/ZTC_ de tbl_municipios.
+    /// Sin municipio resuelto en alguno de los lados, o sin código de zona, devuelve null (la fuente no aplica); nunca se adivina.
     /// </summary>
     private async Task<clsCandidatoTarifaDto?> CandidatoSapAsync<T>(
         clsDbSolucionesTiDbContext dc, IQueryable<T> tabla, string fuente,
@@ -1065,10 +932,8 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
     }
 
     /// <summary>
-    /// Código DANE del municipio colombiano al que corresponde el nombre de una ciudad escrita a mano (levante o devolución del
-    /// contenedor). Primero busca el nombre exacto; si no hay, los municipios cuyo nombre contiene el texto o está contenido en él
-    /// ("Bogotá" ~ "BOGOTA, D.C."). Devuelve null si no hay ninguno o si hay más de uno distinto: una ciudad ambigua no se adivina y
-    /// el tramo vacío se busca por texto de la ruta.
+    /// Código DANE del municipio colombiano de una ciudad escrita a mano (levante o devolución): primero nombre exacto; si no, municipios cuyo nombre contiene el texto o está contenido en él ("Bogotá" ~ "BOGOTA, D.C.").
+    /// Null si no hay ninguno o hay más de uno distinto: una ciudad ambigua no se adivina y el tramo se busca por texto.
     /// </summary>
     private async Task<string?> ResolverDaneCiudadAsync(clsNexoDbContext db, string ciudad, CancellationToken ct)
     {

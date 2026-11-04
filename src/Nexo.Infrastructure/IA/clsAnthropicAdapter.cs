@@ -10,21 +10,9 @@ using Nexo.Application.Common.Ports;
 
 namespace Nexo.Infrastructure.IA;
 
-/// <summary>
-/// Salida hacia Claude por el SDK oficial de Anthropic para .NET.
-///
-/// SIN LLAVE O CON LA FUNCIÓN APAGADA el adaptador existe igual (la aplicación arranca) pero no crea el cliente ni llama a la
-/// red: <see cref="Habilitada"/> devuelve false y <see cref="CompletarAsync"/> lanza un 503 con código estable.
-///
-/// LO QUE SE ENVÍA es solo lo de <see cref="clsPeticionIa"/>: instrucciones, mensajes, esfuerzo, tope de tokens y, si se pide,
-/// el formato de salida. No se envían <c>temperature</c>, <c>top_p</c> ni <c>top_k</c> (la API los rechaza). Con
-/// <see cref="clsOpcionesAnthropic.RazonamientoAdaptativo"/> el modelo razona según el esfuerzo.
-///
-/// ERRORES. Los del proveedor se traducen a <see cref="clsServiceUnavailableException"/> con un código de
-/// <see cref="IAsistenteIaPort"/>. Ni los mensajes ni los logs llevan la llave ni el contenido de la petición: se registra
-/// función, modelo, tokens, latencia y resultado. Los reintentos de 429, 5xx y errores de red los hace el SDK
-/// (<see cref="clsOpcionesAnthropic.MaxReintentos"/>).
-/// </summary>
+/// <summary>Salida hacia Claude por el SDK oficial. Sin llave o con la función apagada el adaptador existe pero no crea cliente ni llama a la red (503 con código estable).
+/// Solo se envía lo de <see cref="clsPeticionIa"/> (nunca temperature, top_p ni top_k: la API los rechaza).
+/// Ni mensajes ni logs llevan la llave ni el contenido de la petición. Los reintentos de 429, 5xx y red los hace el SDK.</summary>
 public sealed partial class clsAnthropicAdapter : IAsistenteIaPort
 {
     private readonly clsOpcionesAnthropic _opciones;
@@ -159,11 +147,7 @@ public sealed partial class clsAnthropicAdapter : IAsistenteIaPort
         catch (JsonException) { return false; }
     }
 
-    /// <summary>
-    /// Lo que respondió el proveedor ante un error (tipo, mensaje e id de la petición), para poder diagnosticar un rechazo sin
-    /// reproducirlo. Es el texto de diagnóstico del proveedor, no la petición: no incluye los mensajes enviados. Se recorta y,
-    /// por si acaso, se borra la llave.
-    /// </summary>
+    /// <summary>Tipo, mensaje e id de petición del error del proveedor, para diagnosticar sin reproducir. No incluye los mensajes enviados; se recorta y se borra la llave.</summary>
     private string DetalleDelProveedor(Exception ex)
     {
         if (ex is not AnthropicApiException) return ex.GetType().Name;

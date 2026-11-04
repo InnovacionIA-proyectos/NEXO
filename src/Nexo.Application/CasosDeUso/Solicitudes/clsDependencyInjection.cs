@@ -6,15 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Nexo.Application.CasosDeUso.Solicitudes;
 
-/// <summary>
-/// Módulo Solicitudes/Captura: Bandeja Priorizada (anti-FIFO), alta de solicitudes
-/// (spot y captura con Excel), carga masiva de líneas, costeo por línea y rechazo.
-/// Antes solo existía un puerto mínimo hacia este módulo desde Cotizaciones
-/// (ISolicitudesPort/ILineasSolicitudPort en Cotizaciones.Ports); ESTE módulo es
-/// la migración completa del servicio original. Los dos puertos de Cotizaciones
-/// siguen viviendo donde están: son un contrato hacia el AGREGADO clsSolicitud, no
-/// hacia este módulo, y ya tienen su propia implementación EF — no se tocan.
-/// </summary>
+/// <summary>Módulo Solicitudes/Captura: Bandeja Priorizada, alta de solicitudes, carga masiva de líneas, costeo por línea y rechazo.</summary>
 public static class clsDependencyInjection
 {
     public static IServiceCollection AddSolicitudesUseCases(this IServiceCollection services)

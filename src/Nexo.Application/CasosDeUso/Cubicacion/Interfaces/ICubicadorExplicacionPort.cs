@@ -1,11 +1,8 @@
 namespace Nexo.Application.CasosDeUso.Cubicacion.Interfaces;
 
 /// <summary>
-/// GET /recomendaciones/explicacion del Cubicador: por qué eligió esa flota, en dos o tres frases. Es aparte de
-/// <see cref="ICubicacionRapidaPort"/> porque el texto lo escribe un modelo y tarda segundos (necesita un tiempo de espera propio, mayor
-/// que el de la recomendación), y porque es opcional: <b>nunca lanza</b>. Sin configurar, con el Cubicador caído, sin responder, con una
-/// respuesta que no se entiende o sin recomendación para esa línea, devuelve null y la pantalla se dibuja igual sin el bloque.
-/// Por aquí no pasa ninguna tarifa ni valor comercial: solo el texto.
+/// Explicación en lenguaje natural de por qué el Cubicador eligió esa flota. Aparte de <see cref="ICubicacionRapidaPort"/> porque el texto lo escribe un modelo
+/// (tarda segundos, necesita tiempo de espera propio) y es opcional: <b>nunca lanza</b>; ante cualquier falla devuelve null y la pantalla se dibuja sin el bloque.
 /// </summary>
 public interface ICubicadorExplicacionPort
 {

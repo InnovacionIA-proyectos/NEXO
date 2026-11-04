@@ -1,7 +1,6 @@
 namespace Nexo.Mensajes.Costeo;
 
-// Un validador por mensaje. La regla es fallo cerrado: un tipo sin validador no se
-// publica, así que esta lista y la de mensajes crecen juntas por construcción.
+// Un validador por mensaje: un tipo sin validador no se publica (fallo cerrado).
 
 public sealed class clsRepartirLineasDeCosteoValidador : IValidadorDeMensaje<clsRepartirLineasDeCosteo>
 {
@@ -14,8 +13,7 @@ public sealed class clsPliegoRepartidoValidador : IValidadorDeMensaje<clsPliegoR
     public IReadOnlyList<string> Validar(clsPliegoRepartido m)
     {
         var motivos = clsMotivos.De(("TrabajoId", m.TrabajoId), ("SolicitudId", m.SolicitudId));
-        // Cero líneas sí es válido: un pliego vacío se cierra completo sin repartir nada.
-        // Negativo no: sería un error de conteo, y la saga nunca alcanzaría su total.
+        // Cero líneas es válido (un pliego vacío se cierra sin repartir); negativo es un error de conteo.
         if (m.TotalLineas < 0)
             motivos.Add("TotalLineas no puede ser negativo: la saga nunca alcanzaría su total.");
         return motivos;
@@ -34,9 +32,7 @@ public sealed class clsLineaCosteadaValidador : IValidadorDeMensaje<clsLineaCost
     {
         var motivos = clsMotivos.De(("TrabajoId", m.TrabajoId), ("LineaId", m.LineaId));
 
-        // Regla inviolable: nunca se propone un flete por debajo del piso. Cero o
-        // negativo no es "barato", es un cálculo roto, y dejarlo pasar contamina la
-        // Biblioteca de tarifas ganadas si esa cotización se marca ganada.
+        // Cero o negativo es un cálculo roto, no un flete barato: contaminaría la Biblioteca de tarifas ganadas.
         if (m.ValorPropuesto <= 0)
             motivos.Add("ValorPropuesto debe ser mayor que cero: un flete en cero es un cálculo roto, no una tarifa.");
 
@@ -93,4 +89,3 @@ public sealed class clsTrabajoActualizadoValidador : IValidadorDeMensaje<clsTrab
     public IReadOnlyList<string> Validar(clsTrabajoActualizado m) => clsMotivos.De(("TrabajoId", m.TrabajoId));
 }
 
-/// <summary>Los identificadores vacíos son el motivo que se repite en todos los mensajes.</summary>

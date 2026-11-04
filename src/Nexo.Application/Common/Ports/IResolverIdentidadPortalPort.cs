@@ -3,10 +3,7 @@ using Nexo.Domain.Enums;
 namespace Nexo.Application.Common.Ports;
 
 /// <summary>
-/// Orquesta la resolución de sesión de identidad del portal en un solo puerto, para
-/// que el esquema de autenticación (Api) no conozca ni la tabla externa ni la de mapeo
-/// de roles. Se llama en CADA petición, sin caché de sesión (docs/contrato-integracion,
-/// D5/ADR-001): la persona pudo perder el permiso desde la última vez.
+/// Resuelve la sesión de identidad del portal. Se llama en CADA petición, sin caché de sesión: la persona pudo perder el permiso desde la última vez.
 /// </summary>
 public interface IResolverIdentidadPortalPort
 {
@@ -14,10 +11,7 @@ public interface IResolverIdentidadPortalPort
 }
 
 /// <summary>
-/// Resultado de resolver un id del portal. <paramref name="Rol"/> null distingue "existe
-/// en la tabla pero sin permiso sobre Nexo" (403, <paramref name="UsuarioId"/>
-/// también null porque no se aprovisiona cuenta local para quien nunca entra) de "no se
-/// pudo resolver identidad alguna" (401, cuando el método devuelve null en vez de esta
-/// clase).
+/// <paramref name="Rol"/> null = existe pero sin permiso sobre Nexo (403, <paramref name="UsuarioId"/> también null);
+/// si el método devuelve null no se resolvió identidad alguna (401).
 /// </summary>
 public sealed record clsIdentidadResueltaDto(Guid? UsuarioId, string Nombre, RolUsuario? Rol);

@@ -6,26 +6,16 @@ namespace Nexo.Api.Sesion;
 
 public record clsSesionActualDto(long Id, string Nombre, RolUsuario Rol, IReadOnlyList<string> Capacidades);
 
-/// <summary>
-/// docs/contrato-integracion/README.md, sección 1: "se llama al entrar al módulo. No
-/// crea sesión: cada petición posterior vuelve a validarse por su cuenta." La identidad
-/// y el rol ya quedaron resueltos por clsIdentidadPortalAuthenticationHandler antes de
-/// llegar acá — este controller solo empaqueta la respuesta; un 401/403 nunca llega
-/// hasta aquí, los produce el esquema de autenticación.
-/// </summary>
+/// <summary>Se llama al entrar al módulo; no crea sesión (cada petición se valida por su cuenta). Identidad y rol ya los resolvió clsIdentidadPortalAuthenticationHandler.</summary>
 [ApiController]
 [Route("api/sesion")]
 public class clsSesionController(ICurrentUser currentUser) : ControllerBase
 {
-    /// <summary>Capacidades por rol: para que el frontend decida qué pinta, no qué
-    /// permite (la autorización real vive en el backend, sección 3 del contrato). Primer
-    /// corte a partir de la tabla "Autorización por operación" — sujeto a que Frontend
-    /// confirme el vocabulario exacto que necesita pintar.</summary>
+    /// <summary>Capacidades por rol, para que el frontend decida qué pinta (la autorización real vive en el backend).</summary>
     private static readonly IReadOnlyDictionary<RolUsuario, string[]> CapacidadesPorRol = new Dictionary<RolUsuario, string[]>
     {
         [RolUsuario.Comercial] = ["capturarSolicitud", "gestionarCotizacion", "agregarConexos"],
-        // S6-HU-25.1/#307: la Biblioteca, sin Bandeja, Mesa ni cotizaciones. Crear solicitud, cargar líneas y
-        // recalcular el puntaje pasaron a SOLO Admin (decisión D5): le llegan por el "*".
+        // AdminBiblioteca: solo la Biblioteca, sin Bandeja, Mesa ni cotizaciones. Crear solicitud, cargar líneas y recalcular el puntaje son solo de Admin (le llegan por el "*").
         [RolUsuario.AdminBiblioteca] = ["verBiblioteca", "ajustarVigencia", "editarReglasSoloSicetac"],
         [RolUsuario.AdminTarifas] = ["verBiblioteca", "ajustarVigencia", "editarReglasSoloSicetac", "gestionarCotizacion", "editarServiciosConexos"],
         [RolUsuario.ServiciosLogisticos] = ["editarServiciosConexos"],
@@ -33,6 +23,7 @@ public class clsSesionController(ICurrentUser currentUser) : ControllerBase
         [RolUsuario.Admin] = ["*"],
     };
 
+    /// <summary>Devuelve la identidad del usuario autenticado (id del portal, nombre, rol) y sus capacidades.</summary>
     [HttpGet("actual")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public ActionResult<clsSesionActualDto> Actual()

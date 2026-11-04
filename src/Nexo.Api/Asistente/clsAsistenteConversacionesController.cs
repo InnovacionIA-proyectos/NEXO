@@ -55,6 +55,7 @@ public class clsAsistenteConversacionesController(
         }
     }
 
+    /// <summary>Lista las conversaciones de quien consulta con el asistente, de la más reciente a la más antigua (<c>top</c> limita cuántas, 50 por defecto).</summary>
     [HttpGet]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyList<clsConversacionResumenDto>>> Listar([FromQuery] int top = 50, CancellationToken ct = default)

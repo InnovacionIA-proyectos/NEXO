@@ -13,8 +13,6 @@ public interface ITarifasCosteoPort
     Task<IReadOnlyList<clsHistoricaSugeridaDto>> HistoricasSugeridasAsync(
         Guid rutaId, TipologiaCarga? tipologia, DateTimeOffset ahora, int top, CancellationToken ct);
 
-    /// <summary>#300: motivo por el que el piso SICE-TAC NO se está usando (el período más reciente cargado no es el
-    /// del mes actual). Null si se usa con normalidad. Es el aviso que Mesa de Costeo muestra cuando
-    /// <see cref="PisoVigenteAsync"/> devuelve null por esa causa.</summary>
+    /// <summary>Motivo por el que el piso SICE-TAC NO se usa (el período cargado más reciente no es el del mes actual); null si se usa con normalidad.</summary>
     Task<string?> MotivoSicetacNoUsadoAsync(CancellationToken ct);
 }

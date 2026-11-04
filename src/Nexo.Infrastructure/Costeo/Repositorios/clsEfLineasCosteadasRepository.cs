@@ -7,14 +7,8 @@ namespace Nexo.Infrastructure.Costeo.Repositorios;
 
 public sealed class clsEfLineasCosteadasRepository(clsNexoDbContext db) : ILineasCosteadasPort
 {
-    /// <summary>
-    /// Deja la línea como resuelta por el servicio.
-    ///
-    /// No se guarda el valor en la línea: el valor propuesto se aplica a la cotización
-    /// en su propio caso de uso, y duplicarlo aquí crearía dos verdades sobre el mismo
-    /// número. Lo que sí queda es que el servicio ya la resolvió, para que la bandeja
-    /// no la muestre como pendiente de costear.
-    /// </summary>
+    /// <summary>Deja la línea como resuelta por el servicio sin guardar el valor aquí (se aplica a la cotización en su propio caso de uso;
+    /// duplicarlo crearía dos verdades), para que la bandeja no la muestre pendiente.</summary>
     public async Task MarcarAutoResueltaAsync(Guid lineaId, decimal valor, string fuente, CancellationToken ct = default)
     {
         var linea = await db.LineasSolicitud.FirstOrDefaultAsync(l => l.Id == lineaId, ct);

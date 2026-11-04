@@ -4,13 +4,7 @@ using Microsoft.AspNetCore.SignalR;
 
 namespace Nexo.Api.Bandeja;
 
-/// <summary>
-/// Implementa el puerto de avisos de bandeja con SignalR.
-///
-/// El nombre del evento, "bandeja", es parte del contrato con el frontend: es lo que el
-/// cliente escucha. Se declara aquí en una constante para que no se escriba de dos formas
-/// distintas en dos sitios.
-/// </summary>
+/// <summary>Implementa el puerto de avisos de bandeja con SignalR. El nombre del evento, "bandeja", es parte del contrato con el frontend.</summary>
 public sealed class clsNotificadorDeBandejaSignalR(IHubContext<clsBandejaHub> hub) : INotificadorDeBandeja
 {
     public const string EventoBandeja = "bandeja";

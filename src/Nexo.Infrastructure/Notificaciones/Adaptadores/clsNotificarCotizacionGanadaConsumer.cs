@@ -7,7 +7,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Nexo.Infrastructure.Notificaciones.Adaptadores;
 
-/// <summary>Traduce una cotización marcada como ganada en el correo de alerta al Administrador de Reglas (urgencia Baja, sección 9 del documento de entendimiento).</summary>
+/// <summary>Traduce una cotización marcada como ganada en el correo de alerta al Administrador de Reglas (urgencia Baja).</summary>
 public sealed class clsNotificarCotizacionGanadaConsumer(
     ICommandHandler<clsNotificarCotizacionGanadaCommand, clsResultadoDeNotificacionDto> notificar,
     ILogger<clsNotificarCotizacionGanadaConsumer> log)

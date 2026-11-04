@@ -3,10 +3,8 @@ using Nexo.Application.Common.Exceptions;
 namespace Nexo.Application.CasosDeUso.Metricas;
 
 /// <summary>
-/// S5-HU-21.1/#287: corte del tiempo de costeo por tamaño del pliego (TotalLineas de la saga).
-/// El tiempo NO es proporcional al número de líneas —se procesan en paralelo, un mensaje por
-/// línea— así que dividir por línea no sirve; se segmenta por tamaño. Los tramos son los de la
-/// HU: 1-10 (coincide con UmbralCosteoDiferido = 10: lo que se costea síncrono), 11-100 y +100.
+/// Corte del tiempo de costeo por tamaño del pliego (TotalLineas de la saga): el tiempo no es proporcional al número de líneas
+/// (se procesan en paralelo), así que se segmenta. 1-10 coincide con UmbralCosteoDiferido = 10 (costeo síncrono).
 /// </summary>
 public enum TamanoPliego { Hasta10, De11A100, Mas100 }
 

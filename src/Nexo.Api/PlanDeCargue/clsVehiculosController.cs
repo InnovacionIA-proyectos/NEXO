@@ -23,15 +23,8 @@ public record clsGuardarVehiculoRequest(
     decimal TaraKg,
     decimal PuertaAnchoMm,
     decimal PuertaAltoMm,
-    // Valores documentados en cubicador/CONTRATO.md junto a VehiculoCubicacionDto.
-    // Sin este [RegularExpression], un valor inválido pasaba de largo hasta el
-    // validador del mensaje a publicar (clsCubicacionSolicitadaValidador) y volvía
-    // como un 400 que mencionaba "clsCubicacionSolicitada"/"clsSolicitud" — nombres
-    // internos de mensajería, no del contrato HTTP — en vez de VALIDATION_ERROR.
-    // record con constructor primario: la metadata de validación debe ir sobre el
-    // parámetro (sin "property:") — con "property:" ASP.NET Core la ignora y además
-    // tira 500 al validar ("validation metadata ... must be associated with the
-    // constructor parameter"), como se vio al probar esto en producción.
+    // Valores documentados en cubicador/CONTRATO.md. Sin [RegularExpression] un valor inválido llegaba al validador del mensaje y volvía con nombres internos de mensajería en vez de VALIDATION_ERROR.
+    // En un record con constructor primario la metadata de validación va sobre el parámetro (sin "property:"): con "property:" ASP.NET Core la ignora y falla con 500.
     [Required]
     [RegularExpression("(?i)^(trasera|frontal|costado_izquierdo|costado_derecho)$",
         ErrorMessage = "puertaPosicion debe ser trasera, frontal, costado_izquierdo o costado_derecho.")]
@@ -41,14 +34,7 @@ public record clsGuardarVehiculoRequest(
     decimal ToleranciaEntreUnidadesMm = 0);
 
 /// <summary>
-/// Alta de vehículos/contenedores por cola — reemplaza el POST síncrono que el
-/// navegador hacía directo contra Cubicador. La fuente de verdad del vehículo
-/// (dimensiones, presets, catálogo) sigue viviendo en Cubicador; NEXO solo genera
-/// el id y publica, una asimetría intencional.
-///
-/// La lectura (GET), a diferencia del POST, SÍ está resuelta enteramente en NEXO —
-/// contra la proyección local que vehiculo.creado/vehiculo.actualizado mantienen
-/// sincronizada, nunca contra Cubicador en caliente.
+/// Alta de vehículos/contenedores por cola: NEXO solo genera el id y publica; la fuente de verdad del vehículo vive en el Cubicador. La lectura (GET) se resuelve en NEXO contra la proyección local.
 /// </summary>
 [ApiController]
 [Route("api/vehiculos")]
@@ -58,6 +44,7 @@ public class clsVehiculosController(
     IQueryHandler<clsListarVehiculosQuery, clsPaginaDto<clsVehiculoCubicacionDto>> listar)
     : ControllerBase
 {
+    /// <summary>Da de alta un vehículo del catálogo de cubicación. Responde 202: se publica por cola y la fuente de verdad es el Cubicador.</summary>
     [Authorize(Roles = "Comercial,AdminTarifas,Admin")]
     [HttpPost]
     [ProducesResponseType(StatusCodes.Status202Accepted)]
@@ -75,14 +62,8 @@ public class clsVehiculosController(
     }
 
     /// <summary>
-    /// Baja de un vehículo del catálogo. Rol Admin: el catálogo es maestro y lo comparten
-    /// todos los planes, a diferencia del alta, que un comercial puede necesitar en medio
-    /// de una cotización.
-    ///
-    /// Responde 409 VEHICULO_EN_USO si algún plan de cargue todavía referencia el
-    /// vehículo (validado síncrono contra la fila espejo de clsPlanCargue, ver
-    /// clsEliminarVehiculoCommandHandler). Solo si no hay ningún plan asociado se publica el
-    /// comando y responde 202.
+    /// Baja de un vehículo del catálogo, solo Admin (el catálogo es maestro y lo comparten todos los planes). 409 VEHICULO_EN_USO si algún plan de cargue aún lo referencia;
+    /// si no, publica el comando y responde 202.
     /// </summary>
     [Authorize(Roles = "Admin")]
     [HttpDelete("{id:guid}")]
@@ -90,10 +71,7 @@ public class clsVehiculosController(
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<ActionResult<clsComandoAceptadoDto>> Eliminar(Guid id, CancellationToken ct = default)
         => Accepted(await eliminar.Handle(new clsEliminarVehiculoCommand(id), ct));
-    /// <summary>Catálogo contra la proyección local. [Authorize] sin rol específico —
-    /// mismo criterio que el resto de las consultas del sistema
-    /// (docs/ROLES_Y_PERMISOS.md). Pagina (page/pageSize, mismo patrón que
-    /// /api/servicios-conexos) aunque el catálogo hoy sea chico.</summary>
+    /// <summary>Catálogo contra la proyección local, paginado (page/pageSize).</summary>
     [Authorize]
     [HttpGet]
     [ProducesResponseType(StatusCodes.Status200OK)]

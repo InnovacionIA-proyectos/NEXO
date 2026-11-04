@@ -24,9 +24,8 @@ public interface IPreferenciasAsistenteRepository
 }
 
 /// <summary>
-/// Qué se acepta como preferencia. Es una segunda barrera: lo que de verdad impide que una preferencia haga proponer un valor bajo el
-/// piso o un precio sin fuente es la estructura (todo precio sale de una consulta, el piso lo aplica el dominio y todo cambio se
-/// confirma), no este filtro. Aquí se rechaza lo que fija un valor de dinero o intenta apagar una regla.
+/// Qué se acepta como preferencia: segunda barrera que rechaza fijar valores de dinero o apagar reglas. La garantía real es la
+/// estructura (precios de consulta, piso del dominio, confirmación).
 /// </summary>
 public static partial class clsValidadorDePreferencias
 {

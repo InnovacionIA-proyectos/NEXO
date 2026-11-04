@@ -13,7 +13,6 @@ public static class clsDependencyInjection
         services.AddScoped<IQueryHandler<clsListarLineasNegocioQuery, IReadOnlyList<clsLineaNegocioDto>>, clsListarLineasNegocioQueryHandler>();
         services.AddScoped<IQueryHandler<clsListarClasesViajeQuery, IReadOnlyList<clsClaseViajeDto>>, clsListarClasesViajeQueryHandler>();
         services.AddScoped<IQueryHandler<clsListarClasesContenedorQuery, IReadOnlyList<clsClaseContenedorDto>>, clsListarClasesContenedorQueryHandler>();
-        // S6-HU-27.2/#321 (diccionario de alias) y S6-HU-27.3/#322 (bandeja de normalización de vehículos).
         services.AddScoped<IQueryHandler<clsListarAliasQuery, IReadOnlyList<clsAliasDto>>, clsListarAliasQueryHandler>();
         services.AddScoped<IQueryHandler<clsResolverAliasQuery, clsResolverAliasDto>, clsResolverAliasQueryHandler>();
         services.AddScoped<ICommandHandler<clsCrearAliasCommand, clsAliasDto>, clsCrearAliasCommandHandler>();

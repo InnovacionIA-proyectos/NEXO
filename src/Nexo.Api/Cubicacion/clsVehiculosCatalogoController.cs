@@ -6,33 +6,31 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Nexo.Api.Cubicacion;
 
-/// <summary>
-/// S5-HU-18.6/#278: passthrough hacia <c>/vehiculos-catalogo</c> del Cubicador
-/// (cubicador/CONTRATO.md §3.2) — las configuraciones con sus medidas, capacidad y
-/// carrocerías, para el motor de selección de flota. NO es <c>/api/planes-cargue/vehiculos</c>
-/// (el catálogo propio del motor 3D) — son dos tablas distintas del lado del Cubicador.
-/// El vehículo y sus carrocerías viajan en UN solo payload; el Cubicador reconcilia.
-/// </summary>
+/// <summary>Passthrough hacia <c>/vehiculos-catalogo</c> del Cubicador: configuraciones con medidas, capacidad y carrocerías para el motor de selección de flota (no es <c>/api/planes-cargue/vehiculos</c>). Vehículo y carrocerías viajan en un solo payload.</summary>
 [ApiController]
 [Route("api/vehiculos-catalogo")]
 public class clsVehiculosCatalogoController(ICubicadorCatalogoPort cubicador, ICurrentUserPort usuarioActual) : ControllerBase
 {
     private const string Ruta = "vehiculos-catalogo";
 
+    /// <summary>Lista los vehículos del catálogo del motor de selección de flota.</summary>
     [Authorize]
     [HttpGet]
     public async Task<ActionResult<JsonNode?>> Listar(CancellationToken ct = default) => Ok(await cubicador.GetAsync(Ruta, ct));
 
+    /// <summary>Crea un vehículo del catálogo en el Cubicador. Solo AdminTarifas y Admin.</summary>
     [Authorize(Roles = "AdminTarifas,Admin")]
     [HttpPost]
     public async Task<ActionResult<JsonNode?>> Crear([FromBody] JsonObject body, CancellationToken ct = default) =>
         Ok(await cubicador.PostAsync(Ruta, body.ConUsuario(usuarioActual), ct));
 
+    /// <summary>Actualiza un vehículo del catálogo del Cubicador. Solo AdminTarifas y Admin.</summary>
     [Authorize(Roles = "AdminTarifas,Admin")]
     [HttpPut("{id}")]
     public async Task<ActionResult<JsonNode?>> Actualizar(string id, [FromBody] JsonObject body, CancellationToken ct = default) =>
         Ok(await cubicador.PutAsync($"{Ruta}/{id}", body.ConUsuario(usuarioActual), ct));
 
+    /// <summary>Elimina un vehículo del catálogo del Cubicador. Solo AdminTarifas y Admin.</summary>
     [Authorize(Roles = "AdminTarifas,Admin")]
     [HttpDelete("{id}")]
     public async Task<ActionResult> Eliminar(string id, [FromBody] JsonObject body, CancellationToken ct = default)
@@ -41,10 +39,7 @@ public class clsVehiculosCatalogoController(ICubicadorCatalogoPort cubicador, IC
         return NoContent();
     }
 
-    /// <summary>Reparación manual de la proyección de NEXO — ver
-    /// <see cref="clsTiposCarroceriaController.RepublicarCatalogo"/>. Vehículos del motor de
-    /// selección de flota: hoy NEXO no proyecta este catálogo (distinto del de
-    /// VehiculosCubicacion/motor 3D), se deja el endpoint por simetría con los otros cinco.</summary>
+    /// <summary>Reparación manual de la proyección; ver <see cref="clsTiposCarroceriaController.RepublicarCatalogo"/>. Hoy NEXO no proyecta este catálogo: el endpoint existe por simetría.</summary>
     [Authorize(Roles = "AdminTarifas,Admin")]
     [HttpPost("republicar-catalogo")]
     public async Task<ActionResult<JsonNode?>> RepublicarCatalogo(CancellationToken ct = default) =>

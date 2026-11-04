@@ -6,8 +6,7 @@ using Nexo.Application.Common.Exceptions;
 
 namespace Nexo.Application.CasosDeUso.PlanDeCargue;
 
-/// <summary>GET /api/planes-cargue/{id}/no-cargadas — subconjunto
-/// de /resultado, solo las colocaciones rechazadas (con su <c>CodigoRechazo</c>).</summary>
+/// <summary>GET /api/planes-cargue/{id}/no-cargadas — subconjunto de /resultado: solo las colocaciones rechazadas (con su <c>CodigoRechazo</c>).</summary>
 public sealed record clsObtenerNoCargadasPlanQuery(Guid PlanCargueId) : IQuery<IReadOnlyList<clsColocacionCargueDto>>;
 
 public sealed class clsObtenerNoCargadasPlanQueryHandler(IPlanCargueRepository planes)

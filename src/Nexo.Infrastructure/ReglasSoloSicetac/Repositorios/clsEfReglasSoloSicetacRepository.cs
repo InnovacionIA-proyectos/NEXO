@@ -42,16 +42,8 @@ public sealed class clsEfReglasSoloSicetacRepository(clsNexoDbContext db, IMemor
         return borradas;
     }
 
-    /// <summary>
-    /// Claves por RUTA + TIPO DE VEHÍCULO en la forma canónica de Domain — puerto de
-    /// lectura para el motor de propuesta de tarifa (RN-01).
-    ///
-    /// Antes proyectaba solo Origen/Destino, descartando TipoVehiculo - marcar un
-    /// único tipo de vehículo como excepción apagaba la comparación contra plaza para
-    /// TODOS los tipos de esa ruta. Se reconstruye con clsTexto.ClaveRutaVehiculo
-    /// en vez de concatenar lo almacenado: aunque hoy se guarda ya normalizado,
-    /// reconstruirla hace la coincidencia inmune a una fila vieja o cargada por otra vía.
-    /// </summary>
+    /// <summary>Claves por RUTA + TIPO DE VEHÍCULO en forma canónica (puerto de lectura del motor de propuesta). Se reconstruyen con
+    /// clsTexto.ClaveRutaVehiculo en vez de concatenar lo almacenado, para ser inmunes a filas viejas o cargadas por otra vía.</summary>
     public async Task<IReadOnlySet<string>> ClavesRutaVehiculoAsync(CancellationToken ct = default) =>
         (await cache.GetOrCreateAsync(CacheKeyClaves, async e =>
         {

@@ -1,12 +1,8 @@
 namespace Nexo.Domain.IA.Entidades;
 
 /// <summary>
-/// Una llamada a un modelo de lenguaje, con éxito o con error: quién la pidió, para qué función, con qué modelo, cuántos tokens
-/// gastó, cuánto tardó y cómo terminó. Sirve para el gasto por función y por mes, para el tope diario por usuario y para
-/// auditar.
-///
-/// NO guarda el contenido enviado ni la respuesta del modelo (ni el Excel de un cliente ni el chat): solo cifras y el
-/// resultado. Es una regla de seguridad, no un descuido.
+/// Una llamada a un modelo de lenguaje (éxito o error): gasto por función y mes, tope diario por usuario y auditoría.
+/// No guarda el contenido enviado ni la respuesta, solo cifras y resultado (regla de seguridad).
 /// </summary>
 public class clsUsoIa
 {
@@ -28,10 +24,7 @@ public class clsUsoIa
     public int TokensCacheLectura { get; set; }
     public int TokensCacheEscritura { get; set; }
 
-    /// <summary>
-    /// Costo en dólares con el precio de lista vigente al hacer la llamada. Se guarda y no se recalcula para que un cambio de
-    /// precios no reescriba el gasto pasado. Null si el modelo no tiene precio conocido.
-    /// </summary>
+    /// <summary>Costo en dólares con el precio vigente al llamar; se guarda para que un cambio de precios no reescriba el gasto pasado. Null si el modelo no tiene precio conocido.</summary>
     public decimal? CostoEstimadoUsd { get; set; }
 
     public int LatenciaMs { get; set; }

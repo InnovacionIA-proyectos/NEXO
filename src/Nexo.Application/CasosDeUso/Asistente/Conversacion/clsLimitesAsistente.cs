@@ -1,9 +1,6 @@
 namespace Nexo.Application.CasosDeUso.Asistente.Conversacion;
 
-/// <summary>
-/// Límites de una conversación con el asistente (sección <c>Asistente</c> de la configuración: <c>Asistente__MaxTurnos</c>…). El tope
-/// diario de tokens por persona es aparte (<c>Anthropic__LimiteTokensPorUsuarioDia</c>).
-/// </summary>
+/// <summary>Límites de una conversación (sección <c>Asistente</c> de la configuración); el tope diario de tokens es aparte.</summary>
 public sealed class clsLimitesAsistente
 {
     /// <summary>Mensajes del usuario que admite una conversación; al llegar al límite hay que empezar otra.</summary>

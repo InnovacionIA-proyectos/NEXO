@@ -2,11 +2,7 @@ using Nexo.Domain.Costeo.Entidades;
 
 namespace Nexo.Application.CasosDeUso.AjustesVigenciaPlaza.Interfaces;
 
-/// <summary>
-/// Persistencia de los overrides LOCALES de vigencia de tarifas de plaza. El mapa
-/// {IdTarifaPlaza -> vigencia ajustada} lo consultan otros módulos (Biblioteca,
-/// costeo — aún no migrados) para computar la vigencia EFECTIVA de una tarifa SAP.
-/// </summary>
+/// <summary>Persistencia de los overrides LOCALES de vigencia de tarifas de plaza; el mapa {IdTarifaPlaza -> vigencia} sirve para computar la vigencia EFECTIVA.</summary>
 public interface IAjustesVigenciaPlazaRepository
 {
     Task<IReadOnlyDictionary<int, DateTime>> MapaAsync(CancellationToken ct);

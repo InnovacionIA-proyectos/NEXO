@@ -1,17 +1,12 @@
 namespace Nexo.Domain.Costeo.Reglas;
 
 /// <summary>
-/// #300: el piso SICE-TAC solo se usa si su período (AAAAMM) es el del MES Y AÑO ACTUALES. Antes se
-/// tomaba el período más alto cargado en DWSice sin compararlo con hoy: si el Data Warehouse se
-/// quedaba un mes atrás, el costeo seguía cotizando contra un piso viejo sin que nadie lo notara.
-/// Sin mes de gracia: el día 1 del mes siguiente, el período anterior ya no sirve.
-///
-/// Función pura (no consulta nada): el adaptador le pasa el período cargado y la hora actual.
+/// El piso SICE-TAC solo se usa si su período (AAAAMM) es el del mes y año actuales, para no cotizar contra
+/// un piso viejo si DWSice se atrasa. Sin mes de gracia: el día 1 del mes siguiente el período anterior ya no sirve.
 /// </summary>
 public static class clsPeriodoSicetac
 {
-    /// <summary>Colombia no tiene horario de verano: UTC-5 fijo. El mes cambia a las 00:00 de Bogotá,
-    /// no a las 00:00 UTC (a las 19:00 del último día del mes, en UTC ya sería el mes siguiente).</summary>
+    /// <summary>Colombia no tiene horario de verano: UTC-5 fijo. El mes cambia a las 00:00 de Bogotá, no a las 00:00 UTC.</summary>
     private static readonly TimeSpan OffsetColombia = TimeSpan.FromHours(-5);
 
     /// <summary>Período AAAAMM de <paramref name="ahora"/> en hora de Colombia (p. ej. 202610).</summary>
@@ -23,11 +18,7 @@ public static class clsPeriodoSicetac
 
     public static bool EsElDelMesActual(int periodo, DateTimeOffset ahora) => periodo == Actual(ahora);
 
-    /// <summary>
-    /// Motivo visible cuando el período más reciente cargado NO es el actual; null si lo es, o si no hay
-    /// ningún período cargado (<paramref name="periodoCargado"/> = 0: no es "desactualizado", es que no hay
-    /// matriz, y eso ya se trata como siempre — sin piso).
-    /// </summary>
+    /// <summary>Motivo visible cuando el período cargado no es el actual. Null si lo es o si no hay período (<paramref name="periodoCargado"/> = 0: no hay matriz, se trata como sin piso).</summary>
     public static string? MotivoNoVigente(int periodoCargado, DateTimeOffset ahora)
     {
         if (periodoCargado == 0 || EsElDelMesActual(periodoCargado, ahora)) return null;

@@ -17,15 +17,7 @@ public sealed record clsCatalogoLineaResueltoDto(
 public sealed record clsResolverCatalogosDeLineasCommand(IReadOnlyList<clsResolverCatalogoLineaInput> Lineas)
     : ICommand<IReadOnlyList<clsCatalogoLineaResueltoDto>>;
 
-/// <summary>
-/// Resuelve texto libre (origen/destino/tipo de vehículo) a RutaId/ConfigVehiculoId,
-/// creando lo que falte en el catálogo — SIN crear ninguna clsSolicitud.
-///
-/// Antes esta resolución solo existía dentro de clsCapturarSolicitudCommand, mezclada con
-/// "crear la solicitud completa". lineas:bulk (clsCargarLineasBulkCommand) YA exige estos IDs
-/// resueltos y no los resuelve por su cuenta: sin este caso de uso, un formulario de texto
-/// libre no tenía cómo alimentarlo.
-/// </summary>
+/// <summary>Resuelve texto libre (origen/destino/vehículo) a RutaId/ConfigVehiculoId creando lo que falte, SIN crear solicitud; alimenta a lineas:bulk, que exige estos ids ya resueltos.</summary>
 public sealed class clsResolverCatalogosDeLineasCommandHandler(
     IRutasCatalogoPort rutasCatalogo, IConfiguracionesVehiculoPort vehiculosCatalogo, IAliasCatalogoPort aliasCatalogo, IUnitOfWork uow)
     : ICommandHandler<clsResolverCatalogosDeLineasCommand, IReadOnlyList<clsCatalogoLineaResueltoDto>>

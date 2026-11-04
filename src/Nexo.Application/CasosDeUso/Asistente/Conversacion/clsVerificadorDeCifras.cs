@@ -4,14 +4,8 @@ using System.Text.RegularExpressions;
 namespace Nexo.Application.CasosDeUso.Asistente.Conversacion;
 
 /// <summary>
-/// Compuerta contra los precios inventados: encuentra en la respuesta del asistente las cifras que parecen dinero y comprueba que cada
-/// una aparece en lo que el asistente tenía delante (resultados de herramientas y mensajes del usuario). Una cifra de dinero sin
-/// origen significa que el modelo la calculó o la inventó, y la respuesta no se entrega.
-///
-/// Una cifra "parece dinero" si lleva <c>$</c>, una unidad (<c>millones</c>, <c>mil</c>) o cae junto a una palabra de precio
-/// (<c>valor</c>, <c>tarifa</c>, <c>flete</c>, <c>COP</c>…). Los números sin ese contexto (pesos, kilómetros, códigos DANE, periodos) no se
-/// revisan: aparecen por todas partes y no son precios. Un número escrito como "3,5 millones" se acepta si está a menos de 1 % de un valor
-/// de las fuentes; una cifra exacta debe coincidir con una de ellas.
+/// Descarta respuestas con cifras de dinero (con <c>$</c>, una unidad o junto a una palabra de precio) que no están en las fuentes.
+/// "3,5 millones" se acepta a menos de 1 % de una fuente; una cifra exacta debe coincidir.
 /// </summary>
 public static partial class clsVerificadorDeCifras
 {
@@ -67,10 +61,7 @@ public static partial class clsVerificadorDeCifras
         }
     }
 
-    /// <summary>
-    /// <c>3.500.000</c> y <c>3,500,000</c> son tres millones y medio; <c>3.500.000,50</c> también; <c>3,5</c> y <c>3.5</c> son tres y medio. Un
-    /// solo separador seguido de exactamente tres dígitos (<c>3.500</c>) se lee como miles, que es como se escribe en Colombia.
-    /// </summary>
+    /// <summary>Convierte a número tolerando separadores: un solo separador con tres dígitos (<c>3.500</c>) son miles, como en Colombia.</summary>
     private static decimal? Interpretar(string crudo)
     {
         var separadores = crudo.Count(c => c is '.' or ',');

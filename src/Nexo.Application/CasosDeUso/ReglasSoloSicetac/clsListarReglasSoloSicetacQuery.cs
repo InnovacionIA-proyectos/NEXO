@@ -14,12 +14,8 @@ public sealed class clsListarReglasSoloSicetacQueryHandler(IReglasSoloSicetacRep
     {
         var lista = await reglas.ListarAsync(ct);
 
-        // Origen/Destino se guardan como código DANE (carga masiva S4-HU-09.2) o texto
-        // libre (filas más viejas) — se resuelve a nombre de municipio para el listado,
-        // sin tocar el valor crudo (front#195/#242: el front necesita el nombre, no el
-        // código). Se prefiere Colombia en el empate: el código DANE no es único por sí
-        // solo entre CO/VE/EC (clsMunicipio.CodigoDane), pero las reglas Solo-SICETAC son
-        // siempre rutas colombianas.
+        // Origen/Destino se guardan como código DANE o texto libre (filas viejas); se resuelve a nombre de municipio sin tocar el valor crudo.
+        // Se prefiere Colombia en el empate: el código DANE no es único entre CO/VE/EC, pero estas reglas son siempre rutas colombianas.
         var catalogo = await municipios.ListarAsync(ct);
         var porCodigoDane = catalogo
             .GroupBy(m => m.CodigoDane)

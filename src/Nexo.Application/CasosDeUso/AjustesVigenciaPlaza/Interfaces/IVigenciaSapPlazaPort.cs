@@ -1,10 +1,6 @@
 namespace Nexo.Application.CasosDeUso.AjustesVigenciaPlaza.Interfaces;
 
-/// <summary>
-/// Vigencia ORIGINAL de SAP para tarifas de plaza (clsDbSolucionesTiDbContext, SOLO
-/// LECTURA). Se usa como base al crear un ajuste nuevo (referencia/auditoría) y
-/// para extender relativo a la vigencia SAP cuando no hay override todavía.
-/// </summary>
+/// <summary>Vigencia ORIGINAL de SAP para tarifas de plaza (solo lectura): referencia al crear un ajuste y base para extender cuando no hay override.</summary>
 public interface IVigenciaSapPlazaPort
 {
     bool Configurado { get; }

@@ -6,11 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Nexo.Infrastructure.Solicitudes.Adaptadores;
 
-/// <summary>
-/// Catálogo de prospectos (~dbSolucionesTI.tblProspectos), cacheado 1 h. Configurado=false
-/// cuando ConnectionStrings:DbSolucionesTi no está definida (clsDbSolucionesTiDbContext no se
-/// registra): la búsqueda de clientes simplemente no cae a esta fuente, nunca falla.
-/// </summary>
+/// <summary>Catálogo de prospectos (tblProspectos), cacheado 1 h. Configurado=false sin ConnectionStrings:DbSolucionesTi: la búsqueda de clientes no cae a esta fuente, nunca falla.</summary>
 public sealed class clsProspectosDwAdapter(IServiceProvider sp, IMemoryCache cache) : IProspectosDwPort
 {
     private readonly clsDbSolucionesTiDbContext? _db = sp.GetService<clsDbSolucionesTiDbContext>();

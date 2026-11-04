@@ -8,11 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Nexo.Infrastructure.Solicitudes.Adaptadores;
 
-/// <summary>
-/// Catálogo de clientes reales (~4,5 K filas) del DW, cacheado 1 h. Configurado=false
-/// cuando ConnectionStrings:DwCubos no está definida (clsDwCubosDbContext no se registra):
-/// la captura se degrada a la tabla local de clientes, nunca falla.
-/// </summary>
+/// <summary>Clientes reales del DW, cacheados 1 h. Configurado=false sin ConnectionStrings:DwCubos: la captura se degrada a la tabla local, nunca falla.</summary>
 public sealed class clsClientesDwAdapter(IServiceProvider sp, IMemoryCache cache) : IClientesDwPort
 {
     private readonly clsDwCubosDbContext? _dw = sp.GetService<clsDwCubosDbContext>();

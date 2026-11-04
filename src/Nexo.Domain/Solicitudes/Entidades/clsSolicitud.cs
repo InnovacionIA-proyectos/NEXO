@@ -24,8 +24,7 @@ public class clsSolicitud : IAuditable
 
     public ModalidadSolicitud? Modalidad { get; set; }
 
-    /// <summary>Condiciones del servicio (recogida/entrega, ratas cargue/descargue,
-    /// medidas de seguridad, póliza) serializadas como JSON.</summary>
+    /// <summary>Condiciones del servicio (recogida/entrega, ratas cargue/descargue, seguridad, póliza) como JSON.</summary>
     public string? CondicionesServicio { get; set; }
 
     /// <summary>Fecha límite de respuesta (SLA). Insumo de la urgencia del score.</summary>

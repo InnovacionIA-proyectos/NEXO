@@ -8,9 +8,8 @@ using Microsoft.Extensions.Logging;
 namespace Nexo.Infrastructure.Biblioteca.Adaptadores;
 
 /// <summary>
-/// Lee <c>tbl_rangos_peso_contenedor</c> y la guarda en memoria (servicio único con su propio alcance de base de datos, porque lo consultan
-/// costeos en paralelo). Sin la tabla, vacía o con la base caída, informa que no está disponible por un minuto y deja un aviso en el log: quien
-/// llama usa entonces la regla que tenía antes en lugar de dejar de costear.
+/// Servicio único con su propio alcance de BD porque los costeos en paralelo no pueden compartir un contexto.
+/// Sin la tabla, vacía o con la BD caída informa "no disponible" por un minuto y registra el aviso.
 /// </summary>
 public sealed class clsRangosPesoContenedorAdapter(
     IServiceScopeFactory scopes, IMemoryCache cache, ILogger<clsRangosPesoContenedorAdapter> log) : IRangosPesoContenedorPort

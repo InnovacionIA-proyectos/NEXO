@@ -2,13 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Nexo.Domain.Cubicacion.Entidades;
 
-/// <summary>
-/// S5-HU-18.5/#277: proyección del catálogo de tipos de carrocería del Cubicador
-/// (<c>GET /tipos-carroceria</c>, <c>cubicador/api/dtos/catalogo.py::TipoCarroceriaDto</c>),
-/// mantenida al día por <c>CarroceriaCreada</c>/<c>CarroceriaActualizada</c>/
-/// <c>CarroceriaEliminada</c>. Ver <see cref="clsTipoMercanciaCatalogo"/> para el criterio
-/// completo (mismo patrón, catálogo hermano).
-/// </summary>
+/// <summary>Proyección del catálogo de tipos de carrocería del Cubicador, mantenida por los eventos de carrocería. Mismo patrón que <see cref="clsTipoMercanciaCatalogo"/>.</summary>
 public class clsTipoCarroceriaCatalogo
 {
     [MaxLength(64)]

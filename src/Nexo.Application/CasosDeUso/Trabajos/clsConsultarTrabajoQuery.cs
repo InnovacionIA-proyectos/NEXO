@@ -5,13 +5,7 @@ using Nexo.Application.Common.Exceptions;
 
 namespace Nexo.Application.CasosDeUso.Trabajos;
 
-/// <summary>
-/// Estado de un trabajo por su identificador: la consulta de respaldo del contrato.
-///
-/// El aviso en vivo por SignalR es una mejora; esto es la garantía. Un cliente que
-/// perdió la conexión, cambió de pestaña o recargó reconstruye todo con esta llamada
-/// sin haber recibido un solo aviso.
-/// </summary>
+/// <summary>Estado de un trabajo por identificador: la consulta de respaldo que reconstruye todo si el aviso en vivo (SignalR) se perdió.</summary>
 public sealed record clsConsultarTrabajoQuery(Guid TrabajoId) : IQuery<clsEstadoTrabajoDto>;
 
 public sealed class clsConsultarTrabajoQueryHandler(IEstadoDeTrabajoPort trabajos)

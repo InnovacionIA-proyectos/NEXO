@@ -11,12 +11,8 @@ using Microsoft.AspNetCore.RateLimiting;
 namespace Nexo.Api.BibliotecaSapHistorico;
 
 /// <summary>
-/// Biblioteca — tarifas de plaza (vigentes) de SAP TM leídas en vivo (SOLO LECTURA)
-/// del datacenter corporativo (dbsolucionesTI.dbo.tblSAPTarifas). Misma estructura
-/// que el histórico; los códigos se resuelven con los catálogos SAP y DANE. El
-/// ajuste LOCAL de vigencia (PATCH/POST/DELETE) vive en
-/// <see cref="clsTarifasPlazaVigenciaController"/> (módulo AjustesVigenciaPlaza),
-/// misma ruta base — no hay colisión porque los verbos/subrutas no se solapan.
+/// Tarifas de plaza vigentes de SAP TM leídas en vivo (solo lectura) de dbsolucionesTI.dbo.tblSAPTarifas; los códigos se resuelven con los catálogos SAP y DANE.
+/// El ajuste local de vigencia vive en <see cref="clsTarifasPlazaVigenciaController"/>, con la misma ruta base (los verbos/subrutas no se solapan).
 /// </summary>
 [ApiController]
 [Authorize]
@@ -27,15 +23,8 @@ public class clsBibliotecaSapPlazaController(
     : ControllerBase
 {
     /// <summary>
-    /// Consulta las tarifas de plaza ordenadas por vigencia descendente, con filtros
-    /// por texto (código DIVIPOLA de origen/destino o detalles), línea de negocio,
-    /// vehículo, carrocería y clase de viaje.
-    ///
-    /// Medido en vivo, ~22,8 K filas: "top" nunca dejaba ver más allá de las
-    /// primeras 50-200, sin aviso de que el resto existía aunque `total` ya
-    /// viajaba en la respuesta. "page" (1-based, opcional, default 1) agrega
-    /// el `Skip` que faltaba; "top" sigue siendo el tamaño de página. Cambio
-    /// aditivo: mismo shape de respuesta de siempre (`{ total, items }`).
+    /// Consulta las tarifas de plaza por vigencia descendente, con filtros por texto (DIVIPOLA de origen/destino o detalles), línea de negocio, vehículo, carrocería y clase de viaje.
+    /// Paginada: <c>page</c> (base 1, default 1) y <c>top</c> como tamaño de página; <c>total</c> es el total sin paginar.
     /// </summary>
     [HttpGet]
     [ProducesResponseType(StatusCodes.Status200OK)]

@@ -11,7 +11,7 @@ public sealed record clsBandejaFilaRaw(
     Guid Id, string clsCliente, TipoSolicitud Tipo, EstadoSolicitud Estado, DateTimeOffset? Deadline,
     decimal? ValorEstimado, decimal? ProbabilidadCierre, DateTimeOffset CreatedAt, int Lineas,
     decimal? FleteTotal, int SinFlete, int Auto, int Revisadas,
-    /// <summary>S5-HU-23.1/#289: resultado de la cotización representativa (ver clsBandejaItemDto.Resultado).</summary>
+    /// <summary>Resultado de la cotización representativa (ver clsBandejaItemDto.Resultado).</summary>
     ResultadoCotizacion? Resultado = null);
 
 public interface ISolicitudesRepository
@@ -33,9 +33,8 @@ public interface ISolicitudesRepository
     void AgregarCotizacion(clsCotizacion cotizacion);
 
     /// <summary>
-    /// <paramref name="creadoPor"/>: aislamiento por comercial (issue #199, S4-HU-19.1) —
-    /// no nulo restringe la bandeja a las solicitudes creadas por ese usuario; nulo trae
-    /// todas (roles distintos de Comercial). <paramref name="resultado"/> (S5-HU-23.1/#289): esperando | ganada | perdida, ya normalizado; null = sin filtro.
+    /// <paramref name="creadoPor"/>: no nulo restringe la bandeja a las solicitudes de ese usuario (aislamiento por comercial); nulo trae todas.
+    /// <paramref name="resultado"/>: esperando | ganada | perdida, ya normalizado; null = sin filtro.
     /// </summary>
     Task<IReadOnlyList<clsBandejaFilaRaw>> BandejaFilasAsync(
         string? atencion, EstadoSolicitud? estado, DateTimeOffset? desde, DateTimeOffset? hasta,

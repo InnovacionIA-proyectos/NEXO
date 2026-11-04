@@ -1,17 +1,15 @@
 namespace Nexo.Domain.Catalogos.Entidades;
 
 /// <summary>
-/// Cómo se traduce una palabra que usa un cliente en sus archivos a lo que entiende NEXO (<c>tbl_diccionario_cliente</c>). Tres tipos:
+/// Traduce una palabra que usa un cliente en sus archivos a lo que entiende NEXO. Tres tipos:
 /// <list type="bullet">
 /// <item><see cref="TipoColumna"/>: un encabezado del Excel del cliente → el campo de NEXO al que corresponde (<see cref="CamposDestino"/>).</item>
 /// <item><see cref="TipoUnidad"/>: una unidad del cliente → la unidad canónica (<see cref="Unidades"/>).</item>
 /// <item><see cref="TipoValor"/>: un valor de una columna categórica → el valor de NEXO; <see cref="Contexto"/> dice de qué campo es.</item>
 /// </list>
-/// Sin cliente (<see cref="ClienteId"/> null) el término aplica a todos. Complementa al diccionario global de sinónimos de
-/// vehículos y contenedores (<see cref="clsAliasElemento"/>): lo propio de un cliente vive aquí, y el concepto de un valor no se valida
-/// contra el catálogo oficial porque un cliente puede usar un valor que el catálogo no tiene.
-/// <see cref="TerminoNormalizado"/> se calcula con el mismo normalizador de la captura, para que "mismo texto" signifique lo mismo al
-/// guardar y al comparar.
+/// Sin cliente (<see cref="ClienteId"/> null) aplica a todos. Complementa al diccionario global <see cref="clsAliasElemento"/>;
+/// el concepto de un valor no se valida contra el catálogo oficial porque un cliente puede usar valores que este no tiene.
+/// <see cref="TerminoNormalizado"/> usa el mismo normalizador de la captura.
 /// </summary>
 public class clsTerminoCliente
 {

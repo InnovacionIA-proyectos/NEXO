@@ -5,11 +5,8 @@ using Nexo.Application.Common.Abstractions;
 namespace Nexo.Application.CasosDeUso.PlanDeCargue;
 
 /// <summary>
-/// #304: GET /api/planes-cargue/por-linea/{lineaId}/estado — completa el sondeo de
-/// <see cref="clsObtenerPlanesPorLineaQuery"/>. Esa devuelve solo la lista de la flota (vacía = "seguir esperando") y por eso
-/// no puede avisar que el Cubicador rechazó el pedido: el front esperaba para siempre. Este dice <c>procesando</c>,
-/// <c>listo</c> o <c>rechazado</c> con el código y el mensaje del Cubicador. Es ADITIVO: la lista no cambió de forma.
-/// Todo contra la proyección local, sin llamar al Cubicador.
+/// GET /api/planes-cargue/por-linea/{lineaId}/estado — completa el sondeo de <see cref="clsObtenerPlanesPorLineaQuery"/>: dice <c>procesando</c>,
+/// <c>listo</c> o <c>rechazado</c> (con código y mensaje del Cubicador), todo contra la proyección local.
 /// </summary>
 public sealed record clsObtenerEstadoCubicacionLineaQuery(Guid LineaSolicitudId) : IQuery<clsEstadoCubicacionLineaDto>;
 

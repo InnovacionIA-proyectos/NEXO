@@ -7,8 +7,7 @@ using Nexo.Mensajes.Cubicacion;
 
 namespace Nexo.Application.CasosDeUso.PlanDeCargue;
 
-/// <summary>Borra un ítem del plan — DELETE
-/// /api/planes-cargue/{id}/items/{itemId}.</summary>
+/// <summary>Borra un ítem del plan (DELETE /api/planes-cargue/{id}/items/{itemId}).</summary>
 public sealed record clsEliminarItemCommand(Guid PlanCargueId, Guid ItemId) : ICommand<clsComandoAceptadoDto>;
 
 public sealed class clsEliminarItemCommandHandler(

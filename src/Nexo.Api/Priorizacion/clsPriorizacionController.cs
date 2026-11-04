@@ -7,20 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Nexo.Api.Priorizacion;
 
-/// <summary>
-/// Recalibrar los pesos del score de priorización.
-///
-/// No existía. La entidad se declaraba "editable por el Admin" desde el inicio y no había
-/// forma de editarla, así que el segundo disparador que pide la HU —recalcular cuando
-/// cambian los parámetros— no tenía quién lo disparara.
-///
-/// SOLO Admin. Cambiar estos pesos reordena la bandeja de todo el mundo: le cambia el
-/// trabajo a los coordinadores sin que ellos hayan tocado nada. No es una preferencia de
-/// pantalla, es política de operación.
-///
-/// El PUT no espera el recálculo. Guarda, publica el aviso y responde; el refresco de
-/// todas las activas corre aparte, con sus reintentos.
-/// </summary>
+/// <summary>Recalibra los pesos del score de priorización. Solo Admin: reordena la bandeja de todos. El PUT no espera el recálculo: guarda, publica el aviso y responde.</summary>
 [ApiController]
 [Authorize(Roles = "Admin")]
 [Route("api/priorizacion/parametros")]
@@ -36,9 +23,7 @@ public class clsPriorizacionController(
     public async Task<ActionResult<clsParametrosScoreDto>> Get(CancellationToken ct = default)
         => Ok(await obtener.Handle(new clsObtenerParametrosScoreQuery(), ct));
 
-    /// <summary>
-    /// Recalibra los pesos. Dispara el recálculo del score persistido en segundo plano.
-    /// </summary>
+    /// <summary>Recalibra los pesos y dispara en segundo plano el recálculo del score persistido.</summary>
     [HttpPut]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]

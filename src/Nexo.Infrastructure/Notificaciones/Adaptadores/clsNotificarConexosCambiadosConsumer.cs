@@ -7,13 +7,8 @@ using Microsoft.Extensions.Logging;
 
 namespace Nexo.Infrastructure.Notificaciones.Adaptadores;
 
-/// <summary>
-/// Traduce el evento de conexos cambiados tras la entrega en la llamada al caso de uso que
-/// notifica (S5-HU-20.1/#286). Delgado a propósito, y con la misma regla que
-/// <see cref="clsNotificarEntregaConsumer"/>: LA EXCEPCIÓN SUBE — un correo que no sale por
-/// una falla de la salida corporativa no se recupera consultando nada, así que el bus
-/// reintenta lo pasajero y manda a la cola de error lo que no tiene arreglo.
-/// </summary>
+/// <summary>Traduce el evento de conexos cambiados en la llamada al caso de uso que notifica. Misma regla que
+/// <see cref="clsNotificarEntregaConsumer"/>: la excepción sube para que el bus reintente o mande a la cola de error.</summary>
 public sealed class clsNotificarConexosCambiadosConsumer(
     ICommandHandler<clsNotificarConexosCambiadosCommand, clsResultadoDeNotificacionDto> notificar,
     ILogger<clsNotificarConexosCambiadosConsumer> log)

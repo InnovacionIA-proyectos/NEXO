@@ -7,21 +7,8 @@ using Microsoft.Extensions.Logging;
 namespace Nexo.Infrastructure.Common.Mensajeria;
 
 /// <summary>
-/// Alerta al equipo cuando CUALQUIER mensaje agota sus reintentos y MassTransit
-/// lo mueve a la cola de error.
-///
-/// Es un consumer de TIPO ABIERTO (<c>AddConsumer(typeof(clsAlertaDeFalloConsumer&lt;&gt;))</c>):
-/// se engancha una sola vez para todos los tipos de mensaje presentes y futuros,
-/// sin tener que acordarse de registrar uno nuevo cada vez que aparece un mensaje
-/// - a diferencia de <see cref="Costeo.Adaptadores.clsFalloDeCosteoConsumer"/> (que sí
-/// es específico de <c>clsCostearLineaSolicitada</c>, porque ahí el fallo se convierte
-/// en un DESENLACE DE NEGOCIO que la saga necesita contar). Este consumer no tiene
-/// opinión de negocio: solo avisa, y corre ADEMÁS de cualquier consumer específico
-/// que ya exista para ese tipo de mensaje - no lo reemplaza.
-///
-/// Degrada en silencio (con log, no con excepción) si falta el SMTP o la lista de
-/// destinatarios: un correo que no sale no debe, a su vez, agotar reintentos y
-/// terminar en su propia cola de error.
+/// Consumer de tipo abierto: alerta por correo cuando cualquier mensaje agota sus reintentos, además de los consumers específicos.
+/// Si falta el SMTP o los destinatarios degrada con log: el correo no debe agotar reintentos ni caer a su propia cola de error.
 /// </summary>
 public sealed class clsAlertaDeFalloConsumer<T>(
     ICorreoPort correo, IConfiguration config, ILogger<clsAlertaDeFalloConsumer<T>> logger)
@@ -63,9 +50,7 @@ public sealed class clsAlertaDeFalloConsumer<T>(
             para ver el mensaje completo y decidir si reintentar manualmente.</p>
             """;
 
-        // Igual que arriba: un correo que no sale no debe, a su vez, agotar reintentos y
-        // terminar en su propia cola de error - por eso se degrada en silencio (con log)
-        // en vez de dejar subir clsCorreoRechazadoException/clsCorreoTransitorioException.
+        // Se degrada con log para que un correo fallido no termine en su propia cola de error.
         try
         {
             await correo.EnviarAsync(

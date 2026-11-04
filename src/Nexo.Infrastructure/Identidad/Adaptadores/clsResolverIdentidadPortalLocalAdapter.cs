@@ -4,16 +4,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Nexo.Infrastructure.Identidad.Adaptadores;
 
-/// <summary>
-/// Solo para Desarrollo/QA sin acceso todavía a la base de identidad real del portal.
-/// Se registra ÚNICAMENTE cuando ConnectionStrings:IdentidadPortal no está configurada
-/// (clsProgram.cs impide arrancar así en Producción — fail-closed). No es un
-/// esquema de rol simulado: no confía en nada que declare el cliente, resuelve el rol
-/// contra un registro REAL ya sembrado en la base local (mismo invariante de seguridad
-/// que el adapter real, solo que la fuente de verdad es la tabla Usuarios local en vez
-/// de la del portal). Para probar como otro rol, un desarrollador edita/siembra esa fila
-/// — no hay forma de declarar el rol por encabezado.
-/// </summary>
+/// <summary>Solo Desarrollo/QA: se registra únicamente sin ConnectionStrings:IdentidadPortal (clsProgram.cs impide arrancar así en Producción).
+/// No confía en nada que declare el cliente: resuelve el rol contra un registro REAL de la tabla Usuarios local;
+/// para probar otro rol se edita esa fila, no hay encabezado que lo declare.</summary>
 public sealed class clsResolverIdentidadPortalLocalAdapter(clsNexoDbContext db) : IResolverIdentidadPortalPort
 {
     public async Task<clsIdentidadResueltaDto?> ResolverAsync(long idPortal, CancellationToken ct = default)

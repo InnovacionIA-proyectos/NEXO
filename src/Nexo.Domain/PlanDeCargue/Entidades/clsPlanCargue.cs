@@ -5,10 +5,7 @@ using Nexo.Domain.Common;
 
 namespace Nexo.Domain.PlanDeCargue.Entidades;
 
-// ---------------------------------------------------------------------------
-// Cubicador 3D — plan de cargue con posiciones calculadas por el motor de bin
-// packing. Convención: dimensiones internas en MILÍMETROS y pesos en KG.
-// ---------------------------------------------------------------------------
+// Plan de cargue calculado por el Cubicador. Convención: dimensiones en MILÍMETROS y pesos en KG.
 
 /// <summary>Tipo de vehículo/contenedor (VehicleType). Los presets son filas editables, no constantes.</summary>
 public class clsVehiculoCubicacion : IAuditable
@@ -63,11 +60,7 @@ public class clsPlanCargue : IAuditable
     /// <summary>Línea de solicitud que originó este plan (botón Cubicar de la Mesa de Costeo).</summary>
     public Guid? LineaSolicitudId { get; set; }
 
-    /// <summary>
-    /// Posición (1-based) de este vehículo dentro de la FLOTA de la línea: una carga que
-    /// no cabe en un vehículo se reparte en varios planes (Vehículo 1..N) con la misma
-    /// LineaSolicitudId. Vale 1 para planes de un solo vehículo o standalone.
-    /// </summary>
+    /// <summary>Posición (1-based) del vehículo en la flota de la línea: una carga que no cabe en uno se reparte en varios planes con la misma LineaSolicitudId.</summary>
     public int NumeroVehiculo { get; set; } = 1;
 
     /// <summary>borrador | procesando | optimizado | ajustado | error</summary>
@@ -94,12 +87,7 @@ public class clsPlanCargue : IAuditable
     /// <summary>JSON de IncidenciaValidacion[] (concepto ValidationIssue).</summary>
     public string IncidenciasJson { get; set; } = "[]";
 
-    /// <summary>
-    /// JSON de MetricasCubicacionDto (cubicador/CONTRATO.md §3.2), tal cual llega en el
-    /// evento enriquecido de plan-de-cargue.generado — igual que <see cref="IncidenciasJson"/>,
-    /// se guarda verbatim (NEXO no recalcula métricas, solo proyecta lo que Cubicador ya
-    /// calculó). Nulo hasta la primera optimización.
-    /// </summary>
+    /// <summary>JSON de métricas tal cual llega de Cubicador (NEXO no las recalcula), como <see cref="IncidenciasJson"/>. Nulo hasta la primera optimización.</summary>
     public string? MetricasJson { get; set; }
 
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;

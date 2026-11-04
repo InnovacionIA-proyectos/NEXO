@@ -1,10 +1,7 @@
 namespace Nexo.Infrastructure.IA;
 
-/// <summary>
-/// Precios de lista del proveedor, en dólares por millón de tokens, para estimar el costo de una llamada al registrarla.
-/// Se mantienen a mano: un modelo que no esté aquí queda sin costo estimado (null) en vez de inventar uno. Son precios de
-/// lista de 2026-10; no incluyen descuentos del contrato ni la tarifa de los tramos de contexto largo.
-/// </summary>
+/// <summary>Precios de lista (dólares por millón de tokens) para estimar el costo al registrar una llamada. Se mantienen a mano:
+/// un modelo ausente queda sin costo estimado (null). No incluyen descuentos ni tramos de contexto largo.</summary>
 public static class clsPreciosIa
 {
     private sealed record clsPrecio(decimal Entrada, decimal Salida, decimal CacheLectura);

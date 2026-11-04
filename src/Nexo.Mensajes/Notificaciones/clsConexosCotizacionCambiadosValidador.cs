@@ -1,7 +1,6 @@
 namespace Nexo.Mensajes.Notificaciones;
 
-/// <summary>Invariantes de <see cref="clsConexosCotizacionCambiados"/>: sin correlación, sin
-/// acción reconocible o sin ningún ítem no hay nada que decirle a quien la creó.</summary>
+/// <summary>Invariantes de <see cref="clsConexosCotizacionCambiados"/>.</summary>
 public sealed class clsConexosCotizacionCambiadosValidador : IValidadorDeMensaje<clsConexosCotizacionCambiados>
 {
     public IReadOnlyList<string> Validar(clsConexosCotizacionCambiados m)

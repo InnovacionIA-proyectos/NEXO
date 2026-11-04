@@ -9,13 +9,9 @@ namespace Nexo.Infrastructure.Cubicacion.Adaptadores;
 /// <summary>Espejo de <c>{ "explicacion": "..." | null }</c> del Cubicador.</summary>
 internal sealed record clsExplicacionCubicadorDto([property: JsonPropertyName("explicacion")] string? Explicacion);
 
-/// <summary>
-/// Llama <c>{BaseAddress}recomendaciones/explicacion</c> con la misma llave dedicada de NEXO que la recomendación
-/// (<c>Cubicador3D:RecomendacionesApiKey</c>). Es un cliente aparte del de <see cref="clsCubicacionRapidaAdapter"/> para tener su propio tiempo
-/// de espera (<c>Cubicador3D:ExplicacionTimeoutSegundos</c>): el texto lo escribe un modelo y tarda segundos.
-/// La explicación es opcional, así que cualquier falla (red, tiempo agotado, llave rechazada, 404 sin recomendación, 5xx, cuerpo ilegible) se
-/// registra y devuelve null; la pantalla no la necesita para funcionar.
-/// </summary>
+/// <summary>Llama <c>{BaseAddress}recomendaciones/explicacion</c> con la llave dedicada <c>RecomendacionesApiKey</c>, con cliente propio
+/// para tener su propio timeout (<c>ExplicacionTimeoutSegundos</c>): el texto lo escribe un modelo.
+/// La explicación es opcional: cualquier falla se registra y devuelve null.</summary>
 public sealed class clsCubicadorExplicacionAdapter(HttpClient http, ILogger<clsCubicadorExplicacionAdapter> log) : ICubicadorExplicacionPort
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);

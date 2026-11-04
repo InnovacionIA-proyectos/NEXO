@@ -11,18 +11,8 @@ using Microsoft.Extensions.Caching.Memory;
 namespace Nexo.Infrastructure.Biblioteca.Adaptadores;
 
 /// <summary>
-/// S5-HU-19.1/#281: implementa <see cref="ITarifaPlazaInternaPort"/>/
-/// <see cref="IHistoricoPlazaInternoPort"/> contra <c>tbl_tarifas_plaza</c>/
-/// <c>tbl_tarifas_plaza_historico</c> — reemplaza a los antiguos métodos privados de
-/// <c>clsPropuestaTarifaAdapter</c> (<c>CandidatoPlazaPropiaAsync</c>/
-/// <c>CandidatoHistoricoPropioAsync</c>, S5-HU-16.3/#256), que solo filtraban por
-/// municipio+vehículo+peso, sin línea de negocio/clase de viaje/clase de contenedor ni
-/// concepto de nivel exacto-luego-tolerante.
-///
-/// Fila de 7 dimensiones unificada entre <see cref="clsTarifaPlaza"/> (el campo de
-/// dedup/vigencia es <see cref="clsTarifaPlaza.Vigencia"/>) y
-/// <see cref="clsTarifaPlazaHistorico"/> (el de dedup es <see cref="clsTarifaPlazaHistorico.TarifaPlazaId"/>,
-/// el de vigencia/ventana es <see cref="clsTarifaPlazaHistorico.ReemplazadoAt"/>).
+/// Implementa los puertos de plaza interna e histórico contra <c>tbl_tarifas_plaza</c>/<c>tbl_tarifas_plaza_historico</c>, con una fila unificada de 7 dimensiones.
+/// En el histórico la dedup es por TarifaPlazaId y la ventana por ReemplazadoAt.
 /// </summary>
 public sealed class clsTarifaPlazaInternaAdapter(clsNexoDbContext db, TimeProvider clock, IMemoryCache cache, IMapeoVehiculoTarifarioPort mapeo)
     : ITarifaPlazaInternaPort, IHistoricoPlazaInternoPort
@@ -47,8 +37,7 @@ public sealed class clsTarifaPlazaInternaAdapter(clsNexoDbContext db, TimeProvid
         var pesoId = await PesoIdAsync(consulta.Peso, ct);
         var top = await SeleccionarAsync(filas, consulta, pesoId, ct);
 
-        // Vencida siempre null — ver el doc-comment de clsResultadoPlazaInterna: esta
-        // tabla no tiene el concepto SAP de "vigencia hasta" vencida.
+        // Vencida siempre es null: esta tabla no tiene el concepto SAP de "vigencia hasta" vencida.
         return new clsResultadoPlazaInterna(
             top is null ? null : new clsCandidatoTarifaDto(
                 "plaza", top.Value.Valor,
@@ -70,14 +59,8 @@ public sealed class clsTarifaPlazaInternaAdapter(clsNexoDbContext db, TimeProvid
         var hoy = clock.GetUtcNow();
         var desde = hoy.AddMonths(-VentanaMesesHistorico);
 
-        // Dedup al ÚLTIMO reemplazo por TarifaPlazaId antes de aplicar el nivel de
-        // matching: una misma tarifa pudo archivarse varias veces, solo la más reciente
-        // compite (igual criterio que clsPropuestaTarifaAdapter.CandidatoSapAsync con el
-        // log SAP: "último registro por tarifa"). Materializa ANTES del GroupBy/First: EF
-        // Core no traduce "GroupBy(...).Select(g => g.OrderBy(...).First())" encadenado con
-        // una proyección más (confirmado al verificar esta issue —
-        // KeyNotFoundException: "EmptyProjectionMember"); la tabla es chica (~cientos de
-        // filas), dedup en memoria es barato.
+        // Dedup al último reemplazo por TarifaPlazaId antes de aplicar el nivel de matching (una tarifa pudo archivarse varias veces; solo la más reciente compite).
+        // Se materializa antes del GroupBy/First: EF Core no traduce ese GroupBy encadenado con otra proyección (KeyNotFoundException "EmptyProjectionMember"); la tabla es chica.
         var enVentana = await db.TarifasPlazaHistorico.AsNoTracking()
             .Where(t => origenIds.Contains(t.OrigenMunicipioId) && destinoIds.Contains(t.DestinoMunicipioId) && t.ReemplazadoAt >= desde)
             .ToListAsync(ct);
@@ -100,10 +83,8 @@ public sealed class clsTarifaPlazaInternaAdapter(clsNexoDbContext db, TimeProvid
     }
 
     /// <summary>
-    /// Nivel exacto (las 5 dimensiones además de municipio): si deja 0 filas, nivel
-    /// tolerante — cada filtro se aplica solo si, aplicado, deja al menos una fila (mismo
-    /// patrón que <c>clsPropuestaTarifaAdapter.CandidatoSapAsync</c>). Descarta Valor &lt;= 0
-    /// y toma el de mayor valor.
+    /// Nivel exacto (las 5 dimensiones además de municipio) y, si deja 0 filas, nivel tolerante: cada filtro se aplica solo si deja al menos una fila.
+    /// Descarta Valor &lt;= 0 y toma el de mayor valor.
     /// </summary>
     private async Task<(clsFila Fila, decimal Valor, string Criterio, bool VehiculoRelajado)?> SeleccionarAsync(
         List<clsFila> filas, clsConsultaTarifaPlazaInterna c, int? pesoId, CancellationToken ct)
@@ -119,9 +100,8 @@ public sealed class clsTarifaPlazaInternaAdapter(clsNexoDbContext db, TimeProvid
     }
 
     /// <summary>
-    /// Los códigos con los que una fila de <c>tbl_tarifas_plaza</c> puede nombrar el vehículo de la línea: el de Plaza/SAP según el mapeo (el
-    /// Sencillo C2 es 2; el Turbo 2L1/2L3 se tarifa como 2L2) y también el propio del vehículo, porque la carga inicial de esta tabla sacó el
-    /// vehículo con códigos de SICE-TAC (3S2, 2L3) y todavía no se decidió unificarla. Es una ampliación: lo que antes coincidía sigue coincidiendo.
+    /// Códigos con los que una fila de <c>tbl_tarifas_plaza</c> puede nombrar el vehículo: el de Plaza/SAP según el mapeo (Sencillo C2 es 2; Turbo 2L1/2L3 se tarifa como 2L2)
+    /// y también el propio del vehículo, porque la carga inicial de la tabla usó códigos de SICE-TAC (3S2, 2L3).
     /// </summary>
     private async Task<HashSet<string>?> TiposDeVehiculoAceptadosAsync(string? tipoVehiculo, CancellationToken ct)
     {
@@ -185,25 +165,13 @@ public sealed class clsTarifaPlazaInternaAdapter(clsNexoDbContext db, TimeProvid
     }
 
     /// <summary>
-    /// S5-HU-19.1/#281: si la ruta ya trae <see cref="clsConsultaTarifaPlazaInterna.OrigenMunicipioId"/>/
-    /// <see cref="clsConsultaTarifaPlazaInterna.DestinoMunicipioId"/> (S5-HU-16.1/#254),
-    /// se usan DIRECTO — es el caso exacto, sin ambigüedad posible. Resolver por texto
-    /// cuando ya hay un Id sería estrictamente peor: dos ciudades reales pueden calzar por
-    /// contención con el mismo texto de ruta (confirmado al verificar esta issue contra
-    /// clsPropuestaPlazaPropiaTests, que agrega un sufijo aleatorio al texto de la ruta —
-    /// resolver por texto ahí cruzó con una fila de OTRO par de municipios).
-    ///
-    /// Solo sin Id resuelto cae a buscar el municipio cuyo nombre normalizado está
-    /// contenido en el texto de la ruta, o al revés — misma regla de contención en las dos
-    /// direcciones que <c>clsTarifarioSapAdapter.CodigosDaneAsync</c>. Puede devolver más
-    /// de un Id (nombres cortos que calzan con varias filas); se usan todos como
-    /// candidatos, nunca se adivina un único "mejor" municipio.
+    /// Si la ruta ya trae los Id de municipio se usan directo (resolver por texto sería peor: dos ciudades pueden calzar por contención con el mismo texto).
+    /// Sin Id cae a buscar el municipio cuyo nombre normalizado está contenido en el texto de la ruta, o al revés; puede devolver varios Id y se usan todos como candidatos.
     /// </summary>
     private async Task<(IReadOnlyList<int> Origen, IReadOnlyList<int> Destino)> ResolverMunicipiosAsync(
         clsConsultaTarifaPlazaInterna consulta, CancellationToken ct)
     {
-        // Atajo: con los dos Id ya resueltos no hace falta ni cargar el catálogo de
-        // municipios en caché.
+        // Atajo: con los dos Id resueltos no hace falta cargar el catálogo de municipios.
         if (consulta.OrigenMunicipioId is { } oId && consulta.DestinoMunicipioId is { } dId)
             return ([oId], [dId]);
 
@@ -215,13 +183,8 @@ public sealed class clsTarifaPlazaInternaAdapter(clsNexoDbContext db, TimeProvid
                 .ToListAsync(ct);
         });
 
-        // S5-HU-19.1/#281: EXACTO primero, contención como último recurso. "BUENAVENTURA"
-        // (texto limpio) matchea por contención, además de la fila correcta, "VENTURA"
-        // (Cañar, Ecuador) y "SAN BUENAVENTURA" (Cotopaxi, Ecuador) — verificado contra la
-        // base real: tbl_municipios cubre Colombia/Venezuela/Ecuador, y nombres cortos o
-        // compuestos colisionan por contención con municipios de OTRO país. Un municipio
-        // exacto nunca es ambiguo; se intenta primero y, si hay alguno, los de contención
-        // ni se consideran.
+        // Exacto primero, contención como último recurso: "BUENAVENTURA" por contención también calza "VENTURA" y "SAN BUENAVENTURA" (Ecuador), porque tbl_municipios
+        // cubre Colombia/Venezuela/Ecuador. Un municipio exacto nunca es ambiguo; si hay alguno, los de contención ni se consideran.
         List<int> Coincide(string textoNorm)
         {
             var exactos = municipios!.Where(m => Normalizar(m.Municipio) == textoNorm).Select(m => m.Id).ToList();

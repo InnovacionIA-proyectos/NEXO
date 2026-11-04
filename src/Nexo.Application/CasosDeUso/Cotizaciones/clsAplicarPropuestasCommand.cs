@@ -11,13 +11,9 @@ using Nexo.Domain.Enums;
 namespace Nexo.Application.CasosDeUso.Cotizaciones;
 
 /// <summary>
-/// Precarga como flete el valor propuesto por la Biblioteca en cada línea de la solicitud que aún no
-/// tiene flete, junto con su aprovisionamiento y su retorno del contenedor cuando la propuesta los trae.
-/// Se saltan las líneas sin valor propuesto, las que tienen un motivo de pendiente (sin vehículo, sin piso
-/// SICE-TAC del mes, tramo vacío sin piso) y las rechazadas.
-///
-/// <paramref name="SoloAutomaticas"/> se conserva por compatibilidad con quien ya lo envía: ya no cambia el
-/// resultado, porque toda línea con valor y sin motivo de pendiente se guarda sola.
+/// Precarga como flete el valor propuesto por la Biblioteca en cada línea sin flete, con su aprovisionamiento y retorno del contenedor si la
+/// propuesta los trae. Se saltan las líneas sin valor, con motivo de pendiente y las rechazadas.
+/// <paramref name="SoloAutomaticas"/> se conserva por compatibilidad y no cambia el resultado.
 /// </summary>
 public sealed record clsAplicarPropuestasCommand(Guid CotizacionId, bool SoloAutomaticas = false) : ICommand<clsAplicarPropuestasResultDto>;
 
@@ -40,9 +36,8 @@ public sealed class clsAplicarPropuestasCommandHandler(
 
         var conFlete = c.Lineas.Where(l => l.LineaSolicitudId != null).Select(l => l.LineaSolicitudId!.Value).ToHashSet();
 
-        // Idempotencia: si TODAS las líneas de la solicitud ya tienen flete en la cotización,
-        // no hay nada que aplicar (evita reejecutar la propuesta —consulta pesada a los DW—
-        // ante un doble clic o reintento).
+        // Idempotencia: si TODAS las líneas ya tienen flete no hay nada que aplicar (evita reejecutar la propuesta, consulta pesada a los DW,
+        // ante doble clic o reintento).
         var totalLineas = await solicitudes.ContarLineasAsync(c.SolicitudId, ct);
         if (conFlete.Count >= totalLineas)
             return new clsAplicarPropuestasResultDto(c.ToDto(), 0);
@@ -55,9 +50,7 @@ public sealed class clsAplicarPropuestasCommandHandler(
         foreach (var p in propuesta.Lineas)
         {
             if (p.ValorPropuesto is not { } valor || conFlete.Contains(p.LineaId)) continue;
-            // Una línea con motivo de pendiente (sin vehículo, sin piso SICE-TAC del mes, tramo vacío sin piso) nunca se aplica
-            // en bloque: queda para que el Administrador de Tarifas la valide. Sin piso contra el cual comparar, aplicar la
-            // propuesta sería guardar un flete sin validar.
+            // Una línea con motivo de pendiente nunca se aplica en bloque: sin piso contra el cual comparar sería guardar un flete sin validar.
             if (!p.Autocosteable) continue;
             // Una línea rechazada no se costea (ni en bloque): se rechazó a propósito, sin flete.
             if (lineasSol.GetValueOrDefault(p.LineaId)?.EstadoLinea == Nexo.Domain.Enums.EstadoLinea.Rechazada) continue;
@@ -68,7 +61,7 @@ public sealed class clsAplicarPropuestasCommandHandler(
                 ValorFlete = valor,
                 ValorAprovisionamiento = p.AprovisionamientoContenedor?.Valor,
                 ValorRetornoContenedor = p.RetornoContenedor?.Valor,
-                // ORIGENTARIFA de la regla 9: SICETAC o TARIFARIO según la fuente ganadora.
+                // ORIGENTARIFA: SICETAC o TARIFARIO según la fuente ganadora.
                 Fuente = p.FuentePropuesta switch
                 {
                     "sicetac" => FuenteFlete.Sicetac,

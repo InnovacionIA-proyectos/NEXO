@@ -7,9 +7,8 @@ namespace Nexo.Application.CasosDeUso.Biblioteca.Interfaces;
 public sealed record clsMapeoVehiculoTarifarioDto(string TipoVehiculo, string CodigoSicetac, string? CodigoPlazaSap);
 
 /// <summary>
-/// Lectura del mapeo de vehículos (<c>tbl_mapeo_vehiculo_tarifario</c>). Es una tabla chica que cambia poco: la implementación la guarda en
-/// memoria unos minutos. Si la tabla no está disponible (por ejemplo el script aún no se aplicó) responde "sin mapeo" y las consultas se
-/// comportan como antes de que existiera, en lugar de dejar de costear.
+/// Lectura del mapeo de vehículos (<c>tbl_mapeo_vehiculo_tarifario</c>), tabla chica cacheada en memoria unos minutos. Si no está disponible
+/// responde "sin mapeo" y se busca con el código propio del vehículo, en lugar de dejar de costear.
 /// </summary>
 public interface IMapeoVehiculoTarifarioPort
 {
@@ -20,7 +19,7 @@ public interface IMapeoVehiculoTarifarioPort
 /// <summary>El código de plaza con el que buscar un vehículo, o la constancia de que no tiene tarifa de plaza.</summary>
 public readonly record struct clsCodigoDePlaza(string? Codigo, bool SinTarifaDePlaza);
 
-/// <summary>Cómo se pide cada código a partir del vehículo de NEXO; un vehículo sin fila de mapeo se busca con su propio código, como antes.</summary>
+/// <summary>Cómo se pide cada código a partir del vehículo de NEXO; un vehículo sin fila de mapeo se busca con su propio código.</summary>
 public static class clsCodigosDeVehiculo
 {
     /// <summary>Mayúsculas y sin espacios: la forma en que se comparan los códigos de vehículo.</summary>

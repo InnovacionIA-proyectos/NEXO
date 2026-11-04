@@ -5,13 +5,8 @@ using Nexo.Domain.Common;
 namespace Nexo.Domain.Costeo.Entidades;
 
 /// <summary>
-/// Regla "solo SICE-TAC" demarcada por el Administrador de Fletes: para una combinación
-/// de origen + destino + tipo de vehículo, la propuesta se resuelve EXCLUSIVAMENTE con el
-/// piso SICE-TAC (sin consultar ni comparar contra plaza/tarifario). Las solicitudes que
-/// hagan match se auto-costean y quedan atendidas para el comercial de inmediato.
-///
-/// Los valores se guardan normalizados (mayúsculas, sin espacios sobrantes) para que la
-/// coincidencia sea estable; el índice único evita duplicados.
+/// Regla "solo SICE-TAC" del Administrador de Fletes: para un origen + destino + tipo de vehículo la propuesta se
+/// resuelve solo con el piso SICE-TAC, sin comparar contra plaza. Los valores se guardan normalizados para que la coincidencia sea estable.
 /// </summary>
 public class clsReglaSoloSicetac : IAuditable
 {

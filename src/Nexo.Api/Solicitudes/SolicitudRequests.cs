@@ -5,11 +5,7 @@ namespace Nexo.Api.Solicitudes;
 /// <summary>Alta de una solicitud spot (o cabecera de licitación; las líneas se cargan luego en bulk).</summary>
 public class clsCrearSolicitudRequest
 {
-    /// <summary>
-    /// Issue #206: uno de los dos es obligatorio (lo valida el handler, no aquí, para
-    /// devolver el mismo código CLIENTE_REQUERIDO que ya usa Captura). ClienteBp resuelve
-    /// o crea el espejo local del cliente real del catálogo DW por NIT.
-    /// </summary>
+    /// <summary>Uno de los dos (ClienteId o ClienteBp) es obligatorio; lo valida el handler para devolver CLIENTE_REQUERIDO como Captura. ClienteBp resuelve o crea el espejo local del cliente del DW por NIT.</summary>
     public Guid? ClienteId { get; set; }
 
     public string? ClienteBp { get; set; }
@@ -43,19 +39,14 @@ public class clsCrearLineaRequest
     [Range(typeof(decimal), "0", "9999999999999.99", ParseLimitsInInvariantCulture = true)]
     public decimal? ValorMercancia { get; set; }
 
-    /// <summary>
-    /// S5-HU-17/#263: horas de cargue/descargue de ESTA línea — mismo campo que ya acepta
-    /// clsCapturaLineaRequest (#251) en el camino normal. Null usa el default de la
-    /// solicitud (clsResolucionHorasLinea.Resolver).
-    /// </summary>
+    /// <summary>Horas de cargue/descargue de esta línea; null usa el default de la solicitud (clsResolucionHorasLinea.Resolver).</summary>
     [Range(typeof(decimal), "0", "240", ParseLimitsInInvariantCulture = true)]
     public decimal? HorasCargue { get; set; }
 
     [Range(typeof(decimal), "0", "240", ParseLimitsInInvariantCulture = true)]
     public decimal? HorasDescargue { get; set; }
 
-    /// <summary>S5-HU-18.3/#275: id de ruta que Cotifly usa para agrupar varias líneas de
-    /// una misma carga heterogénea — lo pone SIEMPRE Cotifly, nunca NEXO.</summary>
+    /// <summary>Id de ruta que Cotifly usa para agrupar varias líneas de una misma carga heterogénea; lo pone siempre Cotifly, nunca NEXO.</summary>
     public Guid? GrupoRutaId { get; set; }
 }
 

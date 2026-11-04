@@ -18,10 +18,8 @@ public sealed class clsExportarCotizacionExcelQueryHandler(
         var c = await cotizaciones.ObtenerParaExportarAsync(x => x.Id == query.Id, ct)
             ?? throw new clsNotFoundException("COTIZACION_NO_ENCONTRADA", "Cotización no encontrada.");
 
-        // Red de seguridad: si la cotización solicitada está VACÍA (p. ej. un borrador
-        // recién abierto sobre una solicitud ya entregada), se exporta la cotización CON
-        // contenido de esa solicitud (la entregada tiene prioridad). Nunca un Excel en ceros.
-        // S6-HU-24.3/#320: una cotización con todas sus líneas rechazadas tampoco está "vacía": su Excel sale con todas en «Sin costeo».
+        // Red de seguridad: si la cotización pedida está VACÍA (p. ej. un borrador recién abierto sobre una solicitud ya entregada) se exporta la
+        // de esa solicitud con contenido; nunca un Excel en ceros. Una con todas las líneas rechazadas tampoco está vacía: sale con todas en «Sin costeo».
         var rechazadas = await lineasSolicitud.ObtenerRechazadasAsync(c.SolicitudId, ct);
         if (c.Lineas.Count == 0 && c.Conexos.Count == 0 && rechazadas.Count == 0)
         {

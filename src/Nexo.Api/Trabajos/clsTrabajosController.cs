@@ -6,13 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Nexo.Api.Trabajos;
 
-/// <summary>
-/// Estado de los trabajos que corren en segundo plano.
-///
-/// Es la consulta de respaldo del contrato de integración. Cualquier rol autenticado
-/// puede consultarla: preguntar por el avance de un trabajo no revela nada que la
-/// operación que lo lanzó no autorizara ya.
-/// </summary>
+/// <summary>Estado de los trabajos en segundo plano: consulta de respaldo del contrato de integración, abierta a cualquier rol autenticado.</summary>
 [ApiController]
 [Authorize]
 [Route("api/trabajos")]

@@ -5,13 +5,8 @@ using Microsoft.Extensions.Logging;
 
 namespace Nexo.Infrastructure.Identidad.Adaptadores;
 
-/// <summary>
-/// Adapter de solo lectura contra la base de identidad real del portal. Nunca lanza:
-/// una falla de conexión se traduce en null, igual que "el id no existe" — quien resuelve
-/// la identidad no puede distinguir (ni le sirve distinguir) entre "no existe" y "la
-/// fuente no respondió", porque en los dos casos la respuesta correcta es fail-closed
-/// (401), no un 500 que exponga que hay una base externa caída.
-/// </summary>
+/// <summary>Solo lectura contra la base de identidad del portal. Nunca lanza: una falla de conexión se traduce en null, igual que "no existe",
+/// porque ambos casos deben ser fail-closed (401), no un 500 que exponga una base externa caída.</summary>
 public sealed class clsIdentidadPortalAdapter(clsIdentidadPortalDbContext db, ILogger<clsIdentidadPortalAdapter> logger)
     : IIdentidadPortalPort
 {

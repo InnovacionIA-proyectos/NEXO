@@ -8,44 +8,10 @@ using Nexo.Mensajes.Cubicacion;
 namespace Nexo.Application.CasosDeUso.PlanDeCargue;
 
 /// <summary>
-/// Crea la flota de un plan de cargue a partir de una línea de
-/// solicitud ya cotizada — POST /api/planes-cargue/desde-linea/{lineaId} — reemplaza el
-/// POST que <c>crearPlanDesdeLinea()</c> (cubicador-api.service.ts) hacía directo contra
-/// Cubicador con la clave compartida.
-///
-/// Mismo patrón que <see cref="clsCrearPlanDemoCommand"/>, no el de <see cref="clsCrearPlanCommand"/>:
-/// Cubicador arma la flota completa (uno o varios vehículos — reparto en cascada, ver
-/// <c>cubicador/application/plan_cargue/desde_linea.py</c>) a partir de las posiciones de
-/// la línea, así que NEXO no conoce de antemano ni la cantidad de planes ni sus Ids. No hay
-/// fila espejo que dejar acá, solo un correlationId de seguimiento — que a propósito ES el
-/// propio <see cref="clsCrearPlanDesdeLineaCommand.LineaSolicitudId"/> (no uno nuevo): es lo
-/// que permite sondear con <see cref="clsObtenerPlanesPorLineaQuery"/> sin que el frontend
-/// tenga que recordar un id de seguimiento aparte — mismo shape que ya espera
-/// <c>SolicitudCubicacionEncolada</c> del lado del frontend (correlationId = lineaId).
-///
-/// Valida que la línea exista ANTES de publicar (a diferencia de clsCrearPlanDemoCommand, que
-/// no tiene nada que validar): sin esto, un lineaId inexistente encolaría un comando que el
-/// worker de Cubicador rechazaría igual al intentar leer
-/// GET /api/lineas-solicitud/{id}/cubicacion (mismo <see cref="ILineaSolicitudCubicacionPort"/>
-/// que sirve ese endpoint) — mejor devolver 404 de una vez que gastar un viaje redondo a la
-/// cola para llegar al mismo resultado.
-///
-/// A propósito NO pasa por <see cref="IParidadCubicadorPort"/>: arma un plan a partir de
-/// datos ya existentes (dato, no cálculo) — mismo criterio que <see cref="clsCrearPlanCommand"/>
-/// y el resto de los comandos de escritura.
-///
-/// LIMITACIÓN CONOCIDA (no de este comando, del worker de Cubicador): hoy
-/// <c>worker/main.py::_ejecutar_solicitud</c> solo devuelve el <b>primer</b> plan de la
-/// flota (`crear_plan_desde_linea` → `plan.id` del "primero"), y sólo ESE plan se reporta
-/// por "plan-de-cargue.generado". Cuando una línea reparte en 2+ vehículos, los vehículos
-/// 2..N quedan optimizados en la base de Cubicador pero NUNCA llegan a proyectarse en NEXO
-/// — <see cref="clsObtenerPlanesPorLineaQuery"/> (que lee solo la proyección local, sin
-/// llamar a Cubicador, por el criterio no-negociable) no puede mostrarlos.
-/// Detectado al implementar este comando, no estaba documentado antes; requiere que el
-/// worker publique un evento por cada plan de la flota, no solo por el primero —
-/// pendiente en `cubicador/worker/main.py` y
-/// `cubicador/application/plan_cargue/desde_linea.py`. No bloquea el caso de un solo
-/// vehículo (el más común), que ya funciona de punta a punta.
+/// Crea la flota de un plan a partir de una línea ya cotizada (POST /api/planes-cargue/desde-linea/{lineaId}). Como <see cref="clsCrearPlanDemoCommand"/>,
+/// no deja fila espejo: Cubicador arma la flota completa y el correlationId es a propósito el propio <see cref="clsCrearPlanDesdeLineaCommand.LineaSolicitudId"/>,
+/// para sondear con <see cref="clsObtenerPlanesPorLineaQuery"/>. Valida que la línea exista ANTES de publicar (404 en vez de un viaje redondo a la cola).
+/// No pasa por <see cref="IParidadCubicadorPort"/>: es dato, no cálculo. Limitación del worker: solo el primer plan de una flota multi-vehículo llega a proyectarse en NEXO.
 /// </summary>
 public sealed record clsCrearPlanDesdeLineaCommand(Guid LineaSolicitudId) : ICommand<clsComandoAceptadoDto>;
 
@@ -58,11 +24,8 @@ public sealed class clsCrearPlanDesdeLineaCommandHandler(
         var linea = await lineas.ObtenerAsync(command.LineaSolicitudId, ct)
             ?? throw new clsNotFoundException("LINEA_SOLICITUD_NO_ENCONTRADA", "La línea de solicitud no existe.");
 
-        // #304: el puente del Cubicador ya no inventa 1 kg para una posición sin peso: la rechaza con
-        // PESO_NO_DECLARADO (el peso decide la capacidad del vehículo). Pero ese rechazo nace en el worker, DESPUÉS de este
-        // 202, y vuelve por cola: clsCubicacionRechazadaConsumer solo lo registra en el log (no hay PlanCargue que marcar,
-        // el Id es el de la línea) y el front se quedaba sondeando para siempre. Se valida acá, antes de encolar, con el
-        // MISMO código y mensaje del Cubicador: 400 sincrónico y nada que publicar. El cero cuenta como no declarado.
+        // El peso decide la capacidad del vehículo: se rechaza con PESO_NO_DECLARADO (cero cuenta como no declarado) antes de encolar,
+        // porque el rechazo del worker llegaría tarde y el front quedaría sondeando para siempre.
         var sinPeso = linea.Posiciones
             .Where(p => p.PesoKg is not > 0)
             .Select(p => string.IsNullOrWhiteSpace(p.Descripcion) ? "(sin descripcion)" : p.Descripcion)
@@ -74,15 +37,10 @@ public sealed class clsCrearPlanDesdeLineaCommandHandler(
 
         var lineaIdTexto = command.LineaSolicitudId.ToString();
 
-        // #304: un intento nuevo empieza de cero — se borra el rechazo del anterior (se guarda con el mismo SaveChanges que
-        // flushea el Outbox del mensaje), así el estado vuelve a "procesando" y el front no ve un rechazo ya viejo.
+        // Un intento nuevo empieza de cero: se borra el rechazo anterior (mismo SaveChanges que flushea el Outbox).
         await rechazos.LimpiarAsync(command.LineaSolicitudId, ct);
 
-        // "crear_desde_linea": el mismo tipo de cola que el worker de Cubicador YA
-        // implementa (verificado en cubicador/worker/main.py y
-        // cubicador/application/plan_cargue/desde_linea.py) — no "crear_plan_desde_linea".
-        // El correlationId del sobre (ver clsCubicacionPublicadorAdapter) queda como el propio
-        // lineaId, igual que el payload.
+        // El tipo de cola es "crear_desde_linea" (el que implementa el worker de Cubicador); el correlationId queda como el propio lineaId.
         await cubicacion.PublicarComandoAsync(
             "crear_desde_linea", lineaIdTexto, new clsCrearPlanDesdeLineaInput(lineaIdTexto), ct);
 

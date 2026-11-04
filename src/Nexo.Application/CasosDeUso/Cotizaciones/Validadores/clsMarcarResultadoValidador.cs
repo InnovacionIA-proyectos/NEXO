@@ -3,11 +3,7 @@ using Nexo.Domain.Enums;
 
 namespace Nexo.Application.CasosDeUso.Cotizaciones.Validadores;
 
-/// <summary>
-/// Forma de <see cref="clsMarcarResultadoCommand"/>. Defensiva a propósito: aunque Api ya
-/// valide el valor por HTTP, un ResultadoCotizacion fuera de rango nunca debe llegar a
-/// persistirse. Que la cotización exista o tenga líneas son precondiciones del handler.
-/// </summary>
+/// <summary>Forma de <see cref="clsMarcarResultadoCommand"/>. Defensiva: aunque Api valide por HTTP, un ResultadoCotizacion fuera de rango nunca debe persistirse.</summary>
 public static class clsMarcarResultadoValidador
 {
     public static void Validar(clsMarcarResultadoCommand command)

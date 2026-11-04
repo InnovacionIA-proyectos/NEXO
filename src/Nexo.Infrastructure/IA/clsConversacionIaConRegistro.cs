@@ -10,11 +10,8 @@ using Nexo.Domain.IA.Entidades;
 
 namespace Nexo.Infrastructure.IA;
 
-/// <summary>
-/// Envuelve la conversación con el modelo para controlar su uso, igual que <see cref="clsAsistenteIaConRegistro"/>: antes de empezar
-/// aplica el tope diario de la persona y, al terminar (bien, con error o porque el usuario cerró la conexión), registra en
-/// <c>tbl_ia_uso</c> UNA fila con la suma de todas las peticiones al proveedor que hizo el intercambio. No guarda el contenido.
-/// </summary>
+/// <summary>Como <see cref="clsAsistenteIaConRegistro"/>, para la conversación: aplica el tope diario al empezar y, al terminar
+/// (bien, con error o porque el usuario cerró la conexión), registra UNA fila en <c>tbl_ia_uso</c> con la suma de todas las peticiones. No guarda el contenido.</summary>
 public sealed class clsConversacionIaConRegistro(
     IConversacionIaPort interno,
     IUsoIaRepository uso,

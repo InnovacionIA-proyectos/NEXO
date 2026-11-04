@@ -1,10 +1,6 @@
 namespace Nexo.Infrastructure.External;
 
-/// <summary>
-/// Fila de la matriz oficial de tarifas SICE-TAC en el Data Warehouse corporativo
-/// (DWSice.dbo.tblRutasSicetac). Modelo de SOLO LECTURA: la tabla la mantiene el
-/// proceso ETL del DW, esta aplicación nunca la escribe.
-/// </summary>
+/// <summary>Fila de la matriz oficial SICE-TAC (DWSice.dbo.tblRutasSicetac). Solo lectura: la mantiene el ETL del DW.</summary>
 public class clsRutaSicetacDw
 {
     public int Id { get; set; }

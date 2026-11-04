@@ -8,12 +8,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Nexo.Infrastructure.Cubicacion;
 
-/// <summary>
-/// Consume el rechazo de una cubicación y marca el
-/// <c>clsPlanCargue</c> correspondiente como <c>error</c> (aviso claro: el
-/// usuario puede reintentar desde el estado "error"). Ver
-/// <see cref="clsPlanDeCargueGeneradoConsumer"/> para el porqué de la topología.
-/// </summary>
+/// <summary>Marca el plan como <c>error</c> al recibir el rechazo de una cubicación (el usuario puede reintentar).</summary>
 public sealed class clsCubicacionRechazadaConsumer(
     clsNexoDbContext db, INotificadorDePlanCargue avisos, IRechazoCubicacionLineaPort rechazos,
     ILogger<clsCubicacionRechazadaConsumer> log)
@@ -33,28 +28,14 @@ public sealed class clsCubicacionRechazadaConsumer(
         var plan = await db.PlanesCargue.FirstOrDefaultAsync(p => p.Id == planId, context.CancellationToken);
         if (plan is null)
         {
-            // Antes: `return` en silencio, sin loguear. Para "optimizar" este Id
-            // siempre es un PlanCargue real (ya existe antes de publicar), asi que
-            // este caso era casi imposible. Pero "crear_desde_linea"
-            // (clsCrearPlanDesdeLineaCommand) publica con PlanId = LineaSolicitudId
-            // A PROPOSITO, porque todavia no existe ningun PlanCargue que reportar -
-            // asi que CUALQUIER rechazo de ese flujo (preset invalido, error de
-            // negocio, lo que sea) cae siempre aca y se perdia sin dejar rastro: el
-            // frontend quedaba sondeando GET /por-linea/{lineaId} para siempre, sin
-            // poder distinguir "todavia procesando" de "fallo y nadie se entero".
-            // Este log al menos lo hace visible para soporte/operacion. Cerrar el
-            // circuito hasta el frontend (mostrar el error en la Mesa de Costeo)
-            // requiere ademas exponer un estado de rechazo por LineaSolicitudId -
-            // hoy clsPlanFlotaItemDto no tiene de donde sacarlo - pendiente como
-            // cambio aparte, no incluido en este fix.
+            // El Id puede no ser un PlanCargue: crear_desde_linea publica con PlanId = LineaSolicitudId porque aún no existe plan.
+            // Se loguea para que ese rechazo no se pierda sin rastro.
             log.LogWarning(
                 "Rechazo de cubicacion para Id={Id} sin PlanCargue asociado: probablemente un fallo de " +
                 "'crear_desde_linea' (Id = LineaSolicitudId, plan nunca llego a crearse). " +
                 "Codigo={Codigo} Mensaje={Mensaje}", planId, mensaje.Codigo, mensaje.Mensaje);
 
-            // #304: el circuito que este comentario dejaba pendiente — el motivo se guarda por línea y el front lo lee en
-            // GET /api/planes-cargue/por-linea/{lineaId}/estado, en vez de sondear para siempre. Solo si el Id ES una línea
-            // real: cualquier otro Id huérfano sigue siendo solo un log.
+            // Solo si el Id ES una línea real se guarda el motivo por línea; cualquier otro Id huérfano sigue siendo solo un log.
             if (await rechazos.RegistrarAsync(planId, mensaje.Codigo, mensaje.Mensaje, context.CancellationToken))
                 await db.SaveChangesAsync(context.CancellationToken);
             return;

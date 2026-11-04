@@ -1,13 +1,6 @@
 namespace Nexo.Mensajes.Bandeja;
 
-/// <summary>
-/// Invariantes de <see cref="clsBandejaCambio"/>.
-///
-/// El motivo tiene que ser uno de los conocidos, no cualquier texto. Un motivo libre
-/// convertiría el contrato en una convención de pasillo: el cliente empezaría a comparar
-/// contra cadenas que alguien escribió de memoria, y un error de tipeo pasaría al
-/// navegador sin que nada lo frene.
-/// </summary>
+/// <summary>Invariantes de <see cref="clsBandejaCambio"/>: el motivo debe ser uno de los conocidos, no texto libre.</summary>
 public sealed class clsBandejaCambioValidador : IValidadorDeMensaje<clsBandejaCambio>
 {
     private static readonly string[] Conocidos =

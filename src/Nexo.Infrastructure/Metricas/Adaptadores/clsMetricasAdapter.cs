@@ -13,8 +13,7 @@ public sealed class clsMetricasAdapter(clsNexoDbContext db) : IMetricasPort
 {
     public async Task<clsCumplimientoDto> CumplimientoAsync(DateTimeOffset? desde, DateTimeOffset? hasta, CancellationToken ct)
     {
-        // S5-HU-21.1/#287: las 5 tarjetas de la cola cuentan solicitudes CREADAS en el rango.
-        // Para Descartadas no existe fecha de descarte: se aproxima por la de creación.
+        // Las 5 tarjetas de la cola cuentan solicitudes CREADAS en el rango; Descartadas no tiene fecha de descarte, se aproxima por la de creación.
         var solicitudes = db.Solicitudes.AsQueryable();
         if (desde is not null) solicitudes = solicitudes.Where(s => s.CreatedAt >= desde);
         if (hasta is not null) solicitudes = solicitudes.Where(s => s.CreatedAt <= hasta);
@@ -23,14 +22,13 @@ public sealed class clsMetricasAdapter(clsNexoDbContext db) : IMetricasPort
             .Select(g => new { Estado = g.Key, N = g.Count() }).ToListAsync(ct);
         int Estado(EstadoSolicitud e) => porEstado.FirstOrDefault(x => x.Estado == e)?.N ?? 0;
 
-        // Licitaciones SIN filtro: el Tablero ni siquiera las muestra (decisión de negocio).
+        // Licitaciones SIN filtro: el Tablero no las muestra.
         var licitacionesTotal = await db.Solicitudes.CountAsync(s => s.Tipo == TipoSolicitud.Licitacion, ct);
         var licitacionesPerdidas = await db.Cotizaciones
             .CountAsync(c => c.Resultado == ResultadoCotizacion.Perdida && c.clsSolicitud!.Tipo == TipoSolicitud.Licitacion, ct);
 
-        // Cumplimiento SLA entra al filtro, pero por EntregadaAt (no por la creación de la
-        // solicitud): % de cotizaciones entregadas con Deadline informado que llegaron a tiempo.
-        // La fórmula no cambia (no cuenta las vencidas sin entregar: aceptado por negocio).
+        // Cumplimiento SLA filtra por EntregadaAt: % de cotizaciones entregadas con Deadline que llegaron a tiempo;
+        // no cuenta las vencidas sin entregar.
         var cotizaciones = db.Cotizaciones
             .Where(c => c.EntregadaAt != null && c.clsSolicitud!.Deadline != null);
         if (desde is not null) cotizaciones = cotizaciones.Where(c => c.EntregadaAt >= desde);
@@ -56,20 +54,9 @@ public sealed class clsMetricasAdapter(clsNexoDbContext db) : IMetricasPort
             entregadas.Count == 0 ? 0 : Math.Round(100.0 * aTiempo / entregadas.Count, 1));
     }
 
-    /// <summary>
-    /// Los 4 KPIs del piloto (documento de entendimiento, sección 14). El tiempo de
-    /// resolución sale de clsEstadoAutoCosteo (la saga que ya persiste SolicitadoEn/
-    /// TerminadoEn para todo pliego que pasó por auto-costeo, sea vía captura diferida
-    /// o vía lineas:bulk); no hay otra fuente con ambos timestamps.
-    ///
-    /// S5-HU-21.1/#287: TerminadoEn se marca cuando TODAS las líneas tienen desenlace, incluso las
-    /// que quedan esperando a una persona — mide cuánto tardó el robot, no cuándo la cotización
-    /// está lista. Por eso: saga Completado (100% automático) = TerminadoEn - SolicitadoEn; saga
-    /// Parcial (hubo intervención manual) = Cotizacion.EntregadaAt - Solicitud.CreatedAt, y si
-    /// todavía no se entregó, ese pliego no entra. Desde S5-HU-19.3 la entrega exige
-    /// el pliego completo; las entregas anteriores pudieron subestimar el tiempo.
-    /// El filtro Desde/Hasta sigue siendo por SolicitadoEn de la saga.
-    /// </summary>
+    /// <summary>KPIs del piloto. El tiempo de resolución sale de clsEstadoAutoCosteo: saga Completado = TerminadoEn - SolicitadoEn;
+    /// saga Parcial (hubo intervención manual) = Cotizacion.EntregadaAt - Solicitud.CreatedAt, y sin entrega no entra.
+    /// El filtro Desde/Hasta es por SolicitadoEn.</summary>
     public async Task<clsKpisPilotoDto> KpisPilotoAsync(
         DateTimeOffset? desde, DateTimeOffset? hasta, TamanoPliego? tamano, CancellationToken ct)
     {
@@ -80,9 +67,7 @@ public sealed class clsMetricasAdapter(clsNexoDbContext db) : IMetricasPort
             .Select(s => new { s.CurrentState, s.SolicitudId, s.SolicitadoEn, s.TotalLineas, Terminado = s.TerminadoEn!.Value })
             .ToListAsync(ct);
 
-        // Tamaño por TotalLineas de la saga: el tiempo NO es proporcional al número de líneas
-        // (se procesan en paralelo, un mensaje por línea), así que se corta por tamaño en vez
-        // de dividir por línea.
+        // Tamaño por TotalLineas de la saga: el tiempo no es proporcional al número de líneas (se procesan en paralelo).
         if (tamano is { } t)
             sagas = sagas.Where(s => s.TotalLineas is { } n && clsTamanoPliego.Contiene(t, n)).ToList();
 
@@ -126,8 +111,7 @@ public sealed class clsMetricasAdapter(clsNexoDbContext db) : IMetricasPort
         var lineasQuery = db.LineasSolicitud.AsQueryable();
         if (desde is not null) lineasQuery = lineasQuery.Where(l => l.CreatedAt >= desde);
         if (hasta is not null) lineasQuery = lineasQuery.Where(l => l.CreatedAt <= hasta);
-        // S6-HU-24.3/#320: una línea RECHAZADA se dejó sin costear a propósito: no cuenta como "por costear" en la proporción de líneas
-        // autocosteadas (si no, cada rechazo bajaría el porcentaje sin que el motor hubiera fallado en nada).
+        // Una línea RECHAZADA se dejó sin costear a propósito: no cuenta como "por costear" ni baja el porcentaje de autocosteo.
         lineasQuery = lineasQuery.Where(l => l.EstadoLinea != EstadoLinea.Rechazada);
         var totalLineas = await lineasQuery.CountAsync(ct);
         var autoCosteadas = await lineasQuery.CountAsync(l => l.EstadoLinea == EstadoLinea.AutoResuelta, ct);
@@ -137,10 +121,8 @@ public sealed class clsMetricasAdapter(clsNexoDbContext db) : IMetricasPort
         if (hasta is not null) cotizacionesQuery = cotizacionesQuery.Where(c => c.EntregadaAt <= hasta);
         var cotizacionesEmitidas = await cotizacionesQuery.CountAsync(ct);
 
-        // No "0 fletes bajo el piso" literal: eso exigiría el piso SICE-TAC vigente EN EL
-        // MOMENTO en que se fijó cada flete, y esa foto histórica no se persiste por línea.
-        // Fuente=Manual es la señal barata y honesta: líneas fuera de la regla automática
-        // (RN-01/RN-02) que alguien debe verificar a mano contra el piso (ver clsKpisPilotoDto).
+        // No se mide "fletes bajo el piso" literal: el piso SICE-TAC vigente al fijar cada flete no se persiste por línea.
+        // Fuente=Manual (fuera de la regla automática RN-01/RN-02) es la señal para verificar a mano.
         var lineasManualQuery = db.Cotizaciones.SelectMany(c => c.Lineas).Where(l => l.Fuente == FuenteFlete.Manual);
         if (desde is not null) lineasManualQuery = lineasManualQuery.Where(l => l.CreatedAt >= desde);
         if (hasta is not null) lineasManualQuery = lineasManualQuery.Where(l => l.CreatedAt <= hasta);

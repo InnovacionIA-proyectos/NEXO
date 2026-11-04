@@ -24,11 +24,7 @@ internal static class clsAliasReglas
         return t;
     }
 
-    /// <summary>
-    /// El código oficial (con su mayúscula/minúscula canónica) si el diccionario lo acepta para ese tipo; null si no. Se aceptan los códigos
-    /// que el diccionario ya usa y los del catálogo oficial: tblSAPTiposVehiculoTarifario para vehículos, las clases de contenedor de SAP
-    /// para contenedores. Sin esto cualquier typo en el código crearía un alias que manda líneas a un tipo que no existe.
-    /// </summary>
+    /// <summary>El código oficial (mayúscula canónica) si el diccionario lo acepta para ese tipo; null si no. Evita que un typo cree un alias hacia un tipo inexistente.</summary>
     public static async Task<string?> CodigoValidoAsync(
         string tipo, string codigo, IAliasCatalogoPort alias, ITiposVehiculoPort tiposVehiculo, CancellationToken ct)
     {
@@ -43,9 +39,7 @@ internal static class clsAliasReglas
     public static clsAliasDto ADto(clsAliasElemento a) => new(a.Id, a.Alias, a.AliasNormalizado, a.TipoElemento, a.Codigo, a.Activo);
 }
 
-// ---------------------------------------------------------------- listar
-
-/// <summary>S6-HU-27.2/#321: el diccionario completo (<c>tipo</c> = vehiculo | contenedor; sin tipo, los dos).</summary>
+/// <summary>El diccionario completo (<c>tipo</c> = vehiculo | contenedor; sin tipo, los dos).</summary>
 public sealed record clsListarAliasQuery(string? Tipo) : IQuery<IReadOnlyList<clsAliasDto>>;
 
 public sealed class clsListarAliasQueryHandler(IAliasCatalogoPort alias) : IQueryHandler<clsListarAliasQuery, IReadOnlyList<clsAliasDto>>
@@ -57,12 +51,7 @@ public sealed class clsListarAliasQueryHandler(IAliasCatalogoPort alias) : IQuer
     }
 }
 
-// ---------------------------------------------------------------- resolver
-
-/// <summary>
-/// S6-HU-27.2/#321: ¿a qué código corresponde este texto suelto? Usa el mismo normalizador y el mismo diccionario que la captura, así que
-/// la respuesta de aquí es la que va a pasar al capturar. Solo cuentan los alias ACTIVOS del tipo pedido (vehiculo por defecto).
-/// </summary>
+/// <summary>¿A qué código corresponde este texto suelto? Mismo normalizador y diccionario que la captura; solo cuentan los alias ACTIVOS del tipo (vehiculo por defecto).</summary>
 public sealed record clsResolverAliasQuery(string? Tipo, string? Texto) : IQuery<clsResolverAliasDto>;
 
 public sealed class clsResolverAliasQueryHandler(IAliasCatalogoPort alias) : IQueryHandler<clsResolverAliasQuery, clsResolverAliasDto>
@@ -80,12 +69,7 @@ public sealed class clsResolverAliasQueryHandler(IAliasCatalogoPort alias) : IQu
     }
 }
 
-// ---------------------------------------------------------------- crear
-
-/// <summary>
-/// S6-HU-27.2/#321: agrega un alias al diccionario (AdminTarifas/Admin). El código tiene que ser uno oficial del tipo (400
-/// CODIGO_NO_RECONOCIDO) y el texto no puede existir ya, en ningún tipo (409 ALIAS_DUPLICADO: el normalizado es único en toda la tabla).
-/// </summary>
+/// <summary>Agrega un alias (AdminTarifas/Admin). El código debe ser oficial del tipo (400 CODIGO_NO_RECONOCIDO) y el texto no puede existir ya en ningún tipo (409 ALIAS_DUPLICADO).</summary>
 public sealed record clsCrearAliasCommand(string? Tipo, string? Alias, string? Codigo) : ICommand<clsAliasDto>;
 
 public sealed class clsCrearAliasCommandHandler(

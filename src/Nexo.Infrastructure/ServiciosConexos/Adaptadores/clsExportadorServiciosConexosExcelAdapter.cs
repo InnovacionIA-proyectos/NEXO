@@ -4,10 +4,8 @@ using ClosedXML.Excel;
 
 namespace Nexo.Infrastructure.ServiciosConexos.Adaptadores;
 
-/// <summary>Exporta el catálogo de servicios conexos a Excel con ClosedXML — mismas columnas
-/// que lee <see cref="Repositorios.clsEfServiciosConexosRepository.ImportarExcelAsync"/> al
-/// reimportarlo, así el mismo archivo sirve para editar y volver a cargar como
-/// actualización (S4-HU-15.3/#249).</summary>
+/// <summary>Exporta con las mismas columnas que lee <see cref="Repositorios.clsEfServiciosConexosRepository.ImportarExcelAsync"/>:
+/// el archivo sirve para editar y recargar como actualización.</summary>
 public sealed class clsExportadorServiciosConexosExcelAdapter : IExportadorServiciosConexosExcelPort
 {
     private static readonly string[] Encabezados =

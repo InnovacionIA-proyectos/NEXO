@@ -7,19 +7,8 @@ using Microsoft.Extensions.Logging;
 
 namespace Nexo.Infrastructure.Notificaciones.Adaptadores;
 
-/// <summary>
-/// Traduce el evento de entrega en la llamada al caso de uso que notifica.
-///
-/// Delgado a propósito: aquí no hay ninguna decisión. Quién recibe el correo, qué dice y
-/// cuándo no hay a quién escribirle son preguntas de negocio y viven en Application.
-///
-/// LA EXCEPCIÓN SUBE. Es lo contrario de los consumidores de avisos, donde un
-/// navegador desconectado no es una avería y el fallo se registra y se sigue. Aquí sí lo
-/// es: una notificación perdida no se recupera consultando nada, no hay pantalla que la
-/// muestre, y nadie se enteraría. Dejándola subir, el bus reintenta las fallas pasajeras
-/// y manda a la cola de error las que no tienen arreglo — que es de donde sale la alerta
-/// al equipo.
-/// </summary>
+/// <summary>Traduce el evento de entrega en la llamada al caso de uso que notifica (sin decisiones aquí). La excepción sube a propósito:
+/// una notificación perdida no se recupera ni se ve en pantalla; el bus reintenta las pasajeras y manda a la cola de error las demás.</summary>
 public sealed class clsNotificarEntregaConsumer(
     ICommandHandler<clsNotificarEntregaCommand, clsResultadoDeNotificacionDto> notificar,
     ILogger<clsNotificarEntregaConsumer> log)
@@ -39,8 +28,7 @@ public sealed class clsNotificarEntregaConsumer(
                 "({Adjuntos} adjunto(s), id en el relay {IdEnElRelay}).",
                 m.CotizacionId, r.Destinatario, r.Adjuntos, r.IdEnElRelay ?? "sin id");
         else
-            // No es un fallo: es que no había correo que mandar. Se registra como aviso
-            // para que se vea en el log sin confundirse con una avería.
+            // No es un fallo: no había correo que mandar; se registra como aviso.
             log.LogWarning(
                 "La cotización {CotizacionId} no se notificó: {Motivo}",
                 m.CotizacionId, r.Motivo);

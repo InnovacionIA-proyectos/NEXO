@@ -17,10 +17,7 @@ public interface IConversacionesAsistenteRepository
 
     Task<clsConversacionAsistente> CrearAsync(Guid usuarioId, string titulo, CancellationToken ct = default);
 
-    /// <summary>
-    /// Agrega el mensaje del usuario y una respuesta del asistente <c>en_curso</c> (vacía), y suma un turno. Devuelve el id de la
-    /// respuesta, al que se enlazan las herramientas que use.
-    /// </summary>
+    /// <summary>Agrega el mensaje del usuario y una respuesta <c>en_curso</c> vacía, y suma un turno; devuelve el id de la respuesta.</summary>
     Task<Guid> IniciarTurnoAsync(Guid conversacionId, string mensajeUsuario, CancellationToken ct = default);
 
     Task FinalizarMensajeAsync(Guid mensajeId, string contenido, string estado, CancellationToken ct = default);
@@ -38,10 +35,7 @@ public interface IConversacionesAsistenteRepository
 
     Task<int> ContarAccionesDelMensajeAsync(Guid mensajeId, CancellationToken ct = default);
 
-    /// <summary>
-    /// Pasa la acción de <c>pendiente</c> a <c>ejecutando</c> en un solo paso atómico y solo si no ha vencido: dos confirmaciones
-    /// simultáneas no pueden aplicar el cambio dos veces. Devuelve false si la acción ya no estaba pendiente o venció.
-    /// </summary>
+    /// <summary>Pasa la acción de <c>pendiente</c> a <c>ejecutando</c> de forma atómica y solo si no venció; false si ya no estaba pendiente.</summary>
     Task<bool> TomarAccionAsync(Guid id, DateTimeOffset ahora, CancellationToken ct = default);
 
     /// <summary>Pasa la acción de <c>pendiente</c> a <c>cancelada</c> (atómico). False si ya no estaba pendiente.</summary>

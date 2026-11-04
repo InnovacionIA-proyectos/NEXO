@@ -6,23 +6,13 @@ using Nexo.Domain.Common;
 namespace Nexo.Infrastructure.Biblioteca.Adaptadores;
 
 /// <summary>
-/// Dataset PROVISIONAL de plaza mientras la conexión SAP en vivo no exista. Valores
-/// representativos de fletes reales de Botero Soto para las rutas más frecuentes —
-/// PENDIENTE de validación formal por negocio: no son un promedio calculado, son
-/// estimaciones razonables a partir de las tarifas ya sembradas en clsDataSeeder.cs
-/// para las mismas rutas.
-///
-/// Se activa SOLO por configuración (`SapTarifaFleteEnVivo:Modo=Mock`,
-/// clsDependencyInjection.cs) — nunca reemplaza a <see cref="ITarifarioSapPort"/> (la
-/// fuente REAL de plaza, vía DbSolucionesTi, que sigue intacta) salvo que un operador
-/// lo encienda a propósito.
+/// Dataset provisional de plaza (sin validar por negocio) para cuando no hay conexión SAP en vivo; solo se activa por configuración (Modo=Mock).
 /// </summary>
 public sealed class clsSapTarifaFleteEnVivoMockAdapter : ISapTarifaFleteEnVivoPort
 {
     public bool Configurado => true;
 
-    /// <summary>Clave: ruta normalizada (clsTexto.ClaveRuta). Valor: tarifa base en COP,
-    /// para un vehículo estándar (Turbo/Sencillo) y peso de referencia (~8 ton).</summary>
+    /// <summary>Clave: ruta normalizada (clsTexto.ClaveRuta). Valor: tarifa base en COP para un vehículo estándar y ~8 ton.</summary>
     private static readonly IReadOnlyDictionary<string, decimal> Dataset = new Dictionary<string, decimal>
     {
         [clsTexto.ClaveRuta("Bogota", "Medellin")] = 2_850_000m,
@@ -43,9 +33,7 @@ public sealed class clsSapTarifaFleteEnVivoMockAdapter : ISapTarifaFleteEnVivoPo
         if (!Dataset.TryGetValue(clave, out var baseCop))
             return Task.FromResult<clsCandidatoTarifaDto?>(null);
 
-        // Ajuste simple por peso: la base es para ~8 ton, escala linealmente con piso de
-        // 60% (un flete no baja de más de la mitad aunque la carga sea liviana) — es una
-        // aproximación deliberadamente simple, PROVISIONAL, no una tarifa SAP real.
+        // Escala lineal por peso respecto a ~8 ton, con piso de 60%: aproximación provisional, no una tarifa SAP.
         var factor = consulta.Peso is > 0
             ? Math.Clamp(consulta.Peso.Value / 8000m, 0.6m, 1.6m)
             : 1m;

@@ -4,17 +4,8 @@ using Microsoft.AspNetCore.SignalR;
 namespace Nexo.Api.Trabajos;
 
 /// <summary>
-/// Canal de avisos del avance de los trabajos.
-///
-/// Cada trabajo es un grupo de SignalR, así que un comercial solo recibe el avance de
-/// los pliegos que está mirando y no el de los ajenos. Sin grupos, todo conectado
-/// recibiría todo.
-///
-/// Va con [Authorize] como el resto del API: el canal no es una puerta trasera.
-///
-/// NO REENVÍA LO PERDIDO, y eso es importante que quede dicho. Un cliente que estuvo
-/// desconectado no recibe lo que se perdió; lo recupera consultando
-/// GET /api/trabajos/{id}. El aviso es una mejora, la consulta es la garantía.
+/// Canal de avisos del avance de los trabajos. Cada trabajo es un grupo de SignalR, así que un comercial solo recibe el avance de los pliegos que mira.
+/// No reenvía lo perdido: quien estuvo desconectado lo recupera con GET /api/trabajos/{id}.
 /// </summary>
 [Authorize]
 public sealed class clsTrabajosHub : Hub

@@ -3,13 +3,8 @@ using System.Globalization;
 namespace Nexo.Domain.Common;
 
 /// <summary>
-/// Parser robusto de importes/pesos que llegan como TEXTO desde fuentes con formato
-/// heterogéneo (export de SAP, Excel de SICE-TAC). Interpreta tanto el formato
-/// colombiano (coma decimal, punto de miles: "1.500.000,50") como el invariante
-/// ("1500000.50" / "1,500,000.50"), detectando el separador decimal como el que
-/// aparece más a la derecha. Reemplaza el uso de <c>NumberStyles.Any</c> con
-/// <c>InvariantCulture</c>, que interpretaba "1500000,50" como 150.000.050 (×100)
-/// y descartaba en silencio "1.500.000".
+/// Parser de importes/pesos que llegan como texto de fuentes heterogéneas. Acepta el formato colombiano
+/// ("1.500.000,50") y el invariante ("1,500,000.50"); el separador decimal es el que aparece más a la derecha.
 /// </summary>
 public static class clsImporteParser
 {
@@ -17,7 +12,7 @@ public static class clsImporteParser
     {
         if (string.IsNullOrWhiteSpace(raw)) return null;
 
-        // Conservar solo dígitos, signo y separadores (quita "$", NBSP, letras…).
+        // Solo dígitos, signo y separadores (quita "$", NBSP, letras).
         var limpio = new string(raw.Where(c => char.IsDigit(c) || c is '.' or ',' or '-' or '+').ToArray());
         if (limpio.Length == 0) return null;
 
@@ -30,21 +25,20 @@ public static class clsImporteParser
 
         if (puntos > 0 && comas > 0)
         {
-            // Ambos presentes: el separador decimal es el que está más a la derecha.
             var dec = limpio.LastIndexOf('.') > limpio.LastIndexOf(',') ? '.' : ',';
             var miles = dec == '.' ? ',' : '.';
             limpio = limpio.Replace(miles.ToString(), string.Empty).Replace(dec, '.');
         }
         else if (comas > 0)
         {
-            // Solo comas: una sola coma con pinta decimal => decimal; el resto => miles.
+            // Una sola coma que no parece de miles es decimal; el resto son miles.
             limpio = comas == 1 && !EsAgrupacionMiles(limpio, ',')
                 ? limpio.Replace(',', '.')
                 : limpio.Replace(",", string.Empty);
         }
         else if (puntos > 0)
         {
-            // Solo puntos: un solo punto con pinta de miles ("1.500") => quitar; si no, decimal.
+            // Un solo punto con forma de miles ("1.500") se quita; si no, es decimal.
             if (puntos > 1 || EsAgrupacionMiles(limpio, '.'))
                 limpio = limpio.Replace(".", string.Empty);
         }
@@ -54,21 +48,18 @@ public static class clsImporteParser
         return negativo ? -v : v;
     }
 
-    /// <summary>Solo positivos y &gt; 0 (los importes de flete/piso nunca son 0 o negativos).</summary>
+    /// <summary>Solo positivos: los importes de flete/piso nunca son 0 ni negativos.</summary>
     public static decimal? ParsePositivo(string? raw)
     {
         var v = Parse(raw);
         return v is > 0 ? v : null;
     }
 
-    /// <summary>
-    /// Un único separador con exactamente 3 dígitos a la derecha y 1–3 a la izquierda
-    /// tiene forma de agrupación de miles ("1.500", "12,345"); "1500000,50" o "1234.56" no.
-    /// </summary>
+    /// <summary>Un único separador con 3 dígitos a la derecha y 1–3 a la izquierda es agrupación de miles ("1.500", "12,345").</summary>
     private static bool EsAgrupacionMiles(string s, char separador)
     {
         var pos = s.IndexOf(separador);
-        if (pos < 0 || s.IndexOf(separador, pos + 1) >= 0) return false; // más de uno
+        if (pos < 0 || s.IndexOf(separador, pos + 1) >= 0) return false;
         var antes = pos;
         var despues = s.Length - pos - 1;
         return despues == 3 && antes >= 1 && antes <= 3;

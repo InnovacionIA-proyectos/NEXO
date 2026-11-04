@@ -2,24 +2,14 @@ using Nexo.Domain.Enums;
 
 namespace Nexo.Domain.Usuarios.Reglas;
 
-/// <summary>
-/// Una persona puede tener varios roles asignados en el portal a la vez (caso real
-/// documentado en docs/contrato-integracion/README.md, Pendiente P3): Nexo solo trabaja
-/// con un rol efectivo por usuario, así que hace falta un orden de precedencia para
-/// desempatar. Función pura: no consulta nada, solo elige entre los candidatos que ya
-/// se resolvieron contra la tabla de mapeo.
-/// </summary>
+/// <summary>Una persona puede tener varios roles en el portal pero Nexo usa uno solo: se desempata por orden de precedencia.</summary>
 public static class clsResolucionRolPortal
 {
-    /// <summary>
-    /// Del que más manda al que menos. Propuesta técnica pendiente de confirmar por
-    /// negocio (Pendiente P3): sale de qué tan a menudo autoriza cada rol operaciones
-    /// de escritura en los controladores actuales, no de una decisión de negocio.
-    /// </summary>
+    /// <summary>Del que más manda al que menos; criterio técnico (qué tanto escribe cada rol), pendiente de confirmar por negocio.</summary>
     private static readonly RolUsuario[] OrdenDePrecedencia =
     [
         RolUsuario.Admin,
-        // S6-HU-25.1/#307: AdminTarifas ahora puede más que AdminBiblioteca (cotizaciones, Mesa, Cubicador completo), así que va primero.
+        // AdminTarifas puede más que AdminBiblioteca (cotizaciones, Mesa, Cubicador completo).
         RolUsuario.AdminTarifas,
         RolUsuario.AdminBiblioteca,
         RolUsuario.Comercial,
@@ -27,8 +17,7 @@ public static class clsResolucionRolPortal
         RolUsuario.ServiciosLogisticos,
     ];
 
-    /// <summary>Null si <paramref name="candidatos"/> viene vacío (la persona no tiene
-    /// ningún rol del portal que traduzca a un rol de Nexo — cierra en 403).</summary>
+    /// <summary>Null si <paramref name="candidatos"/> viene vacío (ningún rol del portal traduce a uno de Nexo; cierra en 403).</summary>
     public static RolUsuario? ElegirRolEfectivo(IEnumerable<RolUsuario> candidatos)
     {
         var conjunto = candidatos.ToHashSet();

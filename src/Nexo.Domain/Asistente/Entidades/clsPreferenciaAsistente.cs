@@ -1,9 +1,8 @@
 namespace Nexo.Domain.Asistente.Entidades;
 
 /// <summary>
-/// Una regla o preferencia propia de una persona para el asistente ("avísame si plaza e histórico difieren más de 20 %"). El asistente la
-/// recibe al inicio de cada conversación de esa persona. Es una PREFERENCIA: nunca reemplaza ni salta las reglas del sistema (el piso
-/// SICE-TAC, que todo precio venga de una consulta, la confirmación de los cambios).
+/// Preferencia de una persona para el asistente ("avísame si plaza e histórico difieren más de 20 %"), que recibe al
+/// inicio de cada una de sus conversaciones. Nunca reemplaza ni salta las reglas del sistema (piso SICE-TAC, precios de una consulta, confirmación de cambios).
 /// </summary>
 public class clsPreferenciaAsistente
 {

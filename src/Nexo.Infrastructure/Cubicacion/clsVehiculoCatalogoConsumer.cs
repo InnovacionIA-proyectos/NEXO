@@ -5,22 +5,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Nexo.Infrastructure.Cubicacion;
 
-/// <summary>
-/// Consume vehiculo.creado/vehiculo.actualizado y mantiene sincronizado el catálogo
-/// de vehículos en la proyección de NEXO (<c>VehiculosCubicacion</c>) — sin esto,
-/// GET /api/vehiculos tendría que llamar a Cubicador en caliente.
-///
-/// Una sola clase para los 2 tipos (en vez de dos consumers casi idénticos): el upsert es
-/// exactamente el mismo, "creado" vs "actualizado" solo importa para la topología/routing
-/// key de Cubicador (ver worker/main.py::_ejecutar_solicitud, tipo "guardar_vehiculo") —
-/// del lado de NEXO no hay ninguna diferencia de tratamiento, es upsert por Id en los dos
-/// casos (idempotente: un reintento tras un fallo a mitad de camino no duplica nada).
-///
-/// IConsumer&lt;T&gt; real de MassTransit: hereda la misma tubería de reintentos/DLQ/alerta
-/// que <see cref="clsPlanDeCargueGeneradoConsumer"/> (ver clsMensajeriaDependencyInjection.cs).
-/// NO hace ninguna llamada saliente a Cubicador: todo lo que escribe viene del
-/// propio evento.
-/// </summary>
+/// <summary>Mantiene la proyección de vehículos (VehiculosCubicacion) desde vehiculo.creado/actualizado: upsert idempotente por Id,
+/// igual para ambos tipos. No consulta a Cubicador; reintentos y DLQ los da la tubería compartida.</summary>
 public sealed class clsVehiculoCatalogoConsumer(clsNexoDbContext db)
     : IConsumer<VehiculoCreado>, IConsumer<VehiculoActualizado>, IConsumer<VehiculoEliminado>
 {
@@ -36,16 +22,8 @@ public sealed class clsVehiculoCatalogoConsumer(clsNexoDbContext db)
         await db.SaveChangesAsync(context.CancellationToken);
     }
 
-    /// <summary>
-    /// Cierra el trío del catálogo: sin esto la proyección se quedaría con vehículos que
-    /// ya no existen en Cubicador y <c>GET /api/vehiculos</c> los seguiría ofreciendo.
-    ///
-    /// Borrar lo que no está NO es un error: si el vehículo ya no está en la proyección
-    /// (evento duplicado, o la proyección se reconstruyó después del borrado) el
-    /// resultado deseado ya se cumplió. Dejar subir una excepción ahí mandaría a
-    /// reintentos y DLQ un mensaje que no tiene nada que arreglar — mismo criterio que
-    /// el upsert de arriba, que también es idempotente por construcción.
-    /// </summary>
+    /// <summary>Quita el vehículo de la proyección. Borrar lo que no está no es un error (evento duplicado o proyección reconstruida):
+    /// subir una excepción mandaría a reintentos y DLQ un mensaje sin nada que arreglar.</summary>
     public async Task Consume(ConsumeContext<VehiculoEliminado> context)
     {
         var id = Guid.Parse(context.Message.VehiculoId);

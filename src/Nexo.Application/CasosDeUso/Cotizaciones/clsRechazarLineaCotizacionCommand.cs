@@ -10,16 +10,9 @@ using Nexo.Domain.Enums;
 namespace Nexo.Application.CasosDeUso.Cotizaciones;
 
 /// <summary>
-/// S6-HU-24.3/#320: rechazar UNA línea de la cotización con un motivo, para entregar el resto al comercial sin que una línea sin costear
-/// frene la entrega. Antes solo existía rechazar la solicitud COMPLETA (<c>Descartada</c>).
-///
-/// Reglas:
-///  · Solo cotización Borrador (una entregada no se toca): 409 COTIZACION_NO_EDITABLE.
-///  · El motivo es obligatorio (hasta 500): 400 MOTIVO_RECHAZO_REQUERIDO.
-///  · La línea tiene que ser de esta solicitud (404) y estar SIN costear: una línea que ya tiene flete en la cotización no se rechaza
-///    (409 LINEA_CON_FLETE) — así una línea rechazada nunca tiene fila de cotización y no puede sumar al total ni salir con precio.
-///    Una ya rechazada: 409 LINEA_YA_RECHAZADA.
-///  · Queda en la auditoría con quién y con qué motivo.
+/// Rechaza UNA línea con un motivo, para entregar el resto sin que una línea sin costear frene la entrega. Solo cotización Borrador
+/// (409 COTIZACION_NO_EDITABLE); motivo obligatorio, hasta 500 (400 MOTIVO_RECHAZO_REQUERIDO); línea de esta solicitud (404) y SIN costear: con
+/// flete no se rechaza (409 LINEA_CON_FLETE), así una rechazada nunca suma al total; ya rechazada: 409 LINEA_YA_RECHAZADA. Queda en la auditoría.
 /// </summary>
 public sealed record clsRechazarLineaCotizacionCommand(Guid CotizacionId, Guid LineaSolicitudId, string? Motivo)
     : ICommand<clsLineaRechazoDto>;

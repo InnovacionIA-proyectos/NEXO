@@ -1,16 +1,8 @@
 namespace Nexo.Application.CasosDeUso.Notificaciones.DTOs;
 
 /// <summary>
-/// Qué pasó al intentar notificar.
-///
-/// Distingue "se envió" de "no había que enviar", y esa diferencia importa: lo primero va
-/// al log como confirmación con el identificador del relay, lo segundo como aviso de
-/// configuración incompleta. Sin separarlas, un entorno sin DW configurado se ve igual
-/// que uno donde el correo salió — y nadie revisa lo que parece normal.
-///
-/// Lo que NO cabe aquí es "falló": un fallo de la salida de correo sube como excepción
-/// para que el bus lo reintente o lo lleve a la cola de error. Devolverlo como resultado
-/// lo dejaría enterrado en una línea de log.
+/// Qué pasó al intentar notificar: distingue "se envió" de "no había que enviar" (configuración incompleta).
+/// Un fallo de la salida de correo no cabe aquí: sube como excepción para que el bus reintente.
 /// </summary>
 /// <param name="Enviado">Si el correo se entregó a la salida corporativa.</param>
 /// <param name="Destinatario">A quién, cuando se envió.</param>

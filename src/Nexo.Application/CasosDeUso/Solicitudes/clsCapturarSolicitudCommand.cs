@@ -27,42 +27,26 @@ public sealed record clsCapturaLineaInput(
     bool? RetornaContenedor, string? CiudadDevolucionContenedor, bool? LevanteContenedorDiferente,
     string? CiudadLevanteContenedor, decimal? ValorAprovisionamiento, decimal? Peso, decimal? ValorMercancia,
     IReadOnlyList<clsPosicionCargaDto>? Posiciones,
-    /// <summary>S4-HU-15.5/#251: horas de ESTA línea — null usa el default
-    /// (clsResolucionHorasLinea.Resolver: 1h+1h si la línea ES una devolución de contenedor, si no las de la
-    /// solicitud completa; #300: "retorna contenedor" ya no las cambia).</summary>
+    /// <summary>Horas de ESTA línea; null usa el default (1h+1h si la línea ES una devolución de contenedor, si no las de la solicitud).</summary>
     decimal? HorasCargue = null, decimal? HorasDescargue = null,
-    /// <summary>S5-HU-16.1/#254: Id de tbl_municipios cuando Origen/Destino se escogió
-    /// desde el buscador de ciudades — null si viene de texto libre (formulario viejo,
-    /// importación de Excel sin ese dato).</summary>
+    /// <summary>Id de tbl_municipios cuando Origen/Destino se escogió del buscador de ciudades; null si viene de texto libre.</summary>
     int? OrigenMunicipioId = null, int? DestinoMunicipioId = null,
-    /// <summary>S5-HU-18.3/#275: id de ruta que Cotifly usa para agrupar las líneas de una
-    /// misma carga heterogénea — lo pone SIEMPRE Cotifly, nunca NEXO.</summary>
+    /// <summary>Id de ruta con que Cotifly agrupa las líneas de una misma carga heterogénea; lo pone SIEMPRE Cotifly, nunca NEXO.</summary>
     Guid? GrupoRutaId = null,
-    /// <summary>S5-HU-18.2/#274: id de la recomendación del Cubicador usada para capturar
-    /// esta línea — null si se capturó sin pasar por el Cubicador.</summary>
+    /// <summary>Id de la recomendación del Cubicador usada para capturar esta línea; null si no pasó por el Cubicador.</summary>
     string? IdRecomendacionVehiculo = null);
 
 public sealed record clsCapturarSolicitudCommand(
     Guid? ClienteId, string? ClienteBp, string Tipo, string? Modalidad, DateTimeOffset? Deadline,
     decimal? ValorEstimado, string? Referencia, decimal? HorasCargue, decimal? HorasDescargue,
     IReadOnlyList<clsCapturaLineaInput> Lineas,
-    /// <summary>Notas u observaciones comerciales (S4-HU-18.10/#227) — distinto de
-    /// <see cref="Referencia"/> (referencia/PO del cliente).</summary>
+    /// <summary>Notas u observaciones comerciales; distinto de <see cref="Referencia"/> (referencia/PO del cliente).</summary>
     string? Notas = null) : ICommand<clsCapturaResultDto>;
 
 /// <summary>
-/// Captura de necesidades del comercial (licitación o spot): resuelve/crea clsCliente,
-/// clsRuta y clsConfiguracionVehiculo desde texto libre, y dispara el auto-costeo con la
-/// Biblioteca (vía IPropuestaTarifaPort, ya migrada). Portado 1:1 desde
-/// Nexo.Api/Services/CapturaSolicitudService.cs (método CapturarAsync +
-/// AutoCostearCoreAsync) del proyecto original.
-///
-/// Compromiso de diseño: para cargues masivos (más de 10 líneas) el auto-costeo se
-/// difiere a un Task.Run con su propio scope de DI (la petición HTTP ya respondió).
-/// Esto obliga a este Handler a depender de IServiceScopeFactory — una abstracción
-/// de Microsoft.Extensions.DependencyInjection, no de ASP.NET Core ni de EF Core —
-/// igual que hacía el service original: es una excepción deliberada a
-/// "Application no depende de infraestructura".
+/// Captura de necesidades del comercial (licitación o spot): resuelve o crea cliente, ruta y configuración de vehículo desde texto libre y
+/// dispara el auto-costeo con la Biblioteca. En cargues masivos (más de 10 líneas) lo difiere a un Task.Run con su propio scope, por lo que
+/// el handler depende de IServiceScopeFactory: excepción deliberada a "Application no depende de infraestructura".
 /// </summary>
 public sealed class clsCapturarSolicitudCommandHandler(
     ISolicitudesRepository solicitudes, IRutasCatalogoPort rutasCatalogo,
@@ -102,9 +86,7 @@ public sealed class clsCapturarSolicitudCommandHandler(
             CreadoPor = usuarioActual.Id,
         };
 
-        // S4-HU-15.5/#251: default de la solicitud completa, usado solo cuando una línea
-        // no trae horas propias ni devuelve contenedor — mismo valor que ya serializa
-        // SerializarCondiciones (4h+4h), no uno nuevo.
+        // Default de la solicitud completa para una línea sin horas propias ni devolución de contenedor; el mismo que serializa SerializarCondiciones (4h+4h).
         var horasCargueSolicitud = command.HorasCargue ?? 4m;
         var horasDescargueSolicitud = command.HorasDescargue ?? 4m;
 
@@ -127,9 +109,8 @@ public sealed class clsCapturarSolicitudCommandHandler(
 
             var ciudadDevolucion = clsResolucionDeCatalogos.Limpiar(lr.CiudadDevolucionContenedor);
             var retornaContenedor = (lr.RetornaContenedor ?? false) || ciudadDevolucion is not null;
-            // #300: solo una línea que ES una devolución de contenedor arranca con 1h+1h. "Retorna contenedor"
-            // de un viaje cargado ya no toca las horas de la línea (RN-03): el tramo vacío de retorno se calcula
-            // aparte, con sus propias 1h+1h (clsPropuestaTarifaAdapter).
+            // Solo una línea que ES una devolución de contenedor arranca con 1h+1h; el tramo vacío de un "retorna contenedor" se calcula
+            // aparte (clsPropuestaTarifaAdapter).
             var lineaNegocio = clsLineasDeNegocio.Reconocer(lr.LineaNegocio);
             if (lineaNegocio is null && !string.IsNullOrWhiteSpace(lr.LineaNegocio))
                 throw new clsValidationFailedException("LINEA_NEGOCIO_INVALIDO",
@@ -198,14 +179,9 @@ public sealed class clsCapturarSolicitudCommandHandler(
     }
 
     /// <summary>
-    /// Auto-costeo al capturar: precarga como flete el VALOR MÁS ALTO propuesto por
-    /// la Biblioteca. Best-effort: si la Biblioteca no responde, la captura no falla
-    /// y todo queda por costear (revisión manual del Administrador de Fletes).
-    /// Estático y con SOLO las dependencias que necesita (repo/puerto de propuestas/
-    /// auditoría/UoW): así el trabajador en segundo plano puede resolverlas desde su
-    /// PROPIO scope de DI sin arrastrar los demás puertos del Handler (que viven en
-    /// el scope de la petición HTTP ya terminada — usarlos causaría
-    /// ObjectDisposedException sobre el DbContext).
+    /// Auto-costeo al capturar: precarga como flete el VALOR MÁS ALTO propuesto por la Biblioteca. Best-effort: si no responde, la captura no
+    /// falla y todo queda por costear. Estático y con solo sus dependencias para resolverlas desde un scope PROPIO (las de la petición ya terminada
+    /// lanzarían ObjectDisposedException).
     /// </summary>
     private static async Task<(int Fletes, int PorCostear)> AutoCostearAsync(
         ISolicitudesRepository solicitudesRepo, IPropuestaTarifaPort propuestasPort, IAuditoriaPort auditoriaPort,
@@ -221,10 +197,8 @@ public sealed class clsCapturarSolicitudCommandHandler(
             {
                 var p = propuesta.Lineas.FirstOrDefault(x => x.LineaId == linea.Id);
 
-                // El flete se guarda solo cuando hay un valor propuesto y ningún motivo de pendiente, sea cual sea el camino de
-                // decisión (solo SICE-TAC, plaza que gobierna sola o proceso completo con su valor recomendado).
-                // Aprovisionamiento y retorno del contenedor salen de la propuesta (tramos vacíos de SICE-TAC), no de lo que
-                // mande el cliente.
+                // El flete se guarda solo con valor propuesto y sin motivo de pendiente, sea cual sea el camino de decisión; el aprovisionamiento y
+                // el retorno del contenedor salen de la propuesta (tramos vacíos de SICE-TAC), no de lo que mande el cliente.
                 if (p is { Autocosteable: true, ValorPropuesto: { } valor })
                 {
                     cotizacion.Lineas.Add(new clsCotizacionLinea
@@ -277,23 +251,15 @@ public sealed class clsCapturarSolicitudCommandHandler(
         }
         catch (Exception ex)
         {
-            // Última red de seguridad: solo se llega aquí si ProponerAsync falla ANTES de
-            // devolver nada (p. ej. la propia clsSolicitud no se pudo leer), no por una fuente
-            // caída en una línea puntual — eso ya lo aísla ProponerAsync internamente
-            // (ver clsPropuestaTarifaAdapter.ProponerAsync, por-grupo). Aun así se deja un
-            // motivo explícito en vez de un PorCostear mudo.
+            // Red de seguridad: solo se llega si ProponerAsync falla antes de devolver nada (una fuente caída en una línea la aísla él mismo);
+            // se deja un motivo explícito en vez de un PorCostear mudo.
             foreach (var linea in solicitud.Lineas)
                 linea.MotivoPendiente = $"No se pudo consultar la Biblioteca: {ex.Message}";
             return (0, solicitud.Lineas.Count);
         }
     }
 
-    /// <summary>
-    /// Cargues masivos: el auto-costeo tomaría minutos (consulta los DW línea a
-    /// línea), así que corre en segundo plano con su PROPIO scope de DI (la
-    /// petición HTTP ya respondió, y el scope de este Handler se dispone con ella).
-    /// Fire-and-forget deliberado, igual que el original (Task.Run sin awaitear).
-    /// </summary>
+    /// <summary>Cargues masivos: el auto-costeo tomaría minutos, así que corre en segundo plano con su PROPIO scope de DI (el de la petición ya terminó). Fire-and-forget deliberado.</summary>
     private void LanzarAutoCosteoEnSegundoPlano(Guid solicitudId, Guid usuarioId)
     {
         _ = Task.Run(async () =>
@@ -320,8 +286,6 @@ public sealed class clsCapturarSolicitudCommandHandler(
         });
     }
 
-
-    // ------------------------------------------------------------- helpers
 
 
     private static string SerializarCondiciones(clsCapturarSolicitudCommand command)

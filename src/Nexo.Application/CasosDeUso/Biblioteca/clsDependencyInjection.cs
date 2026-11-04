@@ -7,13 +7,7 @@ namespace Nexo.Application.CasosDeUso.Biblioteca;
 
 public static class clsDependencyInjection
 {
-    /// <summary>
-    /// Módulo Biblioteca: motor de propuesta de tarifa (plaza SAP + SICE-TAC vivo +
-    /// histórico SAP) y consulta de solo lectura a la matriz SICE-TAC del DW. Cierra
-    /// el bloqueo de "Aplicar propuestas" que dejó pendiente la migración de las
-    /// "2 chicas" (AjustesVigenciaPlaza / ReglasSoloSicetac): ITarifarioSapPort e
-    /// IPropuestaTarifaPort (Common) reemplazan al PropuestaTarifaNoMigradaAdapter.
-    /// </summary>
+    /// <summary>Módulo Biblioteca: motor de propuesta de tarifa (plaza SAP + SICE-TAC vivo + histórico SAP) y consulta de solo lectura a la matriz SICE-TAC del DW.</summary>
     public static IServiceCollection AddBibliotecaUseCases(this IServiceCollection services)
     {
         services.AddScoped<IQueryHandler<clsProponerPropuestaTarifaQuery, clsPropuestaSolicitudDto>, clsProponerPropuestaTarifaQueryHandler>();

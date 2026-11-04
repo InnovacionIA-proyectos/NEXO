@@ -6,12 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Nexo.Infrastructure.Trabajos.Repositorios;
 
-/// <summary>
-/// Lee el estado del trabajo de la tabla de la saga.
-///
-/// Este es el único punto del sistema que sabe que "un trabajo" es una saga de
-/// MassTransit. Application ve un DTO y nada más.
-/// </summary>
+/// <summary>Lee el estado del trabajo de la tabla de la saga; único punto que sabe que "un trabajo" es una saga de MassTransit.</summary>
 public sealed class clsEfEstadoDeTrabajoRepository(clsNexoDbContext db, IPendientesDeCosteoPort pendientes) : IEstadoDeTrabajoPort
 {
     public async Task<clsEstadoTrabajoDto?> ObtenerAsync(Guid trabajoId, CancellationToken ct = default)
@@ -21,12 +16,10 @@ public sealed class clsEfEstadoDeTrabajoRepository(clsNexoDbContext db, IPendien
 
         if (saga is null) return null;
 
-        // "Initial" es el nombre interno del estado de arranque de MassTransit. El
-        // cliente ve "Pendiente", que es lo que el contrato promete y lo que significa.
+        // "Initial" es el estado interno de arranque de MassTransit; el cliente ve "Pendiente".
         var estado = saga.CurrentState == clsEfRegistroDeTrabajos.EstadoInicial ? "Pendiente" : saga.CurrentState;
 
-        // El desglose: qué línea, qué pasó y si se resuelve sola o necesita a alguien.
-        // Es la diferencia entre "3 pendientes" y algo con lo que se puede actuar.
+        // Desglose: qué línea, qué pasó y si se resuelve sola o necesita a alguien.
         var pendientesDelTrabajo = await pendientes.DeTrabajoAsync(trabajoId, ct);
 
         return new clsEstadoTrabajoDto(

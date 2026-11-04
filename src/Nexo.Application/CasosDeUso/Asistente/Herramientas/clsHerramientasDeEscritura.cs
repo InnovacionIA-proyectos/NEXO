@@ -11,16 +11,12 @@ using Nexo.Domain.Enums;
 
 namespace Nexo.Application.CasosDeUso.Asistente.Herramientas;
 
-/// <summary>
-/// Lo que el modelo recibe al proponer un cambio: nada se modificó, la persona tiene que confirmarlo.
-/// </summary>
+/// <summary>Lo que el modelo recibe al proponer un cambio: nada se modificó, la persona tiene que confirmarlo.</summary>
 public sealed record clsAccionPropuestaDto(Guid AccionId, string Tipo, string Resumen, string Estado, DateTimeOffset VenceAt);
 
 /// <summary>
-/// Base de las herramientas que proponen un cambio. NINGUNA escribe en NEXO: validan la forma de lo pedido, comprueban que exista lo que
-/// se quiere tocar, y dejan una acción <c>pendiente</c> con parámetros fijos. Quien la aplica es la persona, al confirmarla, y entonces
-/// mandan las reglas del dominio (el piso SICE-TAC, <c>FLETE_SOLO_SICETAC</c>, cotización entregada…): el asistente no las conoce ni las
-/// evade. Un valor de dinero solo se acepta si salió de una consulta de esta conversación o lo escribió la persona.
+/// Base de las herramientas que proponen un cambio: NINGUNA escribe, solo dejan una acción <c>pendiente</c>; al confirmarla mandan
+/// las reglas del dominio. Un valor de dinero solo se acepta si salió de una consulta de la conversación o lo escribió la persona.
 /// </summary>
 public abstract class clsHerramientaPropuestaBase(
     IConversacionesAsistenteRepository conversaciones,
@@ -69,10 +65,7 @@ public abstract class clsHerramientaPropuestaBase(
     }
 }
 
-/// <summary>
-/// Base de las propuestas sobre una cotización: además comprueban que la cotización exista y que cualquier valor de dinero salga de una
-/// consulta de la conversación o de lo que escribió la persona.
-/// </summary>
+/// <summary>Base de las propuestas sobre una cotización: comprueba que exista y que todo valor de dinero tenga origen.</summary>
 public abstract class clsHerramientaPropuestaDeCotizacionBase(
     IConversacionesAsistenteRepository conversaciones,
     clsContextoConversacionAsistente contexto,
@@ -85,10 +78,7 @@ public abstract class clsHerramientaPropuestaDeCotizacionBase(
     protected Task<clsCotizacionDto> CotizacionAsync(Guid id, CancellationToken ct) =>
         cotizaciones.Handle(new clsObtenerCotizacionQuery(id), ct);
 
-    /// <summary>
-    /// El valor de dinero que el modelo quiere aplicar tiene que salir de una consulta de esta conversación o de lo que escribió la persona:
-    /// un precio calculado o inventado por el modelo no se propone.
-    /// </summary>
+    /// <summary>El valor de dinero propuesto debe salir de una consulta de la conversación o de lo que escribió la persona; un precio inventado no se propone.</summary>
     protected async Task ExigirOrigenDelValorAsync(decimal valor, string nombreDelCampo, CancellationToken ct)
     {
         if (ContextoActual.ConversacionId is not { } conversacionId) return;

@@ -7,13 +7,8 @@ using Nexo.Application.Common.Ports;
 namespace Nexo.Application.CasosDeUso.PlanDeCargue;
 
 /// <summary>
-/// Pide la optimización de un plan de cargue ya existente. NO bloquea: dejar
-/// el plan en "procesando" y publicar a la cola es rápido — el motor corre aparte y el
-/// resultado llega por cola (consumers de Infrastructure: clsPlanDeCargueGeneradoConsumer /
-/// clsCubicacionRechazadaConsumer).
-///
-/// Cerrada la compuerta de paridad, esto ni siquiera llega a tocar el
-/// plan ni a publicar nada: 503 "en verificación" antes de cualquier efecto.
+/// Pide la optimización de un plan ya existente. NO bloquea: deja el plan en "procesando" y publica a la cola; el resultado llega por los consumers.
+/// Con la compuerta de paridad cerrada responde 503 "en verificación" antes de cualquier efecto.
 /// </summary>
 public sealed record clsSolicitarOptimizacionCommand(
     Guid PlanCargueId, string? Estrategia, string? Algoritmo, int? Semilla, bool? RespetarBloqueadas)
@@ -43,9 +38,7 @@ public sealed class clsSolicitarOptimizacionCommandHandler(
 
         plan.Estado = "procesando";
 
-        // Publicar ANTES de guardar: el Outbox mete el mensaje en la MISMA transacción
-        // que el cambio de estado. Al revés, confirmado en runtime (ver
-        // docs/mensajeria/CUBICACION.md #5), el mensaje no se entrega.
+        // Publicar ANTES de guardar: así el Outbox mete el mensaje en la MISMA transacción que el cambio de estado; al revés el mensaje no se entrega.
         await cubicacion.SolicitarCubicacionAsync(
             plan.Id,
             command.Estrategia ?? plan.Estrategia,

@@ -12,21 +12,15 @@ using L = Nexo.Application.CasosDeUso.MapeoExcel.clsLimitesDeLineaDeCaptura;
 
 namespace Nexo.Application.CasosDeUso.MapeoExcel;
 
-/// <summary>
-/// Aplica a TODAS las filas de un Excel el mapeo que el usuario confirmó y devuelve las líneas listas para capturar, con los errores por fila.
-/// Recibe las columnas y las filas que ya devolvió el análisis del archivo; no vuelve a leerlo ni guarda nada.
-/// </summary>
-/// <param name="ClienteId">El cliente dueño del archivo: su diccionario traduce los valores (lo que el cliente escribe → lo que NEXO entiende).</param>
+/// <summary>Aplica a TODAS las filas de un Excel el mapeo confirmado y devuelve las líneas listas para capturar, con los errores por fila. No relee el archivo ni guarda nada.</summary>
 /// <param name="PrimeraFila">El número que tiene en el archivo la primera fila recibida (2 si hay un solo encabezado), para que los errores digan la fila de Excel.</param>
 public sealed record clsAplicarMapeoExcelQuery(
     Guid? ClienteId, IReadOnlyList<clsColumnaAAplicar>? Columnas, IReadOnlyList<IReadOnlyList<string>>? Filas, int PrimeraFila = 2)
     : IQuery<clsResultadoAplicarMapeoDto>;
 
 /// <summary>
-/// Es determinista: no usa la IA. Cada columna pide una conversión de una lista cerrada y el código la aplica; una celda que no se entiende se
-/// reporta con su fila y su campo en vez de adivinarse. Una fila convertida pasa además por los mismos límites de longitud y rango del cuerpo de
-/// la captura y por sus reglas (<see cref="clsCapturarSolicitudValidador.ValidarLinea"/>), de modo que toda línea que sale de aquí la captura
-/// la acepta. Las filas con errores no se devuelven como línea: se reportan (todas sus fallas juntas) para corregirlas de una vez.
+/// Determinista, sin IA: una celda que no se entiende se reporta con su fila y campo en vez de adivinarse. Cada línea convertida pasa
+/// además por las reglas de la captura (<see cref="clsCapturarSolicitudValidador.ValidarLinea"/>); las filas con errores se reportan completas.
 /// </summary>
 public sealed class clsAplicarMapeoExcelQueryHandler(IDiccionarioClienteRepository diccionario)
     : IQueryHandler<clsAplicarMapeoExcelQuery, clsResultadoAplicarMapeoDto>
@@ -77,8 +71,6 @@ public sealed class clsAplicarMapeoExcelQueryHandler(IDiccionarioClienteReposito
         return new clsResultadoAplicarMapeoDto(filas.Count, filasVacias, filasConErrores, lineas, errores, totalErrores);
     }
 
-    // ---------------------------------------------------------------- el mapeo
-
     internal sealed record ColumnaAplicable(int Indice, string Campo, string Transformacion);
 
     /// <summary>El mapeo es una entrada externa: campos y conversiones de las listas cerradas, sin columnas repetidas ni campos duplicados.</summary>
@@ -123,8 +115,6 @@ public sealed class clsAplicarMapeoExcelQueryHandler(IDiccionarioClienteReposito
 
         return resultado;
     }
-
-    // ---------------------------------------------------------------- una fila
 
     /// <summary>Los valores ya convertidos de una fila, a medida que se leen sus celdas.</summary>
     private sealed class Fila(int numero, List<clsErrorDeFilaDto> errores)
@@ -251,8 +241,6 @@ public sealed class clsAplicarMapeoExcelQueryHandler(IDiccionarioClienteReposito
             f.Textos.GetValueOrDefault("descripcion"), f.Numeros.TryGetValue("cantidad", out var cantidad) ? (int)cantidad : 1,
             f.Numeros["largoCm"], f.Numeros["anchoCm"], f.Numeros["altoCm"], f.Numeros["pesoKg"], f.Textos.GetValueOrDefault("codigoTipoMercancia"));
     }
-
-    // ---------------------------------------------------------------- límites y reglas de la captura
 
     private static int MaxTexto(string campo) => campo switch
     {

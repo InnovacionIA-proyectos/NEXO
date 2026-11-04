@@ -21,9 +21,8 @@ public static class clsNit
 }
 
 /// <summary>
-/// Identifica al cliente de una importación de Excel por su NIT, que es lo único que tienen en común el portal, Cotifly y los prospectos.
-/// Las lecturas solo buscan el espejo local y no crean nada; guardar una plantilla sí lo crea (desde el catálogo de clientes del DW o, si es
-/// un prospecto, desde la tabla de prospectos) para que el mismo NIT siempre termine en el mismo cliente local.
+/// Identifica al cliente de una importación por su NIT. Las lecturas no crean nada; guardar una plantilla sí crea el cliente local
+/// (desde el DW o, si es prospecto, desde prospectos) para que el mismo NIT termine siempre en el mismo cliente.
 /// </summary>
 public sealed class clsClienteDeImportacion(IClientesPort clientes, IClientesDwPort clientesDw, IProspectosDwPort prospectosDw)
 {

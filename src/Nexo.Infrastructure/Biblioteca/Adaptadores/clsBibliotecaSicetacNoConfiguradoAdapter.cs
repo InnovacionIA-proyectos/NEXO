@@ -5,11 +5,7 @@ using Nexo.Application.Common.Exceptions;
 namespace Nexo.Infrastructure.Biblioteca.Adaptadores;
 
 /// <summary>
-/// Se registra cuando NO hay cadena de conexión al Data Warehouse
-/// (ConnectionStrings:DwSice): todo endpoint del módulo responde 503 con un
-/// mensaje accionable, en vez de fallar la inyección de dependencias porque
-/// clsDwSiceDbContext no está registrado. Portado de BibliotecaSicetacNoConfigurado
-/// del proyecto original.
+/// Se registra cuando falta ConnectionStrings:DwSice: los endpoints responden 503 en lugar de fallar la inyección de dependencias.
 /// </summary>
 public sealed class clsBibliotecaSicetacNoConfiguradoAdapter : IBibliotecaSicetacPort
 {

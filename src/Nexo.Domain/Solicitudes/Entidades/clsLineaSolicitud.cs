@@ -62,21 +62,11 @@ public class clsLineaSolicitud : IAuditable
     [MaxLength(150)]
     public string? CiudadLevanteContenedor { get; set; }
 
-    /// <summary>
-    /// Valor del aprovisionamiento: reposicionar el contenedor vacío desde la ciudad
-    /// de levante hasta el origen del cargue. El viaje vacío tiene piso regulado
-    /// (Resolución 16075, matriz SICE-TAC condición VACIO).
-    /// </summary>
+    /// <summary>Valor del aprovisionamiento: reposicionar el contenedor vacío desde la ciudad de levante hasta el origen (piso regulado SICE-TAC, condición VACIO).</summary>
     [Range(typeof(decimal), "0", "9999999999999.99", ParseLimitsInInvariantCulture = true)]
     public decimal? ValorAprovisionamiento { get; set; }
 
-    /// <summary>
-    /// S4-HU-15.5/#251: horas de cargue/descargue EFECTIVAS de esta línea — ya
-    /// resueltas (clsResolucionHorasLinea.Resolver) al momento de la captura, no el
-    /// valor crudo que mandó el Comercial. Quedan trazadas acá para auditoría/consulta
-    /// posterior de qué horas se usaron realmente en el cálculo SICE de esta línea
-    /// (clsPisoConHoras.Calcular). Nulas en líneas capturadas ANTES de este cambio.
-    /// </summary>
+    /// <summary>Horas de cargue efectivas, ya resueltas al capturar (no el valor crudo del Comercial); son las que usó el cálculo SICE. Nulas en líneas antiguas.</summary>
     [Range(typeof(decimal), "0", "240", ParseLimitsInInvariantCulture = true)]
     public decimal? HorasCargue { get; set; }
 
@@ -92,49 +82,27 @@ public class clsLineaSolicitud : IAuditable
     [Range(typeof(decimal), "0", "9999999999999.99", ParseLimitsInInvariantCulture = true)]
     public decimal? ValorMercancia { get; set; }
 
-    /// <summary>
-    /// S5-HU-18.3/#275: id de la ruta que Cotifly asigna cuando una carga heterogénea se
-    /// reparte en varios camiones — todas las líneas de la misma ruta llegan con el mismo
-    /// valor. NEXO lo guarda tal cual y NUNCA lo genera: lo pone quien crea las líneas del grupo
-    /// (Cotifly, o el portal al crear una línea por camión — S5-HU-17.8); líneas nacidas directo en NEXO
-    /// quedan en null (no agrupan con nada, y eso no rompe nada existente).
-    /// </summary>
+    /// <summary>Id de la ruta que asigna Cotifly cuando una carga heterogénea se reparte en varios camiones; NEXO no lo genera. Null: la línea no agrupa con otras.</summary>
     public Guid? GrupoRutaId { get; set; }
 
-    /// <summary>
-    /// S5-HU-18.3/#275: orden de captura dentro de la solicitud (1, 2, 3...) — permite
-    /// saber cuál línea de un GrupoRutaId es "la primera" (donde se cuelgan los servicios
-    /// conexos de la ruta). Nulo en líneas capturadas antes de este cambio.
-    /// </summary>
+    /// <summary>Orden de captura dentro de la solicitud (1, 2, 3...); la primera línea de un GrupoRutaId es donde se cuelgan los conexos de la ruta.</summary>
     public int? NumeroLinea { get; set; }
 
-    /// <summary>
-    /// S5-HU-18.2/#274: id de la recomendación de vehículo del Cubicador que corresponde a
-    /// esta línea — permite cruzar lo recomendado contra lo realmente despachado más
-    /// adelante. Nulo si la línea nunca se cubicó.
-    /// </summary>
+    /// <summary>Id de la recomendación de vehículo del Cubicador para esta línea. Nulo si nunca se cubicó.</summary>
     [MaxLength(64)]
     public string? IdRecomendacionVehiculo { get; set; }
 
     public EstadoLinea EstadoLinea { get; set; } = EstadoLinea.PorCostear;
 
-    /// <summary>
-    /// S6-HU-24.3/#320: por qué el Administrador de Tarifas rechazó esta línea (obligatorio, hasta 500). Solo con
-    /// <c>EstadoLinea = Rechazada</c>; se limpia al deshacer el rechazo. Una línea rechazada NO tiene flete en la cotización: por eso no suma
-    /// al total ni sale en el Excel con precio.
-    /// </summary>
+    /// <summary>Por qué el Administrador de Tarifas rechazó la línea. Solo con <c>EstadoLinea = Rechazada</c>; se limpia al deshacer el rechazo.</summary>
     [MaxLength(500)]
     public string? MotivoRechazo { get; set; }
 
-    /// <summary>S6-HU-24.3/#320: quién la rechazó y cuándo (columnas de #314).</summary>
+    /// <summary>Quién rechazó la línea y cuándo.</summary>
     public Guid? RechazadaPor { get; set; }
     public DateTimeOffset? RechazadaAt { get; set; }
 
-    /// <summary>
-    /// Por qué la línea sigue en PorCostear: sin tarifa válida (requiere al Administrador
-    /// de Tarifas) o una fuente que falló. Se muestra al usuario, no es para depurar. Nulo
-    /// mientras no se haya intentado costear, y se limpia cuando la línea queda resuelta.
-    /// </summary>
+    /// <summary>Por qué la línea sigue en PorCostear (sin tarifa válida o una fuente falló). Se muestra al usuario; se limpia al resolverse.</summary>
     [MaxLength(500)]
     public string? MotivoPendiente { get; set; }
 

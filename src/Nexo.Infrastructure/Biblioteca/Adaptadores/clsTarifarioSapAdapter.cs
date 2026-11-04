@@ -16,24 +16,8 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Nexo.Infrastructure.Biblioteca.Adaptadores;
 
 /// <summary>
-/// Réplica de la lógica de negocio del tarifario SAP (getConsultarTarifaFlete,
-/// ver docs getConsultarTarifaFlete_LogicaNegocio.md), portada 1:1 desde
-/// Nexo.Api/Services/TarifarioSapService.cs del proyecto original:
-///
-/// 1. Búsqueda DIRECTA en tblSAPTarifas por zona de transporte / DIVIPOLA, con
-///    filtros de línea de negocio, clase de viaje y (para contenedor) rango de
-///    peso + clase de contenedor, o (para cupo) vehículo + carrocería.
-/// 2. Si no hay resultados, fallback por ZONAS DE TARIFICACIÓN.
-/// 3. Selección: Regla A (devolución línea 6), Regla B (contenedor), Regla C
-///    (cupo). Las vencidas se devuelven marcadas ("inactiva"), nunca se proponen.
-///    Sin regla aplicable, fallback conservador: mayor valor vigente.
-/// 4. SICETAC oficial: solo si la condición de comparación del documento aplica.
-///
-/// Este adapter concentra deliberadamente reglas de negocio junto con las
-/// consultas EF: la lógica está indisolublemente ligada a la forma de las
-/// tablas SAP/DW (IQueryable dinámico según catálogos resueltos en runtime).
-/// Separarla en Application obligaría a exponer un "mini-ORM" de puertos sin
-/// beneficio real.
+/// Réplica de la lógica del tarifario SAP (getConsultarTarifaFlete): búsqueda directa por zona/DIVIPOLA, fallback por zonas de tarificación y selección por reglas A (devolución), B (contenedor) y C (cupo).
+/// Concentra reglas y consultas EF a propósito: separarlas en Application obligaría a exponer un mini-ORM de puertos sin beneficio.
 /// </summary>
 public sealed class clsTarifarioSapAdapter : ITarifarioSapPort
 {
@@ -44,9 +28,7 @@ public sealed class clsTarifarioSapAdapter : ITarifarioSapPort
     private const string UnidadPortacontenedores = "PORTACONTENEDORES";
     private static readonly TimeSpan CacheTtl = TimeSpan.FromHours(1);
 
-    // internal (no private): S5-HU-19.1/#281 las reutiliza para resolver el NOMBRE del
-    // catálogo externo (ILineasNegocioPort/IClasesViajePort) que necesita el matching
-    // exacto de clsTarifaPlazaInternaAdapter — un único mapeo enum->Id SAP, no dos.
+    // internal: las reutiliza clsTarifaPlazaInternaAdapter para resolver el nombre del catálogo externo, con un único mapeo enum->Id SAP.
     internal static readonly Dictionary<LineaNegocio, int> CodigoLinea = new()
     {
         [LineaNegocio.PuertoAInterior] = 1,
@@ -65,10 +47,7 @@ public sealed class clsTarifarioSapAdapter : ITarifarioSapPort
         [ClaseViaje.Extradimensionado] = 5,
     };
 
-    // S5-HU-19.1/#281: "PTO" por "PUERTO" (ej. zona SAP "ZC_PTO_BOLIVAR" vs ruta
-    // "Puerto Bolívar") — el único caso concreto que trajo el issue. Lista corta y
-    // explícita a propósito: cada abreviatura nueva se agrega acá cuando aparezca un
-    // caso real, no se adivina un diccionario completo sin evidencia.
+    // "PTO" por "PUERTO" (zona SAP "ZC_PTO_BOLIVAR" vs ruta "Puerto Bolívar"). Lista corta a propósito: cada abreviatura nueva se agrega cuando aparezca un caso real.
     private static readonly (string Abreviatura, string Completo)[] Abreviaturas = [("PTO", "PUERTO")];
 
     private readonly clsDbSolucionesTiDbContext? _dc;
@@ -150,15 +129,8 @@ public sealed class clsTarifarioSapAdapter : ITarifarioSapPort
 
         var zonas = await ZonasTarificacionAsync(ct);
 
-        // S5-HU-19.1/#281: antes solo "z.Transporte.Contains(origen)" — fallaba contra
-        // códigos de zona que traen una ABREVIATURA ("ZC_PTO_BOLIVAR" vs "Puerto Bolívar")
-        // o que no traen el nombre de la ciudad en absoluto (p. ej. "VABURRA" = Valle de
-        // Aburrá = Medellín). clsResolucionZonaSap (que resolvía esto con un diccionario de
-        // alias manual) se retiró en S5-HU-16.1/#254 a favor de tbl_municipios.NombreTarifasPlaza/
-        // ZonaTarificacion, ya sembrados con el código de zona correcto por municipio
-        // (S4-HU-09.1) — se reutiliza ese mismo mecanismo acá en vez de resucitar el
-        // diccionario de alias manual. La comparación directa ahora prueba las DOS
-        // direcciones de "contiene" (antes solo una) y expande abreviaturas conocidas.
+        // "Contiene" en las dos direcciones y con abreviaturas expandidas ("ZC_PTO_BOLIVAR" vs "Puerto Bolívar"); las zonas que no traen el nombre
+        // de la ciudad (p. ej. "VABURRA" = Medellín) se resuelven con tbl_municipios.NombreTarifasPlaza/ZonaTarificacion.
         bool Coincide(string zonaTransporte, string texto)
         {
             var expandida = ExpandirAbreviaturas(zonaTransporte);
@@ -290,13 +262,8 @@ public sealed class clsTarifarioSapAdapter : ITarifarioSapPort
             .FirstOrDefault();
         if (fallback.Fila is null) return (null, false);
 
-        // Verificado con datos reales (control A/B) que este fallback proponía "la
-        // tarifa vigente de mayor valor" en silencio incluso cuando el peso de la
-        // línea excedía el límite de TODAS las tarifas para ese vehículo, o cuando el
-        // vehículo no resolvió en el catálogo SAP - sin distinguir esos casos de un
-        // match exacto real. La línea sigue cotizándose con este candidato (no se
-        // descarta), pero ahora con una advertencia explícita para el Administrador
-        // de Fletes/cliente antes de confirmar.
+        // Este fallback propone el mayor valor vigente aunque el peso exceda el límite de todas las tarifas del vehículo o el vehículo no resuelva en el catálogo SAP;
+        // la línea se sigue cotizando con este candidato, pero con una advertencia explícita para el Administrador.
         string advertencia;
         if (claseViajeId == 2 && vehiculoIdStr is null)
         {
@@ -383,7 +350,7 @@ public sealed class clsTarifarioSapAdapter : ITarifarioSapPort
         if (claseViajeId == 1)
             config = await ConfigDeContenedorAsync(c, claseContId, ct);
         else
-            // El código con el que SICE-TAC conoce al vehículo; sin fila de mapeo se conserva la regla de antes (quitar la C inicial).
+            // Código con el que SICE-TAC conoce al vehículo; sin fila de mapeo se quita la C inicial.
             config = await _mapeo.SicetacAsync(c.ConfigVehiculo, v => v.Trim().ToUpperInvariant().TrimStart('C'), ct);
         if (string.IsNullOrWhiteSpace(config)) return null;
 
@@ -391,14 +358,13 @@ public sealed class clsTarifarioSapAdapter : ITarifarioSapPort
         var unidadDeSiempre = config == "2L3" || carroceriaCod == CodigoCarroceriaFurgon
             ? "FURGON"
             : await ParametroAsync(458, ct) ?? "ESTACAS";
-        // Una línea de contenedor viaja en portacontenedores: esa es la unidad por defecto. Si SICE-TAC no trae filas de esa unidad para la ruta se
-        // vuelve a la de siempre, y la unidad usada queda en el criterio del candidato.
+        // Una línea de contenedor viaja en portacontenedores por defecto; si SICE-TAC no trae filas de esa unidad para la ruta se usa la unidad habitual,
+        // y la unidad usada queda en el criterio del candidato.
         string[] unidades = claseViajeId == 1 && carroceriaCod != CodigoCarroceriaFurgon
             ? [UnidadPortacontenedores, unidadDeSiempre]
             : [unidadDeSiempre];
 
-        // #300: solo el período del mes y año actuales (sin mes de gracia). Se busca el más reciente HASTA el
-        // actual: un período futuro ya cargado no tapa al vigente. Si no es el actual (o no hay ninguno) no hay piso.
+        // Solo el período del mes y año actuales (sin mes de gracia): se busca el más reciente hasta el actual para que un período futuro ya cargado no tape al vigente. Si no es el actual no hay piso.
         var ahora = _clock.GetUtcNow();
         var actual = clsPeriodoSicetac.Actual(ahora);
         var periodo = await _cache.GetOrCreateAsync($"tarifario:sice-periodo:{actual}", async e =>
@@ -408,10 +374,8 @@ public sealed class clsTarifarioSapAdapter : ITarifarioSapPort
         });
         if (!clsPeriodoSicetac.EsElDelMesActual(periodo, ahora)) return null;
 
-        // La ruta se compara exacta por código DANE cuando la línea trae los dos municipios resueltos: tblRutasSicetac guarda el
-        // mismo código pero SIN el cero a la izquierda del departamento (tbl_municipios "05001000" ~ DWSice "5001000"). El
-        // texto del nombre de la ruta es solo el respaldo (línea sin municipios): como "%YUMBO%-%CALI%" también coincide con
-        // "YUMBO - CALIMA" y se toma el valor más alto, elegía la ciudad equivocada.
+        // Con los dos municipios resueltos se compara exacto por código DANE: tblRutasSicetac lo guarda sin el cero a la izquierda del departamento (tbl_municipios "05001000" ~ DWSice "5001000").
+        // El texto de la ruta es solo respaldo: "%YUMBO%-%CALI%" también coincide con "YUMBO - CALIMA" y se tomaría el valor más alto, de la ciudad equivocada.
         var porDane = c.OrigenDane is not null && c.DestinoDane is not null;
         var origenSinCeros = c.OrigenDane?.TrimStart('0');
         var destinoSinCeros = c.DestinoDane?.TrimStart('0');
@@ -433,10 +397,7 @@ public sealed class clsTarifarioSapAdapter : ITarifarioSapPort
         }
         if (top is null) return null;
 
-        // S4-HU-14.1/#221: bug gemelo del fallback tolerante de PropuestaTarifaAdapter —
-        // este camino "oficial" también tomaba ValorSiceConHora tal cual, asumiendo las
-        // horas pactadas. Mismo helper compartido (clsPisoConHoras), mismo criterio de
-        // fallback: >0 se trata igual que antes, <=0 o null cae a top.Valor.
+        // Igual que el fallback tolerante de clsPropuestaTarifaAdapter: ValorSiceConHora > 0 se usa tal cual (clsPisoConHoras); <= 0 o null cae a top.Valor.
         var valorSiceConHora = top.ValorSiceConHora is > 0 ? top.ValorSiceConHora : null;
         var valor = clsPisoConHoras.Calcular(top.Valor, top.ValorHora, top.HorasPactadas, valorSiceConHora, c.HorasSolicitud);
         return new clsCandidatoTarifaDto(
@@ -448,9 +409,8 @@ public sealed class clsTarifarioSapAdapter : ITarifarioSapPort
     }
 
     /// <summary>
-    /// El código de SICE-TAC del vehículo de una línea de contenedor, escogido por el tamaño del contenedor y su peso con <c>tbl_rangos_peso_contenedor</c>
-    /// y traducido con el mapeo de vehículos. Si la tabla no está disponible (o la clase de contenedor no trae 20 ni 40) se usa la regla de rangos de
-    /// SAP de antes.
+    /// Código SICE-TAC del vehículo de una línea de contenedor, escogido por tamaño y peso con <c>tbl_rangos_peso_contenedor</c> y traducido con el mapeo de vehículos;
+    /// si la tabla no está disponible (o la clase no es 20 ni 40) usa la regla de rangos de SAP.
     /// </summary>
     private async Task<string?> ConfigDeContenedorAsync(clsConsultaTarifarioSap c, int? claseContId, CancellationToken ct)
     {
@@ -560,12 +520,7 @@ public sealed class clsTarifarioSapAdapter : ITarifarioSapPort
     }
 
     /// <summary>
-    /// S5-HU-19.1/#281: antes de rendirse, busca el municipio por nombre (misma regla de
-    /// contención en las 2 direcciones que <see cref="CodigosDaneAsync"/>) y devuelve sus
-    /// códigos de zona YA sembrados (<c>NombreTarifasPlaza</c>/<c>ZonaTarificacion</c>,
-    /// S4-HU-09.1) — el reemplazo de <c>clsResolucionZonaSap.AliasZonasAgregadas</c>
-    /// (retirado en S5-HU-16.1/#254): en vez de un diccionario de alias mantenido a mano
-    /// ("Medellín" -> "VABURRA"), el código de zona ya vive en la fila del municipio.
+    /// Antes de rendirse busca el municipio por nombre (contención en las 2 direcciones, como <see cref="CodigosDaneAsync"/>) y devuelve sus códigos de zona ya sembrados (<c>NombreTarifasPlaza</c>/<c>ZonaTarificacion</c>).
     /// </summary>
     private async Task<List<string>> ZonasPorMunicipioAsync(string textoNormalizado, CancellationToken ct)
     {
@@ -578,10 +533,7 @@ public sealed class clsTarifarioSapAdapter : ITarifarioSapPort
                 .ToListAsync(ct);
         });
 
-        // Exacto primero, contención como último recurso — mismo motivo que
-        // clsTarifaPlazaInternaAdapter.ResolverMunicipiosAsync: nombres cortos o
-        // compuestos ("Buenaventura" contiene a "Ventura", Cañar/Ecuador) cruzan con
-        // municipios de otro país si solo se compara por contención.
+        // Exacto primero, contención como último recurso (mismo motivo que clsTarifaPlazaInternaAdapter.ResolverMunicipiosAsync): "Buenaventura" contiene a "Ventura" (Cañar/Ecuador).
         var exactos = municipios!.Where(m => Normalizar(m.Municipio) == textoNormalizado).ToList();
         var candidatos = exactos.Count > 0
             ? exactos

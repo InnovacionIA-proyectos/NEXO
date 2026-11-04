@@ -9,10 +9,8 @@ using Nexo.Domain.Asistente.Entidades;
 namespace Nexo.Application.CasosDeUso.Asistente.Conversacion;
 
 /// <summary>
-/// La persona confirma un cambio que propuso el asistente y se aplica con los casos de uso de siempre, con su identidad y sus permisos:
-/// las reglas del dominio mandan y, si rechazan el cambio, la acción queda <c>fallida</c> con el código y el motivo, la conversación lo
-/// explica y se responde el mismo error del dominio (no se aplica nada). Solo quien tiene la conversación puede confirmar, una sola vez
-/// y dentro de la vigencia.
+/// Confirma un cambio propuesto por el asistente aplicándolo con los casos de uso y permisos de la persona; si el dominio lo
+/// rechaza, la acción queda <c>fallida</c> y no se aplica nada.
 /// </summary>
 public sealed record clsConfirmarAccionAsistenteCommand(Guid AccionId) : ICommand<clsAccionAsistenteDto>;
 

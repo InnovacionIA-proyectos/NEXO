@@ -6,22 +6,11 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Nexo.Api.Cotizaciones;
 
-// -----------------------------------------------------------------------------
-// POLÍTICA DE ACCESO (SEC-03) — igual que en el proyecto original: Nexo es una
-// herramienta interna con cola de trabajo compartida; la segmentación es por ROL
-// con [Authorize(Roles=...)] en cada endpoint, no por propiedad de instancia.
-// -----------------------------------------------------------------------------
+// Política de acceso: cola de trabajo compartida; la segmentación es por rol con [Authorize(Roles=...)] en cada endpoint, no por propiedad de instancia.
 
-/// <summary>
-/// Cotización integral de una solicitud: fletes por línea, servicios conexos,
-/// entrega al comercial por email y registro del resultado (ganada/perdida).
-/// Controller delgado: valida el request HTTP, lo mapea a un Command/Query de
-/// Application y devuelve el DTO que el Handler produjo. No conoce EF Core ni
-/// ningún detalle de Infrastructure.
-/// </summary>
+/// <summary>Cotización integral de una solicitud: fletes por línea, servicios conexos, entrega al comercial por email y registro del resultado (ganada/perdida).</summary>
 [ApiController]
-// S6-HU-25.1/#307: AdminBiblioteca NO entra a cotizaciones (ni a leerlas). Un [Authorize(Roles)] de clase se SUMA (AND) a los de
-// cada método: aquí deja fuera a ese rol sin repetirlo en cada endpoint; los métodos siguen acotando.
+// AdminBiblioteca no entra a cotizaciones. Un [Authorize(Roles)] de clase se suma (AND) a los de cada método.
 [Authorize(Roles = "Comercial,AdminTarifas,ServiciosLogisticos,LiderProceso,Admin")]
 [Route("api/cotizaciones")]
 public class clsCotizacionesController(
@@ -60,12 +49,7 @@ public class clsCotizacionesController(
     public async Task<ActionResult<clsCotizacionDto>> Obtener(Guid id, CancellationToken ct = default)
         => Ok(await obtener.Handle(new clsObtenerCotizacionQuery(id), ct));
 
-    /// <summary>
-    /// La cotización que ya existe para una solicitud, SIN crear nada (S5-HU-20.1/#286): 200
-    /// con la cotización o 204 si todavía no hay. A diferencia de <c>POST /api/cotizaciones</c>
-    /// (crear o recuperar) no tiene efecto secundario, así que Mesa de Costeo puede
-    /// consultarla al abrir para saber si ya hay una (p. ej. la auto-costeada al capturar).
-    /// </summary>
+    /// <summary>La cotización que ya existe para una solicitud, sin crear nada: 200 con la cotización o 204 si todavía no hay.</summary>
     [HttpGet("por-solicitud/{solicitudId:guid}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
@@ -76,10 +60,8 @@ public class clsCotizacionesController(
     }
 
     /// <summary>
-    /// Precarga como fletes el valor propuesto por la Biblioteca en las líneas sin flete, con su
-    /// aprovisionamiento y su retorno del contenedor. Se saltan las líneas sin valor propuesto, las que
-    /// tienen un motivo de pendiente y las rechazadas. <c>soloAutomaticas</c> se conserva por
-    /// compatibilidad y ya no cambia el resultado.
+    /// Precarga como fletes el valor propuesto por la Biblioteca en las líneas sin flete, con su aprovisionamiento y retorno del contenedor.
+    /// Se saltan las líneas sin valor propuesto, con motivo de pendiente o rechazadas.
     /// </summary>
     [HttpPost("{id:guid}/aplicar-propuestas")]
     [Authorize(Roles = "Comercial,AdminTarifas,Admin")]
@@ -100,10 +82,7 @@ public class clsCotizacionesController(
             id, req.LineaSolicitudId, req.ValorFlete, req.ValorRetornoContenedor, req.Fuente), ct));
 
     /// <summary>
-    /// Corregir el valor de un flete MANUAL ya agregado — modifica la MISMA línea, no suma otra
-    /// (S5-HU-20.1/#286). Solo cotización Borrador (409 COTIZACION_NO_EDITABLE), línea existente
-    /// (404 LINEA_NO_ENCONTRADA), fuente Manual (409 FLETE_NO_EDITABLE) y nunca bajo el piso
-    /// SICE-TAC (400 FLETE_BAJO_PISO_SICETAC). No recibe la fuente: no se puede cambiar.
+    /// Corrige el valor de un flete manual ya agregado (modifica la misma línea). Solo en Borrador y nunca bajo el piso SICE-TAC; la fuente no se puede cambiar.
     /// </summary>
     [HttpPut("{id:guid}/lineas/{lineaSolicitudId:guid}")]
     [Authorize(Roles = "AdminTarifas,Admin")]
@@ -117,9 +96,7 @@ public class clsCotizacionesController(
             id, lineaSolicitudId, req.ValorFlete, req.ValorRetornoContenedor, req.ConfirmarSinPiso), ct));
 
     /// <summary>
-    /// S6-HU-24.3/#320: rechaza UNA línea de la cotización con un motivo, para entregar el resto sin que una línea sin costear frene la
-    /// entrega. Solo AdminTarifas y Admin; sin motivo → 400; solo cotización Borrador y línea sin flete (409). La línea queda
-    /// <c>rechazada</c>, sin precio y sin sumar al total.
+    /// Rechaza una línea con un motivo para poder entregar el resto. Solo AdminTarifas y Admin; la línea queda <c>rechazada</c>, sin precio y sin sumar al total.
     /// </summary>
     [HttpPost("{id:guid}/lineas/{lineaSolicitudId:guid}/rechazo")]
     [Authorize(Roles = "AdminTarifas,Admin")]
@@ -131,10 +108,7 @@ public class clsCotizacionesController(
         Guid id, Guid lineaSolicitudId, [FromBody] clsRechazarLineaRequest req, CancellationToken ct = default)
         => Ok(await rechazarLinea.Handle(new clsRechazarLineaCotizacionCommand(id, lineaSolicitudId, req.Motivo), ct));
 
-    /// <summary>
-    /// S6-HU-24.3/#320: deshace el rechazo de una línea (vuelve a <c>porCostear</c>). Solo mientras la cotización NO esté entregada
-    /// (409 COTIZACION_NO_EDITABLE en otro caso). Solo AdminTarifas y Admin.
-    /// </summary>
+    /// <summary>Deshace el rechazo de una línea (vuelve a <c>porCostear</c>). Solo AdminTarifas y Admin, mientras la cotización no esté entregada.</summary>
     [HttpDelete("{id:guid}/lineas/{lineaSolicitudId:guid}/rechazo")]
     [Authorize(Roles = "AdminTarifas,Admin")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -145,10 +119,8 @@ public class clsCotizacionesController(
         => Ok(await deshacerRechazoLinea.Handle(new clsDeshacerRechazoLineaCotizacionCommand(id, lineaSolicitudId), ct));
 
     /// <summary>
-    /// S6-HU-27.3/#322 (D9): cambia el vehículo de una línea. Solo AdminTarifas y Admin y solo con la cotización en Borrador (entregada → 409
-    /// COTIZACION_NO_EDITABLE). El vehículo se indica con <c>configVehiculoId</c> (configuración oficial) o con <c>tipoVehiculo</c> (texto o código,
-    /// resuelto con el diccionario de alias; uno desconocido → 400 VEHICULO_NO_RECONOCIDO). El flete que la línea tuviera se descarta (se calculó con
-    /// el vehículo anterior) y la línea vuelve a <c>porCostear</c>; la respuesta trae la propuesta recalculada con el piso SICE-TAC del vehículo nuevo.
+    /// Cambia el vehículo de una línea (<c>configVehiculoId</c> oficial, o <c>tipoVehiculo</c> resuelto con el diccionario de alias). Solo AdminTarifas y Admin, con la cotización en Borrador.
+    /// El flete de la línea se descarta y vuelve a <c>porCostear</c>; la respuesta trae la propuesta recalculada con el piso SICE-TAC del vehículo nuevo.
     /// </summary>
     [HttpPut("{id:guid}/lineas/{lineaSolicitudId:guid}/vehiculo")]
     [Authorize(Roles = "AdminTarifas,Admin")]
@@ -161,10 +133,7 @@ public class clsCotizacionesController(
         => Ok(await cambiarVehiculoLinea.Handle(
             new clsCambiarVehiculoLineaCommand(id, lineaSolicitudId, req.ConfigVehiculoId, req.TipoVehiculo, req.Carroceria), ct));
 
-    /// <summary>
-    /// Agregar servicios conexos a la cotización. Se admite mientras no tenga resultado
-    /// (Borrador o Entregada); Ganada/Perdida → 409 COTIZACION_CERRADA (S5-HU-20.1/#286).
-    /// </summary>
+    /// <summary>Agrega servicios conexos mientras la cotización no tenga resultado (Borrador o Entregada); Ganada/Perdida → 409 COTIZACION_CERRADA.</summary>
     [HttpPost("{id:guid}/conexos")]
     [Authorize(Roles = "Comercial,AdminTarifas,Admin")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -175,8 +144,7 @@ public class clsCotizacionesController(
         => Ok(await agregarConexos.Handle(new clsAgregarConexosCotizacionCommand(
             id, req.Items.Select(i => new clsConexoItem(i.LineaId, i.ServicioConexoId, i.Cantidad, i.ValorAplicado, i.Origen)).ToList()), ct));
 
-    /// <summary>Corregir la cantidad (y opcionalmente el valor) de un conexo ya agregado —
-    /// solo en cotización Borrador (S5-HU-18/#262).</summary>
+    /// <summary>Corrige la cantidad (y opcionalmente el valor) de un conexo ya agregado; solo en cotización Borrador.</summary>
     [HttpPatch("{id:guid}/conexos/{conexoId:guid}")]
     [Authorize(Roles = "Comercial,Admin")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -186,8 +154,7 @@ public class clsCotizacionesController(
     public async Task<ActionResult<clsCotizacionDto>> EditarConexo(Guid id, Guid conexoId, [FromBody] clsEditarConexoRequest req, CancellationToken ct = default)
         => Ok(await editarConexo.Handle(new clsEditarConexoCotizacionCommand(id, conexoId, req.Cantidad, req.ValorAplicado), ct));
 
-    /// <summary>Quitar un conexo (S5-HU-18/#262). Desde S5-HU-20.1/#286 también sobre una cotización
-    /// Entregada: se admite mientras no tenga resultado; Ganada/Perdida → 409 COTIZACION_CERRADA.</summary>
+    /// <summary>Quita un conexo mientras la cotización no tenga resultado; Ganada/Perdida → 409 COTIZACION_CERRADA.</summary>
     [HttpDelete("{id:guid}/conexos/{conexoId:guid}")]
     [Authorize(Roles = "Comercial,AdminTarifas,Admin")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -196,11 +163,7 @@ public class clsCotizacionesController(
     public async Task<ActionResult<clsCotizacionDto>> EliminarConexo(Guid id, Guid conexoId, CancellationToken ct = default)
         => Ok(await eliminarConexo.Handle(new clsEliminarConexoCotizacionCommand(id, conexoId), ct));
 
-    /// <summary>
-    /// Entregar la cotización a Comercial: marca la entrega y envía la cotización
-    /// formal (PDF adjunto, si viene) por email al comercial responsable del cliente.
-    /// 409 si ya se había entregado antes (no se reenvía dos veces).
-    /// </summary>
+    /// <summary>Entrega la cotización a Comercial: marca la entrega y envía la cotización formal (PDF adjunto, si viene) por email al comercial responsable. 409 si ya se entregó.</summary>
     [HttpPost("{id:guid}/entregar")]
     [Authorize(Roles = "AdminTarifas,Admin")]
     [RequestSizeLimit(10 * 1024 * 1024)]
@@ -220,9 +183,7 @@ public class clsCotizacionesController(
         return Ok(await entregar.Handle(new clsEntregarCotizacionCommand(id, pdf, formato?.FileName), ct));
     }
 
-    /// <summary>Registrar el resultado (ganada/perdida) y realimentar la Biblioteca. Solo
-    /// Comercial y Admin (S4-HU-11.1/#213): ni AdminTarifas ni AdminBiblioteca deciden
-    /// si una cotización se ganó o se perdió, eso es criterio del Comercial dueño del negocio.</summary>
+    /// <summary>Registra el resultado (ganada/perdida) y realimenta la Biblioteca. Solo Comercial y Admin: el resultado es criterio del Comercial dueño del negocio.</summary>
     [HttpPost("{id:guid}/resultado")]
     [Authorize(Roles = "Comercial,Admin")]
     [ProducesResponseType(StatusCodes.Status200OK)]

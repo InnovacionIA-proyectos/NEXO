@@ -24,8 +24,7 @@ public sealed class clsRechazarSolicitudCommandHandler(
         var s = await solicitudes.ObtenerBasicoAsync(command.SolicitudId, ct)
             ?? throw new clsNotFoundException("SOLICITUD_NO_ENCONTRADA", "clsSolicitud no encontrada.");
 
-        // Aislamiento por comercial (issue #199, S4-HU-19.1): un Comercial no puede
-        // rechazar la solicitud de otro comercial, aunque tenga el Id.
+        // Aislamiento por comercial: un Comercial no puede rechazar la solicitud de otro, aunque tenga el Id.
         if (usuarioActual.Rol == RolUsuario.Comercial && s.CreadoPor != usuarioActual.Id)
             throw new clsForbiddenException("SOLICITUD_AJENA", "No tiene acceso a esta solicitud.");
 

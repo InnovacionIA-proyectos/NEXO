@@ -5,22 +5,10 @@ using Nexo.Domain.Solicitudes.Entidades;
 namespace Nexo.Domain.Priorizacion.Reglas;
 
 /// <summary>
-/// Calcula el score de priorización (0–100) que reemplaza el FIFO.
-///
-/// Score = suma ponderada de 4 componentes (decisión documentada en
-/// docs/decisiones/score-prioridad-4-pesos-vs-solo-urgencia.md tras encontrar que el
-/// repo se contradecía a sí mismo: el código calculaba los 4 componentes pero el total
-/// descartaba 3 de ellos, dejando <see cref="clsParametrosScore"/> con 4 pesos editables
-/// por el Admin sin ningún efecto real):
-///
-///  - Urgencia: rampa lineal inversa al tiempo restante hasta el deadline (vencido = 100).
-///  - Valor: escala logarítmica del valor estimado contra un valor de referencia.
-///  - Probabilidad: probabilidad de cierre (0–100).
-///  - Tipo: licitación pesa más que spot.
-///
-/// Los 4 pesos (<see cref="clsParametrosScore.PesoUrgencia"/> y análogos) son editables por
-/// el Admin y suman 1.0 por defecto, así que el total queda en la misma escala 0–100.
-/// Función pura y determinista: el "ahora" se inyecta para poder probarla.
+/// Score de priorización (0–100): suma ponderada, con los pesos de <see cref="clsParametrosScore"/>, de
+/// urgencia (rampa lineal inversa al tiempo hasta el deadline; vencido = 100), valor (escala logarítmica
+/// contra una referencia), probabilidad de cierre y tipo (licitación pesa más que spot).
+/// Función pura: el "ahora" se inyecta.
 /// </summary>
 public static class clsScorePrioridadCalculator
 {

@@ -12,7 +12,7 @@ public sealed class clsExportadorCotizacionExcelClosedXml : IExportadorCotizacio
 {
     private const string FormatoMoneda = "\"$\" #,##0";
 
-    /// <summary>Texto de la columna "Flete" de una línea rechazada (S6-HU-24.3/#320): sin precio y sin motivo.</summary>
+    /// <summary>Texto de la columna "Flete" de una línea rechazada: sin precio y sin motivo.</summary>
     public const string SinCosteo = "Sin costeo";
 
     public (byte[] Contenido, string NombreArchivo) Generar(clsCotizacion c, IReadOnlyList<clsLineaRechazadaInfo>? lineasRechazadas = null)
@@ -44,11 +44,8 @@ public sealed class clsExportadorCotizacionExcelClosedXml : IExportadorCotizacio
         ws.Cell(f, 1).Value = $"FLETES ({c.Lineas.Count + lineasRechazadas.Count})";
         ws.Cell(f, 1).Style.Font.SetBold();
         f++;
-        // S4-HU-17.4/#230: Fuente, Aprovisionamiento y Retorno contenedor se quitan del
-        // Excel (pedido de frontend, administracion_embarqa_nexo#206). "Flete" queda como
-        // única columna monetaria de la línea, con el TOTAL completo (lo que antes calculaba
-        // "Total línea": ValorFlete + Aprovisionamiento + Retorno contenedor) — no ValorFlete
-        // aislado, que dejaría el número incompleto.
+        // "Flete" es la única columna monetaria de la línea y lleva el TOTAL completo
+        // (ValorFlete + Aprovisionamiento + Retorno contenedor), no ValorFlete aislado.
         EscribirEncabezado(ws, f, new[] { "clsRuta", "Tipología", "Flete" });
         f++;
         decimal totalFletes = 0;
@@ -62,7 +59,7 @@ public sealed class clsExportadorCotizacionExcelClosedXml : IExportadorCotizacio
             ws.Cell(f, 3).Style.NumberFormat.Format = FormatoMoneda;
             f++;
         }
-        // S6-HU-24.3/#320: las líneas rechazadas salen como «Sin costeo» — sin precio y sin motivo — y NO suman al total.
+        // Las líneas rechazadas salen como «Sin costeo» (sin precio ni motivo) y NO suman al total.
         foreach (var r in lineasRechazadas)
         {
             ws.Cell(f, 1).Value = r.Ruta;
