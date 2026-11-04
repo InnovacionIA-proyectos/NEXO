@@ -8,8 +8,7 @@ completo y los errores. Para qué hacer después con la respuesta en NEXO, ver
 > en `cubicador/CONTRATO.md` §3.1 y §5. Esta guía las resume y explica el porqué. Si algo no coincide,
 > mandan ellos.
 >
-> Reemplaza a las partes de `COTIFLY-CONEXION-RECOMENDACION-VEHICULO.md` que quedaron viejas (ver
-> [§9](#9-correcciones-a-la-guía-anterior)).
+> Para lo que sigue en NEXO (captura, importación, lectura del costeo), ver [`NEXO-CONTRATO-INTEGRACION-COTIFLY.md`](./NEXO-CONTRATO-INTEGRACION-COTIFLY.md).
 
 Estado: contrato vigente tras **S5-HU-17.7** (el request lleva `codigoMercancia`) y **S5-HU-17.8**
 (el detalle por camión va por posición).
@@ -264,22 +263,12 @@ Por cada camión de `vehiculos[]`, Cotifly crea **una línea** en NEXO (decidido
 Las reglas completas (orden de líneas, línea sin vehículo, cuarentena de códigos) están en
 [`NEXO-CONTRATO-INTEGRACION-COTIFLY.md`](./NEXO-CONTRATO-INTEGRACION-COTIFLY.md).
 
-## 9. Correcciones a la guía anterior
+## 9. Notas para el cliente de Cotifly
 
-`COTIFLY-CONEXION-RECOMENDACION-VEHICULO.md` quedó parcialmente desactualizado:
-
-| Dice | Hoy |
-|---|---|
-| Consultar **`GET /vehiculos`** para el desplegable de vehículo | **No.** Ese es el catálogo de *presets del motor 3D* (nombres como `"Turbo con estacas"`). El canónico, con `2L2` / `C2` / `3S3`, es **`GET /vehiculos-catalogo`** |
-| Mandar `TipoMercancia` / el **id** de la mercancía | Se manda el **`codigoMercancia`** (S5-HU-17.7) |
-| "Confirmar en qué header espera la API key" | Está confirmado: `Authorization: Bearer <llave>` |
-| Una respuesta con el detalle agrupado por código | Ahora es **por posición** (`indicePosicion`), S5-HU-17.8 |
-| El motivo de `SIN_SELECCION_AUTOMATICA` es lo único a mostrar | También existe `condicionada` (200, válida) y `extradimension.piezas[]` |
-| "Falta agregar el selector de tipo de mercancía" | Sigue siendo cierto: hoy `clsItemCubicacion.TipoMercancia` va siempre en `null`. Hay que construirlo (§3) |
-
-El resto de esa guía (cliente propio con opciones validadas, fábrica real/"NoDisponible", DTOs *wire*
-privados, no lanzar excepciones hacia arriba, el punto de enganche en `clsEnvioCosteoService`, la
-vista agrupada por ruta) **sigue vigente**.
+- El desplegable de vehículo sale de `GET /vehiculos-catalogo` (canónico: `2L2`, `C2`, `3S3`…), no de `GET /vehiculos`, que es el catálogo de presets del motor 3D.
+- Se manda el `codigoMercancia`, no el id. El detalle por camión llega por posición (`indicePosicion`). Hay que tratar `condicionada` y `extradimension.piezas[]`, no solo `SIN_SELECCION_AUTOMATICA`.
+- El selector de tipo de mercancía hay que construirlo: hoy `clsItemCubicacion.TipoMercancia` va siempre en `null`.
+- Diseño recomendado del cliente: opciones validadas, fábrica real/«NoDisponible», DTOs *wire* privados, no lanzar excepciones hacia arriba, enganche en `clsEnvioCosteoService` y vista agrupada por ruta.
 
 ## 10. Checklist de conexión
 

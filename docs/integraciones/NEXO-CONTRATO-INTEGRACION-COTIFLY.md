@@ -7,9 +7,7 @@ orden, qué mandar, qué se recibe, qué decisiones de negocio ya están tomadas
 > endpoint (todas las restricciones y errores) está en [`CONTRATO.md`](../../CONTRATO.md); si algo no coincide, **manda `CONTRATO.md`**. La parte
 > del Cubicador (llave, URL, formato de la recomendación) tiene su guía propia: [`COTIFLY-COMO-CONECTARSE-AL-CUBICADOR.md`](./COTIFLY-COMO-CONECTARSE-AL-CUBICADOR.md).
 
-Verificado el **2026-11-04** contra el código de la rama `QA` y contra respuestas reales de la API. Reemplaza, para el lado de NEXO, a
-[`COTIFLY-CONTRATO.md`](./COTIFLY-CONTRATO.md) (captura de solicitudes) y a
-[`COTIFLY-CONEXION-RECOMENDACION-VEHICULO.md`](./COTIFLY-CONEXION-RECOMENDACION-VEHICULO.md) (ya desactualizada); ambos quedan como historia y llevan un aviso.
+Verificado el **2026-11-04** contra el código de la rama `QA` y contra respuestas reales de la API. Reemplaza a los documentos anteriores de Cotifly (captura de solicitudes y conexión de la recomendación), ya retirados del repositorio.
 
 ---
 
@@ -270,4 +268,3 @@ Si alguna se corrige, el cambio se anuncia en `CONTRATO.md` §7 y en este docume
 | [`CONTRATO.md`](../../CONTRATO.md) | Todos los endpoints de NEXO campo por campo (§0 es la guía de consumo y trae el índice de rutas) |
 | [`COTIFLY-COMO-CONECTARSE-AL-CUBICADOR.md`](./COTIFLY-COMO-CONECTARSE-AL-CUBICADOR.md) | La recomendación de vehículo directo con el Cubicador |
 | [`docs/contrato-integracion/README.md`](../contrato-integracion/README.md) | Por qué la identidad va sin token, trabajos pesados y avisos en vivo |
-| [`COTIFLY-CONTRATO.md`](./COTIFLY-CONTRATO.md), [`COTIFLY-CONEXION-RECOMENDACION-VEHICULO.md`](./COTIFLY-CONEXION-RECOMENDACION-VEHICULO.md) | Historia: este documento los reemplaza para el lado de NEXO |
