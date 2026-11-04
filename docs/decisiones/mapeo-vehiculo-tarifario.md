@@ -33,7 +33,7 @@ Con la tabla, ya no hace falta quitar la `C` inicial en el camino oficial de SIC
 
 La carga inicial de `tbl_tarifas_plaza` sacó el vehículo con códigos de SICE-TAC (`3S2`: 21 filas, `2L3`: 1 fila), y el mapeo dice que `3S2` no tiene
 código de plaza y que `2L3` se tarifa como `2L2`. Mientras no se decida si se corrige la tabla o se separan las columnas del mapeo (pendiente
-documentado en `docs/backlog/BACKLOG-NEXO.md`, sección «Pendientes del mapeo de vehículo»), el emparejamiento acepta **el código de plaza del mapeo y también el
+documentado en el backlog de issues en GitHub, sección «Pendientes del mapeo de vehículo»), el emparejamiento acepta **el código de plaza del mapeo y también el
 propio del vehículo**. Es una ampliación: nada de lo que antes coincidía deja de coincidir, y esas filas no quedan sin usar.
 
 ## Cómo se verificó
