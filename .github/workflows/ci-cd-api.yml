@@ -1,10 +1,7 @@
 name: CI/CD API
 
-# Dispara SOLO por cambios que puedan afectar al
-# servicio API (.NET) — nunca por cambios exclusivos de cubicador/ (ese
-# servicio tiene sus propios workflows, ver ci-cd-cubicador-api.yml/
-# ci-cd-cubicador-worker.yml). Ver docs/despliegue/CI_CD_RUTAS_COMPARTIDAS.md para la
-# convención completa de qué ruta dispara qué pipeline.
+# Solo dispara por cambios que puedan afectar a la API (.NET), nunca por cambios exclusivos de
+# cubicador/, que tiene sus propios workflows. Ver docs/despliegue/CI_CD_RUTAS_COMPARTIDAS.md.
 on:
   push:
     branches: [main, DEPLOY]
@@ -22,36 +19,23 @@ on:
       - ".github/workflows/ci-cd-api.yml"
 
 jobs:
-  # Self-hosted acá también (no ubuntu-latest): TEST_DB_CONNECTION apunta a
-  # dbInformesAutomatizados_Pruebas, una base SQL Server real de la red
-  # corporativa privada (10.10.40.85, ver .env raíz) — un runner en la nube de
-  # GitHub JAMÁS podría alcanzarla, sin importar qué credenciales se le den.
-  # Verificado: no es una base descartable ni un contenedor efímero, es la
-  # misma base "de pruebas" (dedicada, pero real y persistente) que ya usan
-  # para probar la app contra su comportamiento real con SQL Server.
+  # Self-hosted: TEST_DB_CONNECTION apunta a una base SQL Server real de la red corporativa privada,
+  # inalcanzable desde un runner en la nube de GitHub. No es una base descartable ni un contenedor efímero.
   build-and-test:
     runs-on: [self-hosted, dokploy_]
-    # Este runner solo tiene Windows PowerShell (con política de ejecución
-    # restringida) y cmd — no pwsh. Sin este default, cualquier "run:" sin
-    # "shell:" propio cae en PowerShell y falla con "la ejecución de scripts
-    # está deshabilitada en este sistema" (pasó en "Restaurar dependencias",
-    # "Compilar" y "Ejecutar toda la suite", los tres sin shell explícito).
+    # Este runner solo tiene Windows PowerShell (ejecución de scripts restringida) y cmd, no pwsh.
+    # Sin este default, un "run:" sin "shell:" cae en PowerShell y falla con "la ejecución de scripts
+    # está deshabilitada en este sistema".
     defaults:
       run:
         shell: cmd
     steps:
       - uses: actions/checkout@v4
 
-      # DOTNET_INSTALL_DIR explícito: por defecto setup-dotnet instala en
-      # "C:\Program Files\dotnet", y la cuenta con la que corre este runner
-      # self-hosted (dokploy_) no tiene permiso de escritura ahí (requiere
-      # admin) — el job fallaba con "doesn't have write access to the
-      # installation root". runner.tool_cache (RUNNER_TOOL_CACHE) apunta a
-      # una carpeta dentro del propio árbol del runner (_work\_tool), que SÍ
-      # es escribible por esa cuenta: el mismo runner ya escribe ahí al lado
-      # (_work\_temp) sin problema. El paso siguiente agrega esa carpeta al
-      # PATH porque setup-dotnet solo hace eso automáticamente para la
-      # ubicación por defecto.
+      # DOTNET_INSTALL_DIR explícito: por defecto setup-dotnet instala en "C:\Program Files\dotnet",
+      # donde la cuenta del runner (dokploy_) no tiene permiso de escritura. runner.tool_cache sí es
+      # escribible; el paso siguiente agrega esa carpeta al PATH porque setup-dotnet solo lo hace para
+      # la ubicación por defecto.
       - name: Instalar .NET SDK
         uses: actions/setup-dotnet@v4
         env:
@@ -69,53 +53,27 @@ jobs:
       - name: Compilar (Release)
         run: dotnet build Nexo.Clean.sln -c Release --no-restore
 
-      # Nexo.Api.Tests corre contra dbInformesAutomatizados_Pruebas —
-      # la BD de pruebas REAL de la red corporativa, NUNCA un contenedor
-      # efímero. TEST_DB_CONNECTION
-      # es un secreto de GitHub (el mismo valor que ConnectionStrings__Nexo
-      # en el .env raíz, o el que corresponda a esa base de pruebas) — nunca un
-      # valor en el repo. Domain.Tests/Application.Tests no tocan ninguna base —
-      # dotnet test sobre el .sln completo los corre a los tres en una sola
-      # pasada (mismo criterio que docker-compose.ci.yml: sin filtro, para que
-      # un proyecto de test nuevo entre solo).
+      # Nexo.Api.Tests corre contra la BD de pruebas REAL de la red corporativa (nunca un contenedor
+      # efímero); TEST_DB_CONNECTION es un secreto de GitHub, nunca un valor en el repo. El .sln completo
+      # se corre sin filtro para que un proyecto de test nuevo entre solo.
       #
-      # CRÍTICO — no tocar sin leer esto: ApiFixture.cs (tests/Nexo.
-      # Api.Tests/Infra/ApiFixture.cs) NUNCA debe volver a llamar
-      # Database.EnsureDeleted() mientras TEST_DB_CONNECTION apunte a esta base
-      # — se retiró a propósito precisamente para
-      # que este workflow no la borre. Migrate() es aditivo y DataSeeder.SeedAsync
-      # ya es idempotente (no-op si ya hay datos), así que correr esto repetidas
-      # veces contra la MISMA base es seguro en cuanto al esquema/semilla — lo
-      # que SÍ queda pendiente de auditar es si algún test individual (más allá
-      # del seed) asume una base pristina y podría fallar en una segunda corrida
-      # por choque de datos únicos; no se auditaron las ~150 pruebas de Api.Tests
-      # una por una en esta pasada.
+      # CRÍTICO: ApiFixture.cs NUNCA debe llamar Database.EnsureDeleted() mientras TEST_DB_CONNECTION
+      # apunte a esta base, o este workflow la borraría. Migrate() es aditivo y DataSeeder.SeedAsync es
+      # idempotente, pero algún test individual podría asumir una base prístina y chocar en una segunda
+      # corrida por datos únicos.
       #
-      # Sin service container de SQL Server acá: esta base ya está corriendo,
-      # alcanzable directo desde este runner — no hay contenedor que esperar
-      # ("Recovery is complete"). Ese detalle sigue siendo real SI
-      # algún día se vuelve a levantar SQL Server como contenedor efímero para
-      # otro propósito (ver docker-compose.ci.yml, que sí usa uno).
+      # No hay service container de SQL Server: la base ya está corriendo y es alcanzable desde el runner.
       #
-      # Las otras 4 conexiones (todas SOLO LECTURA, ver .env raíz) son OPCIONALES
-      # para que la app arranque — sin ellas, Infrastructure/DependencyInjection.cs
-      # las degrada solas (503 accionable / adapter local), NUNCA falla la DI. Pero
-      # eso significa que sin definirlas ACÁ, TarifasHistoricasTests/
-      # TarifasSicetacTests/SesionTests pasan ejercitando el camino DEGRADADO, no
-      # las fuentes reales — verificado en runtime (17-sep-2026): con las 4 sin
-      # definir, esos tests igual pasaban en verde, pero contra el adapter local/
-      # "no configurado", no contra DwSice/DbSolucionesTi/DwCubos/IdentidadPortal.
-      # Se definen con el MISMO nombre de variable que lee IConfiguration
-      # (ConnectionStrings__*, doble guion bajo) — ASP.NET Core las mapea solo,
-      # cero cambio de código.
-      # Cubicador3D__* (OPCIONALES): 6 pruebas de Nexo.Api.Tests hablan con el Cubicador REAL
-      # (clsCubicacionControllerE2ETests y clsCatalogoCubicadorPassthroughE2ETests, S5-HU-18). Este
-      # runner no levanta el stack del Cubicador, así que SIN estas variables esas pruebas se
-      # OMITEN con un motivo explícito (clsHechoConCubicadorRealAttribute) — antes la app respondía
-      # 503 "no configurado" y la suite quedaba en rojo (corrida del 2026-10-14). Para que corran en
-      # CI: crear los 3 secretos con un Cubicador alcanzable desde el runner (con el catálogo local
-      # sembrado, ver cubicador/docker-compose.yml). Si la URL está definida y el Cubicador no
-      # responde, FALLAN: ahí sí es una señal real. Un secreto inexistente llega como cadena vacía.
+      # Las otras 4 conexiones (SOLO LECTURA) son OPCIONALES: sin ellas la app las degrada sola (503
+      # accionable / adapter local) y TarifasHistoricasTests/TarifasSicetacTests/SesionTests pasan por el
+      # camino DEGRADADO, no contra las fuentes reales. Se definen con el nombre que lee IConfiguration
+      # (ConnectionStrings__*, doble guion bajo).
+      #
+      # Cubicador3D__* (OPCIONALES): 6 pruebas de Nexo.Api.Tests hablan con el Cubicador REAL; este runner
+      # no lo levanta, así que sin estas variables esas pruebas se OMITEN con un motivo explícito
+      # (clsHechoConCubicadorRealAttribute). Para que corran: crear los 3 secretos con un Cubicador
+      # alcanzable desde el runner (catálogo local sembrado, ver cubicador/docker-compose.yml). Si la URL
+      # está definida y el Cubicador no responde, FALLAN. Un secreto inexistente llega como cadena vacía.
       - name: "Ejecutar toda la suite (dotnet test Nexo.Clean.sln)"
         env:
           TEST_DB_CONNECTION: ${{ secrets.TEST_DB_CONNECTION }}
@@ -129,15 +87,13 @@ jobs:
           Database__Esquema: ${{ secrets.DATABASE_ESQUEMA }}
         run: dotnet test Nexo.Clean.sln -c Release --no-build --logger "console;verbosity=normal"
 
-  # El despliegue queda atado estructuralmente a que la suite haya pasado en ESTE
-  # commit — nunca se dispara si "build-and-test" falla. Solo en push directo (nunca
-  # en PRs). Dokploy construye con el Dockerfile del servicio API al recibir esto.
+  # El despliegue depende de que la suite haya pasado en ESTE commit. Solo en push directo (no en PRs).
+  # Dokploy construye con el Dockerfile del servicio API al recibir el webhook.
   deploy:
     needs: build-and-test
     if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/DEPLOY') && github.event_name == 'push'
 
-    # Self-hosted: corre en la red donde vive Dokploy — es la única forma de alcanzar
-    # su webhook, inalcanzable desde runners ubuntu-latest.
+    # Self-hosted: único lugar desde el que se alcanza el webhook de Dokploy (inalcanzable desde ubuntu-latest).
     runs-on: [self-hosted, dokploy_]
     steps:
       - name: Mostrar información del deploy
@@ -155,55 +111,29 @@ jobs:
             -H "X-GitHub-Event: push" ^
             -d "{\"ref\":\"${{ github.ref }}\",\"repository\":{\"full_name\":\"${{ github.repository }}\"}}"
 
-      # El webhook de arriba solo confirma que Dokploy RECIBIO la orden -
-      # Dokploy todavia tiene que hacer pull/build/recrear el contenedor antes
-      # de que el proceso empiece a escuchar. Sin esta espera, el primer
-      # intento de la verificacion de abajo caia casi siempre en el hueco
-      # (contenedor viejo ya detenido, el nuevo aun no responde) y quemaba uno
-      # de los 12 reintentos sin aportar nada.
-      # ping en vez de timeout: el runner self-hosted corre como servicio de
-      # Windows, sin consola adjunta, y "timeout" intenta leer stdin para
-      # detectar Ctrl+C — sin consola falla al instante con "No es compatible
-      # la redirección de entradas". ping sí funciona sin consola: -n 91 son
-      # 90 intervalos de 1s (91 ecos, el primero es inmediato).
+      # El webhook solo confirma que Dokploy RECIBIÓ la orden; luego debe hacer pull/build/recrear el
+      # contenedor. Esta espera evita que el primer intento de verificación caiga en el hueco entre el
+      # contenedor viejo detenido y el nuevo sin responder.
+      # ping en vez de timeout: el runner corre como servicio de Windows sin consola y "timeout" falla
+      # al instante ("No es compatible la redirección de entradas"). -n 91 = 90 intervalos de 1s.
       # - name: Esperar a que el contenedor termine de levantar (90s)
       #   shell: cmd
       #   run: ping -n 91 127.0.0.1 >NUL
 
-      # El webhook de arriba solo confirma que Dokploy RECIBIO la
-      # orden (curl -f en verde con cualquier 2xx) - nunca que el build/deploy
-      # real termino. Ya paso una vez (docs/archivo/VERIFICACION_NEXO_CUBICADOR_2026-09-14.md):
-      # el build fallo por disco lleno y Dokploy siguio sirviendo la imagen
-      # vieja en silencio, con el job de este mismo workflow en verde. Este
-      # paso al menos detecta "el contenedor nuevo nunca volvio a responder"
-      # (crash/timeout de arranque) con reintentos durante ~2 minutos, despues
-      # de la espera inicial de arriba.
+      # El webhook (curl -f en verde con cualquier 2xx) no garantiza que el build/deploy terminó: un build
+      # fallido (p. ej. disco lleno) deja a Dokploy sirviendo la imagen vieja con el job en verde. Este
+      # paso detecta al menos que el contenedor nuevo nunca volvió a responder.
       #
-      # Limite conocido, a proposito no resuelto aca: un health-check simple
-      # NO distingue "se redesplego bien" de "el contenedor VIEJO sigue sano
-      # sirviendo codigo viejo" (exactamente lo que paso en el incidente de
-      # disco lleno) - eso exigiria exponer el commit SHA desplegado (via
-      # /health o un /version nuevo) y comparar contra github.sha, que es un
-      # cambio mas grande (toca el Dockerfile y Program.cs) pendiente de
-      # decidir aparte.
+      # Límite conocido: un health-check simple no distingue "se redesplegó bien" de "el contenedor VIEJO
+      # sigue sano"; eso exigiría exponer el commit SHA desplegado (en /health o /version) y compararlo
+      # con github.sha.
       #
-      # 30 intentos x 10s (~5 min), no 12x10s (~2 min): el host de este
-      # servicio se probo manualmente el 2026-09-22 (sesion de QA de
-      # produccion) y la conexion desde fuera de la red corporativa cae de
-      # forma intermitente (timeouts de 8-20s reconectando solos segundos
-      # despues) - 2 minutos de ventana no alcanzaba a cubrir una caida de VPN
-      # o un redeploy de Dokploy mas lento de lo normal, y el job fallaba en
-      # falso con el servicio ya sano. Reintentos adaptativos en vez de una
-      # espera fija mas larga (p.ej. subir el ping de 90s a 180s): con
-      # reintentos el job sigue saliendo ni bien el servicio responde, sin
-      # quemar minutos de runner cuando el deploy es rapido.
+      # 30 intentos x 10s (~5 min): la conexión desde fuera de la red corporativa cae de forma
+      # intermitente y una ventana de 2 min fallaba en falso con el servicio ya sano. Los reintentos
+      # salen apenas el servicio responde, sin quemar minutos de runner.
       #
-      # El curl de diagnostico (sin -f, nunca falla el step) imprime el
-      # HTTP real de cada intento en el log - antes un intento fallido no
-      # decia SI fue un timeout de red, un 502/503 de Dokploy, o el propio
-      # /health respondiendo Unhealthy (503 con detalle JSON, ver
-      # clsProgram.cs) - asi el proximo fallo se diagnostica desde el log,
-      # sin tener que reproducirlo a mano.
+      # El curl de diagnóstico (sin -f, nunca falla el step) imprime el HTTP real de cada intento para
+      # distinguir un timeout de red, un 502/503 de Dokploy o un /health Unhealthy (ver clsProgram.cs).
       # - name: Verificar que el servicio respondio saludable tras el despliegue
       #   shell: cmd
       #   run: |

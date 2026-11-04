@@ -1,20 +1,11 @@
 name: (reusable) Pruebas de Cubicador
 
-# Workflow REUSABLE (on: workflow_call) — no dispara solo, ver ci-cd-cubicador-api.yml
-# y ci-cd-cubicador-worker.yml, que son los que de verdad se disparan por push/PR.
+# Workflow REUSABLE (on: workflow_call): no dispara solo; lo llaman ci-cd-cubicador-api.yml y
+# ci-cd-cubicador-worker.yml.
 #
-# api y worker comparten la MISMA base de código Python
-# (domain/, application/, infrastructure/) y el mismo docker-compose.yml — no hay
-# forma (ni falta que haga) de correr "solo las pruebas del api" o "solo las del
-# worker": pytest y el smoke test de Docker Compose ya ejercitan el stack
-# integrado (api + worker + Postgres + RabbitMQ juntos). Por eso este job vive
-# UNA sola vez acá y los dos workflows de servicio lo llaman — así, cuando algo
-# compartido cambia y dispara los dos pipelines, no corren dos
-# copias del mismo texto que puedan divergir con el tiempo.
-#
-# Reemplaza a cubicador-ci.yml (ya retirado): mismo contenido exacto,
-# solo que ahora cada servicio decide CUÁNDO llamarlo (paths filter propio) y
-# qué hacer si pasa (su propio job de deploy).
+# api y worker comparten el mismo código Python y el mismo docker-compose.yml, y pytest y el smoke
+# test de Docker Compose ya ejercitan el stack integrado (api + worker + base de datos + RabbitMQ).
+# Por eso este job vive UNA sola vez aquí, y no en copias que puedan divergir.
 on:
   workflow_call:
 
@@ -52,14 +43,11 @@ jobs:
         working-directory: cubicador
         run: pip install -r requirements.txt
 
-      # Valores dummy validos solo para este runner efimero - nunca secretos reales.
-      # MSSQL_SA_PASSWORD tiene que cumplir la politica de SQL Server (8+ caracteres
-      # con mayuscula, minuscula, numero y simbolo) o el contenedor `db` no arranca.
-      # El smoke test usa el SQL Server LOCAL del compose, nunca la base compartida
-      # de QA: corre en cada push y dos ejecuciones simultaneas se pisarian.
-      # NEXO_BASE_URL/NEXO_CALLBACK_API_KEY quedan sin usar en este smoke test (no
-      # se ejercita crear-desde-linea, que depende de un NEXO real corriendo aparte
-      # - ver cubicador/docs/testDocumentation/PRUEBAS_DE_INTEGRACION.md seccion 2.6).
+      # Valores dummy solo para este runner efímero, nunca secretos reales. MSSQL_SA_PASSWORD debe cumplir
+      # la política de SQL Server (8+ caracteres con mayúscula, minúscula, número y símbolo) o el
+      # contenedor `db` no arranca. Se usa el SQL Server LOCAL del compose, nunca la base compartida de
+      # QA: corre en cada push y dos ejecuciones simultáneas se pisarían.
+      # NEXO_BASE_URL/NEXO_CALLBACK_API_KEY no se usan: crear-desde-linea necesita un NEXO real aparte.
       - name: Crear .env para el stack (RabbitMQ apunta al broker compartido de NEXO)
         working-directory: cubicador
         run: |
@@ -75,11 +63,8 @@ jobs:
           NEXO_BASE_URL=http://localhost:5080
           EOF
 
-      # cubicador/ ya no trae su propio RabbitMQ (ver cubicador/docs/DECISIONES_TECNICAS.md
-      # #9): se conecta al `rabbit` compartido del docker-compose.yml raiz via la
-      # red externa `nexo_internal`. Solo se levanta ese servicio (no toda NEXO:
-      # `rabbit` no depende de `db`/`api`, asi que esto no arranca SQL Server ni
-      # el backend C#).
+      # cubicador/ no trae su propio RabbitMQ: se conecta al `rabbit` compartido del docker-compose.yml
+      # raíz por la red externa `nexo_internal`. Solo se levanta ese servicio (no depende de db/api).
       - name: Levantar el rabbit compartido de NEXO
         run: |
           echo -e "RABBITMQ_USER=ci_user\nRABBITMQ_PASSWORD=ci_password" > .env
@@ -89,21 +74,12 @@ jobs:
         working-directory: cubicador
         run: docker compose up -d --build --wait --wait-timeout 180
 
-      # Las pruebas de `unit-tests` corren contra SQLite, que es mas permisivo
-      # que SQL Server: `columna IS 0` es sintaxis valida ahi y el error 102 en
-      # SQL Server. Toda esa familia de fallos es invisible para ese job (#344:
-      # el plan de cargue 3D llevaba meses roto en QA con la suite en verde).
-      #
-      # Este paso es el unico que ejecuta SQL contra el motor de produccion, y
-      # va DENTRO del contenedor porque es el que trae el ODBC Driver 18.
-      # `CUBICADOR_EXIGIR_MSSQL=1` convierte el salto en FALLO. Sin eso, un
-      # typo en el nombre del servicio o una clave cambiada harian que esta
-      # prueba desapareciera sola con el job en verde - la misma forma de
-      # fallo que origino la issue.
-      #
-      # La clave sale del .env que escribio el paso de arriba, no repetida
-      # aca: con dos copias, cambiar una y olvidar la otra da justamente ese
-      # salto silencioso.
+      # `unit-tests` corre contra SQLite, más permisivo que SQL Server (`columna IS 0` es válido en
+      # SQLite y error 102 en SQL Server), así que esa familia de fallos le es invisible.
+      # Este paso es el único que ejecuta SQL contra el motor de producción y va DENTRO del contenedor
+      # porque trae el ODBC Driver 18. `CUBICADOR_EXIGIR_MSSQL=1` convierte el salto en FALLO: sin eso un
+      # typo en el servicio o la clave haría desaparecer la prueba con el job en verde.
+      # La clave sale del .env escrito arriba, no repetida aquí, para no tener dos copias que diverjan.
       - name: "pytest: las consultas del plan de cargue, contra el SQL Server del stack"
         working-directory: cubicador
         run: |

@@ -1,34 +1,23 @@
 name: CI/CD Cubicador-Worker
 
-# Los `paths` de este workflow y los de ci-cd-cubicador-api.yml son IDENTICOS
-# a proposito — el razonamiento completo esta en el encabezado de ese archivo
-# y en docs/despliegue/CI_CD_RUTAS_COMPARTIDAS.md. En dos lineas: el job de pruebas es
-# uno solo y ejercita api+worker juntos (pytest corre la suite entera; el
-# smoke levanta los dos contenedores), y las dos imagenes hacen `COPY . .`,
-# asi que cualquier archivo bajo cubicador/ cambia las dos. Lo unico distinto
-# entre los dos workflows es a que aplicacion de Dokploy le avisan.
+# Los `paths` de este workflow y los de ci-cd-cubicador-api.yml son IDENTICOS a proposito; el
+# razonamiento completo esta en el encabezado de ese archivo y en docs/despliegue/CI_CD_RUTAS_COMPARTIDAS.md.
+# En breve: el job de pruebas es uno solo y ejercita api+worker juntos, y las dos imagenes hacen
+# `COPY . .`, asi que cualquier archivo bajo cubicador/ cambia las dos. Lo unico distinto es a que
+# aplicacion de Dokploy le avisan.
 #
-# Para este workflow en particular: el filtro anterior (cubicador/worker/** +
-# domain/application/infrastructure) dejaba afuera cubicador/api/, y el worker
-# SI importa de ahi — worker/main.py toma `api.dependencias` y
-# `api.dtos.plan_cargue`. Ese es exactamente el archivo del bug 2 (ver
-# docs/despliegue/CI_CD_RUTAS_COMPARTIDAS.md): un cambio bajo cubicador/api/ que rompia
-# al worker mandando items a la DLQ.
-# Con el filtro anterior ese arreglo habria desplegado solo la API, dejando al
-# worker con el codigo roto.
+# El worker importa de cubicador/api/ (worker/main.py toma `api.dependencias` y `api.dtos.plan_cargue`),
+# asi que un filtro que excluya cubicador/api/ desplegaria solo la API y dejaria al worker con codigo roto.
 on:
   push:
     branches: [main, DEPLOY]
     paths:
       - "cubicador/**"
-      # Documentacion no cambia comportamiento: excluirla evita redesplegar
-      # los dos servicios por editar un README.
+      # La documentacion no cambia comportamiento: excluirla evita redesplegar los dos servicios por un README.
       - "!cubicador/docs/**"
       - "!cubicador/**.md"
-      # Insumos de construccion del job docker-smoke que viven FUERA de
-      # cubicador/: ese job levanta el rabbit compartido con
-      # `docker compose -f docker-compose.yml up --build rabbit`, y ese
-      # servicio se construye desde build/Dockerfile.rabbit.
+      # Insumos del job docker-smoke fuera de cubicador/: levanta el rabbit compartido con
+      # `docker compose -f docker-compose.yml up --build rabbit`, construido desde build/Dockerfile.rabbit.
       - "docker-compose.yml"
       - "build/Dockerfile.rabbit"
       - ".github/workflows/ci-cd-cubicador-worker.yml"
@@ -68,11 +57,6 @@ jobs:
             -H "X-GitHub-Event: push" ^
             -d "{\"ref\":\"${{ github.ref }}\",\"repository\":{\"full_name\":\"${{ github.repository }}\"}}"
 
-      # A diferencia de ci-cd-api.yml/ci-cd-cubicador-api.yml, este
-      # servicio NO tiene ningun endpoint HTTP (sin healthcheck propio, ver
-      # cubicador/docker-compose.yml) - no hay nada contra que hacer polling
-      # desde aca para confirmar que el redeploy real ocurrio. Mismo hueco que
-      # ya reportaba cubicador/docker-compose.yml sobre este servicio: "el
-      # candidato mas probable a que todo se quede y nunca vuelva a salir, sin
-      # que nada lo notifique". Verificacion real pendiente de que Dokploy
-      # exponga un endpoint de estado de despliegue por app (fuera del repo).
+      # Este servicio no tiene endpoint HTTP (sin healthcheck propio, ver cubicador/docker-compose.yml),
+      # asi que no hay nada que sondear para confirmar el redeploy. Pendiente de que Dokploy exponga un
+      # endpoint de estado de despliegue por app (fuera del repo).

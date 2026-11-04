@@ -1,47 +1,27 @@
 name: CI/CD Cubicador-API
 
-# Los `paths` de este workflow y los de ci-cd-cubicador-worker.yml son
-# IDENTICOS a proposito. No es copia-pega olvidada: es la consecuencia de dos
-# hechos verificados del repo.
+# Los `paths` de este workflow y los de ci-cd-cubicador-worker.yml son IDENTICOS a proposito:
 #
-# 1) El gate es compartido. Los dos workflows llaman al mismo
-#    _cubicador-pruebas.yml, que corre `pytest -v` sobre TODA la suite — 5 de
-#    los 11 archivos de test son de tests/worker/ — y ademas un smoke de
-#    Docker Compose que levanta api + worker + Postgres + RabbitMQ y ejercita
-#    el flujo async de punta a punta. Un cambio que toque solo al worker puede
-#    poner en rojo el gate de ESTE pipeline; si no se dispara, nadie se entera
-#    hasta el proximo cambio de api/.
+# 1) El gate es compartido: ambos llaman a _cubicador-pruebas.yml, que corre `pytest -v` sobre TODA la
+#    suite (incluye tests/worker/) y un smoke de Docker Compose con api + worker + base + RabbitMQ.
+#    Un cambio solo del worker puede poner en rojo este pipeline.
+# 2) Las dos imagenes contienen todo el arbol (`COPY . .` en cubicador/Dockerfile y
+#    cubicador/Dockerfile.worker): cualquier archivo bajo cubicador/ cambia las DOS imagenes, y
+#    desplegar una sola dejaria a la otra con un commit distinto contra el mismo esquema y protocolo de cola.
 #
-# 2) Las dos imagenes contienen todo el arbol. cubicador/Dockerfile y
-#    cubicador/Dockerfile.worker hacen ambos `COPY . .`, asi que cualquier
-#    archivo bajo cubicador/ cambia las DOS imagenes. Desplegar una sola deja
-#    a la otra corriendo un commit distinto contra el mismo esquema y el mismo
-#    protocolo de cola.
-#
-# Lo unico que de verdad distingue a los dos workflows es a que aplicacion de
-# Dokploy le avisan. Ver docs/despliegue/CI_CD_RUTAS_COMPARTIDAS.md.
-#
-# Separar por carpeta de nivel superior (cubicador/api/** aca,
-# cubicador/worker/** alla) ya estaba mal en la practica, no solo en teoria:
-# worker/main.py importa `api.dependencias` y `api.dtos.plan_cargue`, que es
-# justo donde vivia el bug 2 (ver docs/despliegue/CI_CD_RUTAS_COMPARTIDAS.md) — un cambio
-# bajo cubicador/api/ que
-# rompia al WORKER.
+# Lo unico que distingue a los dos workflows es a que aplicacion de Dokploy le avisan. Separar por
+# carpeta (cubicador/api/** aca, cubicador/worker/** alla) no sirve: worker/main.py importa
+# `api.dependencias` y `api.dtos.plan_cargue`. Ver docs/despliegue/CI_CD_RUTAS_COMPARTIDAS.md.
 on:
   push:
     branches: [main, DEPLOY]
     paths:
       - "cubicador/**"
-      # Documentacion no cambia comportamiento: excluirla evita redesplegar
-      # los dos servicios por editar un README (`COPY . .` igual la mete en la
-      # imagen, pero un .md no justifica un reinicio en Pre-Despliegue).
+      # La documentacion no cambia comportamiento: excluirla evita redesplegar los dos servicios por un README.
       - "!cubicador/docs/**"
       - "!cubicador/**.md"
-      # Insumos de construccion del job docker-smoke que viven FUERA de
-      # cubicador/: ese job levanta el rabbit compartido con
-      # `docker compose -f docker-compose.yml up --build rabbit`, y ese
-      # servicio se construye desde build/Dockerfile.rabbit. Romper cualquiera
-      # de los dos rompe este pipeline.
+      # Insumos del job docker-smoke que viven FUERA de cubicador/: levanta el rabbit compartido con
+      # `docker compose -f docker-compose.yml up --build rabbit`, construido desde build/Dockerfile.rabbit.
       - "docker-compose.yml"
       - "build/Dockerfile.rabbit"
       - ".github/workflows/ci-cd-cubicador-api.yml"
@@ -81,33 +61,18 @@ jobs:
             -H "X-GitHub-Event: push" ^
             -d "{\"ref\":\"${{ github.ref }}\",\"repository\":{\"full_name\":\"${{ github.repository }}\"}}"
 
-      # Mismo razonamiento que ci-cd-api.yml: Dokploy todavia tiene que hacer
-      # pull/build/recrear el contenedor tras recibir el webhook, asi que sin
-      # esta espera el primer intento de abajo caia casi siempre en el hueco
-      # (contenedor viejo ya detenido, el nuevo aun no responde).
-      # ping en vez de timeout: el runner self-hosted corre como servicio de
-      # Windows, sin consola adjunta, y "timeout" intenta leer stdin para
-      # detectar Ctrl+C — sin consola falla al instante con "No es compatible
-      # la redirección de entradas" (ver ci-cd-api.yml). ping sí funciona sin
-      # consola: -n 91 son 90 intervalos de 1s (91 ecos, el primero inmediato).
+      # Igual que en ci-cd-api.yml: Dokploy debe hacer pull/build/recrear tras el webhook, y esta espera
+      # evita que el primer intento de verificacion caiga en el hueco entre contenedores.
+      # ping en vez de timeout: el runner corre sin consola y "timeout" falla al instante (ver ci-cd-api.yml).
       # - name: Esperar a que el contenedor termine de levantar (90s)
       #   shell: cmd
       #   run: ping -n 91 127.0.0.1 >NUL
 
-      # Mismo razonamiento que ci-cd-api.yml - el webhook de arriba
-      # solo confirma que Dokploy RECIBIO la orden, nunca que termino el
-      # build/deploy real. Este paso detecta al menos "el contenedor nuevo
-      # nunca volvio a responder" (crash/timeout de arranque), con reintentos
-      # durante ~5 minutos despues de la espera inicial de arriba (subido de
-      # ~2 minutos/12 intentos: la conexion a estos hosts se probo manualmente
-      # el 2026-09-22 y cae de forma intermitente desde fuera de la red
-      # corporativa, con reintentos automaticos de 8-20s - 2 minutos no
-      # alcanzaba a cubrir eso ni un redeploy lento, y el job fallaba en falso
-      # con el servicio ya sano). El curl de diagnostico (sin -f) imprime el
-      # HTTP real de cada intento en el log, para no tener que adivinar si el
-      # proximo fallo es de red o del servicio. Limite conocido (no distingue
-      # "redeploy exitoso" de "el contenedor viejo sigue sano con codigo
-      # viejo"): igual que en ci-cd-api.yml, ver el comentario completo alli.
+      # Igual que en ci-cd-api.yml: el webhook solo confirma que Dokploy RECIBIO la orden. Este paso
+      # detecta que el contenedor nuevo nunca volvio a responder, con reintentos durante ~5 minutos (la
+      # conexion desde fuera de la red corporativa cae de forma intermitente). El curl de diagnostico
+      # (sin -f) imprime el HTTP real de cada intento. Limite conocido: no distingue un redeploy exitoso
+      # de un contenedor viejo todavia sano; ver ci-cd-api.yml.
       # - name: Verificar que el servicio respondio saludable tras el despliegue
       #   shell: cmd
       #   run: |
