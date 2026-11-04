@@ -1,5 +1,7 @@
 # Qué le falta a Cotifly para conectarse al motor de recomendación de vehículo del Cubicador
 
+> **Documento histórico y desactualizado.** Para conectarse hoy: la recomendación directa con el Cubicador está en [`COTIFLY-COMO-CONECTARSE-AL-CUBICADOR.md`](./COTIFLY-COMO-CONECTARSE-AL-CUBICADOR.md) y todo lo de NEXO en [`NEXO-CONTRATO-INTEGRACION-COTIFLY.md`](./NEXO-CONTRATO-INTEGRACION-COTIFLY.md).
+
 Basado en la revisión real del código de `Cotifly/backend-dotnet` y en el
 diseño del nuevo motor descrito en
 `NEXO/cubicador/docs/PLAN-IMPLEMENTACION-MOTOR-SELECCION-VEHICULOS.md`.
