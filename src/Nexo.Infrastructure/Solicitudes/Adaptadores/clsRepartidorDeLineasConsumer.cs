@@ -4,20 +4,8 @@ using MassTransit;
 
 namespace Nexo.Infrastructure.Solicitudes.Adaptadores;
 
-/// <summary>
-/// Reparte un pliego en un mensaje de costeo por línea.
-///
-/// Existe para que la saga no tenga que leer la base. Ella pide repartir, este
-/// consumidor lee los identificadores y publica uno por línea, y al final le informa el
-/// total autoritativo — que es lo que la saga usa para saber cuándo está completa.
-///
-/// Se informa DESPUÉS de publicar las líneas, no antes: si se cayera a mitad del
-/// reparto, la saga nunca recibiría un total y el timeout la cerraría en Parcial. Al
-/// revés, la saga podría creerse completa con líneas que nunca se publicaron.
-///
-/// Un pliego sin líneas informa cero y la saga cierra completa de inmediato. Es
-/// correcto: no hay nada que costear.
-/// </summary>
+/// <summary>Reparte un pliego en un mensaje de costeo por línea e informa a la saga el total autoritativo DESPUÉS de publicarlas:
+/// si se cayera a mitad, la saga nunca recibiría un total y el timeout la cerraría en Parcial. Un pliego sin líneas informa cero y cierra completa.</summary>
 public sealed class clsRepartidorDeLineasConsumer(ILineasDePliegoPort lineas)
     : IConsumer<clsRepartirLineasDeCosteo>
 {

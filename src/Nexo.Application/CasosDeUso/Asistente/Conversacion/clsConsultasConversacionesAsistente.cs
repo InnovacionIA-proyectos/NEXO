@@ -17,10 +17,7 @@ public sealed class clsListarConversacionesAsistenteQueryHandler(IConversaciones
         .ToList();
 }
 
-/// <summary>
-/// Una conversación completa con las herramientas que se usaron en cada respuesta. La ve su dueño y el Admin (que puede auditarla);
-/// el Admin no escribe en conversaciones ajenas.
-/// </summary>
+/// <summary>Una conversación con las herramientas usadas en cada respuesta; la ve su dueño y el Admin (solo lectura).</summary>
 public sealed record clsObtenerConversacionAsistenteQuery(Guid Id) : IQuery<clsConversacionDetalleDto>;
 
 public sealed class clsObtenerConversacionAsistenteQueryHandler(IConversacionesAsistenteRepository conversaciones, ICurrentUserPort usuario)

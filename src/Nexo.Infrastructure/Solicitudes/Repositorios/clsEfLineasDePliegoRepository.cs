@@ -6,10 +6,7 @@ namespace Nexo.Infrastructure.Solicitudes.Repositorios;
 
 public sealed class clsEfLineasDePliegoRepository(clsNexoDbContext db) : ILineasDePliegoPort
 {
-    /// <summary>
-    /// Solo los identificadores, sin seguimiento. Un pliego de 300 líneas se convierte
-    /// en 300 Guid y no en 300 entidades cargadas en memoria para nada.
-    /// </summary>
+    /// <summary>Solo los identificadores, sin seguimiento: evita cargar cientos de entidades en memoria.</summary>
     public async Task<IReadOnlyList<Guid>> IdsPorSolicitudAsync(Guid solicitudId, CancellationToken ct = default) =>
         await db.LineasSolicitud.AsNoTracking()
             .Where(l => l.SolicitudId == solicitudId)

@@ -8,18 +8,9 @@ using Nexo.Mensajes.Notificaciones;
 namespace Nexo.Application.CasosDeUso.Notificaciones;
 
 /// <summary>
-/// S5-HU-20.1/#286: avisa a quien creó la solicitud que otra persona agregó o quitó un
-/// servicio conexo de su cotización YA entregada ("Cotización actualizada: se agregó X x N;
-/// nuevo total $Y"). Corre fuera de la petición, llamado desde un consumidor — mismo patrón
-/// y mismas reglas que <see cref="clsNotificarEntregaCommand"/>:
-///
-/// - el destinatario es <c>clsSolicitud.Creador</c>, nunca el cliente;
-/// - un fallo de la salida de correo SUBE (el bus reintenta y, si no tiene arreglo, lo lleva
-///   a la cola de error): tragárselo dejaría un aviso perdido sin rastro;
-/// - lo que no es avería —no hay creador, no hay relay configurado— se resuelve sin error.
-///
-/// Cuándo avisar (solo si el actor != creador, solo cotización Entregada) lo decide el caso
-/// de uso que publica el evento; acá el mensaje ya viene decidido.
+/// Avisa al creador de la solicitud que se agregó o quitó un servicio conexo de su cotización ya entregada. Mismas reglas
+/// que <see cref="clsNotificarEntregaCommand"/>: el destinatario es <c>clsSolicitud.Creador</c>, un fallo del correo SUBE
+/// para que el bus reintente, y lo que no es avería (sin creador, sin relay) se resuelve sin error.
 /// </summary>
 public sealed record clsNotificarConexosCambiadosCommand(clsConexosCotizacionCambiados Evento)
     : ICommand<clsResultadoDeNotificacionDto>;

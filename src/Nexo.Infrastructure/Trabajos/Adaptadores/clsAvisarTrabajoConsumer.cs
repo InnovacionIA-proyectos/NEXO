@@ -6,18 +6,8 @@ using Microsoft.Extensions.Logging;
 
 namespace Nexo.Infrastructure.Trabajos.Adaptadores;
 
-/// <summary>
-/// Lee el estado actual del trabajo y lo empuja a quien lo esté mirando.
-///
-/// Lee en vez de confiar en lo que traiga el mensaje, y eso da dos cosas: el aviso sale
-/// de la MISMA fuente que la consulta de respaldo —así no pueden decir cosas distintas—
-/// y un mensaje entregado fuera de orden no puede hacer retroceder la barra de progreso.
-///
-/// UN FALLO AL AVISAR NO ES UN FALLO DEL TRABAJO. Si el aviso no sale, se registra y se
-/// sigue: la verdad está en la consulta por identificador. Dejar que la excepción suba
-/// mandaría el mensaje a reintentos y luego a la cola de error, disparando la alerta del
-/// equipo porque un navegador se desconectó.
-/// </summary>
+/// <summary>Lee el estado actual del trabajo y lo empuja a quien lo mira. Lee en vez de confiar en el mensaje: aviso y consulta salen de
+/// la misma fuente y un mensaje fuera de orden no hace retroceder el progreso. Un fallo al avisar se registra y se sigue.</summary>
 public sealed class clsAvisarTrabajoConsumer(
     IEstadoDeTrabajoPort trabajos,
     INotificadorDeTrabajos notificador,

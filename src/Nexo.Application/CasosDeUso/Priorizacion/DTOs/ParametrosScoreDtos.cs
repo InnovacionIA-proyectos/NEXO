@@ -1,11 +1,6 @@
 namespace Nexo.Application.CasosDeUso.Priorizacion.DTOs;
 
-/// <summary>
-/// Los parámetros del score tal como se ven y se envían.
-///
-/// Es un DTO y no la entidad porque la entidad lleva <c>RowVersion</c>, timestamps de
-/// auditoría y el Id de la fila única — nada de eso es asunto de quien recalibra.
-/// </summary>
+/// <summary>Los parámetros del score sin RowVersion ni datos de auditoría de la entidad.</summary>
 public record clsParametrosScoreDto(
     double PesoUrgencia,
     double PesoValor,
@@ -18,11 +13,5 @@ public record clsParametrosScoreDto(
     double ValorPorDefectoSinValor,
     double ProbabilidadPorDefecto);
 
-/// <summary>
-/// Cuántas solicitudes tocó un recálculo.
-///
-/// <c>Revisadas</c> y <c>Actualizadas</c> van separadas porque la diferencia dice algo:
-/// si se revisan 400 y se actualizan 0, el recálculo está corriendo de más y el
-/// intervalo se puede espaciar. Con un solo número eso no se ve.
-/// </summary>
+/// <summary>Revisadas y Actualizadas van separadas: muchas revisadas con 0 actualizadas indica que el recálculo corre de más.</summary>
 public record clsResultadoDeRecalculoDto(int Revisadas, int Actualizadas, int Lotes);

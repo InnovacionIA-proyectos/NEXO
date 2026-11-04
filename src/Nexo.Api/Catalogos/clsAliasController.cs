@@ -9,7 +9,7 @@ using Microsoft.AspNetCore.RateLimiting;
 
 namespace Nexo.Api.Catalogos;
 
-/// <summary>S6-HU-27.2/#321: agregar un alias al diccionario. El texto y el código son obligatorios.</summary>
+/// <summary>Agrega un alias al diccionario. El texto y el código son obligatorios.</summary>
 public class clsCrearAliasRequest
 {
     /// <summary>"vehiculo" o "contenedor".</summary>
@@ -23,7 +23,7 @@ public class clsCrearAliasRequest
     public string Codigo { get; set; } = null!;
 }
 
-/// <summary>S6-HU-27.3/#322: mapear una configuración en cuarentena a un código oficial.</summary>
+/// <summary>Mapea una configuración en cuarentena a un código oficial.</summary>
 public class clsMapearVehiculoRequest
 {
     [Required(AllowEmptyStrings = false), MaxLength(20)]
@@ -31,9 +31,8 @@ public class clsMapearVehiculoRequest
 }
 
 /// <summary>
-/// Diccionario de alias de vehículos y de clases de contenedor (S6-HU-27.2/#321) y bandeja de normalización de vehículos en cuarentena
-/// (S6-HU-27.3/#322). Leer el diccionario y "resolver" un texto lo puede cualquier usuario autenticado (Cotifly lo usa al importar un
-/// Excel); agregar alias y toda la bandeja son solo de AdminTarifas y Admin.
+/// Diccionario de alias de vehículos y clases de contenedor, y bandeja de normalización de vehículos en cuarentena. Leer y "resolver" lo puede cualquier usuario
+/// autenticado (Cotifly lo usa al importar un Excel); agregar alias y toda la bandeja son solo de AdminTarifas y Admin.
 /// </summary>
 [ApiController]
 [Authorize]
@@ -56,8 +55,8 @@ public class clsAliasController(
         => Ok(await listarAlias.Handle(new clsListarAliasQuery(tipo), ct));
 
     /// <summary>
-    /// ¿A qué código corresponde este texto suelto? (<c>tipo</c> = vehiculo por defecto | contenedor). Responde <c>reconocido: false</c> para un
-    /// texto que el diccionario no conoce — en la captura caería en cuarentena (vehículo) o quedaría como texto libre (contenedor).
+    /// ¿A qué código corresponde este texto suelto? (<c>tipo</c> = vehiculo por defecto | contenedor). Responde <c>reconocido: false</c> si el diccionario no lo conoce:
+    /// en la captura caería en cuarentena (vehículo) o quedaría como texto libre (contenedor).
     /// </summary>
     [HttpGet("alias/resolver")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -67,10 +66,7 @@ public class clsAliasController(
         [FromQuery] string? tipo, [FromQuery] string? texto, CancellationToken ct = default)
         => Ok(await resolverAlias.Handle(new clsResolverAliasQuery(tipo, texto), ct));
 
-    /// <summary>
-    /// Agrega un alias. Solo AdminTarifas y Admin. 400 si el tipo o el código no son oficiales; 409 ALIAS_DUPLICADO si el texto (normalizado) ya
-    /// está en el diccionario, en cualquier tipo.
-    /// </summary>
+    /// <summary>Agrega un alias. Solo AdminTarifas y Admin. 400 si el tipo o el código no son oficiales; 409 ALIAS_DUPLICADO si el texto (normalizado) ya existe en cualquier tipo.</summary>
     [HttpPost("alias")]
     [Authorize(Roles = "AdminTarifas,Admin")]
     [ProducesResponseType(StatusCodes.Status201Created)]
@@ -82,10 +78,7 @@ public class clsAliasController(
         return Created($"/api/catalogos/alias?tipo={dto.TipoElemento.ToLowerInvariant()}", dto);
     }
 
-    /// <summary>
-    /// Bandeja de normalización: las configuraciones de vehículo en cuarentena (<c>EsCatalogoOficial = false</c>) que nadie ha mapeado ni descartado.
-    /// Solo AdminTarifas y Admin.
-    /// </summary>
+    /// <summary>Bandeja de normalización: configuraciones de vehículo en cuarentena (<c>EsCatalogoOficial = false</c>) que nadie ha mapeado ni descartado. Solo AdminTarifas y Admin.</summary>
     [HttpGet("vehiculos-cuarentena")]
     [Authorize(Roles = "AdminTarifas,Admin")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -94,9 +87,8 @@ public class clsAliasController(
         => Ok(await listarCuarentena.Handle(new clsListarVehiculosCuarentenaQuery(), ct));
 
     /// <summary>
-    /// Mapea una configuración en cuarentena a un código oficial: crea el alias de su tipo de vehículo, así que el mismo texto no vuelve a caer en
-    /// cuarentena, y la saca de la bandeja. 404 si no existe; 409 si ya es oficial o ya se descartó; 400 si el código no es oficial; 409
-    /// ALIAS_DUPLICADO si ese texto ya apunta a otro código.
+    /// Mapea una configuración en cuarentena a un código oficial: crea el alias de su tipo de vehículo y la saca de la bandeja. 404 si no existe;
+    /// 409 si ya es oficial o descartada; 400 si el código no es oficial; 409 ALIAS_DUPLICADO si el texto ya apunta a otro código.
     /// </summary>
     [HttpPost("vehiculos-cuarentena/{id:guid}/mapear")]
     [Authorize(Roles = "AdminTarifas,Admin")]

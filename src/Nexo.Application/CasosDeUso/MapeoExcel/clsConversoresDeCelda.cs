@@ -4,10 +4,7 @@ using Nexo.Application.CasosDeUso.Solicitudes;
 
 namespace Nexo.Application.CasosDeUso.MapeoExcel;
 
-/// <summary>
-/// Las conversiones de una celda del Excel de un cliente al valor que usa NEXO. Todas son deterministas y puras: la misma celda da siempre el mismo
-/// resultado, sin base de datos ni IA, y una celda que no se entiende se rechaza con un motivo en vez de adivinarse.
-/// </summary>
+/// <summary>Conversiones deterministas y puras de una celda al valor de NEXO; lo que no se entiende se rechaza con un motivo en vez de adivinarse.</summary>
 public static class clsConversoresDeCelda
 {
     /// <summary>Cómo se leen los separadores de un número.</summary>
@@ -19,18 +16,13 @@ public static class clsConversoresDeCelda
         /// <summary>Coma decimal y punto de miles (<c>1.234,56</c>).</summary>
         ComaDecimal,
 
-        /// <summary>
-        /// Para toneladas, que casi siempre llevan decimales (<c>4,5</c> o <c>4.5</c>): una sola coma o un solo punto es el decimal; con los dos, el
-        /// último es el decimal y el otro separa miles.
-        /// </summary>
+        /// <summary>Para toneladas (<c>4,5</c> o <c>4.5</c>): una sola coma o punto es el decimal; con los dos, el último es el decimal.</summary>
         Toneladas,
     }
 
     private static readonly Regex Miles = new(@"^-?\d{1,3}(,\d{3})+(\.\d+)?$", RegexOptions.Compiled);
     private static readonly Regex NumeroSimple = new(@"^-?\d+(\.\d+)?$", RegexOptions.Compiled);
     private static readonly Regex Moneda = new(@"^(\$|COP)\s*", RegexOptions.Compiled | RegexOptions.IgnoreCase);
-
-    // ---------------------------------------------------------------- números
 
     /// <summary>Un número, o false si la celda no es un número. Acepta <c>$</c> o <c>COP</c> delante y espacios; ninguna otra letra.</summary>
     public static bool TryNumero(string? texto, ModoNumero modo, out decimal valor)
@@ -66,8 +58,6 @@ public static class clsConversoresDeCelda
         return s.Replace(',', '.');
     }
 
-    // ---------------------------------------------------------------- sí / no
-
     private static readonly HashSet<string> Si = ["SI", "S", "X", "TRUE", "VERDADERO", "1", "YES", "Y"];
     private static readonly HashSet<string> No = ["NO", "N", "FALSE", "FALSO", "0"];
 
@@ -80,8 +70,6 @@ public static class clsConversoresDeCelda
         return No.Contains(n);
     }
 
-    // ---------------------------------------------------------------- fechas
-
     private static readonly string[] FormatosDeFecha =
     [
         "yyyy-MM-dd", "yyyy-MM-dd HH:mm", "yyyy-MM-dd HH:mm:ss", "yyyy-MM-ddTHH:mm:ss", "yyyy/MM/dd",
@@ -89,10 +77,7 @@ public static class clsConversoresDeCelda
         "d-M-yyyy", "dd-MM-yyyy", "d-M-yy", "d/M/yy",
     ];
 
-    /// <summary>
-    /// Una fecha (día primero: <c>31/10/2026</c>, como se escribe en Colombia; o ISO <c>2026-10-31</c>). Una fecha sin hora vale hasta el final de ese día
-    /// en Colombia (23:59:59, UTC-5): un «fecha límite 31/10» se entiende como que el 31 todavía cuenta.
-    /// </summary>
+    /// <summary>Fecha día-primero (<c>31/10/2026</c>) o ISO. Sin hora vale hasta el final del día en Colombia (23:59:59, UTC-5): una «fecha límite 31/10» incluye el 31.</summary>
     public static bool TryFecha(string? texto, out DateTimeOffset valor)
     {
         valor = default;
@@ -106,15 +91,9 @@ public static class clsConversoresDeCelda
         return true;
     }
 
-    // ---------------------------------------------------------------- origen y destino en una sola celda
-
     private static readonly string[] SeparadoresConEspacios = [" - ", " – ", " — ", " / ", " > ", " → ", " | "];
 
-    /// <summary>
-    /// Parte «ORIGEN - DESTINO» en sus dos ciudades. Primero busca un separador rodeado de espacios (<c> - </c>, <c> / </c>, <c> → </c>…); si no hay,
-    /// acepta un único guion sin espacios. Si hay más de un separador del mismo tipo o alguna parte queda vacía, no se puede partir sin adivinar
-    /// y devuelve false.
-    /// </summary>
+    /// <summary>Parte «ORIGEN - DESTINO» por un separador con espacios (<c> - </c>, <c> / </c>, <c> → </c>) o un único guion; false si es ambiguo o una parte queda vacía.</summary>
     public static bool TryDividirOrigenDestino(string? texto, out string origen, out string destino)
     {
         origen = destino = string.Empty;

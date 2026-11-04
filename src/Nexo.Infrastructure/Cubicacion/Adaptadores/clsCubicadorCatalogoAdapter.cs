@@ -14,19 +14,9 @@ internal sealed record clsErrorCatalogoCubicadorDto(
     [property: JsonPropertyName("codigo")] string? Codigo,
     [property: JsonPropertyName("mensaje")] string? Mensaje);
 
-/// <summary>
-/// S5-HU-18.6/#278: cliente HTTP del passthrough hacia los seis CRUD de catálogo —
-/// ver <see cref="ICubicadorCatalogoPort"/> para el porqué del diseño "tonto" (JSON sin
-/// tipar). Usa <c>Cubicador3D:OutboundApiKey</c> (el Bearer genérico que
-/// <c>verificar_api_key</c> valida del lado del Cubicador para estos seis endpoints —
-/// DISTINTO de <c>Cubicador3D:RecomendacionesApiKey</c>, que es solo para
-/// <c>/recomendaciones</c> y exige una llave por sistema).
-///
-/// Traducción de errores: el código REAL que manda el Cubicador se propaga tal cual
-/// (mismo criterio que <c>clsCubicacionRapidaAdapter</c>) — 409 CONFLICTO_DE_VERSION
-/// especialmente: su mensaje ya está escrito para mostrarse al usuario del portal
-/// ("El registro cambió desde que se cargó. Volver a leerlo y reintentar.").
-/// </summary>
+/// <summary>Cliente HTTP del passthrough hacia los CRUD de catálogo (ver <see cref="ICubicadorCatalogoPort"/>).
+/// Usa el Bearer genérico <c>Cubicador3D:OutboundApiKey</c>, distinto de <c>RecomendacionesApiKey</c>. Propaga tal cual el código REAL
+/// de error del Cubicador (p. ej. 409 CONFLICTO_DE_VERSION, con mensaje apto para el usuario).</summary>
 public sealed class clsCubicadorCatalogoAdapter(HttpClient http, ILogger<clsCubicadorCatalogoAdapter> log)
     : ICubicadorCatalogoPort
 {
@@ -43,8 +33,7 @@ public sealed class clsCubicadorCatalogoAdapter(HttpClient http, ILogger<clsCubi
 
     public async Task DeleteAsync(string ruta, JsonObject cuerpo, CancellationToken ct = default)
     {
-        // HttpClient.DeleteAsync no manda body: se arma el mensaje a mano (mismo patrón
-        // documentado en la Issue #278).
+        // HttpClient.DeleteAsync no manda body: se arma el mensaje a mano.
         await EnviarAsync(() =>
         {
             var peticion = new HttpRequestMessage(HttpMethod.Delete, ruta) { Content = JsonContent.Create(cuerpo, options: Json) };

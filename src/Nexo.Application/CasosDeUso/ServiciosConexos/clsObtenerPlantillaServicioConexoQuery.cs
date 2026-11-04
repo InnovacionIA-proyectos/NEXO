@@ -4,8 +4,7 @@ using Nexo.Application.Common.Abstractions;
 
 namespace Nexo.Application.CasosDeUso.ServiciosConexos;
 
-/// <summary>Plantilla Excel descargable por tipo de servicio (S4-HU-15.3/#249):
-/// "almacenamiento" | "itr" | "precinto" | "acompanamiento".</summary>
+/// <summary>Plantilla Excel descargable por tipo de servicio: "almacenamiento" | "itr" | "precinto" | "acompanamiento".</summary>
 public sealed record clsObtenerPlantillaServicioConexoQuery(string Tipo) : IQuery<clsArchivoDto>;
 
 public sealed class clsObtenerPlantillaServicioConexoQueryHandler(IPlantillaServicioConexoPort plantilla)

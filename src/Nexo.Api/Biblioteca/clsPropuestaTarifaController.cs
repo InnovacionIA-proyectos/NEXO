@@ -6,13 +6,9 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Nexo.Api.Biblioteca;
 
-/// <summary>
-/// Propuesta de tarifa por línea a partir de la Biblioteca: compara el flete de
-/// plaza SAP contra el piso SICE-TAC (y el histórico SAP como referencia) y
-/// propone el valor más alto.
-/// </summary>
+/// <summary>Propuesta de tarifa por línea: el valor más alto entre el flete de plaza SAP y el piso SICE-TAC (el histórico SAP va de referencia).</summary>
 [ApiController]
-[Authorize(Roles = "Comercial,AdminTarifas,ServiciosLogisticos,LiderProceso,Admin")] // S6-HU-25.1/#307: es la Mesa de Costeo; AdminBiblioteca no entra
+[Authorize(Roles = "Comercial,AdminTarifas,ServiciosLogisticos,LiderProceso,Admin")] // Es la Mesa de Costeo: AdminBiblioteca no entra
 [Route("api/solicitudes/{id:guid}/propuesta-tarifa")]
 public class clsPropuestaTarifaController(IQueryHandler<clsProponerPropuestaTarifaQuery, clsPropuestaSolicitudDto> proponer)
     : ControllerBase

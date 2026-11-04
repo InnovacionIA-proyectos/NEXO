@@ -1,10 +1,6 @@
 namespace Nexo.Infrastructure.External;
 
-/// <summary>
-/// Catálogo DANE de centros poblados en el datacenter corporativo
-/// (dbsolucionesTI.dbo.tblsapdane). SOLO LECTURA. Resuelve los códigos
-/// DIVIPOLA de origen/destino del histórico SAP a nombres legibles.
-/// </summary>
+/// <summary>Catálogo DANE de centros poblados (tblsapdane, solo lectura): resuelve los códigos DIVIPOLA del histórico SAP a nombres legibles.</summary>
 public class clsSapDane
 {
     public decimal Id { get; set; }

@@ -1,13 +1,6 @@
 namespace Nexo.Mensajes.Solicitudes;
 
-/// <summary>
-/// Invariantes de <see cref="clsAutoCosteoSolicitado"/>.
-///
-/// Ninguna es exótica, y ese es el punto: son las que convierten el mensaje en algo
-/// procesable. Un trabajo sin correlación no se puede consultar, un pliego sin
-/// identificador no se puede leer, y un mensaje con cero líneas manda a un consumidor
-/// a costear un pliego vacío.
-/// </summary>
+/// <summary>Invariantes de <see cref="clsAutoCosteoSolicitado"/> que lo hacen procesable.</summary>
 public sealed class clsAutoCosteoSolicitadoValidador : IValidadorDeMensaje<clsAutoCosteoSolicitado>
 {
     public IReadOnlyList<string> Validar(clsAutoCosteoSolicitado mensaje)

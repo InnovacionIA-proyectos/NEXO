@@ -1,7 +1,6 @@
 namespace Nexo.Mensajes.Priorizacion;
 
-// Un validador por mensaje. Fallo cerrado: un tipo sin validador no se publica, así
-// que esta lista y la de mensajes crecen juntas por construcción.
+// Un validador por mensaje: un tipo sin validador no se publica (fallo cerrado).
 
 public sealed class clsArrancarPriorizacionValidador : IValidadorDeMensaje<clsArrancarPriorizacion>
 {
@@ -20,8 +19,7 @@ public sealed class clsParametrosDePriorizacionCambiaronValidador
 {
     public IReadOnlyList<string> Validar(clsParametrosDePriorizacionCambiaron m)
     {
-        // CambiadoPor es obligatorio: recalibrar el score reordena la bandeja de todo
-        // el mundo, y tiene que quedar de quién fue.
+        // CambiadoPor es obligatorio: recalibrar reordena la bandeja de todos y debe quedar el autor.
         var motivos = clsMotivos.De(("CadenaId", m.CadenaId), ("CambiadoPor", m.CambiadoPor));
         if (m.CambiadoEn == default)
             motivos.Add("CambiadoEn es obligatorio: sin fecha no hay rastro del recalibrado.");
@@ -35,8 +33,7 @@ public sealed class clsRecalcularScoresSolicitadoValidador : IValidadorDeMensaje
     {
         var motivos = clsMotivos.De(("CadenaId", m.CadenaId));
 
-        // El motivo es lo único que distingue un recálculo del reloj de uno disparado
-        // por el Admin. Sin él, un recálculo repetido en el log no se puede explicar.
+        // El motivo distingue un recálculo del reloj de uno disparado por el Admin.
         if (string.IsNullOrWhiteSpace(m.Motivo))
             motivos.Add("Motivo es obligatorio: es lo que explica en el log por qué se recalculó.");
 

@@ -41,15 +41,11 @@ from datetime import datetime, timedelta, timezone
 API = os.environ.get("API_BASE", "http://api:8080")
 SEP = "\x1e"
 
-# X-Rol fue retirado (ver IdentidadPortalAuthenticationHandler) en favor de
-# X-Portal-Usuario-Id + ResolverIdentidadPortalLocalAdapter, que resuelve contra un
-# usuario REAL ya sembrado en la tabla Usuarios (no hay rol declarable por header).
-# Todo el script quedó en X-Rol tras ese cambio (401 desde entonces) salvo
-# `probar_comandos_escritura_plan_cargue()` (la única función que se corrigió en
-# su momento) — ahora todo usa el esquema nuevo.
-# 1005 = Paola Restrepo, rol Admin (seed de Database__SeedOnStartup).
+# Identidad: X-Portal-Usuario-Id, resuelto por ResolverIdentidadPortalLocalAdapter contra un usuario
+# REAL sembrado en la tabla Usuarios (no hay rol declarable por header; X-Rol ya no existe).
+# 1005 = usuario con rol Admin (seed de Database__SeedOnStartup).
 ADMIN = ("X-Portal-Usuario-Id", "1005")
-# 1007 = Mariana Ospina, rol Comercial (seed de Database__SeedOnStartup).
+# 1007 = usuario con rol Comercial (seed de Database__SeedOnStartup).
 COMERCIAL = ("X-Portal-Usuario-Id", "1007")
 
 fallos = []
@@ -272,11 +268,8 @@ def probar_comandos_escritura_plan_cargue():
     def pedir(ruta, cuerpo=None, metodo=None, esperado=None, rol=ADMIN):
         return _pedir_base(ruta, cuerpo, metodo, rol=rol, esperado=esperado)
 
-    # guardar_vehiculo se prueba como Comercial (no Admin) a propósito -
-    # es el rol real que usa este comando, y hasta que se sembró este usuario no había
-    # forma de probarlo localmente sin pasos manuales. El resto de la función sigue en
-    # ADMIN porque eliminar_vehiculo (9/9) es Admin-only ([Authorize(Roles = "Admin")]
-    # en VehiculosController) y Comercial no puede completarlo.
+    # guardar_vehiculo se prueba como Comercial (el rol real de este comando). El resto de la función
+    # sigue en ADMIN porque eliminar_vehiculo (9/9) es Admin-only y Comercial no puede completarlo.
     paso("guardar_vehiculo (1/9, como Comercial)")
     codigo, r = pedir("/api/vehiculos", _vehiculo_de_prueba(), "POST", esperado=202, rol=COMERCIAL)
     vehiculo_id = r["correlationId"]
@@ -406,11 +399,10 @@ def main():
     bandeja_hub.invocar("Suscribir")
     # Escucha desde ya y sin parar: con long polling, dejar de sondear es desconectarse.
     avisos_bandeja = bandeja_hub.escuchar_en_segundo_plano("bandeja")
-    # 30 días = 720 horas. Con horizonte 240 queda fuera y el puntaje es 0; el paso final
-    # sube el horizonte a 4000 y la urgencia pasa a 82 = 100*(1 - 720/4000). El total ya
-    # NO es solo la urgencia: esta solicitud no tiene valor ni
-    # probabilidad (usa los defaults 30 y 50) y es licitación (tipo=100), así que con los
-    # pesos por defecto (0.40/0.30/0.20/0.10) el total es 61.8, no 82.
+    # 30 días = 720 horas. Con horizonte 240 queda fuera y el puntaje es 0; el paso final sube el
+    # horizonte a 4000 y la urgencia pasa a 82 = 100*(1 - 720/4000). El total no es solo la urgencia:
+    # sin valor ni probabilidad (defaults 30 y 50) y siendo licitación (tipo=100), con los pesos por
+    # defecto (0.40/0.30/0.20/0.10) el total es 61.8, no 82.
     deadline = (datetime.now(timezone.utc) + timedelta(days=30)).strftime("%Y-%m-%dT%H:%M:%SZ")
     _, creada = pedir("/api/solicitudes",
                       {"clienteId": cliente, "tipo": "licitacion", "deadline": deadline},
@@ -497,8 +489,8 @@ def main():
     linea = det["lineas"][0]["lineaId"]
     _, cot = pedir("/api/cotizaciones", {"solicitudId": solicitud}, esperado=201)
     cid = cot["id"]
-    # Agregar el flete es el paso que devolvía 409 CONFLICTO_CONCURRENCIA hasta la #17:
-    # EF emitía UPDATE en vez de INSERT para la línea nueva.
+    # Agregar el flete comprueba que EF emite INSERT (y no UPDATE) para la línea nueva; si no, devuelve
+    # 409 CONFLICTO_CONCURRENCIA.
     pedir(f"/api/cotizaciones/{cid}/lineas",
           {"lineaSolicitudId": linea, "valorFlete": 1850000, "fuente": "sicetac"}, esperado=200)
     _, srv = pedir("/api/servicios-conexos")
@@ -535,8 +527,7 @@ def main():
     ok(nuevo == 61.8, f"puntaje con horizonte 4000 = {nuevo} (esperado 61.8 = 0.40*82 + 0.30*30 + 0.20*50 + 0.10*100)")
 
     paso("Priorización: cambiar un peso SI mueve el puntaje")
-    # Desde el cambio a 4 pesos (docs/decisiones/score-prioridad-4-pesos-vs-solo-urgencia.md)
-    # los 4 pesos entran en el total, así que recalibrarlos sí debe mover el puntaje.
+    # Los 4 pesos entran en el total, así que recalibrarlos sí debe mover el puntaje.
     antes = score_de(vigilada)
     pedir("/api/priorizacion/parametros",
           parametros(4000, 0.60, 0.20, 0.15, 0.05), "PUT", esperado=200)

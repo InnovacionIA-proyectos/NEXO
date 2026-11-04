@@ -7,22 +7,8 @@ using Nexo.Domain.Priorizacion.Reglas;
 namespace Nexo.Application.CasosDeUso.Priorizacion;
 
 /// <summary>
-/// Refresca el score PERSISTIDO de las solicitudes activas.
-///
-/// QUÉ SIRVE Y QUÉ NO. La bandeja recalcula el score al leerlo, porque la urgencia
-/// depende del "ahora" y una licitación tiene que subir sola a medida que se acerca su
-/// deadline. Así que esto NO ordena la bandeja: mantiene fresco el valor guardado, que
-/// es el que leen métricas y tableros. Sin él, los reportes muestran el score del
-/// momento de la captura y no se parecen a lo que el usuario ve en pantalla.
-///
-/// Antes vivía en un BackgroundService dentro del API. Bajó a caso de uso, que es donde
-/// debía estar: el ciclo lo lleva la mensajería y esto solo hace el trabajo.
-///
-/// POR LOTES. La versión anterior traía todas las activas a memoria y guardaba una sola
-/// vez. Con volumen real eso es una transacción larga bloqueando filas que la bandeja
-/// está leyendo, y un fallo a mitad tira el trabajo completo. Por lotes, lo ya hecho
-/// queda hecho y el reintento del mensaje solo repite lo que falta — y repetir es
-/// inofensivo, porque el cálculo depende del estado y no de cuántas veces se corrió.
+/// Refresca el score PERSISTIDO (el que leen métricas y tableros); no ordena la bandeja, que recalcula al leer.
+/// Va por lotes para no bloquear filas con una transacción larga; reintentar es inofensivo porque el cálculo depende del estado.
 /// </summary>
 public sealed record clsRecalcularScoresActivosCommand(int TamanoDeLote = 200)
     : ICommand<clsResultadoDeRecalculoDto>;
@@ -39,10 +25,7 @@ public sealed class clsRecalcularScoresActivosCommandHandler(
     {
         var tamano = Math.Clamp(command.TamanoDeLote, 1, 2_000);
 
-        // Los parámetros se leen UNA vez para toda la corrida. Si alguien recalibra a
-        // mitad, este recálculo termina con los de antes y el cambio dispara el suyo;
-        // mezclar dos juegos de pesos en la misma pasada dejaría la mitad de las
-        // solicitudes en una escala y la otra mitad en otra.
+        // Parámetros leídos UNA vez por corrida: mezclar dos juegos de pesos en la misma pasada dejaría solicitudes en escalas distintas.
         var parametros = await solicitudes.ParametrosScoreAsync(ct);
         var ahora = reloj.GetUtcNow();
 
@@ -67,9 +50,7 @@ public sealed class clsRecalcularScoresActivosCommandHandler(
                 cambiadasEnElLote++;
             }
 
-            // Solo se guarda si algo cambió. Sin esta guarda, cada pasada escribiría
-            // UpdatedAt de todas las activas y ensuciaría la auditoría con cambios que
-            // no cambiaron nada.
+            // Solo se guarda si algo cambió: evita escribir UpdatedAt de todas las activas en cada pasada.
             if (cambiadasEnElLote > 0)
             {
                 await uow.SaveChangesAsync(ct);

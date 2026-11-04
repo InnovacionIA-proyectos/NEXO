@@ -10,12 +10,7 @@ using Microsoft.AspNetCore.RateLimiting;
 
 namespace Nexo.Api.ReglasSoloSicetac;
 
-/// <summary>
-/// Rutas "solo SICE-TAC" que demarca el Administrador de Fletes: origen + destino +
-/// tipo de vehículo. Las solicitudes que hagan match se cotizan exclusivamente con el
-/// piso SICE-TAC y se auto-costean hacia el comercial (esa parte vive en Biblioteca,
-/// todavía no migrada).
-/// </summary>
+/// <summary>Rutas "solo SICE-TAC" (origen + destino + tipo de vehículo): las solicitudes que coinciden se cotizan solo con el piso SICE-TAC y se auto-costean hacia el comercial.</summary>
 [ApiController]
 [Authorize(Roles = "AdminTarifas,AdminBiblioteca,Admin")]
 [Route("api/reglas-solo-sicetac")]
@@ -76,11 +71,7 @@ public class clsReglasSoloSicetacController(
         return File(archivo.Contenido, archivo.ContentType, archivo.NombreArchivo);
     }
 
-    /// <summary>
-    /// Descarga las reglas ya cargadas (S5-HU-22.1/#288), con las mismas columnas que acepta
-    /// <c>importar-excel</c>: el archivo se puede editar y reimportar. Las reglas que ya existen
-    /// se reportan como duplicadas al reimportar (no se pisan), así que solo entran las filas nuevas.
-    /// </summary>
+    /// <summary>Descarga las reglas cargadas con las columnas de <c>importar-excel</c>, para editarlas y reimportarlas; las existentes se reportan como duplicadas (no se pisan).</summary>
     [HttpGet("exportar-excel")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> ExportarExcel(CancellationToken ct = default)

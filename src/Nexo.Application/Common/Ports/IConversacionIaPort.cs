@@ -8,17 +8,10 @@ public sealed record clsHerramientaIa(string Nombre, string Descripcion, string 
 /// <summary>Lo que el modelo pidió ejecutar. <paramref name="Id"/> lo asigna el proveedor y enlaza la petición con su resultado.</summary>
 public sealed record clsLlamadaHerramientaIa(string Id, string Nombre, JsonElement Entrada);
 
-/// <summary>
-/// Lo que se le devuelve al modelo de una herramienta. <paramref name="EsError"/> le dice que la consulta no se pudo hacer para que lo
-/// explique; <paramref name="Fuente"/> y <paramref name="Encontrado"/> no viajan al modelo (ya van dentro del contenido), son para quien
-/// transmite la conversación.
-/// </summary>
+/// <summary>Resultado de una herramienta para el modelo; <paramref name="Fuente"/> y <paramref name="Encontrado"/> no viajan al modelo, son para quien transmite la conversación.</summary>
 public sealed record clsResultadoHerramientaIa(string Contenido, bool EsError, string? Fuente = null, bool? Encontrado = null);
 
-/// <summary>
-/// Una conversación con herramientas. <paramref name="Mensajes"/> es el historial de texto (el último es del usuario);
-/// <paramref name="MaxIteraciones"/> acota cuántas veces seguidas el modelo puede pedir herramientas antes de responder.
-/// </summary>
+/// <summary><paramref name="MaxIteraciones"/> acota cuántas veces seguidas el modelo puede pedir herramientas antes de responder.</summary>
 public sealed record clsPeticionConversacionIa(
     clsFuncionIa Funcion,
     string Instrucciones,
@@ -48,19 +41,13 @@ public abstract record clsEventoConversacionIa
 }
 
 /// <summary>
-/// Conversación con el modelo con respuesta en tiempo real y herramientas. El puerto corre el bucle completo (pedir, ejecutar las
-/// herramientas que el modelo solicite con <c>ejecutarHerramienta</c>, devolverle los resultados y seguir) y lo cuenta como eventos;
-/// quien lo usa nunca toca los bloques propios del proveedor.
-///
-/// Los errores del proveedor salen como <see cref="Exceptions.clsServiceUnavailableException"/> con los mismos códigos de
-/// <see cref="IAsistenteIaPort"/>; pueden ocurrir al empezar o a la mitad (con parte del texto ya entregado).
+/// Conversación con respuesta en tiempo real y herramientas: el puerto corre el bucle completo y lo cuenta como eventos.
+/// Los errores salen como <see cref="Exceptions.clsServiceUnavailableException"/> (códigos de <see cref="IAsistenteIaPort"/>), también a mitad de la respuesta.
 /// </summary>
 public interface IConversacionIaPort
 {
     /// <summary>
-    /// Falla antes de hacer nada si la función está apagada o sin configurar (<c>IA_APAGADA</c>, <c>IA_NO_CONFIGURADA</c>,
-    /// <c>IA_FUNCION_DESHABILITADA</c>) o si la persona ya consumió su tope diario (<c>429 IA_TOPE_DIARIO</c>). Se llama antes de abrir
-    /// la respuesta para que esos casos sean un error HTTP normal y no un corte a mitad de la transmisión.
+    /// Falla antes de abrir la respuesta si la función está apagada o sin configurar, o si la persona superó su tope diario (429 IA_TOPE_DIARIO).
     /// </summary>
     Task VerificarAsync(clsFuncionIa funcion, Guid? usuarioId, CancellationToken ct = default);
 

@@ -1,9 +1,6 @@
 namespace Nexo.Application.CasosDeUso.BibliotecaSapHistorico.DTOs;
 
-/// <summary>
-/// Tarifa SAP TM (log de cambios tblSAPTarifasLog o tarifas de plaza tblSAPTarifas) expuesta
-/// en la Biblioteca. Espejo de la estructura de la tabla del datacenter.
-/// </summary>
+/// <summary>Tarifa SAP TM (log tblSAPTarifasLog o plaza tblSAPTarifas), espejo de la tabla del datacenter.</summary>
 public record clsSapTarifaHistoricoItemDto(
     int Id,
     int LineaNegocio,

@@ -1,13 +1,9 @@
 name: CI/CD RabbitMQ
 
-# RabbitMQ no tiene código fuente propio en este repo
-# — su definición completa vive en el docker-compose.yml de la raíz (servicio
-# `rabbit`) + build/Dockerfile.rabbit (imagen propia: RabbitMQ oficial + el
-# plugin de retardo que MassTransit necesita para los timeouts de saga). No
-# hace falta "consolidar" nada más: cubicador/docker-compose.yml NO define su
-# propio broker, se conecta al de acá por la red externa `nexo_internal` (ver
-# docs/mensajeria/TOPOLOGIA.md) — por eso este pipeline dispara solo con estos
-# 2 archivos, no con cualquier cambio del repo.
+# RabbitMQ no tiene codigo propio: se define en el servicio `rabbit` del docker-compose.yml raiz y en
+# build/Dockerfile.rabbit (RabbitMQ oficial + plugin de retardo que MassTransit necesita para los
+# timeouts de saga). cubicador/ no define su propio broker: usa este por la red externa `nexo_internal`
+# (ver docs/mensajeria/TOPOLOGIA.md). Por eso este pipeline dispara solo con esos 2 archivos.
 on:
   push:
     branches: [main, DEPLOY]
@@ -23,12 +19,8 @@ on:
       - ".github/workflows/ci-cd-rabbitmq.yml"
 
 jobs:
-  # "build-and-test" acá es build a secas: no hay suite unitaria posible para
-  # un broker sin código propio (el smoke test real solo tiene sentido DESPUÉS
-  # de desplegar, ver el job de abajo) — pero SÍ hay algo que puede romperse:
-  # que la imagen propia (RabbitMQ oficial + plugin de retardo) deje de
-  # construir. Sin este job, un Dockerfile.rabbit roto se descubriría recién
-  # en el despliegue real.
+  # Solo build: no hay suite unitaria para un broker sin codigo propio, pero la imagen propia puede
+  # dejar de construir y sin este job se descubriria recien en el despliegue.
   build:
     runs-on: ubuntu-latest
     steps:
@@ -56,44 +48,3 @@ jobs:
             -H "Content-Type: application/json" ^
             -H "X-GitHub-Event: push" ^
             -d "{\"ref\":\"${{ github.ref }}\",\"repository\":{\"full_name\":\"${{ github.repository }}\"}}"
-
-  # Smoke test POST-DEPLOY: conexión al broker + verificación de que el
-  # exchange y los 7 bindings esperados (los 9 comandos de escritura del plan
-  # de cargue/optimizar despachados por UN solo binding compartido,
-  # más los 3 eventos de catálogo de vehículo, más los 2 eventos de resultado
-  # ya existentes) siguen declarados tras el despliegue. Corre en el mismo
-  # runner self-hosted que el deploy: es la única red desde la que se alcanza
-  # la consola de administración de este broker (no expuesta al público, ver
-  # docker-compose.yml raíz).
-  #
-  # Depende de que NEXO (API) y el worker de Cubicador ya se hayan conectado
-  # al menos una vez contra este broker para declarar sus colas/bindings — ver
-  # el docstring de scripts/rabbitmq_smoke.py para el detalle de esa
-  # precondición.
-  #
-  # DESHABILITADO: el runner self-hosted [self-hosted, dokploy_] tiene la
-  # ejecución de scripts de PowerShell restringida (ExecutionPolicy), y
-  # actions/setup-python@v5 necesita correr un setup.ps1 para instalar Python
-  # ahí. Falla siempre en ese paso, antes de llegar a correr el smoke test en
-  # sí — no es un fallo del script ni de ningún despliegue real. Queda
-  # comentado hasta que se arregle el runner o se corra este paso sin
-  # setup-python (p. ej. dentro de un contenedor Docker).
-  # smoke-test-post-deploy:
-  #   needs: deploy
-  #   runs-on: [self-hosted, dokploy_]
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #
-  #     - uses: actions/setup-python@v5
-  #       with:
-  #         python-version: "3.14"
-  #
-  #     - name: Instalar dependencias (httpx)
-  #       run: pip install httpx
-  #
-  #     - name: Verificar exchange/colas/bindings esperados
-  #       env:
-  #         RABBITMQ_MGMT_URL: ${{ secrets.RABBITMQ_MGMT_URL }}
-  #         RABBITMQ_USER: ${{ secrets.RABBITMQ_USER }}
-  #         RABBITMQ_PASSWORD: ${{ secrets.RABBITMQ_PASSWORD }}
-  #       run: python scripts/rabbitmq_smoke.py

@@ -2,10 +2,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Nexo.Infrastructure.External;
 
-/// <summary>
-/// Business partner solicitante (cliente real) del DW corporativo
-/// (DWCubosOperacionesEBS.dbo.DimBPSolicitante). SOLO LECTURA.
-/// </summary>
+/// <summary>Business partner solicitante (cliente real) del DW (DimBPSolicitante). Solo lectura.</summary>
 public class clsBpSolicitante
 {
     public string Bp { get; set; } = null!;
@@ -14,11 +11,7 @@ public class clsBpSolicitante
     public string Tipo { get; set; } = null!;
 }
 
-/// <summary>
-/// Contexto de SOLO LECTURA contra el DW de cubos de operaciones (base
-/// DWCubosOperacionesEBS, misma instancia que DWSice). NoTracking y SaveChanges
-/// bloqueado, igual que los demás contextos externos.
-/// </summary>
+/// <summary>Contexto de solo lectura contra el DW de cubos de operaciones (misma instancia que DWSice): NoTracking y SaveChanges bloqueado.</summary>
 public class clsDwCubosDbContext : DbContext
 {
     public clsDwCubosDbContext(DbContextOptions<clsDwCubosDbContext> options) : base(options)

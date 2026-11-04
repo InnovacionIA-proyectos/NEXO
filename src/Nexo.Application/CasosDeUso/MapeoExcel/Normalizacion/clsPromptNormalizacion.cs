@@ -4,11 +4,8 @@ using System.Text.Json;
 namespace Nexo.Application.CasosDeUso.MapeoExcel.Normalizacion;
 
 /// <summary>
-/// Lo que se le dice al modelo para normalizar textos libres que las reglas no resolvieron. Todo el texto fijo vive aquí, versionado.
-///
-/// Los textos son DATO del cliente, no instrucciones. El modelo no escribe un valor: elige una <c>clave</c> de una lista que NEXO le da (el
-/// catálogo oficial de vehículos y de carrocerías, o los municipios candidatos de ese texto) o <c>NINGUNA</c>; el caso de uso verifica que la clave
-/// exista en esa lista antes de usarla.
+/// Texto fijo para normalizar textos libres. Los textos son DATO del cliente; el modelo no escribe un valor: elige una <c>clave</c> de la
+/// lista que NEXO le da o <c>NINGUNA</c>, y el caso de uso verifica que exista.
 /// </summary>
 public static class clsPromptNormalizacion
 {

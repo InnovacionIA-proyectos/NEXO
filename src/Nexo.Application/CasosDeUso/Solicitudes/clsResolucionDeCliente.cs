@@ -4,15 +4,7 @@ using Nexo.Domain.Catalogos.Entidades;
 
 namespace Nexo.Application.CasosDeUso.Solicitudes;
 
-/// <summary>
-/// Resuelve el clsCliente local desde clienteId o clienteBp, creando el registro local
-/// si el BP existe en el catálogo DW pero todavía no tiene espejo local. Extraído de
-/// clsCapturarSolicitudCommand (issue #206) para que otro caso de uso —
-/// clsCrearSolicitudCommand, que hoy exige un clienteId ya resuelto y por eso nunca
-/// funciona para un cliente real recién buscado— use exactamente la misma resolución.
-/// Dos resoluciones divergentes crearían clientes locales duplicados según por dónde
-/// entró la solicitud.
-/// </summary>
+/// <summary>Resuelve el clsCliente local desde clienteId o clienteBp, creando el espejo local si el BP está en el DW; resolución única para no duplicar clientes según la entrada.</summary>
 public static class clsResolucionDeCliente
 {
     public static async Task<Guid> ResolverAsync(

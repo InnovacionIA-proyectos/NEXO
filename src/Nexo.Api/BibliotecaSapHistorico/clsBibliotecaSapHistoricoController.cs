@@ -9,10 +9,7 @@ using Microsoft.AspNetCore.RateLimiting;
 
 namespace Nexo.Api.BibliotecaSapHistorico;
 
-/// <summary>
-/// Biblioteca — histórico de tarifas SAP TM leído en vivo (SOLO LECTURA) del
-/// datacenter corporativo (log de cambios dbsolucionesTI.dbo.tblSAPTarifasLog).
-/// </summary>
+/// <summary>Histórico de tarifas SAP TM leído en vivo (solo lectura) del datacenter corporativo (dbsolucionesTI.dbo.tblSAPTarifasLog).</summary>
 [ApiController]
 [Authorize]
 [Route("api/biblioteca-sap-historico")]
@@ -22,13 +19,8 @@ public class clsBibliotecaSapHistoricoController(
     : ControllerBase
 {
     /// <summary>
-    /// Consulta el histórico ordenado por vigencia descendente, con filtros por
-    /// texto (código DIVIPOLA de origen/destino o detalles) y línea de negocio.
-    ///
-    /// S6-HU-29.2/#312: <c>page</c> (1-based, opcional, def. 1) agrega la paginación que faltaba (el histórico tiene ~26 mil filas y
-    /// <c>top</c> solo dejaba ver las primeras); <c>top</c> pasa a ser el tamaño de página. <c>total</c> sigue siendo el total sin
-    /// paginar y el orden es estable. Cambio aditivo: mismo shape de respuesta (<c>{ total, items }</c>); sin <c>page</c> responde la
-    /// primera página, como siempre.
+    /// Consulta el histórico por vigencia descendente, con filtros por texto (DIVIPOLA de origen/destino o detalles) y línea de negocio.
+    /// Paginado: <c>page</c> (base 1, default 1) y <c>top</c> como tamaño de página; <c>total</c> es el total sin paginar y el orden es estable.
     /// </summary>
     [HttpGet]
     [ProducesResponseType(StatusCodes.Status200OK)]

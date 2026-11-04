@@ -8,15 +8,8 @@ using Nexo.Mensajes.Costeo;
 namespace Nexo.Application.CasosDeUso.AjustesVigenciaPlaza;
 
 /// <summary>
-/// Ajuste 1 a 1: fija (o reemplaza) la vigencia local de una tarifa de plaza.
-///
-/// NuevaVigencia es nullable a propósito, aunque el campo es obligatorio para el caso de
-/// uso: <c>DateTime</c> (no nullable) con <c>[Required]</c> en el DTO de Api nunca dispara
-/// esa validación (el model binder ya deja <c>default(DateTime)</c> antes de validar, así
-/// que jamás es "null" para DataAnnotations) — eso dejaba pasar un body vacío como
-/// 0001-01-01 sin error (bug confirmado en QA de producción, 2026-09-22). Mismo patrón que
-/// <see cref="clsAjustarVigenciaPlazaMasivoCommand"/>: nullable + validación explícita acá,
-/// no en el DTO.
+/// Fija (o reemplaza) la vigencia local de una tarifa de plaza. NuevaVigencia es nullable a propósito: con <c>DateTime</c> no nullable
+/// el <c>[Required]</c> del DTO nunca dispara y un body vacío pasaría como 0001-01-01; la validación es explícita acá.
 /// </summary>
 public sealed record clsAjustarVigenciaPlazaCommand(int TarifaPlazaId, DateTime? NuevaVigencia, string? Motivo) : ICommand<Unit>;
 

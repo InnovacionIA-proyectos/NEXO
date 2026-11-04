@@ -4,15 +4,8 @@ using Microsoft.AspNetCore.SignalR;
 namespace Nexo.Api.PlanDeCargue;
 
 /// <summary>
-/// Canal de avisos del desenlace de un plan de cargue.
-///
-/// Va aparte de /hubs/trabajos a propósito: ese canal ya está publicado en el contrato
-/// como el avance de un pliego con líneas pendientes/reintentos técnicos — conceptos que
-/// no aplican acá (un plan de cargue es un solo trabajo, optimizado o rechazado, sin
-/// desenlaces parciales). Mismo criterio que ya separó /hubs/bandeja de /hubs/trabajos.
-///
-/// NO REENVÍA LO PERDIDO: un cliente desconectado recupera el estado con
-/// GET /api/planes-cargue/{id}, no con este canal.
+/// Canal de avisos del desenlace de un plan de cargue, aparte de /hubs/trabajos (aquí no hay desenlaces parciales).
+/// No reenvía lo perdido: un cliente desconectado recupera el estado con GET /api/planes-cargue/{id}.
 /// </summary>
 [Authorize]
 public sealed class clsPlanCargueHub : Hub

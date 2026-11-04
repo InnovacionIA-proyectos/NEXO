@@ -14,20 +14,12 @@ using Nexo.Domain.Enums;
 namespace Nexo.Application.CasosDeUso.Cotizaciones;
 
 /// <summary>
-/// S6-HU-27.3/#322 (decisión D9): cambiar el vehículo de una línea ya creada — antes <c>ConfigVehiculoId</c> solo se escribía al crearla.
-/// Se indica el vehículo con UNO de dos datos: <paramref name="ConfigVehiculoId"/> (una configuración oficial) o <paramref name="TipoVehiculo"/>
-/// (+ <paramref name="Carroceria"/>), que se resuelve igual que en la captura: con el diccionario de alias, o contra una configuración oficial
-/// ya existente. Un texto que el diccionario no conoce NO crea nada en cuarentena: 400 VEHICULO_NO_RECONOCIDO.
-///
-/// Reglas:
-///  · Solo cotización Borrador (409 COTIZACION_NO_EDITABLE si ya se entregó); la línea tiene que ser de la solicitud (404) y no estar
-///    rechazada (409 LINEA_RECHAZADA).
-///  · Solo AdminTarifas y Admin (el controlador).
-///  · El flete que la línea tuviera en la cotización se calculó con el vehículo anterior: se DESCARTA (y el total se recalcula) y la línea
-///    vuelve a <c>PorCostear</c>. Así nada de lo anterior sobrevive bajo un piso SICE-TAC distinto; el flete nuevo entra por los caminos de
-///    siempre (agregar/aplicar propuestas), que validan contra el piso del vehículo nuevo.
-///  · Se devuelve la propuesta recalculada de esa línea con el vehículo nuevo, con su piso.
-///  · Mismo vehículo que ya tenía: no hace nada (200, <c>CambioVehiculo = false</c>).
+/// Cambia el vehículo de una línea con UNO de dos datos: <paramref name="ConfigVehiculoId"/> (configuración oficial) o
+/// <paramref name="TipoVehiculo"/> (+ <paramref name="Carroceria"/>), resuelto como en la captura; un texto que el diccionario no conoce NO
+/// crea nada en cuarentena: 400 VEHICULO_NO_RECONOCIDO.
+/// Solo cotización Borrador (409 COTIZACION_NO_EDITABLE), línea de la solicitud (404) y no rechazada (409 LINEA_RECHAZADA); solo AdminTarifas y Admin.
+/// El flete previo se calculó con el vehículo anterior: se DESCARTA (y el total se recalcula) y la línea vuelve a <c>PorCostear</c>; el nuevo
+/// entra por los caminos de siempre, que validan contra el piso del vehículo nuevo. Mismo vehículo: no hace nada (<c>CambioVehiculo = false</c>).
 /// </summary>
 public sealed record clsCambiarVehiculoLineaCommand(
     Guid CotizacionId, Guid LineaSolicitudId, Guid? ConfigVehiculoId, string? TipoVehiculo, string? Carroceria)

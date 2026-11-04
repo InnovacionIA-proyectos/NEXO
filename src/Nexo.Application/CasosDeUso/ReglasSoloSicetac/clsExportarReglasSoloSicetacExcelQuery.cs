@@ -4,8 +4,7 @@ using Nexo.Application.Common.Abstractions;
 
 namespace Nexo.Application.CasosDeUso.ReglasSoloSicetac;
 
-/// <summary>Exporta a Excel las reglas "solo SICE-TAC" ya cargadas (S5-HU-22.1/#288) — mismo
-/// patrón que el export de Tarifas de Plaza; el archivo se puede editar y reimportar.</summary>
+/// <summary>Exporta a Excel las reglas "solo SICE-TAC" cargadas; el archivo se puede editar y reimportar.</summary>
 public sealed record clsExportarReglasSoloSicetacExcelQuery : IQuery<clsArchivoDto>;
 
 public sealed class clsExportarReglasSoloSicetacExcelQueryHandler(

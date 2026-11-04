@@ -11,20 +11,12 @@ using Nexo.Domain.Common;
 
 namespace Nexo.Application.CasosDeUso.Catalogos;
 
-// S6-HU-27.3/#322 — bandeja de normalización de vehículos: las configuraciones que la captura creó en cuarentena porque nadie sabía a qué
-// código oficial correspondían (EsCatalogoOficial = false). Un humano las MAPEA a un código (queda un alias, así que el mismo texto no
-// vuelve a caer en cuarentena) o las DESCARTA. Las dos salen de la lista; ninguna borra la fila, porque las líneas que ya la usan siguen
-// apuntándole.
-
-// ---------------------------------------------------------------- listar
+// Bandeja de normalización de vehículos: configuraciones en cuarentena (EsCatalogoOficial = false) que un humano MAPEA a un código
+// (queda un alias) o DESCARTA. Ninguna borra la fila, porque las líneas que ya la usan siguen apuntándole.
 
 public sealed record clsListarVehiculosCuarentenaQuery : IQuery<IReadOnlyList<clsVehiculoCuarentenaDto>>;
 
-/// <summary>
-/// Lista las configuraciones con <c>EsCatalogoOficial = false</c> que nadie descartó y cuyo tipo de vehículo AÚN no tiene alias activo: un
-/// tipo ya mapeado (aquí o agregando el alias a mano) sale de la lista aunque su fila siga en cuarentena. Por cada fila: id, tipo,
-/// carrocería (y rango de peso/fecha, por si ayudan a decidir).
-/// </summary>
+/// <summary>Lista las configuraciones en cuarentena no descartadas cuyo tipo de vehículo aún no tiene alias activo (id, tipo, carrocería, rango de peso/fecha).</summary>
 public sealed class clsListarVehiculosCuarentenaQueryHandler(IConfiguracionesVehiculoPort vehiculos, IAliasCatalogoPort alias)
     : IQueryHandler<clsListarVehiculosCuarentenaQuery, IReadOnlyList<clsVehiculoCuarentenaDto>>
 {
@@ -39,13 +31,9 @@ public sealed class clsListarVehiculosCuarentenaQueryHandler(IConfiguracionesVeh
     }
 }
 
-// ---------------------------------------------------------------- mapear
-
 /// <summary>
-/// Mapea una configuración en cuarentena a un código oficial: crea el alias (texto del tipo de vehículo → código) en el diccionario. 404
-/// VEHICULO_NO_ENCONTRADO; 409 VEHICULO_NO_ESTA_EN_CUARENTENA (ya es oficial) o VEHICULO_YA_DESCARTADO; 400 CODIGO_NO_RECONOCIDO; 409
-/// ALIAS_DUPLICADO si el texto ya apunta a OTRO código (si ya apuntaba al mismo, no hay nada que crear y el resultado lo dice con
-/// <c>AliasCreado = false</c>). Las líneas que ya usan la fila no se tocan: se cambian con "cambiar vehículo de la línea".
+/// Mapea una configuración en cuarentena a un código oficial creando el alias. 404 VEHICULO_NO_ENCONTRADO; 409 VEHICULO_NO_ESTA_EN_CUARENTENA,
+/// VEHICULO_YA_DESCARTADO o ALIAS_DUPLICADO (texto ya apuntando a OTRO código); 400 CODIGO_NO_RECONOCIDO. Si ya apuntaba al mismo código, <c>AliasCreado = false</c>.
 /// </summary>
 public sealed record clsMapearVehiculoCuarentenaCommand(Guid VehiculoId, string? Codigo) : ICommand<clsMapeoVehiculoDto>;
 
@@ -104,12 +92,7 @@ public sealed class clsMapearVehiculoCuarentenaCommandHandler(
     }
 }
 
-// ---------------------------------------------------------------- descartar
-
-/// <summary>
-/// Descarta una configuración en cuarentena (no corresponde a ningún vehículo real). Sale de la bandeja; no se borra. 404
-/// VEHICULO_NO_ENCONTRADO; 409 VEHICULO_NO_ESTA_EN_CUARENTENA si ya es oficial; 409 VEHICULO_YA_DESCARTADO.
-/// </summary>
+/// <summary>Descarta una configuración en cuarentena (sale de la bandeja, no se borra). 404 VEHICULO_NO_ENCONTRADO; 409 VEHICULO_NO_ESTA_EN_CUARENTENA o VEHICULO_YA_DESCARTADO.</summary>
 public sealed record clsDescartarVehiculoCuarentenaCommand(Guid VehiculoId) : ICommand<Unit>;
 
 public sealed class clsDescartarVehiculoCuarentenaCommandHandler(

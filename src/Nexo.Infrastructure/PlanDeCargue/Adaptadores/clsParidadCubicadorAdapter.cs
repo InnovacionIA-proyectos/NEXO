@@ -5,19 +5,8 @@ using Microsoft.Extensions.Logging;
 
 namespace Nexo.Infrastructure.PlanDeCargue.Adaptadores;
 
-/// <summary>
-/// Lee la evidencia de paridad de configuración y aplica la regla de
-/// negocio (Domain.PlanDeCargue.Reglas.clsCompuertaDeParidad). Tres claves, no una:
-///
-/// - <c>Cubicacion:ParidadVerificada</c> (bool) — el interruptor.
-/// - <c>Cubicacion:ParidadEvidencia</c> (string) — A QUÉ corrida de paridad se refiere
-///   (ej. la URL de la corrida verde de golden tests en cubicador-ci.yml, o el commit).
-/// - <c>Cubicacion:ParidadFecha</c> (date) — CUÁNDO se confirmó.
-///
-/// Encender la función es, a propósito, más que voltear un booleano: exige dejar dicho
-/// contra qué evidencia se prendió. Ver README (sección "Encendido de la función") para
-/// el procedimiento — quién lo hace y cuándo.
-/// </summary>
+/// <summary>Lee la evidencia de paridad (ParidadVerificada, ParidadEvidencia, ParidadFecha) y aplica clsCompuertaDeParidad.
+/// Encender la función exige dejar dicho contra qué evidencia se prendió, no solo voltear un booleano.</summary>
 public sealed class clsParidadCubicadorAdapter(IConfiguration config, ILogger<clsParidadCubicadorAdapter> logger)
     : IParidadCubicadorPort
 {
@@ -25,10 +14,8 @@ public sealed class clsParidadCubicadorAdapter(IConfiguration config, ILogger<cl
     {
         get
         {
-            // config.GetValue<bool>(...) usa Convert.ChangeType, que lanza
-            // FormatException sin controlar con el valor por defecto real de esta clave
-            // (cadena vacía, no ausente): un despliegue nuevo sin encender la compuerta
-            // crasheaba con 500 en vez de responder el 503 documentado.
+            // GetValue<bool> lanza FormatException con la cadena vacía (valor por defecto real de la clave):
+            // se parsea a mano para responder el 503 documentado en vez de 500.
             var verificada = bool.TryParse(config["Cubicacion:ParidadVerificada"], out var v) && v;
             var evidencia = config["Cubicacion:ParidadEvidencia"];
             var fechaTexto = config["Cubicacion:ParidadFecha"];

@@ -7,7 +7,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Nexo.Infrastructure.Notificaciones.Adaptadores;
 
-/// <summary>Traduce la tarifa vencida detectada en el correo de alerta (urgencia Alta, sección 9 del documento de entendimiento).</summary>
+/// <summary>Traduce la tarifa vencida detectada en el correo de alerta (urgencia Alta).</summary>
 public sealed class clsNotificarTarifaVencidaConsumer(
     ICommandHandler<clsNotificarTarifaVencidaCommand, clsResultadoDeNotificacionDto> notificar,
     ILogger<clsNotificarTarifaVencidaConsumer> log)

@@ -1,9 +1,6 @@
 namespace Nexo.Infrastructure.External;
 
-/// <summary>
-/// Catálogos SAP del datacenter (dbsolucionesTI, SOLO LECTURA) que resuelven los
-/// códigos del histórico de tarifas a descripciones legibles.
-/// </summary>
+/// <summary>Catálogos SAP (solo lectura) que resuelven los códigos del histórico de tarifas a descripciones legibles.</summary>
 
 /// <summary>Línea de negocio (tblSAPLineaNegocio). El histórico referencia el ID.</summary>
 public class clsSapLineaNegocio

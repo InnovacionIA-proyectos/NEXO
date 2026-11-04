@@ -14,19 +14,13 @@ public abstract record clsEventoAsistente
     /// <summary><paramref name="Estado"/>: <c>ejecutando</c>, <c>ok</c> o <c>error</c>.</summary>
     public sealed record Herramienta(string Nombre, string Estado, string? Fuente) : clsEventoAsistente;
 
-    /// <summary>
-    /// La respuesta traía cifras de dinero que no salen de ninguna consulta: lo mostrado hasta ahora debe sustituirse por
-    /// <paramref name="Texto"/>, que es también lo que queda guardado.
-    /// </summary>
+    /// <summary>La respuesta traía cifras de dinero sin origen: lo mostrado debe sustituirse por <paramref name="Texto"/>, que es lo que queda guardado.</summary>
     public sealed record Reemplazo(string Texto, IReadOnlyList<string> CifrasSinOrigen) : clsEventoAsistente;
 
     /// <summary><paramref name="Estado"/>: <c>completo</c>, <c>incompleto</c> o <c>descartado</c>.</summary>
     public sealed record Fin(Guid ConversacionId, Guid MensajeId, string Estado) : clsEventoAsistente;
 
-    /// <summary>
-    /// El asistente propuso un cambio. Nada se ha modificado: la persona debe confirmarlo (<c>POST /api/asistente/acciones/{id}/confirmar</c>)
-    /// o cancelarlo.
-    /// </summary>
+    /// <summary>El asistente propuso un cambio; nada se modificó hasta que la persona lo confirme (<c>POST /api/asistente/acciones/{id}/confirmar</c>) o cancele.</summary>
     public sealed record Accion(clsAccionAsistenteDto Propuesta) : clsEventoAsistente;
 
     /// <summary>La respuesta se cortó a mitad de la transmisión; lo ya mostrado queda como respuesta incompleta.</summary>

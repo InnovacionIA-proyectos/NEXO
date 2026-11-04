@@ -2,11 +2,7 @@ using Nexo.Application.CasosDeUso.Biblioteca.DTOs;
 
 namespace Nexo.Application.CasosDeUso.Biblioteca.Interfaces;
 
-/// <summary>
-/// Consulta de SOLO LECTURA a la matriz oficial SICE-TAC del Data Warehouse
-/// (DWSice.dbo.tblRutasSicetac). Null/lista vacía cuando DwSice no está
-/// configurado. Implementado por Infrastructure/Adapters/clsBibliotecaSicetacAdapter.cs.
-/// </summary>
+/// <summary>Consulta de SOLO LECTURA a la matriz oficial SICE-TAC del Data Warehouse (DWSice.dbo.tblRutasSicetac). Null/lista vacía cuando DwSice no está configurado.</summary>
 public interface IBibliotecaSicetacPort
 {
     Task<clsMatrizSicetacResultDto> BuscarAsync(

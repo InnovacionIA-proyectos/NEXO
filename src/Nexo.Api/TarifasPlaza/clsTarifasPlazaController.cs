@@ -10,10 +10,7 @@ using Microsoft.AspNetCore.RateLimiting;
 
 namespace Nexo.Api.TarifasPlaza;
 
-/// <summary>
-/// CRUD de Tarifas de Plaza gobernadas por Nexo (S4-HU-10.2) — recrea el formulario de
-/// captura que hoy vive en un sistema externo, con carga/descarga masiva por Excel.
-/// </summary>
+/// <summary>CRUD de Tarifas de Plaza gobernadas por Nexo, con carga y descarga masiva por Excel.</summary>
 [ApiController]
 [Authorize(Roles = "AdminTarifas,AdminBiblioteca,Admin")]
 [Route("api/tarifas-plaza")]
@@ -101,6 +98,6 @@ public class clsTarifaPlazaRequest
     public string? TipoVehiculo { get; set; }
     public decimal Valor { get; set; }
     public DateOnly Vigencia { get; set; }
-    /// <summary>Opcional (S6-HU-29.2/#312): vacío o null se guarda como texto vacío. Máx. 2000 caracteres.</summary>
+    /// <summary>Opcional: vacío o null se guarda como texto vacío. Máx. 2000 caracteres.</summary>
     public string? DetallesTarifa { get; set; }
 }

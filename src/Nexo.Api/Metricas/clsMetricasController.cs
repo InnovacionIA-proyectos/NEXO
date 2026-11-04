@@ -15,13 +15,7 @@ public class clsMetricasController(
     IQueryHandler<clsObtenerKpisPilotoQuery, clsKpisPilotoDto> kpisPiloto)
     : ControllerBase
 {
-    /// <summary>
-    /// KPIs de cumplimiento de SLA y estado de la cola (Tablero del Líder).
-    ///
-    /// S5-HU-21.1/#287: <c>desde</c>/<c>hasta</c> opcionales — el mismo filtro que "KPIs del
-    /// Piloto". Las 5 tarjetas de la cola cuentan solicitudes creadas en el rango y Cumplimiento
-    /// SLA, cotizaciones entregadas en el rango. Sin ellos, el comportamiento es el de siempre.
-    /// </summary>
+    /// <summary>KPIs de cumplimiento de SLA y estado de la cola (Tablero del Líder). <c>desde</c>/<c>hasta</c> opcionales: la cola cuenta solicitudes creadas en el rango y Cumplimiento SLA, cotizaciones entregadas en él.</summary>
     [HttpGet("cumplimiento")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult<clsCumplimientoDto>> Cumplimiento(
@@ -29,13 +23,8 @@ public class clsMetricasController(
         => Ok(await cumplimiento.Handle(new clsObtenerCumplimientoQuery(desde, hasta), ct));
 
     /// <summary>
-    /// Los 4 KPIs cuantitativos del piloto de 2 semanas (documento de entendimiento,
-    /// sección 14): tiempo de costeo del pliego, % de líneas auto-costeadas, cotizaciones
-    /// emitidas desde la app y líneas con flete manual a verificar contra el piso.
-    /// Sin filtro de fecha, corre sobre todo el histórico.
-    ///
-    /// S5-HU-21.1/#287: <c>tamano</c> ("1-10", "11-100" o "+100", por total de líneas del pliego)
-    /// recorta el tiempo de costeo; sin él, todos los pliegos.
+    /// Los 4 KPIs del piloto: tiempo de costeo del pliego, % de líneas auto-costeadas, cotizaciones emitidas desde la app y líneas con flete manual a verificar contra el piso.
+    /// Sin fecha corre sobre todo el histórico; <c>tamano</c> ("1-10", "11-100" o "+100", por líneas del pliego) recorta el tiempo de costeo.
     /// </summary>
     [HttpGet("kpis-piloto")]
     [ProducesResponseType(StatusCodes.Status200OK)]

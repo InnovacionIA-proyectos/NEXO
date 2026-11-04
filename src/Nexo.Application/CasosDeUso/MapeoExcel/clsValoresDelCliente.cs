@@ -6,10 +6,7 @@ namespace Nexo.Application.CasosDeUso.MapeoExcel;
 /// <summary>Lo que un cliente escribe distinto a NEXO en una columna categórica (los términos de tipo <c>valor</c> de su diccionario).</summary>
 public static class clsValoresDelCliente
 {
-    /// <summary>
-    /// <c>(campo, término normalizado) → valor de NEXO</c>. Lo propio del cliente manda sobre lo general; sin cliente solo valen los generales,
-    /// porque «todos» son los de todos los clientes.
-    /// </summary>
+    /// <summary><c>(campo, término normalizado) → valor de NEXO</c>; lo del cliente manda sobre lo general y sin cliente solo valen los generales.</summary>
     public static async Task<Dictionary<(string Campo, string Termino), string>> CargarAsync(
         IDiccionarioClienteRepository diccionario, Guid? clienteId, CancellationToken ct)
     {

@@ -1,9 +1,9 @@
 namespace Nexo.Application.CasosDeUso.TarifasPlaza.DTOs;
 
-/// <summary>Tarifa de plaza gobernada por Nexo (S4-HU-10). <see cref="ZonaOrigen"/>/<see cref="ZonaDestino"/>
-/// se resuelven desde el catálogo de municipios al elegir origen/destino (pedido explícito de la Issue #211).
-/// Al menos uno de <see cref="PesoId"/>/<see cref="TipoVehiculo"/> viene lleno — no son
-/// mutuamente excluyentes: las tarifas de contenedor traen ambos (verificado con datos reales).</summary>
+/// <summary>
+/// Tarifa de plaza gobernada por Nexo. <see cref="ZonaOrigen"/>/<see cref="ZonaDestino"/> se resuelven desde el catálogo de municipios.
+/// Al menos uno de <see cref="PesoId"/>/<see cref="TipoVehiculo"/> viene lleno; las tarifas de contenedor traen ambos.
+/// </summary>
 public record clsTarifaPlazaDto(
     Guid Id, string LineaNegocio, string ClaseViaje,
     int OrigenMunicipioId, string Origen, string? ZonaOrigen,

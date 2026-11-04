@@ -5,10 +5,7 @@ using Nexo.Application.Common.Dtos;
 
 namespace Nexo.Application.CasosDeUso.PlanDeCargue;
 
-/// <summary>GET /api/planes-cargue — listado contra la proyección local. Resumen, no
-/// detalle — mismo shape que ya usa la consulta de respaldo de un solo plan. Pagina
-/// (reemplaza el tope fijo de 100, que ya no alcanzaba a mostrar planes viejos, por
-/// page/pageSize real).</summary>
+/// <summary>GET /api/planes-cargue — listado paginado (page/pageSize) contra la proyección local; resumen, no detalle.</summary>
 public sealed record clsListarPlanesCargueQuery(int Page = 1, int PageSize = 50) : IQuery<clsPaginaDto<clsPlanCargueDto>>;
 
 public sealed class clsListarPlanesCargueQueryHandler(IPlanCargueRepository planes)

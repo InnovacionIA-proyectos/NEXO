@@ -11,11 +11,7 @@ public static class clsServicioConexoCategoria
     public static string Normalizada(string? categoria) =>
         (categoria ?? "").Trim().ToUpperInvariant().Contains("ADICION") ? "adicional" : "logistico";
 
-    /// <summary>
-    /// Validación estricta (para crear/editar manual): por defecto "logistico"; un valor
-    /// NO reconocido se RECHAZA (QA-DATA-007), para que un typo no caiga silenciosamente
-    /// a logístico y descuadre los subtotales.
-    /// </summary>
+    /// <summary>Validación estricta (crear/editar manual): por defecto "logistico"; un valor NO reconocido se RECHAZA para que un typo no caiga a logístico y descuadre los subtotales.</summary>
     public static string Validada(string? categoria)
     {
         if (string.IsNullOrWhiteSpace(categoria)) return "logistico";

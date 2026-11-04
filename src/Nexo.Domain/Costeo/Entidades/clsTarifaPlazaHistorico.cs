@@ -1,13 +1,8 @@
 namespace Nexo.Domain.Costeo.Entidades;
 
 /// <summary>
-/// Snapshot del valor ANTERIOR de una <see cref="clsTarifaPlaza"/>, archivado solo por el
-/// trigger de BD <c>TRG_tarifas_plaza_historico</c> cuando cambia Valor/Vigencia/
-/// DetallesTarifa — nunca se escribe desde la aplicación (sin método Agregar/puerto de
-/// escritura). Mapeada por primera vez en S5-HU-16.3/#256: antes de esta issue
-/// <c>tbl_tarifas_plaza_historico</c> existía como tabla SQL pero sin ningún mapeo EF —
-/// el motor de costeo no podía consultar el histórico propio y caía directo al log
-/// externo (tblSAPTarifasLog).
+/// Snapshot del valor anterior de una <see cref="clsTarifaPlaza"/>, archivado por el trigger de BD
+/// <c>TRG_tarifas_plaza_historico</c> cuando cambia Valor/Vigencia/DetallesTarifa. Nunca se escribe desde la aplicación.
 /// </summary>
 public class clsTarifaPlazaHistorico
 {

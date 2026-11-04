@@ -1,10 +1,6 @@
 namespace Nexo.Application.CasosDeUso.PlanDeCargue.Interfaces;
 
-/// <summary>
-/// Compuerta de liberación por paridad del motor. Cuando está
-/// cerrada, ninguna solicitud de cubicación llega a publicarse a la cola — se
-/// responde "en verificación" antes de tocar nada.
-/// </summary>
+/// <summary>Compuerta de liberación por paridad del motor: cerrada, ninguna solicitud de cubicación se publica y se responde "en verificación".</summary>
 public interface IParidadCubicadorPort
 {
     bool Habilitada { get; }

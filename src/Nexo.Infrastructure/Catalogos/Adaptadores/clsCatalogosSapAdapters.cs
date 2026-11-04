@@ -6,7 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Nexo.Infrastructure.Catalogos.Adaptadores;
 
-/// <summary>Línea de negocio (tblSAPLineaNegocio, dbSolucionesTI) — mismo patrón de caché 1h que <see cref="clsTiposVehiculoAdapter"/>.</summary>
+/// <summary>Línea de negocio (tblSAPLineaNegocio, dbSolucionesTI), cacheada 1 h.</summary>
 public sealed class clsLineasNegocioAdapter(IServiceProvider sp, IMemoryCache cache) : ILineasNegocioPort
 {
     private readonly clsDbSolucionesTiDbContext? _dc = sp.GetService<clsDbSolucionesTiDbContext>();

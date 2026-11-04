@@ -7,11 +7,7 @@ using Nexo.Mensajes.Cubicacion;
 
 namespace Nexo.Application.CasosDeUso.PlanDeCargue;
 
-/// <summary>
-/// Alta/edición de un ítem del plan — POST
-/// /api/planes-cargue/{id}/items. <c>Id</c> nulo = alta; con <c>Id</c> = edición (upsert),
-/// misma semántica que el POST síncrono de Cubicador que este comando reemplaza.
-/// </summary>
+/// <summary>Alta/edición de un ítem del plan (POST /api/planes-cargue/{id}/items). <c>Id</c> nulo = alta; con <c>Id</c> = edición (upsert).</summary>
 public sealed record clsGuardarItemCommand(
     Guid PlanCargueId,
     Guid? Id,

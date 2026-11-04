@@ -179,8 +179,7 @@ Cuidado con las tres reglas de arriba, sobre todo la 2: no se puede asumir que
 
 ### Ojo con el checklist de Cotifly
 
-`COTIFLY-CONEXION-RECOMENDACION-VEHICULO.md` manda a consultar `GET /vehiculos`
-para el desplegable de tipo de vehículo. **Ese no es el catálogo canónico**: es
+El desplegable de tipo de vehículo de Cotifly no debe salir de `GET /vehiculos`. **Ese no es el catálogo canónico**: es
 el de presets del motor 3D, que devuelve nombres como `"Turbo con estacas"`. El
 de los códigos `2L2` / `C2` / `3S3` es **`GET /vehiculos-catalogo`**. Es el
 problema de los dos catálogos de `cubicador/docs/DEUDA_DIFERIDA_3D.md` §1.
@@ -204,9 +203,6 @@ Cuando conecten:
 | Llave de API | `Authorization: Bearer`. Para `/recomendaciones` **no sirve la `CUBICADOR_API_KEY` genérica**: va `CUBICADOR_API_KEY_COTIFLY`, porque de la llave sale el `origenSistema` verificado |
 | `origenSistema` | sale de la llave, no del cuerpo. Si el cuerpo lo declara y no coincide, es **401** |
 | Reparto entre camiones | `indicePosicion`, igual que el portal |
-
-El resto del checklist de `COTIFLY-CONEXION-RECOMENDACION-VEHICULO.md` sigue
-vigente, con la corrección de `GET /vehiculos-catalogo` señalada arriba.
 
 ---
 

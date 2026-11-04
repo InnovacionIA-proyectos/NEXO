@@ -5,10 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Nexo.Api.Asistente;
 
-/// <summary>
-/// Las reglas y preferencias propias de quien usa el asistente. Se guardan conversando (el asistente las propone y la persona las confirma);
-/// aquí se ven y se borran. Son de cada persona: nadie ve ni borra las de otra.
-/// </summary>
+/// <summary>Preferencias propias de quien usa el asistente: se ven y se borran aquí; cada persona solo ve las suyas.</summary>
 [ApiController]
 [Authorize(Roles = "AdminTarifas,Admin")]
 [Route("api/asistente/preferencias")]

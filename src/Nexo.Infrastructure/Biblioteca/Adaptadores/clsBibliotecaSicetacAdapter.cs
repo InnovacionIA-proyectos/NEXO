@@ -9,21 +9,12 @@ using Microsoft.Extensions.Caching.Memory;
 namespace Nexo.Infrastructure.Biblioteca.Adaptadores;
 
 /// <summary>
-/// Consulta de SOLO LECTURA a la matriz oficial SICE-TAC del Data Warehouse
-/// (DWSice.dbo.tblRutasSicetac, ~3,8 M de filas). Sin periodo explícito se usa el
-/// más reciente. Portado 1:1 desde
-/// Nexo.Api/Services/BibliotecaSicetacService.cs del proyecto original.
+/// Consulta de solo lectura a la matriz SICE-TAC del Data Warehouse (DWSice.dbo.tblRutasSicetac). Sin periodo explícito usa el más reciente.
 /// </summary>
 public sealed class clsBibliotecaSicetacAdapter(clsDwSiceDbContext dw, IMemoryCache cache) : IBibliotecaSicetacPort
 {
     private const int MaxTop = 200;
-    // PeriodosAsync dispara un DISTINCT sobre Periodo en las ~2.14M filas de
-    // tblRutasSicetac (sin índice - ver clsDependencyInjection.cs), probable causa
-    // principal de los ~33s reportados en frío "sin filtros" (BuscarAsync resuelve
-    // el periodo más reciente por acá antes de filtrar la matriz). Los periodos
-    // SICE-TAC cambian con baja frecuencia (mensual), así que subir el TTL de
-    // 15 min a 6 horas reduce el costo sin arriesgar servir un periodo
-    // desactualizado por más que unas horas.
+    // PeriodosAsync hace un DISTINCT sobre Periodo sin índice; los periodos cambian con baja frecuencia, por eso el TTL largo.
     private static readonly TimeSpan CacheTtl = TimeSpan.FromHours(6);
 
     public async Task<clsMatrizSicetacResultDto> BuscarAsync(
@@ -53,12 +44,8 @@ public sealed class clsBibliotecaSicetacAdapter(clsDwSiceDbContext dw, IMemoryCa
             query = query.Where(r => r.ViaEstandar == viaEstandar.Trim());
 
         var total = await query.CountAsync(ct);
-        // DWSice corre en compatibility level 100 (SQL Server 2008): no soporta OFFSET/FETCH,
-        // que es lo que EF genera para Skip().Take() ("Incorrect syntax near 'OFFSET'").
-        // No es negociable subir el compatibility level de un Data Warehouse corporativo
-        // desde este repo, así que la página se recorta del lado del cliente: Take(page*top)
-        // sigue traduciendo a TOP (soportado desde SQL 2000), y el Skip queda en memoria.
-        // MaxTop=200 acota el costo por página incluso en páginas altas.
+        // DWSice corre en compatibility level 100 (SQL 2008): no soporta el OFFSET/FETCH que genera Skip().Take().
+        // Se usa Take(page*top) (TOP) y el Skip se aplica en memoria; MaxTop acota el costo.
         var candidatos = await query
             .OrderBy(r => r.NombreRuta).ThenBy(r => r.Configuracion).ThenBy(r => r.NombreUnidadTransporte)
             .Take(page * top)

@@ -8,30 +8,10 @@ using Nexo.Application.Common.Ports;
 namespace Nexo.Application.CasosDeUso.Notificaciones;
 
 /// <summary>
-/// Manda el correo de una cotización entregada.
-///
-/// FUERA DE LA PETICIÓN. Antes esto vivía dentro del caso
-/// de uso de entrega: quien entregaba esperaba a que el correo saliera, y con el relay lento
-/// esperaba de más. Ahora la entrega publica el evento y responde; esto corre después,
-/// llamado desde un consumidor.
-///
-/// LA NOTIFICACIÓN ES INTERNA Y VA A QUIEN LA PIDIÓ. El destinatario es
-/// <c>clsSolicitud.Creador</c> — el usuario de Nexo que dio de alta la solicitud de flete,
-/// resuelto contra la sesión real del portal — nunca el cliente ni un
-/// "responsable comercial" sacado de un Data Warehouse por NIT (así resolvía esto antes;
-/// se retiró IComercialResponsablePort/DwCubosSap por completo, ya sin uso).
-/// Es, además, una salvaguarda estructural: <c>clsCliente</c> no tiene columna de correo, así
-/// que no hay de dónde sacar una dirección de cliente aunque alguien lo intentara.
-///
-/// LO QUE NO SE PUEDE HACER es tragarse los fallos. Antes se devolvían en el mensaje de
-/// la respuesta y quedaban ahí; ahora que nadie mira la respuesta, un fallo silencioso
-/// sería una notificación perdida sin rastro. Así que las excepciones de la salida de
-/// correo SUBEN: el bus reintenta las pasajeras y manda a la cola de error las que no
-/// tienen arreglo.
-///
-/// Lo que sí se resuelve sin error son las situaciones en que no hay a quién escribirle
-/// —sin cliente, sin creador, sin relay configurado—. Eso no es una avería: es que no
-/// había correo que mandar, y reintentarlo cuatro veces no lo va a cambiar.
+/// Manda el correo de una cotización entregada, fuera de la petición (llamado desde un consumidor).
+/// El destinatario es <c>clsSolicitud.Creador</c>, nunca el cliente (<c>clsCliente</c> no tiene correo).
+/// Los fallos de la salida de correo SUBEN para que el bus reintente o los lleve a la cola de error; lo que no es avería
+/// (sin cliente, sin creador, sin relay configurado) se resuelve sin error porque reintentar no lo cambia.
 /// </summary>
 public sealed record clsNotificarEntregaCommand(
     Guid CotizacionId,
@@ -69,7 +49,7 @@ public sealed class clsNotificarEntregaCommandHandler(
             return clsResultadoDeNotificacionDto.NoHabiaQueEnviar(
                 "La salida de correo corporativo no está configurada.");
 
-        // S6-HU-24.3/#320: el correo lleva el motivo de cada línea rechazada.
+        // El correo lleva el motivo de cada línea rechazada.
         var rechazadas = (await lineasSolicitud.ObtenerRechazadasAsync(command.SolicitudId, ct))
             .Select(l => new clsLineaRechazadaInfo(
                 l.clsRuta is { } r ? $"{r.Origen} → {r.Destino}" : "—", l.Tipologia?.ToString(), l.MotivoRechazo ?? string.Empty))

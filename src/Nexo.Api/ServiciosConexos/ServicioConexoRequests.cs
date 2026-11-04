@@ -2,10 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Nexo.Api.ServiciosConexos;
 
-/// <summary>
-/// Origen/Destino/Puerto/Ruta/TipoMaquina son opcionales: cada tipo de servicio usa solo
-/// las que le corresponden (S4-HU-15.1/#223) — las demás se normalizan a "NO APLICA".
-/// </summary>
+/// <summary>Origen/Destino/Puerto/Ruta/TipoMaquina son opcionales: cada tipo de servicio usa solo los que le corresponden y los demás se normalizan a "NO APLICA".</summary>
 public class clsCrearServicioConexoRequest
 {
     [Required, MaxLength(30)]

@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Nexo.Infrastructure.Catalogos.Adaptadores;
 
-/// <summary>S6-HU-27.2/#321: diccionario de alias sobre <c>tbl_alias_elementos</c>.</summary>
+/// <summary>Diccionario de alias sobre <c>tbl_alias_elementos</c>.</summary>
 public sealed class clsEfAliasCatalogoRepository(clsNexoDbContext db) : IAliasCatalogoPort
 {
     public async Task<IReadOnlyList<clsAliasElemento>> ListarAsync(string? tipoElemento, CancellationToken ct)

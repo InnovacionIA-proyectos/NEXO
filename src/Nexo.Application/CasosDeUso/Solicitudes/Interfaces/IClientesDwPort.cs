@@ -2,11 +2,7 @@ namespace Nexo.Application.CasosDeUso.Solicitudes.Interfaces;
 
 public sealed record clsClienteDwDto(string Bp, string Nit, string Nombre);
 
-/// <summary>
-/// Clientes reales del Data Warehouse (DWCubosOperacionesEBS.DimBPSolicitante).
-/// Null/Configurado=false cuando ConnectionStrings:DwCubos no está configurada:
-/// la captura se degrada a la tabla local de clientes (ver IClientesPort).
-/// </summary>
+/// <summary>Clientes reales del DW (DimBPSolicitante). Null/Configurado=false si <c>ConnectionStrings:DwCubos</c> no está configurada: la captura usa la tabla local (ver IClientesPort).</summary>
 public interface IClientesDwPort
 {
     bool Configurado { get; }

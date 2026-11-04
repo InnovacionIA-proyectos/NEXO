@@ -4,15 +4,8 @@ using ClosedXML.Excel;
 
 namespace Nexo.Infrastructure.ReglasSoloSicetac.Adaptadores;
 
-/// <summary>
-/// Excel de descarga de las reglas "solo SICE-TAC" (S5-HU-22.1/#288). Mismas 3 columnas que la
-/// plantilla y que lee <see cref="clsExcelReglasSoloSicetacAdapter"/> al importar.
-///
-/// Origen y Destino se escriben TAL COMO están guardados —código DANE en las cargas de S4-HU-09.2,
-/// texto normalizado en las filas más viejas— y como TEXTO, no número: un DANE como "05001000"
-/// perdería el cero inicial si Excel lo tomara por numérico, y la regla reimportada ya no
-/// coincidiría con la guardada.
-/// </summary>
+/// <summary>Excel de descarga de las reglas "solo SICE-TAC", con las mismas 3 columnas de la plantilla. Origen y Destino se escriben
+/// tal como están guardados y como TEXTO: un DANE como "05001000" perdería el cero inicial si Excel lo tomara por número.</summary>
 public sealed class clsExportadorReglasSoloSicetacExcelAdapter : IExportadorReglasSoloSicetacExcelPort
 {
     private static readonly string[] Encabezados = ["ORIGEN", "DESTINO", "TIPO VEHICULO"];

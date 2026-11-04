@@ -8,12 +8,7 @@ using Nexo.Domain.Catalogos.Entidades;
 
 namespace Nexo.Application.CasosDeUso.ServiciosConexos;
 
-/// <summary>
-/// Origen/Destino/Puerto/Ruta/TipoMaquina son opcionales: cada tipo de servicio usa solo
-/// el subconjunto que le corresponde (Almacenamiento → Origen; ITR → Origen+Puerto+
-/// TipoMaquina; adicional por ruta → Ruta; adicional por origen-destino → Origen+Destino;
-/// valor único → ninguna) — las que no vienen se normalizan a "NO APLICA" (S4-HU-15.1/#223).
-/// </summary>
+/// <summary>Origen/Destino/Puerto/Ruta/TipoMaquina son opcionales: cada tipo de servicio usa solo su subconjunto y las que no vienen se normalizan a "NO APLICA".</summary>
 public sealed record clsCrearServicioConexoCommand(
     string CodigoServicio, string TipoServicio, string? Origen, string? Destino, string? Puerto,
     string? Ruta, string? TipoMaquina, decimal CostoUnitario, string Unidad, DateOnly Vigencia,

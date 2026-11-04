@@ -4,18 +4,12 @@ using Nexo.Domain.Enums;
 namespace Nexo.Application.CasosDeUso.Solicitudes.Validadores;
 
 /// <summary>
-/// Forma de <see cref="clsCapturarSolicitudCommand"/>. Se ejecuta ENTERO antes de tocar
-/// nada: en un pliego de 300 líneas, la 300 mal formada se descubre antes de resolver
-/// clientes, rutas o vehículos, no a mitad del recorrido.
-///
-/// Aquí solo se mira el comando. Que el cliente exista, que el BP esté en el catálogo
-/// o que el DW esté configurado son precondiciones del caso de uso: necesitan consultar
-/// y viven en el handler.
+/// Forma de <see cref="clsCapturarSolicitudCommand"/>: se ejecuta ENTERO antes de tocar nada, para descubrir una línea mal formada antes de
+/// resolver clientes, rutas o vehículos. Las precondiciones que consultan datos viven en el handler.
 /// </summary>
 public static class clsCapturarSolicitudValidador
 {
-    /// <summary>#304: tope de unidades de una línea = el del Cubicador por petición (10.000 en total). Se valida acá, al
-    /// capturar, y no al pedir la recomendación, para que el error aparezca donde se originó.</summary>
+    /// <summary>Tope de unidades de una línea = el del Cubicador por petición (10.000 en total); se valida al capturar para que el error aparezca donde se originó.</summary>
     public const int MaxUnidadesPorLinea = 10_000;
 
     /// <summary>Margen del 1 % con el que la suma de las posiciones puede superar el peso total sin rechazar la línea.</summary>

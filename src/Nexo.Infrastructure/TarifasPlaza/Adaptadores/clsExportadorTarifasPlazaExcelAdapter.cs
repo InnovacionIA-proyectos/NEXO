@@ -4,17 +4,14 @@ using ClosedXML.Excel;
 
 namespace Nexo.Infrastructure.TarifasPlaza.Adaptadores;
 
-/// <summary>Exporta el catálogo de tarifas de plaza a Excel con ClosedXML — mismas columnas
-/// legibles que espera <see cref="Repositorios.clsEfTarifasPlazaRepository.ImportarExcelAsync"/>
-/// al leerlo de vuelta, así el mismo archivo sirve para editar y volver a cargar.</summary>
+/// <summary>Exporta con las mismas columnas que lee <see cref="Repositorios.clsEfTarifasPlazaRepository.ImportarExcelAsync"/>: el archivo sirve para editar y recargar.</summary>
 public sealed class clsExportadorTarifasPlazaExcelAdapter : IExportadorTarifasPlazaExcelPort
 {
     private static readonly string[] Encabezados =
     [
         "LINEA DE NEGOCIO", "CLASE DE VIAJE", "ORIGEN", "DESTINO", "CLASE CONTENEDOR",
         "RANGO PESO", "TIPO VEHICULO", "VALOR", "VIGENCIA", "DETALLES",
-        // S5-HU-22.1/#288: al final y opcionales al importar. Sin ellas, exportar y reimportar un
-        // municipio de nombre repetido ("ARMENIA") caería en el primero de la lista.
+        // Al final y opcionales al importar; sin ellas, un municipio de nombre repetido ("ARMENIA") caería en el primero de la lista.
         "DEPARTAMENTO ORIGEN", "DEPARTAMENTO DESTINO",
     ];
 

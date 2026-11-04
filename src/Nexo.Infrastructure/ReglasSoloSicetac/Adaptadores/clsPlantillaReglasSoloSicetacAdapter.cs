@@ -3,8 +3,7 @@ using ClosedXML.Excel;
 
 namespace Nexo.Infrastructure.ReglasSoloSicetac.Adaptadores;
 
-/// <summary>Genera la plantilla Excel de reglas "solo SICE-TAC" con ClosedXML — mismas
-/// 3 columnas que espera <see cref="clsExcelReglasSoloSicetacAdapter"/> al leer la carga masiva.</summary>
+/// <summary>Plantilla Excel de reglas "solo SICE-TAC", con las mismas 3 columnas que lee <see cref="clsExcelReglasSoloSicetacAdapter"/>.</summary>
 public sealed class clsPlantillaReglasSoloSicetacAdapter : IPlantillaReglasSoloSicetacPort
 {
     public (byte[] Contenido, string NombreArchivo) Generar()

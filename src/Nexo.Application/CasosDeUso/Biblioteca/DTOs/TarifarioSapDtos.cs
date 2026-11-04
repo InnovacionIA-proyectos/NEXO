@@ -17,9 +17,7 @@ public record clsConsultaTarifarioSap(
     bool Consolidado,
     bool RetornaContenedor = false,
     string? CiudadDevolucion = null,
-    /// <summary>Horas de cargue+descargue REALES de la solicitud (S4-HU-14.1/#221) — para
-    /// recalcular el piso SICE-TAC oficial en vez de asumir las horas pactadas. Null cuando
-    /// no hay contexto de solicitud.</summary>
+    /// <summary>Horas REALES de cargue+descargue de la solicitud, para recalcular el piso SICE-TAC oficial en vez de asumir las pactadas. Null sin contexto de solicitud.</summary>
     decimal? HorasSolicitud = null,
     /// <summary>Código DANE del origen y del destino (tbl_municipios.CodigoDane) cuando la ruta de la línea ya resolvió
     /// contra el catálogo de municipios. Con los dos, el piso SICE-TAC oficial compara la ruta exacta por código; si falta
@@ -28,11 +26,8 @@ public record clsConsultaTarifarioSap(
     string? DestinoDane = null);
 
 /// <summary>
-/// Resultado del motor: la tarifa de plaza seleccionada por las reglas (si está
-/// vencida NUNCA se propone, solo se informa) y el candidato SICETAC oficial
-/// cuando la condición de comparación aplica. #300: el retorno del contenedor
-/// vacío YA NO sale de aquí (era la tarifa de plaza de la línea 6): se calcula
-/// como viaje vacío SICE-TAC con 1h+1h en <c>clsPropuestaTarifaAdapter</c>.
+/// Resultado del motor: la tarifa de plaza seleccionada (si está vencida NUNCA se propone, solo se informa) y el candidato SICETAC
+/// oficial cuando aplica la comparación. El retorno del contenedor vacío se calcula como viaje vacío SICE-TAC con 1h+1h en <c>clsPropuestaTarifaAdapter</c>.
 /// </summary>
 public record clsResultadoTarifarioSap(
     clsCandidatoTarifaDto? Tarifa,

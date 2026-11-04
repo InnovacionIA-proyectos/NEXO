@@ -1,13 +1,9 @@
 namespace Nexo.Domain.PlanDeCargue.Entidades;
 
 /// <summary>
-/// #304: por qué el worker del Cubicador rechazó "crear_desde_linea" para una línea. Una fila por línea (la clave ES la
-/// línea): un rechazo nuevo reemplaza al anterior, y pedir el plan otra vez la borra (empieza de cero).
-///
-/// Existe porque <c>POST /api/planes-cargue/desde-linea</c> responde 202 y el rechazo vuelve por cola DESPUÉS: como en ese
-/// flujo no hay ningún <c>clsPlanCargue</c> que marcar (el Id del mensaje es el de la línea), el motivo solo se registraba
-/// en el log y el front sondeaba para siempre sin poder distinguir "todavía procesando" de "falló". Es una tabla aparte, no
-/// columnas de la línea, para no tocar una tabla que lee todo el sistema.
+/// Por qué el Cubicador rechazó "crear_desde_linea" para una línea. Una fila por línea: un rechazo nuevo reemplaza al
+/// anterior y pedir el plan otra vez la borra. Como el endpoint responde 202 y el rechazo llega después por cola, no hay un
+/// plan donde marcarlo; esta tabla permite distinguir "procesando" de "falló".
 /// </summary>
 public class clsRechazoCubicacionLinea
 {

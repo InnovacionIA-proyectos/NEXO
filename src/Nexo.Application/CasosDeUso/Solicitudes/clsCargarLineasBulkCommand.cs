@@ -12,14 +12,7 @@ using Nexo.Mensajes.Solicitudes;
 
 namespace Nexo.Application.CasosDeUso.Solicitudes;
 
-/// <summary>
-/// Carga masiva de líneas de un pliego de licitación.
-///
-/// Guarda las líneas y encola el auto-costeo; NO cuesta nada aquí. Devuelve el
-/// identificador del trabajo, que es con lo que el cliente pregunta después por su
-/// avance. Insertar 300 filas es rápido; costearlas no, y por eso lo segundo se va
-/// a la cola.
-/// </summary>
+/// <summary>Carga masiva de líneas de un pliego: guarda las líneas y encola el auto-costeo (no cuesta aquí); devuelve el identificador del trabajo para consultar el avance.</summary>
 public sealed record clsCargarLineasBulkCommand(Guid SolicitudId, IReadOnlyList<clsCrearLineaInput> Lineas) : ICommand<Guid>;
 
 public sealed class clsCargarLineasBulkCommandHandler(
@@ -40,14 +33,9 @@ public sealed class clsCargarLineasBulkCommandHandler(
         if (s.Estado is EstadoSolicitud.Entregada or EstadoSolicitud.Descartada)
             throw new clsConflictException("SOLICITUD_NO_EDITABLE", $"No se pueden agregar líneas a una solicitud {s.Estado}.");
 
-        // S5-HU-17/#263: horas por línea, mismo criterio que clsCapturarSolicitudCommand
-        // (#251) — si la línea no trae las suyas, cae al default de ESTA solicitud (la
-        // que ya tenga en CondicionesServicio, o 4h+4h si nunca se serializó — ver
-        // clsCrearSolicitudCommand, que no guarda condiciones propias).
+        // Horas por línea: si no trae las suyas, el default de ESTA solicitud (CondicionesServicio, o 4h+4h si nunca se serializó).
         var tiemposSolicitud = clsCondicionesServicioDto.Desde(s.CondicionesServicio).TiemposLogisticos!;
-        // S5-HU-18.3/#275: numera en orden de este lote (1..N). Pensado para el caso
-        // común — un bulk sobre una solicitud recién creada, sin líneas previas — no
-        // continúa la numeración de un bulk anterior sobre la misma solicitud.
+        // Numera en orden de este lote (1..N); no continúa la numeración de un bulk anterior sobre la misma solicitud.
         var nuevas = command.Lineas.Select((lr, i) =>
         {
             var (horasCargue, horasDescargue) = clsResolucionHorasLinea.Resolver(
@@ -77,10 +65,7 @@ public sealed class clsCargarLineasBulkCommandHandler(
         var trabajoId = Guid.NewGuid();
         var ahora = clock.GetUtcNow();
 
-        // El trabajo se registra AQUÍ, no cuando la orquestación arranque. Así el
-        // identificador que se devuelve con el 202 es consultable desde el instante en
-        // que el cliente lo recibe, y no hay una ventana en la que responda 404 para un
-        // identificador que sí es válido.
+        // El trabajo se registra AQUÍ para que el identificador devuelto con el 202 sea consultable desde que el cliente lo recibe, sin ventana de 404.
         trabajos.Registrar(trabajoId, s.Id, usuarioActual.Id, ahora);
 
         await publicador.PublicarAsync(

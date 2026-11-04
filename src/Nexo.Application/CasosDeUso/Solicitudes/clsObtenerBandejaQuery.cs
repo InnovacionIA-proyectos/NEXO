@@ -11,18 +11,8 @@ using Nexo.Domain.Solicitudes.Entidades;
 namespace Nexo.Application.CasosDeUso.Solicitudes;
 
 /// <summary>
-/// Bandeja Priorizada (anti-FIFO): la cola se sirve por score descendente, no por
-/// orden de llegada. Por defecto (atención 'pendientes') es la COLA DE TRABAJO:
-/// solicitudes con líneas SIN flete o con todas las líneas revisadas pero todavía sin
-/// entregar (S5-HU-23.1/#289).
-///
-/// Pagina (page 1-based, pageSize) - a diferencia de los listados
-/// paginados en SQL (Skip/Take antes de traer las filas), acá el score se
-/// recalcula en memoria por fila con "ahora" (el score persistido se congela al
-/// capturar), así que la paginación se aplica DESPUÉS de traer y ordenar todo lo
-/// que cumple el filtro. No reduce el trabajo del backend (eso exigiría poder
-/// calcular el score en SQL, fuera de alcance de este fix), pero sí acota el
-/// tamaño de la respuesta - que es el síntoma que reportó el frontend.
+/// Bandeja Priorizada (anti-FIFO): se sirve por score descendente. Por defecto es la COLA DE TRABAJO (líneas sin flete, o todas revisadas pero
+/// sin entregar). El score se recalcula en memoria con "ahora", así que la paginación se aplica DESPUÉS de traer y ordenar todo.
 /// </summary>
 public sealed record clsObtenerBandejaQuery(clsBandejaFiltro Filtro, int Page = 1, int PageSize = 50) : IQuery<clsPaginaDto<clsBandejaItemDto>>;
 
@@ -36,10 +26,8 @@ public sealed class clsObtenerBandejaQueryHandler(
         var parametros = await solicitudes.ParametrosScoreAsync(ct);
         var ahora = clock.GetUtcNow();
         var resultado = clsBandejaResultado.Parsear(filtro.Resultado);
-        // S5-HU-23.1/#289: la vista por defecto es la cola de trabajo ("pendientes"), que solo trae
-        // Estado Pendiente/EnCosteo. Con un resultado informado y sin atención explícita eso
-        // ocultaría justo lo que se pide (una cotización Ganada/Perdida/esperando ya es Entregada),
-        // así que la atención vacía se trata como "todas".
+        // La vista por defecto ("pendientes") solo trae Pendiente/EnCosteo; con un resultado informado y sin atención explícita se trata como
+        // "todas", porque una cotización Ganada/Perdida/esperando ya es Entregada.
         var atencion = (string.IsNullOrWhiteSpace(filtro.Atencion) ? (resultado is null ? "pendientes" : "todas") : filtro.Atencion)
             .Trim().ToLowerInvariant();
 
@@ -47,16 +35,12 @@ public sealed class clsObtenerBandejaQueryHandler(
         if (!string.IsNullOrWhiteSpace(filtro.Estado) && Enum.TryParse<EstadoSolicitud>(filtro.Estado, ignoreCase: true, out var e) && Enum.IsDefined(e))
             estado = e;
 
-        // Aislamiento por comercial (issue #199, S4-HU-19.1): un Comercial solo ve lo
-        // que él mismo creó. El resto de los roles (Mesa de Costeo/AdminBiblioteca,
-        // Admin, etc.) siguen viendo la bandeja completa, sin restricción.
+        // Aislamiento por comercial: un Comercial solo ve lo que él mismo creó; los demás roles ven la bandeja completa.
         var creadoPorFiltro = usuarioActual.Rol == RolUsuario.Comercial ? usuarioActual.Id : (Guid?)null;
 
         var filas = await solicitudes.BandejaFilasAsync(atencion, estado, filtro.Desde, filtro.Hasta, creadoPorFiltro, resultado, ct);
 
-        // S5-HU-23.1/#289: la vigencia es la de la FECHA LÍMITE, no la antigüedad de la captura
-        // (antes: "capturada hace menos de 7 días", sin mirar nunca el Deadline). Sin Deadline
-        // cuenta como vigente (regla confirmada); vencida = Deadline anterior a "ahora".
+        // La vigencia es la de la FECHA LÍMITE; sin Deadline cuenta como vigente, vencida = Deadline anterior a "ahora".
         bool Vigente(clsBandejaFilaRaw f) => f.Deadline is null || f.Deadline >= ahora;
         var vigenciaFiltro = filtro.Vigencia?.Trim().ToLowerInvariant();
         if (vigenciaFiltro == "vigente") filas = filas.Where(Vigente).ToList();

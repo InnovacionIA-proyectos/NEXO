@@ -31,8 +31,7 @@ public sealed class clsCrearReglaSoloSicetacCommandHandler(
         reglas.Agregar(regla);
         await uow.SaveChangesAsync(ct);
 
-        // Mismo criterio de resolución que el listado (#242-adjacent): Origen/Destino
-        // suelen ser código DANE, se resuelve a nombre de municipio para la respuesta.
+        // Origen/Destino suelen ser código DANE: se resuelve a nombre de municipio para la respuesta.
         var catalogo = await municipios.ListarAsync(ct);
         var porCodigoDane = catalogo
             .GroupBy(m => m.CodigoDane)

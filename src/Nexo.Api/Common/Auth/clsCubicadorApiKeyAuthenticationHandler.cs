@@ -8,16 +8,8 @@ using Microsoft.Extensions.Options;
 namespace Nexo.Api.Common.Auth;
 
 /// <summary>
-/// Esquema de servicio-a-servicio para el microservicio Cubicador (Python): valida
-/// "Authorization: Bearer &lt;Cubicador3D:InboundApiKey&gt;" en vez de la sesión del
-/// portal — no identifica una persona ni un rol de negocio, solo autoriza "quién puede
-/// llamar este endpoint" (ver cubicador/CONTRATO.md sección 7). Mismo valor que
-/// NEXO_CALLBACK_API_KEY en el .env del Cubicador — es el mismo secreto compartido,
-/// visto desde cada lado.
-///
-/// Fail-closed: sin key configurada, sin header, o con un valor que no coincide, la
-/// petición NO se autentica (401) — nunca cae al esquema de identidad del portal, que
-/// no tiene sentido para una llamada de servicio a servicio.
+/// Esquema servicio-a-servicio para el Cubicador (Python): valida "Authorization: Bearer &lt;Cubicador3D:InboundApiKey&gt;" (mismo secreto que NEXO_CALLBACK_API_KEY del Cubicador).
+/// No identifica una persona ni un rol. Fail-closed: sin key configurada, sin header o con valor distinto responde 401 y nunca cae al esquema del portal.
 /// </summary>
 public class clsCubicadorApiKeyAuthenticationHandler(
     IConfiguration configuration,

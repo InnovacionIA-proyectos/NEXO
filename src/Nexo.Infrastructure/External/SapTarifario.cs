@@ -1,17 +1,9 @@
 namespace Nexo.Infrastructure.External;
 
-/// <summary>
-/// Tablas del datacenter (dbsolucionesTI, SOLO LECTURA) que soportan la lógica del
-/// tarifario SAP (getConsultarTarifaFlete): zonas de tarificación, rangos de peso
-/// para derivar la configuración SICE-TAC, parámetros y clases de contenedor.
-/// </summary>
+/// <summary>Tablas del datacenter (solo lectura) del tarifario SAP: zonas de tarificación, rangos de peso, parámetros y clases de contenedor.</summary>
 
-/// <summary>
-/// Relación zona de tarificación (ZTC_*) → zonas de transporte (ZC_*) que agrupa
-/// (tblZonasTarificacionRelacion). Es la fuente del fallback por zonas: una ciudad
-/// pertenece a la zona cuyo IDZONATRANSPORTE contiene su nombre
-/// (ZTC_CALI = ZC_CALI + ZC_YUMBO + ZC_PALMIRA).
-/// </summary>
+/// <summary>Zona de tarificación (ZTC_*) → zonas de transporte (ZC_*); fuente del fallback por zonas:
+/// una ciudad pertenece a la zona cuyo IDZONATRANSPORTE contiene su nombre.</summary>
 public class clsSapZonaTarificacionRelacion
 {
     public int Id { get; set; }
@@ -19,11 +11,7 @@ public class clsSapZonaTarificacionRelacion
     public string IdZonaTransporte { get; set; } = null!;   // ZC_YUMBO
 }
 
-/// <summary>
-/// Rango de peso → configuración vehicular SICE-TAC (tblRangoPeso). Con
-/// tblContenedorRangoPeso deriva la config para la comparación SICETAC de
-/// viajes en contenedor.
-/// </summary>
+/// <summary>Rango de peso → configuración vehicular SICE-TAC; con tblContenedorRangoPeso deriva la config de viajes en contenedor.</summary>
 public class clsSapRangoPeso
 {
     public int Id { get; set; }
@@ -40,11 +28,7 @@ public class clsSapContenedorRangoPeso
     public int IdRangoPeso { get; set; }
 }
 
-/// <summary>
-/// Parámetros de la aplicación tarifario (tblParametros). Los que usa la
-/// comparación SICETAC: 457 = nombre tipo carga cupo ("General"),
-/// 458 = nombre unidad transporte cupo ("ESTACAS").
-/// </summary>
+/// <summary>Parámetros del tarifario (tblParametros): 457 = nombre tipo carga cupo ("General"), 458 = nombre unidad transporte cupo ("ESTACAS").</summary>
 public class clsSapParametro
 {
     public string DataAreaId { get; set; } = null!;
@@ -53,10 +37,7 @@ public class clsSapParametro
     public string? NombreParametro { get; set; }
 }
 
-/// <summary>
-/// Clase de contenedor (tblSAPClaseContenedor): resuelve el texto local
-/// ('CNT20.IT') al ID que referencian las tarifas SAP, con la TARA del equipo.
-/// </summary>
+/// <summary>Resuelve el texto local ('CNT20.IT') al ID que referencian las tarifas SAP, con la TARA del equipo.</summary>
 public class clsSapClaseContenedorCatalogo
 {
     public int Id { get; set; }

@@ -4,25 +4,8 @@ using ClosedXML.Excel;
 
 namespace Nexo.Infrastructure.ServiciosConexos.Adaptadores;
 
-/// <summary>
-/// Plantilla de Excel descargable por tipo de servicio conexo (S4-HU-15.3/#249,
-/// corregida en S5-HU-19/#261). El importador
-/// (<see cref="Repositorios.clsEfServiciosConexosRepository.ImportarExcelAsync"/>) sigue
-/// siendo genérico y tolerante — acepta columnas ausentes (las dimensiones que faltan
-/// caen a "NO APLICA") — así que cada plantilla trae SOLO las columnas que ese tipo
-/// necesita, sin forzar a incluir las que nunca aplican.
-///
-/// Corrección de #261: la primera versión (#249) traía las 12 columnas en las 4
-/// plantillas (QA: "el criterio pedía que cada una trajera solo sus columnas") y una fila
-/// de ejemplo con valores de apariencia real que se cargaban tal cual si alguien subía la
-/// plantilla sin editar. Ahora: sin fila de datos cargable — la única fila 2 que se
-/// entrega pre-llena SOLO las columnas verdaderamente FIJAS de ese tipo (código/tipo de
-/// servicio cuando son únicos del tipo, unidad, categoría, activo), dejando en blanco
-/// las que varían fila a fila (origen, destino, puerto, ruta, costo, vigencia) — así,
-/// subida sin tocar, esa fila nunca crea un registro real: o queda vacía (Precinto/
-/// Acompañamiento, donde código/tipo también varían) o queda inválida por falta de costo
-/// (Almacenamiento/ITR), nunca "creada".
-/// </summary>
+/// <summary>Plantilla de Excel por tipo de servicio conexo, con SOLO las columnas que ese tipo necesita. La fila 2 prellena solo
+/// columnas fijas del tipo y deja en blanco las variables: subida sin editar nunca crea un registro real.</summary>
 public sealed class clsPlantillaServicioConexoAdapter : IPlantillaServicioConexoPort
 {
     public (byte[] Contenido, string NombreArchivo) Generar(string tipo)
@@ -56,8 +39,7 @@ public sealed class clsPlantillaServicioConexoAdapter : IPlantillaServicioConexo
         ws.Range(1, 1, 1, encabezados.Length).Style.Font.SetBold()
             .Fill.SetBackgroundColor(XLColor.FromHtml("#E8EEF7"));
 
-        // Fila 2: solo las columnas verdaderamente fijas de este tipo (ver doc de clase) —
-        // nunca un dato variable de apariencia real.
+        // Fila 2: solo columnas fijas del tipo, nunca un dato variable de apariencia real.
         for (var i = 0; i < fijos.Length; i++)
             if (fijos[i].Length > 0) ws.Cell(2, i + 1).Value = fijos[i];
 

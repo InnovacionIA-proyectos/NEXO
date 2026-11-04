@@ -5,12 +5,7 @@ using Nexo.Domain.Solicitudes.Entidades;
 
 namespace Nexo.Application.CasosDeUso.Cotizaciones.Interfaces;
 
-/// <summary>
-/// Puerto hacia la persistencia del agregado Cotización. Los métodos son
-/// deliberadamente específicos (no un CRUD genérico): cada uno refleja una
-/// necesidad real de un caso de uso, con el nivel de tracking/includes que
-/// ese caso de uso requiere.
-/// </summary>
+/// <summary>Puerto de persistencia del agregado Cotización; métodos específicos (no CRUD genérico) con el tracking/includes que pide cada caso de uso.</summary>
 public interface ICotizacionRepository
 {
     /// <summary>Tracked, con Lineas y Conexos.clsServicioConexo. Para editar/leer una cotización por Id.</summary>

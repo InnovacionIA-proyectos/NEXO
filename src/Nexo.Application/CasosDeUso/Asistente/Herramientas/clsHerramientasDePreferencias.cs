@@ -6,11 +6,7 @@ using Nexo.Domain.Enums;
 
 namespace Nexo.Application.CasosDeUso.Asistente.Herramientas;
 
-/// <summary>
-/// Propone guardar una regla o preferencia propia de la persona para sus próximas conversaciones. Como todo cambio, no se guarda hasta
-/// que la persona lo confirma: así un texto ajeno que aparezca en una consulta no puede dejarle al asistente una "preferencia" que la
-/// persona no pidió.
-/// </summary>
+/// <summary>Propone guardar una preferencia de la persona; no se guarda hasta que la confirma, para que un texto ajeno no pueda inyectar una.</summary>
 public sealed class clsProponerGuardarPreferenciaHerramienta(
     IConversacionesAsistenteRepository conversaciones, clsContextoConversacionAsistente contexto, ICurrentUserPort usuario,
     IPreferenciasAsistenteRepository preferencias, clsLimitesAsistente limites, TimeProvider reloj)

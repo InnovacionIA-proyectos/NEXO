@@ -14,19 +14,9 @@ namespace Nexo.Application.CasosDeUso.Costeo;
 public sealed record clsCostearLineaCommand(Guid TrabajoId, Guid SolicitudId, Guid LineaId) : ICommand<Unit>;
 
 /// <summary>
-/// Aplica la regla de costeo a una línea y publica el desenlace. Hay tres, y cada uno va a un sitio distinto porque
-/// confundirlos tiene consecuencias:
-///
-///   Autocosteable (hay valor y ningún motivo de pendiente, en cualquiera de los tres caminos de decisión)
-///                         -> clsLineaCosteada. La línea queda auto-resuelta CON su flete (y su retorno/aprovisionamiento)
-///                            ya en la cotización — ver AgregarFleteAutoCosteoAsync.
-///   No autocosteable      -> clsLineaRequiereTarifaManual. NO es un fallo: el servicio hizo su trabajo y hace falta el
-///                            Administrador de Tarifas (ningún valor, o un motivo que impide guardarlo solo).
-///   Fuente caída          -> la excepción SUBE. MassTransit reintenta; si se agotan los reintentos, el consumidor de fallos
-///                            lo convierte en clsLineaFalloTecnico.
-///
-/// Ese tercer caso es la razón de no envolver esto en un try/catch. Tragarse la excepción convertiría un fallo transitorio
-/// en un pendiente definitivo sin haber reintentado ni una vez, y perdería el paso a la cola de error.
+/// Costea una línea y publica el desenlace: autocosteable (clsLineaCosteada, con flete en la cotización), requiere tarifa
+/// manual (clsLineaRequiereTarifaManual) o fuente caída. En este último caso la excepción SUBE a propósito (sin try/catch):
+/// MassTransit reintenta y, agotados los reintentos, el consumidor de fallos genera clsLineaFalloTecnico.
 /// </summary>
 public sealed class clsCostearLineaCommandHandler(
     IPropuestaDeLineaPort propuesta,
@@ -62,8 +52,7 @@ public sealed class clsCostearLineaCommandHandler(
             return Unit.Value;
         }
 
-        // Además de marcar la línea resuelta, el flete queda en la cotización — igual que la captura
-        // (clsCapturarSolicitudCommand.AutoCostearAsync). Sin esto, la línea quedaría "AutoResuelta" pero sin precio.
+        // El flete también queda en la cotización; sin él la línea sería AutoResuelta pero sin precio.
         await lineas.MarcarAutoResueltaAsync(command.LineaId, resultado.Valor!.Value, resultado.Fuente!, ct);
         await AgregarFleteAutoCosteoAsync(cotizaciones, command.SolicitudId, command.LineaId, decision, ct);
 
@@ -74,10 +63,7 @@ public sealed class clsCostearLineaCommandHandler(
         return Unit.Value;
     }
 
-    /// <summary>
-    /// Agrega a la cotización auto-costeada el flete de la línea, con su aprovisionamiento y su retorno del contenedor si la
-    /// decisión los trae. Mismo criterio que clsCapturarSolicitudCommand.AutoCostearAsync.
-    /// </summary>
+    /// <summary>Agrega el flete de la línea a la cotización auto-costeada, con aprovisionamiento y retorno del contenedor si la decisión los trae.</summary>
     private static async Task AgregarFleteAutoCosteoAsync(
         ICotizacionRepository cotizacionesRepo, Guid solicitudId, Guid lineaId, clsDecisionDeFlujo decision, CancellationToken ct)
     {
@@ -90,8 +76,7 @@ public sealed class clsCostearLineaCommandHandler(
             cotizacionesRepo.Agregar(cotizacion);
         }
 
-        // Recosteo de una línea que ya estaba en la cotización auto-costeada (reintento tras un fallo técnico, por ejemplo):
-        // no duplicar.
+        // Recosteo de una línea ya presente en la cotización: no duplicar.
         if (cotizacion.Lineas.Any(l => l.LineaSolicitudId == lineaId)) return;
 
         cotizacion.Lineas.Add(new clsCotizacionLinea

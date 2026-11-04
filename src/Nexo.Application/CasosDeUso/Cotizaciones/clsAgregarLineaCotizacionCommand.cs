@@ -44,8 +44,7 @@ public sealed class clsAgregarLineaCotizacionCommandHandler(
         {
             lineaSol = await lineasSolicitud.ObtenerDeSolicitudAsync(lid, c.SolicitudId, ct)
                 ?? throw new clsValidationFailedException("LINEA_INVALIDA", "La línea de solicitud no pertenece a esta cotización.");
-            // S6-HU-24.3/#320: a una línea rechazada no se le agrega flete (una rechazada nunca tiene fila de cotización). Si hay que
-            // costearla, primero se deshace el rechazo.
+            // A una línea rechazada no se le agrega flete; si hay que costearla, primero se deshace el rechazo.
             if (lineaSol.EstadoLinea == EstadoLinea.Rechazada)
                 throw new clsConflictException("LINEA_RECHAZADA",
                     "La línea está rechazada: deshaga el rechazo antes de agregarle un flete.");
@@ -54,10 +53,8 @@ public sealed class clsAgregarLineaCotizacionCommandHandler(
             // Fletes) para distinguirla del auto-costeo en la bandeja.
             lineaSol.EstadoLinea = EstadoLinea.Revisada;
 
-            // S5-HU-19.3/#283: mismo cálculo que la propuesta — nunca se guarda un flete por
-            // debajo del piso SICE-TAC, sea tarifario, histórico o manual. El servidor NO
-            // confía en lo que diga el navegador (el piso ya se bloquea en pantalla, pero
-            // llamar la API directo lo saltaría si solo se validara ahí).
+            // Mismo cálculo que la propuesta: nunca se guarda un flete bajo el piso SICE-TAC (tarifario, histórico o manual); el servidor no
+            // confía en el bloqueo de pantalla.
             propuestaLinea = (await propuestas.ProponerAsync(c.SolicitudId, ct)).Lineas.FirstOrDefault(x => x.LineaId == lid);
             if (propuestaLinea?.Sicetac?.Valor is { } piso && command.ValorFlete < piso)
                 throw new clsValidationFailedException("FLETE_BAJO_PISO_SICETAC",
@@ -66,13 +63,8 @@ public sealed class clsAgregarLineaCotizacionCommandHandler(
 
         var fuente = Enum.Parse<FuenteFlete>(command.Fuente, ignoreCase: true);
 
-        // Bloqueo: una tarifa histórica solo se reutiliza si se cumple CUALQUIERA de las
-        // dos — (1) hay al menos una "histórica sugerida" VIGENTE (≤ 1 semana) para la
-        // ruta/tipología (regla de siempre, pensada para el botón "Usar" de esa lista), o
-        // (2) el valor coincide con el candidato Histórico de ESTA propuesta (ventana de
-        // 3 meses, ya recalculada arriba para el piso) — "Aplicar propuestas" ya guarda
-        // ese mismo valor sin esta validación; agregarlo a mano con el mismo valor que
-        // muestra la pantalla no debía poder fallar.
+        // Una tarifa histórica solo se reutiliza si (1) hay una "histórica sugerida" VIGENTE (≤ 1 semana) para la ruta/tipología, o (2) el valor
+        // coincide con el candidato Histórico de ESTA propuesta (ventana de 3 meses, igual que "Aplicar propuestas").
         if (fuente == FuenteFlete.Historica && lineaSol is not null)
         {
             var hoy = DateOnly.FromDateTime(clock.GetUtcNow().UtcDateTime);

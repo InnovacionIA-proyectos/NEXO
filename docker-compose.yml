@@ -1,30 +1,17 @@
-# ============================================================================
-# Nexo (Clean Architecture) — despliegue con Docker Compose
+# Nexo (Clean Architecture) — despliegue con Docker Compose.
 #
-#   - Este repositorio es SOLO BACKEND (no incluye frontend): la migración
-#     a Clean Architecture se acotó explícitamente a src/ del proyecto
-#     original. La API queda publicada en el puerto del host (API_PORT,
-#     por defecto 8080) para que cualquier frontend (el original NEXO/frontend
-#     u otro) la consuma directamente — no hay proxy Nginx aquí.
-#   - Plan de cargue: el motor Cubicador es un microservicio
-#     Python aparte (carpeta cubicador/ de este mismo repo, su propio
-#     docker-compose.yml). NEXO le habla SOLO por colas del mismo RabbitMQ
-#     de abajo (ConnectionStrings:RabbitMq) — no hay URL HTTP ni servicio
-#     adicional que levantar acá. Sin la compuerta de paridad encendida
-#     (Cubicacion__Paridad*, ver .env.example), la función responde 503 "en
-#     verificación", nunca cae a un fallback.
-#   - El servicio 'db' (SQL Server local en contenedor) está DESHABILITADO:
-#     se usa una BD de pruebas/producción real vía ConnectionStrings__Nexo
-#     (.env). No se elimina el bloque por si hace falta volver a levantarlo
-#     para desarrollo aislado.
+# Solo backend: la API se publica en API_PORT (8080 por defecto), sin proxy Nginx.
+# El Cubicador (cubicador/, con su propio docker-compose.yml) se comunica solo por las colas del
+# RabbitMQ de abajo (ConnectionStrings:RabbitMq). Sin la compuerta de paridad (Cubicacion__Paridad*)
+# el plan de cargue responde 503 "en verificación", sin fallback.
+# El servicio 'db' local está deshabilitado: se usa la BD real de ConnectionStrings__Nexo (.env).
 #
 # Uso:
-#   1) cp .env.example .env   y completar los valores (mínimo ConnectionStrings__Nexo).
+#   1) cp .env.example .env y completar los valores (mínimo ConnectionStrings__Nexo).
 #   2) docker compose up -d --build
 #   3) La API queda en http://localhost:${API_PORT:-8080} (health en /health).
-#   4) Sembrar datos demo (opcional, alternativa a MIGRATE_ON_STARTUP=true):
+#   4) Datos demo (opcional, alternativa a MIGRATE_ON_STARTUP=true):
 #        docker compose --profile seed run --rm seed
-# ============================================================================
 
 name: nexo
 
@@ -42,13 +29,8 @@ services:
     ports:
 
       - "${RABBITMQ_UI_PORT:-15672}:15672"
-      # AMQP también publicado al host: `api` y `cubicador/` (docker-compose.yml
-      # propio, proyecto Compose separado que se engancha a esta misma red por
-      # nombre externo `nexo_internal`) alcanzan el puerto 5672 igual por esa
-      # red interna, sin necesitar esto — lo que sí lo necesita es cualquier
-      # herramienta/CI que inspeccione o publique mensajes de prueba desde
-      # fuera de Docker (ver cubicador/scripts/ci_docker_smoke.py). Mismo
-      # criterio que la consola de arriba: no exponer en un despliegue real.
+      # AMQP publicado al host solo para herramientas/CI que operan fuera de Docker
+      # (cubicador/scripts/ci_docker_smoke.py); api y cubicador usan la red interna. No exponer en producción.
       - "${RABBITMQ_AMQP_PORT:-5672}:5672"
     volumes:
       - rabbit-data:/var/lib/rabbitmq
@@ -73,8 +55,6 @@ services:
       - "${API_PORT:-8080}:8080"
     environment:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
-      # 'db' local deshabilitado: se conecta directo a la BD de pruebas real
-      # definida en ConnectionStrings__Nexo (.env), no al contenedor.
       ConnectionStrings__Nexo: ${ConnectionStrings__Nexo}
       ConnectionStrings__RabbitMq: "amqp://${RABBITMQ_USER:-nexo}:${RABBITMQ_PASSWORD}@rabbit:5672/"
       Database__MigrateOnStartup: ${MIGRATE_ON_STARTUP}
@@ -84,12 +64,10 @@ services:
       # Esquema propio de NEXO dentro de ConnectionStrings__Nexo (ver clsEsquemaNexo.cs).
       Database__Esquema: ${Database__Esquema}
       Cors__OrigenesPermitidos: ${ORIGENES_PERMITIDOS_CORS}
-      # Recálculo del score persistido (#19). El reloj vive en el broker, no en este
-      # proceso, así que cambiar el intervalo solo afecta cada cuánto suena: no hay
-      # temporizador en memoria que se duplique con las réplicas.
+      # Recálculo del score persistido. El reloj vive en el broker, no en este proceso: cambiar el
+      # intervalo solo afecta cada cuánto suena, sin temporizadores duplicados por réplica.
       Score__IntervaloRecalculoMinutos: ${SCORE_INTERVALO_MINUTOS:-15}
-      # Cuántas solicitudes por lote. Existe para no dejar una transacción larga
-      # bloqueando filas que la bandeja está leyendo.
+      # Solicitudes por lote: evita transacciones largas que bloqueen filas que lee la bandeja.
       Score__TamanoDeLoteRecalculo: ${SCORE_TAMANO_LOTE:-200}
       # Identidad del portal de la Administración. Vacía en local: cae al
       # adapter que resuelve contra la tabla Usuarios propia (ver .env.example).
@@ -118,22 +96,18 @@ services:
       Cubicacion__ParidadVerificada: ${CUBICACION_PARIDAD_VERIFICADA}
       Cubicacion__ParidadEvidencia: ${CUBICACION_PARIDAD_EVIDENCIA}
       Cubicacion__ParidadFecha: ${CUBICACION_PARIDAD_FECHA}
-      # Bearer de las llamadas ENTRANTES del Cubicador (GET /api/lineas-solicitud/{id}
-      # /cubicacion) — debe ser igual a NEXO_CALLBACK_API_KEY en cubicador/.env. Vacía =
-      # el endpoint responde 401 a cualquier Bearer (fail-closed).
+      # Bearer de las llamadas ENTRANTES del Cubicador (GET /api/lineas-solicitud/{id}/cubicacion);
+      # igual a NEXO_CALLBACK_API_KEY en cubicador/.env. Vacía = 401 a cualquier Bearer (fail-closed).
       Cubicador3D__InboundApiKey: ${CUBICADOR3D_INBOUND_API_KEY}
-      # Llamadas HTTP SALIENTES de NEXO hacia Cubicador. S5-HU-18.1/#273: POST/GET
-      # /recomendaciones (reemplaza al retirado POST /api/cubicacion) — RecomendacionesApiKey
-      # debe ser igual a CUBICADOR_API_KEY_NEXO en cubicador/.env. S5-HU-18.6/#278: los seis
-      # passthrough de catálogo (§3.2) — OutboundApiKey debe ser igual a CUBICADOR_API_KEY
-      # (la llave GENÉRICA, distinta de la de NEXO). Vacías = 503 "no configurado", nunca
-      # rompe el arranque.
+      # Llamadas SALIENTES hacia Cubicador. RecomendacionesApiKey (POST/GET /recomendaciones) debe ser
+      # igual a CUBICADOR_API_KEY_NEXO en cubicador/.env; OutboundApiKey (passthrough de catálogo) igual a
+      # CUBICADOR_API_KEY (llave genérica, distinta de la de NEXO). Vacías = 503 "no configurado",
+      # nunca rompe el arranque.
       Cubicador3D__OutboundBaseUrl: ${CUBICADOR3D_OUTBOUND_BASE_URL}
       Cubicador3D__RecomendacionesApiKey: ${CUBICADOR3D_RECOMENDACIONES_API_KEY}
       Cubicador3D__OutboundApiKey: ${CUBICADOR3D_OUTBOUND_API_KEY}
-      # Microservicio MailSender (#21, ver .env.example). Mismo defecto ya corregido una
-      # vez para Cubicador3D: sin este par, .env.example documenta las claves pero nunca
-      # llegan al contenedor y la salida de correo cae al SMTP directo en silencio.
+      # Microservicio MailSender (ver .env.example). Sin este par las claves no llegan al contenedor
+      # y el correo cae al SMTP directo en silencio.
       MailSender__BaseUrl: ${MAILSENDER_BASE_URL}
       MailSender__Remitente: ${MAILSENDER_REMITENTE}
       MailSender__TimeoutSegundos: ${MAILSENDER_TIMEOUT_SEGUNDOS:-30}
@@ -147,27 +121,15 @@ services:
       start_period: 40s
     restart: unless-stopped
 
-  # ---------------------------------------------------------------------------
-  # Recorrido de punta a punta contra la aplicación levantada.
+  # Recorrido de punta a punta contra la aplicación levantada:
   #
   #   docker compose up -d
   #   docker compose --profile e2e run --rm e2e
   #
-  # Comprueba lo que la suite no puede: la suite corre con transporte en memoria y
-  # bases efímeras —rápida y bien aislada, y por eso mismo ciega a si las piezas
-  # encajan de verdad—. Esto habla con el API real, con el Outbox entregando contra
-  # SQL Server, RabbitMQ con su plugin de retardo, la saga persistida y SignalR
-  # empujando a un cliente de verdad.
-  #
-  # No es teórico: así se encontró que el arranque de la cadena de priorización
-  # publicaba al Outbox sin guardar, cosa que ninguna prueba veía porque ninguna
-  # publica a través del Outbox.
-  #
-  # Va en un perfil para que `docker compose up` no lo arranque. Sale con código
-  # distinto de cero si algo falla, así que sirve tal cual en un pipeline.
-  #
-  # Solo biblioteca estándar de Python: sin pip, para que no falle por una red que
-  # intercepta TLS en vez de por el código.
+  # Cubre lo que la suite (transporte en memoria, bases efímeras) no ve: API real, Outbox contra
+  # SQL Server, RabbitMQ con plugin de retardo, saga persistida y SignalR. Va en un perfil para que
+  # `docker compose up` no lo arranque; sale con código distinto de cero si algo falla. Solo
+  # biblioteca estándar de Python (sin pip), para no depender de la red.
   e2e:
     profiles: ["e2e"]
     image: python:3.12-slim
@@ -188,7 +150,6 @@ services:
     build:
       context: .
       dockerfile: src/Nexo.Api/Dockerfile
-    # depends_on: db: deshabilitado junto con el servicio 'db' de arriba (BD de pruebas real).
     environment:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
       ConnectionStrings__Nexo: ${ConnectionStrings__Nexo}
@@ -197,17 +158,9 @@ services:
       - internal
     restart: "no"
 
-  # ---------------------------------------------------------------------
-  # Cubicador 3D — microservicio Python. Vive en cubicador/ dentro de este
-  # mismo repo, con SU PROPIO docker-compose.yml (proyecto Compose separado:
-  # despliegue independiente, no forma parte de este `docker compose up`).
-  # No está aquí como servicio porque no comparte ciclo de vida ni base de
-  # datos con este stack — solo comparte el broker `rabbit` de arriba, al que
-  # cubicador/ se conecta enganchándose a la red `internal` por su nombre
-  # externo (`nexo_internal`, fijado por el `name:` de la cabecera de este
-  # archivo). Ver cubicador/docker-compose.yml y
-  # cubicador/docs/DECISIONES_TECNICAS.md #9.
-  # ---------------------------------------------------------------------
+  # Cubicador 3D: microservicio Python en cubicador/ con SU PROPIO docker-compose.yml (proyecto
+  # Compose separado). Solo comparte el broker `rabbit`, al que se engancha por la red externa
+  # `nexo_internal` (fijada por el `name:` de la cabecera de este archivo).
 
 networks:
   internal:

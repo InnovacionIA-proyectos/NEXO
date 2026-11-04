@@ -22,14 +22,7 @@ public class clsCotizacion : IAuditable
     public EstadoCotizacion Estado { get; set; } = EstadoCotizacion.Borrador;
     public ResultadoCotizacion Resultado { get; set; } = ResultadoCotizacion.SinDefinir;
 
-    /// <summary>
-    /// S4-HU-15.6/#252: distingue una cotización auto-costeada (nunca pasa por
-    /// /entregar — no tiene sentido notificar por email al mismo Comercial que la
-    /// generó) de una manual (SÍ exige Entregada antes de marcar resultado, decisión
-    /// de negocio #171). Sin esto, auto-costeo quedaba bloqueado para siempre: el
-    /// paso de Entregar es exclusivo de Tarifas/Coordinador, que nunca interviene
-    /// en ese camino.
-    /// </summary>
+    /// <summary>Cotización auto-costeada: nunca pasa por entregar. Una manual sí exige Entregada antes de marcar resultado.</summary>
     public bool EsAutoCosteo { get; set; }
 
     [Range(typeof(decimal), "0", "99999999999999.99", ParseLimitsInInvariantCulture = true)]
@@ -42,12 +35,7 @@ public class clsCotizacion : IAuditable
 
     public DateTimeOffset? EntregadaAt { get; set; }
 
-    /// <summary>
-    /// S5-HU-20.1/#286: última vez que se agregó o quitó un servicio conexo DESPUÉS de
-    /// entregar la cotización. Null mientras nunca se haya tocado tras la entrega. A
-    /// propósito es una marca aparte y NO mueve <see cref="Estado"/> ni
-    /// <see cref="EntregadaAt"/>: el SLA y las métricas siguen midiendo la entrega original.
-    /// </summary>
+    /// <summary>Última vez que se agregó o quitó un conexo tras la entrega. No mueve <see cref="Estado"/> ni <see cref="EntregadaAt"/>: el SLA mide la entrega original.</summary>
     public DateTimeOffset? ModificadaTrasEntregaAt { get; set; }
 
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
@@ -75,17 +63,11 @@ public class clsCotizacionLinea : IAuditable
     [Range(typeof(decimal), "0", "9999999999999.99", ParseLimitsInInvariantCulture = true)]
     public decimal ValorFlete { get; set; }
 
-    /// <summary>
-    /// Aprovisionamiento del contenedor (posicionar el vacío levante → origen,
-    /// Res. 16075). Concepto separado del flete que suma al total.
-    /// </summary>
+    /// <summary>Aprovisionamiento del contenedor (vacío levante → origen); concepto separado del flete que suma al total.</summary>
     [Range(typeof(decimal), "0", "9999999999999.99", ParseLimitsInInvariantCulture = true)]
     public decimal? ValorAprovisionamiento { get; set; }
 
-    /// <summary>
-    /// Devolución del contenedor vacío al finalizar el viaje (tarifa línea 6
-    /// exclusiva). Concepto separado del flete que suma al total.
-    /// </summary>
+    /// <summary>Devolución del contenedor vacío al finalizar el viaje; concepto separado del flete que suma al total.</summary>
     [Range(typeof(decimal), "0", "9999999999999.99", ParseLimitsInInvariantCulture = true)]
     public decimal? ValorRetornoContenedor { get; set; }
 
@@ -102,13 +84,7 @@ public class clsCotizacionConexo : IAuditable
     [Required]
     public Guid CotizacionId { get; set; }
 
-    /// <summary>
-    /// Línea de la cotización a la que aplica este conexo (S4-HU-15.4/#250). Obligatoria
-    /// a propósito: antes un conexo colgaba de la cotización completa sin poder decir a
-    /// cuál línea aplicaba — ya no existe la opción de un conexo "general". Apunta a
-    /// clsCotizacionLinea (no a clsLineaSolicitud): si la solicitud se recostea, cada
-    /// recosteo tiene sus propias líneas de cotización, y el conexo sigue esa misma vida.
-    /// </summary>
+    /// <summary>Línea de la cotización a la que aplica el conexo (obligatoria). Apunta a clsCotizacionLinea y no a la línea de solicitud porque cada recosteo tiene sus propias líneas.</summary>
     [Required]
     public Guid CotizacionLineaId { get; set; }
 
@@ -126,10 +102,7 @@ public class clsCotizacionConexo : IAuditable
     [Range(typeof(decimal), "0", "9999999999999.99", ParseLimitsInInvariantCulture = true)]
     public decimal ValorAplicado { get; set; }
 
-    /// <summary>
-    /// Precio de venta de una unidad del servicio en el momento de agregarlo: el de la biblioteca o, si no tenía, su costo. Queda fijo aunque la
-    /// biblioteca cambie después. <see cref="ValorAplicado"/> sigue siendo el COSTO; lo que se cotiza es <see cref="ValorVenta"/>.
-    /// </summary>
+    /// <summary>Precio de venta unitario al agregarlo (el de la biblioteca o, si no tenía, su costo); queda fijo. <see cref="ValorAplicado"/> es el costo; lo que se cotiza es <see cref="ValorVenta"/>.</summary>
     [Range(typeof(decimal), "0", "9999999999999.99", ParseLimitsInInvariantCulture = true)]
     public decimal PrecioVentaUnitario { get; set; }
 
@@ -137,14 +110,7 @@ public class clsCotizacionConexo : IAuditable
     [System.ComponentModel.DataAnnotations.Schema.NotMapped]
     public decimal ValorVenta => Math.Round(PrecioVentaUnitario * Cantidad, 2, MidpointRounding.AwayFromZero);
 
-    /// <summary>
-    /// S5-HU-18/#262: "individual" (el usuario lo agregó a ESTA línea puntual) o
-    /// "general" (el usuario pidió agregarlo a TODAS las líneas de la cotización de una
-    /// sola vez, lo que en la práctica crea un clsCotizacionConexo por línea — sigue
-    /// existiendo una línea por conexo, igual que decidió #250; esto es solo la
-    /// trazabilidad de CÓMO se agregó, no un conexo "general" sin línea). Antes el
-    /// frontend tenía que adivinar esto; ahora es un dato real.
-    /// </summary>
+    /// <summary>"individual" (agregado a esta línea) o "general" (agregado a todas de una vez; igual crea un conexo por línea). Solo trazabilidad de cómo se agregó.</summary>
     [Required, MaxLength(20)]
     public string Origen { get; set; } = "individual";
 

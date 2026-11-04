@@ -10,12 +10,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Nexo.Infrastructure.Solicitudes.Repositorios;
 
-/// <summary>
-/// Persistencia del módulo Solicitudes/Captura. Portado de las consultas EF que
-/// vivían en Nexo.Api/Services/SolicitudService.cs del proyecto original
-/// (ObtenerBandejaAsync en particular: la proyección se queda aquí; el cálculo del
-/// score con Domain.Priorizacion.Reglas se movió a Application, donde pertenece).
-/// </summary>
 public sealed class clsEfSolicitudesCatalogoRepository(clsNexoDbContext db) : ISolicitudesRepository
 {
     public void Agregar(clsSolicitud solicitud) => db.Solicitudes.Add(solicitud);
@@ -44,9 +38,8 @@ public sealed class clsEfSolicitudesCatalogoRepository(clsNexoDbContext db) : IS
     {
         var q = db.Solicitudes.AsNoTracking().AsQueryable();
 
-        // Aislamiento por comercial (issue #199): null para los roles que ven todo. Va ANTES de
-        // cualquier otro filtro (también los de S5-HU-23.1/#289): un Comercial nunca ve filas de otro
-        // aunque la rama "pendientes" ahora tenga un OR.
+        // Aislamiento por comercial: null para los roles que ven todo. Va antes de cualquier otro filtro:
+        // un Comercial nunca ve filas de otro, aunque la rama "pendientes" tenga un OR.
         if (creadoPor is { } cp) q = q.Where(s => s.CreadoPor == cp);
 
         if (estado is { } e)
@@ -58,13 +51,8 @@ public sealed class clsEfSolicitudesCatalogoRepository(clsNexoDbContext db) : IS
         if (hasta is { } h) q = q.Where(s => s.CreatedAt <= h);
 
         // Atención: sin flete = línea sin clsCotizacionLinea; auto = AutoResuelta; admin = Revisada.
-        //
-        // S5-HU-23.1/#289: "pendientes" = hay línea sin flete O (todas las líneas con flete y alguna
-        // Revisada). La segunda es una solicitud que el Administrador de Fletes ya revisó entera pero
-        // aún no entregó: antes no aparecía en ninguna cola de trabajo. NO es una categoría nueva: sigue
-        // apareciendo también en "administrador"/"atendidas". No aplica a "automatico" (el auto-costeo
-        // tiene su propio atajo, S4-HU-15.6). El filtro de estado de arriba ya excluye Entregada y
-        // Descartada, así que al entregarla deja de salir en Pendientes.
+        // "pendientes" = hay línea sin flete O (todas con flete y alguna Revisada): revisada entera pero aún no entregada.
+        // También sigue apareciendo en "administrador"/"atendidas"; no aplica a "automatico". El filtro de estado ya excluye Entregada y Descartada.
         q = atencion switch
         {
             "pendientes" => q.Where(s => s.Lineas.Any(l => (l.EstadoLinea != EstadoLinea.Rechazada && !db.CotizacionLineas.Any(cl => cl.LineaSolicitudId == l.Id)))
@@ -82,12 +70,8 @@ public sealed class clsEfSolicitudesCatalogoRepository(clsNexoDbContext db) : IS
             _ => q, // "todas"
         };
 
-        // S5-HU-23.1/#289 (HU-B25): resultado de la cotización.
-        //  - esperando: cotización Entregada, o auto-costeada en Borrador (nunca pasa por /entregar),
-        //    sin NINGUNA cotización con resultado, y la solicitud no Descartada.
-        //  - ganada / perdida: solo esas.
-        // "Sin ninguna con resultado" mantiene el filtro coherente con la columna: si hay una Ganada, la
-        // fila muestra Ganada y no puede salir en "esperando" por culpa de otra cotización en borrador.
+        // Resultado: esperando = Entregada (o auto-costeada en Borrador) sin NINGUNA cotización con resultado y solicitud no Descartada;
+        // ganada/perdida: solo esas. Así, si hay una Ganada la fila no sale en "esperando" por otra cotización en borrador.
         q = resultado switch
         {
             clsBandejaResultado.Esperando => q.Where(s => s.Estado != EstadoSolicitud.Descartada

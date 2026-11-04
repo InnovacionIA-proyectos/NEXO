@@ -26,14 +26,8 @@ public class clsRolPortalDw
     public string Descripcion { get; set; } = null!;
 }
 
-/// <summary>
-/// Contexto de SOLO LECTURA contra la base de identidad del portal de la Administración
-/// (docs/contrato-integracion/README.md, sección 7). Nombres de tabla/columna según el
-/// esquema de referencia de la integración; confirmar contra sys.columns de la base real
-/// antes de desplegar (mismo criterio que los demás Data Warehouses de solo lectura: no
-/// asumir, verificar). El nombre de la base física (distinta entre QA y Producción) va
-/// en la cadena de conexión (ConnectionStrings:IdentidadPortal), nunca hardcodeado aquí.
-/// </summary>
+/// <summary>Contexto de SOLO LECTURA contra la base de identidad del portal. El nombre de la base física
+/// (distinto en QA y Producción) va en ConnectionStrings:IdentidadPortal.</summary>
 public class clsIdentidadPortalDbContext : DbContext
 {
     public clsIdentidadPortalDbContext(DbContextOptions<clsIdentidadPortalDbContext> options) : base(options)
@@ -47,11 +41,8 @@ public class clsIdentidadPortalDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder b)
     {
-        // Tipos reales verificados contra sys.columns de dbSolucionesTI_Prueba
-        // (2026-09-01): tblSAPUsuariosApp.ID es numeric(18,0), no bigint; y los
-        // IDROLES/IDUSUARIO de tblSAPUsuarioRoles/tblSAPRoles son int, no bigint.
-        // Sin el HasConversion + HasColumnType explícitos, SqlClient lanza
-        // InvalidCastException al leer (GetInt64 sobre una columna decimal/int).
+        // Tipos reales: tblSAPUsuariosApp.ID es numeric(18,0) y los IDROLES/IDUSUARIO son int, no bigint.
+        // Sin HasConversion + HasColumnType explícitos, SqlClient lanza InvalidCastException al leer.
         var usuarios = b.Entity<clsUsuarioPortalDw>();
         usuarios.ToTable("tblSAPUsuariosApp", "dbo", t => t.ExcludeFromMigrations());
         usuarios.HasKey(x => x.Id);

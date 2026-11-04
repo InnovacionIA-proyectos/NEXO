@@ -10,27 +10,8 @@ using Microsoft.Extensions.Logging;
 
 namespace Nexo.Infrastructure.Cubicacion;
 
-/// <summary>
-/// Consume el resultado de una escritura/optimización exitosa y proyecta la base
-/// propia de NEXO —
-/// reactivando tablas que ya existían en el <c>DbContext</c> sin ningún código que las
-/// usara (<c>VehiculosCubicacion</c>, <c>ItemsPlanCargue</c>, <c>ColocacionesCargue</c>).
-///
-/// IConsumer&lt;T&gt; real de MassTransit: hereda la política de reintentos (1s/5s/
-/// 15s/60s) y el DLQ (`PlanDeCargueGenerado_error`) de la tubería compartida de
-/// NEXO (ver clsMensajeriaDependencyInjection.cs::Tuberia) — no hay código de
-/// reintento propio aquí. La topología (bind al exchange `cubicador.eventos` de
-/// Cubicador) se configura en el registro del bus, no aquí.
-///
-/// NO hace ninguna llamada saliente a Cubicador: todo lo que escribe viene del
-/// propio evento — nunca reconsulta.
-///
-/// UPSERT, no solo UPDATE: a diferencia de la versión anterior, este
-/// consumer inserta el plan si no existe (crear_plan_demo no deja fila espejo al
-/// publicar — ver docs/mensajeria/CUBICACION.md §6.5 y ADR-planid-generado-por-nexo.md)
-/// y siempre upsertea el vehículo con datos REALES (ya no el stub de solo Id+Nombre que
-/// deja <c>clsCrearPlanCommand</c> para no romper la FK).
-/// </summary>
+/// <summary>Proyecta a la base de NEXO el plan generado: upsert del plan (puede no existir) y del vehículo con datos reales.
+/// No consulta de vuelta a Cubicador; reintentos y DLQ los da la tubería compartida.</summary>
 public sealed class clsPlanDeCargueGeneradoConsumer(
     clsNexoDbContext db, INotificadorDePlanCargue avisos, ILogger<clsPlanDeCargueGeneradoConsumer> log)
     : IConsumer<PlanDeCargueGenerado>
@@ -60,13 +41,8 @@ public sealed class clsPlanDeCargueGeneradoConsumer(
 
         AplicarPlan(plan, resultado.Plan);
 
-        // Colocaciones: se REEMPLAZAN completas en cada evento (mismo criterio que
-        // Cubicador usa en su propia base, `guardar_resultado_optimizacion` — el evento
-        // trae el snapshot COMPLETO, no un delta). Se marcan para borrar ANTES de tocar
-        // items: la FK clsColocacionCargue.ItemPlanCargueId es Restrict, así que un item que
-        // ya no viene en el evento no se puede borrar mientras una colocación vieja lo
-        // referencie (EF Core igual ordena el DELETE real por dependencia de FK al margen
-        // del orden de estas llamadas, pero dejarlo en este orden es más fácil de leer).
+        // Las colocaciones se reemplazan completas (el evento trae el snapshot, no un delta).
+        // Se marcan para borrar antes de tocar items: la FK ItemPlanCargueId es Restrict.
         if (plan.Colocaciones.Count > 0)
             db.ColocacionesCargue.RemoveRange(plan.Colocaciones);
 
@@ -81,10 +57,7 @@ public sealed class clsPlanDeCargueGeneradoConsumer(
 
         await db.SaveChangesAsync(ct);
 
-        // Un fallo al avisar NO es un fallo del trabajo: la verdad sigue en
-        // GET /api/planes-cargue/{id}. Dejar que la excepción suba mandaría este mensaje
-        // — que ya cumplió su parte, el plan quedó guardado — a reintentos y DLQ por algo
-        // tan ajeno como un navegador desconectado. Mismo criterio que clsAvisarTrabajoConsumer.
+        // Un fallo al avisar no es un fallo del trabajo: si subiera, el mensaje ya cumplido iría a reintentos y DLQ.
         try
         {
             await avisos.AvisarAsync(new clsAvisoPlanCargueDto(plan.Id, plan.Estado, plan.Puntaje), ct);
@@ -130,9 +103,7 @@ public sealed class clsPlanDeCargueGeneradoConsumer(
                 db.ItemsPlanCargue.Add(AplicarItem(new clsItemPlanCargue { Id = id, PlanCargueId = plan.Id }, e));
         }
 
-        // Items que ya no vienen en el evento (borrados via eliminar_item desde el
-        // último snapshot) - sus colocaciones ya se removieron arriba, así que esto
-        // es seguro contra la FK Restrict.
+        // Items que ya no vienen en el evento; sus colocaciones ya se removieron arriba (FK Restrict).
         foreach (var item in plan.Items.Where(i => !idsDelEvento.Contains(i.Id)).ToList())
             db.ItemsPlanCargue.Remove(item);
     }
@@ -194,12 +165,7 @@ public sealed class clsPlanDeCargueGeneradoConsumer(
 
 }
 
-/// <summary>
-/// Upsert de <see cref="clsVehiculoCubicacion"/> desde el evento de Cubicador — compartido
-/// entre <see cref="clsPlanDeCargueGeneradoConsumer"/> (que trae el vehículo del plan
-/// embebido) y <see cref="clsVehiculoCatalogoConsumer"/> (vehiculo.creado/actualizado
-/// dedicados), para no duplicar el mapeo evento-a-entidad.
-/// </summary>
+/// <summary>Upsert de clsVehiculoCubicacion compartido por este consumer y clsVehiculoCatalogoConsumer.</summary>
 internal static class clsVehiculoProyeccion
 {
     private static readonly JsonSerializerOptions JsonCamelCase = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };

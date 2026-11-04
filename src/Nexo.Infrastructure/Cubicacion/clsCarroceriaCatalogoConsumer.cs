@@ -6,11 +6,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Nexo.Infrastructure.Cubicacion;
 
-/// <summary>
-/// S5-HU-18.5/#277: consume carroceria.creada/carroceria.actualizada/carroceria.eliminada
-/// y mantiene sincronizada la proyección de NEXO (<c>TiposCarroceriaCatalogo</c>). Mismo
-/// criterio que <see cref="clsMercanciaCatalogoConsumer"/>/<see cref="clsVehiculoCatalogoConsumer"/>.
-/// </summary>
+/// <summary>Mantiene la proyección de tipos de carrocería (TiposCarroceriaCatalogo) desde carroceria.creada/actualizada/eliminada;
+/// mismo criterio que <see cref="clsMercanciaCatalogoConsumer"/>.</summary>
 public sealed class clsCarroceriaCatalogoConsumer(clsNexoDbContext db)
     : IConsumer<CarroceriaCreada>, IConsumer<CarroceriaActualizada>, IConsumer<CarroceriaEliminada>
 {

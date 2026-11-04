@@ -1,9 +1,8 @@
 namespace Nexo.Domain.Catalogos.Entidades;
 
 /// <summary>
-/// El mapeo de columnas de un Excel que un cliente ya confirmó, guardado para reusarlo cuando llegue otro archivo con los mismos encabezados.
-/// Se reconoce por <see cref="FirmaEncabezados"/>: el resumen de los encabezados normalizados y en orden, así que cambiar, agregar, quitar
-/// o reordenar una columna da otra firma y el archivo se vuelve a analizar como uno nuevo.
+/// Mapeo de columnas de un Excel ya confirmado por un cliente, para reusarlo con archivos de los mismos encabezados.
+/// Se reconoce por <see cref="FirmaEncabezados"/>: cambiar, agregar, quitar o reordenar una columna da otra firma.
 /// </summary>
 public class clsPlantillaMapeoCliente
 {

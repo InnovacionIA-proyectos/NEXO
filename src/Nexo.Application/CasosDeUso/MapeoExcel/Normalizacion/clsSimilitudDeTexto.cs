@@ -3,10 +3,7 @@ using Nexo.Application.CasosDeUso.Solicitudes;
 
 namespace Nexo.Application.CasosDeUso.MapeoExcel.Normalizacion;
 
-/// <summary>
-/// Cercanía entre dos nombres escritos distinto («Bogota D.C.» y «Bogotá, D.C.»). Es solo para ELEGIR qué candidatos se le muestran al modelo y
-/// para reconocer un nombre idéntico con otra puntuación; lo que se asigna lo decide una regla exacta, nunca este puntaje.
-/// </summary>
+/// <summary>Cercanía entre nombres escritos distinto; solo elige candidatos para el modelo, lo que se asigna lo decide una regla exacta.</summary>
 public static class clsSimilitudDeTexto
 {
     private static readonly HashSet<string> Vacias = ["DE", "DEL", "LA", "LAS", "LOS", "Y", "DC"];

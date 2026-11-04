@@ -3,11 +3,8 @@ namespace Nexo.Application.CasosDeUso.Solicitudes.Interfaces;
 public sealed record clsProspectoDwDto(string Nit, string Nombre);
 
 /// <summary>
-/// Prospectos comerciales (dbSolucionesTI.tblProspectos) — todavía no son clientes
-/// reales con BP en el DW (ver <see cref="IClientesDwPort"/>). Solo se consulta cuando
-/// la búsqueda no encuentra nada en DimBPSolicitante: evita cargar y combinar los dos
-/// catálogos completos en cada búsqueda. Null/Configurado=false cuando
-/// ConnectionStrings:DbSolucionesTi no está configurada.
+/// Prospectos comerciales (dbSolucionesTI.tblProspectos), aún sin BP en el DW (ver <see cref="IClientesDwPort"/>). Solo se consulta si la
+/// búsqueda no halla nada en DimBPSolicitante. Null/Configurado=false si <c>ConnectionStrings:DbSolucionesTi</c> no está configurada.
 /// </summary>
 public interface IProspectosDwPort
 {

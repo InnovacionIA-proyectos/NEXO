@@ -12,19 +12,8 @@ using Nexo.Mensajes.Notificaciones;
 namespace Nexo.Application.CasosDeUso.Cotizaciones;
 
 /// <summary>
-/// Entregar la cotización a Comercial.
-///
-/// NO MANDA EL CORREO: marca la entrega, publica el
-/// evento y responde. El correo lo manda un consumidor aparte.
-///
-/// Antes el envío ocurría aquí mismo, después de guardar. Ya era best-effort —un fallo no
-/// revertía la entrega— pero quien entregaba esperaba a que el relay respondiera: un
-/// correo lento se sentía como una aplicación lenta, y el relay caído dejaba a la persona
-/// mirando una pantalla girando por algo que no tenía nada que ver con su trabajo.
-///
-/// El evento se publica en la MISMA transacción que la entrega, vía Outbox. Esa es la
-/// garantía que reemplaza al envío síncrono: si la entrega quedó firme, la notificación
-/// está pendiente de salir; y si la entrega se revirtió, no se notifica nada.
+/// Entrega la cotización a Comercial. NO MANDA EL CORREO: marca la entrega y publica el evento en la MISMA transacción (Outbox); un consumidor
+/// aparte envía el correo. Así un relay lento o caído no bloquea a quien entrega, y si la entrega se revierte no se notifica nada.
 /// </summary>
 public sealed record clsEntregarCotizacionCommand(
     Guid CotizacionId, byte[]? FormatoPdf, string? NombrePdf) : ICommand<clsEntregarCotizacionResultDto>;
@@ -46,15 +35,12 @@ public sealed class clsEntregarCotizacionCommandHandler(
             ?? throw new clsNotFoundException("COTIZACION_NO_ENCONTRADA", "Cotización no encontrada.");
         if (c.Estado == EstadoCotizacion.Entregada)
             throw new clsConflictException("COTIZACION_YA_ENTREGADA", "La cotización ya fue entregada.");
-        // S5-HU-19.3/#283: la cotización se arma línea por línea (clsAgregarLineaCotizacionCommand
-        // marca Revisada), así que tener al menos 1 flete NO implica que el pliego completo
-        // esté costeado — se puede entregar con líneas del pliego todavía PorCostear. Una
-        // línea sigue PorCostear tanto si nunca se tocó como si quedó en ConsultaCompleta
-        // (S5-HU-19.2/#282) sin que nadie la resolviera a mano todavía.
+        // Tener al menos 1 flete NO implica que el pliego esté costeado: una línea sigue PorCostear si nunca se tocó o quedó en ConsultaCompleta
+        // sin que nadie la resolviera a mano.
         var lineasSol = await lineasSolicitud.ObtenerPorSolicitudAsync(c.SolicitudId, ct);
 
-        // S6-HU-24.3/#320: una cotización sin ningún flete solo se entrega si ES porque todas sus líneas se rechazaron a propósito (se
-        // envía igual al comercial, con los motivos). Sin fletes y sin rechazos sigue siendo "no hay nada que entregar".
+        // Una cotización sin fletes solo se entrega si todas sus líneas se rechazaron a propósito (se envía igual, con los motivos); sin fletes
+        // ni rechazos no hay nada que entregar.
         var hayRechazadas = lineasSol.Values.Any(l => l.EstadoLinea == EstadoLinea.Rechazada);
         if (c.Lineas.Count == 0 && !hayRechazadas)
             throw new clsCotizacionSinFleteException("entregar");
@@ -80,11 +66,8 @@ public sealed class clsEntregarCotizacionCommandHandler(
 
         auditoria.Registrar(usuarioActual.Id, "cotizaciones", c.Id, "entregar", $"{{\"total\":{c.Total}}}");
 
-        // Se publica ANTES de guardar: con el Outbox eso es lo que mete el evento en la
-        // misma transacción. Al revés podría quedar la entrega firme sin notificación.
-        //
-        // El formato viaja en el mensaje porque es la única pieza que no está en la base:
-        // llega como archivo en esta petición y no se persiste en ningún lado.
+        // Se publica ANTES de guardar: con el Outbox eso mete el evento en la misma transacción. El formato viaja en el mensaje porque es la
+        // única pieza que no está en la base (llega como archivo en esta petición).
         await publicador.PublicarAsync(
             new clsCotizacionEntregada(
                 c.Id, c.SolicitudId, usuarioActual.Id, c.EntregadaAt!.Value,

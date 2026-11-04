@@ -4,13 +4,7 @@ using Nexo.Application.Common.Exceptions;
 
 namespace Nexo.Infrastructure.BibliotecaSapHistorico.Adaptadores;
 
-/// <summary>
-/// Se registra cuando NO hay cadena de conexión al datacenter corporativo
-/// (ConnectionStrings:DbSolucionesTi): todo endpoint del módulo responde 503
-/// con un mensaje accionable, en vez de fallar la inyección de dependencias
-/// porque clsDbSolucionesTiDbContext no está registrado. Portado de
-/// BibliotecaSapHistoricoNoConfigurado del proyecto original.
-/// </summary>
+/// <summary>Se registra sin ConnectionStrings:DbSolucionesTi: todo endpoint responde 503 accionable en vez de fallar la DI.</summary>
 public sealed class clsSapHistoricoNoConfiguradoAdapter : ISapHistoricoPort
 {
     private static clsServiceUnavailableException Error() => new(

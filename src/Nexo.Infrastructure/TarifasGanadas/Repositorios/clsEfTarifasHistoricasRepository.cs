@@ -21,16 +21,14 @@ public sealed class clsEfTarifasHistoricasRepository(clsNexoDbContext db, TimePr
 
     public void Agregar(clsTarifaHistorica tarifa) => db.TarifasHistoricas.Add(tarifa);
 
-    // ------------------------------------------------------- Biblioteca de Tarifas Ganadas (lectura)
 
     public async Task<IReadOnlyList<clsBibliotecaItemDto>> SugerirAsync(Guid? rutaId, Guid? vehiculoId, string? mercancia, CancellationToken ct)
     {
         TipologiaCarga? tip = null;
         if (!string.IsNullOrWhiteSpace(mercancia) && Enum.TryParse<TipologiaCarga>(mercancia, true, out var t)) tip = t;
 
-        // Corte de 3 meses (S4-HU-13/#219): obligatorio, solo para la sugerencia automática
-        // — un eje independiente de los umbrales 6/12 de BuscarAsync (Biblioteca), que no se
-        // tocan. Mismo criterio de mes-a-mes (ignora el día) que ya usa BuscarAsync.
+        // Corte de 3 meses, obligatorio solo para la sugerencia automática; mismo criterio mes-a-mes (ignora el día)
+        // que BuscarAsync, con umbrales 6/12 independientes.
         var hoy = clock.GetUtcNow();
         var corte3 = new DateOnly(hoy.Year, hoy.Month, 1).AddMonths(-3);
 

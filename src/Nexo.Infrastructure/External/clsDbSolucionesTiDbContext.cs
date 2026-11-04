@@ -3,11 +3,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Nexo.Infrastructure.External;
 
-/// <summary>
-/// Contexto de SOLO LECTURA contra el datacenter corporativo (base dbsolucionesTI).
-/// El usuario de conexión solo tiene permisos de lectura; además este contexto
-/// deshabilita el tracking y bloquea SaveChanges como defensa en profundidad.
-/// </summary>
+/// <summary>Contexto de SOLO LECTURA contra el datacenter corporativo (dbsolucionesTI): sin tracking y con SaveChanges bloqueado como defensa en profundidad.</summary>
 public class clsDbSolucionesTiDbContext : DbContext
 {
     public clsDbSolucionesTiDbContext(DbContextOptions<clsDbSolucionesTiDbContext> options) : base(options)

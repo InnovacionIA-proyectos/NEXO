@@ -8,14 +8,8 @@ using Nexo.Mensajes.Notificaciones;
 namespace Nexo.Application.CasosDeUso.Cotizaciones;
 
 /// <summary>
-/// S5-HU-20.1/#286 (HU-B23/B24): reglas que comparten agregar y quitar un servicio conexo.
-///
-/// Los servicios se pueden cambiar mientras la cotización no tenga resultado
-/// (<c>Resultado == SinDefinir</c>), o sea Borrador O Entregada. Antes la regla era
-/// "solo Borrador", pero un servicio omitido se descubre justo después de entregar. Una vez
-/// Ganada o Perdida ya no admite cambios: el resultado realimentó la Biblioteca y es del
-/// Comercial. (Editar la cantidad de un conexo —PATCH— sigue siendo solo Borrador: ese cambio
-/// no se pidió extender.)
+/// Reglas que comparten agregar y quitar un conexo: se admite mientras la cotización no tenga resultado (Borrador o Entregada); Ganada o
+/// Perdida no admite cambios porque el resultado realimentó la Biblioteca. Editar la cantidad (PATCH) sigue siendo solo Borrador.
 /// </summary>
 internal static class clsCambioDeConexos
 {
@@ -26,8 +20,7 @@ internal static class clsCambioDeConexos
                 "La cotización ya está marcada como Ganada/Perdida: no admite cambios de servicios.");
     }
 
-    /// <summary>Detalle de la auditoría de agregar/quitar: servicio, cantidad y valor de cada
-    /// ítem (al quitar, el valor que tenía) y si el cambio fue después de la entrega.</summary>
+    /// <summary>Detalle de la auditoría de agregar/quitar: servicio, cantidad y valor de cada ítem, y si el cambio fue tras la entrega.</summary>
     public static string DetalleDeAuditoria(IReadOnlyList<clsConexoCambiado> items, bool trasEntrega) =>
         System.Text.Json.JsonSerializer.Serialize(new
         {
@@ -35,11 +28,9 @@ internal static class clsCambioDeConexos
             trasEntrega,
         });
 
-    /// <summary>Si la cotización ya estaba entregada: deja la marca <c>ModificadaTrasEntregaAt</c>
-    /// (sin tocar Estado ni EntregadaAt: el SLA y las métricas siguen midiendo la entrega
-    /// original) y publica el aviso a quien creó la solicitud — salvo que el actor sea esa misma
-    /// persona. Sobre un Borrador no hace nada. Se llama ANTES de guardar: el evento va por el
-    /// Outbox, en la misma transacción que el cambio.</summary>
+    /// <summary>Si la cotización ya estaba entregada: deja la marca <c>ModificadaTrasEntregaAt</c> (sin tocar Estado ni EntregadaAt, para que el SLA
+    /// siga midiendo la entrega original) y avisa a quien creó la solicitud, salvo que sea el actor. Se llama ANTES de guardar: el evento va por el
+    /// Outbox en la misma transacción.</summary>
     public static async Task RegistrarTrasEntregaAsync(
         clsCotizacion c, string accion, IReadOnlyList<clsConexoCambiado> items,
         ISolicitudesPort solicitudes, IPublicadorDeMensajes publicador,

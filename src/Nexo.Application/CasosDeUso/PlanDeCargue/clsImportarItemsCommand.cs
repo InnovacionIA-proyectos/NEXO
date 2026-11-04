@@ -7,8 +7,7 @@ using Nexo.Mensajes.Cubicacion;
 
 namespace Nexo.Application.CasosDeUso.PlanDeCargue;
 
-/// <summary>Un ítem dentro de un <see cref="clsImportarItemsCommand"/> — mismos campos que
-/// <see cref="clsGuardarItemCommand"/> menos el PlanCargueId (lo trae el comando contenedor).</summary>
+/// <summary>Un ítem de <see cref="clsImportarItemsCommand"/>: mismos campos que <see cref="clsGuardarItemCommand"/> menos el PlanCargueId.</summary>
 public sealed record clsItemAImportar(
     string? Sku, string Descripcion, string? Pedido, string? clsCliente, string? Destino, int SecuenciaEntrega,
     decimal LargoMm, decimal AnchoMm, decimal AltoMm, decimal PesoKg, int Cantidad, string? Color, int Prioridad,
@@ -16,12 +15,7 @@ public sealed record clsItemAImportar(
     bool MantenerVertical, bool Fragil, bool Peligroso, bool Refrigerado, string? GrupoCompatibilidad,
     string? Observaciones);
 
-/// <summary>
-/// Importación masiva de ítems (1-2.000) — POST
-/// /api/planes-cargue/{id}/items/importar. NEXO valida el rango temprano (400 rápido, sin
-/// encolar) — Cubicador vuelve a validarlo del lado del worker, que es quien manda si
-/// algo se cuela.
-/// </summary>
+/// <summary>Importación masiva de ítems (1-2.000), POST /api/planes-cargue/{id}/items/importar. NEXO valida el rango temprano (400 sin encolar); Cubicador lo revalida en el worker.</summary>
 public sealed record clsImportarItemsCommand(Guid PlanCargueId, IReadOnlyList<clsItemAImportar> Items)
     : ICommand<clsComandoAceptadoDto>;
 

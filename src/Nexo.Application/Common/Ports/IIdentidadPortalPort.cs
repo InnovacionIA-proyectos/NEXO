@@ -1,12 +1,8 @@
 namespace Nexo.Application.Common.Ports;
 
 /// <summary>
-/// Lectura de SOLO LECTURA contra la tabla de usuarios y permisos de la administración
-/// (docs/contrato-integracion/README.md, sección 7: "el único punto de contacto es la
-/// lectura de la tabla de usuarios y permisos... es de solo lectura"). Nunca lanza ante
-/// una falla de conexión: la traduce a null, para que quien resuelve la identidad la
-/// trate igual que un identificador inexistente (401) en vez de un 500 que exponga
-/// detalle interno.
+/// Lectura de SOLO LECTURA de usuarios y permisos de la administración. Ante una falla de conexión devuelve null (no lanza),
+/// para tratarla como identificador inexistente (401) y no exponer detalle interno con un 500.
 /// </summary>
 public interface IIdentidadPortalPort
 {

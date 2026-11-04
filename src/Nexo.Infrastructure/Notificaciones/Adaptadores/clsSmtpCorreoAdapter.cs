@@ -6,23 +6,8 @@ using Microsoft.Extensions.Logging;
 
 namespace Nexo.Infrastructure.Notificaciones.Adaptadores;
 
-/// <summary>
-/// Salida de correo por SMTP directo. Configuración en la sección "Smtp".
-///
-/// ES EL CAMINO DE RESERVA, no el previsto. Se usa solo cuando no hay
-/// <c>MailSender:BaseUrl</c> configurada, para que un entorno que ya tenía el SMTP puesto
-/// no se quede sin notificación al entrar el microservicio.
-///
-/// Y hay una razón concreta para preferir el otro: el relay corporativo por SOAP solo
-/// adjunta archivos que ya están en una ruta alcanzable por ese servidor, y el formato de
-/// la cotización llega como archivo en la petición — no está en ningún disco compartido.
-/// Este adaptador adjunta desde memoria porque habla SMTP directo, pero es el camino que
-/// la compañía está dejando atrás.
-///
-/// Sube <see cref="clsCorreoTransitorioException"/> en vez de la excepción cruda de SMTP para
-/// que el bus la trate igual que la del microservicio: la política de reintentos no tiene
-/// por qué saber cuál adaptador está detrás.
-/// </summary>
+/// <summary>Salida de correo por SMTP directo (sección "Smtp"). Es el camino de reserva: se usa solo sin MailSender:BaseUrl.
+/// Sube <see cref="clsCorreoTransitorioException"/> en vez de la excepción cruda de SMTP para que el bus trate igual a ambos adaptadores.</summary>
 public sealed class clsSmtpCorreoAdapter(IConfiguration config, ILogger<clsSmtpCorreoAdapter> logger) : ICorreoPort
 {
     public bool Configurado =>

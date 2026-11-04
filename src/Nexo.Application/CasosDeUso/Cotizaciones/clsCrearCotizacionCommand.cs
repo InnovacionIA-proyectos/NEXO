@@ -25,9 +25,7 @@ public sealed class clsCrearCotizacionCommandHandler(
         var solicitud = await solicitudes.ObtenerBasicoAsync(command.SolicitudId, ct)
             ?? throw new clsValidationFailedException("SOLICITUD_INVALIDA", "La solicitud indicada no existe.");
 
-        // Una solicitud YA ENTREGADA se abre sobre su cotización entregada (con sus fletes
-        // y servicios), no sobre un borrador vacío: así la Mesa y la exportación muestran
-        // el detalle real y no se crea una cotización en ceros.
+        // Una solicitud YA ENTREGADA se abre sobre su cotización entregada, no sobre un borrador vacío: la Mesa y la exportación muestran el detalle real.
         if (solicitud.Estado == EstadoSolicitud.Entregada)
         {
             var entregada = await cotizaciones.ObtenerConLineasYConexosAsync(

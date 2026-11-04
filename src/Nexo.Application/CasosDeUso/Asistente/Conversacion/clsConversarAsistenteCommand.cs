@@ -13,9 +13,8 @@ using Nexo.Domain.Enums;
 namespace Nexo.Application.CasosDeUso.Asistente.Conversacion;
 
 /// <summary>
-/// Un mensaje del usuario al asistente. Sin <paramref name="ConversacionId"/> empieza una conversación nueva.
-/// Devuelve la respuesta como una secuencia de eventos: todo lo que puede fallar antes de responder (mensaje inválido, conversación
-/// ajena, límite de turnos, función apagada, tope diario) falla aquí, antes de devolver la secuencia, para que sea un error HTTP normal.
+/// Un mensaje del usuario al asistente; sin <paramref name="ConversacionId"/> empieza una conversación. Todo lo que puede fallar
+/// antes de responder falla antes de devolver la secuencia, para que sea un error HTTP normal.
 /// </summary>
 public sealed record clsConversarAsistenteCommand(Guid? ConversacionId, string? Mensaje) : ICommand<IAsyncEnumerable<clsEventoAsistente>>;
 
@@ -205,10 +204,7 @@ public sealed class clsConversarAsistenteCommandHandler(
         }
     }
 
-    /// <summary>
-    /// Ejecuta la herramienta con la identidad de la persona y deja constancia. Un rechazo del dominio (sin permiso, solicitud ajena,
-    /// no existe) vuelve al modelo como error para que lo explique; no se esconde ni se reintenta por otro camino.
-    /// </summary>
+/// <summary>Ejecuta la herramienta con la identidad de la persona; un rechazo del dominio vuelve al modelo como error, sin reintentos por otro camino.</summary>
     private async Task<clsResultadoHerramientaIa> EjecutarHerramientaAsync(
         Guid conversacionId, Guid respuestaId, clsLlamadaHerramientaIa llamada, CancellationToken ct)
     {

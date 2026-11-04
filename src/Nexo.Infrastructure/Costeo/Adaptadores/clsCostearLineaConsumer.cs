@@ -5,17 +5,8 @@ using MassTransit;
 
 namespace Nexo.Infrastructure.Costeo.Adaptadores;
 
-/// <summary>
-/// Traduce el mensaje de costeo en el comando del caso de uso, y nada más.
-///
-/// Un consumidor es un adaptador de entrada, igual que un controlador HTTP: recibe algo
-/// del mundo exterior, lo convierte al lenguaje de la aplicación y delega. Si aquí
-/// empezara a haber decisiones, la lógica quedaría atada al transporte.
-///
-/// NO captura excepciones a propósito. Un fallo de fuente tiene que subir para que
-/// MassTransit reintente con su política escalonada; taparlo aquí convertiría un
-/// problema transitorio en un pendiente definitivo.
-/// </summary>
+/// <summary>Traduce el mensaje de costeo en el comando del caso de uso. No captura excepciones a propósito:
+/// un fallo de fuente debe subir para que MassTransit reintente con su política escalonada.</summary>
 public sealed class clsCostearLineaConsumer(ICommandHandler<clsCostearLineaCommand, Unit> costear)
     : IConsumer<clsCostearLineaSolicitada>
 {

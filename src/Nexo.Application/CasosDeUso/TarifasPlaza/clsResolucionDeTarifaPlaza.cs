@@ -7,11 +7,8 @@ using Nexo.Domain.Costeo.Entidades;
 namespace Nexo.Application.CasosDeUso.TarifasPlaza;
 
 /// <summary>
-/// Resolución compartida entre Crear/Editar (S4-HU-10.2) y el importador Excel: valida
-/// línea de negocio y clase de viaje contra el catálogo real (tblSAPLineaNegocio/
-/// tblSAPClaseViaje) y devuelve el texto CANÓNICO del catálogo, no el que escribió quien
-/// captura — así dos formas de escribir la misma línea de negocio nunca producen dos
-/// tarifas "distintas" para Nexo.
+/// Resolución compartida entre Crear/Editar y el importador Excel: valida línea de negocio y clase de viaje contra el catálogo real y
+/// devuelve el texto CANÓNICO del catálogo, para que dos formas de escribir lo mismo no produzcan tarifas distintas.
 /// </summary>
 public static class clsResolucionDeTarifaPlaza
 {
@@ -40,7 +37,6 @@ public static class clsTarifaPlazaMapper
         t.ClaseContenedor, t.PesoId, t.Peso is null ? null : FormatoRango(t.Peso), t.TipoVehiculo,
         t.Valor, t.Vigencia, t.DetallesTarifa, t.CreatedAt);
 
-    /// <summary>"3-15000" para una banda cerrada, "10500+" para una banda abierta (sin
-    /// PesoMaximo) — mismo formato que espera el importador/exportador Excel.</summary>
+    /// <summary>"3-15000" para banda cerrada, "10500+" para banda abierta (sin PesoMaximo); mismo formato del importador/exportador Excel.</summary>
     public static string FormatoRango(clsRangoPeso p) => p.PesoMaximo is { } max ? $"{p.PesoMinimo}-{max}" : $"{p.PesoMinimo}+";
 }

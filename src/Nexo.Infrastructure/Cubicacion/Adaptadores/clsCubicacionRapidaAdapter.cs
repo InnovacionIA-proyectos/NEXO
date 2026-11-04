@@ -9,35 +9,14 @@ using Microsoft.Extensions.Logging;
 
 namespace Nexo.Infrastructure.Cubicacion.Adaptadores;
 
-/// <summary>Espejo de <c>{ "codigo": "...", "mensaje": "..." }</c> (CONTRATO.md §4 del Cubicador).</summary>
+/// <summary>Espejo de <c>{ "codigo": "...", "mensaje": "..." }</c> del Cubicador.</summary>
 internal sealed record clsErrorCubicadorDto(
     [property: JsonPropertyName("codigo")] string? Codigo,
     [property: JsonPropertyName("mensaje")] string? Mensaje);
 
-/// <summary>
-/// Único cliente HTTP saliente de NEXO hacia Cubicador — ver
-/// <see cref="ICubicacionRapidaPort"/> para por qué esta operación concreta es una
-/// excepción declarada al "solo colas" del resto de Cubicación.
-///
-/// S5-HU-18.1/#273: llama <c>{BaseAddress}recomendaciones</c> (reemplaza al retirado
-/// <c>POST /api/cubicacion</c>) con el Bearer de <c>Cubicador3D:RecomendacionesApiKey</c>
-/// — equivalente del lado de NEXO a <c>CUBICADOR_API_KEY_NEXO</c>, distinto del
-/// <c>Cubicador3D:OutboundApiKey</c> genérico que usaba el contrato viejo y que el
-/// Cubicador ya no acepta en este endpoint.
-///
-/// JSON en camelCase explícito: <c>cubicador/api/dtos/comun.py::ApiModel</c> usa
-/// <c>alias_generator=to_camel</c> "igual que JsonSerializerDefaults.Web de NEXO" (su
-/// propio comentario) — así que el shape ya coincide con las propiedades PascalCase de
-/// los DTOs de Application sin necesidad de un mapeo campo a campo.
-///
-/// Traducción de errores: el Cubicador devuelve <c>{ codigo, mensaje }</c> real
-/// (CONTRATO.md §4) — se parsea y se propaga EL MISMO código (catálogo existente
-/// ampliado: MERCANCIAS_REQUERIDAS, MERCANCIA_DESCONOCIDA, MERCANCIA_NO_CUBICABLE,
-/// DIMENSIONES_INVALIDAS, CUBICACION_DEMASIADO_GRANDE), no un código inventado por NEXO
-/// que lo reemplace. <c>SIN_SELECCION_AUTOMATICA</c> y <c>condicionada</c> NO son errores:
-/// llegan con 200 dentro de <see cref="clsRecomendacionDto.Resultado"/> — este adaptador no
-/// les da tratamiento especial, los deja pasar como cualquier respuesta exitosa.
-/// </summary>
+/// <summary>Cliente HTTP saliente hacia Cubicador (excepción al "solo colas", ver <see cref="ICubicacionRapidaPort"/>).
+/// Usa el Bearer de Cubicador3D:RecomendacionesApiKey y JSON camelCase (coincide con los DTOs sin mapeo).
+/// Propaga el mismo código de error del Cubicador; SIN_SELECCION_AUTOMATICA y condicionada llegan con 200 y no son errores.</summary>
 public sealed class clsCubicacionRapidaAdapter(HttpClient http, ILogger<clsCubicacionRapidaAdapter> log)
     : ICubicacionRapidaPort
 {
@@ -95,17 +74,14 @@ public sealed class clsCubicacionRapidaAdapter(HttpClient http, ILogger<clsCubic
             var detalle = await respuesta.Content.ReadAsStringAsync(ct);
             var error = TryParseError(detalle);
 
-            // 400 (mercancía/medidas/tamaño del request inválidos): la culpa es del request,
-            // no del transporte — se propaga el código REAL que manda el Cubicador
-            // (catálogo ampliado de la sección 2.6/§4, no uno inventado por NEXO), para que
-            // quien llame pueda distinguir MERCANCIA_DESCONOCIDA de DIMENSIONES_INVALIDAS.
+            // 400: la culpa es del request, no del transporte; se propaga el código REAL del Cubicador
+            // para distinguir p. ej. MERCANCIA_DESCONOCIDA de DIMENSIONES_INVALIDAS.
             if (respuesta.StatusCode == HttpStatusCode.BadRequest)
                 throw new clsValidationFailedException(
                     error?.Codigo ?? "CUBICACION_INVALIDA", error?.Mensaje ?? Recortar(detalle));
 
-            // S6-HU-29.2/#312: "no hay recomendación para esta línea" es una respuesta del Cubicador, NO una caída: 404 con código
-            // propio, para que el front distinga "todavía no hay" de "el Cubicador está caído". Solo en la RECONSULTA: un 404 al
-            // CREAR no significa "sin recomendación" (la creación siempre devuelve una), sino una ruta mal configurada, y eso sí es 503.
+            // "Sin recomendación" es una respuesta del Cubicador (404 con código propio), no una caída; solo aplica a la RECONSULTA:
+            // un 404 al CREAR es una ruta mal configurada y sí es 503.
             if (esConsulta && respuesta.StatusCode == HttpStatusCode.NotFound)
                 throw new clsNotFoundException(
                     "RECOMENDACION_NO_ENCONTRADA",

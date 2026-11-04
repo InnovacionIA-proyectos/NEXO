@@ -3,16 +3,13 @@ using Nexo.Domain.Common;
 
 namespace Nexo.Domain.Priorizacion.Entidades;
 
-/// <summary>
-/// Parámetros configurables del score de priorización (fila única, editable por el Admin).
-/// Permite recalibrar pesos y referencias sin tocar código.
-/// </summary>
+/// <summary>Parámetros del score de priorización (fila única, editable por el Admin).</summary>
 public class clsParametrosScore : IAuditable
 {
     /// <summary>Fila única (singleton). Siempre Id = 1.</summary>
     public int Id { get; set; } = 1;
 
-    // Pesos de cada componente (deberían sumar 1.0).
+    // Pesos de cada componente; deben sumar 1.0.
     [Range(0, 1)] public double PesoUrgencia { get; set; } = 0.40;
     [Range(0, 1)] public double PesoValor { get; set; } = 0.30;
     [Range(0, 1)] public double PesoProbabilidad { get; set; } = 0.20;

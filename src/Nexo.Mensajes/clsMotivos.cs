@@ -1,12 +1,6 @@
 namespace Nexo.Mensajes;
 
-/// <summary>
-/// Atajo para el chequeo que repiten todos los validadores: un identificador vacío
-/// nunca es válido en un mensaje.
-///
-/// Vive en el namespace raíz porque lo usan los validadores de todos los contextos.
-/// Estaba dentro de los de costeo, que fue donde nació.
-/// </summary>
+/// <summary>Atajo para el chequeo que repiten los validadores: un identificador vacío nunca es válido.</summary>
 internal static class clsMotivos
 {
     public static List<string> De(params (string Nombre, Guid Valor)[] campos)

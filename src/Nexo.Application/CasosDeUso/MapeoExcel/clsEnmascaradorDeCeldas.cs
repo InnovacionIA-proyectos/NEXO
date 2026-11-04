@@ -4,13 +4,8 @@ using Nexo.Application.CasosDeUso.Solicitudes;
 namespace Nexo.Application.CasosDeUso.MapeoExcel;
 
 /// <summary>
-/// Quita de lo que sale hacia el modelo los datos que nunca deben salir: NIT, nombres de personas, correos, teléfonos y valores
-/// comerciales. El enmascarado se hace aquí, por reglas y ANTES de armar el mensaje; el modelo no decide qué se oculta.
-///
-/// Para saber a qué campo corresponde una columna el modelo no necesita el dato, solo de qué tipo es, así que el marcador
-/// (<c>&lt;NIT&gt;</c>, <c>&lt;CORREO&gt;</c>…) conserva esa información. Tres vías, de la más fuerte a la más débil:
-/// el encabezado (toda la columna), el contenido de las celdas de la columna (si lo que trae parece un correo, un teléfono, un NIT o
-/// nombres de personas, se oculta toda) y el contenido de cada celda suelta.
+/// Quita de lo que sale hacia el modelo NIT, nombres de personas, correos, teléfonos y valores comerciales, por reglas y ANTES de armar el
+/// mensaje. El marcador (<c>&lt;NIT&gt;</c>…) conserva el tipo del dato. Vías: encabezado, contenido de la columna y de cada celda.
 /// </summary>
 public static class clsEnmascaradorDeCeldas
 {
@@ -32,7 +27,7 @@ public static class clsEnmascaradorDeCeldas
     // "100 1500" también lo cumple.
     private static readonly Regex FijoLocal = new(@"(?<![\w.,\-])\d{3}[\s\-]\d{4}(?!\d)", RegexOptions.Compiled);
     private static readonly Regex Control = new(@"[\p{C}]", RegexOptions.Compiled);
-    // "NombreContacto", "TelefonoCelular", "NIT2": el encabezado pegado se parte por donde cambia de minúscula a mayúscula ("NombreContacto"), donde una sigla termina y empieza una palabra ("NITCliente") o de letra a número.
+    // "NombreContacto", "NITCliente", "NIT2": parte el encabezado pegado en cambios de minúscula a mayúscula, fin de sigla y letra/número.
     private static readonly Regex CortePorMayuscula = new(@"(?<=\p{Ll})(?=\p{Lu})|(?<=\p{Lu})(?=\p{Lu}\p{Ll})|(?<=\p{L})(?=\d)|(?<=\d)(?=\p{L})", RegexOptions.Compiled);
 
     private const string MarcadorNit = "<NIT>";
@@ -97,11 +92,7 @@ public static class clsEnmascaradorDeCeldas
         return null;
     }
 
-    /// <summary>
-    /// El marcador de cada columna: el del encabezado y, donde el encabezado no dice nada, el que sale del contenido de sus celdas.
-    /// Una columna cuyas celdas traen correos, teléfonos, NIT o nombres de personas se oculta ENTERA, no solo las celdas que se reconocieron:
-    /// el nombre que la lista no conoce va en la misma columna que el que sí.
-    /// </summary>
+    /// <summary>Marcador de cada columna: el del encabezado y, si este no dice nada, el del contenido; una columna sensible se oculta ENTERA, no solo las celdas reconocidas.</summary>
     public static IReadOnlyList<string?> MarcadoresDeColumnas(IReadOnlyList<string> encabezados, IReadOnlyList<IReadOnlyList<string>>? filas)
     {
         var marcadores = new string?[encabezados.Count];
@@ -114,11 +105,7 @@ public static class clsEnmascaradorDeCeldas
         return marcadores;
     }
 
-    /// <summary>
-    /// El marcador que merece una columna por lo que traen sus celdas, o null. Un correo, un NIT con dígito de verificación o un teléfono en
-    /// cualquier celda bastan; un nombre de persona cuenta cuando aparece en al menos una de cada diez celdas con texto (una ciudad que se
-    /// parece a un nombre no debe esconder la columna entera, una columna de nombres sí).
-    /// </summary>
+    /// <summary>Marcador por contenido: un correo, un NIT con dígito o un teléfono en cualquier celda bastan; un nombre de persona, en al menos una de cada diez celdas con texto.</summary>
     public static string? MarcadorPorContenido(IEnumerable<string?> celdas)
     {
         var conTexto = 0;
@@ -143,9 +130,8 @@ public static class clsEnmascaradorDeCeldas
     }
 
     /// <summary>
-    /// Una celda lista para salir: sin caracteres de control, sin correos, teléfonos ni números largos y recortada. Con
-    /// <paramref name="detectarNombres"/> también oculta la celda entera si parece el nombre de una persona (para columnas de texto libre;
-    /// no para las categóricas, donde "Santa Marta" o "Camión Sencillo" son justo lo que se necesita ver).
+    /// Celda lista para salir: sin caracteres de control, correos, teléfonos ni números largos, y recortada. Con <paramref name="detectarNombres"/>
+    /// oculta también nombres de persona (no en columnas categóricas, donde «Santa Marta» debe verse).
     /// </summary>
     public static string Celda(string? valor, string? marcadorDeLaColumna, bool detectarNombres = false)
     {

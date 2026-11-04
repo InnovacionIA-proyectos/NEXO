@@ -16,10 +16,7 @@ public sealed record clsListarHerramientasAsistenteQuery : IQuery<IReadOnlyList<
 /// <summary>Ejecuta una herramienta por su nombre con la entrada que envió el modelo.</summary>
 public sealed record clsEjecutarHerramientaAsistenteQuery(string Nombre, JsonElement Entrada) : IQuery<clsResultadoHerramienta>;
 
-/// <summary>
-/// Punto único por el que el asistente llega a las herramientas. El rol del usuario autenticado decide qué ve: una herramienta que
-/// su rol no puede usar no se le ofrece al modelo y, si el modelo la pide igual, se rechaza con 403 antes de ejecutar nada.
-/// </summary>
+/// <summary>Punto único de acceso a las herramientas: el rol decide cuáles se ofrecen y una no permitida se rechaza con 403.</summary>
 public sealed class clsHerramientasDelAsistente(IEnumerable<IHerramientaAsistente> herramientas, ICurrentUserPort usuario)
 {
     private readonly Dictionary<string, IHerramientaAsistente> _porNombre = herramientas.ToDictionary(h => h.Nombre, StringComparer.Ordinal);

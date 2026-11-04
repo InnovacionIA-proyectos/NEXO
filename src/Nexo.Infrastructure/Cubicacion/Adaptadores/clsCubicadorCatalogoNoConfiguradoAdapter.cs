@@ -4,11 +4,7 @@ using Nexo.Application.Common.Exceptions;
 
 namespace Nexo.Infrastructure.Cubicacion.Adaptadores;
 
-/// <summary>
-/// Se registra cuando falta <c>Cubicador3D:OutboundBaseUrl</c> y/o
-/// <c>Cubicador3D:OutboundApiKey</c>: los seis passthrough de catálogo (S5-HU-18.6/#278)
-/// responden 503 accionable en vez de fallar la inyección de dependencias.
-/// </summary>
+/// <summary>Se registra sin <c>Cubicador3D:OutboundBaseUrl</c> o <c>OutboundApiKey</c>: los passthrough de catálogo responden 503 accionable en vez de fallar la DI.</summary>
 public sealed class clsCubicadorCatalogoNoConfiguradoAdapter : ICubicadorCatalogoPort
 {
     public Task<JsonNode?> GetAsync(string ruta, CancellationToken ct = default) => NoConfigurado<JsonNode?>();
