@@ -1,6 +1,6 @@
 # Diccionario de datos de NEXO
 
-Qué guarda cada una de las 45 tablas de la base de NEXO (`dbTarifario_Nexo_Pruebas`, esquema `dbo`), qué significa cada columna, sus llaves e índices y de dónde salen sus datos.
+Qué guarda cada una de las 46 tablas de la base de NEXO (`dbTarifario_Nexo_Pruebas`, esquema `dbo`), qué significa cada columna, sus llaves e índices y de dónde salen sus datos.
 
 - **Fuente:** `docs/Database/esquema/ESQUEMA_NEXO.sql`. Tipos, nulos, valores por defecto, índices y `CHECK` corresponden a ese archivo.
 - **Esquema:** la aplicación lo lee de la variable `Database__Esquema` (`dbo`).
@@ -22,6 +22,7 @@ Qué guarda cada una de las 45 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 6. [`tbl_alias_elementos`](#6-tbl_alias_elementos)
 7. [`tbl_diccionario_cliente`](#7-tbl_diccionario_cliente)
 8. [`tbl_plantillas_mapeo_cliente`](#8-tbl_plantillas_mapeo_cliente)
+   - bis. [`tbl_recetas_lectura_cliente`](#8-bis-tbl_recetas_lectura_cliente)
 9. [`tbl_mapeo_vehiculo_tarifario`](#9-tbl_mapeo_vehiculo_tarifario)
 10. [`tbl_rangos_peso_contenedor`](#10-tbl_rangos_peso_contenedor)
 11. [`tbl_municipios`](#11-tbl_municipios)
@@ -151,7 +152,7 @@ Qué guarda cada una de las 45 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 **Llaves e índices:** PK `PK_clientes` (Id); Único `IX_clientes_Nit` (Nit).
 
 **FK salientes:** ninguna.  
-**FK entrantes:** `tbl_solicitudes.ClienteId` (NO ACTION); `tbl_diccionario_cliente.ClienteId` (NO ACTION); `tbl_plantillas_mapeo_cliente.ClienteId` (NO ACTION).
+**FK entrantes:** `tbl_solicitudes.ClienteId` (NO ACTION); `tbl_diccionario_cliente.ClienteId` (NO ACTION); `tbl_plantillas_mapeo_cliente.ClienteId` (NO ACTION); `tbl_recetas_lectura_cliente.ClienteId` (NO ACTION).
 
 **De dónde salen los datos:**
 - **Se crea al capturar una solicitud** (`clsResolucionDeCliente`): si el cliente no existe por NIT, se trae del Data Warehouse corporativo (`clsClientesDwAdapter`, solo lectura) y se copia aquí.
@@ -297,6 +298,38 @@ Qué guarda cada una de las 45 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 
 **De dónde salen los datos:**
 - La escribe el backend al confirmar un mapeo y la reutiliza al reconocer la firma. Si el cliente cambia el orden o los encabezados, la firma cambia y se vuelve a sugerir.
+
+---
+
+## 8 bis. `tbl_recetas_lectura_cliente`
+
+**Entidad:** `clsRecetaLecturaCliente` — **Para qué sirve:** Cómo leer el Excel de un cliente: dónde están los encabezados y los datos de cada hoja, cómo se despivotan las tablas cruzadas y qué hojas se usan. La IA propone la receta y la persona la confirma sobre una vista previa. Un archivo nuevo del cliente con un formato parecido (≥ 85 % de los títulos de la parte alta) se lee con la receta guardada sin llamar a la IA; si el formato cambia, la receta y las instrucciones sirven de contexto a la IA.
+
+| Columna | Tipo | Nullable | Default | Descripción |
+|---|---|---|---|---|
+| `Id` | `uniqueidentifier` | No |  | PK |
+| `ClienteId` | `uniqueidentifier` | No |  | Cliente dueño del formato |
+| `Nombre` | `nvarchar(100)` | Sí |  | Etiqueta opcional para reconocer la receta |
+| `Receta` | `nvarchar(max)` | No |  | JSON de la receta (versión, hojas, columnas, etiquetas y valores de tablas cruzadas, constantes, unión de hojas) |
+| `Huella` | `nvarchar(max)` | No |  | JSON: arreglo de textos normalizados de la parte alta de las hojas que usa la receta. Con él se compara el parecido de otro archivo |
+| `Instrucciones` | `nvarchar(4000)` | Sí |  | Lo que la persona explicó sobre cómo está armado el archivo |
+| `Usos` | `int` | No | `0` | Veces que se reutilizó sin IA |
+| `UltimoUsoAt` | `datetimeoffset` | Sí |  | Último uso; el de fecha más antigua se descarta al pasar de 20 recetas por cliente |
+| `CreadoPor` | `uniqueidentifier` | Sí |  | Usuario que la guardó |
+| `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de creación (auditoría) |
+| `UpdatedAt` | `datetimeoffset` | Sí |  | Fecha de última modificación (auditoría) |
+
+**Llaves e índices:** PK `PK_recetas_lectura_cliente` (Id); `IX_recetas_lectura_cliente_ClienteId` (ClienteId).
+
+**CHECK** `CK_recetas_lectura_cliente_Huella`: `(isjson([Huella])=(1))`
+
+**CHECK** `CK_recetas_lectura_cliente_Receta`: `(isjson([Receta])=(1))`
+
+**FK salientes:** `ClienteId` → `tbl_clientes.Id` (NO ACTION).  
+**FK entrantes:** ninguna.
+
+**De dónde salen los datos:**
+- La escribe el backend (`PUT /api/captura-solicitudes/recetas-lectura`) al confirmar una receta, y suma `Usos` cada vez que `leer-estructura` la reutiliza. Cada cliente conserva hasta 20.
 
 ---
 

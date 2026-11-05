@@ -35,6 +35,7 @@ public class clsNexoDbContext : DbContext
     public DbSet<clsAliasElemento> AliasElementos => Set<clsAliasElemento>();
     public DbSet<clsTerminoCliente> TerminosCliente => Set<clsTerminoCliente>();
     public DbSet<clsPlantillaMapeoCliente> PlantillasMapeo => Set<clsPlantillaMapeoCliente>();
+    public DbSet<clsRecetaLecturaCliente> RecetasLectura => Set<clsRecetaLecturaCliente>();
     public DbSet<clsTarifaHistorica> TarifasHistoricas => Set<clsTarifaHistorica>();
     public DbSet<clsServicioConexo> ServiciosConexos => Set<clsServicioConexo>();
     public DbSet<clsCotizacion> Cotizaciones => Set<clsCotizacion>();
@@ -265,6 +266,18 @@ public class clsNexoDbContext : DbContext
             e.Property(x => x.Encabezados).IsRequired();
             e.Property(x => x.Columnas).IsRequired();
             e.HasIndex(x => new { x.ClienteId, x.FirmaEncabezados }).IsUnique();
+            e.HasOne(x => x.Cliente).WithMany().HasForeignKey(x => x.ClienteId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // La receta de lectura del Excel de un cliente (dónde están encabezados y datos). Sin migración de EF: el esquema vive en ESQUEMA_NEXO.sql.
+        b.Entity<clsRecetaLecturaCliente>(e =>
+        {
+            e.ToTable("tbl_recetas_lectura_cliente");
+            e.Property(x => x.Nombre).HasMaxLength(100);
+            e.Property(x => x.Receta).IsRequired();
+            e.Property(x => x.Huella).IsRequired();
+            e.Property(x => x.Instrucciones).HasMaxLength(4000);
+            e.HasIndex(x => x.ClienteId);
             e.HasOne(x => x.Cliente).WithMany().HasForeignKey(x => x.ClienteId).OnDelete(DeleteBehavior.Restrict);
         });
 

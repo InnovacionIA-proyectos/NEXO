@@ -161,10 +161,16 @@ Decidido: Cotifly **no replica** la importación; usa la de NEXO. Todas las ruta
 | 5 | `POST /api/captura-solicitudes` | Captura con las líneas ya normalizadas (§5) |
 | opc. | `PUT plantillas-mapeo` · `GET plantillas-mapeo?clienteNit=` · `DELETE plantillas-mapeo/{id}` | Recordar el mapeo confirmado para el siguiente archivo igual |
 | opc. | `GET/POST/PUT/DELETE /api/diccionario-cliente` | Diccionario de términos por cliente (lo que significa «Outbound» para ese cliente) |
+| alt. al 1 | `POST leer-estructura` (`multipart`: `archivo`, `clienteId` \| `clienteNit`, `instrucciones?`, `receta?`) | Para Excel de formato complejo (tabla que no empieza en la fila 1, encabezados de varias filas, origen o vehículo en las columnas, datos sueltos). La IA propone una receta de lectura y NEXO devuelve `tablas` (igual que `analizar-excel`, una por hoja o unidas), `resumen` y `dudas`. No guarda nada |
+| opc. | `PUT recetas-lectura` (`multipart`: `archivo`, `receta`, `clienteId` \| `clienteNit`, `nombre?`, `instrucciones?`) · `GET recetas-lectura?clienteNit=` · `DELETE recetas-lectura/{id}` | Guardar la receta confirmada: el siguiente archivo del cliente con el mismo formato se lee sin IA |
 
 - **Identificar al cliente por NIT.** Todos aceptan **`clienteNit`** como alternativa a `clienteId` (con los dos manda `clienteId`). El NIT se compara sin puntos, espacios ni dígito de verificación:
   `900.123.456-7` y `900123456` son el mismo cliente. Las **lecturas** no crean nada (sin cliente local se comportan como «sin cliente»: solo diccionario general, sin plantilla). `PUT plantillas-mapeo`
   con un NIT sin cliente local **lo crea** con los datos del DW (también prospectos); un NIT desconocido da `400 CLIENTE_NIT_INVALIDO`.
+- **Excel de formato complejo (`leer-estructura`).** Cada elemento de `tablas` entra al paso 2 (`sugerir-mapeo`) igual que una hoja de `analizar-excel`. Para corregir una lectura, se llama otra vez con `instrucciones`
+  (texto libre) y la `receta` que devolvió la llamada anterior; la conversación la lleva Cotifly, NEXO no guarda historial. `origenReceta` dice de dónde salió la lectura (`guardada`, `ia`, `manual`, `automatica`);
+  con `guardada` no se llamó a la IA. Si la IA no está disponible responde igual (`iaUsada: false`, `motivoSinIa`). `leer-estructura` solo **busca** el cliente por NIT; `PUT recetas-lectura` con un NIT sin cliente local
+  lo crea como `PUT plantillas-mapeo`. Detalle completo, la forma de la receta y los errores en `CONTRATO.md` §3.3.
 - **Línea de negocio.** `normalizar-valores` con `campo: "lineaNegocio"` resuelve en este orden: diccionario del cliente → sinónimos inequívocos (`impo`/`importación` → Puerto a interior,
   `expo`/`exportación` → Interior a puerto) → IA con las seis líneas → `sin_resolver`. «Inbound»/«Outbound» **no** tienen regla: salen del diccionario del cliente o quedan sin resolver.
 - **Es una sugerencia.** Nada se asigna por lo que diga la IA sin que una regla lo valide; si la IA está apagada o falla, la respuesta trae lo que resolvieron las reglas (`iaUsada: false`, `motivoSinIa`).
@@ -233,7 +239,8 @@ Cada conexo de la cotización trae **dos valores**, y no son lo mismo:
 | `RECOMENDACION_NO_ENCONTRADA` (404) | reconsulta | El Cubicador no tiene recomendación para esa línea: «todavía no hay», no una caída |
 | `SOLICITUD_NO_ENCONTRADA` (404), `SOLICITUD_DESCARTADA` (409) | lectura | La solicitud no existe o fue descartada |
 | `IA_TOPE_DIARIO` (429) | importación | La persona agotó su cupo diario de IA |
-| `ARCHIVO_REQUERIDO`, `FORMATO_NO_SOPORTADO`, `EXCEL_INVALIDO`, `EXCEL_SIN_DATOS` | `analizar-excel` | Problemas con el archivo |
+| `ARCHIVO_REQUERIDO`, `FORMATO_NO_SOPORTADO`, `EXCEL_INVALIDO`, `EXCEL_SIN_DATOS` | `analizar-excel`, `leer-estructura` | Problemas con el archivo |
+| `RECETA_INVALIDA`, `RECETA_REQUERIDA`, `RECETA_SIN_FILAS`, `INSTRUCCIONES_DEMASIADO_LARGAS` | `leer-estructura`, `PUT recetas-lectura` | La receta o las instrucciones no sirven; el mensaje dice qué |
 
 ## 10. Discrepancias conocidas que afectan a Cotifly
 
