@@ -4,23 +4,8 @@ using ClosedXML.Excel;
 namespace Nexo.Infrastructure.Common;
 
 /// <summary>
-/// Lee una fecha de una celda de Excel sin depender de la cultura del servidor
-/// (S5-HU-22.1/#288). Es LA forma de leer fechas en todo importador de Nexo: antes cada uno
-/// tenía la suya, y la de Tarifas de Plaza (<c>GetString()</c> + <c>DateOnly.TryParse</c> sin
-/// cultura) rechazaba una fecha guardada como valor nativo de Excel.
-///
-/// Orden, de más a menos confiable:
-///  1. Tipo fecha nativo de la celda.
-///  2. Serial de Excel: una fecha en una celda con formato General (o de texto con solo
-///     dígitos) llega como el número de días desde 1899-12-30 — p. ej. 46315 = 2026-10-20.
-///     Solo se acepta dentro de un rango plausible de fechas (1970-2099): un 5 o un 400000
-///     no son una fecha, son un dato mal puesto en la columna, y deben rechazarse.
-///  3. Texto en formatos explícitos, en InvariantCulture: dd/MM/yyyy, d/M/yyyy, yyyy-MM-dd,
-///     MM/dd/yyyy (en ese orden: ante "05/10/2026" gana día/mes, como en Colombia).
-///  4. Al final, es-CO a propósito (nunca la cultura ambiente del proceso).
-///
-/// Devuelve null si la celda está vacía o si lo que trae no es una fecha reconocible — el
-/// llamador distingue ambos casos con <see cref="IXLCell.IsEmpty"/>.
+/// Lee una fecha de una celda de Excel sin depender de la cultura del servidor: fecha nativa, serial (solo 1970-2099), texto con formatos explícitos (día/mes primero) y es-CO al final.
+/// Devuelve null si la celda está vacía o no es una fecha reconocible.
 /// </summary>
 public static class clsLectorFechasExcel
 {

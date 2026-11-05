@@ -6,15 +6,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Nexo.Infrastructure.Identidad.Adaptadores;
 
-/// <summary>
-/// Implementación real (Producción/QA): consulta la tabla de la
-/// administración en cada llamada (sin caché de sesión), traduce sus roles a uno de los
-/// 6 de Nexo vía <see cref="clsMapeoRolPortal"/>, y mantiene sincronizada la cuenta local
-/// que sirve de autoría real para clsAuditLog (docs/contrato-integracion, sección 1 y
-/// ADR-001). Guarda inmediatamente (no espera al UnitOfWork del caso de uso): esto corre
-/// en la autenticación, antes de saber si la petición es una consulta que nunca llama a
-/// SaveChanges.
-/// </summary>
+/// <summary>Consulta la tabla de la administración en cada llamada (sin caché), traduce sus roles a uno de los 6 de Nexo vía
+/// <see cref="clsMapeoRolPortal"/> y sincroniza la cuenta local usada como autoría de clsAuditLog.
+/// Guarda de inmediato: corre en la autenticación, sin pasar por el UnitOfWork del caso de uso.</summary>
 public sealed class clsResolverIdentidadPortalAdapter(IIdentidadPortalPort identidadPortal, clsNexoDbContext db)
     : IResolverIdentidadPortalPort
 {
@@ -59,9 +53,7 @@ public sealed class clsResolverIdentidadPortalAdapter(IIdentidadPortalPort ident
         return new clsIdentidadResueltaDto(usuario.Id, usuario.Nombre, rolEfectivo);
     }
 
-    /// <summary>Primero por id (estable mientras no cambie la base física del portal);
-    /// si no matchea, respaldo por nombre (Pendiente P2 en el contrato) — ver
-    /// docs/contrato-integracion/README.md sección 2.</summary>
+    /// <summary>Primero por id (estable mientras no cambie la base física del portal); si no matchea, respaldo por nombre.</summary>
     private async Task<Domain.Enums.RolUsuario?> ResolverRolAsync(RolPortalDto rolPortal, CancellationToken ct)
     {
         var porId = await db.MapeosRolPortal.FirstOrDefaultAsync(m => m.IdRolPortal != null && m.IdRolPortal == rolPortal.Id, ct);

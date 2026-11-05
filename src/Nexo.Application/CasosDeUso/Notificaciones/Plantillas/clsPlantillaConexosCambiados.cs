@@ -4,12 +4,7 @@ using Nexo.Mensajes.Notificaciones;
 
 namespace Nexo.Application.CasosDeUso.Notificaciones.Plantillas;
 
-/// <summary>
-/// Correo de "Cotización actualizada" (S5-HU-20.1/#286): se agregó o se quitó un servicio
-/// conexo de una cotización que ya se había entregado. Misma identidad visual y misma
-/// moneda explícita (es-CO, sufijo COP) que <see cref="clsPlantillaDeEntrega"/>; los nombres
-/// de servicio vienen del catálogo y se escapan igual por si traen caracteres de marcado.
-/// </summary>
+/// <summary>Correo de "Cotización actualizada": se agregó o quitó un servicio conexo de una cotización ya entregada. Misma identidad y moneda que <see cref="clsPlantillaDeEntrega"/>.</summary>
 public static class clsPlantillaConexosCambiados
 {
     private static readonly CultureInfo Cop = CultureInfo.GetCultureInfo("es-CO");

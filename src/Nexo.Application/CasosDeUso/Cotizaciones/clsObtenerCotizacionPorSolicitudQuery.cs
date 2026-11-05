@@ -6,16 +6,7 @@ using Nexo.Domain.Enums;
 
 namespace Nexo.Application.CasosDeUso.Cotizaciones;
 
-/// <summary>
-/// S5-HU-20.1/#286: la cotización que ya existe para una solicitud, SIN crear nada. Hasta
-/// ahora el único camino para traerla era <c>POST /api/cotizaciones</c> (crear o recuperar),
-/// que tiene efecto secundario: Mesa de Costeo solo lo llamaba si el usuario hacía clic o
-/// tenía <c>autoAplicarPropuestas</c>, así que la pantalla no sabía que ya había una
-/// cotización (p. ej. la auto-costeada al capturar) y "Iniciar costeo" parecía aplicar todo.
-///
-/// Devuelve null —no lanza— cuando no hay: para el llamador "todavía no hay cotización" es
-/// un estado normal, no un error.
-/// </summary>
+/// <summary>La cotización que ya existe para una solicitud, SIN crear nada; devuelve null (no lanza) si no hay, que para quien llama es un estado normal.</summary>
 public sealed record clsObtenerCotizacionPorSolicitudQuery(Guid SolicitudId) : IQuery<clsCotizacionDto?>;
 
 public sealed class clsObtenerCotizacionPorSolicitudQueryHandler(
@@ -24,10 +15,8 @@ public sealed class clsObtenerCotizacionPorSolicitudQueryHandler(
 {
     public async Task<clsCotizacionDto?> Handle(clsObtenerCotizacionPorSolicitudQuery query, CancellationToken ct = default)
     {
-        // Misma elección que clsCrearCotizacionCommand, para que GET y POST nunca apunten a
-        // cotizaciones distintas de la misma solicitud: si la solicitud ya se entregó, su
-        // cotización Entregada; si no, el borrador en curso. Un FirstOrDefault a secas por
-        // SolicitudId sería ambiguo cuando conviven una entregada y un borrador.
+        // Misma elección que clsCrearCotizacionCommand para que GET y POST apunten a la misma cotización: la Entregada si la solicitud ya se
+        // entregó, si no el borrador en curso.
         var solicitud = await solicitudes.ObtenerBasicoAsync(query.SolicitudId, ct);
         if (solicitud is null) return null;
 

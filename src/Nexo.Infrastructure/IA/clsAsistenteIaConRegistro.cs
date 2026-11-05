@@ -9,19 +9,9 @@ using Nexo.Domain.IA.Entidades;
 
 namespace Nexo.Infrastructure.IA;
 
-/// <summary>
-/// Envuelve al adaptador del proveedor para controlar su uso. Antes de llamar, aplica el tope diario de la persona; después,
-/// registra la llamada (función, usuario, modelo, tokens, costo estimado, latencia y resultado) en <c>tbl_ia_uso</c>, con éxito
-/// o con error. No guarda el contenido enviado ni la respuesta.
-///
-/// TOPE DIARIO. El día es el de Colombia (medianoche en UTC-5) y se mide en tokens (entrada, salida y caché). El tope es
-/// BLANDO: se verifica antes de llamar con lo ya registrado, así que dos llamadas simultáneas pueden pasarlo por una llamada.
-/// Un tope de 0 lo desactiva, y una llamada sin usuario (proceso interno) no tiene tope por persona. Al superarlo responde
-/// <c>429 IA_TOPE_DIARIO</c> con el consumo y la hora en que se reinicia.
-///
-/// NO SE REGISTRA lo que nunca llegó al proveedor (sin llave, función o IA apagada): no consumió nada. Si guardar el registro
-/// falla, se avisa en el log y la respuesta al usuario no se pierde.
-/// </summary>
+/// <summary>Envuelve al adaptador del proveedor: aplica el tope diario de tokens por persona (día de Colombia, UTC-5) y registra cada
+/// llamada en <c>tbl_ia_uso</c>, sin guardar el contenido. El tope es BLANDO (dos llamadas simultáneas pueden pasarlo); 0 lo desactiva
+/// y sin usuario no hay tope. Lo que nunca llegó al proveedor no se registra; si guardar falla, solo se avisa en el log.</summary>
 public sealed class clsAsistenteIaConRegistro(
     IAsistenteIaPort interno,
     IUsoIaRepository uso,

@@ -21,11 +21,6 @@ public interface ITarifasPlazaRepository
     /// <summary>Elimina por Id; devuelve cuántas filas borró (0 o 1).</summary>
     Task<int> EliminarAsync(Guid id, CancellationToken ct);
 
-    /// <summary>
-    /// Carga masiva desde Excel: upsert por las 7 dimensiones (última fila del archivo gana
-    /// si se repite), con reporte de error por fila (tope 20 mensajes) — mismo patrón que
-    /// el importador de TarifasSicetacAdmin (retirado en la Issue #179, el código de
-    /// referencia queda en el historial de git).
-    /// </summary>
+    /// <summary>Carga masiva desde Excel: upsert por las 7 dimensiones (la última fila del archivo gana si se repite), con reporte de error por fila (tope 20 mensajes).</summary>
     Task<clsImportarTarifasPlazaResultDto> ImportarExcelAsync(Stream excel, Guid? usuarioId, CancellationToken ct);
 }

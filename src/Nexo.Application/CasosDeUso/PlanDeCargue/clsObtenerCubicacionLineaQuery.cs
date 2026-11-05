@@ -5,12 +5,7 @@ using Nexo.Application.Common.Exceptions;
 
 namespace Nexo.Application.CasosDeUso.PlanDeCargue;
 
-/// <summary>
-/// Puente Solicitudes → Cubicador (microservicio Python): lo que el Cubicador necesita
-/// de una línea de solicitud para cubicarla, sin exponerle el resto del módulo
-/// Solicitudes. Llamado por el worker de Cubicador vía GET /api/lineas-solicitud/{id}
-/// /cubicacion — ver cubicador/CONTRATO.md sección 7.
-/// </summary>
+/// <summary>Puente Solicitudes → Cubicador: lo que el Cubicador necesita de una línea para cubicarla, sin exponerle el resto del módulo. Lo llama el worker vía GET /api/lineas-solicitud/{id}/cubicacion.</summary>
 public sealed record clsObtenerCubicacionLineaQuery(Guid Id) : IQuery<clsLineaParaCubicacionDto>;
 
 public sealed class clsObtenerCubicacionLineaQueryHandler(ILineaSolicitudCubicacionPort lineas)

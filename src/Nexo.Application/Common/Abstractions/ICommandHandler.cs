@@ -5,11 +5,7 @@ public interface ICommand<TResult>
 {
 }
 
-/// <summary>
-/// Caso de uso de escritura. Un handler por Command (Single Responsibility). No hay
-/// despachador/mediador de por medio a propósito: el controller inyecta el handler
-/// concreto que necesita (menos indirección, sin depender de una librería externa).
-/// </summary>
+/// <summary>Caso de uso de escritura, un handler por Command. Sin mediador a propósito: el controller inyecta el handler concreto.</summary>
 public interface ICommandHandler<in TCommand, TResult> where TCommand : ICommand<TResult>
 {
     Task<TResult> Handle(TCommand command, CancellationToken ct = default);

@@ -13,8 +13,7 @@ namespace Nexo.Api.Solicitudes;
 /// <summary>Bandeja Priorizada y ciclo de vida de la solicitud: alta, costeo, rechazo,
 /// recálculo de score y carga masiva de líneas de licitación.</summary>
 [ApiController]
-// S6-HU-25.1/#307: AdminBiblioteca NO entra a la Bandeja, a la Mesa ni a las solicitudes (ni a leerlas). El [Authorize(Roles)] de
-// clase se SUMA (AND) a los de cada método.
+// AdminBiblioteca no entra a la Bandeja, la Mesa ni las solicitudes (ni a leerlas). El [Authorize(Roles)] de clase se suma (AND) a los de cada método.
 [Authorize(Roles = "Comercial,AdminTarifas,ServiciosLogisticos,LiderProceso,Admin")]
 [Route("api/solicitudes")]
 public class clsSolicitudesController(
@@ -28,21 +27,9 @@ public class clsSolicitudesController(
     : ControllerBase
 {
     /// <summary>
-    /// Bandeja Priorizada (anti-FIFO). Filtros: estado de la solicitud, atención
-    /// (pendientes | automatico | administrador | atendidas | todas) y rango de fecha
-    /// de captura (desde/hasta). Sin filtros muestra la cola de pendientes.
-    ///
-    /// S5-HU-23.1/#289 (misma consulta y mismo repositorio para TODOS los roles; para Comercial se
-    /// limita antes a lo que él mismo creó, issue #199):
-    ///  - <c>vigencia</c> (vigente | vencida) se mide contra la FECHA LÍMITE (Deadline), no contra la
-    ///    antigüedad de la captura; una solicitud sin Deadline cuenta como vigente.
-    ///  - atención <c>pendientes</c> incluye también la solicitud con todas las líneas revisadas por el
-    ///    Administrador de Fletes que aún no se entrega (y sigue saliendo en <c>administrador</c>/<c>atendidas</c>).
-    ///  - <c>resultado</c> (esperando | ganada | perdida): <c>esperando</c> = cotización entregada (o
-    ///    auto-costeada) sin resultado y solicitud no descartada. Con resultado informado y sin
-    ///    <c>atencion</c> se trata la atención como "todas" (no se aplica la restricción por defecto a
-    ///    Pendiente/EnCosteo). Valor desconocido -> 400 RESULTADO_INVALIDO. Cada fila trae <c>resultado</c>.
-    /// Pagina (page/pageSize, respuesta `{ items, total }`).
+    /// Bandeja Priorizada (anti-FIFO), paginada (<c>{ items, total }</c>). Filtros: estado, atención (pendientes | automatico | administrador | atendidas | todas), fecha de captura,
+    /// vigencia (vigente | vencida, contra el Deadline; sin Deadline cuenta como vigente) y resultado (esperando | ganada | perdida; otro valor → 400 RESULTADO_INVALIDO).
+    /// Sin filtros muestra la cola de pendientes. Para Comercial la consulta se limita a lo que él creó.
     /// </summary>
     [HttpGet]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -50,7 +37,7 @@ public class clsSolicitudesController(
     public async Task<ActionResult<clsPaginaDto<clsBandejaItemDto>>> GetBandeja(
         [FromQuery] string? estado, [FromQuery] string? atencion, [FromQuery] DateTimeOffset? desde,
         [FromQuery] DateTimeOffset? hasta, [FromQuery] string? vigencia, [FromQuery] string? resultado = null,
-        [FromQuery] string orderBy = "score", // vestigial, como en el original: siempre ordena por score
+        [FromQuery] string orderBy = "score", // vestigial: siempre ordena por score
         [FromQuery, Range(1, int.MaxValue)] int page = 1,
         [FromQuery, Range(1, 200)] int pageSize = 50,
         CancellationToken ct = default)
@@ -75,12 +62,7 @@ public class clsSolicitudesController(
         return Created($"/api/solicitudes/{id}", new { id });
     }
 
-    /// <summary>
-    /// Resuelve texto libre (origen/destino/tipo de vehículo) a RutaId/ConfigVehiculoId,
-    /// creando lo que falte en el catálogo. NO crea ninguna solicitud: es el paso previo
-    /// para que un formulario de captura pueda alimentar a lineas:bulk, que ya exige
-    /// esos IDs resueltos y no los resuelve por su cuenta.
-    /// </summary>
+    /// <summary>Resuelve texto libre (origen/destino/vehículo) a RutaId/ConfigVehiculoId, creando lo que falte en el catálogo. No crea solicitud: es el paso previo para lineas:bulk, que exige esos IDs ya resueltos.</summary>
     [HttpPost("resolver-catalogos")]
     [Authorize(Roles = "Comercial,Admin")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -92,14 +74,7 @@ public class clsSolicitudesController(
         return Ok(await resolverCatalogos.Handle(new clsResolverCatalogosDeLineasCommand(lineas), ct));
     }
 
-    /// <summary>
-    /// Carga masiva de líneas de un pliego de licitación.
-    ///
-    /// Responde 202 con el identificador del trabajo, no con el resultado: las líneas
-    /// quedan guardadas y el costeo se hace en segundo plano. El avance se consulta
-    /// con ese identificador. Contrato en docs/contrato-integracion. 409 si la
-    /// solicitud no está en un estado que admita más líneas.
-    /// </summary>
+    /// <summary>Carga masiva de líneas de un pliego de licitación. Responde 202 con el identificador del trabajo: las líneas quedan guardadas y el costeo corre en segundo plano. 409 si la solicitud no admite más líneas.</summary>
     [HttpPost("{id:guid}/lineas:bulk")]
     [Authorize(Roles = "Admin")]
     [ProducesResponseType(StatusCodes.Status202Accepted)]

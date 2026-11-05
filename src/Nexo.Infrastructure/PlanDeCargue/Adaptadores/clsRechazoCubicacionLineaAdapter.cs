@@ -5,7 +5,6 @@ using Nexo.Infrastructure.Persistence;
 
 namespace Nexo.Infrastructure.PlanDeCargue.Adaptadores;
 
-/// <summary>#304: ver <see cref="IRechazoCubicacionLineaPort"/>.</summary>
 public sealed class clsRechazoCubicacionLineaAdapter(clsNexoDbContext db) : IRechazoCubicacionLineaPort
 {
     public Task<clsRechazoCubicacionLinea?> ObtenerAsync(Guid lineaSolicitudId, CancellationToken ct = default) =>

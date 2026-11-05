@@ -11,13 +11,8 @@ using Nexo.Mensajes.Notificaciones;
 namespace Nexo.Application.CasosDeUso.Cotizaciones;
 
 /// <summary>
-/// Quitar un conexo de la cotización. S5-HU-18/#262: antes no había forma de deshacer un
-/// conexo agregado por error, solo dejarlo y compensar agregando otra fila.
-/// S5-HU-20.1/#286 (HU-B24): se admite mientras la cotización no tenga resultado (Borrador o
-/// Entregada); Ganada/Perdida → 409 COTIZACION_CERRADA. Tras la entrega deja la marca
-/// <c>ModificadaTrasEntregaAt</c> y avisa a quien creó la solicitud (ver
-/// <see cref="clsCambioDeConexos"/>). Es el "quitar conexo" del issue: ya existía como
-/// DELETE, acá se amplía en vez de duplicarlo con un segundo comando.
+/// Quita un conexo de la cotización mientras no tenga resultado (Borrador o Entregada); Ganada/Perdida → 409 COTIZACION_CERRADA.
+/// Tras la entrega marca <c>ModificadaTrasEntregaAt</c> y avisa a quien creó la solicitud (<see cref="clsCambioDeConexos"/>).
 /// </summary>
 public sealed record clsEliminarConexoCotizacionCommand(Guid CotizacionId, Guid ConexoId) : ICommand<clsCotizacionDto>;
 

@@ -2,33 +2,20 @@ using Nexo.Application.CasosDeUso.Solicitudes.DTOs;
 
 namespace Nexo.Application.CasosDeUso.PlanDeCargue.DTOs;
 
-/// <summary>Respuesta del 202: el patrón de trabajos pesados del contrato de
-/// integración, aplicado a la cubicación.</summary>
+/// <summary>Respuesta del 202 del patrón de trabajos pesados, aplicado a la cubicación.</summary>
 public record clsSolicitudDeCubicacionAceptadaDto(Guid PlanCargueId, string Estado, string ConsultarEn);
 
-/// <summary>
-/// Respuesta 202 genérica de los comandos de escritura que NO generan (ni tienen) un
-/// recurso propio de NEXO para consultar — guardar_vehiculo, crear_plan_demo,
-/// guardar_item, importar_items, eliminar_item, eliminar_plan, ajustar_colocacion.
-/// <c>CorrelationId</c> es el mismo id que viaja en el sobre de la cola, útil para
-/// cruzar con logs/DLQ si el worker rechaza el comando.
-/// </summary>
+/// <summary>Respuesta 202 genérica de los comandos de escritura sin recurso propio que consultar. <c>CorrelationId</c> es el id del sobre de la cola, para cruzar con logs/DLQ.</summary>
 public record clsComandoAceptadoDto(Guid CorrelationId, string Estado);
 
-/// <summary>
-/// Lo que el Cubicador (microservicio Python) necesita de una línea de solicitud para
-/// armar el plan de cargue 3D — puente Mesa de Costeo → Cubicador (crear-desde-línea,
-/// ver cubicador/CONTRATO.md sección 7). clsRuta puede venir sin resolver (Origen/Destino
-/// nulos) si la línea no tiene ruta asignada.
-/// </summary>
+/// <summary>Lo que el Cubicador necesita de una línea de solicitud para armar el plan 3D. clsRuta puede venir sin resolver (Origen/Destino nulos) si la línea no tiene ruta.</summary>
 public record clsLineaParaCubicacionDto(
     Guid LineaId,
     IReadOnlyList<clsPosicionCargaDto> Posiciones,
     string? Origen,
     string? Destino);
 
-/// <summary>Consulta de respaldo: reconstruye el estado completo sin haber recibido
-/// ningún aviso — igual criterio que GET /api/trabajos/{id}.</summary>
+/// <summary>Consulta de respaldo: reconstruye el estado completo sin haber recibido ningún aviso.</summary>
 public record clsPlanCargueDto(
     Guid Id,
     string Nombre,
@@ -44,21 +31,13 @@ public record clsPlanCargueDto(
     int TotalColocaciones,
     DateTimeOffset UpdatedAt);
 
-/// <summary>Lo que viaja por el canal de avisos cuando un plan cambia de estado. Sin la
-/// lista de colocaciones a propósito (puede haber cientos): el aviso dice que hay
-/// desenlace, la consulta trae el detalle — mismo reparto que /hubs/trabajos.</summary>
+/// <summary>Lo que viaja por el canal de avisos cuando un plan cambia de estado. Sin la lista de colocaciones a propósito (pueden ser cientos): el aviso dice que hay desenlace y la consulta trae el detalle.</summary>
 public record clsAvisoPlanCargueDto(Guid PlanCargueId, string Estado, decimal Puntaje, string? Motivo = null)
 {
     public static clsAvisoPlanCargueDto Desde(clsPlanCargueDto p) => new(p.Id, p.Estado, p.Puntaje);
 }
 
-// ---------------------------------------------------------------------------------
-// Lectura completa del visor 3D — TODAS contra la proyección local que llena
-// clsPlanDeCargueGeneradoConsumer/clsVehiculoCatalogoConsumer. Ninguna de estas consultas
-// llama a Cubicador (criterio no-negociable). Los shapes espejan cubicador/CONTRATO.md
-// §3.2 (clsResultadoPlanDto/clsVehiculoCubicacionDto/etc.) para que el frontend reciba lo
-// mismo que ya conoce del contrato de Cubicador.
-// ---------------------------------------------------------------------------------
+// Lectura completa del visor 3D, toda contra la proyección local; los shapes espejan el contrato de Cubicador.
 
 public record clsEjeVehiculoDto(decimal PosicionMm, decimal CapacidadKg);
 
@@ -83,8 +62,7 @@ public record clsColocacionCargueDto(
     decimal PesoEncimaKg, string EstadoEstabilidad, string Accesibilidad, bool Bloqueada, bool AjusteManual,
     string? CodigoRechazo, string? RazonRechazo);
 
-/// <summary>Detalle completo del plan (a diferencia de <see cref="clsPlanCargueDto"/>, que es
-/// el resumen de la consulta de respaldo) — con sus ítems completos.</summary>
+/// <summary>Detalle completo del plan (a diferencia del resumen de <see cref="clsPlanCargueDto"/>), con sus ítems completos.</summary>
 public record clsPlanCargueDetalleDto(
     Guid Id, string Nombre, Guid VehiculoId, Guid? LineaSolicitudId, int NumeroVehiculo,
     string Estado, string Estrategia, string Algoritmo, int? Semilla,
@@ -92,10 +70,7 @@ public record clsPlanCargueDetalleDto(
     decimal Puntaje, IReadOnlyList<clsItemPlanCargueDetalleDto> Items,
     DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt);
 
-/// <summary>GET /api/planes-cargue/{id}/resultado y /exportar — mismo shape que
-/// <c>clsResultadoPlanDto</c> de Cubicador, leído de la proyección local. <c>Metricas</c>
-/// es <c>null</c> si el plan nunca se optimizó (nadie ha publicado un
-/// plan-de-cargue.generado con métricas todavía).</summary>
+/// <summary>GET .../resultado y /exportar, leído de la proyección local. <c>Metricas</c> es <c>null</c> si el plan nunca se optimizó.</summary>
 public record clsResultadoPlanDto(
     clsPlanCargueDetalleDto Plan,
     clsVehiculoCubicacionDto Vehiculo,
@@ -103,17 +78,12 @@ public record clsResultadoPlanDto(
     Mensajes.Cubicacion.clsMetricasCubicacionEvento? Metricas,
     IReadOnlyList<Mensajes.Cubicacion.clsIncidenciaValidacionEvento> Incidencias);
 
-/// <summary>GET /api/planes-cargue/{id}/flota — los vehículos (planes) hermanos de una
-/// misma línea de solicitud (una carga que no cabe en un vehículo se reparte en varios
-/// planes con la misma LineaSolicitudId).</summary>
+/// <summary>GET .../flota — los vehículos (planes) hermanos de una misma línea de solicitud (una carga que no cabe en uno se reparte en varios).</summary>
 public record clsPlanFlotaItemDto(Guid Id, int NumeroVehiculo, int TotalVehiculos, int UnidadesCargadas, int UnidadesTotales);
 
 /// <summary>
-/// #304: estado del "crear plan desde línea" — lo que el sondeo (<c>GET .../por-linea/{lineaId}</c>, que solo devuelve la
-/// lista de la flota) no puede decir: si todavía procesa o si el Cubicador lo rechazó.
-/// <paramref name="Estado"/>: <c>procesando</c> (aún no hay flota ni rechazo), <c>listo</c> (hay flota) o
-/// <c>rechazado</c> (<paramref name="Codigo"/>/<paramref name="Mensaje"/> traen el motivo del Cubicador; manda sobre una
-/// flota vieja, porque el rechazo es del último intento).
+/// Estado del "crear plan desde línea": <paramref name="Estado"/> es <c>procesando</c> (aún sin flota ni rechazo), <c>listo</c> (hay flota) o
+/// <c>rechazado</c> (<paramref name="Codigo"/>/<paramref name="Mensaje"/> traen el motivo del Cubicador; manda sobre una flota vieja porque es del último intento).
 /// </summary>
 public record clsEstadoCubicacionLineaDto(
     string Estado, string? Codigo, string? Mensaje, DateTimeOffset? RechazadoAt, IReadOnlyList<clsPlanFlotaItemDto> Vehiculos);

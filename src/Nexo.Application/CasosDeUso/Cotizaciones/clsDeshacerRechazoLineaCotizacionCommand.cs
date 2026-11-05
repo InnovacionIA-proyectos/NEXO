@@ -9,10 +9,8 @@ using Nexo.Domain.Enums;
 namespace Nexo.Application.CasosDeUso.Cotizaciones;
 
 /// <summary>
-/// S6-HU-24.3/#320: deshacer el rechazo de una línea. Solo mientras la cotización NO esté entregada (409 COTIZACION_NO_EDITABLE): una vez
-/// entregada, el comercial ya recibió el correo con el motivo y la línea sale como "Sin costeo" — decisión: deshacer solo en la Mesa,
-/// antes de entregar. La línea vuelve a <c>PorCostear</c> (sin flete: hay que costearla) y el motivo, quién y cuándo se limpian; el rechazo
-/// anterior queda en la auditoría.
+/// Deshace el rechazo de una línea solo mientras la cotización NO esté entregada (409 COTIZACION_NO_EDITABLE). La línea vuelve a <c>PorCostear</c>
+/// y se limpian motivo, quién y cuándo; el rechazo anterior queda en la auditoría.
 /// </summary>
 public sealed record clsDeshacerRechazoLineaCotizacionCommand(Guid CotizacionId, Guid LineaSolicitudId) : ICommand<clsLineaRechazoDto>;
 

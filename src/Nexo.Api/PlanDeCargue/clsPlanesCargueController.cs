@@ -33,14 +33,7 @@ public record clsImportarItemsRequest(IReadOnlyList<clsGuardarItemRequest> Items
 public record clsAjustarColocacionRequest(
     decimal? X, decimal? Y, decimal? Z, int? OrientacionIndice, bool? Bloqueada, bool? Retirar, bool? Reinsertar);
 
-/// <summary>
-/// Plan de cargue: orquestación async contra el motor Cubicador. El patrón es el mismo
-/// que el resto de trabajos pesados del contrato — 202 + identificador, avance por
-/// SignalR (/hubs/plan-cargue), consulta de respaldo acá mismo. La escritura del plan
-/// (alta, ítems, borrado, ajuste manual) sigue el mismo camino de cola: ninguno de
-/// estos endpoints toca Cubicador directo, y cada 202 documenta esa asimetría caso
-/// por caso.
-/// </summary>
+/// <summary>Plan de cargue: orquestación async contra el Cubicador (202 + identificador, avance por SignalR en /hubs/plan-cargue, consulta de respaldo aquí). Ningún endpoint llama al Cubicador directo.</summary>
 [ApiController]
 [Route("api/planes-cargue")]
 public class clsPlanesCargueController(
@@ -65,12 +58,7 @@ public class clsPlanesCargueController(
     : ControllerBase
 {
     /// <summary>
-    /// Crea un plan de cargue nuevo. El PlanId lo genera NEXO acá — responde 202 porque
-    /// la fila de Cubicador se crea async, aunque la
-    /// fila espejo de NEXO (consultable de inmediato con el GET de abajo) queda creada en
-    /// el mismo momento de este POST, en estado "procesando" hasta que llegue la
-    /// confirmación de Cubicador (ver <see cref="clsCrearPlanCommand"/> para la carrera que
-    /// ese estado evita).
+    /// Crea un plan de cargue. El PlanId lo genera NEXO; responde 202 porque la fila del Cubicador se crea async, mientras la fila espejo de NEXO queda creada ya, en estado "procesando".
     /// </summary>
     [Authorize(Roles = "Comercial,AdminTarifas,Admin")]
     [HttpPost]
@@ -84,10 +72,7 @@ public class clsPlanesCargueController(
     }
 
     /// <summary>
-    /// Escenario de demostración. 202 con un CorrelationId de seguimiento — a diferencia
-    /// de <see cref="Crear"/>, acá NO hay un PlanId de NEXO todavía (Cubicador elige el
-    /// vehículo internamente): el plan resultante se sigue por /hubs/plan-cargue una vez
-    /// Cubicador lo confirma.
+    /// Escenario de demostración. 202 con un CorrelationId de seguimiento (aún no hay PlanId: el Cubicador elige el vehículo); el plan se sigue por /hubs/plan-cargue.
     /// </summary>
     [Authorize(Roles = "Comercial,AdminTarifas,Admin")]
     [HttpPost("demo")]
@@ -96,26 +81,19 @@ public class clsPlanesCargueController(
         => Accepted(await crearPlanDemo.Handle(new clsCrearPlanDemoCommand(), ct));
 
     /// <summary>
-    /// Crea la flota de un plan de cargue a partir de una línea de solicitud ya cotizada
-    /// (botón "Cubicar" de la Mesa de Costeo) — reemplaza el POST que
-    /// <c>crearPlanDesdeLinea()</c> (cubicador-api.service.ts) hacía directo contra
-    /// Cubicador con la clave compartida. 202 con un CorrelationId de seguimiento que ES el
-    /// propio <paramref name="lineaId"/> (no hay PlanId de NEXO todavía: Cubicador decide
-    /// cuántos vehículos hacen falta) — sondear con <c>GET .../por-linea/{lineaId}</c>
-    /// (<see cref="clsObtenerPlanesPorLineaQuery"/>) hasta que aparezca la flota.
+    /// Crea la flota de un plan a partir de una línea ya cotizada (botón "Cubicar" de la Mesa de Costeo). 202 con un CorrelationId que es el propio <paramref name="lineaId"/>;
+    /// se sondea con <c>GET .../por-linea/{lineaId}</c> hasta que aparezca la flota.
     /// </summary>
     [Authorize(Roles = "Comercial,AdminTarifas,Admin")]
     [HttpPost("desde-linea/{lineaId:guid}")]
     [ProducesResponseType(StatusCodes.Status202Accepted)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)] // #304: PESO_NO_DECLARADO
+    [ProducesResponseType(StatusCodes.Status400BadRequest)] // PESO_NO_DECLARADO
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<clsComandoAceptadoDto>> CrearDesdeLinea(Guid lineaId, CancellationToken ct = default)
         => Accepted(await crearPlanDesdeLinea.Handle(new clsCrearPlanDesdeLineaCommand(lineaId), ct));
 
     /// <summary>
-    /// Pide la optimización de un plan de cargue ya existente. No bloquea: responde 202
-    /// de inmediato, el resultado llega por /hubs/plan-cargue o se consulta con GET
-    /// /api/planes-cargue/{id}. 503 si la compuerta de paridad está cerrada.
+    /// Pide la optimización de un plan existente. Responde 202; el resultado llega por /hubs/plan-cargue o con GET /api/planes-cargue/{id}. 503 si la compuerta de paridad está cerrada.
     /// </summary>
     [Authorize(Roles = "Comercial,AdminTarifas,Admin")]
     [HttpPost("{id:guid}/optimizar")]
@@ -182,11 +160,7 @@ public class clsPlanesCargueController(
         Guid id, Guid itemId, CancellationToken ct = default)
         => Accepted(await eliminarItem.Handle(new clsEliminarItemCommand(id, itemId), ct));
 
-    /// <summary>
-    /// Borra el plan. Responde 202 (no 204): aunque NEXO ya borra su fila espejo antes
-    /// de publicar (borrado optimista), el borrado en Cubicador sigue siendo async —
-    /// 202 documenta esa asimetría en vez de prometer un 204 que no es del todo cierto.
-    /// </summary>
+    /// <summary>Borra el plan. Responde 202 (no 204): NEXO borra su fila espejo de inmediato, pero el borrado en el Cubicador es async.</summary>
     [Authorize(Roles = "Comercial,AdminTarifas,Admin")]
     [HttpDelete("{id:guid}")]
     [ProducesResponseType(StatusCodes.Status202Accepted)]
@@ -194,11 +168,7 @@ public class clsPlanesCargueController(
     public async Task<ActionResult<clsComandoAceptadoDto>> Eliminar(Guid id, CancellationToken ct = default)
         => Accepted(await eliminarPlan.Handle(new clsEliminarPlanCommand(id), ct));
 
-    /// <summary>
-    /// Ajuste manual de una colocación. Deja de ser un PATCH síncrono contra Cubicador
-    /// — 202 async, reconciliado por el aviso de rechazo
-    /// en /hubs/plan-cargue si Cubicador lo rechaza.
-    /// </summary>
+    /// <summary>Ajuste manual de una colocación: 202 async, reconciliado por el aviso de rechazo en /hubs/plan-cargue si el Cubicador lo rechaza.</summary>
     [Authorize(Roles = "Comercial,AdminTarifas,Admin")]
     [HttpPatch("{id:guid}/colocaciones/{colocacionId:guid}")]
     [ProducesResponseType(StatusCodes.Status202Accepted)]
@@ -212,16 +182,9 @@ public class clsPlanesCargueController(
         return Accepted(r);
     }
 
-    // ----------------------------------------------------------------------------
-    // Lectura del visor 3D, toda contra la proyección local que mantienen
-    // clsPlanDeCargueGeneradoConsumer/clsVehiculoCatalogoConsumer — NINGUNO de estos
-    // endpoints llama a Cubicador (criterio no-negociable). [Authorize] sin rol
-    // específico: mismo criterio que el resto de las consultas del sistema
-    // (docs/ROLES_Y_PERMISOS.md — "cualquiera de los 6 roles puede consultar").
-    // ----------------------------------------------------------------------------
+    // Lectura del visor 3D contra la proyección local: ningún endpoint llama al Cubicador. [Authorize] sin rol específico (cualquiera de los 6 roles puede consultar).
 
-    /// <summary>GET /api/planes-cargue — listado contra la proyección local. Pagina
-    /// (page/pageSize) en vez del tope fijo de 100 que tenía antes.</summary>
+    /// <summary>Listado contra la proyección local, paginado (page/pageSize).</summary>
     [Authorize]
     [HttpGet]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -233,12 +196,8 @@ public class clsPlanesCargueController(
         => Ok(await listar.Handle(new clsListarPlanesCargueQuery(page, pageSize), ct));
 
     /// <summary>
-    /// GET /api/planes-cargue/por-linea/{lineaId} — sondeo de la flota que crea
-    /// <c>CrearDesdeLinea</c>, contra la proyección local. Responde
-    /// 200 con lista VACÍA (nunca 404) mientras el comando sigue en proceso — ver
-    /// <see cref="clsObtenerPlanesPorLineaQuery"/>. Ubicado antes del GET por id en este
-    /// archivo solo por legibilidad: el ruteo no depende del orden, "por-linea" no calza
-    /// con la restricción <c>:guid</c> de <c>{id:guid}</c>.
+    /// Sondeo de la flota que crea <c>CrearDesdeLinea</c>, contra la proyección local. Responde 200 con lista vacía (nunca 404) mientras el comando sigue en proceso;
+    /// ver <see cref="clsObtenerPlanesPorLineaQuery"/>.
     /// </summary>
     [Authorize]
     [HttpGet("por-linea/{lineaId:guid}")]
@@ -247,10 +206,7 @@ public class clsPlanesCargueController(
         => Ok(await obtenerPlanesPorLinea.Handle(new clsObtenerPlanesPorLineaQuery(lineaId), ct));
 
     /// <summary>
-    /// #304: GET /api/planes-cargue/por-linea/{lineaId}/estado — dice si el "crear plan desde línea" sigue
-    /// <c>procesando</c>, quedó <c>listo</c> o fue <c>rechazado</c> por el Cubicador (con su código y mensaje, p. ej.
-    /// <c>FLOTA_INSUFICIENTE</c>). Complementa el sondeo de arriba, que solo devuelve la flota y por eso no podía avisar un
-    /// rechazo: el front esperaba para siempre. Siempre 200.
+    /// Dice si "crear plan desde línea" sigue <c>procesando</c>, quedó <c>listo</c> o fue <c>rechazado</c> por el Cubicador (con su código y mensaje, p. ej. <c>FLOTA_INSUFICIENTE</c>). Siempre 200.
     /// </summary>
     [Authorize]
     [HttpGet("por-linea/{lineaId:guid}/estado")]
@@ -258,8 +214,7 @@ public class clsPlanesCargueController(
     public async Task<ActionResult<clsEstadoCubicacionLineaDto>> ObtenerEstadoPorLinea(Guid lineaId, CancellationToken ct = default)
         => Ok(await obtenerEstadoPorLinea.Handle(new clsObtenerEstadoCubicacionLineaQuery(lineaId), ct));
 
-    /// <summary>GET /api/planes-cargue/{id}/resultado — detalle completo (ítems,
-    /// colocaciones con geometría, métricas, incidencias).</summary>
+    /// <summary>Detalle completo del plan (ítems, colocaciones con geometría, métricas, incidencias).</summary>
     [Authorize]
     [HttpGet("{id:guid}/resultado")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -267,15 +222,14 @@ public class clsPlanesCargueController(
     public async Task<ActionResult<clsResultadoPlanDto>> ObtenerResultado(Guid id, CancellationToken ct = default)
         => Ok(await obtenerResultado.Handle(new clsObtenerResultadoPlanQuery(id), ct));
 
-    /// <summary>GET /api/planes-cargue/{id}/flota — los vehículos (planes) de la misma flota.</summary>
+    /// <summary>Los vehículos (planes) de la misma flota.</summary>
     [Authorize]
     [HttpGet("{id:guid}/flota")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyList<clsPlanFlotaItemDto>>> ObtenerFlota(Guid id, CancellationToken ct = default)
         => Ok(await obtenerFlota.Handle(new clsObtenerFlotaPlanQuery(id), ct));
 
-    /// <summary>GET /api/planes-cargue/{id}/metricas — subconjunto de /resultado.
-    /// Responde 200 con <c>null</c> si el plan existe pero nunca se optimizó.</summary>
+    /// <summary>Subconjunto de /resultado. 200 con <c>null</c> si el plan existe pero nunca se optimizó.</summary>
     [Authorize]
     [HttpGet("{id:guid}/metricas")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -283,8 +237,7 @@ public class clsPlanesCargueController(
     public async Task<ActionResult<clsMetricasCubicacionEvento?>> ObtenerMetricas(Guid id, CancellationToken ct = default)
         => Ok(await obtenerMetricas.Handle(new clsObtenerMetricasPlanQuery(id), ct));
 
-    /// <summary>GET /api/planes-cargue/{id}/no-cargadas — subconjunto de /resultado, solo
-    /// las colocaciones rechazadas.</summary>
+    /// <summary>Subconjunto de /resultado: solo las colocaciones rechazadas.</summary>
     [Authorize]
     [HttpGet("{id:guid}/no-cargadas")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -292,13 +245,7 @@ public class clsPlanesCargueController(
     public async Task<ActionResult<IReadOnlyList<clsColocacionCargueDto>>> ObtenerNoCargadas(Guid id, CancellationToken ct = default)
         => Ok(await obtenerNoCargadas.Handle(new clsObtenerNoCargadasPlanQuery(id), ct));
 
-    /// <summary>
-    /// GET /api/planes-cargue/{id}/colocaciones — todas las colocaciones del plan
-    /// (cargadas y no), subconjunto de /resultado. Reemplazo 1:1 de
-    /// <c>colocaciones()</c> en cubicador-api.service.ts — ver
-    /// <see cref="clsObtenerColocacionesPlanQuery"/> para por qué se implementa en vez de
-    /// deprecarlo a favor de /resultado.
-    /// </summary>
+    /// <summary>Todas las colocaciones del plan (cargadas y no), subconjunto de /resultado; ver <see cref="clsObtenerColocacionesPlanQuery"/>.</summary>
     [Authorize]
     [HttpGet("{id:guid}/colocaciones")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -306,9 +253,7 @@ public class clsPlanesCargueController(
     public async Task<ActionResult<IReadOnlyList<clsColocacionCargueDto>>> ObtenerColocaciones(Guid id, CancellationToken ct = default)
         => Ok(await obtenerColocaciones.Handle(new clsObtenerColocacionesPlanQuery(id), ct));
 
-    /// <summary>GET /api/planes-cargue/{id}/exportar — mismo shape que /resultado (igual
-    /// que Cubicador: hoy es el mismo contenido, el nombre queda para una futura
-    /// diferenciación real, p.ej. un archivo).</summary>
+    /// <summary>Mismo contenido que /resultado; el nombre queda para una futura diferenciación (p. ej. un archivo).</summary>
     [Authorize]
     [HttpGet("{id:guid}/exportar")]
     [ProducesResponseType(StatusCodes.Status200OK)]

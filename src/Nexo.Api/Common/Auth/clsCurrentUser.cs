@@ -4,16 +4,7 @@ using Nexo.Domain.Enums;
 
 namespace Nexo.Api.Common.Auth;
 
-/// <summary>
-/// clsUsuario autenticado de la petición actual. Extiende el puerto de Application
-/// (ICurrentUserPort) — así los Handlers lo consumen sin conocer HttpContext.
-///
-/// Lee directo los claims que deja clsIdentidadPortalAuthenticationHandler
-/// (NameIdentifier/Name/Role, ya resueltos contra la tabla del portal en esta misma
-/// petición). Sin fallback a un usuario de sistema: el fail-closed de
-/// clsProgram.cs garantiza que si se llegó hasta un Handler, la petición ya tiene una
-/// identidad real.
-/// </summary>
+/// <summary>Usuario autenticado de la petición actual, leído de los claims que deja clsIdentidadPortalAuthenticationHandler. Sin fallback a un usuario de sistema.</summary>
 public interface ICurrentUser : ICurrentUserPort
 {
 }

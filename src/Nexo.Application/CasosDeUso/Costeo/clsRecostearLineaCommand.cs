@@ -12,19 +12,9 @@ namespace Nexo.Application.CasosDeUso.Costeo;
 public sealed record clsRecostearLineaCommand(Guid TrabajoId, Guid SolicitudId, Guid LineaId) : ICommand<Unit>;
 
 /// <summary>
-/// Le vuelve a preguntar a la regla. Si ahora la línea se puede guardar sola (hay un valor
-/// propuesto y ningún motivo de pendiente), la resuelve, le agrega el flete (con su
-/// aprovisionamiento y su retorno del contenedor) a la cotización auto-costeada y cierra el
-/// pendiente; si sigue sin poder guardarse sola, la deja exactamente como estaba.
-///
-/// Ese "si no, no toca nada" es lo importante. Cerrar el pendiente sin haber resuelto
-/// dejaría la línea invisible: desaparecería de la cola del Administrador de Tarifas y
-/// no se costearía nunca. Y como esto corre sobre todos los pendientes cada vez que se
-/// cargan tarifas, tampoco escribe en la base cuando no hay nada que cambiar.
-///
-/// NO publica nada hacia la saga a propósito. Ese trabajo ya cerró, y cerró en Parcial
-/// con razón: en ese momento lo estaba. El recosteo arregla la línea, no reescribe el
-/// histórico de aquella corrida.
+/// Vuelve a preguntar a la regla: si la línea ya se puede guardar sola la resuelve, agrega el flete a la cotización y cierra
+/// el pendiente; si no, la deja exactamente como estaba (cerrar sin resolver la volvería invisible).
+/// No publica nada a la saga: aquella corrida ya cerró en Parcial con razón.
 /// </summary>
 public sealed class clsRecostearLineaCommandHandler(
     IPropuestaDeLineaPort propuesta,
@@ -53,7 +43,6 @@ public sealed class clsRecostearLineaCommandHandler(
         return Unit.Value;
     }
 
-    /// <summary>Mismo criterio que clsCostearLineaCommand — ver su doc-comment.</summary>
     private static async Task AgregarFleteAutoCosteoAsync(
         ICotizacionRepository cotizacionesRepo, Guid solicitudId, Guid lineaId, clsDecisionDeFlujo decision, CancellationToken ct)
     {

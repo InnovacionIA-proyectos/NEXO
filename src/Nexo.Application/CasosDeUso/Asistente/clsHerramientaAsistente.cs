@@ -5,13 +5,7 @@ using Nexo.Domain.Enums;
 
 namespace Nexo.Application.CasosDeUso.Asistente;
 
-/// <summary>
-/// Lo que una herramienta le devuelve al asistente. Siempre trae la <paramref name="Fuente"/> de donde salió el dato: ningún valor
-/// llega al modelo sin ella. Cuando no hay dato, <paramref name="Encontrado"/> es false y <paramref name="Nota"/> lo dice, para que el
-/// asistente informe que no hay valor en lugar de inventarlo.
-/// </summary>
-/// <param name="Valor">El resultado de la consulta tal como lo expone el caso de uso existente; null si no hay dato.</param>
-/// <param name="Nota">Aclaración para el asistente: por qué no hay dato, o un límite del resultado (por ejemplo que se recortó).</param>
+/// <summary>Resultado de una herramienta; siempre trae la fuente del dato. Sin dato, <paramref name="Encontrado"/> es false y <paramref name="Nota"/> lo explica.</summary>
 public sealed record clsResultadoHerramienta(bool Encontrado, object? Valor, string Fuente, string? Nota = null)
 {
     public static clsResultadoHerramienta Con(object valor, string fuente, string? nota = null) => new(true, valor, fuente, nota);
@@ -22,11 +16,7 @@ public sealed record clsResultadoHerramienta(bool Encontrado, object? Valor, str
 /// <summary>Lo que se le muestra al modelo de una herramienta: nombre, para qué sirve y la forma de su entrada (JSON Schema).</summary>
 public sealed record clsDefinicionHerramientaDto(string Nombre, string Descripcion, JsonElement EsquemaEntrada);
 
-/// <summary>
-/// Una consulta de solo lectura que el asistente puede pedir. Envuelve un caso de uso o un puerto que ya existe y se ejecuta con la
-/// identidad del usuario que conversa: el rol decide si la herramienta está disponible (<see cref="Roles"/>) y las reglas de acceso
-/// propias de cada consulta (por ejemplo, que un Comercial solo vea sus solicitudes) se mantienen. Ninguna herramienta escribe.
-/// </summary>
+/// <summary>Consulta de solo lectura que el asistente puede pedir; se ejecuta con la identidad del usuario y respeta sus reglas de acceso.</summary>
 public interface IHerramientaAsistente
 {
     /// <summary>Identificador estable en minúsculas con guion bajo; es el nombre con el que el modelo la pide.</summary>
@@ -46,10 +36,7 @@ public interface IHerramientaAsistente
     Task<clsResultadoHerramienta> EjecutarAsync(JsonElement entrada, CancellationToken ct = default);
 }
 
-/// <summary>
-/// Base de las herramientas: valida que la entrada sea un objeto, entrega lectores con error claro para cada campo y traduce la
-/// caída de una fuente externa en un resultado "sin datos" (el asistente debe poder decir que la fuente no responde, no fallar).
-/// </summary>
+/// <summary>Base de las herramientas: valida la entrada y convierte la caída de una fuente externa en un resultado "sin datos" en vez de fallar.</summary>
 public abstract class clsHerramientaBase : IHerramientaAsistente
 {
     public abstract string Nombre { get; }

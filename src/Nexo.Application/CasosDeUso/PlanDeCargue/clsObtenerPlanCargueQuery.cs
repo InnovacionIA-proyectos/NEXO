@@ -5,11 +5,7 @@ using Nexo.Application.Common.Exceptions;
 
 namespace Nexo.Application.CasosDeUso.PlanDeCargue;
 
-/// <summary>
-/// Consulta de respaldo del contrato: reconstruye estado/resultado sin
-/// haber recibido ningún aviso por SignalR — la conexión se cae, el navegador se
-/// duerme, y la verdad sigue estando acá.
-/// </summary>
+/// <summary>Consulta de respaldo: reconstruye estado/resultado sin haber recibido ningún aviso por SignalR.</summary>
 public sealed record clsObtenerPlanCargueQuery(Guid PlanCargueId) : IQuery<clsPlanCargueDto>;
 
 public sealed class clsObtenerPlanCargueQueryHandler(IPlanCargueRepository planes)

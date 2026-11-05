@@ -2,10 +2,7 @@ using Nexo.Application.Common.Exceptions;
 
 namespace Nexo.Application.CasosDeUso.AjustesVigenciaPlaza.Validadores;
 
-/// <summary>
-/// Forma de <see cref="clsAjustarVigenciaPlazaMasivoCommand"/>: qué campos exige cada modo.
-/// Solo mira el comando — no consulta repositorios ni SAP, que es trabajo del caso de uso.
-/// </summary>
+/// <summary>Valida la forma de <see cref="clsAjustarVigenciaPlazaMasivoCommand"/>: qué campos exige cada modo. No consulta repositorios ni SAP.</summary>
 public static class clsAjustarVigenciaPlazaMasivoValidador
 {
     public static void Validar(clsAjustarVigenciaPlazaMasivoCommand command)

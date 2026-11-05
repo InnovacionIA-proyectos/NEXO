@@ -3,10 +3,7 @@ using Nexo.Domain.Usuarios.Entidades;
 
 namespace Nexo.Application.Common;
 
-/// <summary>
-/// clsUsuario autenticado de la operación actual, visto desde Application (sin depender
-/// de HttpContext ni de ningún tipo de ASP.NET Core). El adapter concreto vive en Api.
-/// </summary>
+/// <summary>Usuario autenticado de la operación actual, sin depender de HttpContext ni de ASP.NET Core.</summary>
 public interface ICurrentUserPort
 {
     Guid Id { get; }

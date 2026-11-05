@@ -6,13 +6,7 @@ using Nexo.Application.Common.Exceptions;
 
 namespace Nexo.Application.CasosDeUso.PlanDeCargue;
 
-/// <summary>
-/// GET /api/planes-cargue/{id}/resultado — detalle completo
-/// (ítems, colocaciones con geometría, métricas, incidencias) contra la proyección
-/// local. También sirve GET .../exportar: mismo shape, mismo criterio que usa
-/// Cubicador en su propia API síncrona (su endpoint /exportar es, hoy, idéntico a
-/// /resultado — ver cubicador/api/routers/planes_cargue.py).
-/// </summary>
+/// <summary>GET /api/planes-cargue/{id}/resultado — detalle completo (ítems, colocaciones con geometría, métricas, incidencias) desde la proyección local; también sirve GET .../exportar (mismo shape).</summary>
 public sealed record clsObtenerResultadoPlanQuery(Guid PlanCargueId) : IQuery<clsResultadoPlanDto>;
 
 public sealed class clsObtenerResultadoPlanQueryHandler(IPlanCargueRepository planes)

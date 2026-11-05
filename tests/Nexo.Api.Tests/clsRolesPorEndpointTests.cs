@@ -50,6 +50,12 @@ public class clsRolesPorEndpointTests(clsApiFixture fx)
             new("POST resolver-catalogos", HttpMethod.Post, "/api/solicitudes/resolver-catalogos", ["Comercial", "Admin"], new { }),
             new("POST rechazar", HttpMethod.Post, $"/api/solicitudes/{Inexistente}/rechazar", ["Comercial", "Admin"], new { }),
 
+            // ---- lectura de Excel por receta: la usa quien importa archivos
+            new("POST leer-estructura", HttpMethod.Post, "/api/captura-solicitudes/leer-estructura", ["Comercial", "Admin"], new { }),
+            new("PUT recetas-lectura", HttpMethod.Put, "/api/captura-solicitudes/recetas-lectura", ["Comercial", "Admin"], new { }),
+            new("GET recetas-lectura", HttpMethod.Get, "/api/captura-solicitudes/recetas-lectura", ["Comercial", "Admin"]),
+            new("DELETE recetas-lectura", HttpMethod.Delete, $"/api/captura-solicitudes/recetas-lectura/{Inexistente}", ["Comercial", "Admin"]),
+
             // ---- cotizaciones: AdminBiblioteca no entra
             new("Cotizaciones GET /{id}", HttpMethod.Get, $"/api/cotizaciones/{Inexistente}", Mesa),
             new("Cotizaciones POST", HttpMethod.Post, "/api/cotizaciones", CosteoYCubicador, new { }),

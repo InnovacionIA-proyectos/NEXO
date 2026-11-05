@@ -3,16 +3,10 @@ using Nexo.Domain.Common;
 
 namespace Nexo.Domain.Costeo.Reglas;
 
-/// <summary>
-/// Lo que una fuente encontró para una línea: cuánto y de dónde.
-///
-/// Es un objeto de valor de dominio y no un DTO de aplicación a propósito: la regla
-/// del mayor es una invariante del negocio y no puede depender de la forma en que una
-/// capa externa serializa sus datos.
-/// </summary>
+/// <summary>Lo que una fuente encontró para una línea: cuánto y de dónde.</summary>
 /// <param name="VehiculoRelajado">
-/// true cuando la línea pide un vehículo y la fuente no tiene filas de ese vehículo, de modo que el valor salió de otro. Un candidato así
-/// se muestra como referencia, pero no puede gobernar solo ni entrar al recomendado.
+/// true cuando la fuente no tiene filas del vehículo pedido y el valor salió de otro. Se muestra como
+/// referencia, pero no puede gobernar solo ni entrar al recomendado.
 /// </param>
 public sealed record clsCandidatoDeTarifa(string Fuente, decimal Valor, bool VehiculoRelajado = false);
 
@@ -23,37 +17,20 @@ public sealed record clsCandidatoDeTarifa(string Fuente, decimal Valor, bool Veh
 public sealed record clsResultadoDeCosteo(decimal? Valor, string? Fuente, string Justificacion)
 {
     /// <summary>
-    /// No hay propuesta automática: la línea necesita que el Administrador de Tarifas
-    /// agregue o actualice la tarifa.
-    ///
-    /// NO es un fallo. El servicio hizo su trabajo y la respuesta es que aquí no hay
-    /// tarifa válida. Se expone explícito y no como "valor nulo" porque de esta
-    /// distinción depende que la línea NO se reintente: reintentar algo que espera a una
-    /// persona quema reintentos y acaba disparando la alerta del equipo por nada.
+    /// No hay propuesta automática: la línea espera que el Administrador de Tarifas agregue o actualice
+    /// la tarifa. No es un fallo y no debe reintentarse.
     /// </summary>
     public bool RequiereTarifaManual => Valor is null;
 }
 
 /// <summary>
-/// Las reglas inviolables del costeo por línea.
-///
-/// Función pura: entra qué encontró cada fuente, sale qué se propone y por qué. No
-/// consulta nada, no conoce EF ni almacenes. Vive en Domain porque son invariantes del
-/// negocio, y estaban en un adaptador de Infrastructure donde no se podían probar.
-///
-/// Las reglas que aplica:
-///
-///   1. Nunca por debajo del piso SICE-TAC vigente. Cotizar bajo el piso es sanción.
-///   2. Regla del mayor: propuesta = MAX(tarifa de plaza, histórico de plaza (últimos
-///      3 meses), piso SICE-TAC). El histórico solo compite cuando hay piso vigente
-///      con el cual validar que no está desactualizado (ver regla 6).
-///   3. Si falta plaza y falta piso, gobierna el que haya.
-///   4. Tarifa vencida se marca y no se propone: se descarta la plaza y gobierna el
-///      piso (el histórico sigue compitiendo; no depende de la vigencia del tarifario).
-///   5. Trazabilidad de fuente: toda propuesta dice de dónde salió.
-///   6. Sin piso vigente, el histórico NUNCA compite ni se propone solo: no hay piso
-///      contra el cual validar que no esté desactualizado. Se ofrece solo como
-///      referencia para que una persona decida.
+/// Reglas del costeo por línea (función pura: entra lo que encontró cada fuente, sale la propuesta y su justificación):
+///   1. Nunca por debajo del piso SICE-TAC vigente (cotizar bajo el piso es sanción).
+///   2. Regla del mayor: MAX(plaza, histórico de plaza de los últimos 3 meses, piso SICE-TAC).
+///   3. Si falta plaza y piso, gobierna el que haya.
+///   4. Tarifa vencida no se propone: se descarta la plaza y gobierna el piso; el histórico sigue compitiendo.
+///   5. Toda propuesta dice de qué fuente salió.
+///   6. Sin piso vigente el histórico nunca se propone solo (no hay con qué validar que esté al día): es solo referencia.
 /// </summary>
 public static class clsReglaDeCosteo
 {
@@ -62,8 +39,7 @@ public static class clsReglaDeCosteo
     {
         if (sicetac is not null)
         {
-            // Con piso vigente, plaza e histórico compiten por el mayor; el empate
-            // entre ambos lo gana la plaza, por ser la tarifa comercial vigente.
+            // Plaza e histórico compiten por el mayor; el empate lo gana la plaza.
             var mejorComercial = plaza is not null && historico is not null
                 ? (plaza.Valor >= historico.Valor ? plaza : historico)
                 : plaza ?? historico;
@@ -75,10 +51,7 @@ public static class clsReglaDeCosteo
             var mayor = mejorComercial.Valor >= sicetac.Valor ? mejorComercial : sicetac;
             var diferencia = Math.Abs(mejorComercial.Valor - sicetac.Valor);
             var porcentaje = sicetac.Valor > 0 ? Math.Round(diferencia / sicetac.Valor * 100, 1) : 0;
-            // Fraseo idéntico al histórico de "El flete de plaza ... supera/es superado
-            // por el piso SICE-TAC" cuando el comercial es la plaza (no romper el
-            // fraseo ya validado contra datos reales, ver clsPliegoDatasetValidacionTests);
-            // el histórico usa el mismo patrón con su propio sujeto.
+            // El fraseo para la plaza está validado contra datos reales: no cambiarlo.
             var (sujeto, sujetoObjeto) = mejorComercial.Fuente == "plaza"
                 ? ("El flete de plaza", "el flete de plaza")
                 : ("El histórico de plaza (últimos 3 meses)", "el histórico de plaza (últimos 3 meses)");
@@ -94,8 +67,7 @@ public static class clsReglaDeCosteo
             return new clsResultadoDeCosteo(plaza.Valor, plaza.Fuente,
                 "Solo se encontró flete de plaza; sin piso SICE-TAC comparable para la ruta.");
 
-        // Sin piso vigente, el histórico viaja como referencia, no como propuesta:
-        // proponerlo sería costear sin saber si respeta el piso vigente.
+        // Sin piso vigente el histórico es solo referencia: proponerlo no garantiza respetar el piso.
         var referencia = historico is not null
             ? $" Referencia disponible: histórico SAP {clsMoneda.Pesos(historico.Valor)} (el Administrador de Fletes decide manualmente)."
             : string.Empty;
@@ -105,10 +77,7 @@ public static class clsReglaDeCosteo
             "Administrador de Fletes en la bandeja de entrada, según las reglas de priorización." + referencia);
     }
 
-    /// <summary>
-    /// Igual que <see cref="Decidir"/>, pero descartando la plaza cuando su vigencia
-    /// venció. Una tarifa vencida no se propone aunque sea la más alta.
-    /// </summary>
+    /// <summary>Como <see cref="Decidir"/>, pero descarta la plaza vencida aunque sea la más alta.</summary>
     public static clsResultadoDeCosteo DecidirConTarifario(
         clsCandidatoDeTarifa? sicetac, clsCandidatoDeTarifa? plaza, clsCandidatoDeTarifa? historico, bool tarifarioVencido)
     {
@@ -117,10 +86,7 @@ public static class clsReglaDeCosteo
         var sinPlaza = Decidir(sicetac, plaza: null, historico);
         var aviso = "El tarifario está INACTIVO (vigencia vencida): se descarta la plaza; el tarifario vencido queda solo como referencia. ";
 
-        // El histórico puede seguir compitiendo contra el piso (regla 4): si gana, la
-        // justificación de Decidir ya lo explica y solo se antepone el aviso de plaza
-        // vencida. Si nadie más que el piso queda en pie, se aclara que nunca cotiza
-        // por debajo de él.
+        // Si el histórico gana, la justificación de Decidir ya lo explica y solo se antepone el aviso.
         var justificacion = sinPlaza.Fuente switch
         {
             "sicetac" => aviso + $"Se propone el piso SICE-TAC vigente ({clsMoneda.Pesos(sicetac!.Valor)}); nunca cotiza por debajo del piso legal.",
@@ -132,29 +98,22 @@ public static class clsReglaDeCosteo
         return sinPlaza with { Justificacion = justificacion };
     }
 
-    /// <summary>Motivo con el que queda pendiente una línea sin vehículo (S5-HU-20.5/#297).</summary>
+    /// <summary>Motivo con el que queda pendiente una línea sin vehículo.</summary>
     public const string MotivoLineaSinVehiculo = "Línea sin vehículo: requiere consulta completa";
 
     /// <summary>
-    /// S5-HU-20.5/#297: <c>true</c> cuando la línea es de Cupo —o no trae clase de viaje— y llega sin
-    /// vehículo. NO aplica a Contenedor (el vehículo se deduce por peso y clase de contenedor), ni a
-    /// Carga suelta ni a Extradimensionado (decidido por Sara: solo Cupo).
+    /// <c>true</c> cuando la línea es de Cupo (o no trae clase de viaje) y llega sin vehículo. No aplica a
+    /// Contenedor (el vehículo se deduce por peso y clase de contenedor), Carga suelta ni Extradimensionado.
     /// </summary>
     public static bool LineaSinVehiculoQueExigeConsultaCompleta(ClaseViaje? claseViaje, string? tipoVehiculo) =>
         (claseViaje is null or ClaseViaje.Cupo) && string.IsNullOrWhiteSpace(tipoVehiculo);
 
     /// <summary>
-    /// Flujo de decisión del flete principal de una línea, en tres caminos:
-    ///
-    ///   1. Con regla Solo-SICETAC y valor SICE-TAC: se usa solo el piso (<see cref="ModoDecision.SoloSicetac"/>).
-    ///   2. Sin regla, con piso y con plaza vigente estrictamente mayor que el piso: se usa solo la plaza
-    ///      (<see cref="ModoDecision.PlazaVigenteMayor"/>); el histórico no se consulta.
-    ///   3. Todo lo demás es proceso completo (<see cref="ModoDecision.ConsultaCompleta"/>): se comparan piso, plaza vigente
-    ///      (o la vencida solo como referencia) e histórico, y el recomendado es el valor más alto (<see cref="Decidir"/>).
-    ///
-    /// Solo los candidatos que coinciden en vehículo pueden gobernar o ser recomendados: uno con el vehículo relajado
-    /// (<see cref="clsCandidatoDeTarifa.VehiculoRelajado"/>) se anota en la justificación como referencia y no cuenta.
-    /// Si el proceso completo no deja ningún valor, la línea queda sin recomendado.
+    /// Flujo de decisión del flete principal de una línea:
+    ///   1. Con regla Solo-SICETAC y valor SICE-TAC: solo el piso (<see cref="ModoDecision.SoloSicetac"/>).
+    ///   2. Sin regla, con plaza vigente estrictamente mayor que el piso: solo la plaza (<see cref="ModoDecision.PlazaVigenteMayor"/>).
+    ///   3. Todo lo demás: proceso completo (<see cref="ModoDecision.ConsultaCompleta"/>), gana el valor más alto.
+    /// Solo gobiernan los candidatos que coinciden en vehículo; los relajados se anotan como referencia.
     /// </summary>
     public static clsDecisionDeFlujo DecidirFlujo(
         bool hayReglaSoloSicetac, clsCandidatoDeTarifa? sicetac,
@@ -175,9 +134,7 @@ public static class clsReglaDeCosteo
             : justificacion + " Sin coincidencia de vehículo (solo referencia, no se recomienda): " +
               string.Join("; ", referenciasRelajadas.Select(c => $"{c.Fuente} {clsMoneda.Pesos(c.Valor)}")) + ".";
 
-        // Una línea de Cupo (o sin clase de viaje) sin vehículo nunca se autocostea: sin vehículo el piso SICE-TAC se
-        // busca sin filtro y toma el menor valor, y la plaza cae al mayor valor vigente. Va directo a proceso completo,
-        // con los candidatos como referencia, y queda pendiente con su motivo propio.
+        // Sin vehículo el piso se busca sin filtro (toma el menor valor) y la plaza cae al mayor vigente: nunca se autocostea.
         if (lineaSinVehiculoQueLoExige)
         {
             var referencia = plazaVigenteExacta is not null
@@ -188,23 +145,21 @@ public static class clsReglaDeCosteo
                 ModoDecision.ConsultaCompleta, MotivoLineaSinVehiculo);
         }
 
-        // Camino 1: con regla y con piso, el piso gobierna solo. Con regla pero sin piso no hay nada que proponer por esta
-        // vía: pasa al proceso completo (nunca al camino 2, que es explícitamente "sin regla").
+        // Camino 1: con regla y piso, el piso gobierna solo. Con regla y sin piso pasa al proceso completo, no al camino 2.
         if (hayReglaSoloSicetac && sicetacExacto is not null)
             return new clsDecisionDeFlujo(
                 new clsResultadoDeCosteo(sicetacExacto.Valor, sicetacExacto.Fuente,
                     $"La ruta marcada como SOLO SICE-TAC por el Administrador: se propone el piso SICE-TAC ({clsMoneda.Pesos(sicetacExacto.Valor)}) sin comparar con plaza ni histórico."),
                 ModoDecision.SoloSicetac);
 
-        // Camino 2: sin regla, con piso y con plaza vigente estrictamente mayor que el piso, la plaza gobierna sola.
+        // Camino 2: sin regla, con plaza vigente > piso.
         if (!hayReglaSoloSicetac && sicetacExacto is not null && plazaVigenteExacta is not null && plazaVigenteExacta.Valor > sicetacExacto.Valor)
             return new clsDecisionDeFlujo(
                 new clsResultadoDeCosteo(plazaVigenteExacta.Valor, plazaVigenteExacta.Fuente,
                     AnotarRelajados($"La plaza vigente ({clsMoneda.Pesos(plazaVigenteExacta.Valor)}) supera el piso SICE-TAC ({clsMoneda.Pesos(sicetacExacto.Valor)}): se propone la plaza sin consultar el histórico.")),
                 ModoDecision.PlazaVigenteMayor);
 
-        // Camino 3: proceso completo. Regla del mayor entre los candidatos que coinciden en vehículo, con la plaza vigente
-        // si la hay o la vencida solo como referencia.
+        // Camino 3: proceso completo, con la plaza vencida solo como referencia.
         var resultado = plazaVigenteExacta is not null
             ? Decidir(sicetacExacto, plazaVigenteExacta, historicoExacto)
             : DecidirConTarifario(sicetacExacto, plazaVencidaExacta, historicoExacto, tarifarioVencido: plazaVencidaExacta is not null);
@@ -212,18 +167,13 @@ public static class clsReglaDeCosteo
     }
 }
 
-/// <summary>Los 3 caminos del flujo de decisión — ver <see cref="clsReglaDeCosteo.DecidirFlujo"/>.</summary>
+/// <summary>Los 3 caminos de <see cref="clsReglaDeCosteo.DecidirFlujo"/>.</summary>
 public enum ModoDecision { SoloSicetac, PlazaVigenteMayor, ConsultaCompleta }
 
 /// <summary>
-/// Qué se propuso y por qué camino.
-///
-/// <see cref="MotivoPendiente"/>: motivo con el que la línea NO se guarda sola aunque haya un valor propuesto (línea de Cupo sin
-/// vehículo, período SICE-TAC no vigente, tramo vacío sin piso...). <see cref="ValorAprovisionamiento"/> y
-/// <see cref="ValorRetornoContenedor"/> son los tramos vacíos de levante y de retorno del contenedor, ya calculados con SICE-TAC.
-///
-/// <see cref="Autocosteable"/>: el flete se guarda solo cuando hay un valor propuesto y ningún motivo de pendiente, sea cual
-/// sea el camino de decisión. Sin valor (proceso completo sin ningún candidato) o con motivo, la línea queda pendiente.
+/// Qué se propuso y por qué camino. <see cref="MotivoPendiente"/>: motivo por el que la línea no se guarda sola
+/// aunque haya valor (Cupo sin vehículo, período SICE-TAC no vigente, tramo vacío sin piso...).
+/// <see cref="ValorAprovisionamiento"/>/<see cref="ValorRetornoContenedor"/>: tramos vacíos de levante y retorno del contenedor, calculados con SICE-TAC.
 /// </summary>
 public sealed record clsDecisionDeFlujo(
     clsResultadoDeCosteo Resultado, ModoDecision Modo, string? MotivoPendiente = null,

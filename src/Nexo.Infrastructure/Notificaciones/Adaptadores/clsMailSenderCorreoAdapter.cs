@@ -7,34 +7,18 @@ using Microsoft.Extensions.Logging;
 
 namespace Nexo.Infrastructure.Notificaciones.Adaptadores;
 
-/// <summary>
-/// Salida de correo por el microservicio MailSender de la compañía.
-///
-/// POR QUÉ NO SMTP DIRECTO. El servicio SOAP corporativo solo adjunta archivos que ya
-/// están en una ruta alcanzable por ese servidor, y el formato de la cotización llega
-/// como archivo en la petición: no está en ningún disco compartido. El MailSender existe
-/// justamente para eso — recibe el adjunto por multipart y lo encola.
-///
-/// DOS COLAS, Y CONVIENE NO CONFUNDIRLAS. El MailSender tiene su propia cola durable y su
-/// worker: cuando responde 202, se compromete a intentar el envío al relay y a
-/// reintentarlo. Nuestra cola garantiza otra cosa distinta: que la notificación LE LLEGUE
-/// al MailSender aunque esté caído cuando se entregó la cotización. Por eso este
-/// adaptador no reintenta el SMTP —eso no es asunto suyo— sino que traduce lo que el
-/// MailSender responde en algo que nuestro bus pueda tratar.
-///
-/// LA URL VA EN CONFIGURACIÓN porque cambia en cada despliegue mientras el servicio hace
-/// lo mismo. Sin URL configurada, Configurado = false y quien llama decide cómo degradar;
-/// no se inventa un valor por defecto que apunte a un entorno equivocado.
-/// </summary>
+/// <summary>Salida de correo por el microservicio MailSender, que recibe el adjunto por multipart y lo encola
+/// (el relay SOAP solo adjunta archivos ya presentes en su ruta). No reintenta el SMTP: traduce la respuesta del
+/// MailSender en excepciones que el bus sabe tratar. Sin URL configurada, Configurado = false y quien llama decide cómo degradar.</summary>
 public sealed class clsMailSenderCorreoAdapter(
     HttpClient http,
     IConfiguration config,
     ILogger<clsMailSenderCorreoAdapter> log) : ICorreoPort
 {
-    /// <summary>URL base del microservicio. Cambia por despliegue.</summary>
+    /// <summary>URL base del microservicio.</summary>
     public const string ClaveBaseUrl = "MailSender:BaseUrl";
 
-    /// <summary>Remitente con el que sale el correo. Opcional: el relay tiene su propio por defecto.</summary>
+    /// <summary>Remitente del correo; opcional, el relay tiene su propio por defecto.</summary>
     public const string ClaveRemitente = "MailSender:Remitente";
 
     private const string clsRuta = "api/v1/emails";
@@ -56,8 +40,7 @@ public sealed class clsMailSenderCorreoAdapter(
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException && !ct.IsCancellationRequested)
         {
-            // No respondió: red, servicio caído, tiempo agotado. Es exactamente el caso
-            // para el que existe la política de reintentos del bus.
+            // No respondió (red, servicio caído, tiempo agotado): caso para la política de reintentos del bus.
             throw new clsCorreoTransitorioException(
                 $"El MailSender no respondió: {ex.Message}", ex);
         }
@@ -75,9 +58,7 @@ public sealed class clsMailSenderCorreoAdapter(
                 return id;
             }
 
-            // 400 mal formado, 413 adjunto demasiado grande, 422 no procesable: reintentar
-            // esto cuatro veces solo retrasa la alerta. El bus está configurado para no
-            // reintentar clsCorreoRechazadoException y llevarla derecho a la cola de error.
+            // 400/413/422: reintentar solo retrasa la alerta; el bus no reintenta clsCorreoRechazadoException y la lleva a la cola de error.
             if (respuesta.StatusCode is HttpStatusCode.BadRequest
                 or HttpStatusCode.RequestEntityTooLarge
                 or HttpStatusCode.UnprocessableEntity)
@@ -97,8 +78,7 @@ public sealed class clsMailSenderCorreoAdapter(
         if (!string.IsNullOrWhiteSpace(remitente))
             formulario.Add(new StringContent(remitente), "From");
 
-        // Los destinatarios se repiten como campos con el mismo nombre: así lo espera el
-        // multipart del MailSender para varios.
+        // Los destinatarios se repiten como campos con el mismo nombre, como espera el multipart del MailSender.
         foreach (var destinatario in correo.Destinatarios)
             formulario.Add(new StringContent(destinatario), "To");
 
@@ -106,9 +86,7 @@ public sealed class clsMailSenderCorreoAdapter(
         formulario.Add(new StringContent(correo.CuerpoHtml), "Body");
         formulario.Add(new StringContent("true"), "IsHtml");
 
-        // El relay EXIGE que los metadatos sean un documento JSON válido: una cadena
-        // suelta se rechaza con 422. Serializar aquí es lo correcto —el formato es asunto
-        // del transporte— y de paso hace imposible que un caso de uso se equivoque.
+        // El relay EXIGE los metadatos como JSON válido: una cadena suelta se rechaza con 422.
         if (correo.Metadatos is { Count: > 0 })
             formulario.Add(new StringContent(JsonSerializer.Serialize(correo.Metadatos)), "Metadata");
 
@@ -133,8 +111,7 @@ public sealed class clsMailSenderCorreoAdapter(
         }
         catch (JsonException)
         {
-            // Que el cuerpo del 202 no se pueda leer no invalida el encolado: el correo ya
-            // fue aceptado. Se pierde el identificador, no el correo.
+            // Un cuerpo ilegible no invalida el encolado: el correo ya fue aceptado, solo se pierde el identificador.
             return null;
         }
     }
@@ -145,7 +122,6 @@ public sealed class clsMailSenderCorreoAdapter(
             ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         : "application/octet-stream";
 
-    /// <summary>El detalle del error va al log y al mensaje de la excepción; sin volcar páginas.</summary>
     private static string Recortar(string texto) =>
         string.IsNullOrWhiteSpace(texto) ? "(sin cuerpo)"
         : texto.Length <= 400 ? texto.Trim()

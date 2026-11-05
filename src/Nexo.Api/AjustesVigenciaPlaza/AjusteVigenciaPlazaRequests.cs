@@ -5,9 +5,7 @@ namespace Nexo.Api.AjustesVigenciaPlaza;
 /// <summary>Ajuste 1 a 1 de la vigencia de una tarifa de plaza.</summary>
 public class clsAjustarVigenciaPlazaRequest
 {
-    // DateTime? (no DateTime): [Required] sobre un tipo valor no-nullable nunca dispara —
-    // el model binder ya deja default(DateTime) antes de validar, así que nunca es "null"
-    // para DataAnnotations (bug confirmado: un body vacío pasaba como 0001-01-01 con 204).
+    // DateTime? y no DateTime: [Required] no dispara sobre un tipo valor no nullable (el binder deja default(DateTime) antes de validar).
     [Required(ErrorMessage = "El campo NuevaVigencia es requerido.")]
     public DateTime? NuevaVigencia { get; set; }
 
@@ -15,11 +13,7 @@ public class clsAjustarVigenciaPlazaRequest
     public string? Motivo { get; set; }
 }
 
-/// <summary>
-/// Ajuste MASIVO de vigencia sobre un conjunto de tarifas de plaza (por Id).
-/// Modo "fecha": fija la misma NuevaVigencia a todas. Modo "extender": suma Cantidad
-/// de Unidad ("dias"|"meses") a la vigencia efectiva de cada una.
-/// </summary>
+/// <summary>Ajuste masivo de vigencia: Modo "fecha" fija NuevaVigencia; Modo "extender" suma Cantidad de Unidad ("dias"|"meses").</summary>
 public class clsAjusteVigenciaMasivoRequest
 {
     [Required, MinLength(1, ErrorMessage = "Indica al menos una tarifa.")]

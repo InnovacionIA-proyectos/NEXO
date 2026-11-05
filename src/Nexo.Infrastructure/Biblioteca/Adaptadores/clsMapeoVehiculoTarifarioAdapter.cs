@@ -8,11 +8,8 @@ using Microsoft.Extensions.Logging;
 namespace Nexo.Infrastructure.Biblioteca.Adaptadores;
 
 /// <summary>
-/// Lee <c>tbl_mapeo_vehiculo_tarifario</c> y la guarda en memoria. Es un servicio ÚNICO con su propio alcance de base de datos porque lo
-/// consultan los costeos en paralelo (cada trabajador con su propio contexto) y un contexto compartido no es seguro entre hilos.
-///
-/// Sin la tabla (el script aún no se aplicó) o con la base caída, responde "sin mapeo" por un minuto y registra el aviso: el costeo sigue
-/// como antes de existir el mapeo, en lugar de fallar.
+/// Servicio único con su propio alcance de BD porque los costeos en paralelo no pueden compartir un contexto.
+/// Sin la tabla o con la BD caída responde "sin mapeo" por un minuto y registra el aviso, en lugar de fallar.
 /// </summary>
 public sealed class clsMapeoVehiculoTarifarioAdapter(
     IServiceScopeFactory scopes, IMemoryCache cache, ILogger<clsMapeoVehiculoTarifarioAdapter> log) : IMapeoVehiculoTarifarioPort

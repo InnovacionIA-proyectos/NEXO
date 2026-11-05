@@ -32,10 +32,7 @@ public sealed class clsEfPlanCargueRepository(clsNexoDbContext db) : IPlanCargue
 
     public async Task<(IReadOnlyList<clsPlanCargue> Items, int Total)> ListarRecientesAsync(int page, int pageSize, CancellationToken ct)
     {
-        // Include de Items/Colocaciones porque clsListarPlanesCargueQueryHandler necesita
-        // sus conteos (TotalItems/TotalColocaciones) - correcto pero no lo más liviano
-        // posible; si el listado se vuelve lento, la palanca es proyectar con
-        // Items.Count()/Colocaciones.Count() en el SELECT en vez de traer las filas.
+        // Include de Items/Colocaciones porque el listado necesita sus conteos; si se vuelve lento, proyectar Items.Count()/Colocaciones.Count() en el SELECT.
         var query = db.PlanesCargue.AsNoTracking();
         var total = await query.CountAsync(ct);
         var items = await query
@@ -64,10 +61,7 @@ public sealed class clsEfPlanCargueRepository(clsNexoDbContext db) : IPlanCargue
             .ToListAsync(ct);
     }
 
-    /// <summary>Ver la firma en IPlanCargueRepository — a
-    /// diferencia de <see cref="ObtenerFlotaAsync"/>, no parte de un PlanId existente:
-    /// filtra directo por LineaSolicitudId, así que también sirve mientras ningún plan de
-    /// la línea ha llegado todavía (lista vacía, no falla).</summary>
+    /// <summary>A diferencia de ObtenerFlotaAsync, filtra directo por LineaSolicitudId: sirve aunque ningún plan de la línea haya llegado (lista vacía, no falla).</summary>
     public async Task<IReadOnlyList<clsPlanCargue>> ObtenerPorLineaAsync(Guid lineaSolicitudId, CancellationToken ct) =>
         await db.PlanesCargue
             .AsNoTracking()

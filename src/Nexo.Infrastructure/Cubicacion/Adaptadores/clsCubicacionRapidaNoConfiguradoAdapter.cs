@@ -4,12 +4,7 @@ using Nexo.Application.Common.Exceptions;
 
 namespace Nexo.Infrastructure.Cubicacion.Adaptadores;
 
-/// <summary>
-/// Se registra cuando falta <c>Cubicador3D:OutboundBaseUrl</c> y/o
-/// <c>Cubicador3D:RecomendacionesApiKey</c>: POST/GET /api/cubicacion responden 503
-/// accionable en vez de fallar la inyección de dependencias — mismo criterio que
-/// <c>clsBibliotecaSicetacNoConfiguradoAdapter</c>/<c>clsSapHistoricoNoConfiguradoAdapter</c>.
-/// </summary>
+/// <summary>Se registra sin <c>Cubicador3D:OutboundBaseUrl</c> o <c>RecomendacionesApiKey</c>: responde 503 accionable en vez de fallar la DI.</summary>
 public sealed class clsCubicacionRapidaNoConfiguradoAdapter : ICubicacionRapidaPort
 {
     public Task<clsRecomendacionDto> CrearAsync(clsCrearRecomendacionInput solicitud, CancellationToken ct = default) => NoConfigurada();

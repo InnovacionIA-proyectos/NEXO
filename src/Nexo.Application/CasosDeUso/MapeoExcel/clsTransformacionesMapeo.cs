@@ -1,9 +1,6 @@
 namespace Nexo.Application.CasosDeUso.MapeoExcel;
 
-/// <summary>
-/// Las conversiones que el mapeo puede pedirle a una columna antes de usar su valor. Son una lista cerrada: el modelo elige entre estas y
-/// el código las aplica, así que nada de lo que diga el modelo se ejecuta ni se convierte en un valor.
-/// </summary>
+/// <summary>Conversiones que el mapeo puede pedir a una columna: lista cerrada que el código aplica; nada de lo que diga el modelo se ejecuta.</summary>
 public static class clsTransformacionesMapeo
 {
     public const string Ninguna = "ninguna";
@@ -26,10 +23,7 @@ public static class clsTransformacionesMapeo
     public static readonly IReadOnlyList<string> CamposNumericos =
         ["peso", "valorMercancia", "horasCargue", "horasDescargue", "cantidad", "largoCm", "anchoCm", "altoCm", "pesoKg"];
 
-    /// <summary>
-    /// Si la conversión tiene sentido para el campo. Pasar toneladas a kilos solo vale para un peso; partir «ORIGEN - DESTINO», para el origen o el
-    /// destino; la coma decimal, para un número; la fecha, para el campo de fecha. Una columna que no se usa (<c>ignorar</c>) no se convierte.
-    /// </summary>
+    /// <summary>Si la conversión tiene sentido para el campo (toneladas a kilos solo para peso, partir origen-destino solo para origen o destino…); una columna <c>ignorar</c> no se convierte.</summary>
     public static bool Aplica(string campo, string transformacion) => transformacion switch
     {
         Ninguna => true,

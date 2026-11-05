@@ -15,25 +15,15 @@ using Nexo.Domain.Enums;
 
 namespace Nexo.Application.CasosDeUso.MapeoExcel.Normalizacion;
 
-/// <summary>
-/// Normaliza los textos libres distintos de un Excel (tipo de vehículo, carrocería, línea de negocio y ciudad) a los valores oficiales de NEXO. No persiste nada: el
-/// usuario revisa el resultado y la captura sigue como siempre (lo que no se resuelva se envía tal cual y la captura lo manda a la cuarentena de
-/// vehículos).
-/// </summary>
+/// <summary>Normaliza los textos libres distintos de un Excel (vehículo, carrocería, línea de negocio, ciudad) a valores oficiales de NEXO. No persiste nada.</summary>
 /// <param name="ClienteId">El cliente dueño del archivo: su diccionario manda. Sin él solo se usa el diccionario general.</param>
 public sealed record clsNormalizarValoresQuery(Guid? ClienteId, IReadOnlyList<clsValorANormalizar>? Valores)
     : IQuery<clsResultadoNormalizacionDto>;
 
 /// <summary>
-/// El orden de las cosas:
-/// 1) Reglas exactas, sin IA: el diccionario del cliente, el de alias de vehículos, el catálogo oficial (código o descripción idénticos) y, para
-///    la línea de negocio, los pocos sinónimos inequívocos (impo/importación, expo/exportación); para las ciudades, un código DANE o un nombre de municipio con las mismas palabras (sin tildes, puntuación ni «D.C.»), usando el departamento
-///    si el texto lo trae («Santa Rosa, Cauca»).
-/// 2) Con lo que queda sin resolver, UNA sola llamada a la IA por todos los textos distintos (no una por fila), solo con textos que no traen datos
-///    sensibles y con listas cerradas: el catálogo oficial para vehículos y carrocerías, las seis líneas de negocio de NEXO, y un puñado de municipios parecidos para cada ciudad.
-/// 3) Nada se asigna por lo que diga el modelo: su respuesta solo vale si la clave elegida está en la lista que se le dio para ese texto y su
-///    confianza llega al mínimo. Lo demás queda sin resolver.
-/// Si la IA falla o está apagada se devuelve igual lo que resolvieron las reglas. Un tope de uso superado (429) sí se informa.
+/// Orden: 1) reglas exactas sin IA (diccionario del cliente, alias, catálogo oficial, sinónimos inequívocos, código DANE o nombre de municipio);
+/// 2) UNA sola llamada a la IA por todos los textos pendientes, sin datos sensibles y con listas cerradas; 3) lo del modelo solo vale si la
+/// clave está en la lista dada y su confianza llega al mínimo. Si la IA falla se devuelve lo de las reglas; un tope de uso (429) sí se informa.
 /// </summary>
 public sealed class clsNormalizarValoresQueryHandler(
     IAsistenteIaPort ia,
@@ -170,8 +160,6 @@ public sealed class clsNormalizarValoresQueryHandler(
         return new clsResultadoNormalizacionDto(iaUsada, motivoSinIa, porClave.Count, salida);
     }
 
-    // ---------------------------------------------------------------- entrada
-
     private sealed record Entrada(string Campo, string Texto, string Normalizado);
 
     private static List<Entrada> Validar(IReadOnlyList<clsValorANormalizar>? valores)
@@ -194,8 +182,6 @@ public sealed class clsNormalizarValoresQueryHandler(
         }
         return resultado;
     }
-
-    // ---------------------------------------------------------------- catálogos
 
     private async Task<IReadOnlyList<clsTipoVehiculoDto>> CatalogoDeVehiculosAsync(CancellationToken ct) =>
         (await tiposVehiculo.ListarAsync(ct))
@@ -221,8 +207,6 @@ public sealed class clsNormalizarValoresQueryHandler(
             colombia.ToLookup(m => clsSimilitudDeTexto.Clave(m.Municipio)),
             colombia.GroupBy(m => m.CodigoDane.Trim()).ToDictionary(g => g.Key, g => g.First()));
     }
-
-    // ---------------------------------------------------------------- reglas exactas
 
     private static (Resolucion, IReadOnlyList<clsPromptNormalizacion.Opcion>?, IReadOnlyList<clsMunicipio>?) ReglasDeVehiculo(
         string normalizado, Dictionary<(string Campo, string Termino), string> valoresDelCliente,
@@ -252,10 +236,7 @@ public sealed class clsNormalizarValoresQueryHandler(
             : (Resolucion.Sin(), null, null);
     }
 
-    /// <summary>
-    /// Los únicos textos que se traducen sin preguntar. «Inbound», «Outbound» y similares no están a propósito: cada cliente los usa distinto, así
-    /// que salen del diccionario del cliente o de la IA (con confianza baja si no hay de dónde apoyarse).
-    /// </summary>
+    /// <summary>Los únicos textos que se traducen sin preguntar; «Inbound»/«Outbound» no están a propósito: cada cliente los usa distinto.</summary>
     private static readonly Dictionary<string, LineaNegocio> SinonimosDeLineaNegocio = new()
     {
         ["IMPO"] = LineaNegocio.PuertoAInterior,
@@ -332,8 +313,6 @@ public sealed class clsNormalizarValoresQueryHandler(
         var candidatos = clsSimilitudDeTexto.MejoresCandidatos(nombre, catalogo.Todos, m => m.Municipio, MaxCandidatosPorCiudad, MinPuntajeCandidato);
         return (Resolucion.Sin(), null, candidatos);
     }
-
-    // ---------------------------------------------------------------- la IA
 
     private clsPeticionIa Peticion(
         IReadOnlyList<Pendiente> pendientes, IReadOnlyList<clsTipoVehiculoDto> catalogoVehiculos, Dictionary<string, string> carrocerias)

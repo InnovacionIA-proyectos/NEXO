@@ -5,23 +5,12 @@ using Nexo.Domain.Enums;
 
 namespace Nexo.Application.CasosDeUso.Notificaciones;
 
-// ---------------------------------------------------------------------------
-// Las 3 alertas de negocio de la sección 9 del documento de entendimiento — hoy la
-// única notificación que existía era "cotización entregada" (al cliente interno que
-// pidió la consulta), y ninguna de estas tres, pese a ser las que sostienen la
-// confianza del comercial en la propuesta (riesgo de "volver al Excel", sección 12).
-//
-// Las tres comparten forma: resolver destinatarios por ROL (no por una solicitud con
-// creador identificable, como la de entrega) y mandar un correo simple por el mismo
-// ICorreoPort/MailSender ya en producción. Un handler por alerta y no uno genérico
-// parametrizado: el asunto, el cuerpo y a quién le llega son decisiones de negocio
-// distintas para cada una, y ya son solo 3 — no hay abstracción que valga la pena.
-// ---------------------------------------------------------------------------
+// Un handler por alerta y no uno genérico: asunto, cuerpo y destinatarios (por ROL) son decisiones de negocio distintas.
 
 public sealed record clsNotificarTarifaVencidaCommand(Guid LineaId, string Justificacion, DateTimeOffset DetectadaEn)
     : ICommand<clsResultadoDeNotificacionDto>;
 
-/// <summary>Urgencia Alta: la Biblioteca (AdminBiblioteca), el Administrador de Tarifas y Servicios Logísticos — ver docs/documentacion/ROLES_Y_PERMISOS.md.</summary>
+/// <summary>Urgencia Alta: AdminBiblioteca, Administrador de Tarifas y Servicios Logísticos.</summary>
 public sealed class clsNotificarTarifaVencidaCommandHandler(
     IDestinatariosDeAlertaPort destinatarios, ICorreoPort correo)
     : ICommandHandler<clsNotificarTarifaVencidaCommand, clsResultadoDeNotificacionDto>
@@ -56,10 +45,7 @@ public sealed class clsNotificarTarifaVencidaCommandHandler(
 public sealed record clsNotificarLineaFalloTecnicoCommand(Guid TrabajoId, Guid LineaId, string Motivo)
     : ICommand<clsResultadoDeNotificacionDto>;
 
-/// <summary>
-/// Urgencia Media: Administrador de Tarifas (AdminTarifas). S6-HU-25.1/#307: antes le llegaba al rol de la Biblioteca; ese rol (AdminBiblioteca)
-/// ya no entra a la Mesa de Costeo, que es donde se resuelve una línea que no pudo costearse.
-/// </summary>
+/// <summary>Urgencia Media: Administrador de Tarifas (AdminTarifas); AdminBiblioteca no entra a la Mesa de Costeo.</summary>
 public sealed class clsNotificarLineaFalloTecnicoCommandHandler(
     IDestinatariosDeAlertaPort destinatarios, ICorreoPort correo)
     : ICommandHandler<clsNotificarLineaFalloTecnicoCommand, clsResultadoDeNotificacionDto>

@@ -10,16 +10,8 @@ using Nexo.Mensajes.Priorizacion;
 namespace Nexo.Application.CasosDeUso.Priorizacion;
 
 /// <summary>
-/// Recalibra los pesos del score.
-///
-/// NO RECALCULA AQUÍ. Guarda los parámetros, publica el aviso y responde. Recalcular
-/// todas las activas dentro de esta petición dejaría al Admin mirando una pantalla
-/// girando por algo que no necesita esperar, y un fallo a mitad del recálculo le
-/// devolvería un error por un cambio que sí se guardó.
-///
-/// El aviso sale por el Outbox, o sea en la MISMA transacción que el cambio. Eso cierra
-/// el hueco obvio: no puede quedar el parámetro guardado sin recálculo, ni un recálculo
-/// disparado por un cambio que se acabó revirtiendo.
+/// Recalibra los pesos del score. No recalcula aquí: guarda y publica el aviso por Outbox en la MISMA transacción,
+/// así no queda parámetro guardado sin recálculo ni recálculo por un cambio revertido.
 /// </summary>
 public sealed record clsActualizarParametrosScoreCommand(clsParametrosScoreDto Parametros, Guid UsuarioId)
     : ICommand<clsParametrosScoreDto>;
@@ -43,9 +35,8 @@ public sealed class clsActualizarParametrosScoreCommandHandler(
                 clsCadenaDePriorizacion.Unica, command.UsuarioId, reloj.GetUtcNow()),
             ct);
 
-        // Y este cambio SÍ reordena la bandeja de verdad, a diferencia del refresco del
-        // puntaje persistido: la bandeja calcula el puntaje al leer, así que un horizonte
-        // distinto le cambia el orden en la siguiente consulta.
+        // Este cambio SÍ reordena la bandeja: el puntaje se calcula al leer, así que un horizonte distinto
+        // cambia el orden en la siguiente consulta.
         await publicador.PublicarAsync(
             new clsBandejaCambio(clsMotivoDeCambio.ParametrosRecalibrados, reloj.GetUtcNow()), ct);
 

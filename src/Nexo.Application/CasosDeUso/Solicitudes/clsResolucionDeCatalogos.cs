@@ -5,14 +5,7 @@ using Nexo.Domain.Catalogos.Entidades;
 
 namespace Nexo.Application.CasosDeUso.Solicitudes;
 
-/// <summary>
-/// Resuelve clsRuta/clsConfiguracionVehiculo desde texto libre contra el catálogo, creando lo
-/// que falte. Extraído de clsCapturarSolicitudCommand (donde vivía mezclado con "crear la
-/// solicitud") para que otro caso de uso —como clsResolverCatalogosDeLineasCommand, que
-/// alimenta a lineas:bulk desde un formulario de texto libre sin crear la solicitud
-/// completa— use exactamente la misma normalización. Dos normalizadores divergentes
-/// crearían rutas/vehículos duplicados según por dónde entró el texto.
-/// </summary>
+/// <summary>Resuelve ruta y configuración de vehículo desde texto libre contra el catálogo, creando lo que falte; es la normalización única para no duplicar rutas ni vehículos según la entrada.</summary>
 public static class clsResolucionDeCatalogos
 {
     public static string? Limpiar(string? s)
@@ -23,13 +16,9 @@ public static class clsResolucionDeCatalogos
     }
 
     /// <summary>
-    /// Clave de comparación (NO lo que se guarda: eso sale de <see cref="Limpiar"/>). S5-HU-20.5/#297:
-    /// sin tildes y con los separadores <c>_</c> y <c>-</c> unificados a espacio, para que "Bogotá" y
-    /// "Bogota", o "Furgon Refrigerado" y "FURGON_REFRIGERADO", resuelvan a la MISMA fila en vez de crear
-    /// una nueva. Las claves de lo ya guardado se calculan con este mismo método al cargar el catálogo,
-    /// así que no hace falta migrar nada; si dos filas viejas colapsan en una clave gana la primera.
-    /// A propósito NO se unifican otras formas ("T.MULA" vs "Tractomula"): adivinar equivalencias es lo
-    /// que decide un humano en la cuarentena (S5-HU-18.4).
+    /// Clave de comparación (no lo que se guarda: eso sale de <see cref="Limpiar"/>): sin tildes y con <c>_</c> y <c>-</c> unificados a espacio, para que
+    /// "Bogotá"/"Bogota" o "Furgon Refrigerado"/"FURGON_REFRIGERADO" resuelvan a la MISMA fila; si dos filas viejas colapsan gana la primera.
+    /// Otras formas ("T.MULA" vs "Tractomula") NO se unifican a propósito: esa equivalencia la decide un humano en la cuarentena.
     /// </summary>
     public static string Normalizar(string? s)
     {
@@ -44,9 +33,8 @@ public static class clsResolucionDeCatalogos
     public static string ClaveVehiculo(string tipo, string? carroceria) => $"{Normalizar(tipo)}|{Normalizar(carroceria)}";
 
     /// <summary>
-    /// Indexa las configuraciones de vehículo por clave normalizada. Varias filas pueden compartir clave ("Furgón" y "FURGON"):
-    /// gana siempre la misma, primero una oficial que no esté descartada y, entre iguales, la más antigua. Así el vehículo que
-    /// se asigna a una línea no depende del orden en que la base devuelva las filas.
+    /// Indexa las configuraciones de vehículo por clave normalizada. Si varias comparten clave ("Furgón" y "FURGON") gana una oficial no
+    /// descartada y, entre iguales, la más antigua, para que el resultado no dependa del orden de la base.
     /// </summary>
     public static Dictionary<string, clsConfiguracionVehiculo> IndexarVehiculosPorClave(IEnumerable<clsConfiguracionVehiculo> vehiculos) =>
         vehiculos.GroupBy(v => ClaveVehiculo(v.TipoVehiculo, v.Carroceria))
@@ -63,13 +51,8 @@ public static class clsResolucionDeCatalogos
     }
 
     /// <summary>
-    /// Busca la ruta en el diccionario ya cargado; si no existe, la crea y la agrega al
-    /// catálogo. S5-HU-16.1/#254: cuando el frontend ya resolvió Origen/Destino contra el
-    /// buscador de ciudades (tbl_municipios), <paramref name="origenMunicipioId"/>/
-    /// <paramref name="destinoMunicipioId"/> quedan guardados en la ruta — nuevos o sobre
-    /// una ya existente (se sobrescribe; el mismo texto normalizado siempre debería
-    /// resolver al mismo municipio). Null si la línea no los trae (formulario viejo, texto
-    /// libre que no pasó por el buscador).
+    /// Busca la ruta en el diccionario cargado o la crea. Si el frontend resolvió Origen/Destino con el buscador de ciudades, los ids de
+    /// municipio se guardan en la ruta (también sobre una existente); null si la línea no los trae.
     /// </summary>
     public static (clsRuta clsRuta, bool Creada) ResolverRuta(
         string origen, string destino, IDictionary<string, clsRuta> rutasPorClave, IRutasCatalogoPort catalogo,
@@ -94,20 +77,10 @@ public static class clsResolucionDeCatalogos
     }
 
     /// <summary>
-    /// Igual que <see cref="ResolverRuta"/>, pero para el vehículo (opcional: sin tipo, no
-    /// hay nada que resolver). S5-HU-18.4/#276: una fila nueva SIEMPRE nace en cuarentena
-    /// (EsCatalogoOficial = false) — comparar texto normalizado no es suficiente para saber
-    /// si corresponde a un código canónico del Cubicador ("TMULA"/"T.MULA"/"Tractomula" no
-    /// calzan entre sí hoy, y adivinar la equivalencia aquí perpetuaría el mismo problema).
-    /// Esa decisión la toma un humano en la bandeja de normalización (S6-HU-27.3/#322).
-    ///
-    /// S6-HU-27.2/#321: antes de caer en cuarentena se consulta el diccionario de alias
-    /// (<paramref name="aliasVehiculo"/>: <c>AliasNormalizado → código</c>, de <c>tbl_alias_elementos</c>). Solo aplica a la columna "tipo de
-    /// vehículo": si el texto es un alias ("TB", "T.B", "Turbo", "2L2" → 2L2), el tipo que se busca/guarda es el CÓDIGO, así que todas
-    /// las variantes llegan a la MISMA fila; la carrocería no se toca (viaja tal cual, con la normalización de siempre). Un alias lo
-    /// puso un humano, así que la fila que se cree con el código nace oficial, y una fila (código + carrocería) que estaba en
-    /// cuarentena se promueve a oficial (el tracking de EF la guarda con el SaveChanges del caso de uso). Una fila que alguien
-    /// descartó no se promueve. Sin alias, nada cambia: texto desconocido → cuarentena.
+    /// Igual que <see cref="ResolverRuta"/> para el vehículo (opcional). Una fila nueva nace SIEMPRE en cuarentena (EsCatalogoOficial = false):
+    /// la equivalencia con un código canónico del Cubicador la decide un humano. Antes se consulta <paramref name="aliasVehiculo"/>
+    /// (<c>AliasNormalizado → código</c>): si el texto es un alias ("TB", "Turbo" → 2L2) se usa el CÓDIGO, la fila nace oficial y una fila en
+    /// cuarentena con ese código y carrocería se promueve (no si alguien la descartó). La carrocería no se toca.
     /// </summary>
     public static (clsConfiguracionVehiculo? Vehiculo, bool Creado) ResolverVehiculo(
         string? tipoVehiculo, string? carroceria,
@@ -140,9 +113,8 @@ public static class clsResolucionDeCatalogos
     private static readonly string[] ClasesContenedor = ["CNT20.IT", "CNT20.RE", "CNT20.ST", "CNT40.HC", "CNT40.RE"];
 
     /// <summary>
-    /// Código de la clase de contenedor a partir del texto que llegó. S6-HU-27.2/#321, en este orden: (1) el diccionario de alias
-    /// (<paramref name="aliasContenedor"/>: "40 HC", "40HC", "20 STD" → CNT40.HC, CNT20.ST); (2) un código real de SAP dentro del texto
-    /// ("CNT40.HC", "cnt 40 hc"); (3) el texto tal cual (máximo 20), como antes. Null si no vino nada.
+    /// Código de la clase de contenedor del texto, en este orden: alias (<paramref name="aliasContenedor"/>: "40 HC" → CNT40.HC), código SAP
+    /// dentro del texto ("cnt 40 hc") y el texto tal cual (máx. 20). Null si no vino nada.
     /// </summary>
     public static string? ResolverClaseContenedor(string? valor, IReadOnlyDictionary<string, string>? aliasContenedor = null)
     {

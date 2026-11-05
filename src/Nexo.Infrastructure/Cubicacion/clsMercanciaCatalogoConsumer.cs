@@ -6,14 +6,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Nexo.Infrastructure.Cubicacion;
 
-/// <summary>
-/// S5-HU-18.5/#277: consume mercancia.creada/mercancia.actualizada/mercancia.eliminada y
-/// mantiene sincronizada la proyección de NEXO (<c>TiposMercanciaCatalogo</c>) — alimenta
-/// el desplegable de tipo de mercancía en Captura (S5-HU-18.2/#274) sin que NEXO tenga que
-/// preguntarle al Cubicador en caliente. Mismo criterio que
-/// <see cref="clsVehiculoCatalogoConsumer"/>: upsert idempotente por Id, borrar lo que no
-/// está no es un error.
-/// </summary>
+/// <summary>Mantiene la proyección de tipos de mercancía (TiposMercanciaCatalogo) desde mercancia.creada/actualizada/eliminada:
+/// upsert idempotente por Id; borrar lo que no está no es un error.</summary>
 public sealed class clsMercanciaCatalogoConsumer(clsNexoDbContext db)
     : IConsumer<MercanciaCreada>, IConsumer<MercanciaActualizada>, IConsumer<MercanciaEliminada>
 {

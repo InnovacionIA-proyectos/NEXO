@@ -4,9 +4,7 @@ using Nexo.Application.Common.Abstractions;
 
 namespace Nexo.Application.CasosDeUso.PlanDeCargue;
 
-/// <summary>GET /api/planes-cargue/{id}/flota — los vehículos
-/// (planes) de la misma flota, contra la proyección local (mismo criterio que
-/// `flota()` de Cubicador, ver cubicador/CONTRATO.md §3.2).</summary>
+/// <summary>GET /api/planes-cargue/{id}/flota — los vehículos (planes) de la misma flota, desde la proyección local.</summary>
 public sealed record clsObtenerFlotaPlanQuery(Guid PlanCargueId) : IQuery<IReadOnlyList<clsPlanFlotaItemDto>>;
 
 public sealed class clsObtenerFlotaPlanQueryHandler(IPlanCargueRepository planes)

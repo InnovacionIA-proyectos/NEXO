@@ -3,11 +3,8 @@ using Nexo.Application.Common.Exceptions;
 
 namespace Nexo.Infrastructure.IA;
 
-/// <summary>
-/// El tope diario de tokens por persona, común a toda función de IA. El día es el de Colombia (medianoche en UTC-5) y se mide con lo ya
-/// registrado en <c>tbl_ia_uso</c>, así que es blando: dos llamadas simultáneas pueden pasarlo por una. Un tope de 0 lo desactiva y una
-/// llamada sin usuario (proceso interno) no tiene tope por persona.
-/// </summary>
+/// <summary>Tope diario de tokens por persona, común a toda función de IA: día de Colombia (UTC-5), medido con lo registrado
+/// en <c>tbl_ia_uso</c>, por lo que es blando. 0 lo desactiva y sin usuario no hay tope.</summary>
 internal static class clsTopeDiarioIa
 {
     private static readonly TimeSpan DesfaseColombia = TimeSpan.FromHours(-5);

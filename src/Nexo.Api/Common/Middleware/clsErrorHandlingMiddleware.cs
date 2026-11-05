@@ -4,11 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Nexo.Api.Common.Middleware;
 
-/// <summary>
-/// Middleware global de manejo de errores. Traduce las excepciones de Application
-/// (que no conocen HTTP) al código de estado correspondiente, y captura cualquier
-/// excepción no controlada. Responde SIEMPRE en JSON con { code, message, timestamp }.
-/// </summary>
+/// <summary>Traduce las excepciones de Application al código HTTP que corresponde y captura las no controladas. Responde siempre JSON { code, message, timestamp }.</summary>
 public class clsErrorHandlingMiddleware
 {
     private readonly RequestDelegate _next;

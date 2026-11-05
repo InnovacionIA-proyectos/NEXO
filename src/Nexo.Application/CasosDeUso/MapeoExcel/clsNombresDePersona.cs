@@ -4,14 +4,9 @@ using Nexo.Application.CasosDeUso.Solicitudes;
 namespace Nexo.Application.CasosDeUso.MapeoExcel;
 
 /// <summary>
-/// Reconoce un nombre de persona escrito en una celda cualquiera. Es la segunda defensa del enmascarado: la primera mira el encabezado, y un
-/// encabezado que no delata nada ("Quien recibe", "Col 7") dejaba salir los nombres tal cual.
-///
-/// No hay manera de reconocer TODOS los nombres con reglas, así que esto no pretende ser exacto sino cubrir lo corriente sin ocultar de más:
-/// una ciudad, un vehículo o una mercancía de dos palabras ("Santa Marta", "Camión Sencillo") tienen que pasar. Por eso el criterio no es la
-/// forma ("dos palabras con mayúscula") sino que alguna de las palabras sea un nombre o un apellido conocido, y que la celda no empiece con
-/// el prefijo de un lugar ("San", "Santa", "Puerto"). El que se queda sin reconocer lo recoge el enmascarado por columna: ver
-/// <see cref="clsEnmascaradorDeCeldas.MarcadorPorContenido"/>.
+/// Reconoce un nombre de persona en una celda (segunda defensa del enmascarado). No pretende ser exacto: una ciudad o vehículo de dos
+/// palabras debe pasar, así que exige que alguna palabra sea un nombre o apellido conocido y que no empiece con prefijo de lugar
+/// ("San", "Puerto"). El resto lo recoge <see cref="clsEnmascaradorDeCeldas.MarcadorPorContenido"/>.
 /// </summary>
 internal static class clsNombresDePersona
 {

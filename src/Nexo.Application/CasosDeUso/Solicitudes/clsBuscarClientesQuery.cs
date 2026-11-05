@@ -5,12 +5,8 @@ using Nexo.Application.Common.Abstractions;
 namespace Nexo.Application.CasosDeUso.Solicitudes;
 
 /// <summary>
-/// Búsqueda de clientes para el formulario de captura. Con el DW configurado busca
-/// primero sobre los clientes REALES (DimBPSolicitante) por nombre, NIT o BP; solo si
-/// esa búsqueda no encuentra nada, cae a tblProspectos — así nunca se cargan ni
-/// combinan los dos catálogos completos en la misma búsqueda, y no hace falta
-/// deduplicar (un NIT ya real en DimBPSolicitante nunca llega a consultarse en
-/// prospectos). Sin el DW configurado, busca sobre la tabla local.
+/// Búsqueda de clientes para la captura: primero clientes reales del DW (nombre, NIT o BP); solo si no hay resultados cae a prospectos,
+/// así nunca se combinan ni deduplican los dos catálogos. Sin DW configurado busca en la tabla local.
 /// </summary>
 public sealed record clsBuscarClientesQuery(string? Q) : IQuery<IReadOnlyList<clsClienteBusquedaDto>>;
 

@@ -15,17 +15,8 @@ using Microsoft.AspNetCore.Mvc;
 namespace Nexo.Api.Solicitudes;
 
 /// <summary>
-/// Captura de necesidades del equipo comercial: solicitudes puntuales (spot) o
-/// pliegos de licitación, ingresados a mano o importados desde el Excel del cliente.
-/// La puerta de entrada de nuevas solicitudes (analizar-excel y Capturar) es solo de
-/// Comercial/Admin.
-///
-/// S5-HU-22.1/#288: los roles ya NO están a nivel de clase. Un [Authorize(Roles)] de método no
-/// reemplaza el de la clase —se combinan con AND—, así que con "Comercial,Admin" en la clase el
-/// catálogo de ciudades devolvía 403 a AdminBiblioteca (que sí gestiona servicios en
-/// Biblioteca) y el frontend, que traga ese error, dejaba el campo sin sugerencias. Ahora la
-/// clase exige solo estar autenticado (más la política de respaldo: un rol válido de Nexo) y
-/// cada endpoint dice quién puede usarlo.
+/// Captura de necesidades del equipo comercial: solicitudes spot o pliegos de licitación, a mano o importados desde el Excel del cliente.
+/// La clase solo exige estar autenticado; cada endpoint declara sus roles (un [Authorize(Roles)] de método se combina con AND con el de la clase).
 /// </summary>
 [ApiController]
 [Authorize]
@@ -53,11 +44,7 @@ public class clsCapturaSolicitudesController(
     private async Task<Guid?> ClienteDelArchivoAsync(Guid? clienteId, string? clienteNit, CancellationToken ct) =>
         clienteId ?? await clienteDeImportacion.BuscarLocalAsync(clienteNit, ct);
 
-    /// <summary>
-    /// Analiza un Excel de licitación (cualquier plantilla de cliente) y devuelve
-    /// las hojas con encabezados y filas para que el usuario mapee las columnas.
-    /// No persiste nada.
-    /// </summary>
+    /// <summary>Analiza un Excel de licitación (cualquier plantilla de cliente) y devuelve las hojas con encabezados y filas para mapear columnas. No persiste nada.</summary>
     [HttpPost("analizar-excel")]
     [Authorize(Roles = "Comercial,Admin")]
     [RequestSizeLimit(MaxTamanoArchivo)]
@@ -70,11 +57,8 @@ public class clsCapturaSolicitudesController(
     }
 
     /// <summary>
-    /// Propone a qué campo de NEXO corresponde cada columna del Excel de un cliente. Recibe los encabezados y las filas que ya devolvió
-    /// <c>analizar-excel</c> (para una sola hoja); solo cuentan las primeras 20 filas y los datos sensibles (NIT, nombres, correos, teléfonos y
-    /// valores) se ocultan antes de salir. Es una SUGERENCIA, no persiste nada: el usuario la revisa y la confirma. Con <c>clienteId</c> usa
-    /// el diccionario de ese cliente, que manda sobre la IA; en su lugar puede enviarse <c>clienteNit</c> (solo busca el cliente local, nunca lo crea). Si la IA está apagada o falla responde igual con lo que resolvió el diccionario
-    /// (<c>iaUsada=false</c> y <c>motivoSinIa</c>) y el resto se mapea a mano. 429 <c>IA_TOPE_DIARIO</c> si la persona ya consumió su tope.
+    /// Propone a qué campo de NEXO corresponde cada columna del Excel de un cliente, a partir de lo que devolvió <c>analizar-excel</c> (una hoja, primeras 20 filas, con los datos sensibles ocultos).
+    /// Es una sugerencia que no persiste. Con <c>clienteId</c> (o <c>clienteNit</c>) el diccionario del cliente manda sobre la IA; si la IA falla responde con lo del diccionario (<c>iaUsada=false</c>). 429 <c>IA_TOPE_DIARIO</c> si superó su tope.
     /// </summary>
     [HttpPost("sugerir-mapeo")]
     [Authorize(Roles = "Comercial,Admin")]
@@ -86,10 +70,8 @@ public class clsCapturaSolicitudesController(
             await ClienteDelArchivoAsync(req.ClienteId, req.ClienteNit, ct), req.Encabezados, req.Filas?.Select(f => (IReadOnlyList<string>)(f ?? [])).ToList()), ct));
 
     /// <summary>
-    /// Aplica el mapeo que el usuario confirmó a TODAS las filas del Excel (las que devolvió <c>analizar-excel</c>, sin el encabezado) y devuelve
-    /// las líneas listas para <c>POST /api/captura-solicitudes</c> más los errores por fila. Convierte toneladas a kilos, separa «ORIGEN - DESTINO»,
-    /// lee números con coma decimal y fechas, y traduce los valores con el diccionario del cliente (<c>clienteId</c> o <c>clienteNit</c>, que solo busca el cliente local). Las filas se validan con los mismos límites y
-    /// reglas de la captura; una fila con errores no sale como línea. No usa la IA ni persiste nada.
+    /// Aplica el mapeo confirmado a todas las filas del Excel y devuelve las líneas listas para <c>POST /api/captura-solicitudes</c> más los errores por fila (una fila con errores no sale como línea).
+    /// Convierte unidades y formatos, traduce valores con el diccionario del cliente y valida con las mismas reglas de la captura. No usa la IA ni persiste nada.
     /// </summary>
     [HttpPost("aplicar-mapeo")]
     [Authorize(Roles = "Comercial,Admin")]
@@ -103,11 +85,8 @@ public class clsCapturaSolicitudesController(
             req.PrimeraFila), ct));
 
     /// <summary>
-    /// Lleva los textos libres distintos de un Excel (tipo de vehículo, carrocería, línea de negocio y ciudad) a los valores oficiales de NEXO. Primero reglas exactas
-    /// (diccionario del cliente —<c>clienteId</c> o <c>clienteNit</c>, que solo busca el cliente local—, alias, catálogo oficial, código DANE o nombre de municipio); con lo que no resuelven, UNA sola llamada a la IA por
-    /// todos los textos distintos, con listas cerradas: lo que el modelo elige solo vale si la regla lo valida. No persiste nada; lo que siga sin
-    /// resolverse se envía tal cual al capturar y la captura lo manda a la cuarentena de vehículos. Si la IA está apagada o falla responde igual
-    /// con lo que resolvieron las reglas (<c>iaUsada=false</c> y <c>motivoSinIa</c>). 429 <c>IA_TOPE_DIARIO</c> si la persona ya consumió su tope.
+    /// Lleva los textos libres distintos de un Excel (vehículo, carrocería, línea de negocio, ciudad) a los valores oficiales de NEXO: primero reglas exactas (diccionario del cliente, alias, catálogo, DANE) y, con lo que no resuelven, una sola llamada a la IA con listas cerradas.
+    /// No persiste; lo que siga sin resolverse va a cuarentena al capturar. Si la IA falla responde con lo de las reglas (<c>iaUsada=false</c>). 429 <c>IA_TOPE_DIARIO</c> si superó su tope.
     /// </summary>
     [HttpPost("normalizar-valores")]
     [Authorize(Roles = "Comercial,Admin")]
@@ -118,10 +97,7 @@ public class clsCapturaSolicitudesController(
         => Ok(await normalizarValores.Handle(new clsNormalizarValoresQuery(
             await ClienteDelArchivoAsync(req.ClienteId, req.ClienteNit, ct), req.Valores.Select(v => new clsValorANormalizar(v.Campo, v.Valor)).ToList()), ct));
 
-    /// <summary>
-    /// Crea la solicitud (cabecera + líneas) resolviendo o creando rutas y
-    /// configuraciones de vehículo a partir del texto libre de las líneas.
-    /// </summary>
+    /// <summary>Crea la solicitud (cabecera + líneas) resolviendo o creando rutas y configuraciones de vehículo desde el texto libre de las líneas.</summary>
     [HttpPost]
     [Authorize(Roles = "Comercial,Admin")]
     [ProducesResponseType(StatusCodes.Status201Created)]
@@ -145,23 +121,10 @@ public class clsCapturaSolicitudesController(
         return Created($"/api/solicitudes/{result.Id}", result);
     }
 
+    // "string?" a propósito: con Nullable Reference Types, [ApiController] trata un [FromQuery] no-nullable como [Required] y respondería un 400 genérico antes del 400 PARAMETROS_REQUERIDOS de este método.
     /// <summary>
-    /// Estima el valor del aprovisionamiento del contenedor: piso SICE-TAC del viaje
-    /// VACÍO (Res. 16075) desde la ciudad de levante hasta el origen del cargue, con
-    /// 1 h + 1 h. Con <c>carroceria</c> elige la fila de esa unidad de transporte (la
-    /// misma que usa el costeo de la línea); sin ella devuelve una aproximación (la
-    /// menor) y lo avisa en <c>advertencia</c>. Devuelve candidato nulo si la matriz no
-    /// trae la ruta. levante/origen son obligatorios (400 PARAMETROS_REQUERIDOS si faltan).
-    /// Al costear, la línea calcula su propio aprovisionamiento: este endpoint es solo una
-    /// estimación para mostrar en el formulario.
-    ///
-    /// A propósito "string?" y no "string": con Nullable Reference Types habilitado,
-    /// [ApiController] trata un parámetro [FromQuery] no-nullable como implícitamente
-    /// [Required] y devuelve su propio 400 VALIDATION_ERROR genérico (en inglés, sin pasar
-    /// por este método) antes de llegar aquí — se probó en producción (2026-09-22) y
-    /// reemplazaba el código/mensaje de negocio de abajo. Swagger los marca como
-    /// opcionales por este mismo motivo (limitación conocida, no corregida): preferible a
-    /// cambiar el contrato de error que ya consume el frontend.
+    /// Estima el aprovisionamiento del contenedor: piso SICE-TAC del viaje vacío desde la ciudad de levante hasta el origen del cargue (1 h + 1 h). Con <c>carroceria</c> usa la fila de esa unidad; sin ella devuelve la menor y avisa en <c>advertencia</c>.
+    /// Candidato nulo si la matriz no trae la ruta. Es solo una estimación para el formulario: al costear, la línea calcula su propio aprovisionamiento.
     /// </summary>
     [HttpGet("aprovisionamiento")]
     [Authorize(Roles = "Comercial,Admin")]
@@ -179,41 +142,27 @@ public class clsCapturaSolicitudesController(
         return Ok(new clsAprovisionamientoDto(candidato));
     }
 
-    /// <summary>
-    /// Búsqueda de clientes para el formulario. Con el DW configurado busca sobre los
-    /// clientes REALES (DimBPSolicitante) por nombre, NIT o BP; sin él, sobre la tabla local.
-    /// </summary>
+    /// <summary>Búsqueda de clientes para el formulario: con el DW configurado, sobre los clientes reales (DimBPSolicitante) por nombre, NIT o BP; si no, sobre la tabla local.</summary>
     [HttpGet("clientes")]
     [Authorize(Roles = "Comercial,Admin")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyList<clsClienteBusquedaDto>>> Clientes([FromQuery] string? q, CancellationToken ct = default)
         => Ok(await buscarClientes.Handle(new clsBuscarClientesQuery(q), ct));
 
-    /// <summary>Departamentos de Colombia con municipio en tbl_municipios (S5-HU-16.1/#254).</summary>
+    /// <summary>Departamentos de Colombia con municipio en tbl_municipios.</summary>
     [HttpGet("departamentos")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyList<string>>> Departamentos(CancellationToken ct = default)
         => Ok(await listarDepartamentos.Handle(new clsListarDepartamentosQuery(), ct));
 
-    /// <summary>
-    /// Búsqueda de ciudades para Origen/Destino, filtrable por departamento y/o texto.
-    /// S5-HU-16.1/#254: el frontend debe capturar el "id" de la ciudad elegida y enviarlo
-    /// como origenMunicipioId/destinoMunicipioId al crear la solicitud (ver
-    /// clsCapturaLineaRequest) — es lo que permite a #255/#256 dejar de comparar por texto.
-    /// </summary>
+    /// <summary>Búsqueda de ciudades para Origen/Destino, filtrable por departamento y/o texto. El frontend debe enviar el "id" elegido como origenMunicipioId/destinoMunicipioId al crear la solicitud.</summary>
     [HttpGet("ciudades")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyList<clsCiudadBusquedaDto>>> Ciudades(
         [FromQuery] string? departamento, [FromQuery] string? q, CancellationToken ct = default)
         => Ok(await buscarCiudades.Handle(new clsBuscarCiudadesQuery(departamento, q), ct));
 
-    /// <summary>
-    /// Catálogo completo de municipios (S4-HU-09.1), todas las columnas — para poblar
-    /// el desplegable de Origen/Destino de una sola vez en el cliente (~3.800 filas,
-    /// sin paginar ni filtrar: pensado para cargarse una vez y quedar en memoria del
-    /// front, no para consultarse en cada tecleo). Tabla creada y poblada por script
-    /// (ver docs/Database/ESQUEMA_NEXO.sql y el script de poblado), no por migración.
-    /// </summary>
+    /// <summary>Catálogo completo de municipios (~3.800 filas, sin paginar ni filtrar) para cargarse una vez en el cliente. La tabla se crea y puebla por script (docs/Database/ESQUEMA_NEXO.sql), no por migración.</summary>
     [HttpGet("municipios")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyList<clsMunicipioDto>>> Municipios(CancellationToken ct = default)

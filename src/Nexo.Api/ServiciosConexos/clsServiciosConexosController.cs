@@ -21,11 +21,7 @@ public class clsServiciosConexosController(
     IQueryHandler<clsObtenerPlantillaServicioConexoQuery, clsArchivoDto> plantillaExcel)
     : ControllerBase
 {
-    /// <summary>
-    /// Listar el catálogo de servicios conexos, con búsqueda por tipo/código/dimensiones
-    /// (q, S5-HU-18/#262), filtro por categoría y paginación. Devuelve la página y el
-    /// total que cumple el filtro.
-    /// </summary>
+    /// <summary>Lista el catálogo de servicios conexos, con búsqueda <c>q</c> por tipo/código/dimensiones, filtro por categoría y paginación.</summary>
     [HttpGet]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult<clsPaginaServiciosDto>> Listar(
@@ -75,10 +71,7 @@ public class clsServiciosConexosController(
         return Ok(await importarExcel.Handle(new clsImportarServiciosConexosExcelCommand(stream), ct));
     }
 
-    /// <summary>Descarga masiva a Excel del catálogo — el mismo archivo sirve para editarlo
-    /// y reimportarlo como actualización (S4-HU-15.3/#249). S5-HU-19/#261: filtrable por
-    /// texto libre (q, sobre tipo/código) y/o categoría (logistico/adicional) — mismos
-    /// filtros que GET /api/servicios-conexos; sin filtros, exporta el catálogo completo.</summary>
+    /// <summary>Descarga a Excel del catálogo (editable y reimportable), filtrable por <c>q</c> y categoría como GET /api/servicios-conexos; sin filtros exporta todo.</summary>
     [HttpGet("exportar-excel")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> ExportarExcel([FromQuery] string? q = null, [FromQuery] string? categoria = null, CancellationToken ct = default)
@@ -87,8 +80,7 @@ public class clsServiciosConexosController(
         return File(archivo.Contenido, archivo.ContentType, archivo.NombreArchivo);
     }
 
-    /// <summary>Plantilla de Excel descargable por tipo de servicio (S4-HU-15.3/#249):
-    /// almacenamiento, itr, precinto, acompanamiento — cada una con solo sus columnas.</summary>
+    /// <summary>Plantilla de Excel descargable por tipo de servicio (almacenamiento, itr, precinto, acompanamiento), cada una con solo sus columnas.</summary>
     [HttpGet("plantilla-excel/{tipo}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]

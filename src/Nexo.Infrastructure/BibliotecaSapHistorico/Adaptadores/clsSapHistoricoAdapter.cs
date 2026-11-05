@@ -9,16 +9,8 @@ using Microsoft.Extensions.Caching.Memory;
 
 namespace Nexo.Infrastructure.BibliotecaSapHistorico.Adaptadores;
 
-/// <summary>
-/// Consulta de SOLO LECTURA a las tarifas SAP TM del datacenter corporativo: el
-/// histórico sale del log de cambios (dbsolucionesTI.dbo.tblSAPTarifasLog, ~24 K
-/// filas) y las de plaza de dbo.tblSAPTarifas. Se ordena por vigencia descendente
-/// y los catálogos/filtros se cachean. Portado 1:1 desde
-/// Nexo.Api/Services/BibliotecaSapHistoricoService.cs del proyecto
-/// original; el ajuste local de vigencia (antes IAjusteVigenciaPlazaService) se
-/// resuelve aquí con IAjustesVigenciaPlazaRepository.MapaAsync (mismo módulo que
-/// ya migró la escritura de esos overrides).
-/// </summary>
+/// <summary>Consulta de solo lectura a las tarifas SAP TM: el histórico sale de tblSAPTarifasLog y las de plaza de tblSAPTarifas,
+/// por vigencia descendente y con catálogos/filtros cacheados. El ajuste local de vigencia viene de IAjustesVigenciaPlazaRepository.MapaAsync.</summary>
 public sealed class clsSapHistoricoAdapter(
     clsDbSolucionesTiDbContext db, IMemoryCache cache, IAjustesVigenciaPlazaRepository ajustes) : ISapHistoricoPort
 {
@@ -73,8 +65,7 @@ public sealed class clsSapHistoricoAdapter(
 
         var total = await query.CountAsync(ct);
         var filas = await query
-            // S6-HU-29.2/#312: orden ESTABLE. Con empates en Vigencia y FechaCreacion (hay muchas filas del mismo día) el motor
-            // podía devolverlas en otro orden entre página y página y repetir o saltarse filas: el Id desempata.
+            // Orden estable: con empates en Vigencia y FechaCreacion el motor podía repetir o saltarse filas entre páginas; el Id desempata.
             .OrderByDescending(t => t.Vigencia).ThenByDescending(t => t.FechaCreacion).ThenByDescending(t => t.Id)
             .Skip((page - 1) * top)
             .Take(top)
@@ -132,10 +123,7 @@ public sealed class clsSapHistoricoAdapter(
         return filtros!;
     }
 
-    /// <summary>
-    /// Catálogo DANE (tblsapdane, ~10,7 K filas) como diccionario código → nombre.
-    /// Es un catálogo estable: se carga una vez y se cachea 1 hora.
-    /// </summary>
+    /// <summary>Catálogo DANE como diccionario código → nombre; estable, cacheado 1 hora.</summary>
     private async Task<Dictionary<string, string>> NombresDaneAsync(CancellationToken ct)
     {
         var dict = await cache.GetOrCreateAsync("saphist:dane", async e =>
@@ -159,11 +147,7 @@ public sealed class clsSapHistoricoAdapter(
         return dict!;
     }
 
-    /// <summary>Catálogos SAP como diccionarios en memoria (estables: cache 1 hora).</summary>
-    /// <remarks>
-    /// Llaves de cruce verificadas contra los datos: LINEANEGOCIO y TIPOVEHICULO
-    /// referencian el ID de su catálogo; TIPOCARROSERIA referencia el CODIGO.
-    /// </remarks>
+    /// <summary>Catálogos SAP en memoria (cache 1 hora). LINEANEGOCIO y TIPOVEHICULO referencian el ID del catálogo; TIPOCARROSERIA el CODIGO.</summary>
     private async Task<clsCatalogosSap> CatalogosAsync(CancellationToken ct)
     {
         var cat = await cache.GetOrCreateAsync("saphist:catalogos", async e =>
@@ -190,7 +174,6 @@ public sealed class clsSapHistoricoAdapter(
         Dictionary<string, string> Carrocerias,
         Dictionary<int, string> ClasesViaje);
 
-    /// <summary>VALOR llega como texto desde SAP; null si no es un número válido.</summary>
     private static decimal? ParseValor(string valor) => clsImporteParser.Parse(valor);
 
     /// <summary>SAP envía cadenas vacías en vez de null en varios campos.</summary>

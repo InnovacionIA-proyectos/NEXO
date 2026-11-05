@@ -1,15 +1,8 @@
 namespace Nexo.Mensajes.Priorizacion;
 
 /// <summary>
-/// Identidad de la única cadena de recálculo que existe.
-///
-/// Es una constante, no un identificador nuevo por arranque, y de eso depende todo lo
-/// demás: la saga se correlaciona por este valor, así que por construcción NO puede
-/// haber dos cadenas. Un segundo arranque cae sobre la instancia que ya existe.
-///
-/// Es el reemplazo del PeriodicTimer que vivía en el proceso del API. Aquel se
-/// duplicaba con cada réplica —dos procesos, dos relojes, el mismo UPDATE sobre las
-/// mismas filas— y ese sí es un problema que no se ve hasta que hay dos instancias.
+/// Identidad de la única cadena de recálculo. Es una constante: la saga se correlaciona por este valor,
+/// así que por construcción no puede haber dos cadenas (ni dos relojes con varias réplicas del API).
 /// </summary>
 public static class clsCadenaDePriorizacion
 {
@@ -23,42 +16,24 @@ public static class clsCadenaDePriorizacion
 }
 
 /// <summary>
-/// Arma la cadena de recálculo. Lo publica el API al arrancar.
-///
-/// Se publica en CADA arranque a propósito, y es idempotente por diseño: si la cadena
-/// ya existe se le vuelve a armar el reloj, y el temporizador anterior queda
-/// descartado por su token. Eso hace que el arranque REPARE la cadena si el reloj se
-/// perdió —por ejemplo si alguien borró el volumen del broker—, en vez de dejarla
-/// muerta en silencio sin que nadie se entere hasta revisar los reportes.
+/// Arma la cadena de recálculo; el API lo publica en cada arranque. Es idempotente: si la cadena existe
+/// se le rearma el reloj, así el arranque repara la cadena si el reloj se perdió.
 /// </summary>
 public sealed record clsArrancarPriorizacion(Guid CadenaId);
 
-/// <summary>
-/// Vence el plazo y toca recalcular. Es el reloj, y vive en el broker.
-///
-/// Que viva en el broker es lo que lo hace sobrevivir a un reinicio del proceso: con
-/// un temporizador en memoria, reiniciar el API dejaba el siguiente recálculo
-/// perdido hasta que a alguien se le ocurriera mirar.
-/// </summary>
+/// <summary>Vence el plazo y toca recalcular. El reloj vive en el broker para sobrevivir a reinicios del proceso.</summary>
 public sealed record clsTicDePriorizacion(Guid CadenaId);
 
 /// <summary>
-/// El Admin recalibró los parámetros del score. Es el segundo disparador que pide la HU.
-///
-/// Importa que sea un disparador y no un recálculo directo: el que cambia los
-/// parámetros recibe su 200 de inmediato y el recálculo de todas las activas ocurre
-/// aparte, con sus reintentos. Recalibrar no debe quedarse esperando a que termine.
+/// El Admin recalibró los parámetros del score. Es un disparador y no un recálculo directo: quien recalibra
+/// recibe su respuesta de inmediato y el recálculo ocurre aparte, con reintentos.
 /// </summary>
 public sealed record clsParametrosDePriorizacionCambiaron(
     Guid CadenaId, Guid CambiadoPor, DateTimeOffset CambiadoEn);
 
 /// <summary>
-/// Hay que refrescar el score persistido de las solicitudes activas.
-///
-/// El trabajo de verdad. Lo publica la saga —por reloj o por cambio de parámetros— y
-/// lo atiende un consumidor con reintentos escalonados. Si los agota, va a la cola de
-/// error y de ahí sale la alerta al equipo: un recálculo caído no puede tumbar el API
-/// ni pasar inadvertido.
+/// Hay que refrescar el score persistido de las solicitudes activas. Lo publica la saga y lo atiende un
+/// consumidor con reintentos escalonados; si los agota va a la cola de error y alerta al equipo.
 /// </summary>
 /// <param name="CadenaId">La cadena que lo pidió. Para trazar, no para correlacionar.</param>
 /// <param name="Motivo">Reloj o cambio de parámetros. Va al log.</param>

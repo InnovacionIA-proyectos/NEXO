@@ -9,15 +9,8 @@ namespace Nexo.Infrastructure.Solicitudes.Repositorios;
 
 public sealed class clsEfTarifasCosteoRepository(clsNexoDbContext db, IPropuestaTarifaPort propuestas) : ITarifasCosteoPort
 {
-    /// <summary>
-    /// Issue #179: antes leía una caché local (tbl_tarifas_sicetac) alimentada solo a
-    /// mano por Excel, sin evidencia de uso real y desactualizada (nunca cubría el
-    /// período vigente). Ahora lee la misma fuente DWSice que ya usa el motor
-    /// automático de costeo (<see cref="IPropuestaTarifaPort.PisoSicetacVigenteAsync"/>),
-    /// así que "vencida" ya no aplica: DWSice solo trae el período actual.
-    /// #300: y solo se usa si ese período es el del mes y año actuales (sin mes de gracia); si no, devuelve null y
-    /// <see cref="MotivoSicetacNoUsadoAsync"/> dice por qué.
-    /// </summary>
+    /// <summary>Lee el piso de DWSice (solo trae el período actual): se usa solo si es el del mes y año actuales, sin mes de gracia;
+    /// si no, devuelve null y <see cref="MotivoSicetacNoUsadoAsync"/> dice por qué.</summary>
     public async Task<clsPisoSicetacDto?> PisoVigenteAsync(
         string origen, string destino, string? vehiculo, TipologiaCarga? tipologia,
         string? carroceria, CancellationToken ct)
@@ -43,10 +36,7 @@ public sealed class clsEfTarifasCosteoRepository(clsNexoDbContext db, IPropuesta
         return hist.Select(h => new clsHistoricaSugeridaDto(h.Id, h.Valor, h.Fecha, h.Tipologia, VigenciaHistorica(h.Fecha, ahora))).ToList();
     }
 
-    /// <summary>
-    /// Vigencia de una tarifa histórica como referencia reutilizable: MÁXIMO 1 semana
-    /// (los fletes cambian semanalmente). Los últimos 2 días se marcan "por vencer".
-    /// </summary>
+    /// <summary>Vigencia de una tarifa histórica como referencia: máximo 1 semana; los últimos 2 días se marcan "por vencer".</summary>
     private static string VigenciaHistorica(DateOnly fecha, DateTimeOffset ahora)
     {
         var dias = DateOnly.FromDateTime(ahora.UtcDateTime).DayNumber - fecha.DayNumber;

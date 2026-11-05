@@ -3,19 +3,10 @@ using System.Text;
 
 namespace Nexo.Domain.Common;
 
-/// <summary>
-/// Normalización de texto libre para cruzar catálogos (rutas, ciudades) provenientes
-/// de fuentes distintas (Excel del cliente, export SICE-TAC, captura manual). Centraliza
-/// el criterio para que la captura y la importación resuelvan la MISMA ruta y no se
-/// dupliquen registros por tildes o mayúsculas ("Bogotá" vs "BOGOTA").
-/// </summary>
+/// <summary>Normalización de texto libre para cruzar catálogos de fuentes distintas sin duplicar por tildes o mayúsculas ("Bogotá" vs "BOGOTA").</summary>
 public static class clsTexto
 {
-    /// <summary>
-    /// Pasa un nombre de enumerado (<c>PuertoAInterior</c>, <c>CargaSuelta</c>) a texto con minúscula inicial
-    /// (<c>puertoAInterior</c>, <c>cargaSuelta</c>) — el formato de los campos de texto nuevos de la línea de costeo
-    /// (S6-HU-24.1/#309 y S6-HU-29.1/#311). Null si no hay valor.
-    /// </summary>
+    /// <summary>Pasa un nombre de enumerado (<c>PuertoAInterior</c>) a texto con minúscula inicial (<c>puertoAInterior</c>). Null si no hay valor.</summary>
     public static string? MinusculaInicial<T>(T? valor) where T : struct, Enum =>
         valor is { } v ? MinusculaInicial(v.ToString()) : null;
 
@@ -46,20 +37,11 @@ public static class clsTexto
     /// <summary>Clave de una ruta (origen|destino) normalizada para reutilizarla entre fuentes.</summary>
     public static string ClaveRuta(string? origen, string? destino) => $"{Normalizar(origen)}|{Normalizar(destino)}";
 
-    /// <summary>
-    /// Clave de ruta + tipo de vehículo (origen|destino|tipoVehiculo) normalizada.
-    /// La regla "Solo SICE-TAC" se DEFINE con estas 3 llaves (ver clsReglaSoloSicetac),
-    /// pero se venía APLICANDO solo con las 2 primeras (<see cref="ClaveRuta"/>): marcar
-    /// un único tipo de vehículo apagaba la comparación contra plaza para TODOS los tipos
-    /// de vehículo de la ruta.
-    /// </summary>
+    /// <summary>Clave normalizada origen|destino|tipoVehiculo; la regla "Solo SICE-TAC" se define con estas 3 llaves.</summary>
     public static string ClaveRutaVehiculo(string? origen, string? destino, string? tipoVehiculo) =>
         $"{ClaveRuta(origen, destino)}|{Normalizar(tipoVehiculo)}";
 
-    /// <summary>
-    /// Intenta partir "ORIGEN - DESTINO" (formato de NOMBRERUTA del export SICE-TAC) en sus
-    /// dos ciudades. Devuelve null si no hay un separador claro.
-    /// </summary>
+    /// <summary>Parte "ORIGEN - DESTINO" (formato NOMBRERUTA de SICE-TAC) en sus dos ciudades; null si no hay separador claro.</summary>
     public static (string Origen, string Destino)? PartirRuta(string? nombreRuta)
     {
         var limpio = Limpiar(nombreRuta);

@@ -15,25 +15,15 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Nexo.Application.CasosDeUso.MapeoExcel;
 
-/// <summary>
-/// Propone a qué campo de NEXO corresponde cada columna del Excel de un cliente. Recibe los encabezados y las filas que ya devolvió el
-/// análisis del archivo; no vuelve a leer el archivo ni guarda nada.
-/// </summary>
+/// <summary>Propone a qué campo de NEXO corresponde cada columna del Excel de un cliente. No relee el archivo ni guarda nada.</summary>
 /// <param name="ClienteId">El cliente dueño del archivo: su diccionario es la mejor pista. Sin él solo se usa el diccionario general.</param>
 public sealed record clsSugerirMapeoExcelQuery(Guid? ClienteId, IReadOnlyList<string>? Encabezados, IReadOnlyList<IReadOnlyList<string>>? Filas)
     : IQuery<clsSugerenciaMapeoDto>;
 
 /// <summary>
-/// El orden de las cosas:
-/// 0) Si el cliente ya confirmó un mapeo para EXACTAMENTE estos encabezados (su plantilla guardada), se devuelve ese y no se llama a la IA. Si
-///    cambia un encabezado, se agrega, se quita o se reordena una columna, no hay plantilla y se sugiere de nuevo.
-/// 1) Lo que el diccionario del cliente ya sabe se resuelve sin la IA y manda siempre sobre ella.
-/// 2) Si quedan columnas sin resolver y la IA está disponible, se le piden SOLO con datos mínimos: encabezados, hasta 20 filas, enmascaradas
-///    (NIT, nombres, correos, teléfonos y valores nunca salen) y recortadas. Sin ninguna columna pendiente no se llama.
-/// 3) Lo que responde el modelo se valida como cualquier entrada externa: solo cuentan índices que existen, campos y transformaciones de las
-///    listas cerradas y confianzas entre 0 y 1; el resto se descarta.
-/// Si la IA falla o está apagada, se devuelve igual lo que resolvió el diccionario y el resto queda para mapear a mano. Un tope de uso superado
-/// (429) sí se informa, no se esconde.
+/// Orden: 0) plantilla guardada con EXACTAMENTE estos encabezados (sin IA); 1) diccionario del cliente, que manda sobre la IA; 2) IA solo
+/// para lo pendiente, con datos mínimos y enmascarados; 3) lo que responde el modelo se valida como entrada externa. Si la IA falla
+/// se devuelve lo del diccionario; un tope de uso superado (429) sí se informa.
 /// </summary>
 public sealed class clsSugerirMapeoExcelQueryHandler(
     IAsistenteIaPort ia, IDiccionarioClienteRepository diccionario, ICurrentUserPort usuarioActual, IPlantillasMapeoRepository plantillas)
@@ -128,20 +118,13 @@ public sealed class clsSugerirMapeoExcelQueryHandler(
     }
 
 
-    // ---------------------------------------------------------------- plantilla guardada
-
-    /// <summary>
-    /// La propuesta que sale de una plantilla: una entrada por columna, con confianza 1 y <c>origen = "plantilla"</c>. Lo guardado se vuelve a
-    /// validar contra las listas vigentes (un campo o una conversión que ya no existan se tratan como <c>ignorar</c> / <c>ninguna</c>). Null
-    /// si lo guardado no se puede leer o no corresponde al archivo: entonces se sugiere de nuevo como si no hubiera plantilla.
-    /// </summary>
+    /// <summary>Propuesta de una plantilla: una entrada por columna, confianza 1 y <c>origen = "plantilla"</c>, revalidada contra las listas vigentes.</summary>
     public const string DudaPlantillaObsoleta =
         "La plantilla guardada para estos encabezados ya no sirve (cambiaron los campos de NEXO): se sugirió el mapeo de nuevo. Revísalo y confírmalo otra vez.";
 
     /// <summary>
-    /// La propuesta que sale de la plantilla guardada, o null si no se puede usar. <c>Obsoleta</c> distingue «no sirve ya» (lo guardado apunta a un campo
-    /// o a una conversión que ya no existe, ya no cumple las reglas del mapeo, o no se puede leer) de «no hay plantilla»: la primera se avisa.
-    /// Lo guardado se vuelve a validar contra las listas y las reglas VIGENTES; nunca se importa con un mapeo a medias.
+    /// Propuesta de la plantilla guardada, o null si no sirve. <c>Obsoleta</c> distingue «ya no sirve» (campo o conversión inexistente, reglas
+    /// incumplidas, ilegible) de «no hay plantilla»; la primera se avisa.
     /// </summary>
     private static (clsSugerenciaMapeoDto? Sugerencia, bool Obsoleta) DesdePlantilla(clsPlantillaMapeoCliente plantilla, IReadOnlyList<string> encabezados, int cantidadConEncabezado)
     {
@@ -175,8 +158,6 @@ public sealed class clsSugerirMapeoExcelQueryHandler(
             .ToList();
         return (new clsSugerenciaMapeoDto(false, "PLANTILLA_RECONOCIDA", columnas, [], plantilla.Id), false);
     }
-
-    // ---------------------------------------------------------------- entrada
 
 
     private static IReadOnlyList<string> LimpiarEncabezados(IReadOnlyList<string>? encabezados)
@@ -217,8 +198,6 @@ public sealed class clsSugerirMapeoExcelQueryHandler(
             UsuarioId: usuarioActual.Id);
     }
 
-    // ---------------------------------------------------------------- salida del modelo
-
     /// <summary>Lo que el modelo propuso, validado: solo índices existentes, campos y transformaciones de las listas y confianza entre 0 y 1.</summary>
     internal static (Dictionary<int, clsColumnaMapeadaDto> Columnas, List<string> Dudas) InterpretarRespuesta(string? json, IReadOnlyList<string> encabezados)
     {
@@ -257,8 +236,6 @@ public sealed class clsSugerirMapeoExcelQueryHandler(
         e.TryGetProperty(propiedad, out var p) && p.ValueKind == JsonValueKind.String ? p.GetString() : null;
 
     private static string Recortar(string texto) => texto.Length <= MaxCaracteresDuda ? texto : texto[..MaxCaracteresDuda];
-
-    // ---------------------------------------------------------------- dudas que salen del propio mapeo
 
     private static IEnumerable<string> DudasDelMapeo(IReadOnlyList<clsColumnaMapeadaDto> columnas)
     {

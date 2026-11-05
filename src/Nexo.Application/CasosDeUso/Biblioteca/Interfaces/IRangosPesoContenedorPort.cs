@@ -7,12 +7,12 @@ public sealed record clsRangoPesoContenedorDto(int Contenedor, string TipoVehicu
 
 /// <summary>
 /// El vehículo que corresponde a un contenedor según su tamaño y su peso. <paramref name="TablaDisponible"/> en false significa que la tabla no se
-/// pudo leer o está vacía (el script aún no se aplicó): quien llama usa entonces la regla que tenía antes. Con la tabla disponible y
-/// <paramref name="TipoVehiculo"/> en null, ningún vehículo aplica (el peso supera el tope más alto de ese tamaño).
+/// pudo leer o está vacía: quien llama usa su regla de respaldo. Con la tabla disponible y <paramref name="TipoVehiculo"/> en null, ningún
+/// vehículo aplica (el peso supera el tope más alto de ese tamaño).
 /// </summary>
 public readonly record struct clsVehiculoDeContenedor(bool TablaDisponible, string? TipoVehiculo);
 
-/// <summary>Lectura de <c>tbl_rangos_peso_contenedor</c>, que reemplaza las reglas de las tablas de SAP para escoger el vehículo de un contenedor.</summary>
+/// <summary>Lectura de <c>tbl_rangos_peso_contenedor</c>, para escoger el vehículo de un contenedor.</summary>
 public interface IRangosPesoContenedorPort
 {
     Task<clsVehiculoDeContenedor> VehiculoParaAsync(int contenedorPies, decimal pesoKg, CancellationToken ct = default);

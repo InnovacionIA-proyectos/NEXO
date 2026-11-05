@@ -7,19 +7,8 @@ using Nexo.Application.Common.Exceptions;
 namespace Nexo.Application.CasosDeUso.PlanDeCargue;
 
 /// <summary>
-/// GET /api/planes-cargue/{id}/colocaciones — todas las
-/// colocaciones del plan (cargadas y no), contra la proyección local. Subconjunto de
-/// /resultado, mismo criterio que ya usan <see cref="clsObtenerMetricasPlanQuery"/> y
-/// <see cref="clsObtenerNoCargadasPlanQuery"/> — la diferencia con
-/// clsObtenerNoCargadasPlanQuery es que este NO filtra por <c>Cargada</c>.
-///
-/// Resuelve una duda abierta previamente ("colocaciones() puede ser redundante con
-/// resultado() — sin confirmar", ver docs/mensajeria/CUBICACION.md §8.2): se decide
-/// implementarlo, no eliminarlo. Sí es
-/// estrictamente un subconjunto de <c>resultado().colocaciones</c>, pero existir como
-/// endpoint propio le da a <c>colocaciones()</c> (cubicador-api.service.ts) un reemplazo
-/// 1:1 — cambiar solo la URL, sin tener que reescribir ese call site para leer el payload
-/// más grande de /resultado.
+/// GET /api/planes-cargue/{id}/colocaciones — todas las colocaciones del plan (cargadas y no) desde la proyección local; subconjunto de /resultado
+/// que, a diferencia de <see cref="clsObtenerNoCargadasPlanQuery"/>, NO filtra por <c>Cargada</c>.
 /// </summary>
 public sealed record clsObtenerColocacionesPlanQuery(Guid PlanCargueId) : IQuery<IReadOnlyList<clsColocacionCargueDto>>;
 

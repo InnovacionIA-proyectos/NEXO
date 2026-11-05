@@ -4,8 +4,7 @@ using Nexo.Application.Common.Abstractions;
 
 namespace Nexo.Application.CasosDeUso.Solicitudes;
 
-/// <summary>Catálogo completo de municipios (S4-HU-09.1), todas las columnas — sin
-/// filtro ni paginación, para poblar el desplegable de Origen/Destino.</summary>
+/// <summary>Catálogo completo de municipios, sin filtro ni paginación, para poblar el desplegable de Origen/Destino.</summary>
 public sealed record clsListarMunicipiosQuery : IQuery<IReadOnlyList<clsMunicipioDto>>;
 
 public sealed class clsListarMunicipiosQueryHandler(IMunicipiosRepository municipios)

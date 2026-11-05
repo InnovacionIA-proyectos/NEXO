@@ -7,6 +7,7 @@ using Nexo.Application.CasosDeUso.Costeo;
 using Nexo.Application.CasosDeUso.DiccionarioCliente;
 using Nexo.Application.CasosDeUso.IA;
 using Nexo.Application.CasosDeUso.MapeoExcel;
+using Nexo.Application.CasosDeUso.LecturaExcel;
 using Nexo.Application.CasosDeUso.PlantillasMapeo;
 using Nexo.Application.CasosDeUso.Trabajos;
 using Nexo.Infrastructure.Common.Mensajeria;
@@ -48,20 +49,8 @@ using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
-// -----------------------------------------------------------------------------
-// Composition root. Backend migrado en su totalidad: Cotizaciones (piloto),
-// ReglasSoloSicetac, AjustesVigenciaPlaza, Biblioteca (TarifarioSap +
-// PropuestaTarifa + matriz SICE-TAC — cierra el bloqueo de "Aplicar propuestas"),
-// BibliotecaSapHistorico (histórico y tarifas de plaza SAP TM en vivo),
-// Solicitudes/Captura (Bandeja Priorizada, alta spot/licitación, auto-costeo),
-// ServiciosConexos (catálogo administrado), TarifasGanadas (Biblioteca de
-// tarifas ganadas) y Métricas (Tablero del Líder). El piso SICE-TAC de Mesa de
-// Costeo se resuelve contra DWSice en vivo (issue #179), ya no hay caché local
-// con import de Excel. Cubicación 3D y Plan de Cargue son un microservicio
-// Python aparte (carpeta cubicador/ de este mismo repo) — NEXO no reimplementa
-// el motor, solo le pide trabajos y recibe resultados por cola vía MassTransit
-// (ver AddMensajeria() y docs/mensajeria/CUBICACION.md).
-// -----------------------------------------------------------------------------
+// Composition root. Cubicación 3D y Plan de Cargue viven en un microservicio Python aparte (cubicador/): NEXO solo le pide trabajos
+// y recibe resultados por cola vía MassTransit (ver AddMensajeria()).
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -93,6 +82,7 @@ builder.Services.AddDiccionarioClienteUseCases();
 builder.Services.AddIaUseCases();
 builder.Services.AddMapeoExcelUseCases();
 builder.Services.AddPlantillasMapeoUseCases();
+builder.Services.AddLecturaExcelUseCases();
 builder.Services.AddCubicacionUseCases();
 builder.Services.AddCotizacionesUseCases();
 builder.Services.AddNotificacionesUseCases();
@@ -110,9 +100,7 @@ builder.Services.AddRangosPesoUseCases();
 builder.Services.AddTarifasPlazaUseCases();
 builder.Services.AddSingleton(builder.Configuration.GetSection("Asistente").Get<clsLimitesAsistente>() ?? new clsLimitesAsistente());
 builder.Services.AddAsistenteUseCases();
-// Arma la cadena de priorización al arrancar y se va. NO tiene reloj: el reloj vive en
-// la saga, dentro del broker. Reemplaza al RecalculoScoreHostedService, que llevaba un
-// PeriodicTimer adentro y por lo tanto se duplicaba con cada réplica del API.
+// Arma la cadena de priorización al arrancar y se va. No tiene reloj: el reloj vive en la saga, dentro del broker.
 builder.Services.AddHostedService<clsArranqueDeLaCadenaHostedService>();
 
 builder.Services.AddSingleton(TimeProvider.System);
@@ -121,9 +109,8 @@ builder.Services.AddScoped<ICurrentUser, clsCurrentUser>();
 builder.Services.AddScoped<Nexo.Application.Common.ICurrentUserPort>(sp => sp.GetRequiredService<ICurrentUser>());
 
 // --------------------------------------------------------------- Autenticación / Autorización
-// Fail-closed: Nexo no tiene login propio (docs/contrato-integracion, D1) — la única
-// fuente de identidad es la tabla de usuarios/permisos del portal. Sin ella configurada,
-// el arranque en Producción falla aquí mismo, antes de exponer un solo endpoint.
+// Fail-closed: Nexo no tiene login propio y la única fuente de identidad es la tabla de usuarios/permisos del portal.
+// Sin ella configurada, el arranque en Producción falla aquí mismo, antes de exponer un solo endpoint.
 var identidadPortalConfigurada = !string.IsNullOrWhiteSpace(builder.Configuration.GetConnectionString("IdentidadPortal"));
 if (builder.Environment.IsProduction() && !identidadPortalConfigurada)
     throw new InvalidOperationException(
@@ -148,11 +135,8 @@ builder.Services.AddAuthentication(clsIdentidadPortalAuthenticationHandler.Schem
     .AddScheme<AuthenticationSchemeOptions, clsCubicadorApiKeyAuthenticationHandler>(
         clsCubicadorApiKeyAuthenticationHandler.SchemeName, _ => { });
 
-// Autenticación (identidad válida, ver el Handler) y autorización (uno de los 6 roles de
-// Nexo, resuelto contra la tabla del portal) son cosas DISTINTAS a propósito: sin esta
-// segunda condición en el fallback, alguien con identidad válida pero sin permiso sobre
-// Nexo pasaría cualquier endpoint que no declare [Authorize(Roles=...)] — el
-// contrato exige rechazarlo en TODOS, no solo en los que restringen por rol específico.
+// Autenticación (identidad válida) y autorización (uno de los 6 roles de Nexo) son distintas a propósito: sin esta segunda condición en el fallback,
+// una identidad válida sin permiso sobre Nexo pasaría cualquier endpoint que no declare [Authorize(Roles=...)].
 builder.Services.AddAuthorization(options =>
 {
     options.FallbackPolicy = new AuthorizationPolicyBuilder()
@@ -190,33 +174,21 @@ builder.Services.AddControllers()
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(o =>
 {
-    // Sin esto, los /// <summary> de los controllers (varios ya los tenían) nunca
-    // llegaban al contrato que consume el frontend en /swagger - quedaban solo
-    // como comentario para quien lee el código. GenerateDocumentationFile en
-    // Nexo.Api.csproj es el otro lado de este cambio.
+    // Lleva los /// <summary> de los controllers al contrato de /swagger (requiere GenerateDocumentationFile en Nexo.Api.csproj).
     var xml = Path.Combine(AppContext.BaseDirectory, $"{Assembly.GetExecutingAssembly().GetName().Name}.xml");
     if (File.Exists(xml)) o.IncludeXmlComments(xml);
 });
 
-// El backend lo consumen dos clientes con orígenes distintos: el frontend standalone
-// (desarrollo) y el módulo cabina-fletes dentro del portal de la Administración —
-// el portal tiene su propio dominio por ambiente (QA, Producción) y Nexo mantiene
-// su propia URL base (docs/contrato-integracion/README.md, sección 7), así que la
-// llamada del portal es cross-origin. Por eso la configuración admite una lista,
-// no un único origen.
+// El backend lo consumen el frontend standalone (desarrollo) y el módulo cabina-fletes dentro del portal, que es cross-origin; por eso la configuración admite una lista.
 const string ClientesCors = "clientes";
-// Mismo criterio fail-closed que IdentidadPortal/RabbitMq más arriba: sin esta
-// variable en Producción, el fallback de desarrollo (localhost:5173) dejaría el CORS
-// mal configurado en silencio en vez de fallar visiblemente al arrancar.
+// Fail-closed como IdentidadPortal/RabbitMq: sin esta variable en Producción, el fallback de desarrollo (localhost:5173) dejaría el CORS mal configurado en silencio.
 if (builder.Environment.IsProduction() && builder.Configuration["Cors:OrigenesPermitidos"] is null)
     throw new InvalidOperationException(
         "Cors:OrigenesPermitidos no está configurado en Producción. Configure los orígenes permitidos antes de desplegar.");
 
 var origenesPermitidos = (builder.Configuration["Cors:OrigenesPermitidos"] ?? "http://localhost:5173")
     .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-// "*" es un atajo SOLO para desarrollo/pruebas: WithOrigins("*") no es un comodín (lo
-// compara como string literal y termina bloqueando todo), así que hay que pasar por
-// AllowAnyOrigin() explícitamente. No usar en QA/Producción — ver README sección 7.
+// "*" es un atajo SOLO para desarrollo/pruebas: WithOrigins("*") no es un comodín, hay que usar AllowAnyOrigin(). No usar en QA/Producción.
 builder.Services.AddCors(o => o.AddPolicy(ClientesCors, p =>
 {
     if (origenesPermitidos is [ "*" ])
@@ -283,25 +255,13 @@ app.MapControllers();
 // frontend: es a donde se conecta el cliente para suscribirse a un trabajo.
 app.MapHub<clsTrabajosHub>("/hubs/trabajos");
 
-// El canal de la bandeja va aparte del de trabajos a propósito: /hubs/trabajos ya está
-// publicado en el contrato como el canal del avance de UN trabajo, con un grupo por
-// trabajo. Meterle la bandeja dejaría el nombre mintiendo.
+// El canal de la bandeja va aparte: /hubs/trabajos es el avance de UN trabajo, con un grupo por trabajo.
 app.MapHub<clsBandejaHub>("/hubs/bandeja");
 
-// Plan de cargue: aparte de /hubs/trabajos por la misma razón que la bandeja — un
-// plan de cargue no tiene líneas pendientes ni reintentos técnicos, forzar esa
-// forma dejaría el nombre mintiendo.
+// Plan de cargue va aparte de /hubs/trabajos: no tiene líneas pendientes ni reintentos técnicos.
 app.MapHub<clsPlanCargueHub>("/hubs/plan-cargue");
-// /health responde JSON con el detalle por chequeo, no solo "Healthy"/"Unhealthy".
-//
-// El motivo es concreto: un 503 con el cuerpo en texto plano no dice QUÉ está caído.
-// Diagnosticar uno costó varias corridas hasta resolver HealthCheckService a mano para
-// ver que el chequeo en rojo era el del bus. Con esto se lee en la respuesta.
-//
-// Es una sonda de readiness: incluye el bus de mensajería, así que hay una ventana al
-// arrancar en la que responde 503 con "Not ready: not started". Es correcto — hasta que
-// el bus no está listo el proceso no debería recibir tráfico — y el compose ya lo
-// contempla con start_period.
+// /health responde JSON con el detalle por chequeo: un 503 en texto plano no dice qué está caído.
+// Es una sonda de readiness que incluye el bus: al arrancar hay una ventana con 503 "Not ready: not started", y el compose la cubre con start_period.
 app.MapHealthChecks("/health", new HealthCheckOptions
 {
     ResponseWriter = async (contexto, reporte) =>
@@ -325,6 +285,5 @@ app.MapHealthChecks("/health", new HealthCheckOptions
 
 app.Run();
 
-/// <summary>Marcador público para que WebApplicationFactory&lt;clsProgram&gt; (tests de integración)
-/// pueda referenciar el entry point pese a los top-level statements.</summary>
+/// <summary>Marcador público para que WebApplicationFactory&lt;clsProgram&gt; (tests de integración) pueda referenciar el entry point.</summary>
 public partial class clsProgram { }

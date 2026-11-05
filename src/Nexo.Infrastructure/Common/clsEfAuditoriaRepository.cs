@@ -4,11 +4,7 @@ using Nexo.Infrastructure.Persistence;
 
 namespace Nexo.Infrastructure.Common;
 
-/// <summary>
-/// Registra en el MISMO DbContext que el resto del caso de uso (comparte el
-/// SaveChangesAsync/transacción de la Unit of Work): auditar y persistir el
-/// cambio de negocio son, a propósito, una sola operación atómica.
-/// </summary>
+/// <summary>Usa el mismo DbContext del caso de uso: auditar y persistir el cambio son una sola operación atómica.</summary>
 public sealed class clsEfAuditoriaRepository(clsNexoDbContext db) : IAuditoriaPort
 {
     public void Registrar(Guid? usuarioId, string entidad, Guid entidadId, string accion, string diff) =>

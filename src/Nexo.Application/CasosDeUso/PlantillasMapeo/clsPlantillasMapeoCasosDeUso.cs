@@ -26,8 +26,7 @@ internal static class clsPlantillasMapeoReglas
     public static string SerializarEncabezados(IReadOnlyList<string> encabezados) => JsonSerializer.Serialize(encabezados, Json);
 
     /// <summary>
-    /// La forma con la que se guardan las columnas: <c>{ "version": 1, "columnas": [...] }</c>. La versión permite cambiar esa forma más adelante
-    /// sin que las plantillas ya guardadas se lean mal: una versión que este código no conoce se trata como plantilla vieja (se vuelve a sugerir).
+    /// Forma de guardado de las columnas (<c>{ "version": 1, "columnas": [...] }</c>); una versión desconocida se trata como plantilla vieja y se vuelve a sugerir.
     /// </summary>
     public const int VersionDeColumnas = 1;
 
@@ -61,12 +60,9 @@ internal static class clsPlantillasMapeoReglas
 // ---------------------------------------------------------------- guardar
 
 /// <summary>
-/// Guarda el mapeo que el usuario confirmó como la plantilla de un cliente. Es un «guardar o reemplazar»: la plantilla se identifica por los
-/// encabezados (su firma), así que guardar otra vez con los mismos encabezados actualiza la que ya había y no crea una segunda. El mapeo se
-/// valida igual que al aplicarlo (campos y conversiones de las listas, sin campos repetidos y con origen y destino): una plantilla que
-/// luego no se pudiera aplicar no sirve. El cliente se indica con <paramref name="ClienteId"/> o con <paramref name="ClienteNit"/> (si vienen los
-/// dos manda el id): con el NIT se usa el cliente local y, si aún no existe, se crea con los datos del DW. 400 si el cliente no existe, el NIT
-/// no es de ningún cliente ni prospecto, los encabezados no son válidos o el mapeo no es válido.
+/// Guarda o reemplaza la plantilla de un cliente, identificada por la firma de sus encabezados; el mapeo se valida igual que al aplicarlo.
+/// El cliente se indica con <paramref name="ClienteId"/> o <paramref name="ClienteNit"/> (manda el id); con NIT se usa el cliente local o se crea con datos del DW.
+/// 400 si el cliente no existe o los encabezados o el mapeo no son válidos.
 /// </summary>
 public sealed record clsGuardarPlantillaMapeoCommand(
     Guid? ClienteId, string? Nombre, IReadOnlyList<string?>? Encabezados, IReadOnlyList<clsColumnaAAplicar>? Columnas, string? ClienteNit = null)
@@ -130,8 +126,7 @@ public sealed class clsGuardarPlantillaMapeoCommandHandler(
         }
         catch (Exception ex) when (creada && !reintento && repositorio.EsChoqueDeFirma(ex))
         {
-            // Dos confirmaciones del mismo formato a la vez (un doble clic): la otra insertó entre mi búsqueda y mi inserción. No es un error del
-            // usuario; se vuelve a empezar, y ahora la plantilla ya existe, así que esta vez se reemplaza.
+            // Doble confirmación simultánea del mismo formato: la otra insertó primero; se reintenta y esta vez se reemplaza.
             repositorio.DescartarCambiosPendientes();
             return await Guardar(command, reintento: true, ct);
         }

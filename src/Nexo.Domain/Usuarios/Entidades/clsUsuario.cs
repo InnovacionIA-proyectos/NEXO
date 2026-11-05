@@ -18,12 +18,7 @@ public class clsUsuario : IAuditable
     [Required]
     public RolUsuario Rol { get; set; }
 
-    /// <summary>
-    /// Vínculo con la identidad de la persona en la tabla de usuarios/permisos del
-    /// portal de la Administración (encabezado X-Portal-clsUsuario-Id, ver
-    /// docs/contrato-integracion). Reemplaza al antiguo AdObjectId de Azure AD.
-    /// Dato interno: no se expone en el API.
-    /// </summary>
+    /// <summary>Identidad de la persona en el portal de la Administración. Dato interno: no se expone en el API.</summary>
     [JsonIgnore]
     public long? IdentidadPortalId { get; set; }
 

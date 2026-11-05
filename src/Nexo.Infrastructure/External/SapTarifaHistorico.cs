@@ -1,11 +1,7 @@
 namespace Nexo.Infrastructure.External;
 
-/// <summary>
-/// Estructura común de las tarifas SAP TM del datacenter corporativo: la tabla
-/// vigente (dbo.tblSAPTarifas, "tarifas de plaza") y su log de cambios
-/// (dbo.tblSAPTarifasLog) comparten estas columnas. Modelos de SOLO LECTURA:
-/// las tablas las mantiene la integración SAP.
-/// </summary>
+/// <summary>Columnas comunes de las tarifas SAP TM: tabla vigente (tblSAPTarifas, "tarifas de plaza") y su log (tblSAPTarifasLog).
+/// Solo lectura: las mantiene la integración SAP.</summary>
 public abstract class clsSapTarifaBase
 {
     public int Id { get; set; }
@@ -27,10 +23,7 @@ public abstract class clsSapTarifaBase
     public bool? Devolucion { get; set; }
 }
 
-/// <summary>
-/// Tarifa de plaza (vigente) de SAP TM (dbo.tblSAPTarifas). Trae columnas
-/// adicionales que el log no tiene (detalles, flags, fecha de modificación).
-/// </summary>
+/// <summary>Tarifa de plaza vigente (tblSAPTarifas); trae columnas que el log no tiene (detalles, flags, fecha de modificación).</summary>
 public class clsSapTarifaPlaza : clsSapTarifaBase
 {
     public DateTime FechaModificacion { get; set; }
@@ -40,11 +33,7 @@ public class clsSapTarifaPlaza : clsSapTarifaBase
     public bool? Exclusivo { get; set; }
 }
 
-/// <summary>
-/// Log de cambios de tarifas SAP TM (dbo.tblSAPTarifasLog): reemplaza al antiguo
-/// tblSAPTarifasHistorico como fuente del histórico. LINEANEGOCIO y CLASEVIAJE
-/// llegan como varchar con el código numérico (conversión en el mapeo EF).
-/// </summary>
+/// <summary>Log de cambios de tarifas SAP TM (tblSAPTarifasLog), fuente del histórico. LINEANEGOCIO y CLASEVIAJE llegan como varchar (conversión en el mapeo EF).</summary>
 public class clsSapTarifaLog : clsSapTarifaBase
 {
     public int IdTarifa { get; set; }                   // fila de tblSAPTarifas que originó el registro

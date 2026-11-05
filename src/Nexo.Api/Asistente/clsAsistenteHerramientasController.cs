@@ -8,10 +8,7 @@ using Microsoft.AspNetCore.RateLimiting;
 
 namespace Nexo.Api.Asistente;
 
-/// <summary>
-/// Herramientas de lectura del asistente de cotización. Son las mismas consultas que ya expone NEXO, envueltas para que el asistente las
-/// pida por nombre; se ejecutan con la identidad de quien llama, así que nunca muestran más de lo que su rol ya puede ver. No escriben.
-/// </summary>
+/// <summary>Herramientas de lectura del asistente: las mismas consultas de NEXO, ejecutadas con la identidad de quien llama. No escriben.</summary>
 [ApiController]
 [Authorize]
 [Route("api/asistente/herramientas")]
@@ -26,10 +23,7 @@ public class clsAsistenteHerramientasController(
         => Ok(await listar.Handle(new clsListarHerramientasAsistenteQuery(), ct));
 
     /// <summary>
-    /// Ejecuta una herramienta. El cuerpo es la entrada de la herramienta (un objeto JSON). La respuesta trae siempre la <c>fuente</c>;
-    /// sin datos, <c>encontrado</c> es false y <c>nota</c> dice por qué. Errores: 400 <c>HERRAMIENTA_DESCONOCIDA</c> o
-    /// <c>HERRAMIENTA_ENTRADA_INVALIDA</c>, 403 <c>HERRAMIENTA_NO_PERMITIDA</c> (o <c>SOLICITUD_AJENA</c>), 404 si la solicitud o la línea
-    /// no existen.
+    /// Ejecuta una herramienta; el cuerpo es su entrada (objeto JSON). La respuesta trae siempre la <c>fuente</c>; sin datos, <c>encontrado</c> es false y <c>nota</c> dice por qué.
     /// </summary>
     [HttpPost("{nombre}")]
     [EnableRateLimiting(clsRateLimitingExtensions.PoliticaListadosEstandar)]

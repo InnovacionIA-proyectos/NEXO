@@ -4,16 +4,7 @@ using Microsoft.AspNetCore.SignalR;
 
 namespace Nexo.Api.Trabajos;
 
-/// <summary>
-/// Implementa el puerto de avisos con SignalR.
-///
-/// Vive en Api porque SignalR es ASP.NET Core, y ni Application ni Infrastructure
-/// pueden verlo. El contenedor las une en el arranque: el consumidor de Infrastructure
-/// pide el puerto y recibe esto, sin saber qué hay detrás.
-///
-/// El nombre del evento, "avance", es parte del contrato con el frontend: es lo que el
-/// cliente escucha.
-/// </summary>
+/// <summary>Implementa el puerto de avisos con SignalR (vive en Api porque Application e Infrastructure no ven SignalR). El nombre del evento, "avance", es parte del contrato con el frontend.</summary>
 public sealed class clsNotificadorSignalR(IHubContext<clsTrabajosHub> hub) : INotificadorDeTrabajos
 {
     public const string EventoAvance = "avance";

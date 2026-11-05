@@ -2,14 +2,10 @@ using Nexo.Application.Common.Exceptions;
 
 namespace Nexo.Application.CasosDeUso.Cotizaciones.Validadores;
 
-/// <summary>
-/// Reglas compartidas por agregar/editar un conexo de cotización (S5-HU-18/#262).
-/// </summary>
+/// <summary>Reglas compartidas por agregar y editar un conexo de cotización.</summary>
 public static class clsConexoCotizacionValidador
 {
-    /// <summary>tbl_cotizacion_conexos.Cantidad es decimal(12,2) — más de 2 decimales se
-    /// truncaría en silencio en la base. El rango (&gt; 0, tope razonable) ya lo valida
-    /// [Range] en el request de Api; esto es lo único que faltaba.</summary>
+    /// <summary>La cantidad es decimal(12,2): más de 2 decimales se truncaría en silencio en la base. El rango ya lo valida [Range] en el request.</summary>
     public static void ValidarCantidad(decimal cantidad)
     {
         if (decimal.Round(cantidad, 2) != cantidad)

@@ -45,10 +45,7 @@ public sealed class clsConsultarAprovisionamientoHerramienta(IPropuestaTarifaPor
     }
 }
 
-/// <summary>
-/// La propuesta de tarifa de UNA línea de una solicitud: valor propuesto, de qué fuente salió, los candidatos que se compararon y, si la
-/// línea no se costea sola, el motivo de pendiente. Es la lectura de siempre del motor de propuesta (no persiste nada).
-/// </summary>
+/// <summary>Propuesta de tarifa de UNA línea (valor, fuente, candidatos o motivo de pendiente); lectura del motor, no persiste nada.</summary>
 public sealed class clsConsultarPropuestaLineaHerramienta(
     IQueryHandler<clsProponerPropuestaTarifaQuery, clsPropuestaSolicitudDto> propuestas,
     ISolicitudesPort solicitudes,

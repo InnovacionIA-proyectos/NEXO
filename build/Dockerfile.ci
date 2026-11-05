@@ -1,17 +1,8 @@
-# ============================================================================
-# Nexo (Clean Architecture) — arnés de compilación y pruebas
-#
-# Este archivo NO produce la imagen que va a producción: de eso se encarga
-# src/Nexo.Api/Dockerfile, que publica únicamente el proyecto Api.
-#
-# Aquí se compila la SOLUCIÓN COMPLETA — las 4 capas más los 3 proyectos de
-# test — para verificar que "dotnet build termina sin errores" sin depender
-# del SDK instalado en la máquina de quien lo corre.
-#
-# Contexto de build esperado: la RAÍZ del repositorio.
+# Arnés de compilación y pruebas de Nexo: compila la SOLUCIÓN COMPLETA (4 capas + 3 proyectos de test)
+# sin depender del SDK de la máquina. NO produce la imagen de producción (eso es src/Nexo.Api/Dockerfile).
+# Contexto de build: la RAÍZ del repositorio.
 #   docker compose -f docker-compose.ci.yml build
 #   docker compose -f docker-compose.ci.yml run --rm build
-# ============================================================================
 
 FROM mcr.microsoft.com/dotnet/sdk:10.0
 
@@ -39,20 +30,12 @@ RUN dotnet restore "Nexo.Clean.sln"
 COPY src/       src/
 COPY tests/     tests/
 COPY docs/      docs/
-# ContratoMessageTypeTests.cs lee cubicador/infrastructure/mensajeria/rabbitmq.py
-# y cubicador/worker/main.py directo del disco para derivar el messageType/tipo
-# real que publica Cubicador — sin esta carpeta, esos 5 tests fallan con
-# FileNotFoundException dentro de este contenedor. No hace falta para compilar
-# ni para correr el resto de la suite: solo para que ESTOS tests encuentren
-# su fuente de verdad Python.
+# ContratoMessageTypeTests.cs lee cubicador/infrastructure/mensajeria/rabbitmq.py y
+# cubicador/worker/main.py del disco; sin esta carpeta esos tests fallan con FileNotFoundException.
+# No hace falta para compilar ni para el resto de la suite.
 COPY cubicador/ cubicador/
 
-# El build va como comando del contenedor y no como RUN a propósito. Si fuera
-# parte de la construcción de la imagen, un error de compilación abortaría el
-# `docker build` y el log del compilador saldría mezclado con la salida de
-# Docker. Como comando, el log sale limpio por stdout y el código de salida del
-# contenedor es el del compilador — que es justo lo que un CI necesita leer.
-#
-# El comando se puede sobrescribir para correr otra cosa con el mismo entorno:
+# El build va como CMD y no como RUN: así el log del compilador sale limpio por stdout y el código de
+# salida del contenedor es el del compilador, que es lo que un CI necesita leer. Se puede sobrescribir:
 #   docker compose -f docker-compose.ci.yml run --rm build dotnet test ...
 CMD ["dotnet", "build", "Nexo.Clean.sln", "-c", "Release", "--no-restore"]

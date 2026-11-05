@@ -27,9 +27,7 @@ public sealed class clsObtenerCosteoQueryHandler(
         var s = await solicitudes.ObtenerParaCosteoAsync(query.SolicitudId, ct)
             ?? throw new clsNotFoundException("SOLICITUD_NO_ENCONTRADA", "clsSolicitud no encontrada.");
 
-        // Aislamiento por comercial (issue #199, S4-HU-19.1): un Comercial no puede abrir
-        // la solicitud de otro comercial, aunque tenga el Id. El resto de los roles
-        // (Mesa de Costeo/AdminBiblioteca, Admin, etc.) no tienen esta restricción.
+        // Aislamiento por comercial: un Comercial no puede abrir la solicitud de otro, aunque tenga el Id.
         if (usuarioActual.Rol == RolUsuario.Comercial && s.CreadoPor != usuarioActual.Id)
             throw new clsForbiddenException("SOLICITUD_AJENA", "No tiene acceso a esta solicitud.");
 
@@ -40,9 +38,8 @@ public sealed class clsObtenerCosteoQueryHandler(
 
         var claves = await reglasSoloSicetac.ClavesRutaVehiculoAsync(ct);
         var lineas = new List<clsLineaCosteoDto>();
-        // S5-HU-20.5/#297: orden ESTABLE — NumeroLinea ascendente (las líneas viejas, sin número, al final),
-        // luego fecha de creación y luego Id. Antes no se ordenaba y el orden del GET podía cambiar entre
-        // consultas. NEXO numera por el orden del arreglo de la captura: no hay un campo "orden" de entrada.
+        // Orden ESTABLE: NumeroLinea ascendente (las líneas sin número al final), luego fecha de creación y Id. NEXO numera por el orden del
+        // arreglo de la captura.
         var ordenadas = s.Lineas
             .OrderBy(l => l.NumeroLinea is null).ThenBy(l => l.NumeroLinea)
             .ThenBy(l => l.CreatedAt).ThenBy(l => l.Id);
@@ -62,11 +59,10 @@ public sealed class clsObtenerCosteoQueryHandler(
                 l.Tipologia, l.Peso, l.clsConfiguracionVehiculo?.TipoVehiculo, l.clsConfiguracionVehiculo?.Carroceria,
                 clsPosicionCargaDto.Desde(l.Dimensiones), piso, historicas, l.HorasCargue, l.HorasDescargue,
                 l.GrupoRutaId, l.IdRecomendacionVehiculo, l.ValorMercancia, l.NumeroLinea,
-                // S6-HU-26.1/#30: para que la Mesa sepa cuándo NO ofrecer "Editar flete" (con regla responde 409).
+                // Para que la Mesa sepa cuándo NO ofrecer "Editar flete" (con regla responde 409).
                 clsReglaSoloSicetacDeLinea.Tiene(
                     claves, l.ClaseViaje, l.clsRuta?.OrigenMunicipio?.CodigoDane, l.clsRuta?.DestinoMunicipio?.CodigoDane,
                     l.clsConfiguracionVehiculo?.TipoVehiculo),
-                // S6-HU-24.1/#309 y S6-HU-29.1/#311: campos nuevos, al final y opcionales — no rompen a quien ya lee el DTO.
                 clsTexto.MinusculaInicial((EstadoLinea?)l.EstadoLinea), l.MotivoPendiente,
                 clsTexto.MinusculaInicial(l.LineaNegocio), clsTexto.MinusculaInicial(l.ClaseViaje),
                 l.ClaseViaje == ClaseViaje.Contenedor ? l.ClaseContenedor : null,
@@ -82,9 +78,8 @@ public sealed class clsObtenerCosteoQueryHandler(
 
         var tiempos = clsCondicionesServicioDto.Desde(s.CondicionesServicio).TiemposLogisticos
             ?? clsTiemposLogisticosDto.PorDefecto;
-        // #300: si el piso de TODAS las líneas faltó porque DWSice no trae el período del mes actual, se dice
-        // (en vez de un "sin piso" mudo que parece un dato que no existe). Solo se consulta si alguna línea
-        // quedó sin piso: el caso normal no paga nada.
+        // Si el piso de TODAS las líneas faltó porque DWSice no trae el período del mes actual, se dice (en vez de un "sin piso" mudo); solo se
+        // consulta si alguna línea quedó sin piso.
         var avisoSicetac = lineas.Any(l => l.PisoSicetac is null) ? await tarifas.MotivoSicetacNoUsadoAsync(ct) : null;
         return new clsSolicitudCosteoDto(s.ToDto(), tiempos, lineas, avisoSicetac);
     }

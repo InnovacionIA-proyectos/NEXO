@@ -6,30 +6,13 @@ using Nexo.Domain.Cotizaciones.Entidades;
 namespace Nexo.Application.CasosDeUso.Notificaciones.Plantillas;
 
 /// <summary>
-/// El cuerpo del correo de una cotización entregada.
-///
-/// Sale del caso de uso a su propia clase porque son dos cosas distintas: una es decidir
-/// a quién se notifica y cuándo, la otra es cómo se ve el correo. Mezcladas, cualquier
-/// ajuste de redacción obliga a tocar el archivo donde vive la lógica de la notificación.
-///
-/// El destinatario ahora es quien SOLICITÓ la consulta (no un
-/// "comercial responsable" externo), así que el saludo y el cuerpo se ajustan a eso —
-/// confirma que Nexo entregó SU solicitud, no una notificación genérica de cliente.
-/// Redacción sujeta a revisión final de negocio antes de producción; el contenido en sí
-/// (qué datos muestra, qué omite) sí quedó acotado acá: nunca nombre, correo ni ningún
-/// dato de contacto del cliente más allá de razón social y NIT, que ya son públicos en
-/// cualquier factura.
+/// Cuerpo del correo de una cotización entregada. Del cliente solo muestra razón social y NIT: nunca nombre, correo ni
+/// datos de contacto.
 /// </summary>
 public static class clsPlantillaDeEntrega
 {
-    // es-CO explícita a propósito: el runtime corre con globalización invariante en el
-    // contenedor (sin LANG/ICU configurado), así que la cultura ambiente no trae símbolo
-    // de moneda real ("¤" en vez de "$") — ver tests/QA/hu-06.2-destinatario-real-plantilla.
-    // No depender de CultureInfo.CurrentCulture: este formato debe verse igual sin
-    // importar cómo esté configurado el proceso que lo ejecuta.
-    //
-    // Sufijo "COP" en vez del símbolo "$": a pedido de negocio, para que quede explícito
-    // que es pesos colombianos (un "$" solo se confunde con otras monedas del signo).
+    // es-CO explícita: el runtime corre con globalización invariante en el contenedor y la cultura ambiente no trae símbolo
+    // de moneda real. Sufijo "COP" en vez de "$" para que quede explícito que son pesos colombianos.
     private static readonly CultureInfo Cop = CultureInfo.GetCultureInfo("es-CO");
 
     private static string Moneda(decimal valor) => $"{valor.ToString("N0", Cop)} COP";
@@ -37,8 +20,7 @@ public static class clsPlantillaDeEntrega
     public static string Asunto(clsCotizacion c, clsCliente cliente) =>
         $"Tu cotización para {cliente.Nombre} quedó entregada — {Moneda(c.Total)}";
 
-    /// <param name="lineasRechazadas">S6-HU-24.3/#320: las líneas que el Administrador de Tarifas rechazó, con su motivo. El correo SÍ lleva
-    /// los motivos (el Excel y el PDF no): es la forma en que el comercial se entera de por qué una línea quedó sin costeo.</param>
+    /// <param name="lineasRechazadas">Líneas rechazadas por el Administrador de Tarifas, con su motivo; solo el correo lleva los motivos (no el Excel ni el PDF).</param>
     public static string CuerpoHtml(
         clsCotizacion c, clsCliente cliente, string nombreDestinatario, IReadOnlyList<clsLineaRechazadaInfo>? lineasRechazadas = null)
     {
@@ -57,10 +39,7 @@ public static class clsPlantillaDeEntrega
             l.ValorFlete + (l.ValorAprovisionamiento ?? 0) + (l.ValorRetornoContenedor ?? 0));
         var subtotalConexos = c.Conexos.Sum(x => x.ValorVenta);
 
-        // Diseño alineado al resto de correos transaccionales de Botero Soto (barra de
-        // marca arriba, título en caja azul, cuerpo, pie gris con disclaimer). Todo con
-        // estilos inline y tablas (nada de <style> ni flex/grid): así se ve igual en
-        // clientes de correo que no soportan CSS moderno.
+        // Estilos inline y tablas (sin <style> ni flex/grid) para que se vea igual en clientes de correo sin CSS moderno.
         return $"""
             <div style="max-width:560px;margin:0 auto;font-family:Arial,Helvetica,sans-serif;">
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">

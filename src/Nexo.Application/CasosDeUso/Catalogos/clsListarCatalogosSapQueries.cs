@@ -3,7 +3,7 @@ using Nexo.Application.Common.Abstractions;
 
 namespace Nexo.Application.CasosDeUso.Catalogos;
 
-/// <summary>Catálogo de línea de negocio para el desplegable de Tarifas de Plaza (S4-HU-10.1).</summary>
+/// <summary>Catálogo de línea de negocio para el desplegable de Tarifas de Plaza.</summary>
 public sealed record clsListarLineasNegocioQuery : IQuery<IReadOnlyList<clsLineaNegocioDto>>;
 
 public sealed class clsListarLineasNegocioQueryHandler(ILineasNegocioPort lineasNegocio)
@@ -13,7 +13,7 @@ public sealed class clsListarLineasNegocioQueryHandler(ILineasNegocioPort lineas
         lineasNegocio.ListarAsync(ct);
 }
 
-/// <summary>Catálogo de clase de viaje para el desplegable de Tarifas de Plaza (S4-HU-10.1).</summary>
+/// <summary>Catálogo de clase de viaje para el desplegable de Tarifas de Plaza.</summary>
 public sealed record clsListarClasesViajeQuery : IQuery<IReadOnlyList<clsClaseViajeDto>>;
 
 public sealed class clsListarClasesViajeQueryHandler(IClasesViajePort clasesViaje)
@@ -23,7 +23,7 @@ public sealed class clsListarClasesViajeQueryHandler(IClasesViajePort clasesViaj
         clasesViaje.ListarAsync(ct);
 }
 
-/// <summary>Catálogo de clase de contenedor para el desplegable de Tarifas de Plaza (S4-HU-10.1).</summary>
+/// <summary>Catálogo de clase de contenedor para el desplegable de Tarifas de Plaza.</summary>
 public sealed record clsListarClasesContenedorQuery : IQuery<IReadOnlyList<clsClaseContenedorDto>>;
 
 public sealed class clsListarClasesContenedorQueryHandler(IClasesContenedorPort clasesContenedor)

@@ -5,9 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Nexo.Infrastructure.PlanDeCargue.Repositorios;
 
-/// <summary>Lee la proyección de vehículos que
-/// clsVehiculoCatalogoConsumer/clsPlanDeCargueGeneradoConsumer mantienen sincronizada
-/// — nunca llama a Cubicador.</summary>
+/// <summary>Lee la proyección de vehículos; nunca llama a Cubicador.</summary>
 public sealed class clsEfVehiculoCubicacionRepository(clsNexoDbContext db) : IVehiculoCubicacionRepository
 {
     public async Task<(IReadOnlyList<clsVehiculoCubicacion> Items, int Total)> ListarAsync(int page, int pageSize, CancellationToken ct)

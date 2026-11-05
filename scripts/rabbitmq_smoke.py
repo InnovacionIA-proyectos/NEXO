@@ -38,13 +38,10 @@ RABBITMQ_PASSWORD = os.environ["RABBITMQ_PASSWORD"]
 RABBITMQ_VHOST = os.environ.get("RABBITMQ_VHOST", "/")
 EXCHANGE = "cubicador.eventos"
 
-# (nombre de cola, routing key esperada) — ver MensajeriaDependencyInjection.cs
-# (lado NEXO) y worker/main.py (lado Cubicador) para el origen de cada una.
-# "cubicador.optimizar" es la ÚNICA cola que atienden los 9 comandos que
-# valida CubicacionSolicitadaValidador (optimizar + los 8 comandos de
-# escritura del plan de cargue) más crear_desde_linea — los 10 se
-# despachan por el campo "tipo" dentro del
-# mismo mensaje, así que un solo binding basta.
+# (nombre de cola, routing key esperada) — ver MensajeriaDependencyInjection.cs (lado NEXO) y
+# worker/main.py (lado Cubicador). "cubicador.optimizar" es la ÚNICA cola de los comandos que valida
+# CubicacionSolicitadaValidador (optimizar, comandos de escritura del plan de cargue y
+# crear_desde_linea); se despachan por el campo "tipo" del mensaje, así que un solo binding basta.
 COLAS_Y_ROUTING_KEYS_ESPERADAS: list[tuple[str, str]] = [
     ("cubicador.optimizar", "cubicacion.solicitada"),
     ("cubicacion.dlq", "cubicacion.dlq"),

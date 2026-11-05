@@ -10,11 +10,7 @@ using Nexo.Domain.Costeo.Entidades;
 
 namespace Nexo.Application.CasosDeUso.TarifasPlaza;
 
-/// <summary>
-/// Edita una tarifa de plaza existente. El UPDATE de Valor/Vigencia/DetallesTarifa dispara
-/// el trigger de BD TRG_tarifas_plaza_historico, que archiva el valor anterior en
-/// tbl_tarifas_plaza_historico — no hay nada especial que hacer acá para eso.
-/// </summary>
+/// <summary>Edita una tarifa de plaza; el trigger TRG_tarifas_plaza_historico archiva el valor anterior en tbl_tarifas_plaza_historico.</summary>
 public sealed record clsEditarTarifaPlazaCommand(
     Guid Id, string LineaNegocio, string ClaseViaje, int OrigenMunicipioId, int DestinoMunicipioId,
     string? ClaseContenedor, int? PesoId, string? TipoVehiculo,

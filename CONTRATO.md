@@ -17,6 +17,359 @@ Base URL: la que publique cada ambiente (`ASPNETCORE_URLS` / `API_PORT`, ver
 `http://localhost:${API_PORT:-8080}`. Swagger vive en `/swagger`, **solo en
 Development**.
 
+## 0. Cómo consumir este contrato (frontend e integraciones)
+
+Última verificación: **2026-11-04**. Las rutas y los roles se contrastaron con los controllers de la rama `QA`; los nombres de campo marcados con ⚠️ salen de la
+**respuesta real** de la API, no del código fuente. Lo que sirve a **Cotifly** está reunido en un solo documento:
+[`docs/integraciones/NEXO-CONTRATO-INTEGRACION-COTIFLY.md`](docs/integraciones/NEXO-CONTRATO-INTEGRACION-COTIFLY.md).
+
+### 0.1 Lo mínimo para llamar a NEXO
+
+| Qué | Valor |
+|---|---|
+| **Base URL** | La de cada ambiente (arriba). Swagger solo en Development |
+| **Identidad** | No hay login ni token. Cada petición lleva el id numérico del portal en el header **`X-Portal-clsUsuario-Id`** (ojo: no es `X-Portal-Usuario-Id`; ver §1.1 y §7 #1) |
+| **Rol** | Lo resuelve NEXO a partir de ese id. Sin rol de NEXO: `403 SIN_PERMISO_CABINA_FLETES` en todo |
+| **Formato** | JSON en **camelCase**; enums como texto (§1.6); fechas ISO 8601; dinero y peso como número (pesos y **kg**); medidas en **cm** |
+| **Errores** | Siempre `{ code, message, timestamp, details? }` (§1.4). **Ramificar por `code`**, nunca por `message` |
+| **Archivos** | `multipart/form-data`, campo `archivo`, máx. 10 MB, `.xlsx`/`.xlsm` (§1.9) |
+
+### 0.2 Lo que más tropieza al consumir la API
+
+1. **Header de identidad.** `X-Portal-clsUsuario-Id` es el único que funciona hoy; con `X-Portal-Usuario-Id` todo responde `401 SESION_INVALIDA`.
+2. **Nombres con prefijo `cls` en el JSON.** Hoy viajan así: `clsCliente` en cada fila de la bandeja (`GET /api/solicitudes`) y en los ítems del plan de cargue,
+   `clsRuta` en las líneas de `GET /api/solicitudes/{id}` y de `.../propuesta-tarifa`, y `clsVehiculoCreado` en `resolver-catalogos`. Están en §7; se leen tal cual.
+3. **Dos formas de lista.** Las paginadas devuelven `{ items, total }` (solicitudes, servicios-conexos, vehículos, planes de cargue, bibliotecas) y las de catálogo devuelven
+   un **arreglo plano** (clientes, ciudades, departamentos, municipios, `/api/catalogos/*`). La paginación está en §1.7.
+4. **Mayúsculas.** Al **escribir**, `tipo` acepta `spot`/`licitacion` y el servidor responde `Spot`/`Licitacion`. En lectura, `LineaSolicitudDto.estadoLinea` viaja en PascalCase
+   (`PorCostear`) pero `LineaCosteoDto.estadoLinea` en minúscula inicial (`porCostear`), igual que `lineaNegocio` y `claseViaje` (§2).
+5. **Línea de negocio.** Son exactamente seis (`Nacional`, `Puerto a interior`, `Interior a puerto`, `Devolución de contenedor`, `Andino`, `Licitaciones`, o su código `puertoAInterior`…). Cualquier otro
+   texto es `400 LINEA_NEGOCIO_INVALIDO`; para traducir lo que escribe un cliente se usa `normalizar-valores` (§3.3).
+6. **Costo y venta de los servicios conexos.** `valorAplicado` es el **costo** (uso interno); lo que se cotiza y se muestra al cliente es **`valorVenta`**, y `total` suma la venta (§3.4, §3.9).
+7. **Textos opcionales que nunca fallan.** `GET /api/cubicacion/explicacion` siempre responde `200` (`explicacion: null` si no hay texto); no hay que tratarla como error.
+8. **Lo pesado responde `202`.** Se sigue por SignalR o por consulta de respaldo (§1.10, §1.11); el aviso en vivo es una mejora, no una garantía.
+9. **`429`.** Algunas lecturas tienen límite por rol; se reintenta después de `Retry-After` segundos (§1.8).
+10. **Cada rol ve lo suyo.** En la bandeja el `Comercial` solo ve las solicitudes que él creó; `AdminBiblioteca` no entra a Bandeja, Mesa ni Cotizaciones (matriz en §5).
+
+### 0.3 Flujos típicos
+
+| Flujo | Llamadas, en orden |
+|---|---|
+| **Capturar una solicitud a mano** | `GET /api/captura-solicitudes/clientes` → `GET .../ciudades` (guardar `id` como `origenMunicipioId`/`destinoMunicipioId`) → `POST /api/cubicacion` (recomendación de flota; luego `GET /api/cubicacion/explicacion`) → `POST /api/captura-solicitudes` (una línea por camión) → `GET /api/solicitudes/{id}` |
+| **Importar un Excel de cliente** | `POST .../analizar-excel` → `POST .../sugerir-mapeo` (con `clienteId` o `clienteNit`) → el usuario confirma → `POST .../aplicar-mapeo` → `POST .../normalizar-valores` (vehículo, carrocería, línea de negocio, ciudad) → `POST /api/captura-solicitudes` → opcional: `PUT .../plantillas-mapeo` para recordar el mapeo |
+| **Importar un Excel de formato distinto o complejo** | `POST .../leer-estructura` (con `clienteId` o `clienteNit`) → el usuario revisa `tablas`, `resumen` y `dudas` → si algo está mal, otra vez `leer-estructura` con `instrucciones` y la `receta` anterior → cada tabla (`tablas[i]`) entra al flujo de arriba desde `sugerir-mapeo` → al confirmar, `PUT .../recetas-lectura` para que el próximo archivo igual se lea sin IA |
+| **Costear y cotizar** | `GET /api/solicitudes/{id}` → `GET .../propuesta-tarifa` → `POST /api/cotizaciones` → `POST .../aplicar-propuestas` (o `POST/PUT .../lineas`) → `POST .../conexos` → `POST .../entregar` → `POST .../resultado` |
+| **Mantener catálogos** | Servicios conexos (con `precioVenta`), tarifas de plaza, reglas Solo-SICETAC, rangos de peso, diccionario por cliente, alias de vehículos: cada uno en su sección de §3 |
+
+### 0.4 Índice de endpoints
+
+Generado a partir de los controllers (**todas** las rutas que existen hoy) para ubicar rápido el endpoint y su rol. El detalle —parámetros, cuerpos, respuestas y errores— está
+en la sección que se indica; la matriz completa de permisos es la §5.
+
+**§3.1 Sesión**
+
+| Método | Ruta | Roles |
+|---|---|---|
+| `GET` | `/api/sesion/actual` | Todos |
+
+**§3.2 Bandeja y solicitudes**
+
+| Método | Ruta | Roles |
+|---|---|---|
+| `GET` | `/api/solicitudes` | Comercial, AdminTarifas, ServiciosLogisticos, LiderProceso, Admin |
+| `POST` | `/api/solicitudes` | Admin |
+| `POST` | `/api/solicitudes/resolver-catalogos` | Comercial, Admin |
+| `GET` | `/api/solicitudes/{id}` | Comercial, AdminTarifas, ServiciosLogisticos, LiderProceso, Admin |
+| `POST` | `/api/solicitudes/{id}/lineas:bulk` | Admin |
+| `GET` | `/api/solicitudes/{id}/propuesta-tarifa` | Comercial, AdminTarifas, ServiciosLogisticos, LiderProceso, Admin |
+| `POST` | `/api/solicitudes/{id}/recalcular-score` | Admin |
+| `POST` | `/api/solicitudes/{id}/rechazar` | Comercial, Admin |
+
+**§3.3 Captura de solicitudes**
+
+| Método | Ruta | Roles |
+|---|---|---|
+| `POST` | `/api/captura-solicitudes` | Comercial, Admin |
+| `POST` | `/api/captura-solicitudes/analizar-excel` | Comercial, Admin |
+| `POST` | `/api/captura-solicitudes/aplicar-mapeo` | Comercial, Admin |
+| `GET` | `/api/captura-solicitudes/aprovisionamiento` | Comercial, Admin |
+| `GET` | `/api/captura-solicitudes/ciudades` | Todos |
+| `GET` | `/api/captura-solicitudes/clientes` | Comercial, Admin |
+| `GET` | `/api/captura-solicitudes/departamentos` | Todos |
+| `GET` | `/api/captura-solicitudes/municipios` | Todos |
+| `POST` | `/api/captura-solicitudes/normalizar-valores` | Comercial, Admin |
+| `POST` | `/api/captura-solicitudes/leer-estructura` | Comercial, Admin |
+| `GET` | `/api/captura-solicitudes/plantillas-mapeo` | Comercial, Admin |
+| `PUT` | `/api/captura-solicitudes/plantillas-mapeo` | Comercial, Admin |
+| `DELETE` | `/api/captura-solicitudes/plantillas-mapeo/{id}` | Comercial, Admin |
+| `GET` | `/api/captura-solicitudes/recetas-lectura` | Comercial, Admin |
+| `PUT` | `/api/captura-solicitudes/recetas-lectura` | Comercial, Admin |
+| `DELETE` | `/api/captura-solicitudes/recetas-lectura/{id}` | Comercial, Admin |
+| `POST` | `/api/captura-solicitudes/sugerir-mapeo` | Comercial, Admin |
+
+**§3.4 Cotizaciones**
+
+| Método | Ruta | Roles |
+|---|---|---|
+| `POST` | `/api/cotizaciones` | Comercial, AdminTarifas, Admin |
+| `GET` | `/api/cotizaciones/por-solicitud/{solicitudId}` | Comercial, AdminTarifas, ServiciosLogisticos, LiderProceso, Admin |
+| `GET` | `/api/cotizaciones/{id}` | Comercial, AdminTarifas, ServiciosLogisticos, LiderProceso, Admin |
+| `POST` | `/api/cotizaciones/{id}/aplicar-propuestas` | Comercial, AdminTarifas, Admin |
+| `POST` | `/api/cotizaciones/{id}/conexos` | Comercial, AdminTarifas, Admin |
+| `DELETE` | `/api/cotizaciones/{id}/conexos/{conexoId}` | Comercial, AdminTarifas, Admin |
+| `PATCH` | `/api/cotizaciones/{id}/conexos/{conexoId}` | Comercial, Admin |
+| `POST` | `/api/cotizaciones/{id}/entregar` | AdminTarifas, Admin |
+| `GET` | `/api/cotizaciones/{id}/exportar-excel` | Comercial, AdminTarifas, ServiciosLogisticos, LiderProceso, Admin |
+| `POST` | `/api/cotizaciones/{id}/lineas` | AdminTarifas, Admin |
+| `PUT` | `/api/cotizaciones/{id}/lineas/{lineaSolicitudId}` | AdminTarifas, Admin |
+| `DELETE` | `/api/cotizaciones/{id}/lineas/{lineaSolicitudId}/rechazo` | AdminTarifas, Admin |
+| `POST` | `/api/cotizaciones/{id}/lineas/{lineaSolicitudId}/rechazo` | AdminTarifas, Admin |
+| `PUT` | `/api/cotizaciones/{id}/lineas/{lineaSolicitudId}/vehiculo` | AdminTarifas, Admin |
+| `POST` | `/api/cotizaciones/{id}/resultado` | Comercial, Admin |
+
+**§3.5 Biblioteca SICE-TAC**
+
+| Método | Ruta | Roles |
+|---|---|---|
+| `GET` | `/api/biblioteca-sicetac` | Todos |
+| `GET` | `/api/biblioteca-sicetac/filtros` | Todos |
+| `GET` | `/api/biblioteca-sicetac/periodos` | Todos |
+
+**§3.6 Biblioteca histórico SAP**
+
+| Método | Ruta | Roles |
+|---|---|---|
+| `GET` | `/api/biblioteca-sap-historico` | Todos |
+| `GET` | `/api/biblioteca-sap-historico/filtros` | Todos |
+
+**§3.7 Biblioteca plaza SAP (y vigencia)**
+
+| Método | Ruta | Roles |
+|---|---|---|
+| `GET` | `/api/biblioteca-sap-plaza` | Todos |
+| `GET` | `/api/biblioteca-sap-plaza/filtros` | Todos |
+| `POST` | `/api/biblioteca-sap-plaza/vigencia/masivo` | AdminTarifas, AdminBiblioteca, Admin |
+| `DELETE` | `/api/biblioteca-sap-plaza/{tarifaId}/vigencia` | AdminTarifas, AdminBiblioteca, Admin |
+| `PATCH` | `/api/biblioteca-sap-plaza/{tarifaId}/vigencia` | AdminTarifas, AdminBiblioteca, Admin |
+
+**§3.8 Reglas Solo-SICETAC**
+
+| Método | Ruta | Roles |
+|---|---|---|
+| `GET` | `/api/reglas-solo-sicetac` | AdminTarifas, AdminBiblioteca, Admin |
+| `POST` | `/api/reglas-solo-sicetac` | AdminTarifas, AdminBiblioteca, Admin |
+| `GET` | `/api/reglas-solo-sicetac/exportar-excel` | AdminTarifas, AdminBiblioteca, Admin |
+| `POST` | `/api/reglas-solo-sicetac/importar-excel` | AdminTarifas, AdminBiblioteca, Admin |
+| `GET` | `/api/reglas-solo-sicetac/plantilla-excel` | AdminTarifas, AdminBiblioteca, Admin |
+| `DELETE` | `/api/reglas-solo-sicetac/{id}` | AdminTarifas, AdminBiblioteca, Admin |
+
+**§3.9 Servicios conexos**
+
+| Método | Ruta | Roles |
+|---|---|---|
+| `GET` | `/api/servicios-conexos` | Todos |
+| `POST` | `/api/servicios-conexos` | ServiciosLogisticos, AdminTarifas, Admin |
+| `GET` | `/api/servicios-conexos/exportar-excel` | Todos |
+| `POST` | `/api/servicios-conexos/importar-excel` | ServiciosLogisticos, AdminTarifas, Admin |
+| `GET` | `/api/servicios-conexos/plantilla-excel/{tipo}` | Todos |
+| `PATCH` | `/api/servicios-conexos/{id}` | ServiciosLogisticos, AdminTarifas, Admin |
+
+**§3.10 Tarifas Ganadas**
+
+| Método | Ruta | Roles |
+|---|---|---|
+| `GET` | `/api/tarifas-historicas` | Todos |
+
+**§3.12 Métricas**
+
+| Método | Ruta | Roles |
+|---|---|---|
+| `GET` | `/api/metricas/cumplimiento` | LiderProceso, AdminTarifas, Admin |
+| `GET` | `/api/metricas/kpis-piloto` | LiderProceso, AdminTarifas, Admin |
+
+**§3.13 Priorización**
+
+| Método | Ruta | Roles |
+|---|---|---|
+| `GET` | `/api/priorizacion/parametros` | Admin |
+| `PUT` | `/api/priorizacion/parametros` | Admin |
+
+**§3.14 Cubicación**
+
+| Método | Ruta | Roles |
+|---|---|---|
+| `GET` | `/api/cubicacion` | Comercial, AdminBiblioteca, AdminTarifas, Admin |
+| `POST` | `/api/cubicacion` | Comercial, AdminBiblioteca, AdminTarifas, Admin |
+| `GET` | `/api/cubicacion/explicacion` | Comercial, AdminBiblioteca, AdminTarifas, Admin |
+
+**§3.14 Cubicación (servicio a servicio)**
+
+| Método | Ruta | Roles |
+|---|---|---|
+| `GET` | `/api/lineas-solicitud/{id}/cubicacion` | Bearer de servicio (§1.2) |
+
+**§3.14.1 Passthrough de catálogo del Cubicador**
+
+| Método | Ruta | Roles |
+|---|---|---|
+| `GET` | `/api/categorias-mercancia` | Todos |
+| `POST` | `/api/categorias-mercancia` | AdminTarifas, Admin |
+| `DELETE` | `/api/categorias-mercancia/{id}` | AdminTarifas, Admin |
+| `PUT` | `/api/categorias-mercancia/{id}` | AdminTarifas, Admin |
+| `GET` | `/api/parametros-motor` | Todos |
+| `PUT` | `/api/parametros-motor/{clave}` | AdminTarifas, Admin |
+| `GET` | `/api/reglas-incompatibilidad` | Todos |
+| `POST` | `/api/reglas-incompatibilidad` | AdminTarifas, Admin |
+| `DELETE` | `/api/reglas-incompatibilidad/{id}` | AdminTarifas, Admin |
+| `GET` | `/api/tipos-carroceria` | Todos |
+| `POST` | `/api/tipos-carroceria` | AdminTarifas, Admin |
+| `POST` | `/api/tipos-carroceria/republicar-catalogo` | AdminTarifas, Admin |
+| `DELETE` | `/api/tipos-carroceria/{id}` | AdminTarifas, Admin |
+| `PUT` | `/api/tipos-carroceria/{id}` | AdminTarifas, Admin |
+| `GET` | `/api/tipos-mercancia` | Todos |
+| `POST` | `/api/tipos-mercancia` | AdminTarifas, Admin |
+| `POST` | `/api/tipos-mercancia/republicar-catalogo` | AdminTarifas, Admin |
+| `DELETE` | `/api/tipos-mercancia/{id}` | AdminTarifas, Admin |
+| `PUT` | `/api/tipos-mercancia/{id}` | AdminTarifas, Admin |
+| `GET` | `/api/vehiculos-catalogo` | Todos |
+| `POST` | `/api/vehiculos-catalogo` | AdminTarifas, Admin |
+| `POST` | `/api/vehiculos-catalogo/republicar-catalogo` | AdminTarifas, Admin |
+| `DELETE` | `/api/vehiculos-catalogo/{id}` | AdminTarifas, Admin |
+| `PUT` | `/api/vehiculos-catalogo/{id}` | AdminTarifas, Admin |
+
+**§3.15 Plan de cargue**
+
+| Método | Ruta | Roles |
+|---|---|---|
+| `GET` | `/api/planes-cargue` | Todos |
+| `POST` | `/api/planes-cargue` | Comercial, AdminTarifas, Admin |
+| `POST` | `/api/planes-cargue/demo` | Comercial, AdminTarifas, Admin |
+| `POST` | `/api/planes-cargue/desde-linea/{lineaId}` | Comercial, AdminTarifas, Admin |
+| `GET` | `/api/planes-cargue/por-linea/{lineaId}` | Todos |
+| `GET` | `/api/planes-cargue/por-linea/{lineaId}/estado` | Todos |
+| `DELETE` | `/api/planes-cargue/{id}` | Comercial, AdminTarifas, Admin |
+| `GET` | `/api/planes-cargue/{id}` | Todos |
+| `GET` | `/api/planes-cargue/{id}/colocaciones` | Todos |
+| `PATCH` | `/api/planes-cargue/{id}/colocaciones/{colocacionId}` | Comercial, AdminTarifas, Admin |
+| `GET` | `/api/planes-cargue/{id}/exportar` | Todos |
+| `GET` | `/api/planes-cargue/{id}/flota` | Todos |
+| `POST` | `/api/planes-cargue/{id}/items` | Comercial, AdminTarifas, Admin |
+| `POST` | `/api/planes-cargue/{id}/items/importar` | Comercial, AdminTarifas, Admin |
+| `DELETE` | `/api/planes-cargue/{id}/items/{itemId}` | Comercial, AdminTarifas, Admin |
+| `GET` | `/api/planes-cargue/{id}/metricas` | Todos |
+| `GET` | `/api/planes-cargue/{id}/no-cargadas` | Todos |
+| `POST` | `/api/planes-cargue/{id}/optimizar` | Comercial, AdminTarifas, Admin |
+| `GET` | `/api/planes-cargue/{id}/resultado` | Todos |
+
+**§3.16 Catálogo de vehículos**
+
+| Método | Ruta | Roles |
+|---|---|---|
+| `GET` | `/api/vehiculos` | Todos |
+| `POST` | `/api/vehiculos` | Comercial, AdminTarifas, Admin |
+| `DELETE` | `/api/vehiculos/{id}` | Admin |
+
+**§3.17 Trabajos**
+
+| Método | Ruta | Roles |
+|---|---|---|
+| `GET` | `/api/trabajos/{id}` | Todos |
+
+**§3.19 Catálogos**
+
+| Método | Ruta | Roles |
+|---|---|---|
+| `GET` | `/api/catalogos/alias` | Todos |
+| `POST` | `/api/catalogos/alias` | AdminTarifas, Admin |
+| `GET` | `/api/catalogos/alias/resolver` | Todos |
+| `GET` | `/api/catalogos/clases-contenedor` | Todos |
+| `GET` | `/api/catalogos/clases-viaje` | Todos |
+| `GET` | `/api/catalogos/lineas-negocio` | Todos |
+| `GET` | `/api/catalogos/municipios` | Todos |
+| `GET` | `/api/catalogos/tipos-vehiculo` | Todos |
+| `GET` | `/api/catalogos/vehiculos-cuarentena` | AdminTarifas, Admin |
+| `POST` | `/api/catalogos/vehiculos-cuarentena/{id}/descartar` | AdminTarifas, Admin |
+| `POST` | `/api/catalogos/vehiculos-cuarentena/{id}/mapear` | AdminTarifas, Admin |
+
+**§3.19.1 Diccionario por cliente**
+
+| Método | Ruta | Roles |
+|---|---|---|
+| `GET` | `/api/diccionario-cliente` | Todos |
+| `POST` | `/api/diccionario-cliente` | Comercial, AdminBiblioteca, AdminTarifas, Admin |
+| `GET` | `/api/diccionario-cliente/opciones` | Todos |
+| `DELETE` | `/api/diccionario-cliente/{id}` | Comercial, AdminBiblioteca, AdminTarifas, Admin |
+| `PUT` | `/api/diccionario-cliente/{id}` | Comercial, AdminBiblioteca, AdminTarifas, Admin |
+
+**§3.20 Rangos de peso**
+
+| Método | Ruta | Roles |
+|---|---|---|
+| `GET` | `/api/pesos` | AdminTarifas, AdminBiblioteca, Admin |
+| `POST` | `/api/pesos` | AdminTarifas, AdminBiblioteca, Admin |
+| `DELETE` | `/api/pesos/{id}` | AdminTarifas, AdminBiblioteca, Admin |
+| `PUT` | `/api/pesos/{id}` | AdminTarifas, AdminBiblioteca, Admin |
+
+**§3.21 Tarifas de plaza**
+
+| Método | Ruta | Roles |
+|---|---|---|
+| `GET` | `/api/tarifas-plaza` | AdminTarifas, AdminBiblioteca, Admin |
+| `POST` | `/api/tarifas-plaza` | AdminTarifas, AdminBiblioteca, Admin |
+| `GET` | `/api/tarifas-plaza/exportar-excel` | AdminTarifas, AdminBiblioteca, Admin |
+| `POST` | `/api/tarifas-plaza/importar-excel` | AdminTarifas, AdminBiblioteca, Admin |
+| `DELETE` | `/api/tarifas-plaza/{id}` | AdminTarifas, AdminBiblioteca, Admin |
+| `PUT` | `/api/tarifas-plaza/{id}` | AdminTarifas, AdminBiblioteca, Admin |
+
+**§3.22 Uso y gasto de la IA**
+
+| Método | Ruta | Roles |
+|---|---|---|
+| `GET` | `/api/ia/uso/gasto` | Admin |
+
+**§3.23 Herramientas del asistente**
+
+| Método | Ruta | Roles |
+|---|---|---|
+| `GET` | `/api/asistente/herramientas` | Todos (cada herramienta filtra por rol) |
+| `POST` | `/api/asistente/herramientas/{nombre}` | Todos (cada herramienta filtra por rol) |
+
+**§3.24 Conversación con el asistente**
+
+| Método | Ruta | Roles |
+|---|---|---|
+| `GET` | `/api/asistente/conversaciones` | AdminTarifas, Admin |
+| `POST` | `/api/asistente/conversaciones/mensajes` | AdminTarifas, Admin |
+| `GET` | `/api/asistente/conversaciones/{id}` | AdminTarifas, Admin |
+
+**§3.24.1 Acciones del asistente**
+
+| Método | Ruta | Roles |
+|---|---|---|
+| `POST` | `/api/asistente/acciones/{id}/cancelar` | AdminTarifas, Admin |
+| `POST` | `/api/asistente/acciones/{id}/confirmar` | AdminTarifas, Admin |
+
+**§3.24.2 Preferencias del asistente**
+
+| Método | Ruta | Roles |
+|---|---|---|
+| `GET` | `/api/asistente/preferencias` | AdminTarifas, Admin |
+| `DELETE` | `/api/asistente/preferencias/{id}` | AdminTarifas, Admin |
+
+**§3.18 Salud**
+
+| Método | Ruta | Roles |
+|---|---|---|
+| `GET` | `/health` | Anónimo |
+
+**§4. Tiempo real (SignalR)**
+
+| Método | Ruta | Roles |
+|---|---|---|
+| `HUB` | `/hubs/bandeja` | Todos |
+| `HUB` | `/hubs/plan-cargue` | Todos |
+| `HUB` | `/hubs/trabajos` | Todos |
+
 ---
 
 ## 1. Convenciones generales
@@ -207,7 +560,7 @@ petición más grande la corta el servidor antes de llegar al endpoint.
 | Endpoint | Campo | Extensiones | Si falta el archivo |
 |---|---|---|---|
 | `POST /api/captura-solicitudes/analizar-excel` | `archivo` | `.xlsx`, `.xlsm` | `400 ARCHIVO_REQUERIDO` |
-| `POST /api/tarifas-sicetac/importar` | `archivo` | `.xlsx`, `.xlsm` | `400 ARCHIVO_REQUERIDO` |
+| ~~`POST /api/tarifas-sicetac/importar`~~ (retirado en #179) | — | — | — |
 | `POST /api/reglas-solo-sicetac/importar-excel` | `archivo` | `.xlsx`, `.xlsm` | `400 VALIDATION_ERROR` (ver nota) |
 | `POST /api/servicios-conexos/importar-excel` | `archivo` | `.xlsx`, `.xlsm` | `400 VALIDATION_ERROR` (ver nota) |
 | `POST /api/cotizaciones/{id}/entregar` | `formato` (opcional) | PDF, sin validación de extensión | se entrega sin adjunto |
@@ -298,7 +651,7 @@ interface SolicitudDto {
   notas: string | null                           // observaciones comerciales (#227)
 }
 interface BandejaItemDto {                       // fila de GET /api/solicitudes
-  id: UUID; cliente: string; tipo: string; estado: string
+  id: UUID; clsCliente: string; tipo: string; estado: string   // ⚠️ el campo viaja como `clsCliente`, no `cliente` (§7 #5)
   deadline: FechaISO | null; valorEstimado: Decimal | null; scorePrioridad: Decimal
   lineas: number; fleteTotal: Decimal | null; lineasSinFlete: number
   fechaCaptura: FechaISO
@@ -325,7 +678,7 @@ interface PisoSicetacDto {
 }
 interface HistoricaSugeridaDto { id: UUID; valor: Decimal; fecha: Fecha; tipologia: TipologiaCarga | null; vigencia: string }
 interface LineaCosteoDto {
-  lineaId: UUID; rutaId: UUID | null; ruta: string | null; tipologia: TipologiaCarga | null
+  lineaId: UUID; rutaId: UUID | null; clsRuta: string | null; tipologia: TipologiaCarga | null   // ⚠️ viaja como `clsRuta`, no `ruta` (§7 #6)
   peso: Decimal | null; tipoVehiculo: string | null; carroceria: string | null
   posiciones: PosicionCargaDto[]
   pisoSicetac: PisoSicetacDto | null // #300: null también cuando el período más reciente cargado en DWSice NO es el del mes actual (ver avisoSicetac)
@@ -402,7 +755,7 @@ interface CotizacionDto {
 interface AplicarPropuestasResultDto { cotizacion: CotizacionDto; agregadas: number }
 interface EntregarCotizacionResultDto { cotizacion: CotizacionDto; estadoNotificacion: string; mensaje: string }
 interface PropuestaLineaDto {
-  lineaId: UUID; ruta: string | null; vehiculo: string | null; peso: Decimal | null
+  lineaId: UUID; clsRuta: string | null; vehiculo: string | null; peso: Decimal | null   // ⚠️ `clsRuta`, no `ruta` (§7 #6)
   sicetac: CandidatoTarifaDto | null; plaza: CandidatoTarifaDto | null; historicoSap: CandidatoTarifaDto | null
   valorPropuesto: Decimal | null; fuentePropuesta: string | null; justificacion: string
   retornoContenedor: CandidatoTarifaDto | null // piso SICE-TAC de VIAJE VACÍO (destino → ciudad de devolución), 1h+1h, misma configuración y misma unidad de transporte (carrocería) que la línea; fuente "retorno_contenedor"
@@ -603,7 +956,7 @@ Formato de cada endpoint:
 ### 3.2 Bandeja y solicitudes — `/api/solicitudes`
 
 #### `GET /api/solicitudes` — Bandeja Priorizada
-- **Roles**: Todos. Rate limit estándar.
+- **Roles**: `Comercial`, `AdminTarifas`, `ServiciosLogisticos`, `LiderProceso`, `Admin` (`AdminBiblioteca` no entra: #307). Rate limit estándar.
 
 | Query | | Tipo | Restricción |
 |---|---|---|---|
@@ -641,7 +994,7 @@ esta es la forma de seguirla. **No se mezcla en Pendientes.**
 - **Errores**: `400 RESULTADO_INVALIDO`
 
 #### `GET /api/solicitudes/{id}` — abrir solicitud (costeo pre-armado)
-- **Roles**: Todos.
+- **Roles**: `Comercial`, `AdminTarifas`, `ServiciosLogisticos`, `LiderProceso`, `Admin` (`AdminBiblioteca` no entra: #307).
 - **→** `200 SolicitudCosteoDto`
 - **Orden de `lineas` (S5-HU-20.5/#297)**: estable. Por `numeroLinea` ascendente (las líneas viejas, sin
   número, al final), luego por fecha de creación y luego por `id`. Antes no se ordenaba y el orden podía
@@ -770,7 +1123,7 @@ guardar el flete sería guardarlo sin validar.
 de la línea (4 + 4 por defecto) y marcar `retornaContenedor` ya **no** las cambia. Las horas de los tramos
 vacíos son una constante de negocio, no un campo de la línea.
 
-- **Roles**: Todos.
+- **Roles**: `Comercial`, `AdminTarifas`, `ServiciosLogisticos`, `LiderProceso`, `Admin` (`AdminBiblioteca` no entra: #307) (es la Mesa de Costeo).
 - **→** `200 PropuestaSolicitudDto`
 - **Errores**: `404 SOLICITUD_NO_ENCONTRADA` · `404 LINEA_NO_ENCONTRADA`
 
@@ -783,7 +1136,7 @@ Biblioteca) y el campo se quedaba sin sugerencias. Ahora:
 
 | Endpoint | Roles |
 |---|---|
-| `POST analizar-excel`, `POST sugerir-mapeo`, `POST aplicar-mapeo`, `POST normalizar-valores`, `PUT/GET/DELETE plantillas-mapeo`, `POST /` (capturar) | `Comercial`, `Admin` |
+| `POST analizar-excel`, `POST leer-estructura`, `POST sugerir-mapeo`, `POST aplicar-mapeo`, `POST normalizar-valores`, `PUT/GET/DELETE plantillas-mapeo`, `PUT/GET/DELETE recetas-lectura`, `POST /` (capturar) | `Comercial`, `Admin` |
 | `GET aprovisionamiento`, `GET clientes` | `Comercial`, `Admin` (revisado caso por caso: se mantienen) |
 | `GET departamentos`, `GET ciudades`, `GET municipios` | **cualquier rol válido de Nexo** (hay que estar autenticado; sin sesión → `401`) |
 
@@ -916,6 +1269,104 @@ interface PlantillaMapeoDto {
 ```
 - **Errores**: `400 VALIDATION_ERROR` · `400 CLIENTE_REQUERIDO` · `400 CLIENTE_NO_ENCONTRADO` · `400 NOMBRE_DEMASIADO_LARGO` · `400 ENCABEZADOS_REQUERIDOS` · `400 DEMASIADAS_COLUMNAS` · `400 ENCABEZADO_DEMASIADO_LARGO` ·
   `400 COLUMNA_FUERA_DE_RANGO` · los del mapeo de `aplicar-mapeo` (`MAPEO_REQUERIDO`, `CAMPO_INVALIDO`, `TRANSFORMACION_INVALIDA`, `TRANSFORMACION_NO_APLICA`, `CAMPO_DUPLICADO`, `CAMPO_REQUERIDO`, `COLUMNA_INVALIDA`) · `404 PLANTILLA_NO_ENCONTRADA` (borrar)
+
+#### `POST /api/captura-solicitudes/leer-estructura` — leer un Excel de formato complejo
+Para los archivos que `analizar-excel` no lee bien: la tabla no empieza en la fila 1, los encabezados ocupan varias filas con celdas combinadas, el origen o el vehículo están en las columnas
+(tabla cruzada), hay datos sueltos fuera de la tabla (un escenario, un destino), varias hojas con el mismo formato, etc. La IA propone una **receta de lectura** (dónde están los encabezados y los datos
+de cada hoja y cómo se «despivota» una tabla cruzada); NEXO la **ejecuta de forma determinista** y devuelve tablas normales, en la misma forma que `analizar-excel`, listas para `sugerir-mapeo`.
+La persona revisa la vista previa, corrige con una frase si hace falta y confirma. **No guarda nada**: guardar es `PUT recetas-lectura`.
+
+- **Body**: `multipart/form-data` (§1.9)
+
+| Campo | | Tipo | Descripción |
+|---|---|---|---|
+| `archivo` | **requerido** | archivo | El Excel (.xlsx/.xlsm, máx. 10 MB) |
+| `clienteId` | *opcional* | UUID | El cliente, para reutilizar sus formatos guardados. Si vienen los dos manda este |
+| `clienteNit` | *opcional* | string | Máx. 30. Solo **busca** el cliente local: no lo crea. Sin cliente no se busca formato guardado |
+| `instrucciones` | *opcional* | string | Máx. 4000. Lo que la persona explica o corrige, en lenguaje natural («el escenario está en la celda A2», «no uses la hoja Resumen»). **Siempre consulta a la IA** |
+| `receta` | *opcional* | string (JSON) | La `receta` de una lectura anterior. **Sola** se ejecuta tal cual, sin IA (la persona la ajustó a mano). **Con `instrucciones`** la IA la toma de base y la ajusta |
+
+Qué receta se usa, en este orden:
+1. `receta` sin `instrucciones` → se ejecuta tal cual (`origenReceta = "manual"`). Sin IA.
+2. Sin `receta` ni `instrucciones`, y el cliente tiene un formato guardado **igual** (≥ 85 % de los títulos de la parte alta del archivo; los datos de más abajo no cuentan) → ese formato (`"guardada"`), se suma un uso. **Sin IA.**
+3. En cualquier otro caso se le pide la receta a la IA (`"ia"`), con la receta enviada o con el formato guardado **parecido** (≥ 50 %) como punto de partida, las instrucciones que la persona dio al guardarlo y lo que cambió
+   (`cambios`). Los números de las celdas no se envían (solo `#`) y los documentos van enmascarados. Si la receta de la IA no se puede ejecutar, se le pide corregirla **una** vez.
+4. Si la IA no está disponible (apagada, sin llave, tope diario, error o respuesta inválida) **no falla**: usa el formato guardado más parecido, o una lectura simple de la primera fila con encabezado de cada hoja
+   (`"automatica"`), y `motivoSinIa` dice por qué (`IA_NO_DISPONIBLE`, `IA_RESPUESTA_INVALIDA`, el código del proveedor…). `avisos` lo explica para mostrarlo.
+
+```ts
+interface LecturaEstructuraDto {
+  archivo: string
+  origenReceta: 'guardada' | 'ia' | 'manual' | 'automatica'
+  similitud: number | null            // 0..1 con el formato guardado que se usó o se tomó de base
+  recetaGuardadaId: string | null
+  iaUsada: boolean
+  motivoSinIa: string | null          // 'RECETA_GUARDADA' | 'SIN_INSTRUCCION' | 'IA_NO_DISPONIBLE' | 'IA_RESPUESTA_INVALIDA' | código del proveedor | null
+  receta: RecetaLectura               // la que se ejecutó: se reenvía en `receta` para ajustarla o guardarla
+  resumen: string | null              // cómo entendió el archivo la IA, en lenguaje sencillo
+  dudas: string[]                     // preguntas que la persona puede responder con una instrucción
+  hojasDelArchivo: { nombre: string, oculta: boolean, filas: number, columnas: number, usada: boolean }[]
+  tablas: HojaExcelDto[]              // el mismo DTO de analizar-excel (§2); las filas ya son las que salen de la receta, máx. 5000 por tabla
+  avisos: string[]
+  cambios: { faltan: string[], nuevos: string[] } | null   // títulos que ya no aparecen / nuevos respecto al formato guardado
+}
+
+// Todo lo que la IA puede describir. Filas y columnas desde 1; las columnas, como letras de Excel.
+interface RecetaLectura {
+  version: 1
+  hojas: {
+    hoja: string                      // nombre exacto de la hoja, o '*' para las demás hojas visibles
+    usar: boolean                     // false = ignorarla
+    trasponer: boolean                // true = las filas del archivo son columnas
+    filasEncabezado?: number[]        // una o varias filas (títulos de dos niveles con celdas combinadas); sin ellas, la hoja no tiene encabezado
+    primeraFila?: number; ultimaFila?: number; hastaPrimeraFilaVacia: boolean
+    columnas?: string[]               // subconjunto de columnas: 'A', 'C:F'
+    etiquetas?: { columna: string, nombre?: string }[]   // tabla cruzada: columnas que identifican cada fila (origen, destino…)
+    valores?: { columnas: string[], dimensiones: { fila: number, nombre: string }[], nombreValor: string, omitirVacios: boolean } // columnas de valores: cada una se vuelve una fila por celda, con sus títulos como dimensiones
+    seccion?: { columna: string, nombre: string }         // filas que son un título de grupo, no un dato
+    constantes?: { nombre: string, celda?: string, hoja: boolean }[] // un dato suelto (o el nombre de la hoja) repetido en todas las filas
+  }[]
+  unir: boolean                       // true = las hojas con las mismas columnas salen como una sola tabla
+  notas?: string
+}
+```
+- **Cómo usar `tablas`**: cada elemento es una hoja lista para el flujo de siempre: `sugerir-mapeo` recibe `encabezados` y `filas` de **una** tabla. `filaEncabezado` es la fila del archivo (o 0 si la receta no tiene encabezado).
+- **Cómo corregir**: la persona escribe lo que ve mal y el front llama otra vez con `instrucciones` + `receta` (la que acaba de recibir) + el mismo archivo. La IA ajusta lo mínimo. La conversación es del front: aquí no se guarda historial.
+- **Cuándo mostrar qué**: `resumen` y `dudas` solo vienen con la IA. Con `origenReceta = "guardada"` basta con mostrar la vista previa y un botón de confirmar. Si `cambios` no es null, mostrar qué cambió respecto al formato anterior.
+- **Errores**: `400 ARCHIVO_REQUERIDO` · `400 FORMATO_NO_SOPORTADO` · `400 EXCEL_INVALIDO` · `400 EXCEL_SIN_DATOS` · `400 INSTRUCCIONES_DEMASIADO_LARGAS` · `400 RECETA_INVALIDA` (JSON mal formado o una receta que no se puede ejecutar; el mensaje dice qué).
+  La falta de IA **no** es un error.
+
+#### `/api/captura-solicitudes/recetas-lectura` — formatos de Excel guardados por cliente
+La receta que la persona **confirmó** se guarda como el formato del cliente (`tbl_recetas_lectura_cliente`). El siguiente archivo del cliente con el mismo formato se lee con ella **sin llamar a la IA** (más barato y siempre igual);
+si el formato cambia, `leer-estructura` lo detecta y la IA reorganiza partiendo de la receta anterior. Roles: `Comercial`, `Admin`.
+
+**`PUT /api/captura-solicitudes/recetas-lectura`** — guarda la receta. `201` la primera vez, `200` si reemplazó a un formato parecido (≥ 85 %) que el cliente ya tenía; si es distinto agrega otro. Un cliente conserva hasta **20**
+formatos: al pasar el límite se descarta el que lleva más tiempo sin usarse. Antes de guardar la ejecuta contra el archivo y exige que dé filas; la huella con la que se reconocerá el formato la calcula el servidor con ese archivo.
+
+| Campo (`multipart/form-data`) | | Tipo | Restricción |
+|---|---|---|---|
+| `archivo` | **requerido** | archivo | El mismo Excel con el que se confirmó la receta |
+| `receta` | **requerido** | string (JSON) | La `receta` que devolvió `leer-estructura` (máx. 60.000 caracteres) |
+| `clienteId` | condicional | UUID | **Requerido si no viene `clienteNit`**; debe existir. Si vienen los dos, manda este |
+| `clienteNit` | condicional | string | Máx. 30. Si no tiene cliente local, se crea con los datos del DW (ver «Cliente por NIT»); `400 CLIENTE_NIT_INVALIDO` si no es de ningún cliente ni prospecto |
+| `nombre` | *opcional* | string | Máx. 100 |
+| `instrucciones` | *opcional* | string | Máx. 4000. Lo que la persona explicó del archivo; se le da de contexto a la IA cuando el formato cambie |
+
+**`GET /api/captura-solicitudes/recetas-lectura?clienteId=`** (o **`?clienteNit=`**) — los formatos del cliente (sin ninguno de los dos, los de todos). Con un NIT sin cliente local responde `200 []` y no crea nada.
+**`DELETE /api/captura-solicitudes/recetas-lectura/{id}`** — lo borra (`204`); el siguiente archivo de ese cliente vuelve a pasar por la IA.
+
+```ts
+interface RecetaGuardadaDto {
+  id: string; clienteId: string; clienteNombre: string | null; nombre: string | null
+  receta: RecetaLectura; instrucciones: string | null
+  usos: number; ultimoUsoAt: string | null   // veces que se reutilizó sin IA
+  createdAt: string; updatedAt: string | null
+}
+```
+- **Auditoría**: crear, reemplazar y borrar quedan en `tbl_audit_log` (entidad `receta_lectura_cliente`).
+- **Roles**: como en las plantillas de mapeo, el `clienteId` lo manda el front y cualquier `Comercial` puede ver o reemplazar el formato de cualquier cliente.
+- **Errores**: `400 ARCHIVO_REQUERIDO` · `400 FORMATO_NO_SOPORTADO` · `400 EXCEL_INVALIDO` · `400 RECETA_REQUERIDA` · `400 RECETA_INVALIDA` · `400 RECETA_SIN_FILAS` (la receta no da ninguna fila con ese archivo) ·
+  `400 CLIENTE_REQUERIDO` · `400 CLIENTE_NO_ENCONTRADO` · `400 NOMBRE_DEMASIADO_LARGO` · `400 INSTRUCCIONES_DEMASIADO_LARGAS` · `404 RECETA_NO_ENCONTRADA` (borrar)
 
 #### `POST /api/captura-solicitudes/aplicar-mapeo`
 Aplica el mapeo que el usuario **confirmó** a **todas** las filas del Excel y devuelve las líneas listas para `POST /api/captura-solicitudes`, más los
@@ -1247,7 +1698,7 @@ Comercial/Admin.
 - **Errores**: `400 SOLICITUD_INVALIDA`
 
 #### `GET /api/cotizaciones/{id}`
-- **Roles**: Todos.
+- **Roles**: `Comercial`, `AdminTarifas`, `ServiciosLogisticos`, `LiderProceso`, `Admin` (`AdminBiblioteca` no entra: #307).
 - **→** `200 CotizacionDto`
 - **Errores**: `404 COTIZACION_NO_ENCONTRADA`
 
@@ -1257,7 +1708,7 @@ S5-HU-20.1/#286. **Nunca crea nada** (a diferencia de `POST /api/cotizaciones`, 
 para saber si ya hay una cotización —p. ej. la auto-costeada al capturar— sin tener que
 disparar el POST.
 
-- **Roles**: Todos.
+- **Roles**: `Comercial`, `AdminTarifas`, `ServiciosLogisticos`, `LiderProceso`, `Admin` (`AdminBiblioteca` no entra: #307).
 - **→** `200 CotizacionDto` · `204 No Content` si la solicitud no tiene cotización (o no existe).
 - Elige igual que el POST: si la solicitud ya está `Entregada`, su cotización `Entregada`;
   si no, el borrador en curso. GET y POST nunca apuntan a cotizaciones distintas.
@@ -1463,7 +1914,7 @@ Si `resultado = "ganada"`, realimenta la biblioteca de Tarifas Ganadas.
 - **Errores**: `400 RESULTADO_INVALIDO` · `404 COTIZACION_NO_ENCONTRADA` · `409 COTIZACION_NO_ENTREGADA` · `409 RESULTADO_YA_DEFINIDO` · `409 SOLICITUD_NO_TRANSICIONABLE`
 
 #### `GET /api/cotizaciones/{id}/exportar-excel`
-- **Roles**: Todos.
+- **Roles**: `Comercial`, `AdminTarifas`, `ServiciosLogisticos`, `LiderProceso`, `Admin` (`AdminBiblioteca` no entra: #307).
 - S6-HU-24.3/#320: las líneas rechazadas salen en la hoja con su ruta y la palabra «Sin costeo» en vez del precio (sin precio y **sin el motivo**), y no suman al total.
 - **→** `200` binario `.xlsx` con `Content-Disposition: attachment`.
 - **Errores**: `404 COTIZACION_NO_ENCONTRADA`
@@ -1558,7 +2009,7 @@ Quita el ajuste; la tarifa vuelve a regirse por la vigencia de SAP.
 
 ### 3.8 Reglas Solo-SICETAC — `/api/reglas-solo-sicetac`
 
-**Todo el controller**: `AdminTarifas`, `Admin`.
+**Todo el controller**: `AdminTarifas`, `AdminBiblioteca`, `Admin` (#307: se agregó `AdminBiblioteca`).
 
 #### `GET /api/reglas-solo-sicetac`
 - Rate limit estándar. **→** `200 ReglaSoloSicetacDto[]`
@@ -1593,13 +2044,18 @@ Columnas: Origen, Destino, Tipo de vehículo.
   vehículo no esté en el catálogo de SAP (hay reglas con `3S2`/`2L3`, que SAP no trae). Antes
   se contaban como `invalidas`. El catálogo solo se exige a las reglas que se van a crear.
 
+#### `GET /api/reglas-solo-sicetac/plantilla-excel`
+Plantilla de Excel vacía para la carga masiva, con las 3 columnas de `importar-excel` (`ORIGEN`, `DESTINO`, `TIPO VEHICULO`).
+- **Roles**: `AdminTarifas`, `AdminBiblioteca`, `Admin`.
+- **→** `200`, archivo `.xlsx`
+
 #### `GET /api/reglas-solo-sicetac/exportar-excel`
 S5-HU-22.1/#288. Descarga las reglas ya cargadas, con las **mismas 3 columnas que acepta
 `importar-excel`** (`ORIGEN`, `DESTINO`, `TIPO VEHICULO`) y los valores tal como están
 guardados (código DANE como **texto**, para no perder el cero inicial de `05001000`). El
 archivo se puede editar y reimportar: las reglas que ya existen se reportan como `duplicadas`
 (no se pisan) y solo entran las filas nuevas.
-- **Roles**: `AdminTarifas`, `Admin`.
+- **Roles**: `AdminTarifas`, `AdminBiblioteca`, `Admin`.
 - **→** `200`, archivo `.xlsx` (`reglas-solo-sicetac-yyyyMMdd.xlsx`)
 
 ### 3.9 Servicios conexos — `/api/servicios-conexos`
@@ -1720,6 +2176,9 @@ crea ningún registro.
 | Recientes | sin filtros | `200 BibliotecaItemDto[]` |
 
 ### 3.11 Tarifas SICE-TAC (caché local) — `/api/tarifas-sicetac`
+
+> **⚠️ Retirado (#179).** Esta sección se conserva solo como historia: **ninguna de estas rutas existe hoy** (la caché local de SICE-TAC se
+> reemplazó por la lectura directa de DWSice; ver §3.5 `/api/biblioteca-sicetac`). Llamarlas devuelve `404`.
 
 #### `GET /api/tarifas-sicetac`
 - **Roles**: Todos.
@@ -2247,7 +2706,7 @@ interface TerminoClienteDto {
 Bandas de peso (kg) propias de Nexo para Tarifas de Plaza (S4-HU-10.1) — **no
 es un catálogo cerrado**, se pueden agregar bandas nuevas con el tiempo.
 `pesoMaximo = null` es una banda abierta (p. ej. "+10500 kg").
-**Todo el controller**: `AdminTarifas`, `Admin`.
+**Todo el controller**: `AdminTarifas`, `AdminBiblioteca`, `Admin` (#307: se agregó `AdminBiblioteca`).
 
 #### `GET /api/pesos`
 - **→** `200 RangoPesoDto[]`
@@ -2279,7 +2738,7 @@ catálogo de municipios al elegir `origenMunicipioId`/`destinoMunicipioId`.
 Al menos uno de `pesoId`/`tipoVehiculo` es obligatorio — **no son mutuamente
 excluyentes**: las tarifas de contenedor traen ambos (el tipo de vehículo se
 deriva de la banda de peso), las nacionales solo `tipoVehiculo`.
-**Todo el controller**: `AdminTarifas`, `Admin`.
+**Todo el controller**: `AdminTarifas`, `AdminBiblioteca`, `Admin` (#307: se agregó `AdminBiblioteca`).
 
 #### `GET /api/tarifas-plaza`
 - **→** `200 TarifaPlazaDto[]`
@@ -2601,7 +3060,7 @@ abiertos a los 6 roles.
 
 | Operación | Com | AdmBib | AdmTar | ServLog | Líder | Admin |
 |---|:-:|:-:|:-:|:-:|:-:|:-:|
-| `POST /api/captura-solicitudes/analizar-excel` · `POST .../sugerir-mapeo` · `POST .../aplicar-mapeo` · `POST .../normalizar-valores` · `PUT/GET/DELETE .../plantillas-mapeo` · `POST /api/captura-solicitudes` · `GET aprovisionamiento` · `GET clientes` | ✅ | | | | | ✅ |
+| `POST /api/captura-solicitudes/analizar-excel` · `POST .../leer-estructura` · `PUT/GET/DELETE .../recetas-lectura` · `POST .../sugerir-mapeo` · `POST .../aplicar-mapeo` · `POST .../normalizar-valores` · `PUT/GET/DELETE .../plantillas-mapeo` · `POST /api/captura-solicitudes` · `GET aprovisionamiento` · `GET clientes` | ✅ | | | | | ✅ |
 | `GET /api/captura-solicitudes/ciudades` · `departamentos` · `municipios` (S5-HU-22.1: cualquier rol válido) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | **Bandeja y Mesa**: `GET /api/solicitudes` · `GET /api/solicitudes/{id}` · `GET .../propuesta-tarifa` · `/hubs/bandeja` (#307) | ✅ | | ✅ | ✅ | ✅ | ✅ |
 | `POST /api/solicitudes` (#307, D5: solo Admin) | | | | | | ✅ |
@@ -2674,5 +3133,8 @@ comportamiento real del código.
 | 2 | `CatalogoLineaResueltoDto` | `clsVehiculoCreado` | `vehiculoCreado` | Nombre de campo JSON en `resolver-catalogos` |
 | 3 | Ítem de plan de cargue | `clsCliente` | `cliente` | Nombre de campo JSON en `items` e `items/importar` |
 | 4 | `importar-excel` de reglas y servicios | sin archivo → `400 VALIDATION_ERROR` | `400 ARCHIVO_REQUERIDO` | Código de error distinto al de los otros uploads |
+| 5 | `BandejaItemDto` (`GET /api/solicitudes`) | `clsCliente` | `cliente` | Nombre de campo JSON de cada fila de la bandeja. Verificado contra la respuesta real (2026-11-04) |
+| 6 | `LineaCosteoDto` (`GET /api/solicitudes/{id}`) y `PropuestaLineaDto` (`.../propuesta-tarifa`) | `clsRuta` | `ruta` | Nombre de campo JSON del texto de la ruta. Verificado contra la respuesta real (2026-11-04) |
 
-Los tres primeros parecen efecto del renombrado masivo con prefijo `cls`.
+Los seis parecen efecto del renombrado masivo con prefijo `cls`. **Quien consume la API debe leer los nombres que figuran en la columna «Hoy (código)»**:
+este documento los describe tal como viajan. Cuando se corrija el código se avisará aquí y en `docs/integraciones/` para que el cambio no rompa a nadie.

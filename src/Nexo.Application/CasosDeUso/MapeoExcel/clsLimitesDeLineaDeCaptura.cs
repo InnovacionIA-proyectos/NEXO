@@ -1,10 +1,6 @@
 namespace Nexo.Application.CasosDeUso.MapeoExcel;
 
-/// <summary>
-/// Los límites que la captura de una línea impone a sus campos (longitudes y rangos). Son los mismos que declara el cuerpo de
-/// <c>POST /api/captura-solicitudes</c>; se repiten aquí porque la importación de un Excel arma las líneas sin pasar por ese cuerpo y no puede
-/// aceptar una fila que la captura luego rechazaría. Una prueba compara estos valores con los atributos del cuerpo y falla si se separan.
-/// </summary>
+/// <summary>Límites de los campos de una línea de captura; se repiten de <c>POST /api/captura-solicitudes</c> porque la importación no pasa por ese cuerpo. Una prueba verifica que no se separen.</summary>
 public static class clsLimitesDeLineaDeCaptura
 {
     public const int MaxCiudad = 150;

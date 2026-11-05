@@ -12,11 +12,7 @@ public static class clsParametrosScoreMappers
             p.ValorPorDefectoSinValor, p.ProbabilidadPorDefecto);
 
     /// <summary>
-    /// Copia el DTO sobre la entidad con seguimiento.
-    ///
-    /// Se copia campo por campo sobre la fila existente en vez de reemplazarla: la fila
-    /// es única (Id = 1) y tiene token de concurrencia. Cambiar la instancia perdería
-    /// el token y dos recalibraciones a la vez se pisarían en silencio.
+    /// Copia campo por campo sobre la fila existente: es única (Id = 1) y lleva token de concurrencia; reemplazar la instancia lo perdería.
     /// </summary>
     public static void Copiar(this clsParametrosScoreDto d, clsParametrosScore destino)
     {

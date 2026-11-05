@@ -20,15 +20,8 @@ public class clsTarifasHistoricasController(
     : ControllerBase
 {
     /// <summary>
-    /// Con ruta/vehículo → sugerencias para el costeo (siempre las 10 más recientes, sin
-    /// paginar — es una sugerencia puntual, no un listado a recorrer). Con
-    /// q/mercancia/vigencia/origen → búsqueda filtrada de la Biblioteca, PAGINADA
-    /// (page/pageSize, respuesta `{ items, total }`). Sin nada → las más recientes
-    /// sin paginar (mismo comportamiento que "sugerir").
-    ///
-    /// El shape de la respuesta depende de la rama (array plano vs. `{items,total}`) -
-    /// a propósito, son dos casos de uso distintos que comparten ruta desde el original;
-    /// separarlos en dos endpoints queda fuera del alcance de este fix.
+    /// Con ruta/vehículo: las 10 más recientes como sugerencia de costeo (sin paginar). Con q/mercancia/vigencia/origen: búsqueda filtrada y paginada (<c>{ items, total }</c>). Sin nada: las más recientes sin paginar.
+    /// El shape depende de la rama (array plano vs. <c>{ items, total }</c>): son dos casos de uso que comparten ruta.
     /// </summary>
     [HttpGet]
     [ProducesResponseType(StatusCodes.Status200OK)]

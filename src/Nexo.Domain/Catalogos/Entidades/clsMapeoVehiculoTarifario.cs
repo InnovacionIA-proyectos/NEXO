@@ -1,9 +1,9 @@
 namespace Nexo.Domain.Catalogos.Entidades;
 
 /// <summary>
-/// Con qué código se busca un vehículo de NEXO en cada fuente de tarifas. SICE-TAC y Plaza/SAP nombran el mismo vehículo con códigos
-/// distintos (el Sencillo es <c>C2</c> en NEXO y <c>2</c> en las dos fuentes; el Turbo <c>2L1</c>/<c>2L3</c> se tarifa en plaza como
-/// <c>2L2</c>), y buscarlo con el código de NEXO no encuentra filas y termina eligiendo, sin avisar, el vehículo más barato de la ruta.
+/// Código con el que se busca un vehículo de NEXO en cada fuente de tarifas. SICE-TAC y Plaza/SAP lo nombran distinto
+/// (Sencillo: <c>C2</c> en NEXO, <c>2</c> en las fuentes; Turbo <c>2L1</c>/<c>2L3</c> se tarifa en plaza como <c>2L2</c>);
+/// con el código de NEXO no hay filas y se elegiría sin aviso el vehículo más barato de la ruta.
 /// </summary>
 public class clsMapeoVehiculoTarifario
 {

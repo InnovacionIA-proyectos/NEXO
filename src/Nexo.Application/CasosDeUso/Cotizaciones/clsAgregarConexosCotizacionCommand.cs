@@ -12,17 +12,12 @@ using Nexo.Mensajes.Notificaciones;
 
 namespace Nexo.Application.CasosDeUso.Cotizaciones;
 
-/// <summary>LineaId (S4-HU-15.4/#250): a qué línea de la cotización aplica — obligatorio,
-/// ya no existe el conexo "general" sin línea. Origen (S5-HU-18/#262): "individual" o
-/// "general" — ver clsCotizacionConexo.Origen.</summary>
+/// <summary>LineaId: a qué línea de la cotización aplica (obligatorio). Origen: "individual" o "general" (ver clsCotizacionConexo.Origen).</summary>
 public sealed record clsConexoItem(Guid LineaId, Guid ServicioConexoId, decimal Cantidad, decimal? ValorAplicado, string Origen = "individual");
 
 /// <summary>
-/// Agregar servicios conexos (logísticos/adicionales) a la cotización. S5-HU-20.1/#286:
-/// se admite mientras la cotización no tenga resultado (Borrador o Entregada); si ya está
-/// Ganada/Perdida → 409 COTIZACION_CERRADA. Tras la entrega deja la marca
-/// <c>ModificadaTrasEntregaAt</c> y avisa a quien creó la solicitud (ver
-/// <see cref="clsCambioDeConexos"/>).
+/// Agrega servicios conexos a la cotización mientras no tenga resultado (Borrador o Entregada); Ganada/Perdida → 409 COTIZACION_CERRADA.
+/// Tras la entrega marca <c>ModificadaTrasEntregaAt</c> y avisa a quien creó la solicitud (<see cref="clsCambioDeConexos"/>).
 /// </summary>
 public sealed record clsAgregarConexosCotizacionCommand(
     Guid CotizacionId, IReadOnlyList<clsConexoItem> Items) : ICommand<clsCotizacionDto>;

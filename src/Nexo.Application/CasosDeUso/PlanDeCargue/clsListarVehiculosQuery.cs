@@ -6,10 +6,7 @@ using Nexo.Application.Common.Dtos;
 
 namespace Nexo.Application.CasosDeUso.PlanDeCargue;
 
-/// <summary>GET /api/vehiculos — catálogo desde la proyección local, sin llamar a
-/// Cubicador. Pagina (page 1-based, pageSize) aunque el catálogo hoy sea chico
-/// (~15 filas) — el contrato queda consistente con el resto de los endpoints de
-/// listado.</summary>
+/// <summary>GET /api/vehiculos — catálogo paginado (page 1-based, pageSize) desde la proyección local, sin llamar a Cubicador.</summary>
 public sealed record clsListarVehiculosQuery(int Page = 1, int PageSize = 50) : IQuery<clsPaginaDto<clsVehiculoCubicacionDto>>;
 
 public sealed class clsListarVehiculosQueryHandler(IVehiculoCubicacionRepository vehiculos)

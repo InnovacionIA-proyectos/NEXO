@@ -9,13 +9,8 @@ using Nexo.Application.Common.Ports;
 
 namespace Nexo.Infrastructure.IA;
 
-/// <summary>
-/// Conversación con herramientas y respuesta en tiempo real (<see cref="IConversacionIaPort"/>) sobre el mismo cliente del proveedor.
-///
-/// El bucle vive aquí y no en Application porque con el razonamiento adaptativo el modelo emite bloques de pensamiento firmados que
-/// hay que devolverle intactos junto a sus peticiones de herramienta; son un detalle del proveedor y no salen del adaptador. Cada
-/// petición se recibe como flujo, el texto se entrega al instante y los bloques se ensamblan para armar el siguiente turno.
-/// </summary>
+/// <summary>Conversación con herramientas y respuesta en tiempo real. El bucle vive aquí y no en Application porque los bloques de
+/// pensamiento firmados del razonamiento adaptativo hay que devolverlos intactos y son un detalle del proveedor.</summary>
 public sealed partial class clsAnthropicAdapter : IConversacionIaPort
 {
     public Task VerificarAsync(clsFuncionIa funcion, Guid? usuarioId, CancellationToken ct = default)

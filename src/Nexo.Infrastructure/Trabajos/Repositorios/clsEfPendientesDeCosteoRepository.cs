@@ -12,8 +12,7 @@ public sealed class clsEfPendientesDeCosteoRepository(clsNexoDbContext db) : IPe
     public async Task RegistrarAsync(Guid trabajoId, Guid solicitudId, Guid lineaId,
                                      TipoPendienteDeCosteo tipo, string motivo, CancellationToken ct = default)
     {
-        // Idempotente: un reintento del mensaje no es un pendiente nuevo. Sin esto la
-        // misma línea aparecería repetida tantas veces como se reentregara.
+        // Idempotente: un reintento del mensaje no es un pendiente nuevo.
         var yaEstaba = await db.Set<clsLineaPendienteDeCosteo>()
             .AnyAsync(p => p.TrabajoId == trabajoId
                         && p.LineaSolicitudId == lineaId
@@ -27,8 +26,7 @@ public sealed class clsEfPendientesDeCosteoRepository(clsNexoDbContext db) : IPe
             SolicitudId = solicitudId,
             LineaSolicitudId = lineaId,
             Tipo = tipo,
-            // La columna admite 500: un motivo más largo se recorta en vez de tumbar el
-            // registro, porque perder el pendiente es peor que perder la cola del texto.
+            // La columna admite 500: un motivo más largo se recorta, porque perder el pendiente es peor.
             Motivo = motivo.Length > 500 ? motivo[..500] : motivo,
         });
     }
@@ -42,9 +40,8 @@ public sealed class clsEfPendientesDeCosteoRepository(clsNexoDbContext db) : IPe
 
     public async Task MarcarResueltoAsync(Guid trabajoId, Guid lineaId, TipoPendienteDeCosteo tipo, CancellationToken ct = default)
     {
-        // Se marca en vez de borrar: queda el rastro de cuánto tardó, que para el tipo
-        // Manual es cuánto tardó la intervención de una persona. Ese dato es el que
-        // permite saber si la cola del Administrador de Tarifas es un cuello de botella.
+        // Se marca en vez de borrar: queda cuánto tardó (en Manual, la intervención de una persona),
+        // dato para detectar si la cola del Administrador de Tarifas es un cuello de botella.
         var abiertos = await db.Set<clsLineaPendienteDeCosteo>()
             .Where(p => p.TrabajoId == trabajoId && p.LineaSolicitudId == lineaId
                      && p.Tipo == tipo && p.ResueltaEn == null)

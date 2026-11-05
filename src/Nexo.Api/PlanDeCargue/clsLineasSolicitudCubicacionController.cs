@@ -7,12 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Nexo.Api.PlanDeCargue;
 
-/// <summary>
-/// Puente de solo lectura hacia el microservicio Cubicador (Python) — NO es un
-/// controlador de uso interno/frontend. Autenticación por Bearer estático de
-/// servicio-a-servicio (<see cref="clsCubicadorApiKeyAuthenticationHandler"/>), no por
-/// sesión de usuario. Ver cubicador/CONTRATO.md sección 7.
-/// </summary>
+/// <summary>Puente de solo lectura hacia el Cubicador (Python), no de uso del frontend: autentica con Bearer estático servicio-a-servicio (<see cref="clsCubicadorApiKeyAuthenticationHandler"/>), no por sesión de usuario.</summary>
 [ApiController]
 [Authorize(AuthenticationSchemes = clsCubicadorApiKeyAuthenticationHandler.SchemeName)]
 [Route("api/lineas-solicitud")]

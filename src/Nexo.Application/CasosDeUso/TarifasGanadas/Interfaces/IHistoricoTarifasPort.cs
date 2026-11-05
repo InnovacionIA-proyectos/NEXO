@@ -12,9 +12,7 @@ public interface IHistoricoTarifasPort
     /// <summary>Las 10 más recientes que calzan con ruta/vehículo/mercancía (sugerencia de costeo).</summary>
     Task<IReadOnlyList<clsBibliotecaItemDto>> SugerirAsync(Guid? rutaId, Guid? vehiculoId, string? mercancia, CancellationToken ct);
 
-    /// <summary>Búsqueda filtrada de la Biblioteca. Pagina 1-based +
-    /// pageSize, reemplaza el tope fijo de 50 (que no exponía el total real ni
-    /// dejaba pedir más) por paginación real.</summary>
+    /// <summary>Búsqueda filtrada de la Biblioteca, con paginación 1-based y pageSize.</summary>
     Task<(IReadOnlyList<clsBibliotecaItemDto> Items, int Total)> BuscarAsync(
         string? q, string? mercancia, string? vigencia, bool? deGanada, int page, int pageSize, CancellationToken ct);
 }

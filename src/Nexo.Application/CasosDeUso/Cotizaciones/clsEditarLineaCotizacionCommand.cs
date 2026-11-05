@@ -13,27 +13,16 @@ using Nexo.Domain.Common;
 namespace Nexo.Application.CasosDeUso.Cotizaciones;
 
 /// <summary>
-/// S5-HU-20.1/#286: corregir el valor de un flete ya agregado a la cotización.
-///
-/// Existe porque <see cref="clsAgregarLineaCotizacionCommand"/> SIEMPRE agrega una fila nueva:
-/// editar desde el front reusando "agregar" duplicaría la línea e inflaría el total
-/// (<see cref="clsCotizacionCalculos.Recalcular"/> suma ambas). Acá se modifica LA MISMA fila.
-///
-/// S6-HU-26.1/#30 — se puede editar un flete de CUALQUIER fuente (Manual, Tarifario/plaza, SICE-TAC, Histórico), para
-/// corregir una tarifa sin tener que reemplazarla eligiendo otro candidato. Antes solo la Manual (409 FLETE_NO_EDITABLE).
+/// Corrige el valor de un flete ya agregado, modificando LA MISMA fila (reusar "agregar" duplicaría la línea e inflaría el total).
 /// Reglas:
-///  · Solo cotización Borrador; la línea tiene que existir en ESTA cotización.
-///  · Si la ruta y el vehículo de la línea tienen regla Solo-SICE, NO se edita (409 FLETE_SOLO_SICETAC): ahí gobierna
-///    el piso y nadie lo sobreescribe a mano.
-///  · Nunca por debajo del piso SICE-TAC (400 FLETE_BAJO_PISO_SICETAC, misma regla que al agregar, #283).
-///  · Si el piso NO se puede verificar (la ruta no tiene fila en DWSice, el período no es el del mes actual, o la consulta
-///    falló), NO se guarda en silencio: 409 PISO_SICETAC_NO_VERIFICABLE. Antes la validación simplemente se saltaba y
-///    cualquier valor entraba. Quien edita puede confirmar con <c>ConfirmarSinPiso</c> y queda en la auditoría.
-///  · Al guardar, la fuente PASA A MANUAL (decisión D4): el valor ya no sale de la fuente original sino de una persona.
-///    La auditoría guarda el valor y la fuente ANTERIORES.
+///  · Solo cotización Borrador; la línea tiene que existir en ESTA cotización; se edita un flete de cualquier fuente.
+///  · Con regla Solo-SICE para la ruta y el vehículo NO se edita (409 FLETE_SOLO_SICETAC): gobierna el piso.
+///  · Nunca por debajo del piso SICE-TAC (400 FLETE_BAJO_PISO_SICETAC, misma regla que al agregar).
+///  · Si el piso NO se puede verificar (sin fila en DWSice, período distinto al del mes actual o consulta fallida): 409 PISO_SICETAC_NO_VERIFICABLE,
+///    salvo <c>ConfirmarSinPiso</c>, que queda en la auditoría.
+///  · Al guardar la fuente PASA A MANUAL (el valor ya lo fija una persona) y la auditoría guarda el valor y la fuente ANTERIORES.
 /// </summary>
-/// <param name="LineaSolicitudId">La línea del PLIEGO (clsLineaSolicitud), no el Id de la fila de la cotización:
-/// es la que el front ya conoce y la misma que usa "agregar".</param>
+/// <param name="LineaSolicitudId">La línea del PLIEGO (clsLineaSolicitud), no el Id de la fila de la cotización; la misma que usa "agregar".</param>
 /// <param name="ValorRetornoContenedor">null = no se toca el valor que ya tenía.</param>
 /// <param name="ConfirmarSinPiso">true = quien edita acepta guardar aunque no se haya podido verificar el piso. Solo
 /// sirve para el caso "no verificable": un valor bajo un piso que SÍ se encontró se rechaza siempre.</param>
@@ -62,9 +51,8 @@ public sealed class clsEditarLineaCotizacionCommandHandler(
         var linea = c.Lineas.FirstOrDefault(l => l.LineaSolicitudId == command.LineaSolicitudId)
             ?? throw new clsNotFoundException("LINEA_NO_ENCONTRADA", "La línea no tiene un flete en esta cotización.");
 
-        // S6-HU-26.1/#30: con regla Solo-SICE para la ruta y el vehículo, gobierna el piso y no se edita a mano. Misma
-        // definición que usa el motor de propuesta y que la Mesa expone como tieneReglaSoloSicetac. Antes que el piso: es
-        // más barato y, si hay regla, el piso es irrelevante.
+        // Con regla Solo-SICE gobierna el piso y no se edita a mano (misma definición que el motor de propuesta y que tieneReglaSoloSicetac).
+        // Va antes que el piso porque es más barato.
         var lineaSolicitud = await lineasSolicitud.ObtenerConRutaYVehiculoAsync(command.LineaSolicitudId, c.SolicitudId, ct);
         var claves = await reglasSoloSicetac.ClavesRutaVehiculoAsync(ct);
         if (lineaSolicitud is not null && clsReglaSoloSicetacDeLinea.Tiene(
@@ -75,8 +63,7 @@ public sealed class clsEditarLineaCotizacionCommandHandler(
                 "La ruta y el vehículo de esta línea tienen regla Solo SICE-TAC: el flete lo fija el piso SICE-TAC y no se puede " +
                 "editar a mano. Un Administrador de Tarifas puede quitar la regla si hace falta.");
 
-        // Mismo piso que al agregar (#283): el servidor no confía en que la pantalla lo haya
-        // bloqueado — llamar la API directo lo saltaría.
+        // Mismo piso que al agregar: el servidor no confía en el bloqueo de pantalla.
         var propuesta = (await propuestas.ProponerAsync(c.SolicitudId, ct)).Lineas
             .FirstOrDefault(x => x.LineaId == command.LineaSolicitudId);
 
@@ -85,10 +72,8 @@ public sealed class clsEditarLineaCotizacionCommandHandler(
             throw new clsValidationFailedException("FLETE_BAJO_PISO_SICETAC",
                 $"El flete ({clsMoneda.Pesos(command.ValorFlete)}) está por debajo del piso SICE-TAC ({clsMoneda.Pesos(piso)}). No se puede guardar un valor por debajo del piso.");
 
-        // S6-HU-26.1/#30: el hueco de #283 — la validación del piso se SALTABA cuando no había piso (ruta sin fila en
-        // DWSice, período que no es el del mes actual, o la consulta falló), y cualquier valor entraba sin aviso. Ahora se
-        // avisa; el que edita decide con ConfirmarSinPiso y queda en la auditoría. No se puede distinguir "no hay piso para
-        // esta ruta" de "la consulta falló" desde acá, y no hace falta: en los dos casos el piso no se verificó.
+        // Sin piso (ruta sin fila en DWSice, período distinto al del mes actual o consulta fallida) no se guarda en silencio: el que edita decide
+        // con ConfirmarSinPiso y queda en la auditoría. No se distinguen los casos: en todos el piso no se verificó.
         if (!pisoVerificado && !command.ConfirmarSinPiso)
         {
             var motivo = string.IsNullOrWhiteSpace(propuesta?.MotivoPendiente) || !propuesta.MotivoPendiente.StartsWith("SICE-TAC no se usa")
@@ -102,7 +87,7 @@ public sealed class clsEditarLineaCotizacionCommandHandler(
         var anterior = linea.ValorFlete;
         var fuenteAnterior = linea.Fuente;
         linea.ValorFlete = command.ValorFlete;
-        // Decisión D4: el valor ya no sale de su fuente original, sale de una persona.
+        // El valor ya no sale de su fuente original sino de una persona.
         linea.Fuente = FuenteFlete.Manual;
         if (command.ValorRetornoContenedor is { } retorno) linea.ValorRetornoContenedor = retorno;
         linea.UpdatedAt = DateTimeOffset.UtcNow;

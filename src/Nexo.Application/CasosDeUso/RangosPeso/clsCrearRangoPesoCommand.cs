@@ -7,8 +7,7 @@ using Nexo.Domain.Costeo.Entidades;
 
 namespace Nexo.Application.CasosDeUso.RangosPeso;
 
-/// <summary>El Administrador de Tarifas agrega una banda de peso al catálogo (S4-HU-10.1)
-/// — no es un catálogo cerrado, el sistema externo permite bandas puntuales nuevas.</summary>
+/// <summary>Agrega una banda de peso al catálogo; no es cerrado, el sistema externo permite bandas puntuales nuevas.</summary>
 public sealed record clsCrearRangoPesoCommand(int PesoMinimo, int? PesoMaximo) : ICommand<clsRangoPesoDto>;
 
 public sealed class clsCrearRangoPesoCommandHandler(IRangosPesoRepository rangos, IUnitOfWork uow)

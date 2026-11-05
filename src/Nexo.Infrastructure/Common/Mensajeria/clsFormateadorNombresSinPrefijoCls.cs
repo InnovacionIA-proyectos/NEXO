@@ -3,11 +3,7 @@ using MassTransit;
 namespace Nexo.Infrastructure.Common.Mensajeria;
 
 /// <summary>
-/// Evita que el prefijo "cls" de las clases (consumers, sagas, mensajes) cambie los
-/// nombres de cola/exchange que MassTransit genera por convención. Sin esto, renombrar
-/// una clase (p. ej. CostearLineaConsumer -> clsCostearLineaConsumer) crearía una cola
-/// nueva en RabbitMQ y dejaría huérfana la anterior. Envuelve el formateador por
-/// defecto y quita el segmento "cls-" inicial del resultado.
+/// Quita el prefijo "cls-" de los nombres de cola/exchange de MassTransit para que renombrar una clase no cree una cola nueva y deje huérfana la anterior.
 /// </summary>
 public sealed class clsFormateadorNombresSinPrefijoCls : IEndpointNameFormatter
 {

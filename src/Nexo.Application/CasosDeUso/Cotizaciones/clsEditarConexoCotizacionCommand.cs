@@ -10,11 +10,7 @@ using Nexo.Domain.Enums;
 
 namespace Nexo.Application.CasosDeUso.Cotizaciones;
 
-/// <summary>
-/// S5-HU-18/#262: corregir la cantidad (y opcionalmente el costo, <c>ValorAplicado</c>) de un conexo ya
-/// agregado — antes la única forma de corregir un error de cantidad era agregar otra fila,
-/// sin poder deshacer la original.
-/// </summary>
+/// <summary>Corrige la cantidad (y opcionalmente el costo, <c>ValorAplicado</c>) de un conexo ya agregado.</summary>
 public sealed record clsEditarConexoCotizacionCommand(
     Guid CotizacionId, Guid ConexoId, decimal Cantidad, decimal? ValorAplicado) : ICommand<clsCotizacionDto>;
 

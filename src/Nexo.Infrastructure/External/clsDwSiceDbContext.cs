@@ -3,11 +3,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Nexo.Infrastructure.External;
 
-/// <summary>
-/// Contexto de SOLO LECTURA contra el Data Warehouse corporativo (base DWSice).
-/// El usuario de conexión solo tiene permisos de lectura; además este contexto
-/// deshabilita el tracking y bloquea SaveChanges como defensa en profundidad.
-/// </summary>
+/// <summary>Contexto de SOLO LECTURA contra el DW corporativo (DWSice): sin tracking y con SaveChanges bloqueado como defensa en profundidad.</summary>
 public class clsDwSiceDbContext : DbContext
 {
     public clsDwSiceDbContext(DbContextOptions<clsDwSiceDbContext> options) : base(options)

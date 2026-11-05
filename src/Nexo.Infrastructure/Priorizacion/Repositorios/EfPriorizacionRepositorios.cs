@@ -7,14 +7,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Nexo.Infrastructure.Priorizacion.Repositorios;
 
-/// <summary>
-/// La fila única de parámetros, con seguimiento porque el caso de uso la va a modificar.
-///
-/// Si no existe se crea con los valores por defecto en vez de fallar. La siembra la crea,
-/// pero una base migrada a mano podría no tenerla, y en ese caso el Admin se encontraría
-/// un 500 al abrir la pantalla de recalibración — cuando lo que corresponde es mostrarle
-/// la configuración por defecto, que es exactamente con la que el sistema está corriendo.
-/// </summary>
+/// <summary>La fila única de parámetros, con seguimiento. Si no existe se crea con los valores por defecto
+/// (una base migrada a mano podría no tenerla) en vez de fallar con 500.</summary>
 public sealed class clsEfParametrosScoreRepository(clsNexoDbContext db) : IParametrosScorePort
 {
     public async Task<clsParametrosScore> ParaEditarAsync(CancellationToken ct = default)
@@ -28,16 +22,8 @@ public sealed class clsEfParametrosScoreRepository(clsNexoDbContext db) : IParam
     }
 }
 
-/// <summary>
-/// Las activas por lotes, paginando por identificador.
-///
-/// Por identificador y no por Skip/Take: el recálculo ESCRIBE sobre las mismas filas que
-/// recorre. Con desplazamiento, una fila que cambia de posición entre dos lotes se salta
-/// sin que nadie se entere, y el resultado es una solicitud con score viejo que nadie
-/// sabe explicar.
-///
-/// Con seguimiento porque el caso de uso modifica el score y lo guarda por lote.
-/// </summary>
+/// <summary>Las activas por lotes, paginando por identificador y no por Skip/Take: el recálculo escribe sobre las filas que recorre
+/// y con desplazamiento se saltarían. Con seguimiento porque se modifica el score.</summary>
 public sealed class clsEfSolicitudesParaRecalcularRepository(clsNexoDbContext db)
     : ISolicitudesParaRecalcularPort
 {

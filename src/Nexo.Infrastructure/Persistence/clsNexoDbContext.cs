@@ -35,6 +35,7 @@ public class clsNexoDbContext : DbContext
     public DbSet<clsAliasElemento> AliasElementos => Set<clsAliasElemento>();
     public DbSet<clsTerminoCliente> TerminosCliente => Set<clsTerminoCliente>();
     public DbSet<clsPlantillaMapeoCliente> PlantillasMapeo => Set<clsPlantillaMapeoCliente>();
+    public DbSet<clsRecetaLecturaCliente> RecetasLectura => Set<clsRecetaLecturaCliente>();
     public DbSet<clsTarifaHistorica> TarifasHistoricas => Set<clsTarifaHistorica>();
     public DbSet<clsServicioConexo> ServiciosConexos => Set<clsServicioConexo>();
     public DbSet<clsCotizacion> Cotizaciones => Set<clsCotizacion>();
@@ -68,26 +69,15 @@ public class clsNexoDbContext : DbContext
     {
         base.OnModelCreating(b);
 
-        // Esquema propio dentro de dbInformesAutomatizados_Pruebas (BD compartida con
-        // otra app ajena a NEXO, que ya vive en 'dbo' y en su propio 'dbo_prueba').
-        // Sin esto, las tablas de Nexo quedan mezcladas con las de esa otra app.
-        // Se llamó "dbo_NEXO_prueba" originalmente; se renombró a "db_NEXO" — sigue
-        // siendo un schema dentro de la MISMA base compartida, no una base aparte.
-        // Es la única línea que hay que tocar para mover NEXO a otro schema/base.
+        // Esquema propio dentro de una base compartida con otra app ajena a NEXO; es la única línea que hay que tocar para mover NEXO a otro esquema.
         b.HasDefaultSchema(clsEsquemaNexo.Nombre);
 
-        // Tablas del Transactional Outbox de MassTransit. Viven en ESTA base a
-        // propósito: la garantía de atomicidad depende de que el mensaje y los datos
-        // del caso de uso se guarden en la misma transacción.
+        // Tablas del Outbox de MassTransit en esta base: el mensaje y los datos del caso de uso deben guardarse en la misma transacción.
         b.AddInboxStateEntity();
         b.AddOutboxMessageEntity();
         b.AddOutboxStateEntity();
 
-        // Líneas que quedaron sin costear, con su tipo y su motivo. Un solo sitio para
-        // las dos razones: dos sitios contando lo mismo acaban contradiciéndose.
-        //
-        // El índice va filtrado por las que siguen pendientes, que es la consulta que
-        // hace la pantalla; indexar las ya resueltas no aporta y la tabla crece.
+        // Líneas sin costear, con tipo y motivo. El índice va filtrado por las pendientes (lo que consulta la pantalla); indexar las resueltas no aporta.
         b.Entity<clsLineaPendienteDeCosteo>(e =>
         {
             e.ToTable("tbl_lineas_pendientes_de_costeo");
@@ -97,9 +87,7 @@ public class clsNexoDbContext : DbContext
             e.HasIndex(x => x.SolicitudId).HasFilter("[ResueltaEn] IS NULL");
         });
 
-        // Estado de la saga del auto-costeo. Se persiste aquí y no en otra base porque
-        // ES la respuesta al cliente que preguntó por su trabajo: si un reinicio lo
-        // borrara, quedaría preguntando por algo que ya nadie recuerda.
+        // Estado de la saga del auto-costeo: es la respuesta al cliente que consulta su trabajo, por eso se persiste aquí y sobrevive a un reinicio.
         b.Entity<clsEstadoAutoCosteo>(e =>
         {
             e.ToTable("tbl_trabajos_auto_costeo");
@@ -142,29 +130,18 @@ public class clsNexoDbContext : DbContext
         b.Entity<clsMapeoRolPortal>(e =>
         {
             e.ToTable("tbl_mapeo_rol_portal");
-            // Filtrado (no único plano): IdRolPortal queda NULL hasta que TI confirme el
-            // id real (ver comentario del seed más abajo), y puede haber varias filas así
-            // a la vez.
+            // Filtrado (no único plano): IdRolPortal es NULL hasta que TI confirme el id real y puede haber varias filas así a la vez.
             e.HasIndex(x => x.IdRolPortal).IsUnique().HasFilter("[IdRolPortal] IS NOT NULL");
             e.Property(x => x.Rol).HasConversion<string>().HasMaxLength(40);
             e.Property(x => x.DescripcionRolPortal).HasMaxLength(200);
 
-            // Equivalencias de ALTA confianza por nombre (docs/contrato-integracion,
-            // sección 2). El resto de los 6 roles de Nexo (AdminBiblioteca,
-            // LiderProceso, ServiciosLogisticos) no tienen candidato todavía: Pendiente
-            // P2, a confirmar por negocio. IdRolPortal queda NULL a propósito: no hay
-            // todavía un IDROLES real confirmado contra la base de identidad, y adivinar
-            // uno arriesgaría matchear por accidente el rol de otra persona. La resolución
-            // por nombre (clsResolverIdentidadPortalAdapter) alcanza mientras tanto; cuando
-            // TI confirme el id real, se completa esta columna con un UPDATE, sin deploy.
+            // Equivalencias de alta confianza por nombre (docs/contrato-integracion, sección 2). IdRolPortal queda NULL a propósito: adivinar un id
+            // arriesgaría coincidir con el rol de otra persona; la resolución por nombre (clsResolverIdentidadPortalAdapter) alcanza hasta que TI confirme el id real.
             e.HasData(
                 new clsMapeoRolPortal { Id = Guid.Parse("00000000-0000-0000-0001-000000000001"), IdRolPortal = null, DescripcionRolPortal = "TarifasComercial", Rol = RolUsuario.Comercial, CreatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero) },
                 new clsMapeoRolPortal { Id = Guid.Parse("00000000-0000-0000-0001-000000000002"), IdRolPortal = null, DescripcionRolPortal = "TarifasAdministrador", Rol = RolUsuario.AdminTarifas, CreatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero) },
                 new clsMapeoRolPortal { Id = Guid.Parse("00000000-0000-0000-0001-000000000003"), IdRolPortal = null, DescripcionRolPortal = "Administracion", Rol = RolUsuario.Admin, CreatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero) },
-                // Roles nuevos creados en el portal ya con el sufijo "NEXO" (uno por
-                // cada rol de Nexo, IDROLES real de tblSAPRoles en
-                // dbSolucionesTI — ver docs/contrato-integracion): reemplazan en la
-                // práctica a los 3 de arriba para las pruebas de identidad real.
+                // Roles creados en el portal con sufijo "NEXO" (IDROLES real de tblSAPRoles en dbSolucionesTI): sustituyen a los 3 de arriba para identidad real.
                 new clsMapeoRolPortal { Id = Guid.Parse("00000000-0000-0000-0001-000000000004"), IdRolPortal = 48, DescripcionRolPortal = "ComercialNEXO", Rol = RolUsuario.Comercial, CreatedAt = new DateTimeOffset(2026, 9, 1, 0, 0, 0, TimeSpan.Zero) },
                 new clsMapeoRolPortal { Id = Guid.Parse("00000000-0000-0000-0001-000000000005"), IdRolPortal = 49, DescripcionRolPortal = "CoordinadorFletesNEXO", Rol = RolUsuario.AdminBiblioteca, CreatedAt = new DateTimeOffset(2026, 9, 1, 0, 0, 0, TimeSpan.Zero) },
                 new clsMapeoRolPortal { Id = Guid.Parse("00000000-0000-0000-0001-000000000006"), IdRolPortal = 50, DescripcionRolPortal = "AdminTarifasNEXO", Rol = RolUsuario.AdminTarifas, CreatedAt = new DateTimeOffset(2026, 9, 1, 0, 0, 0, TimeSpan.Zero) },
@@ -226,7 +203,7 @@ public class clsNexoDbContext : DbContext
             e.Property(x => x.HorasCargue).HasColumnType("decimal(6,2)");
             e.Property(x => x.HorasDescargue).HasColumnType("decimal(6,2)");
             e.Property(x => x.IdRecomendacionVehiculo).HasMaxLength(64);
-            e.Property(x => x.MotivoRechazo).HasMaxLength(500);   // S6-HU-24.3/#320 (columnas de #314)
+            e.Property(x => x.MotivoRechazo).HasMaxLength(500);
             e.HasOne(x => x.clsSolicitud)
              .WithMany(s => s.Lineas)
              .HasForeignKey(x => x.SolicitudId)
@@ -256,7 +233,7 @@ public class clsNexoDbContext : DbContext
             e.Property(x => x.Descartada).HasDefaultValue(false);
         });
 
-        // S6-HU-27.2/#321: diccionario de alias (tabla creada en #315). Sin migración de EF: el esquema vive en ESQUEMA_NEXO.sql.
+        // Diccionario de alias. Sin migración de EF: el esquema vive en ESQUEMA_NEXO.sql.
         b.Entity<clsAliasElemento>(e =>
         {
             e.ToTable("tbl_alias_elementos");
@@ -292,6 +269,18 @@ public class clsNexoDbContext : DbContext
             e.HasOne(x => x.Cliente).WithMany().HasForeignKey(x => x.ClienteId).OnDelete(DeleteBehavior.Restrict);
         });
 
+        // La receta de lectura del Excel de un cliente (dónde están encabezados y datos). Sin migración de EF: el esquema vive en ESQUEMA_NEXO.sql.
+        b.Entity<clsRecetaLecturaCliente>(e =>
+        {
+            e.ToTable("tbl_recetas_lectura_cliente");
+            e.Property(x => x.Nombre).HasMaxLength(100);
+            e.Property(x => x.Receta).IsRequired();
+            e.Property(x => x.Huella).IsRequired();
+            e.Property(x => x.Instrucciones).HasMaxLength(4000);
+            e.HasIndex(x => x.ClienteId);
+            e.HasOne(x => x.Cliente).WithMany().HasForeignKey(x => x.ClienteId).OnDelete(DeleteBehavior.Restrict);
+        });
+
         b.Entity<clsTarifaHistorica>(e =>
         {
             e.ToTable("tbl_tarifas_historicas");
@@ -323,9 +312,7 @@ public class clsNexoDbContext : DbContext
             e.Property(x => x.Ruta).HasDefaultValue(clsServicioConexo.NoAplica);
             e.Property(x => x.TipoMaquina).HasDefaultValue(clsServicioConexo.NoAplica);
             e.Property(x => x.Activo).HasDefaultValue(true);
-            // Única real (S4-HU-15/#223): un mismo CodigoServicio puede repetirse con
-            // dimensiones distintas (Almacenamiento en dos ciudades), nunca la misma
-            // combinación completa.
+            // Única real: un mismo CodigoServicio puede repetirse con dimensiones distintas (p. ej. Almacenamiento en dos ciudades), nunca con la misma combinación completa.
             e.HasIndex(x => new { x.CodigoServicio, x.Origen, x.Destino, x.Puerto, x.Ruta, x.TipoMaquina }).IsUnique();
             e.HasIndex(x => x.CodigoServicio);
             e.HasOne(x => x.ActualizadoPorUsuario)
@@ -375,9 +362,7 @@ public class clsNexoDbContext : DbContext
              .WithMany()
              .HasForeignKey(x => x.ServicioConexoId)
              .OnDelete(DeleteBehavior.Restrict);
-            // Restrict (no Cascade): clsCotizacion ya cascadea hacia Conexos directo
-            // (línea 281) — un segundo camino en cascada Cotizacion→Lineas→Conexos
-            // produciría "multiple cascade paths", que SQL Server rechaza al crear el FK.
+            // Restrict (no Cascade): clsCotizacion ya cascadea hacia Conexos directo y un segundo camino Cotizacion→Lineas→Conexos produciría "multiple cascade paths" en SQL Server.
             e.HasOne(x => x.clsCotizacionLinea)
              .WithMany()
              .HasForeignKey(x => x.CotizacionLineaId)
@@ -471,9 +456,7 @@ public class clsNexoDbContext : DbContext
                 e.Property(p).HasColumnType("decimal(12,2)");
         });
 
-        // S5-HU-18.5/#277: proyecciones del catálogo del Cubicador, mantenidas por eventos
-        // (clsMercanciaCatalogoConsumer/clsCarroceriaCatalogoConsumer) — Id es el string que
-        // asigna el Cubicador, no un Guid generado acá.
+        // Proyecciones del catálogo del Cubicador, mantenidas por eventos; Id es el string que asigna el Cubicador, no un Guid generado acá.
         b.Entity<clsTipoMercanciaCatalogo>(e =>
         {
             e.ToTable("tbl_tipos_mercancia_catalogo");
@@ -486,7 +469,7 @@ public class clsNexoDbContext : DbContext
             e.HasKey(x => x.Id);
         });
 
-        // #304: el rechazo del Cubicador a "crear_desde_linea", una fila por línea (la clave ES la línea).
+        // Rechazo del Cubicador a "crear_desde_linea", una fila por línea (la clave ES la línea).
         b.Entity<clsRechazoCubicacionLinea>(e =>
         {
             e.ToTable("tbl_rechazos_cubicacion_linea");
@@ -515,10 +498,7 @@ public class clsNexoDbContext : DbContext
             e.ToTable("tbl_items_plan_cargue");
             foreach (var p in new[] { "LargoMm", "AnchoMm", "AltoMm", "PesoKg", "MaxPesoEncimaKg" })
                 e.Property(p).HasColumnType("decimal(12,2)");
-            // La propiedad se llama clsCliente (dato suelto del ítem, no navegación a
-            // clsCliente la entidad) pero la columna real en tbl_items_plan_cargue —
-            // ver ESQUEMA_NEXO.sql — siempre fue [Cliente]. Sin este mapeo EF genera
-            // "Invalid column name 'clsCliente'" en cualquier lectura/escritura de items.
+            // La propiedad se llama clsCliente pero la columna real de tbl_items_plan_cargue es [Cliente]; sin este mapeo EF genera "Invalid column name 'clsCliente'".
             e.Property(x => x.clsCliente).HasColumnName("Cliente");
         });
 
@@ -572,15 +552,12 @@ public class clsNexoDbContext : DbContext
         {
             e.ToTable("tbl_municipios");
             e.Property(x => x.Id).ValueGeneratedOnAdd();
-            // Clave natural real: el código DANE por sí solo choca entre Venezuela y
-            // Ecuador (verificado contra datos reales, S4-HU-09.1) — la combinación con
-            // el país sí es única.
+            // Clave natural real: el código DANE solo choca entre Venezuela y Ecuador; con el país sí es única.
             e.HasIndex(x => new { x.CodigoDane, x.Pais }).IsUnique();
             e.HasIndex(x => x.NombreTarifasPlaza);
         });
 
-        // tbl_pesos/tbl_tarifas_plaza/tbl_tarifas_plaza_historico creadas y pobladas a
-        // mano en S4-HU-10.1 — mismo criterio "sin migración de EF Core" que tbl_municipios.
+        // tbl_pesos/tbl_tarifas_plaza/tbl_tarifas_plaza_historico se crean a mano, sin migración de EF Core (igual que tbl_municipios).
         b.Entity<clsRangoPeso>(e =>
         {
             e.ToTable("tbl_pesos");
@@ -590,11 +567,8 @@ public class clsNexoDbContext : DbContext
 
         b.Entity<clsTarifaPlaza>(e =>
         {
-            // UseSqlOutputClause(false): tbl_tarifas_plaza tiene un trigger (histórico de
-            // vigencia) y SQL Server prohíbe combinar la cláusula OUTPUT (la que usa EF Core
-            // por defecto para leer valores generados) con triggers en la misma tabla —
-            // sin esto, cualquier INSERT/UPDATE lanza "the target table has database
-            // triggers" (confirmado con datos reales al verificar esta issue).
+            // UseSqlOutputClause(false): tbl_tarifas_plaza tiene un trigger y SQL Server no permite la cláusula OUTPUT (la que usa EF por defecto) en tablas con triggers;
+            // sin esto todo INSERT/UPDATE lanza "the target table has database triggers".
             e.ToTable("tbl_tarifas_plaza", tb => tb.UseSqlOutputClause(false));
             e.HasIndex(x => new { x.LineaNegocio, x.ClaseViaje, x.OrigenMunicipioId, x.DestinoMunicipioId, x.ClaseContenedor, x.PesoId, x.TipoVehiculo }).IsUnique();
             e.HasOne(x => x.Origen).WithMany().HasForeignKey(x => x.OrigenMunicipioId).OnDelete(DeleteBehavior.Restrict);
@@ -602,10 +576,7 @@ public class clsNexoDbContext : DbContext
             e.HasOne(x => x.Peso).WithMany().HasForeignKey(x => x.PesoId).OnDelete(DeleteBehavior.Restrict);
         });
 
-        // S5-HU-16.3/#256: mapeo de SOLO LECTURA — la llena únicamente el trigger de
-        // tbl_tarifas_plaza (TRG_tarifas_plaza_historico), nunca esta aplicación. Sin
-        // navegaciones a clsMunicipio/clsRangoPeso: el motor de costeo (#256) solo
-        // necesita los ids crudos para el match exacto, no las entidades relacionadas.
+        // Solo lectura: la llena únicamente el trigger TRG_tarifas_plaza_historico, nunca la aplicación. Sin navegaciones: el costeo solo necesita los ids crudos para el match exacto.
         b.Entity<clsTarifaPlazaHistorico>(e =>
         {
             e.ToTable("tbl_tarifas_plaza_historico");
@@ -627,22 +598,8 @@ public class clsNexoDbContext : DbContext
             });
         });
 
-        // LA CLAVE LA ASIGNA EL DOMINIO, NO LA BASE.
-        //
-        // Las entidades nacen con su Id (`= Guid.NewGuid()`), que es lo correcto en DDD:
-        // una entidad tiene identidad desde que existe, no desde que se guarda. Pero por
-        // convención EF marca toda clave Guid como generada al insertar, y entonces una
-        // clave YA puesta le dice "esto viene de la base, o sea ya existe". Al agregar un
-        // hijo nuevo a un padre ya persistido, EF emitía UPDATE en vez de INSERT: cero
-        // filas afectadas, DbUpdateConcurrencyException y un 409 CONFLICTO_CONCURRENCIA
-        // al usuario.
-        //
-        // Se rompía POST /api/cotizaciones/{id}/lineas —agregar el flete a una cotización,
-        // el camino principal del módulo piloto— y llevaba así tiempo sin detectarse
-        // porque la suite de Api.Tests no se corría completa.
-        //
-        // Esto le dice al modelo lo que de verdad pasa: la clave llega puesta y hay que
-        // insertarla tal cual.
+        // La clave la asigna el dominio, no la base. Por convención EF trata toda clave Guid como generada, y una clave ya puesta le indica
+        // "esto ya existe": al agregar un hijo nuevo a un padre persistido emitía UPDATE en vez de INSERT y fallaba con DbUpdateConcurrencyException (409).
         foreach (var entity in b.Model.GetEntityTypes().Where(t => t.ClrType.IsClass))
         {
             var clave = entity.FindPrimaryKey();

@@ -3,12 +3,9 @@ using System.ComponentModel.DataAnnotations;
 namespace Nexo.Domain.Catalogos.Entidades;
 
 /// <summary>
-/// S6-HU-27.2/#321: una variante de texto libre ("TB", "T.B", "40HC") que el diccionario traduce al código oficial. Una sola tabla
-/// (<c>tbl_alias_elementos</c>, creada en #315) para dos catálogos, distinguidos por <see cref="TipoElemento"/>: los tipos de vehículo
-/// (Codigo = 2L2, C2, C3, 2S2, 3S3…) y las clases de contenedor (Codigo = CNT40.HC, CNT20.ST…). <see cref="Codigo"/> es texto, no una FK:
-/// no depende de ninguna fila concreta de <c>tbl_configuraciones_vehiculo</c>. <see cref="AliasNormalizado"/> es único en TODA la tabla
-/// (sin importar el tipo) y se calcula con el mismo normalizador de la captura (clsResolucionDeCatalogos.Normalizar), para que "mismo
-/// texto" signifique lo mismo al resolver y al guardar.
+/// Variante de texto libre ("TB", "T.B", "40HC") que el diccionario traduce al código oficial. Una tabla para dos
+/// catálogos según <see cref="TipoElemento"/>: tipos de vehículo (2L2, C2, C3...) y clases de contenedor (CNT40.HC...).
+/// <see cref="Codigo"/> es texto, no FK. <see cref="AliasNormalizado"/> es único en toda la tabla y usa el normalizador de la captura.
 /// </summary>
 public class clsAliasElemento
 {

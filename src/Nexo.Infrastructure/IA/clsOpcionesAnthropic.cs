@@ -2,26 +2,15 @@ using Nexo.Application.Common.Ports;
 
 namespace Nexo.Infrastructure.IA;
 
-/// <summary>
-/// Configuración de la sección <c>Anthropic</c> (variables de entorno <c>Anthropic__ApiKey</c>, <c>Anthropic__Model</c>…).
-///
-/// La llave solo llega por entorno (Dokploy o GitHub Secrets); nunca va en el repositorio ni se escribe en logs ni mensajes.
-/// Todas las funciones nacen apagadas: una función solo se usa cuando <c>Anthropic:Funciones:&lt;nombre&gt;</c> es true.
-///
-/// El modelo y el esfuerzo son configuración y no código: cambiarlos es cambiar una variable. No se configuran
-/// <c>temperature</c>, <c>top_p</c> ni <c>top_k</c> porque la API los rechaza.
-/// </summary>
+/// <summary>Sección <c>Anthropic</c>. La llave solo llega por entorno (Anthropic__ApiKey): nunca va en el repositorio ni en logs o mensajes.
+/// Las funciones nacen apagadas. No se configuran temperature, top_p ni top_k porque la API los rechaza.</summary>
 public sealed class clsOpcionesAnthropic
 {
     public const string Seccion = "Anthropic";
 
     public const string ModeloPorDefecto = "claude-sonnet-5-5";
-    // `medium` sale de la evaluacion del mapeo de Excel (#353/#363): 93,8 % de acierto contra 91,7 % de `high`, 0 falsos positivos
-    // en las dos y US$ 0,0196 por Excel contra US$ 0,0217. `high` sirve igual -la diferencia de acierto esta dentro del ruido del
-    // dataset, donde una columna mueve unos 6 puntos-, asi que esto se elige por costo, no porque `high` este mal.
-    //
-    // OJO: el esfuerzo es GLOBAL, lo comparten el mapeo y el asistente de cotizacion, y al asistente nadie lo ha medido en `medium`.
-    // Si llega a hacer falta un esfuerzo distinto por funcion, hay que partir esta opcion; hoy no lo es.
+    // `medium` se eligió por costo: acierto equivalente a `high` en la evaluación del mapeo de Excel y menor gasto.
+    // OJO: el esfuerzo es GLOBAL (lo comparten el mapeo y el asistente de cotización); si hace falta uno por función, hay que partir esta opción.
     public const string EsfuerzoPorDefecto = "medium";
 
     public string? ApiKey { get; set; }
@@ -29,16 +18,11 @@ public sealed class clsOpcionesAnthropic
     /// <summary>Interruptor general: con false todas las funciones de IA quedan apagadas aunque haya llave y funciones encendidas.</summary>
     public bool Habilitada { get; set; } = true;
 
-    /// <summary>
-    /// Tope de tokens (entrada, salida y caché) que una persona puede consumir por día (hora de Colombia). 0 lo desactiva.
-    /// </summary>
+    /// <summary>Tope de tokens (entrada, salida y caché) por persona y día (hora de Colombia). 0 lo desactiva.</summary>
     public long LimiteTokensPorUsuarioDia { get; set; } = 500_000;
 
-    /// <summary>
-    /// Identificador de la workspace (<c>wrkspc_…</c>). Una llave atada a una workspace no lo necesita; una llave de toda la
-    /// organización sí, o el proveedor rechaza cada petición. No es un secreto, pero sí es lo que acota el gasto: el límite
-    /// mensual se fija por workspace.
-    /// </summary>
+    /// <summary>Identificador de la workspace (wrkspc_…). Una llave de toda la organización lo necesita o el proveedor rechaza la petición;
+    /// no es un secreto, pero acota el gasto (el límite mensual es por workspace).</summary>
     public string? WorkspaceId { get; set; }
     public string Model { get; set; } = ModeloPorDefecto;
 

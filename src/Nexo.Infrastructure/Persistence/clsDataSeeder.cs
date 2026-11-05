@@ -26,12 +26,8 @@ public static class clsDataSeeder
         var now = DateTimeOffset.UtcNow;
 
         // ----------------------------------------------------------------- Usuarios (11)
-        //
-        // IdentidadPortalId: id que un desarrollador manda en X-Portal-clsUsuario-Id para
-        // entrar localmente como esta persona cuando ConnectionStrings:IdentidadPortal NO
-        // está configurada (clsResolverIdentidadPortalLocalAdapter, ver clsDependencyInjection.cs).
-        // No todas tienen: coord3/lider2/sl2 simulan a alguien que todavía no inició sesión
-        // por el portal ("edge: sin identidad del portal").
+        // IdentidadPortalId: id que se envía en X-Portal-clsUsuario-Id para entrar localmente como esta persona sin IdentidadPortal configurada.
+        // coord3/lider2/sl2 no lo tienen: simulan a alguien que aún no inició sesión por el portal.
         var coord1 = new clsUsuario { Nombre = "Carlos Herrera", Email = "cherrera@boterosoto.com.co", Rol = RolUsuario.AdminBiblioteca, IdentidadPortalId = 1001 };
         var coord2 = new clsUsuario { Nombre = "Yined Zapata", Email = "yzapata@boterosoto.com.co", Rol = RolUsuario.AdminBiblioteca, IdentidadPortalId = 1002 };
         var coord3 = new clsUsuario { Nombre = "Édinson Molina", Email = "emolina@boterosoto.com.co", Rol = RolUsuario.AdminBiblioteca };
@@ -42,9 +38,6 @@ public static class clsDataSeeder
         var sl2 = new clsUsuario { Nombre = "Jorge Organista", Email = "jorganista@boterosoto.com.co", Rol = RolUsuario.ServiciosLogisticos }; // edge: sin identidad del portal
         var admin1 = new clsUsuario { Nombre = "Paola Restrepo", Email = "prestrepo@boterosoto.com.co", Rol = RolUsuario.Admin, IdentidadPortalId = 1005 };
         var admin2 = new clsUsuario { Nombre = "Albert Blanco", Email = "ablanco@boterosoto.com.co", Rol = RolUsuario.Admin, IdentidadPortalId = 1006 };
-        // Faltaba un Comercial sembrado - la mayoría de los comandos de escritura de
-        // plan de cargue exigen ese rol, y sin este usuario no había forma de probarlos
-        // localmente con X-Portal-clsUsuario-Id sin sembrar uno a mano.
         var com1 = new clsUsuario { Nombre = "Mariana Ospina", Email = "mospina@boterosoto.com.co", Rol = RolUsuario.Comercial, IdentidadPortalId = 1007 };
         db.Usuarios.AddRange(coord1, coord2, coord3, coord4, lider1, lider2, sl1, sl2, admin1, admin2, com1);
 
@@ -93,8 +86,7 @@ public static class clsDataSeeder
         db.ConfiguracionesVehiculo.AddRange(configs);
 
         // ----------------------------------------------------------------- Servicios conexos (10)
-        // Reestructurado en #223 (S4-HU-15.1): estos 10 son la variante "valor único" (sin
-        // dimensión de ciudad/ruta/puerto, Origen/Destino/Puerto/Ruta/TipoMaquina = NoAplica).
+        // Variante "valor único": sin dimensión de ciudad/ruta/puerto (Origen/Destino/Puerto/Ruta/TipoMaquina = NoAplica).
         clsServicioConexo ServicioValorUnico(string codigo, decimal costo, DateOnly vigencia, clsUsuario actualizador, bool activo = true) =>
             new()
             {

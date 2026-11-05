@@ -5,12 +5,8 @@ using ClosedXML.Excel;
 
 namespace Nexo.Infrastructure.Solicitudes.Adaptadores;
 
-/// <summary>
-/// Análisis tolerante de Excel de licitación: cada cliente envía una plantilla
-/// distinta, así que solo se detecta el encabezado (fila con >= 3 valores
-/// distintos) y el mapeo de columnas lo decide el usuario en el frontend.
-/// Portado 1:1 desde CapturaSolicitudService.AnalizarExcelAsync del original.
-/// </summary>
+/// <summary>Análisis tolerante de Excel de licitación: solo se detecta el encabezado (fila con >= 3 valores distintos);
+/// el mapeo de columnas lo decide el usuario en el frontend.</summary>
 public sealed class clsExcelSolicitudesAdapter : IExcelSolicitudesPort
 {
     private const int MaxFilasPorHoja = 1000;

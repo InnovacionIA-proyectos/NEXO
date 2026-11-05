@@ -16,11 +16,8 @@ public abstract class clsAppException : Exception
     }
 }
 
-// Las cinco NO son sealed a propósito. El middleware de Api traduce por TIPO, así que
-// una excepción propia de un contexto tiene que heredar de una de estas cuatro para
-// seguir saliendo con su código HTTP correcto. Heredar de clsAppException directamente la
-// dejaría caer en el catch genérico y respondería 500 en vez de 400.
-// Ver CasosDeUso/<Contexto>/Excepciones/.
+// No son sealed a propósito: el middleware de Api traduce por TIPO, así que las excepciones de un contexto
+// deben heredar de una de estas para conservar su código HTTP (heredar de clsAppException daría 500).
 
 /// <summary>El recurso no existe (Api la traduce a 404).</summary>
 public class clsNotFoundException(string code, string message) : clsAppException(code, message);
