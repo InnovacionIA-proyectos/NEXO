@@ -173,6 +173,27 @@ CREATE TABLE [dbo].[tbl_plantillas_mapeo_cliente] (
     , CONSTRAINT [CK_plantillas_mapeo_cliente_Columnas] CHECK (ISJSON([Columnas]) = 1)
 );
 
+-- Receta de lectura del Excel de un cliente: dónde están los encabezados y los datos de cada hoja, tablas cruzadas, hojas que se
+-- usan. La propone la IA y la persona la confirma sobre una vista previa. Huella son los títulos de la parte alta del archivo
+-- (arreglo JSON de textos normalizados): con ella se reconoce otro archivo del mismo formato y se lee con la receta sin llamar a la
+-- IA; si el formato cambia, la receta y las Instrucciones sirven de contexto a la IA. Receta y Huella son JSON.
+CREATE TABLE [dbo].[tbl_recetas_lectura_cliente] (
+    [Id] uniqueidentifier NOT NULL,
+    [ClienteId] uniqueidentifier NOT NULL,
+    [Nombre] nvarchar(100) NULL,
+    [Receta] nvarchar(max) NOT NULL,
+    [Huella] nvarchar(max) NOT NULL,
+    [Instrucciones] nvarchar(4000) NULL,
+    [Usos] int NOT NULL CONSTRAINT [DF_recetas_lectura_cliente_Usos] DEFAULT (0),
+    [UltimoUsoAt] datetimeoffset NULL,
+    [CreadoPor] uniqueidentifier NULL,
+    [CreatedAt] datetimeoffset NOT NULL CONSTRAINT [DF_recetas_lectura_cliente_CreatedAt] DEFAULT (sysdatetimeoffset()),
+    [UpdatedAt] datetimeoffset NULL
+    , CONSTRAINT [PK_recetas_lectura_cliente] PRIMARY KEY ([Id])
+    , CONSTRAINT [CK_recetas_lectura_cliente_Receta] CHECK (ISJSON([Receta]) = 1)
+    , CONSTRAINT [CK_recetas_lectura_cliente_Huella] CHECK (ISJSON([Huella]) = 1)
+);
+
 -- Código de cada tipo de vehículo en SICE-TAC (CONFIGURACION de tblRutasSicetac) y en Plaza/SAP (el mismo para tblSAPTarifas
 -- y tbl_tarifas_plaza). Global, no por cliente. Parte del TipoVehiculo ya resuelto por tbl_alias_elementos. CodigoPlazaSap NULL
 -- = sin tarifa de plaza. Datos iniciales: ../seeder/mapeo_vehiculos.csv.
@@ -952,6 +973,7 @@ CREATE UNIQUE INDEX [IX_diccionario_cliente_Unico] ON [dbo].[tbl_diccionario_cli
 CREATE INDEX [IX_diccionario_cliente_ClienteId_Tipo] ON [dbo].[tbl_diccionario_cliente] ([ClienteId], [Tipo]);
 CREATE UNIQUE INDEX [IX_mapeo_vehiculo_tarifario_TipoVehiculo] ON [dbo].[tbl_mapeo_vehiculo_tarifario] ([TipoVehiculo]);
 CREATE UNIQUE INDEX [IX_plantillas_mapeo_cliente_Firma] ON [dbo].[tbl_plantillas_mapeo_cliente] ([ClienteId], [FirmaEncabezados]);
+CREATE INDEX [IX_recetas_lectura_cliente_ClienteId] ON [dbo].[tbl_recetas_lectura_cliente] ([ClienteId]);
 CREATE UNIQUE INDEX [IX_rangos_peso_contenedor_Contenedor_TipoVehiculo] ON [dbo].[tbl_rangos_peso_contenedor] ([Contenedor], [TipoVehiculo]);
 CREATE INDEX [IX_colocaciones_cargue_ItemPlanCargueId] ON [dbo].[tbl_colocaciones_cargue] ([ItemPlanCargueId]);
 CREATE INDEX [IX_colocaciones_cargue_PlanCargueId_Cargada] ON [dbo].[tbl_colocaciones_cargue] ([PlanCargueId], [Cargada]);
@@ -1054,6 +1076,7 @@ ALTER TABLE [dbo].[tbl_servicios_conexos] ADD CONSTRAINT [FK_servicios_conexos_u
 ALTER TABLE [dbo].[tbl_solicitudes] ADD CONSTRAINT [FK_solicitudes_clientes_ClienteId] FOREIGN KEY ([ClienteId]) REFERENCES [dbo].[tbl_clientes] ([Id]);
 ALTER TABLE [dbo].[tbl_diccionario_cliente] ADD CONSTRAINT [FK_diccionario_cliente_clientes_ClienteId] FOREIGN KEY ([ClienteId]) REFERENCES [dbo].[tbl_clientes] ([Id]);
 ALTER TABLE [dbo].[tbl_plantillas_mapeo_cliente] ADD CONSTRAINT [FK_plantillas_mapeo_cliente_clientes_ClienteId] FOREIGN KEY ([ClienteId]) REFERENCES [dbo].[tbl_clientes] ([Id]);
+ALTER TABLE [dbo].[tbl_recetas_lectura_cliente] ADD CONSTRAINT [FK_recetas_lectura_cliente_clientes_ClienteId] FOREIGN KEY ([ClienteId]) REFERENCES [dbo].[tbl_clientes] ([Id]);
 -- Apunta al índice único IX_mapeo_vehiculo_tarifario_TipoVehiculo, no a la llave primaria.
 ALTER TABLE [dbo].[tbl_rangos_peso_contenedor] ADD CONSTRAINT [FK_rangos_peso_contenedor_mapeo_vehiculo_tarifario_TipoVehiculo] FOREIGN KEY ([TipoVehiculo]) REFERENCES [dbo].[tbl_mapeo_vehiculo_tarifario] ([TipoVehiculo]);
 ALTER TABLE [dbo].[tbl_solicitudes] ADD CONSTRAINT [FK_solicitudes_usuarios_CreadoPor] FOREIGN KEY ([CreadoPor]) REFERENCES [dbo].[tbl_usuarios] ([Id]);

@@ -8,13 +8,13 @@ en [`docs/documentacion/database/`](../documentacion/database/).
 | Servidor | `10.10.40.85,1433` (SQL Server 2019) |
 | Base | `dbTarifario_Nexo_Pruebas` |
 | Esquema | `dbo` |
-| Tablas | 45 |
+| Tablas | 46 |
 
 ## Contenido de la carpeta
 
 | Ruta | Qué es |
 |---|---|
-| `esquema/ESQUEMA_NEXO.sql` | DDL de las 45 tablas: columnas, llaves, `CHECK`, índices y trigger. Es la única definición del esquema. |
+| `esquema/ESQUEMA_NEXO.sql` | DDL de las 46 tablas: columnas, llaves, `CHECK`, índices y trigger. Es la única definición del esquema. |
 | `seeder/` | Datos iniciales: `datos_base_nexo.sql` (usuario de sistema, roles del portal y parámetros del score) y un CSV por cada catálogo. |
 | `scripts/ejecutar_schema_y_seeders.py` | Crea las tablas y carga los datos iniciales en una base vacía. |
 
@@ -42,7 +42,7 @@ py scripts/ejecutar_schema_y_seeders.py --server 10.10.40.85,1433
 
 El script:
 
-1. Aplica `esquema/ESQUEMA_NEXO.sql`: crea las 45 tablas en el esquema `dbo`, con sus índices,
+1. Aplica `esquema/ESQUEMA_NEXO.sql`: crea las 46 tablas en el esquema `dbo`, con sus índices,
    llaves foráneas y el trigger de histórico de tarifas de plaza.
 2. Aplica `seeder/datos_base_nexo.sql`: usuario de sistema, los 9 mapeos de rol del portal y los
    parámetros del score.

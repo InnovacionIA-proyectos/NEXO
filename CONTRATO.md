@@ -57,6 +57,7 @@ Development**.
 |---|---|
 | **Capturar una solicitud a mano** | `GET /api/captura-solicitudes/clientes` → `GET .../ciudades` (guardar `id` como `origenMunicipioId`/`destinoMunicipioId`) → `POST /api/cubicacion` (recomendación de flota; luego `GET /api/cubicacion/explicacion`) → `POST /api/captura-solicitudes` (una línea por camión) → `GET /api/solicitudes/{id}` |
 | **Importar un Excel de cliente** | `POST .../analizar-excel` → `POST .../sugerir-mapeo` (con `clienteId` o `clienteNit`) → el usuario confirma → `POST .../aplicar-mapeo` → `POST .../normalizar-valores` (vehículo, carrocería, línea de negocio, ciudad) → `POST /api/captura-solicitudes` → opcional: `PUT .../plantillas-mapeo` para recordar el mapeo |
+| **Importar un Excel de formato distinto o complejo** | `POST .../leer-estructura` (con `clienteId` o `clienteNit`) → el usuario revisa `tablas`, `resumen` y `dudas` → si algo está mal, otra vez `leer-estructura` con `instrucciones` y la `receta` anterior → cada tabla (`tablas[i]`) entra al flujo de arriba desde `sugerir-mapeo` → al confirmar, `PUT .../recetas-lectura` para que el próximo archivo igual se lea sin IA |
 | **Costear y cotizar** | `GET /api/solicitudes/{id}` → `GET .../propuesta-tarifa` → `POST /api/cotizaciones` → `POST .../aplicar-propuestas` (o `POST/PUT .../lineas`) → `POST .../conexos` → `POST .../entregar` → `POST .../resultado` |
 | **Mantener catálogos** | Servicios conexos (con `precioVenta`), tarifas de plaza, reglas Solo-SICETAC, rangos de peso, diccionario por cliente, alias de vehículos: cada uno en su sección de §3 |
 
@@ -97,9 +98,13 @@ en la sección que se indica; la matriz completa de permisos es la §5.
 | `GET` | `/api/captura-solicitudes/departamentos` | Todos |
 | `GET` | `/api/captura-solicitudes/municipios` | Todos |
 | `POST` | `/api/captura-solicitudes/normalizar-valores` | Comercial, Admin |
+| `POST` | `/api/captura-solicitudes/leer-estructura` | Comercial, Admin |
 | `GET` | `/api/captura-solicitudes/plantillas-mapeo` | Comercial, Admin |
 | `PUT` | `/api/captura-solicitudes/plantillas-mapeo` | Comercial, Admin |
 | `DELETE` | `/api/captura-solicitudes/plantillas-mapeo/{id}` | Comercial, Admin |
+| `GET` | `/api/captura-solicitudes/recetas-lectura` | Comercial, Admin |
+| `PUT` | `/api/captura-solicitudes/recetas-lectura` | Comercial, Admin |
+| `DELETE` | `/api/captura-solicitudes/recetas-lectura/{id}` | Comercial, Admin |
 | `POST` | `/api/captura-solicitudes/sugerir-mapeo` | Comercial, Admin |
 
 **§3.4 Cotizaciones**
@@ -1131,7 +1136,7 @@ Biblioteca) y el campo se quedaba sin sugerencias. Ahora:
 
 | Endpoint | Roles |
 |---|---|
-| `POST analizar-excel`, `POST sugerir-mapeo`, `POST aplicar-mapeo`, `POST normalizar-valores`, `PUT/GET/DELETE plantillas-mapeo`, `POST /` (capturar) | `Comercial`, `Admin` |
+| `POST analizar-excel`, `POST leer-estructura`, `POST sugerir-mapeo`, `POST aplicar-mapeo`, `POST normalizar-valores`, `PUT/GET/DELETE plantillas-mapeo`, `PUT/GET/DELETE recetas-lectura`, `POST /` (capturar) | `Comercial`, `Admin` |
 | `GET aprovisionamiento`, `GET clientes` | `Comercial`, `Admin` (revisado caso por caso: se mantienen) |
 | `GET departamentos`, `GET ciudades`, `GET municipios` | **cualquier rol válido de Nexo** (hay que estar autenticado; sin sesión → `401`) |
 
@@ -1264,6 +1269,104 @@ interface PlantillaMapeoDto {
 ```
 - **Errores**: `400 VALIDATION_ERROR` · `400 CLIENTE_REQUERIDO` · `400 CLIENTE_NO_ENCONTRADO` · `400 NOMBRE_DEMASIADO_LARGO` · `400 ENCABEZADOS_REQUERIDOS` · `400 DEMASIADAS_COLUMNAS` · `400 ENCABEZADO_DEMASIADO_LARGO` ·
   `400 COLUMNA_FUERA_DE_RANGO` · los del mapeo de `aplicar-mapeo` (`MAPEO_REQUERIDO`, `CAMPO_INVALIDO`, `TRANSFORMACION_INVALIDA`, `TRANSFORMACION_NO_APLICA`, `CAMPO_DUPLICADO`, `CAMPO_REQUERIDO`, `COLUMNA_INVALIDA`) · `404 PLANTILLA_NO_ENCONTRADA` (borrar)
+
+#### `POST /api/captura-solicitudes/leer-estructura` — leer un Excel de formato complejo
+Para los archivos que `analizar-excel` no lee bien: la tabla no empieza en la fila 1, los encabezados ocupan varias filas con celdas combinadas, el origen o el vehículo están en las columnas
+(tabla cruzada), hay datos sueltos fuera de la tabla (un escenario, un destino), varias hojas con el mismo formato, etc. La IA propone una **receta de lectura** (dónde están los encabezados y los datos
+de cada hoja y cómo se «despivota» una tabla cruzada); NEXO la **ejecuta de forma determinista** y devuelve tablas normales, en la misma forma que `analizar-excel`, listas para `sugerir-mapeo`.
+La persona revisa la vista previa, corrige con una frase si hace falta y confirma. **No guarda nada**: guardar es `PUT recetas-lectura`.
+
+- **Body**: `multipart/form-data` (§1.9)
+
+| Campo | | Tipo | Descripción |
+|---|---|---|---|
+| `archivo` | **requerido** | archivo | El Excel (.xlsx/.xlsm, máx. 10 MB) |
+| `clienteId` | *opcional* | UUID | El cliente, para reutilizar sus formatos guardados. Si vienen los dos manda este |
+| `clienteNit` | *opcional* | string | Máx. 30. Solo **busca** el cliente local: no lo crea. Sin cliente no se busca formato guardado |
+| `instrucciones` | *opcional* | string | Máx. 4000. Lo que la persona explica o corrige, en lenguaje natural («el escenario está en la celda A2», «no uses la hoja Resumen»). **Siempre consulta a la IA** |
+| `receta` | *opcional* | string (JSON) | La `receta` de una lectura anterior. **Sola** se ejecuta tal cual, sin IA (la persona la ajustó a mano). **Con `instrucciones`** la IA la toma de base y la ajusta |
+
+Qué receta se usa, en este orden:
+1. `receta` sin `instrucciones` → se ejecuta tal cual (`origenReceta = "manual"`). Sin IA.
+2. Sin `receta` ni `instrucciones`, y el cliente tiene un formato guardado **igual** (≥ 85 % de los títulos de la parte alta del archivo; los datos de más abajo no cuentan) → ese formato (`"guardada"`), se suma un uso. **Sin IA.**
+3. En cualquier otro caso se le pide la receta a la IA (`"ia"`), con la receta enviada o con el formato guardado **parecido** (≥ 50 %) como punto de partida, las instrucciones que la persona dio al guardarlo y lo que cambió
+   (`cambios`). Los números de las celdas no se envían (solo `#`) y los documentos van enmascarados. Si la receta de la IA no se puede ejecutar, se le pide corregirla **una** vez.
+4. Si la IA no está disponible (apagada, sin llave, tope diario, error o respuesta inválida) **no falla**: usa el formato guardado más parecido, o una lectura simple de la primera fila con encabezado de cada hoja
+   (`"automatica"`), y `motivoSinIa` dice por qué (`IA_NO_DISPONIBLE`, `IA_RESPUESTA_INVALIDA`, el código del proveedor…). `avisos` lo explica para mostrarlo.
+
+```ts
+interface LecturaEstructuraDto {
+  archivo: string
+  origenReceta: 'guardada' | 'ia' | 'manual' | 'automatica'
+  similitud: number | null            // 0..1 con el formato guardado que se usó o se tomó de base
+  recetaGuardadaId: string | null
+  iaUsada: boolean
+  motivoSinIa: string | null          // 'RECETA_GUARDADA' | 'SIN_INSTRUCCION' | 'IA_NO_DISPONIBLE' | 'IA_RESPUESTA_INVALIDA' | código del proveedor | null
+  receta: RecetaLectura               // la que se ejecutó: se reenvía en `receta` para ajustarla o guardarla
+  resumen: string | null              // cómo entendió el archivo la IA, en lenguaje sencillo
+  dudas: string[]                     // preguntas que la persona puede responder con una instrucción
+  hojasDelArchivo: { nombre: string, oculta: boolean, filas: number, columnas: number, usada: boolean }[]
+  tablas: HojaExcelDto[]              // el mismo DTO de analizar-excel (§2); las filas ya son las que salen de la receta, máx. 5000 por tabla
+  avisos: string[]
+  cambios: { faltan: string[], nuevos: string[] } | null   // títulos que ya no aparecen / nuevos respecto al formato guardado
+}
+
+// Todo lo que la IA puede describir. Filas y columnas desde 1; las columnas, como letras de Excel.
+interface RecetaLectura {
+  version: 1
+  hojas: {
+    hoja: string                      // nombre exacto de la hoja, o '*' para las demás hojas visibles
+    usar: boolean                     // false = ignorarla
+    trasponer: boolean                // true = las filas del archivo son columnas
+    filasEncabezado?: number[]        // una o varias filas (títulos de dos niveles con celdas combinadas); sin ellas, la hoja no tiene encabezado
+    primeraFila?: number; ultimaFila?: number; hastaPrimeraFilaVacia: boolean
+    columnas?: string[]               // subconjunto de columnas: 'A', 'C:F'
+    etiquetas?: { columna: string, nombre?: string }[]   // tabla cruzada: columnas que identifican cada fila (origen, destino…)
+    valores?: { columnas: string[], dimensiones: { fila: number, nombre: string }[], nombreValor: string, omitirVacios: boolean } // columnas de valores: cada una se vuelve una fila por celda, con sus títulos como dimensiones
+    seccion?: { columna: string, nombre: string }         // filas que son un título de grupo, no un dato
+    constantes?: { nombre: string, celda?: string, hoja: boolean }[] // un dato suelto (o el nombre de la hoja) repetido en todas las filas
+  }[]
+  unir: boolean                       // true = las hojas con las mismas columnas salen como una sola tabla
+  notas?: string
+}
+```
+- **Cómo usar `tablas`**: cada elemento es una hoja lista para el flujo de siempre: `sugerir-mapeo` recibe `encabezados` y `filas` de **una** tabla. `filaEncabezado` es la fila del archivo (o 0 si la receta no tiene encabezado).
+- **Cómo corregir**: la persona escribe lo que ve mal y el front llama otra vez con `instrucciones` + `receta` (la que acaba de recibir) + el mismo archivo. La IA ajusta lo mínimo. La conversación es del front: aquí no se guarda historial.
+- **Cuándo mostrar qué**: `resumen` y `dudas` solo vienen con la IA. Con `origenReceta = "guardada"` basta con mostrar la vista previa y un botón de confirmar. Si `cambios` no es null, mostrar qué cambió respecto al formato anterior.
+- **Errores**: `400 ARCHIVO_REQUERIDO` · `400 FORMATO_NO_SOPORTADO` · `400 EXCEL_INVALIDO` · `400 EXCEL_SIN_DATOS` · `400 INSTRUCCIONES_DEMASIADO_LARGAS` · `400 RECETA_INVALIDA` (JSON mal formado o una receta que no se puede ejecutar; el mensaje dice qué).
+  La falta de IA **no** es un error.
+
+#### `/api/captura-solicitudes/recetas-lectura` — formatos de Excel guardados por cliente
+La receta que la persona **confirmó** se guarda como el formato del cliente (`tbl_recetas_lectura_cliente`). El siguiente archivo del cliente con el mismo formato se lee con ella **sin llamar a la IA** (más barato y siempre igual);
+si el formato cambia, `leer-estructura` lo detecta y la IA reorganiza partiendo de la receta anterior. Roles: `Comercial`, `Admin`.
+
+**`PUT /api/captura-solicitudes/recetas-lectura`** — guarda la receta. `201` la primera vez, `200` si reemplazó a un formato parecido (≥ 85 %) que el cliente ya tenía; si es distinto agrega otro. Un cliente conserva hasta **20**
+formatos: al pasar el límite se descarta el que lleva más tiempo sin usarse. Antes de guardar la ejecuta contra el archivo y exige que dé filas; la huella con la que se reconocerá el formato la calcula el servidor con ese archivo.
+
+| Campo (`multipart/form-data`) | | Tipo | Restricción |
+|---|---|---|---|
+| `archivo` | **requerido** | archivo | El mismo Excel con el que se confirmó la receta |
+| `receta` | **requerido** | string (JSON) | La `receta` que devolvió `leer-estructura` (máx. 60.000 caracteres) |
+| `clienteId` | condicional | UUID | **Requerido si no viene `clienteNit`**; debe existir. Si vienen los dos, manda este |
+| `clienteNit` | condicional | string | Máx. 30. Si no tiene cliente local, se crea con los datos del DW (ver «Cliente por NIT»); `400 CLIENTE_NIT_INVALIDO` si no es de ningún cliente ni prospecto |
+| `nombre` | *opcional* | string | Máx. 100 |
+| `instrucciones` | *opcional* | string | Máx. 4000. Lo que la persona explicó del archivo; se le da de contexto a la IA cuando el formato cambie |
+
+**`GET /api/captura-solicitudes/recetas-lectura?clienteId=`** (o **`?clienteNit=`**) — los formatos del cliente (sin ninguno de los dos, los de todos). Con un NIT sin cliente local responde `200 []` y no crea nada.
+**`DELETE /api/captura-solicitudes/recetas-lectura/{id}`** — lo borra (`204`); el siguiente archivo de ese cliente vuelve a pasar por la IA.
+
+```ts
+interface RecetaGuardadaDto {
+  id: string; clienteId: string; clienteNombre: string | null; nombre: string | null
+  receta: RecetaLectura; instrucciones: string | null
+  usos: number; ultimoUsoAt: string | null   // veces que se reutilizó sin IA
+  createdAt: string; updatedAt: string | null
+}
+```
+- **Auditoría**: crear, reemplazar y borrar quedan en `tbl_audit_log` (entidad `receta_lectura_cliente`).
+- **Roles**: como en las plantillas de mapeo, el `clienteId` lo manda el front y cualquier `Comercial` puede ver o reemplazar el formato de cualquier cliente.
+- **Errores**: `400 ARCHIVO_REQUERIDO` · `400 FORMATO_NO_SOPORTADO` · `400 EXCEL_INVALIDO` · `400 RECETA_REQUERIDA` · `400 RECETA_INVALIDA` · `400 RECETA_SIN_FILAS` (la receta no da ninguna fila con ese archivo) ·
+  `400 CLIENTE_REQUERIDO` · `400 CLIENTE_NO_ENCONTRADO` · `400 NOMBRE_DEMASIADO_LARGO` · `400 INSTRUCCIONES_DEMASIADO_LARGAS` · `404 RECETA_NO_ENCONTRADA` (borrar)
 
 #### `POST /api/captura-solicitudes/aplicar-mapeo`
 Aplica el mapeo que el usuario **confirmó** a **todas** las filas del Excel y devuelve las líneas listas para `POST /api/captura-solicitudes`, más los
@@ -2957,7 +3060,7 @@ abiertos a los 6 roles.
 
 | Operación | Com | AdmBib | AdmTar | ServLog | Líder | Admin |
 |---|:-:|:-:|:-:|:-:|:-:|:-:|
-| `POST /api/captura-solicitudes/analizar-excel` · `POST .../sugerir-mapeo` · `POST .../aplicar-mapeo` · `POST .../normalizar-valores` · `PUT/GET/DELETE .../plantillas-mapeo` · `POST /api/captura-solicitudes` · `GET aprovisionamiento` · `GET clientes` | ✅ | | | | | ✅ |
+| `POST /api/captura-solicitudes/analizar-excel` · `POST .../leer-estructura` · `PUT/GET/DELETE .../recetas-lectura` · `POST .../sugerir-mapeo` · `POST .../aplicar-mapeo` · `POST .../normalizar-valores` · `PUT/GET/DELETE .../plantillas-mapeo` · `POST /api/captura-solicitudes` · `GET aprovisionamiento` · `GET clientes` | ✅ | | | | | ✅ |
 | `GET /api/captura-solicitudes/ciudades` · `departamentos` · `municipios` (S5-HU-22.1: cualquier rol válido) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | **Bandeja y Mesa**: `GET /api/solicitudes` · `GET /api/solicitudes/{id}` · `GET .../propuesta-tarifa` · `/hubs/bandeja` (#307) | ✅ | | ✅ | ✅ | ✅ | ✅ |
 | `POST /api/solicitudes` (#307, D5: solo Admin) | | | | | | ✅ |
