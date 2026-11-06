@@ -146,7 +146,7 @@ public class clsNormalizarValoresApiTests(clsApiFixture fx)
         {
             var dto = await (await c.PostAsJsonAsync(Ruta, Cuerpo([V("ciudad", "76001"), V("ciudad", "Medelin")]))).Json();
             Assert.False(dto.GetProperty("iaUsada").GetBoolean());
-            Assert.Equal("IA_NO_DISPONIBLE", dto.GetProperty("motivoSinIa").GetString());
+            Assert.Equal("IA_DESACTIVADA", dto.GetProperty("motivoSinIa").GetString());
             Assert.Equal(["resuelto", "sin_resolver"], dto.GetProperty("valores").EnumerateArray().Select(v => v.GetProperty("estado").GetString()));
         }
 
@@ -154,6 +154,12 @@ public class clsNormalizarValoresApiTests(clsApiFixture fx)
         using var c2 = ClienteCon(caida, "Comercial");
         var dto2 = await (await c2.PostAsJsonAsync(Ruta, Cuerpo([V("ciudad", "Medelin")]))).Json();
         Assert.Equal("IA_LIMITE_PROVEEDOR", dto2.GetProperty("motivoSinIa").GetString());
+
+        // Un proveedor que falla no se confunde con una IA apagada.
+        using var sinServicio = FabricaConIa(clsAsistenteIaFalso.Falla("IA_NO_DISPONIBLE"));
+        using var c3 = ClienteCon(sinServicio, "Comercial");
+        var dto3 = await (await c3.PostAsJsonAsync(Ruta, Cuerpo([V("ciudad", "Medelin")]))).Json();
+        Assert.Equal("IA_NO_DISPONIBLE", dto3.GetProperty("motivoSinIa").GetString());
     }
 
     [Fact]

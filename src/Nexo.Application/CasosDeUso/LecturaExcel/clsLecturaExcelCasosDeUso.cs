@@ -183,7 +183,7 @@ public sealed class clsLeerEstructuraCommandHandler(
         IReadOnlyList<clsHojaCruda> hojas, string? instrucciones, clsRecetaLectura? recetaBase, string? instruccionesGuardadas,
         clsCambiosDeFormatoDto? cambios, CancellationToken ct)
     {
-        if (!ia.Habilitada(clsFuncionIa.ImportacionExcel)) return new(null, null, [], "IA_NO_DISPONIBLE", []);
+        if (!ia.Habilitada(clsFuncionIa.ImportacionExcel)) return new(null, null, [], clsMotivosSinIa.Desactivada, []);
 
         var cambiosTexto = cambios is null ? null : (IReadOnlyList<string>)
             [.. cambios.Faltan.Select(t => $"ya no aparece «{t}»"), .. cambios.Nuevos.Select(t => $"nuevo «{t}»")];

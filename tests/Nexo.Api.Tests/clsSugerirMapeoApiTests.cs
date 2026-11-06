@@ -149,7 +149,7 @@ public class clsSugerirMapeoApiTests(clsApiFixture fx)
         Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
         var dto = await resp.Json();
         Assert.False(dto.GetProperty("iaUsada").GetBoolean());
-        Assert.Equal("IA_NO_DISPONIBLE", dto.GetProperty("motivoSinIa").GetString());
+        Assert.Equal("IA_DESACTIVADA", dto.GetProperty("motivoSinIa").GetString());
         Assert.Equal(4, dto.GetProperty("columnas").GetArrayLength());
         Assert.All(dto.GetProperty("columnas").EnumerateArray(), x => Assert.Equal("ignorar", x.GetProperty("campo").GetString()));
     }
