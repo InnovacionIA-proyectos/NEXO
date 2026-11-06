@@ -2926,7 +2926,9 @@ tokens por persona de §3.22. La función se apaga con `Anthropic__Funciones__As
 
 #### `POST /api/asistente/conversaciones/mensajes`
 - **Roles**: AdminTarifas, Admin.
-- **Body**: `{ conversacionId?: Guid, mensaje: string }`. Sin `conversacionId` empieza una conversación nueva.
+- **Body**: `{ conversacionId?: Guid, mensaje: string, contexto?: { solicitudId: Guid, cotizacionId?: Guid, lineaSolicitudId?: Guid } }`. Sin `conversacionId` empieza una conversación nueva.
+- **`contexto`** (opcional): lo que la persona tiene abierto en pantalla. El asistente lo recibe como dato, después de sus reglas, y lo usa cuando la persona dice «esta línea» o «esta cotización», sin pedirle los identificadores ni gastar el límite de caracteres del mensaje.
+  Se valida con los permisos de quien pregunta antes de llamar al modelo y **no se guarda**: se manda en cada mensaje que lo necesite.
 - **→** `200 text/event-stream`. Cada evento es `event: <nombre>` + `data: <JSON en una línea>`:
 
 | Evento | `data` | Cuándo |
@@ -2940,7 +2942,8 @@ tokens por persona de §3.22. La función se apaga con `Anthropic__Funciones__As
 | `fin` | `{ conversacionId, mensajeId, estado }` | Último en el caso normal. `estado`: `completo` o `descartado` |
 | `error` | `{ codigo, mensaje }` | Último si la respuesta se cortó a mitad (lo ya mostrado queda como `incompleto`): `IA_NO_DISPONIBLE`, `IA_TIEMPO_AGOTADO`, `IA_LIMITE_PROVEEDOR`, `IA_RECHAZADA`, `IA_RESPUESTA_TRUNCADA`, `ASISTENTE_DEMASIADAS_CONSULTAS`, `ASISTENTE_ERROR` |
 
-- **Errores antes de abrir el flujo** (respuesta HTTP normal): `400 MENSAJE_REQUERIDO` · `400 MENSAJE_DEMASIADO_LARGO` ·
+- **Errores antes de abrir el flujo** (respuesta HTTP normal): `400 MENSAJE_REQUERIDO` · `400 MENSAJE_DEMASIADO_LARGO` · `400 CONTEXTO_INVALIDO` (la cotización o la línea no son de esa solicitud, o falta `solicitudId`) ·
+  `403 SOLICITUD_AJENA` · `404 SOLICITUD_NO_ENCONTRADA` · `404 COTIZACION_NO_ENCONTRADA` ·
   `403 CONVERSACION_AJENA` · `404 CONVERSACION_NO_ENCONTRADA` · `429 ASISTENTE_LIMITE_TURNOS` (`details: { maxTurnos }`; hay que empezar
   otra conversación) · `429 IA_TOPE_DIARIO` · `503 IA_APAGADA` / `IA_NO_CONFIGURADA` / `IA_FUNCION_DESHABILITADA`.
 - El navegador no puede usar `EventSource` (es solo `GET`): se lee el cuerpo con `fetch` y su `ReadableStream`. Si el cliente cierra la
@@ -2988,7 +2991,7 @@ terminó: es la auditoría de la escritura.
 interface AccionAsistenteDto {
   id: Guid; conversacionId: Guid; mensajeId: Guid
   tipo: "agregar_flete" | "editar_flete" | "agregar_conexos" | "rechazar_linea" | "cambiar_vehiculo" | "guardar_preferencia"
-  resumen: string                       // lo que se le muestra a la persona para decidir
+  resumen: string                       // lo que se le muestra a la persona para decidir; nombra la ruta y el vehículo de la línea («Cali → Barranquilla · Turbo»), no sus identificadores
   parametros: object                    // exactamente lo que se aplicaría
   estado: "pendiente" | "ejecutando" | "ejecutada" | "fallida" | "cancelada" | "vencida"
   venceAt: string; resueltaAt: string | null

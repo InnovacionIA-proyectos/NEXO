@@ -118,3 +118,9 @@ public sealed class clsHerramientaPropuestaFalsa(
             "Asistente", "Queda pendiente de que la persona lo confirme en pantalla.");
     }
 }
+
+/// <summary>El arnés no manda contexto de pantalla: no hay nada que resolver.</summary>
+public sealed class clsSinContextoPantalla : IResolutorContextoPantalla
+{
+    public Task<string> ResolverAsync(clsContextoPantalla contexto, CancellationToken ct) => throw new NotSupportedException();
+}

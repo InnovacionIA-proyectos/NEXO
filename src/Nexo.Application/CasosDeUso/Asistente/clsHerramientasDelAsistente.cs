@@ -80,6 +80,7 @@ public static class clsDependencyInjection
         services.AddScoped<IQueryHandler<clsListarPreferenciasAsistenteQuery, IReadOnlyList<clsPreferenciaAsistenteDto>>, clsListarPreferenciasAsistenteQueryHandler>();
         services.AddScoped<ICommandHandler<clsEliminarPreferenciaAsistenteCommand, Unit>, clsEliminarPreferenciaAsistenteCommandHandler>();
         services.AddScoped<clsContextoConversacionAsistente>();
+        services.AddScoped<IResolutorContextoPantalla, clsResolutorContextoPantalla>();
         services.AddScoped<ICommandHandler<clsConfirmarAccionAsistenteCommand, clsAccionAsistenteDto>, clsConfirmarAccionAsistenteCommandHandler>();
         services.AddScoped<ICommandHandler<clsCancelarAccionAsistenteCommand, clsAccionAsistenteDto>, clsCancelarAccionAsistenteCommandHandler>();
         services.AddScoped<clsHerramientasDelAsistente>();
