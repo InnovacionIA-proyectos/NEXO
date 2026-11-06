@@ -350,6 +350,11 @@ public class clsNexoDbContext : DbContext
              .WithMany()
              .HasForeignKey(x => x.LineaSolicitudId)
              .OnDelete(DeleteBehavior.Restrict);
+            // Un flete por línea de solicitud y cotización; los fletes sin línea de solicitud no cuentan.
+            e.HasIndex(x => new { x.CotizacionId, x.LineaSolicitudId })
+             .IsUnique()
+             .HasFilter("[LineaSolicitudId] IS NOT NULL")
+             .HasDatabaseName("IX_cotizacion_lineas_Cotizacion_LineaSolicitud");
         });
 
         b.Entity<clsCotizacionConexo>(e =>

@@ -982,6 +982,7 @@ CREATE INDEX [IX_cotizacion_conexos_ServicioConexoId] ON [dbo].[tbl_cotizacion_c
 CREATE INDEX [IX_cotizacion_conexos_CotizacionLineaId] ON [dbo].[tbl_cotizacion_conexos] ([CotizacionLineaId]);
 CREATE INDEX [IX_cotizacion_lineas_CotizacionId] ON [dbo].[tbl_cotizacion_lineas] ([CotizacionId]);
 CREATE INDEX [IX_cotizacion_lineas_LineaSolicitudId] ON [dbo].[tbl_cotizacion_lineas] ([LineaSolicitudId]);
+CREATE UNIQUE INDEX [IX_cotizacion_lineas_Cotizacion_LineaSolicitud] ON [dbo].[tbl_cotizacion_lineas] ([CotizacionId], [LineaSolicitudId]) WHERE ([LineaSolicitudId] IS NOT NULL);
 CREATE INDEX [IX_cotizaciones_EntregadaPor] ON [dbo].[tbl_cotizaciones] ([EntregadaPor]);
 CREATE INDEX [IX_cotizaciones_SolicitudId] ON [dbo].[tbl_cotizaciones] ([SolicitudId]);
 CREATE UNIQUE INDEX [AK_InboxState_MessageId_ConsumerId] ON [dbo].[InboxState] ([MessageId], [ConsumerId]);

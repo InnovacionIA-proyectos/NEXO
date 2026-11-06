@@ -27,7 +27,10 @@ public sealed class clsAplicarPropuestasCommandHandler(
     IUnitOfWork uow)
     : ICommandHandler<clsAplicarPropuestasCommand, clsAplicarPropuestasResultDto>
 {
-    public async Task<clsAplicarPropuestasResultDto> Handle(clsAplicarPropuestasCommand command, CancellationToken ct = default)
+    public Task<clsAplicarPropuestasResultDto> Handle(clsAplicarPropuestasCommand command, CancellationToken ct = default) =>
+        Aplicar(command, reintento: false, ct);
+
+    private async Task<clsAplicarPropuestasResultDto> Aplicar(clsAplicarPropuestasCommand command, bool reintento, CancellationToken ct)
     {
         var c = await cotizaciones.ObtenerConLineasYConexosAsync(command.CotizacionId, ct)
             ?? throw new clsNotFoundException("COTIZACION_NO_ENCONTRADA", "Cotización no encontrada.");
@@ -79,7 +82,17 @@ public sealed class clsAplicarPropuestasCommandHandler(
         {
             clsCotizacionCalculos.Recalcular(c);
             auditoria.Registrar(usuarioActual.Id, "cotizaciones", c.Id, "aplicar_propuestas", $"{{\"agregadas\":{agregadas}}}");
-            await uow.SaveChangesAsync(ct);
+            try
+            {
+                await uow.SaveChangesAsync(ct);
+            }
+            catch (Exception ex) when (cotizaciones.EsChoqueDeLineaDuplicada(ex))
+            {
+                // Otro pedido ya guardó esos fletes: se relee la cotización y no se agrega nada.
+                cotizaciones.DescartarCambiosPendientes();
+                if (reintento) throw new clsConflictException("LINEA_YA_COSTEADA", "Alguna línea ya tiene un flete en esta cotización. Vuelva a cargarla.");
+                return await Aplicar(command, reintento: true, ct);
+            }
             // Marca esas líneas como Revisada (gestión en la Mesa) para la bandeja.
             await lineasSolicitud.MarcarRevisadasAsync(lineasCosteadas, ct);
         }
