@@ -138,7 +138,7 @@ public class clsNormalizarLineaNegocioTests
         var r = await Normalizar("Impo", "Outbound");
 
         Assert.Equal(["resuelto", "sin_resolver"], r.Valores.Select(v => v.Estado));
-        Assert.Equal("IA_NO_DISPONIBLE", r.MotivoSinIa);
+        Assert.Equal("IA_DESACTIVADA", r.MotivoSinIa);
     }
 
     [Theory]

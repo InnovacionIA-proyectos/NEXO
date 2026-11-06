@@ -333,7 +333,7 @@ public class clsSugerirMapeoExcelTests
         var r = await Manejador().Handle(Consulta(["CIUDAD ORIGEN", "Otra"], cliente: Cliente));
 
         Assert.False(r.IaUsada);
-        Assert.Equal("IA_NO_DISPONIBLE", r.MotivoSinIa);
+        Assert.Equal("IA_DESACTIVADA", r.MotivoSinIa);
         Assert.Equal(("origen", "diccionario"), (r.Columnas[0].Campo, r.Columnas[0].Origen));
         Assert.Equal(("ignorar", "ninguno"), (r.Columnas[1].Campo, r.Columnas[1].Origen));
         _ia.Verify(i => i.CompletarAsync(It.IsAny<clsPeticionIa>(), It.IsAny<CancellationToken>()), Times.Never);

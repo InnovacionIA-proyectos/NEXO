@@ -254,7 +254,7 @@ public class clsLecturaEstructuraTests
 
         Assert.Equal("automatica", r.OrigenReceta);
         Assert.False(r.IaUsada);
-        Assert.Equal("IA_NO_DISPONIBLE", r.MotivoSinIa);
+        Assert.Equal("IA_DESACTIVADA", r.MotivoSinIa);
         Assert.NotEmpty(r.Tablas);
         Assert.Contains(r.Avisos, a => a.Contains("lectura simple"));
     }
@@ -269,7 +269,7 @@ public class clsLecturaEstructuraTests
         var r = await Lector(Formato(TitulosB)).Handle(Leer(Cliente));
 
         Assert.Equal("guardada", r.OrigenReceta);
-        Assert.Equal("IA_NO_DISPONIBLE", r.MotivoSinIa);
+        Assert.Equal("IA_DESACTIVADA", r.MotivoSinIa);
         Assert.Contains(r.Avisos, a => a.Contains("formato cambió"));
     }
 

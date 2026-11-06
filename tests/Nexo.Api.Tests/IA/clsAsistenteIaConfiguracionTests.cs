@@ -125,6 +125,16 @@ public class clsAsistenteIaConfiguracionTests(clsApiFixture fx)
     }
 
     [Fact]
+    public void Una_llamada_a_la_IA_no_pasa_de_un_minuto_con_la_configuracion_por_defecto()
+    {
+        var o = new clsOpcionesAnthropic();
+
+        var peorCaso = o.TimeoutEfectivo * (o.ReintentosEfectivos + 1);
+
+        Assert.True(peorCaso <= TimeSpan.FromSeconds(60), $"El peor caso es {peorCaso.TotalSeconds} s");
+    }
+
+    [Fact]
     public void Los_reintentos_y_el_tope_de_tokens_quedan_dentro_de_limites()
     {
         var o = new clsOpcionesAnthropic { MaxReintentos = 99, MaxTokensSalida = 10 };

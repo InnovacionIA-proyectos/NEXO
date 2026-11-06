@@ -32,8 +32,9 @@ public sealed class clsOpcionesAnthropic
     /// <summary>Con true el modelo decide cuánto razonar según el esfuerzo; con false no razona.</summary>
     public bool RazonamientoAdaptativo { get; set; } = true;
 
-    public int TimeoutSegundos { get; set; } = 60;
-    public int MaxReintentos { get; set; } = 2;
+    /// <summary>Por intento. Con los reintentos, una llamada tarda como máximo (reintentos + 1) × este tiempo.</summary>
+    public int TimeoutSegundos { get; set; } = 30;
+    public int MaxReintentos { get; set; } = 1;
     public int MaxTokensSalida { get; set; } = 4096;
 
     /// <summary>Interruptor por función, por el nombre de <see cref="clsFuncionIa"/> (sin distinguir mayúsculas).</summary>
