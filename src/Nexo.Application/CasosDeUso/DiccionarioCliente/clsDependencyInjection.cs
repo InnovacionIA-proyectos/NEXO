@@ -1,4 +1,5 @@
 using Nexo.Application.CasosDeUso.DiccionarioCliente.DTOs;
+using Nexo.Application.CasosDeUso.Solicitudes;
 using Nexo.Application.Common.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -7,6 +8,7 @@ namespace Nexo.Application.CasosDeUso.DiccionarioCliente;
 public static class clsDependencyInjection
 {
     public static IServiceCollection AddDiccionarioClienteUseCases(this IServiceCollection services) => services
+        .AddScoped<clsClienteDeImportacion>()
         .AddScoped<IQueryHandler<clsListarDiccionarioClienteQuery, IReadOnlyList<clsTerminoClienteDto>>, clsListarDiccionarioClienteQueryHandler>()
         .AddScoped<IQueryHandler<clsObtenerOpcionesDiccionarioClienteQuery, clsOpcionesDiccionarioClienteDto>, clsObtenerOpcionesDiccionarioClienteQueryHandler>()
         .AddScoped<ICommandHandler<clsCrearTerminoClienteCommand, clsTerminoClienteDto>, clsCrearTerminoClienteCommandHandler>()

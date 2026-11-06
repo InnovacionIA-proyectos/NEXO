@@ -9,10 +9,17 @@ using Microsoft.AspNetCore.RateLimiting;
 
 namespace Nexo.Api.Catalogos;
 
-/// <summary>Un término del diccionario de clientes. <c>clienteId</c> null = aplica a todos los clientes.</summary>
+/// <summary>
+/// Un término del diccionario de clientes. El cliente se indica con <c>clienteId</c> o con <c>clienteNit</c> (no con los dos);
+/// sin ninguno el término aplica a todos los clientes.
+/// </summary>
 public class clsCrearTerminoClienteRequest
 {
     public Guid? ClienteId { get; set; }
+
+    /// <summary>NIT del cliente (con o sin puntos y dígito de verificación). Si no tiene cliente local se crea con los datos del DW.</summary>
+    [MaxLength(30)]
+    public string? ClienteNit { get; set; }
 
     [Required(AllowEmptyStrings = false), MaxLength(200)]
     public string Termino { get; set; } = null!;
@@ -75,8 +82,9 @@ public class clsDiccionarioClienteController(
     private const string RolesEscritura = "Comercial,AdminBiblioteca,AdminTarifas,Admin";
 
     /// <summary>
-    /// Los términos del diccionario. Con <c>clienteId</c> trae los de ese cliente y, por defecto, también los que aplican a todos
-    /// (<c>incluirGenerales=false</c> los omite); sin él, los de todos los clientes. <c>tipo</c> = columna | unidad | valor,
+    /// Los términos del diccionario. Con <c>clienteId</c> (o <c>clienteNit</c>; manda el id) trae los de ese cliente y, por defecto,
+    /// también los que aplican a todos (<c>incluirGenerales=false</c> los omite); sin ninguno, los de todos los clientes. Con un NIT que no
+    /// tiene cliente local no hay términos propios y no se crea nada. <c>tipo</c> = columna | unidad | valor,
     /// <c>q</c> busca en el término y el concepto y <c>soloActivos</c> omite los inactivos. Otro tipo → 400 TIPO_TERMINO_INVALIDO.
     /// </summary>
     [HttpGet]
@@ -85,8 +93,8 @@ public class clsDiccionarioClienteController(
     [EnableRateLimiting(clsRateLimitingExtensions.PoliticaListadosEstandar)]
     public async Task<ActionResult<IReadOnlyList<clsTerminoClienteDto>>> Listar(
         [FromQuery] Guid? clienteId, [FromQuery] bool incluirGenerales = true, [FromQuery] string? tipo = null,
-        [FromQuery] string? q = null, [FromQuery] bool soloActivos = false, CancellationToken ct = default)
-        => Ok(await listar.Handle(new clsListarDiccionarioClienteQuery(clienteId, incluirGenerales, tipo, q, soloActivos), ct));
+        [FromQuery] string? q = null, [FromQuery] bool soloActivos = false, [FromQuery] string? clienteNit = null, CancellationToken ct = default)
+        => Ok(await listar.Handle(new clsListarDiccionarioClienteQuery(clienteId, incluirGenerales, tipo, q, soloActivos, clienteNit), ct));
 
     /// <summary>Los valores que acepta el diccionario (tipos, campos de NEXO, unidades y contextos) para armar los formularios.</summary>
     [HttpGet("opciones")]
@@ -95,8 +103,9 @@ public class clsDiccionarioClienteController(
         => Ok(await opciones.Handle(new clsObtenerOpcionesDiccionarioClienteQuery(), ct));
 
     /// <summary>
-    /// Agrega un término. 400 si el tipo, el concepto o el contexto no son válidos o el cliente no existe; 409 TERMINO_DUPLICADO si el
-    /// cliente ya tiene ese término (sin distinguir mayúsculas ni tildes) con el mismo tipo y contexto.
+    /// Agrega un término. 400 si el tipo, el concepto o el contexto no son válidos, el cliente no existe (CLIENTE_NO_ENCONTRADO), el NIT no
+    /// es de ningún cliente ni prospecto (CLIENTE_NIT_INVALIDO) o vienen <c>clienteId</c> y <c>clienteNit</c> a la vez (CLIENTE_AMBIGUO);
+    /// 409 TERMINO_DUPLICADO si el cliente ya tiene ese término (sin distinguir mayúsculas ni tildes) con el mismo tipo y contexto.
     /// </summary>
     [HttpPost]
     [Authorize(Roles = RolesEscritura)]
@@ -106,7 +115,7 @@ public class clsDiccionarioClienteController(
     public async Task<ActionResult<clsTerminoClienteDto>> Crear([FromBody] clsCrearTerminoClienteRequest req, CancellationToken ct = default)
     {
         var dto = await crear.Handle(
-            new clsCrearTerminoClienteCommand(req.ClienteId, req.Termino, req.Tipo, req.Concepto, req.Contexto, req.Ejemplo, req.Activo), ct);
+            new clsCrearTerminoClienteCommand(req.ClienteId, req.Termino, req.Tipo, req.Concepto, req.Contexto, req.Ejemplo, req.Activo, req.ClienteNit), ct);
         return Created($"/api/diccionario-cliente?clienteId={dto.ClienteId}", dto);
     }
 

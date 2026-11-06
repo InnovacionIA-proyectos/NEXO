@@ -1,6 +1,7 @@
 using Nexo.Application.CasosDeUso.DiccionarioCliente.Interfaces;
 using Nexo.Domain.Catalogos.Entidades;
 using Nexo.Infrastructure.Persistence;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 
 namespace Nexo.Infrastructure.Catalogos.Adaptadores;
@@ -42,4 +43,10 @@ public sealed class clsEfDiccionarioClienteRepository(clsNexoDbContext db) : IDi
     public void Agregar(clsTerminoCliente termino) => db.TerminosCliente.Add(termino);
 
     public void Eliminar(clsTerminoCliente termino) => db.TerminosCliente.Remove(termino);
+
+    // 2601 y 2627: violación de un índice único / de una restricción única.
+    public bool EsChoqueUnico(Exception error) =>
+        error is DbUpdateException { InnerException: SqlException { Number: 2601 or 2627 } };
+
+    public void DescartarCambiosPendientes() => db.ChangeTracker.Clear();
 }
