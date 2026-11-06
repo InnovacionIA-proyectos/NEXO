@@ -1745,12 +1745,14 @@ línea (no confía en lo que diga el navegador) y valida:
   **o** si `valorFlete` coincide con el histórico de la propuesta de esa línea
   (ventana de 3 meses). Si no viene de ninguna de las dos → `409 HISTORICA_VENCIDA`.
 
+- Una línea de solicitud tiene **un solo flete por cotización**: agregarle otro responde `409 LINEA_YA_COSTEADA` (para cambiarlo, `PUT .../lineas/{lineaSolicitudId}`). También aplica a dos pedidos simultáneos: gana uno y el otro recibe el 409. Los fletes sin `lineaSolicitudId` no tienen ese límite.
+
 - **→** `200 CotizacionDto`
-- **Errores**: `400 FUENTE_INVALIDA` · `400 LINEA_INVALIDA` · `400 FLETE_BAJO_PISO_SICETAC` · `404 COTIZACION_NO_ENCONTRADA` · `409 COTIZACION_NO_EDITABLE` · `409 HISTORICA_VENCIDA`
+- **Errores**: `400 FUENTE_INVALIDA` · `400 LINEA_INVALIDA` · `400 FLETE_BAJO_PISO_SICETAC` · `404 COTIZACION_NO_ENCONTRADA` · `409 COTIZACION_NO_EDITABLE` · `409 LINEA_RECHAZADA` · `409 LINEA_YA_COSTEADA` · `409 HISTORICA_VENCIDA`
 
 #### `PUT /api/cotizaciones/{id}/lineas/{lineaSolicitudId}` — editar un flete
 S5-HU-20.1/#286; **S6-HU-26.1/#30: de cualquier fuente**. Modifica **la misma fila** de la cotización: `POST .../lineas` siempre
-agrega una nueva, así que editar con él duplicaría la línea e inflaría el total. La ruta
+agrega una nueva, así que sobre una línea que ya tiene flete responde `409 LINEA_YA_COSTEADA`: para cambiarlo se usa este `PUT`. La ruta
 usa el id de la línea del **pliego** (`lineaSolicitudId`, el mismo que manda el POST), no
 el de la fila de la cotización.
 

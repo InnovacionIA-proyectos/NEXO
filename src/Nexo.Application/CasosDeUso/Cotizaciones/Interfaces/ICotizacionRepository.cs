@@ -24,4 +24,10 @@ public interface ICotizacionRepository
     Task<Guid?> BuscarIdConContenidoPorSolicitudAsync(Guid solicitudId, CancellationToken ct);
 
     void Agregar(clsCotizacion cotizacion);
+
+    /// <summary>Si el error de guardado es porque la cotización ya tiene una línea para esa línea de solicitud (otra petición la agregó primero).</summary>
+    bool EsChoqueDeLineaDuplicada(Exception error);
+
+    /// <summary>Descarta lo pendiente de guardar para poder volver a consultar tras un choque.</summary>
+    void DescartarCambiosPendientes();
 }

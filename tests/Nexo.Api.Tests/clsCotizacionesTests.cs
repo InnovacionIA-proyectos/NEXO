@@ -398,4 +398,82 @@ public class clsCotizacionesTests : IDisposable
         var editar = await cli.PatchJson($"/api/cotizaciones/{cid}/conexos/{conexoId}", new { cantidad = 2 });
         Assert.Equal(HttpStatusCode.Conflict, editar.StatusCode);
     }
+
+    // ---------------------------------------------------------------- un flete por línea y cotización
+
+    private int FilasDeLaCotizacion(Guid cotizacionId) => _fx.WithDb(db => db.CotizacionLineas.Count(l => l.CotizacionId == cotizacionId));
+
+    private async Task<(Guid cotizacion, Guid linea)> CotizacionBorradorConLineaSinFlete()
+    {
+        var (sid, lid) = await NuevaSolicitudConLinea();
+        var cot = await (await _fx.Client().PostJson("/api/cotizaciones", new { solicitudId = sid })).Json();
+        return (cot.GetProperty("id").GetGuid(), lid);
+    }
+
+    [Fact]
+    public async Task Agregar_dos_veces_el_flete_de_la_misma_linea_es_409_y_el_total_no_cambia()
+    {
+        var cli = _fx.Client();
+        var (cid, lid) = await CotizacionBorradorConLineaSinFlete();
+        var cuerpo = new { lineaSolicitudId = lid, valorFlete = 1_000_000, fuente = "manual" };
+
+        var primera = await cli.PostJson($"/api/cotizaciones/{cid}/lineas", cuerpo);
+        Assert.Equal(HttpStatusCode.OK, primera.StatusCode);
+        var total = (await primera.Json()).GetProperty("total").GetDecimal();
+
+        var repetida = await cli.PostJson($"/api/cotizaciones/{cid}/lineas", cuerpo);
+
+        Assert.Equal(HttpStatusCode.Conflict, repetida.StatusCode);
+        Assert.Equal("LINEA_YA_COSTEADA", await repetida.ErrorCode());
+        Assert.Equal(1, FilasDeLaCotizacion(cid));
+        var vigente = await cli.GetFromJsonAsync<JsonElement>($"/api/cotizaciones/{cid}");
+        Assert.Equal(total, vigente.GetProperty("total").GetDecimal());
+    }
+
+    [Fact]
+    public async Task Varios_pedidos_a_la_vez_con_el_mismo_flete_dejan_una_sola_fila_y_el_resto_recibe_409()
+    {
+        var cli = _fx.Client();
+        var (cid, lid) = await CotizacionBorradorConLineaSinFlete();
+
+        var respuestas = await Task.WhenAll(Enumerable.Range(0, 6).Select(_ =>
+            Task.Run(() => cli.PostJson($"/api/cotizaciones/{cid}/lineas", new { lineaSolicitudId = lid, valorFlete = 1_000_000, fuente = "manual" }))));
+
+        var estados = respuestas.Select(r => r.StatusCode).ToList();
+        Assert.Single(estados, HttpStatusCode.OK);
+        Assert.All(estados.Where(s => s != HttpStatusCode.OK), s => Assert.Equal(HttpStatusCode.Conflict, s));
+        Assert.Equal(1, FilasDeLaCotizacion(cid));
+    }
+
+    [Fact]
+    public async Task Los_fletes_sin_linea_de_solicitud_se_pueden_agregar_varias_veces()
+    {
+        var cli = _fx.Client();
+        var (cid, _) = await CotizacionBorradorConLineaSinFlete();
+
+        for (var i = 0; i < 2; i++)
+            Assert.Equal(HttpStatusCode.OK, (await cli.PostJson($"/api/cotizaciones/{cid}/lineas", new { valorFlete = 500_000, fuente = "manual" })).StatusCode);
+
+        Assert.Equal(2, FilasDeLaCotizacion(cid));
+    }
+
+    [Fact]
+    public async Task La_base_rechaza_una_segunda_fila_para_la_misma_linea_en_la_misma_cotizacion()
+    {
+        var cli = _fx.Client();
+        var (cid, lid) = await CotizacionBorradorConLineaSinFlete();
+        await cli.PostJson($"/api/cotizaciones/{cid}/lineas", new { lineaSolicitudId = lid, valorFlete = 1_000_000, fuente = "manual" });
+
+        var error = Assert.Throws<DbUpdateException>(() => _fx.WithDb(db =>
+        {
+            db.CotizacionLineas.Add(new Nexo.Domain.Cotizaciones.Entidades.clsCotizacionLinea
+            {
+                CotizacionId = cid, LineaSolicitudId = lid, ValorFlete = 1, Fuente = Nexo.Domain.Enums.FuenteFlete.Manual,
+            });
+            db.SaveChanges();
+            return 0;
+        }));
+
+        Assert.Contains("IX_cotizacion_lineas_Cotizacion_LineaSolicitud", error.InnerException!.Message);
+    }
 }
