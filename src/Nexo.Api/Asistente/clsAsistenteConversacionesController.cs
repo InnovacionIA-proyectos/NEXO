@@ -32,7 +32,7 @@ public class clsAsistenteConversacionesController(
     public async Task Mensajes([FromBody] clsEnviarMensajeRequest req, CancellationToken ct = default)
     {
         // Todo lo que puede fallar antes de responder falla aquí, como un error HTTP normal; después solo hay eventos.
-        var eventos = await conversar.Handle(new clsConversarAsistenteCommand(req.ConversacionId, req.Mensaje), ct);
+        var eventos = await conversar.Handle(new clsConversarAsistenteCommand(req.ConversacionId, req.Mensaje, req.Contexto?.ADominio()), ct);
 
         Response.StatusCode = StatusCodes.Status200OK;
         Response.ContentType = "text/event-stream; charset=utf-8";
@@ -84,4 +84,11 @@ public class clsAsistenteConversacionesController(
 }
 
 /// <param name="ConversacionId">Sin valor empieza una conversación nueva.</param>
-public sealed record clsEnviarMensajeRequest(Guid? ConversacionId, string? Mensaje);
+/// <param name="Contexto">Lo que la persona tiene abierto en pantalla; opcional. No cuenta para el límite de caracteres del mensaje.</param>
+public sealed record clsEnviarMensajeRequest(Guid? ConversacionId, string? Mensaje, clsContextoPantallaRequest? Contexto = null);
+
+/// <summary>La solicitud abierta y, si las hay, su cotización y la línea que la persona está mirando.</summary>
+public sealed record clsContextoPantallaRequest(Guid SolicitudId, Guid? CotizacionId = null, Guid? LineaSolicitudId = null)
+{
+    public clsContextoPantalla ADominio() => new(SolicitudId, CotizacionId, LineaSolicitudId);
+}

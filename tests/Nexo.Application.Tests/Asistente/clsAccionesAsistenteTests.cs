@@ -5,6 +5,7 @@ using Nexo.Application.CasosDeUso.Asistente.Conversacion;
 using Nexo.Application.CasosDeUso.Asistente.Herramientas;
 using Nexo.Application.CasosDeUso.Cotizaciones;
 using Nexo.Application.CasosDeUso.Cotizaciones.DTOs;
+using Nexo.Application.CasosDeUso.Cotizaciones.Interfaces;
 using Nexo.Application.Common;
 using Nexo.Application.Common.Abstractions;
 using Nexo.Application.Common.Exceptions;
@@ -31,6 +32,8 @@ public class clsAccionesAsistenteTests
     private readonly clsRepositorioPreferenciasEnMemoria _preferencias = new();
     private readonly Mock<ICurrentUserPort> _usuario = new();
     private readonly Mock<IQueryHandler<clsObtenerCotizacionQuery, clsCotizacionDto>> _cotizaciones = new();
+    private readonly Mock<ILineasSolicitudPort> _lineasSolicitud = new();
+    private readonly Mock<IResolutorContextoPantalla> _pantalla = new();
     private readonly clsContextoConversacionAsistente _contexto = new();
     private readonly clsLimitesAsistente _limites = new();
     private readonly clsRelojPrueba _reloj = new(new DateTimeOffset(2026, 10, 27, 15, 0, 0, TimeSpan.Zero));
@@ -68,11 +71,11 @@ public class clsAccionesAsistenteTests
 
     private IHerramientaAsistente[] Herramientas() =>
     [
-        new clsProponerAgregarFleteHerramienta(_repo, _contexto, _usuario.Object, _cotizaciones.Object, _limites, _reloj),
-        new clsProponerEditarFleteHerramienta(_repo, _contexto, _usuario.Object, _cotizaciones.Object, _limites, _reloj),
-        new clsProponerAgregarConexosHerramienta(_repo, _contexto, _usuario.Object, _cotizaciones.Object, _limites, _reloj),
-        new clsProponerRechazarLineaHerramienta(_repo, _contexto, _usuario.Object, _cotizaciones.Object, _limites, _reloj),
-        new clsProponerCambiarVehiculoHerramienta(_repo, _contexto, _usuario.Object, _cotizaciones.Object, _limites, _reloj),
+        new clsProponerAgregarFleteHerramienta(_repo, _contexto, _usuario.Object, _cotizaciones.Object, _lineasSolicitud.Object, _limites, _reloj),
+        new clsProponerEditarFleteHerramienta(_repo, _contexto, _usuario.Object, _cotizaciones.Object, _lineasSolicitud.Object, _limites, _reloj),
+        new clsProponerAgregarConexosHerramienta(_repo, _contexto, _usuario.Object, _cotizaciones.Object, _lineasSolicitud.Object, _limites, _reloj),
+        new clsProponerRechazarLineaHerramienta(_repo, _contexto, _usuario.Object, _cotizaciones.Object, _lineasSolicitud.Object, _limites, _reloj),
+        new clsProponerCambiarVehiculoHerramienta(_repo, _contexto, _usuario.Object, _cotizaciones.Object, _lineasSolicitud.Object, _limites, _reloj),
     ];
 
     private clsHerramientasDelAsistente Catalogo() => new(Herramientas(), _usuario.Object);
@@ -99,6 +102,48 @@ public class clsAccionesAsistenteTests
 
     private static string Fleten(decimal valor = 4_500_000m) =>
         $$"""{"cotizacionId":"{{Cotizacion}}","lineaSolicitudId":"{{Linea}}","valorFlete":{{valor}},"fuente":"Manual"}""";
+
+    // ------------------------------------------------------------------ resúmenes legibles
+
+    private void LineaConRutaYVehiculo() =>
+        _lineasSolicitud.Setup(l => l.ObtenerConRutaYVehiculoAsync(Linea, It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Nexo.Domain.Solicitudes.Entidades.clsLineaSolicitud
+            {
+                Id = Linea,
+                clsRuta = new Nexo.Domain.Catalogos.Entidades.clsRuta { Origen = "Cali", Destino = "Barranquilla" },
+                clsConfiguracionVehiculo = new Nexo.Domain.Catalogos.Entidades.clsConfiguracionVehiculo { TipoVehiculo = "Turbo" },
+            });
+
+    [Theory]
+    [InlineData("proponer_agregar_flete")]
+    [InlineData("proponer_editar_flete")]
+    [InlineData("proponer_rechazar_linea")]
+    [InlineData("proponer_cambiar_vehiculo")]
+    public async Task Los_resumenes_nombran_la_ruta_y_el_vehiculo_y_no_los_identificadores(string herramienta)
+    {
+        LineaConRutaYVehiculo();
+        var json = herramienta switch
+        {
+            "proponer_agregar_flete" => Fleten(),
+            "proponer_editar_flete" => $$"""{"cotizacionId":"{{Cotizacion}}","lineaSolicitudId":"{{Linea}}","valorFlete":4500000}""",
+            "proponer_rechazar_linea" => $$"""{"cotizacionId":"{{Cotizacion}}","lineaSolicitudId":"{{Linea}}","motivo":"El cliente cancela"}""",
+            _ => $$"""{"cotizacionId":"{{Cotizacion}}","lineaSolicitudId":"{{Linea}}","tipoVehiculo":"C3"}""",
+        };
+
+        var accion = await ProponerYObtener(herramienta, json);
+
+        Assert.Contains("Cali → Barranquilla · Turbo", accion.Resumen);
+        Assert.DoesNotContain("bbbbbbbb", accion.Resumen);
+        Assert.DoesNotContain("aaaaaaaa", accion.Resumen);
+    }
+
+    [Fact]
+    public async Task Sin_ruta_conocida_el_resumen_usa_el_identificador_corto_de_la_linea()
+    {
+        var accion = await ProponerYObtener("proponer_agregar_flete", Fleten());
+
+        Assert.Contains("la línea bbbbbbbb ", accion.Resumen);
+    }
 
     // ------------------------------------------------------------------ proponer: el modelo solo propone
 
@@ -464,9 +509,9 @@ public class clsAccionesAsistenteTests
         var contexto = new clsContextoConversacionAsistente();
         var catalogo = new clsHerramientasDelAsistente(
         [
-            new clsProponerAgregarFleteHerramienta(_repo, contexto, _usuario.Object, _cotizaciones.Object, _limites, _reloj),
+            new clsProponerAgregarFleteHerramienta(_repo, contexto, _usuario.Object, _cotizaciones.Object, _lineasSolicitud.Object, _limites, _reloj),
         ], _usuario.Object);
-        var handler = new clsConversarAsistenteCommandHandler(modelo.Object, _repo, catalogo, _usuario.Object, _limites, contexto, _preferencias);
+        var handler = new clsConversarAsistenteCommandHandler(modelo.Object, _repo, catalogo, _usuario.Object, _limites, contexto, _preferencias, _pantalla.Object);
 
         List<clsEventoAsistente> eventos = [];
         await foreach (var e in await handler.Handle(new clsConversarAsistenteCommand(null, "Pon el flete en $4.500.000"))) eventos.Add(e);

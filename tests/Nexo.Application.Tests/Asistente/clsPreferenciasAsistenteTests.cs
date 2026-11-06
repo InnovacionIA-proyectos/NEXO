@@ -5,6 +5,7 @@ using Nexo.Application.CasosDeUso.Asistente.Conversacion;
 using Nexo.Application.CasosDeUso.Asistente.Herramientas;
 using Nexo.Application.CasosDeUso.Cotizaciones;
 using Nexo.Application.CasosDeUso.Cotizaciones.DTOs;
+using Nexo.Application.CasosDeUso.Cotizaciones.Interfaces;
 using Nexo.Application.Common;
 using Nexo.Application.Common.Abstractions;
 using Nexo.Application.Common.Exceptions;
@@ -32,6 +33,8 @@ public class clsPreferenciasAsistenteTests
     private readonly clsRepositorioPreferenciasEnMemoria _preferencias = new();
     private readonly Mock<ICurrentUserPort> _usuario = new();
     private readonly Mock<IQueryHandler<clsObtenerCotizacionQuery, clsCotizacionDto>> _cotizaciones = new();
+    private readonly Mock<ILineasSolicitudPort> _lineasSolicitud = new();
+    private readonly Mock<IResolutorContextoPantalla> _pantalla = new();
     private readonly Mock<ICommandHandler<clsEditarLineaCotizacionCommand, clsCotizacionDto>> _editarFlete = new();
     private readonly clsContextoConversacionAsistente _contexto = new();
     private readonly clsLimitesAsistente _limites = new();
@@ -57,7 +60,7 @@ public class clsPreferenciasAsistenteTests
     [
         new clsProponerGuardarPreferenciaHerramienta(_repo, _contexto, _usuario.Object, _preferencias, _limites, TimeProvider.System),
         new clsListarPreferenciasHerramienta(_preferencias, _usuario.Object),
-        new clsProponerEditarFleteHerramienta(_repo, _contexto, _usuario.Object, _cotizaciones.Object, _limites, TimeProvider.System),
+        new clsProponerEditarFleteHerramienta(_repo, _contexto, _usuario.Object, _cotizaciones.Object, _lineasSolicitud.Object, _limites, TimeProvider.System),
     ];
 
     private clsHerramientasDelAsistente Catalogo() => new(Herramientas(), _usuario.Object);
@@ -256,10 +259,10 @@ public class clsPreferenciasAsistenteTests
         var contexto = new clsContextoConversacionAsistente();
         var catalogo = new clsHerramientasDelAsistente(
         [
-            new clsProponerEditarFleteHerramienta(_repo, contexto, _usuario.Object, _cotizaciones.Object, _limites, TimeProvider.System),
+            new clsProponerEditarFleteHerramienta(_repo, contexto, _usuario.Object, _cotizaciones.Object, _lineasSolicitud.Object, _limites, TimeProvider.System),
             new clsHerramientaDePrueba("consultar_piso_sicetac", () => clsResultadoHerramienta.Con(new { valorPiso = 2_900_000m }, "SICE-TAC (DWSice), periodo 202610")),
         ], _usuario.Object);
-        return (new clsConversarAsistenteCommandHandler(modelo.Object, _repo, catalogo, _usuario.Object, _limites, contexto, _preferencias), modelo, peticiones);
+        return (new clsConversarAsistenteCommandHandler(modelo.Object, _repo, catalogo, _usuario.Object, _limites, contexto, _preferencias, _pantalla.Object), modelo, peticiones);
     }
 
     private sealed class clsHerramientaDePrueba(string nombre, Func<clsResultadoHerramienta> resultado) : IHerramientaAsistente
@@ -276,6 +279,41 @@ public class clsPreferenciasAsistenteTests
         List<clsEventoAsistente> lista = [];
         await foreach (var e in flujo) lista.Add(e);
         return lista;
+    }
+
+    [Fact]
+    public async Task El_contexto_de_pantalla_valido_viaja_al_final_de_las_instrucciones_y_uno_invalido_corta_antes_de_responder()
+    {
+        var contexto = new clsContextoPantalla(Guid.NewGuid());
+        _pantalla.Setup(p => p.ResolverAsync(contexto, It.IsAny<CancellationToken>())).ReturnsAsync("CONTEXTO DE PANTALLA\n- solicitudId: x");
+        var (handler, _, peticiones) = Conversacion((_, _, _) => Responde("Hola"));
+
+        await Leer(await handler.Handle(new clsConversarAsistenteCommand(null, "Hola", contexto)));
+
+        var instrucciones = Assert.Single(peticiones).Instrucciones;
+        Assert.StartsWith(clsInstruccionesAsistente.Texto, instrucciones);
+        Assert.EndsWith("CONTEXTO DE PANTALLA\n- solicitudId: x", instrucciones);
+
+        var ajeno = new clsContextoPantalla(Guid.NewGuid());
+        _pantalla.Setup(p => p.ResolverAsync(ajeno, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new clsForbiddenException("SOLICITUD_AJENA", "No tiene acceso a esta solicitud."));
+        var conversacionesAntes = _repo.Conversaciones.Count;
+
+        await Assert.ThrowsAsync<clsForbiddenException>(() => handler.Handle(new clsConversarAsistenteCommand(null, "Hola", ajeno)));
+
+        Assert.Equal(conversacionesAntes, _repo.Conversaciones.Count);
+        Assert.Single(peticiones);
+    }
+
+    [Fact]
+    public async Task Sin_contexto_de_pantalla_las_instrucciones_no_lo_mencionan()
+    {
+        var (handler, _, peticiones) = Conversacion((_, _, _) => Responde("Hola"));
+
+        await Leer(await handler.Handle(new clsConversarAsistenteCommand(null, "Hola")));
+
+        Assert.DoesNotContain("CONTEXTO DE PANTALLA", Assert.Single(peticiones).Instrucciones);
+        _pantalla.Verify(p => p.ResolverAsync(It.IsAny<clsContextoPantalla>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]

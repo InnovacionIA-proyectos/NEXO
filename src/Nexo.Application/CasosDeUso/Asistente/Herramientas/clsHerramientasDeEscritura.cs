@@ -3,6 +3,7 @@ using System.Text.Json;
 using Nexo.Application.CasosDeUso.Asistente.Conversacion;
 using Nexo.Application.CasosDeUso.Cotizaciones;
 using Nexo.Application.CasosDeUso.Cotizaciones.DTOs;
+using Nexo.Application.CasosDeUso.Cotizaciones.Interfaces;
 using Nexo.Application.Common;
 using Nexo.Application.Common.Abstractions;
 using Nexo.Application.Common.Exceptions;
@@ -71,6 +72,7 @@ public abstract class clsHerramientaPropuestaDeCotizacionBase(
     clsContextoConversacionAsistente contexto,
     ICurrentUserPort usuario,
     IQueryHandler<clsObtenerCotizacionQuery, clsCotizacionDto> cotizaciones,
+    ILineasSolicitudPort lineasSolicitud,
     clsLimitesAsistente limites,
     TimeProvider reloj) : clsHerramientaPropuestaBase(conversaciones, contexto, usuario, limites, reloj)
 {
@@ -94,6 +96,13 @@ public abstract class clsHerramientaPropuestaDeCotizacionBase(
                 "Consulta la fuente primero o pídele a la persona el valor; no lo calcules.");
     }
 
+    /// <summary>La línea como la ve la persona («Cali → Barranquilla · Turbo»); sin ruta conocida, su identificador corto.</summary>
+    protected async Task<string> DescribirLineaAsync(Guid solicitudId, Guid lineaId, CancellationToken ct)
+    {
+        var linea = await lineasSolicitud.ObtenerConRutaYVehiculoAsync(lineaId, solicitudId, ct);
+        return clsDescripcionDeLinea.De(linea) ?? Corto(lineaId);
+    }
+
     protected static string Monto(decimal valor) => "$" + valor.ToString("#,##0.##", CultureInfo.GetCultureInfo("es-CO"));
 
     protected static string Corto(Guid id) => id.ToString("N")[..8];
@@ -102,8 +111,9 @@ public abstract class clsHerramientaPropuestaDeCotizacionBase(
 /// <summary>Agregar el flete de una línea a la cotización.</summary>
 public sealed class clsProponerAgregarFleteHerramienta(
     IConversacionesAsistenteRepository conversaciones, clsContextoConversacionAsistente contexto, ICurrentUserPort usuario,
-    IQueryHandler<clsObtenerCotizacionQuery, clsCotizacionDto> cotizaciones, clsLimitesAsistente limites, TimeProvider reloj)
-    : clsHerramientaPropuestaDeCotizacionBase(conversaciones, contexto, usuario, cotizaciones, limites, reloj)
+    IQueryHandler<clsObtenerCotizacionQuery, clsCotizacionDto> cotizaciones, ILineasSolicitudPort lineasSolicitud,
+    clsLimitesAsistente limites, TimeProvider reloj)
+    : clsHerramientaPropuestaDeCotizacionBase(conversaciones, contexto, usuario, cotizaciones, lineasSolicitud, limites, reloj)
 {
     public override string Nombre => "proponer_agregar_flete";
 
@@ -131,11 +141,11 @@ public sealed class clsProponerAgregarFleteHerramienta(
         var retorno = e.Decimal("valorRetornoContenedor", 0, 1_000_000_000_000m);
         var fuente = e.Enumeracion<FuenteFlete>("fuente") ?? throw Falta("fuente");
 
-        await CotizacionAsync(cotizacionId, ct);
+        var cotizacion = await CotizacionAsync(cotizacionId, ct);
         await ExigirOrigenDelValorAsync(valor, "valorFlete", ct);
         if (retorno is { } r) await ExigirOrigenDelValorAsync(r, "valorRetornoContenedor", ct);
 
-        var resumen = $"Agregar a la línea {Corto(lineaId)} de la cotización {Corto(cotizacionId)} un flete de {Monto(valor)} (fuente {fuente})" +
+        var resumen = $"Agregar a la línea {await DescribirLineaAsync(cotizacion.SolicitudId, lineaId, ct)} un flete de {Monto(valor)} (fuente {fuente})" +
             (retorno is { } rr ? $" y un retorno de contenedor de {Monto(rr)}." : ".");
         return (new { cotizacionId, lineaSolicitudId = lineaId, valorFlete = valor, valorRetornoContenedor = retorno, fuente = fuente.ToString() }, resumen);
     }
@@ -146,8 +156,9 @@ public sealed class clsProponerAgregarFleteHerramienta(
 /// <summary>Corregir el valor de un flete manual ya agregado.</summary>
 public sealed class clsProponerEditarFleteHerramienta(
     IConversacionesAsistenteRepository conversaciones, clsContextoConversacionAsistente contexto, ICurrentUserPort usuario,
-    IQueryHandler<clsObtenerCotizacionQuery, clsCotizacionDto> cotizaciones, clsLimitesAsistente limites, TimeProvider reloj)
-    : clsHerramientaPropuestaDeCotizacionBase(conversaciones, contexto, usuario, cotizaciones, limites, reloj)
+    IQueryHandler<clsObtenerCotizacionQuery, clsCotizacionDto> cotizaciones, ILineasSolicitudPort lineasSolicitud,
+    clsLimitesAsistente limites, TimeProvider reloj)
+    : clsHerramientaPropuestaDeCotizacionBase(conversaciones, contexto, usuario, cotizaciones, lineasSolicitud, limites, reloj)
 {
     public override string Nombre => "proponer_editar_flete";
 
@@ -174,11 +185,11 @@ public sealed class clsProponerEditarFleteHerramienta(
             ?? throw new clsValidationFailedException("HERRAMIENTA_ENTRADA_INVALIDA", "proponer_editar_flete: falta \"valorFlete\".");
         var retorno = e.Decimal("valorRetornoContenedor", 0, 1_000_000_000_000m);
 
-        await CotizacionAsync(cotizacionId, ct);
+        var cotizacion = await CotizacionAsync(cotizacionId, ct);
         await ExigirOrigenDelValorAsync(valor, "valorFlete", ct);
         if (retorno is { } r) await ExigirOrigenDelValorAsync(r, "valorRetornoContenedor", ct);
 
-        var resumen = $"Cambiar el flete de la línea {Corto(lineaId)} de la cotización {Corto(cotizacionId)} a {Monto(valor)}" +
+        var resumen = $"Cambiar el flete de la línea {await DescribirLineaAsync(cotizacion.SolicitudId, lineaId, ct)} a {Monto(valor)}" +
             (retorno is { } rr ? $" y el retorno de contenedor a {Monto(rr)}." : ".");
         return (new { cotizacionId, lineaSolicitudId = lineaId, valorFlete = valor, valorRetornoContenedor = retorno }, resumen);
     }
@@ -187,8 +198,9 @@ public sealed class clsProponerEditarFleteHerramienta(
 /// <summary>Agregar servicios conexos a la cotización.</summary>
 public sealed class clsProponerAgregarConexosHerramienta(
     IConversacionesAsistenteRepository conversaciones, clsContextoConversacionAsistente contexto, ICurrentUserPort usuario,
-    IQueryHandler<clsObtenerCotizacionQuery, clsCotizacionDto> cotizaciones, clsLimitesAsistente limites, TimeProvider reloj)
-    : clsHerramientaPropuestaDeCotizacionBase(conversaciones, contexto, usuario, cotizaciones, limites, reloj)
+    IQueryHandler<clsObtenerCotizacionQuery, clsCotizacionDto> cotizaciones, ILineasSolicitudPort lineasSolicitud,
+    clsLimitesAsistente limites, TimeProvider reloj)
+    : clsHerramientaPropuestaDeCotizacionBase(conversaciones, contexto, usuario, cotizaciones, lineasSolicitud, limites, reloj)
 {
     private const int MaxItems = 20;
 
@@ -228,7 +240,7 @@ public sealed class clsProponerAgregarConexosHerramienta(
         foreach (var i in e.Objetos("items", MaxItems))
             if (i.Decimal("valorAplicado", 0, 1_000_000_000_000m) is { } v) await ExigirOrigenDelValorAsync(v, "valorAplicado", ct);
 
-        var resumen = $"Agregar {items.Count} servicio(s) conexo(s) a la cotización {Corto(cotizacionId)}.";
+        var resumen = $"Agregar {items.Count} servicio(s) conexo(s) a la cotización.";
         return (new { cotizacionId, items }, resumen);
     }
 }
@@ -236,8 +248,9 @@ public sealed class clsProponerAgregarConexosHerramienta(
 /// <summary>Rechazar una línea con un motivo.</summary>
 public sealed class clsProponerRechazarLineaHerramienta(
     IConversacionesAsistenteRepository conversaciones, clsContextoConversacionAsistente contexto, ICurrentUserPort usuario,
-    IQueryHandler<clsObtenerCotizacionQuery, clsCotizacionDto> cotizaciones, clsLimitesAsistente limites, TimeProvider reloj)
-    : clsHerramientaPropuestaDeCotizacionBase(conversaciones, contexto, usuario, cotizaciones, limites, reloj)
+    IQueryHandler<clsObtenerCotizacionQuery, clsCotizacionDto> cotizaciones, ILineasSolicitudPort lineasSolicitud,
+    clsLimitesAsistente limites, TimeProvider reloj)
+    : clsHerramientaPropuestaDeCotizacionBase(conversaciones, contexto, usuario, cotizaciones, lineasSolicitud, limites, reloj)
 {
     public override string Nombre => "proponer_rechazar_linea";
 
@@ -260,17 +273,18 @@ public sealed class clsProponerRechazarLineaHerramienta(
         var lineaId = e.Identificador("lineaSolicitudId");
         var motivo = e.Texto("motivo", requerido: true)!;
 
-        await CotizacionAsync(cotizacionId, ct);
+        var cotizacion = await CotizacionAsync(cotizacionId, ct);
         return (new { cotizacionId, lineaSolicitudId = lineaId, motivo },
-            $"Rechazar la línea {Corto(lineaId)} de la cotización {Corto(cotizacionId)} con el motivo: {motivo}");
+            $"Rechazar la línea {await DescribirLineaAsync(cotizacion.SolicitudId, lineaId, ct)} con el motivo: {motivo}");
     }
 }
 
 /// <summary>Cambiar el vehículo de una línea.</summary>
 public sealed class clsProponerCambiarVehiculoHerramienta(
     IConversacionesAsistenteRepository conversaciones, clsContextoConversacionAsistente contexto, ICurrentUserPort usuario,
-    IQueryHandler<clsObtenerCotizacionQuery, clsCotizacionDto> cotizaciones, clsLimitesAsistente limites, TimeProvider reloj)
-    : clsHerramientaPropuestaDeCotizacionBase(conversaciones, contexto, usuario, cotizaciones, limites, reloj)
+    IQueryHandler<clsObtenerCotizacionQuery, clsCotizacionDto> cotizaciones, ILineasSolicitudPort lineasSolicitud,
+    clsLimitesAsistente limites, TimeProvider reloj)
+    : clsHerramientaPropuestaDeCotizacionBase(conversaciones, contexto, usuario, cotizaciones, lineasSolicitud, limites, reloj)
 {
     public override string Nombre => "proponer_cambiar_vehiculo";
 
@@ -298,9 +312,9 @@ public sealed class clsProponerCambiarVehiculoHerramienta(
         Guid? config = e.Texto("configVehiculoId") is null ? null : e.Identificador("configVehiculoId");
         var carroceria = e.Texto("carroceria");
 
-        await CotizacionAsync(cotizacionId, ct);
+        var cotizacion = await CotizacionAsync(cotizacionId, ct);
         var vehiculo = tipo ?? $"configuración {Corto(config!.Value)}";
         return (new { cotizacionId, lineaSolicitudId = lineaId, tipoVehiculo = tipo, configVehiculoId = config, carroceria },
-            $"Cambiar el vehículo de la línea {Corto(lineaId)} de la cotización {Corto(cotizacionId)} a {vehiculo}. El flete que tenga se descarta.");
+            $"Cambiar el vehículo de la línea {await DescribirLineaAsync(cotizacion.SolicitudId, lineaId, ct)} a {vehiculo}. El flete que tenga se descarta.");
     }
 }
