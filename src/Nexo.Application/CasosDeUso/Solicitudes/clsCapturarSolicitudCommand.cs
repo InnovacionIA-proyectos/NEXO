@@ -50,7 +50,8 @@ public sealed record clsCapturarSolicitudCommand(
 /// </summary>
 public sealed class clsCapturarSolicitudCommandHandler(
     ISolicitudesRepository solicitudes, IRutasCatalogoPort rutasCatalogo,
-    IConfiguracionesVehiculoPort vehiculosCatalogo, IAliasCatalogoPort aliasCatalogo, IVehiculosNexoPort vehiculosNexo, IClientesPort clientes, IClientesDwPort clientesDw,
+    IConfiguracionesVehiculoPort vehiculosCatalogo, IAliasCatalogoPort aliasCatalogo, IVehiculosNexoPort vehiculosNexo,
+    IMunicipiosRepository municipiosCatalogo, IClientesPort clientes, IClientesDwPort clientesDw,
     IPropuestaTarifaPort propuestas, IAuditoriaPort auditoria, ICurrentUserPort usuarioActual,
     TimeProvider clock, IPublicadorDeMensajes publicador, IUnitOfWork uow, IServiceScopeFactory scopes)
     : ICommandHandler<clsCapturarSolicitudCommand, clsCapturaResultDto>
@@ -71,6 +72,9 @@ public sealed class clsCapturarSolicitudCommandHandler(
         var aliasVehiculo = await aliasCatalogo.MapaActivoAsync(clsAliasElemento.TipoVehiculo, ct);
         var aliasContenedor = await aliasCatalogo.MapaActivoAsync(clsAliasElemento.TipoContenedor, ct);
         var oficialidad = await Catalogos.clsOficialidadDeVehiculos.CargarAsync(vehiculosNexo, ct);
+
+        var municipios = await clsResolucionDeCatalogos.CargarMunicipiosAsync(
+            municipiosCatalogo, command.Lineas.Select((l, i) => (i + 1, l.OrigenMunicipioId, l.DestinoMunicipioId)), ct);
 
         var rutasCreadas = 0;
         var vehiculosCreados = 0;
@@ -98,7 +102,7 @@ public sealed class clsCapturarSolicitudCommandHandler(
             var peso = clsCapturarSolicitudValidador.PesoResuelto(lr);
 
             var (ruta, rutaCreada) = clsResolucionDeCatalogos.ResolverRuta(
-                lr.Origen, lr.Destino, rutasPorClave, rutasCatalogo, lr.OrigenMunicipioId, lr.DestinoMunicipioId);
+                lr.Origen, lr.Destino, rutasPorClave, rutasCatalogo, lr.OrigenMunicipioId, lr.DestinoMunicipioId, municipios);
             if (rutaCreada) rutasCreadas++;
 
             var (vehiculo, vehiculoCreado) = clsResolucionDeCatalogos.ResolverVehiculo(lr.TipoVehiculo, lr.Carroceria, vehiculosPorClave, vehiculosCatalogo, aliasVehiculo, oficialidad);

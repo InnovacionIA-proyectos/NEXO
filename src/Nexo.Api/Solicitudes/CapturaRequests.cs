@@ -120,6 +120,12 @@ public class clsResolverCatalogoLineaRequest
 
     [MaxLength(100)]
     public string? Carroceria { get; set; }
+
+    /// <summary>Id de <c>tbl_municipios</c> del origen cuando se escogió del buscador de ciudades (no el código DANE). Opcional.</summary>
+    public int? OrigenMunicipioId { get; set; }
+
+    /// <summary>Id de <c>tbl_municipios</c> del destino cuando se escogió del buscador de ciudades (no el código DANE). Opcional.</summary>
+    public int? DestinoMunicipioId { get; set; }
 }
 
 /// <summary>Un contenedor a recomendar: entrada de POST /api/solicitudes/recomendar-vehiculo-contenedor.</summary>

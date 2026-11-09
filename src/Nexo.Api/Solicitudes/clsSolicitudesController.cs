@@ -71,7 +71,7 @@ public class clsSolicitudesController(
     public async Task<ActionResult<IReadOnlyList<clsCatalogoLineaResueltoDto>>> ResolverCatalogos(
         [FromBody] List<clsResolverCatalogoLineaRequest> req, CancellationToken ct = default)
     {
-        var lineas = req.Select(lr => new clsResolverCatalogoLineaInput(lr.Origen, lr.Destino, lr.TipoVehiculo, lr.Carroceria)).ToList();
+        var lineas = req.Select(lr => new clsResolverCatalogoLineaInput(lr.Origen, lr.Destino, lr.TipoVehiculo, lr.Carroceria, lr.OrigenMunicipioId, lr.DestinoMunicipioId)).ToList();
         return Ok(await resolverCatalogos.Handle(new clsResolverCatalogosDeLineasCommand(lineas), ct));
     }
 

@@ -1051,9 +1051,14 @@ catálogo. No crea ninguna solicitud; es el paso previo a `lineas:bulk`.
 | `destino` | **requerido** | string | máx. 150 |
 | `tipoVehiculo` | *opcional* | string | máx. 100 |
 | `carroceria` | *opcional* | string | máx. 100 |
+| `origenMunicipioId` | *opcional* | int | `id` de `tbl_municipios` (el de `GET .../ciudades`, no el código DANE) del origen |
+| `destinoMunicipioId` | *opcional* | int | ídem para el destino |
 
-- **→** `200 CatalogoLineaResueltoDto[]`
-- **Errores**: `400 SIN_LINEAS` (array vacío)
+- **→** `200 CatalogoLineaResueltoDto[]`, en el mismo orden y con el mismo `indice` de las líneas enviadas
+- **Errores**: `400 SIN_LINEAS` (array vacío) · `400 MUNICIPIO_NO_ENCONTRADO` (un id que no está en el catálogo; el mensaje dice la línea)
+- **Municipios**: con los dos ids la ruta se busca **primero por municipios** y después por texto. Por texto solo se **completan** los ids que la ruta tiene vacíos; **nunca se cambian** los que ya tiene
+  (un mismo nombre existe en varios departamentos: si el texto coincide con una ruta de otro municipio se reutiliza esa ruta tal cual). Una ruta **nueva** con id toma su nombre del municipio del catálogo, no del texto.
+  La misma regla aplica a `POST /api/captura-solicitudes` (`origenMunicipioId`/`destinoMunicipioId` de cada línea). `lineas:bulk` no cambia: recibe la ruta ya resuelta.
 - **Alias (S6-HU-27.2/#321)**: el `tipoVehiculo` se busca primero en el diccionario de alias (§3.19): `TB`, `T.B`, `Turbo` y `2L2` resuelven
   a la **misma** configuración (se guarda el código, `2L2`, no el texto). La `carroceria` no pasa por el diccionario. Un texto que el
   diccionario no conoce sigue naciendo en **cuarentena** (`EsCatalogoOficial = false`) hasta que alguien lo mapee en la bandeja (§3.19).

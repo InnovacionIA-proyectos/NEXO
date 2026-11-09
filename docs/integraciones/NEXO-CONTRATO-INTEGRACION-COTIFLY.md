@@ -109,7 +109,7 @@ Cuando el Cubicador recomienda varios camiones, Cotifly manda **una línea por c
 
 | Campo de la línea | Qué poner |
 |---|---|
-| `origen` / `destino` | Los de la ruta. Mandar también `origenMunicipioId` / `destinoMunicipioId` (§3): sin ellos el costeo no resuelve el municipio |
+| `origen` / `destino` | Los de la ruta. Mandar también `origenMunicipioId` / `destinoMunicipioId` (§3): sin ellos el costeo no resuelve el municipio. Una ruta que ya existe solo recibe los ids que tenía vacíos: nunca se le cambia un municipio |
 | `tipoVehiculo` | El `codigoVehiculo` del camión (`2L2`, `C2`, `3S3`…) |
 | `carroceria` | El `codigoCarroceria` del camión (`FURGON`, `ESTACAS`…) |
 | `peso` | El `pesoTotalKg` **de ese camión**, en kg, **incluyendo la tara** (§8) |
