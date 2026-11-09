@@ -8,6 +8,13 @@ public enum clsFuncionIa
     ApoyoCubicador,
 }
 
+/// <summary>Motivos por los que una función con IA responde sin ella; el resto son los códigos <c>IA_*</c> del proveedor.</summary>
+public static class clsMotivosSinIa
+{
+    /// <summary>Sin llave, IA apagada o función apagada en este ambiente: no hubo llamada al proveedor.</summary>
+    public const string Desactivada = "IA_DESACTIVADA";
+}
+
 /// <summary>Un turno de la conversación. <paramref name="Rol"/> es <c>user</c> o <c>assistant</c>.</summary>
 public sealed record clsMensajeIa(string Rol, string Contenido)
 {

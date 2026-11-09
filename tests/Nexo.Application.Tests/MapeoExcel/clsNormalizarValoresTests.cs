@@ -355,7 +355,7 @@ public class clsNormalizarValoresTests
         var r = await Manejador().Handle(Consulta(null, V("ciudad", "Cali"), V("ciudad", "Medelin")));
 
         Assert.False(r.IaUsada);
-        Assert.Equal("IA_NO_DISPONIBLE", r.MotivoSinIa);
+        Assert.Equal("IA_DESACTIVADA", r.MotivoSinIa);
         Assert.Equal(["resuelto", "sin_resolver"], r.Valores.Select(v => v.Estado));
         NoSeLlamoALaIa();
     }

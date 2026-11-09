@@ -113,7 +113,7 @@ public class clsRecetasLecturaApiTests(clsApiFixture fx)
         var dto = await resp.Json();
         Assert.Equal("automatica", dto.GetProperty("origenReceta").GetString());
         Assert.False(dto.GetProperty("iaUsada").GetBoolean());
-        Assert.Equal("IA_NO_DISPONIBLE", dto.GetProperty("motivoSinIa").GetString());
+        Assert.Equal("IA_DESACTIVADA", dto.GetProperty("motivoSinIa").GetString());
         Assert.True(dto.GetProperty("tablas").GetArrayLength() > 0);
     }
 

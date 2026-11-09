@@ -1171,7 +1171,7 @@ Cómo se arma, en este orden:
    lo demás se descarta y esa columna queda sin propuesta. La respuesta siempre trae **una entrada por columna**, en el orden del archivo.
 
 **Si la IA no está disponible el flujo manual sigue**: responde `200` igual, con lo que resolvió el diccionario, `iaUsada = false` y el motivo en
-`motivoSinIa` (`IA_NO_DISPONIBLE` si no hay llave o la función está apagada, o el código `IA_*` del error del proveedor). Un **tope diario superado
+`motivoSinIa` (`IA_DESACTIVADA` si no hay llave o la IA o la función están apagadas en el ambiente: no hubo llamada; `IA_NO_DISPONIBLE`, `IA_TIEMPO_AGOTADO`, `IA_LIMITE_PROVEEDOR`… si el proveedor falló). Un **tope diario superado
 no se esconde**: responde `429 IA_TOPE_DIARIO` (§3.22 si el módulo de IA está desplegado). Cada llamada a la IA queda registrada en `tbl_ia_uso`.
 
 | Body | | Tipo | Restricción |
@@ -1184,7 +1184,7 @@ no se esconde**: responde `429 IA_TOPE_DIARIO` (§3.22 si el módulo de IA está
 ```ts
 interface SugerenciaMapeoDto {
   iaUsada: boolean
-  motivoSinIa: string | null        // PLANTILLA_RECONOCIDA | DICCIONARIO_COMPLETO | IA_NO_DISPONIBLE | IA_* ; null si la IA participó
+  motivoSinIa: string | null        // PLANTILLA_RECONOCIDA | DICCIONARIO_COMPLETO | IA_DESACTIVADA | IA_* ; null si la IA participó
   columnas: ColumnaMapeadaDto[]     // una por columna, en el orden del archivo
   dudas: string[]                   // lo que el usuario debería mirar (máx. 10)
   plantillaId: string | null        // la plantilla guardada que se reconoció; null si no hubo
@@ -1292,7 +1292,7 @@ Qué receta se usa, en este orden:
 3. En cualquier otro caso se le pide la receta a la IA (`"ia"`), con la receta enviada o con el formato guardado **parecido** (≥ 50 %) como punto de partida, las instrucciones que la persona dio al guardarlo y lo que cambió
    (`cambios`). Los números de las celdas no se envían (solo `#`) y los documentos van enmascarados. Si la receta de la IA no se puede ejecutar, se le pide corregirla **una** vez.
 4. Si la IA no está disponible (apagada, sin llave, tope diario, error o respuesta inválida) **no falla**: usa el formato guardado más parecido, o una lectura simple de la primera fila con encabezado de cada hoja
-   (`"automatica"`), y `motivoSinIa` dice por qué (`IA_NO_DISPONIBLE`, `IA_RESPUESTA_INVALIDA`, el código del proveedor…). `avisos` lo explica para mostrarlo.
+   (`"automatica"`), y `motivoSinIa` dice por qué (`IA_DESACTIVADA`, `IA_RESPUESTA_INVALIDA`, el código del proveedor…). `avisos` lo explica para mostrarlo.
 
 ```ts
 interface LecturaEstructuraDto {
@@ -1301,7 +1301,7 @@ interface LecturaEstructuraDto {
   similitud: number | null            // 0..1 con el formato guardado que se usó o se tomó de base
   recetaGuardadaId: string | null
   iaUsada: boolean
-  motivoSinIa: string | null          // 'RECETA_GUARDADA' | 'SIN_INSTRUCCION' | 'IA_NO_DISPONIBLE' | 'IA_RESPUESTA_INVALIDA' | código del proveedor | null
+  motivoSinIa: string | null          // 'RECETA_GUARDADA' | 'SIN_INSTRUCCION' | 'IA_DESACTIVADA' | 'IA_RESPUESTA_INVALIDA' | código del proveedor | null
   receta: RecetaLectura               // la que se ejecutó: se reenvía en `receta` para ajustarla o guardarla
   resumen: string | null              // cómo entendió el archivo la IA, en lenguaje sencillo
   dudas: string[]                     // preguntas que la persona puede responder con una instrucción
@@ -1447,8 +1447,8 @@ Cómo se resuelve, en este orden:
 4. **Lo que siga sin resolverse** no se inventa: se envía tal cual al capturar y la captura lo trata como siempre (un vehículo nuevo cae en la **cuarentena** de §3.19; una ciudad
    queda como texto). Un resultado `ia` es una **propuesta**: para que no se repita se confirma creando el alias (`POST /api/catalogos/alias`) o el término del diccionario.
 
-Si la IA no está disponible el flujo manual sigue: responde `200` con lo que resolvieron las reglas, `iaUsada = false` y `motivoSinIa` (`IA_NO_DISPONIBLE` o el código `IA_*` del
-proveedor; `SIN_PENDIENTES` si las reglas resolvieron todo o lo que falta no tiene dónde elegir). Un **tope diario superado no se esconde**: `429 IA_TOPE_DIARIO`. Usa la función
+Si la IA no está disponible el flujo manual sigue: responde `200` con lo que resolvieron las reglas, `iaUsada = false` y `motivoSinIa` (`IA_DESACTIVADA` si está apagada, o el código `IA_*` del
+proveedor si falló; `SIN_PENDIENTES` si las reglas resolvieron todo o lo que falta no tiene dónde elegir). Un **tope diario superado no se esconde**: `429 IA_TOPE_DIARIO`. Usa la función
 `ImportacionExcel`; cada llamada queda registrada en `tbl_ia_uso`.
 
 | Body | | Tipo | Restricción |
@@ -1460,7 +1460,7 @@ proveedor; `SIN_PENDIENTES` si las reglas resolvieron todo o lo que falta no tie
 ```ts
 interface ResultadoNormalizacionDto {
   iaUsada: boolean
-  motivoSinIa: string | null        // SIN_PENDIENTES | IA_NO_DISPONIBLE | IA_* ; null si la IA participó
+  motivoSinIa: string | null        // SIN_PENDIENTES | IA_DESACTIVADA | IA_* ; null si la IA participó
   totalDistintos: number            // distintos por campo y texto normalizado (lo que se resolvió una vez)
   valores: ValorNormalizadoDto[]    // uno por texto distinto recibido (campo + texto tal como llegó), en el orden recibido
 }
@@ -2831,6 +2831,7 @@ con lo ya registrado. Al superarlo, la función responde `429 IA_TOPE_DIARIO` co
 función se enciende por separado (`503 IA_FUNCION_DESHABILITADA` si está apagada). Los demás `503` del proveedor son
 `IA_TIEMPO_AGOTADO`, `IA_LIMITE_PROVEEDOR`, `IA_NO_DISPONIBLE`, `IA_CREDENCIAL_INVALIDA`, `IA_PETICION_RECHAZADA`, `IA_RECHAZADA`,
 `IA_RESPUESTA_TRUNCADA` e `IA_RESPUESTA_INVALIDA`.
+Cada llamada espera por defecto 30 s por intento y reintenta una vez (`Anthropic__TimeoutSegundos`, `Anthropic__MaxReintentos`): como máximo ~60 s antes de rendirse.
 
 #### `GET /api/ia/uso/gasto`
 Gasto por mes y por función, del mes más reciente al más antiguo.
