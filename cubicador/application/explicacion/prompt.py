@@ -19,6 +19,7 @@ from __future__ import annotations
 import json
 from decimal import Decimal
 
+from application.explicacion.verificacion import valores_del_texto
 from domain.entidades.recomendacion import RecomendacionGuardada
 
 VERSION = "1"
@@ -86,6 +87,14 @@ def cifras_permitidas(recomendacion: RecomendacionGuardada) -> list[Decimal]:
     puede salir en el texto. Se agrega el conteo de vehiculos y los ordinales
     (1, 2, 3...) porque "el segundo camion" y "los 2 vehiculos" son cifras
     normales de la redaccion y no salen de ningun campo.
+
+    Y se agregan las cifras que el motor escribio DENTRO de sus propios textos
+    -las advertencias y el motivo-, porque tambien entran al mensaje y las
+    INSTRUCCIONES piden nombrar la advertencia en una frase. Sin esto, una
+    advertencia tan comun como "Vehiculo(s) 1 por debajo del 75% de llenado"
+    hacia que el modelo escribiera ese 75, `verificar` lo tomara por inventado
+    y se descartara la explicacion entera: nunca salia texto (#441). Son cifras
+    del motor por construccion; lo que faltaba era declararlas.
     """
     permitidas = [Decimal(len(recomendacion.vehiculos))]
     permitidas += [Decimal(i) for i in range(len(recomendacion.vehiculos) + 1)]
@@ -95,6 +104,8 @@ def cifras_permitidas(recomendacion: RecomendacionGuardada) -> list[Decimal]:
             v.porcentaje_llenado_volumen, v.porcentaje_llenado_peso,
         ]
         permitidas += [Decimal(m.cantidad) for m in v.mercancias]
+    for texto in (*recomendacion.advertencias, recomendacion.motivo_sin_seleccion or ""):
+        permitidas += valores_del_texto(texto)
     return permitidas
 
 
