@@ -148,7 +148,7 @@ public sealed class clsConversarAsistenteCommandHandler(
                             break;
                         case clsEventoConversacionIa.HerramientaTerminada f:
                             yield return new clsEventoAsistente.Herramienta(
-                                f.Llamada.Nombre, f.Resultado.EsError ? "error" : "ok", f.Resultado.Fuente);
+                                f.Llamada.Nombre, f.Resultado.EsError ? "error" : "ok", f.Resultado.Fuente, f.Resultado.Encontrado, f.Resultado.Resumen);
                             while (_accionesPropuestas.TryDequeue(out var accionId))
                                 if (await conversaciones.ObtenerAccionAsync(accionId, CancellationToken.None) is { } propuesta)
                                     yield return new clsEventoAsistente.Accion(clsAccionAsistenteDto.De(propuesta));
@@ -247,7 +247,16 @@ public sealed class clsConversarAsistenteCommandHandler(
             Resultado = resultado, LatenciaMs = (int)Math.Min(reloj.ElapsedMilliseconds, int.MaxValue),
         }, CancellationToken.None);
 
-        return new clsResultadoHerramientaIa(contenido, EsError: leido is null, leido?.Fuente, leido?.Encontrado);
+        return new clsResultadoHerramientaIa(contenido, EsError: leido is null, leido?.Fuente, leido?.Encontrado, Acotar(leido?.Resumen));
+    }
+
+    private const int MaxCaracteresResumen = 300;
+
+    private static string? Acotar(string? resumen)
+    {
+        var limpio = resumen?.ReplaceLineEndings(" ").Trim();
+        if (string.IsNullOrEmpty(limpio)) return null;
+        return limpio.Length <= MaxCaracteresResumen ? limpio : limpio[..(MaxCaracteresResumen - 1)] + "…";
     }
 
     private async Task<IReadOnlyList<string>> CifrasSinOrigenAsync(

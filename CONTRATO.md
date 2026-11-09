@@ -2943,7 +2943,7 @@ tokens por persona de §3.22. La función se apaga con `Anthropic__Funciones__As
 |---|---|---|
 | `conversacion` | `{ conversacionId, mensajeId }` | Primero. `mensajeId` es el de la respuesta que se está generando |
 | `texto` | `{ delta }` | Cada trozo de la respuesta, a medida que se genera; se concatenan |
-| `herramienta` | `{ nombre, estado, fuente? }` | `estado`: `ejecutando`, `ok` o `error`. Muestra qué está consultando el asistente |
+| `herramienta` | `{ nombre, estado, fuente?, encontrado?, resumen? }` | `estado`: `ejecutando`, `ok` o `error`. Muestra qué está consultando el asistente. Al terminar en `ok`, `encontrado` dice si la fuente tenía el dato y `resumen` es **una frase corta (máx. 300 caracteres) armada por NEXO** para pintar una tarjeta (por ejemplo «Piso SICE-TAC 3S3 (Carga general, Cargado): $3.422.777 · período 202610»); sin datos es el motivo. Nunca trae el resultado completo y no viaja al modelo. Hoy lo traen el piso SICE-TAC, el aprovisionamiento, la propuesta de línea, las tarifas, los conexos y las ciudades; el campo es opcional: quien no lo use no se rompe |
 | `preferencias` | `[ { id, texto, createdAt } ]` | Después de `conversacion`, solo si la persona tiene preferencias guardadas: las que el asistente recibe en esta respuesta (para mostrar que se aplican) |
 | `accion` | `AccionAsistenteDto` | El asistente propuso un cambio (§3.24.1). Nada se ha modificado: la persona debe confirmarlo o cancelarlo |
 | `reemplazo` | `{ texto, cifrasSinOrigen[] }` | La respuesta traía cifras de dinero sin origen: lo mostrado debe sustituirse por `texto` (es lo que queda guardado) |
