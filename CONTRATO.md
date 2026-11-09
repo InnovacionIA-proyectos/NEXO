@@ -79,6 +79,7 @@ en la sección que se indica; la matriz completa de permisos es la §5.
 | `GET` | `/api/solicitudes` | Comercial, AdminTarifas, ServiciosLogisticos, LiderProceso, Admin |
 | `POST` | `/api/solicitudes` | Admin |
 | `POST` | `/api/solicitudes/resolver-catalogos` | Comercial, Admin |
+| `POST` | `/api/solicitudes/recomendar-vehiculo-contenedor` | Comercial, AdminTarifas, Admin |
 | `GET` | `/api/solicitudes/{id}` | Comercial, AdminTarifas, ServiciosLogisticos, LiderProceso, Admin |
 | `POST` | `/api/solicitudes/{id}/lineas:bulk` | Admin |
 | `GET` | `/api/solicitudes/{id}/propuesta-tarifa` | Comercial, AdminTarifas, ServiciosLogisticos, LiderProceso, Admin |
@@ -1056,6 +1057,32 @@ catálogo. No crea ninguna solicitud; es el paso previo a `lineas:bulk`.
   a la **misma** configuración (se guarda el código, `2L2`, no el texto). La `carroceria` no pasa por el diccionario. Un texto que el
   diccionario no conoce sigue naciendo en **cuarentena** (`EsCatalogoOficial = false`) hasta que alguien lo mapee en la bandeja (§3.19).
 
+#### `POST /api/solicitudes/recomendar-vehiculo-contenedor` — el vehículo de un contenedor según su tamaño y peso
+Solo lectura y **por lote** (una importación trae cientos de líneas de contenedor). Devuelve el vehículo que el costeo escogería (`tbl_rangos_peso_contenedor`: el de
+menor peso máximo que alcance para el peso). El front lo **prellena** en la línea (la persona puede cambiarlo) y lo manda como `tipoVehiculo` al crear la solicitud:
+así queda guardado en la línea y el costeo lo respeta. Si el peso cambia después, el vehículo no se recalcula.
+
+- **Roles**: `Comercial`, `AdminTarifas`, `Admin`.
+- **Body**: **array** de 1 a 5.000 elementos:
+
+| Campo | | Tipo | Restricción |
+|---|---|---|---|
+| `indice` | **requerido** | int | La posición de la línea en el archivo; se devuelve tal cual |
+| `claseContenedor` | **requerido** | string | Clase de SAP (`CNT40.HC`) o el tamaño en pies (`20`, `40`); máx. 30 |
+| `pesoKg` | **requerido** | decimal | Mayor que 0 |
+
+- **→** `200`, en el mismo orden:
+```ts
+interface RecomendacionVehiculoContenedorDto {
+  indice: number
+  tipoVehiculo: string | null        // código NEXO (3S3, 2S2…); null si el peso supera el tope, la clase no trae 20 ni 40 pies o la tabla no está disponible
+  contenedorPies: number | null      // 20 | 40; null si la clase no trae el tamaño
+  tablaDisponible: boolean           // false: la tabla no se pudo leer; el costeo usa su regla de respaldo
+  pesoMaximoContenedor: number | null // el tope más alto de ese tamaño (para «supera las N t del contenedor de 40'»)
+}
+```
+- **Errores**: `400 SIN_LINEAS` · `400 DEMASIADAS_LINEAS` · `400 PESO_INVALIDO` (el mensaje trae el `indice`) · `400 VALIDATION_ERROR`
+
 #### `POST /api/solicitudes/{id}/lineas:bulk` — carga masiva de un pliego
 - **Roles**: `Admin` (#307, decisión D5: solo Admin).
 - **Body**: `{ lineas: LineaBulk[] }`, **requerido**, mínimo 1 línea.
@@ -1918,6 +1945,7 @@ Si `resultado = "ganada"`, realimenta la biblioteca de Tarifas Ganadas.
 #### `GET /api/cotizaciones/{id}/exportar-excel`
 - **Roles**: `Comercial`, `AdminTarifas`, `ServiciosLogisticos`, `LiderProceso`, `Admin` (`AdminBiblioteca` no entra: #307).
 - S6-HU-24.3/#320: las líneas rechazadas salen en la hoja con su ruta y la palabra «Sin costeo» en vez del precio (sin precio y **sin el motivo**), y no suman al total.
+- Columnas de los fletes: `Ruta`, `Tipología`, `Flete` y `Vehículo` (el de la línea; «—» si no tiene).
 - **→** `200` binario `.xlsx` con `Content-Disposition: attachment`.
 - **Errores**: `404 COTIZACION_NO_ENCONTRADA`
 
@@ -3076,6 +3104,7 @@ abiertos a los 6 roles.
 | **Bandeja y Mesa**: `GET /api/solicitudes` · `GET /api/solicitudes/{id}` · `GET .../propuesta-tarifa` · `/hubs/bandeja` (#307) | ✅ | | ✅ | ✅ | ✅ | ✅ |
 | `POST /api/solicitudes` (#307, D5: solo Admin) | | | | | | ✅ |
 | `POST /api/solicitudes/resolver-catalogos` | ✅ | | | | | ✅ |
+| `POST /api/solicitudes/recomendar-vehiculo-contenedor` | ✅ | | ✅ | | | ✅ |
 | `POST /api/solicitudes/{id}/lineas:bulk` (#307, D5: solo Admin) | | | | | | ✅ |
 | `POST /api/solicitudes/{id}/rechazar` | ✅ | | | | | ✅ |
 | `POST /api/solicitudes/{id}/recalcular-score` (#307, D5: solo Admin) | | | | | | ✅ |

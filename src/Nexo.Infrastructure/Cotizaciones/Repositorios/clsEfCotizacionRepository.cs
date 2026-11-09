@@ -30,6 +30,7 @@ public sealed class clsEfCotizacionRepository(clsNexoDbContext db) : ICotizacion
     public Task<clsCotizacion?> ObtenerParaExportarAsync(Expression<Func<clsCotizacion, bool>> filtro, CancellationToken ct) =>
         db.Cotizaciones.AsNoTracking()
             .Include(x => x.Lineas).ThenInclude(l => l.clsLineaSolicitud).ThenInclude(ls => ls!.clsRuta)
+            .Include(x => x.Lineas).ThenInclude(l => l.clsLineaSolicitud).ThenInclude(ls => ls!.clsConfiguracionVehiculo)
             .Include(x => x.Conexos).ThenInclude(x => x.clsServicioConexo)
             .Include(x => x.clsSolicitud).ThenInclude(s => s!.clsCliente)
             .FirstOrDefaultAsync(filtro, ct);
