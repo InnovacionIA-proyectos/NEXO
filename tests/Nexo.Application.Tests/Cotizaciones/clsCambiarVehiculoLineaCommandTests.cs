@@ -1,4 +1,5 @@
 using Nexo.Application.CasosDeUso.Catalogos.Interfaces;
+using Nexo.Application.CasosDeUso.Catalogos.Interfaces;
 using Nexo.Application.CasosDeUso.Cotizaciones;
 using Nexo.Application.CasosDeUso.Cotizaciones.Interfaces;
 using Nexo.Application.CasosDeUso.Solicitudes.Interfaces;
@@ -25,6 +26,7 @@ public class clsCambiarVehiculoLineaCommandTests
     private readonly Mock<ILineasSolicitudPort> _lineas = new();
     private readonly Mock<IConfiguracionesVehiculoPort> _vehiculos = new();
     private readonly Mock<IAliasCatalogoPort> _alias = new();
+    private readonly Mock<IVehiculosNexoPort> _vehiculosNexo = new();
     private readonly Mock<IPropuestaTarifaPort> _propuestas = new();
     private readonly Mock<IAuditoriaPort> _auditoria = new();
     private readonly Mock<ICurrentUserPort> _usuario = new();
@@ -37,11 +39,13 @@ public class clsCambiarVehiculoLineaCommandTests
     {
         _alias.Setup(a => a.MapaActivoAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(new Dictionary<string, string>());
         _vehiculos.Setup(v => v.ListarAsync(It.IsAny<CancellationToken>())).ReturnsAsync([_anterior, _nuevo]);
+        _vehiculosNexo.Setup(v => v.ListarCodigosAsync(It.IsAny<CancellationToken>())).ReturnsAsync([]);
+        _vehiculosNexo.Setup(v => v.ListarCarroceriasOficialesAsync(It.IsAny<CancellationToken>())).ReturnsAsync([]);
         _vehiculos.Setup(v => v.ObtenerAsync(_nuevo.Id, It.IsAny<CancellationToken>())).ReturnsAsync(_nuevo);
     }
 
     private clsCambiarVehiculoLineaCommandHandler Handler() => new(
-        _cotizaciones.Object, _lineas.Object, _vehiculos.Object, _alias.Object, _propuestas.Object,
+        _cotizaciones.Object, _lineas.Object, _vehiculos.Object, _alias.Object, _vehiculosNexo.Object, _propuestas.Object,
         _auditoria.Object, _usuario.Object, TimeProvider.System, _uow.Object);
 
     private (clsCotizacion C, clsLineaSolicitud L) Preparar(
@@ -225,6 +229,37 @@ public class clsCambiarVehiculoLineaCommandTests
 
         Assert.Equal(_nuevo.Id, l.ConfigVehiculoId);
         Assert.Equal("2S2", r.TipoVehiculo);
+    }
+
+    [Fact]
+    public async Task Por_texto_un_codigo_de_la_tabla_de_traduccion_se_crea_oficial_y_se_asigna()
+    {
+        var (c, l) = Preparar();
+        _vehiculosNexo.Setup(v => v.ListarCodigosAsync(It.IsAny<CancellationToken>())).ReturnsAsync([new clsCodigoVehiculoNexo("2L3", "Liviano 2L3")]);
+        clsConfiguracionVehiculo? creada = null;
+        _vehiculos.Setup(v => v.Agregar(It.IsAny<clsConfiguracionVehiculo>())).Callback<clsConfiguracionVehiculo>(v => creada = v);
+
+        var r = await Handler().Handle(new clsCambiarVehiculoLineaCommand(c.Id, l.Id, null, "2l3", null));
+
+        Assert.NotNull(creada);
+        Assert.True(creada!.EsCatalogoOficial);
+        Assert.Equal("2L3", creada.TipoVehiculo);
+        Assert.Equal(creada.Id, l.ConfigVehiculoId);
+        Assert.Equal("2L3", r.TipoVehiculo);
+    }
+
+    [Fact]
+    public async Task Por_texto_un_codigo_de_la_tabla_con_carroceria_desconocida_sigue_siendo_400()
+    {
+        var (c, l) = Preparar();
+        _vehiculosNexo.Setup(v => v.ListarCodigosAsync(It.IsAny<CancellationToken>())).ReturnsAsync([new clsCodigoVehiculoNexo("2L3", "Liviano 2L3")]);
+        _vehiculosNexo.Setup(v => v.ListarCarroceriasOficialesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(["FURGON"]);
+
+        var ex = await Assert.ThrowsAsync<clsValidationFailedException>(() =>
+            Handler().Handle(new clsCambiarVehiculoLineaCommand(c.Id, l.Id, null, "2L3", "Carroceria rara")));
+
+        Assert.Equal("VEHICULO_NO_RECONOCIDO", ex.Code);
+        _vehiculos.Verify(v => v.Agregar(It.IsAny<clsConfiguracionVehiculo>()), Times.Never);
     }
 
     [Fact]

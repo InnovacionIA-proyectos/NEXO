@@ -69,7 +69,14 @@ public static class clsPromptReceta
         5. Si la persona te explicó cómo está armado el archivo, sigue esa explicación mientras sea coherente con lo que ves; si no coincide con las hojas, dilo en "dudas".
         6. "resumen": dos o tres frases en español sencillo que explican a un comercial cómo entendiste el archivo (qué hoja es qué, dónde están origen, destino y vehículo).
         7. "dudas": hasta 5 preguntas cortas sobre lo que no puedes decidir con lo que ves (puede ir vacía).
+        8. Sé compacto: la respuesta tiene un tope de longitud. Si varias hojas se leen igual, una sola entrada con "hoja": "*" en vez de una por hoja; para ignorar el resto
+           de hojas basta una entrada "*" con "usar": false; "notas" y "resumen" cortos.
         """;
+
+    /// <summary>Se agrega al mensaje cuando la primera respuesta se cortó por longitud.</summary>
+    public const string NotaCompacta =
+        "NOTA: tu respuesta anterior se cortó por ser demasiado larga. Devuelve la receta más compacta: una sola entrada \"*\" para las hojas que se leen igual, " +
+        "una sola entrada \"*\" con \"usar\": false para las que no sirven, sin repetir configuraciones iguales, y \"resumen\" y \"notas\" de una frase.";
 
     // ---------------------------------------------------------------- el mensaje
 

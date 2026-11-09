@@ -31,7 +31,8 @@ public sealed class clsExportarCotizacionExcelQueryHandler(
 
         var sinCosteo = rechazadas
             .Select(l => new clsLineaRechazadaInfo(
-                l.clsRuta is { } r ? $"{r.Origen} → {r.Destino}" : "—", l.Tipologia?.ToString(), l.MotivoRechazo ?? string.Empty))
+                l.clsRuta is { } r ? $"{r.Origen} → {r.Destino}" : "—", l.Tipologia?.ToString(), l.MotivoRechazo ?? string.Empty,
+                l.clsConfiguracionVehiculo?.TipoVehiculo))
             .ToList();
 
         var (contenido, nombre) = exportador.Generar(c, sinCosteo);

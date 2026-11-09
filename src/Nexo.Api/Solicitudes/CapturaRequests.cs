@@ -128,6 +128,20 @@ public class clsResolverCatalogoLineaRequest
     public int? DestinoMunicipioId { get; set; }
 }
 
+/// <summary>Un contenedor a recomendar: entrada de POST /api/solicitudes/recomendar-vehiculo-contenedor.</summary>
+public class clsRecomendarVehiculoContenedorRequest
+{
+    /// <summary>Posición de la línea en el archivo; se devuelve tal cual para que el front la asocie.</summary>
+    public int Indice { get; set; }
+
+    /// <summary>Clase de SAP (<c>CNT40.HC</c>) o el tamaño en pies (20 / 40).</summary>
+    [MaxLength(30)]
+    public string? ClaseContenedor { get; set; }
+
+    [Range(typeof(decimal), "0.01", "9999999999", ParseLimitsInInvariantCulture = true)]
+    public decimal PesoKg { get; set; }
+}
+
 /// <summary>Una pieza/bulto a transportar, con dimensiones en centímetros.</summary>
 public class clsCapturaPosicionRequest
 {

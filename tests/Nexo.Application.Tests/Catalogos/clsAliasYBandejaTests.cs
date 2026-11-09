@@ -16,6 +16,7 @@ public class clsAliasYBandejaTests
 {
     private readonly Mock<IAliasCatalogoPort> _alias = new();
     private readonly Mock<ITiposVehiculoPort> _tiposVehiculo = new();
+    private readonly Mock<IVehiculosNexoPort> _vehiculosNexo = new();
     private readonly Mock<IConfiguracionesVehiculoPort> _vehiculos = new();
     private readonly Mock<IAuditoriaPort> _auditoria = new();
     private readonly Mock<Nexo.Application.Common.ICurrentUserPort> _usuario = new();
@@ -25,6 +26,8 @@ public class clsAliasYBandejaTests
     {
         _tiposVehiculo.Setup(t => t.ListarAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync([new clsTipoVehiculoDto("2S2", "Minimula", true), new clsTipoVehiculoDto("C2", "Sencillo", true)]);
+        _vehiculosNexo.Setup(v => v.ListarCodigosAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new clsCodigoVehiculoNexo("2L3", "Liviano 2L3"), new clsCodigoVehiculoNexo("3S2", "Tractocamión 3S2")]);
         _alias.Setup(a => a.ListarCodigosAsync(clsAliasElemento.TipoVehiculo, It.IsAny<CancellationToken>()))
             .ReturnsAsync(["2L2", "3S3"]);
         _alias.Setup(a => a.MapaActivoAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -34,9 +37,9 @@ public class clsAliasYBandejaTests
     private static clsAliasElemento Alias(string texto, string codigo, string tipo = clsAliasElemento.TipoVehiculo, bool activo = true) =>
         new() { Alias = texto, AliasNormalizado = Nexo.Application.CasosDeUso.Solicitudes.clsResolucionDeCatalogos.Normalizar(texto), TipoElemento = tipo, Codigo = codigo, Activo = activo };
 
-    private clsCrearAliasCommandHandler Crear() => new(_alias.Object, _tiposVehiculo.Object, _auditoria.Object, _usuario.Object, _uow.Object);
+    private clsCrearAliasCommandHandler Crear() => new(_alias.Object, _tiposVehiculo.Object, _vehiculosNexo.Object, _auditoria.Object, _usuario.Object, _uow.Object);
     private clsMapearVehiculoCuarentenaCommandHandler Mapear() =>
-        new(_vehiculos.Object, _alias.Object, _tiposVehiculo.Object, _auditoria.Object, _usuario.Object, _uow.Object);
+        new(_vehiculos.Object, _alias.Object, _tiposVehiculo.Object, _vehiculosNexo.Object, _auditoria.Object, _usuario.Object, _uow.Object);
 
     // ---------------------------------------------------------------- listar y resolver
 
@@ -128,6 +131,26 @@ public class clsAliasYBandejaTests
         Assert.Equal("MINI MULA X", guardado!.AliasNormalizado);
         Assert.Equal(clsAliasElemento.TipoVehiculo, guardado.TipoElemento);
         _uow.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Crear_acepta_los_codigos_de_la_tabla_de_traduccion_aunque_SAP_no_los_tenga()
+    {
+        _alias.Setup(a => a.BuscarPorNormalizadoAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync((clsAliasElemento?)null);
+
+        var dto = await Crear().Handle(new clsCrearAliasCommand("vehiculo", "Liviano grande", "2l3"));
+        var otro = await Crear().Handle(new clsCrearAliasCommand("vehiculo", "Tracto largo", "3S2"));
+
+        Assert.Equal(("2L3", "3S2"), (dto.Codigo, otro.Codigo));
+    }
+
+    [Fact]
+    public async Task Crear_con_un_codigo_que_no_esta_en_SAP_ni_en_la_tabla_sigue_siendo_400()
+    {
+        var ex = await Assert.ThrowsAsync<clsValidationFailedException>(() =>
+            Crear().Handle(new clsCrearAliasCommand("vehiculo", "Cualquiera", "9Z9")));
+
+        Assert.Equal("CODIGO_NO_RECONOCIDO", ex.Code);
     }
 
     [Fact]

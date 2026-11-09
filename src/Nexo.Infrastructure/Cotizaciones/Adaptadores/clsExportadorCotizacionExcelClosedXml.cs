@@ -34,7 +34,7 @@ public sealed class clsExportadorCotizacionExcelClosedXml : IExportadorCotizacio
         ws.Cell(f, 1).Style.Font.SetBold().Font.SetFontSize(14);
         f += 2;
         void Dato(string k, string v) { ws.Cell(f, 1).Value = k; ws.Cell(f, 1).Style.Font.SetBold(); ws.Cell(f, 2).Value = v; f++; }
-        Dato("clsCliente", c.clsSolicitud?.clsCliente?.Nombre ?? "—");
+        Dato("Cliente", c.clsSolicitud?.clsCliente?.Nombre ?? "—");
         Dato("NIT", c.clsSolicitud?.clsCliente?.Nit ?? "—");
         Dato("Estado", c.Estado.ToString());
         Dato("Resultado", c.Resultado.ToString());
@@ -46,7 +46,7 @@ public sealed class clsExportadorCotizacionExcelClosedXml : IExportadorCotizacio
         f++;
         // "Flete" es la única columna monetaria de la línea y lleva el TOTAL completo
         // (ValorFlete + Aprovisionamiento + Retorno contenedor), no ValorFlete aislado.
-        EscribirEncabezado(ws, f, new[] { "clsRuta", "Tipología", "Flete" });
+        EscribirEncabezado(ws, f, new[] { "Ruta", "Tipología", "Flete", "Vehículo" });
         f++;
         decimal totalFletes = 0;
         foreach (var l in c.Lineas)
@@ -57,6 +57,7 @@ public sealed class clsExportadorCotizacionExcelClosedXml : IExportadorCotizacio
             ws.Cell(f, 2).Value = l.clsLineaSolicitud?.Tipologia?.ToString() ?? "—";
             ws.Cell(f, 3).Value = totalLinea;
             ws.Cell(f, 3).Style.NumberFormat.Format = FormatoMoneda;
+            ws.Cell(f, 4).Value = l.clsLineaSolicitud?.clsConfiguracionVehiculo?.TipoVehiculo ?? "—";
             f++;
         }
         // Las líneas rechazadas salen como «Sin costeo» (sin precio ni motivo) y NO suman al total.
@@ -67,6 +68,7 @@ public sealed class clsExportadorCotizacionExcelClosedXml : IExportadorCotizacio
             ws.Cell(f, 3).Value = SinCosteo;
             ws.Cell(f, 3).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
             ws.Cell(f, 3).Style.Font.SetItalic();
+            ws.Cell(f, 4).Value = r.Vehiculo ?? "—";
             f++;
         }
         f++;

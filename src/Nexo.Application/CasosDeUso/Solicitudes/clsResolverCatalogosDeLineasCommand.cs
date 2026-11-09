@@ -21,7 +21,7 @@ public sealed record clsResolverCatalogosDeLineasCommand(IReadOnlyList<clsResolv
 /// <summary>Resuelve texto libre (origen/destino/vehículo) a RutaId/ConfigVehiculoId creando lo que falte, SIN crear solicitud; alimenta a lineas:bulk, que exige estos ids ya resueltos.</summary>
 public sealed class clsResolverCatalogosDeLineasCommandHandler(
     IRutasCatalogoPort rutasCatalogo, IConfiguracionesVehiculoPort vehiculosCatalogo, IAliasCatalogoPort aliasCatalogo,
-    IMunicipiosRepository municipiosCatalogo, IUnitOfWork uow)
+    IVehiculosNexoPort vehiculosNexo, IMunicipiosRepository municipiosCatalogo, IUnitOfWork uow)
     : ICommandHandler<clsResolverCatalogosDeLineasCommand, IReadOnlyList<clsCatalogoLineaResueltoDto>>
 {
     public async Task<IReadOnlyList<clsCatalogoLineaResueltoDto>> Handle(
@@ -37,6 +37,7 @@ public sealed class clsResolverCatalogosDeLineasCommandHandler(
         var vehiculos = await vehiculosCatalogo.ListarAsync(ct);
         var vehiculosPorClave = clsResolucionDeCatalogos.IndexarVehiculosPorClave(vehiculos);
         var aliasVehiculo = await aliasCatalogo.MapaActivoAsync(clsAliasElemento.TipoVehiculo, ct);
+        var oficialidad = await Catalogos.clsOficialidadDeVehiculos.CargarAsync(vehiculosNexo, ct);
 
         var municipios = await clsResolucionDeCatalogos.CargarMunicipiosAsync(
             municipiosCatalogo, command.Lineas.Select((l, i) => (i + 1, l.OrigenMunicipioId, l.DestinoMunicipioId)), ct);
@@ -52,7 +53,7 @@ public sealed class clsResolverCatalogosDeLineasCommandHandler(
             var (ruta, rutaCreada) = clsResolucionDeCatalogos.ResolverRuta(
                 lr.Origen, lr.Destino, rutasPorClave, rutasCatalogo, lr.OrigenMunicipioId, lr.DestinoMunicipioId, municipios);
             var (vehiculo, vehiculoCreado) = clsResolucionDeCatalogos.ResolverVehiculo(
-                lr.TipoVehiculo, lr.Carroceria, vehiculosPorClave, vehiculosCatalogo, aliasVehiculo);
+                lr.TipoVehiculo, lr.Carroceria, vehiculosPorClave, vehiculosCatalogo, aliasVehiculo, oficialidad);
 
             resultado.Add(new clsCatalogoLineaResueltoDto(i, ruta.Id, vehiculo?.Id, rutaCreada, vehiculoCreado));
         }

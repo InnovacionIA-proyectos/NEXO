@@ -48,6 +48,7 @@ public class clsRolesPorEndpointTests(clsApiFixture fx)
             new("POST lineas:bulk", HttpMethod.Post, $"/api/solicitudes/{Inexistente}/lineas:bulk", ["Admin"], new { }),
             new("POST recalcular-score", HttpMethod.Post, $"/api/solicitudes/{Inexistente}/recalcular-score", ["Admin"]),
             new("POST resolver-catalogos", HttpMethod.Post, "/api/solicitudes/resolver-catalogos", ["Comercial", "Admin"], new { }),
+            new("POST recomendar-vehiculo-contenedor", HttpMethod.Post, "/api/solicitudes/recomendar-vehiculo-contenedor", ["Comercial", "AdminTarifas", "Admin"], new { }),
             new("POST rechazar", HttpMethod.Post, $"/api/solicitudes/{Inexistente}/rechazar", ["Comercial", "Admin"], new { }),
 
             // ---- lectura de Excel por receta: la usa quien importa archivos

@@ -41,7 +41,8 @@ public sealed class clsConsultarServiciosConexosHerramienta(IQueryHandler<clsLis
 
         return clsResultadoHerramienta.Con(
             new clsListadoAsistente<clsServicioConexoDto>(pagina.Total, pagina.Items), Fuente,
-            pagina.Total > pagina.Items.Count ? $"Se muestran {pagina.Items.Count} de {pagina.Total}; afina los filtros para ver otros." : null);
+            pagina.Total > pagina.Items.Count ? $"Se muestran {pagina.Items.Count} de {pagina.Total}; afina los filtros para ver otros." : null,
+            resumen: $"{pagina.Total} servicio(s) conexo(s) activos");
     }
 }
 
@@ -80,6 +81,7 @@ public sealed class clsBuscarCiudadesDaneHerramienta(IQueryHandler<clsBuscarCiud
         var items = encontradas.Take(top).ToList();
         return clsResultadoHerramienta.Con(
             new clsListadoAsistente<clsCiudadBusquedaDto>(encontradas.Count, items), Fuente,
-            encontradas.Count > items.Count ? $"Se muestran {items.Count} de {encontradas.Count}; afina la búsqueda." : null);
+            encontradas.Count > items.Count ? $"Se muestran {items.Count} de {encontradas.Count}; afina la búsqueda." : null,
+            resumen: $"{encontradas.Count} ciudad(es) encontradas");
     }
 }

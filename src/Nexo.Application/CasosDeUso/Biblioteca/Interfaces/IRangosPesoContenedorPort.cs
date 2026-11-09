@@ -16,6 +16,9 @@ public readonly record struct clsVehiculoDeContenedor(bool TablaDisponible, stri
 public interface IRangosPesoContenedorPort
 {
     Task<clsVehiculoDeContenedor> VehiculoParaAsync(int contenedorPies, decimal pesoKg, CancellationToken ct = default);
+
+    /// <summary>El tope de peso más alto de ese tamaño de contenedor; null si la tabla no está disponible o no tiene ese tamaño.</summary>
+    Task<int?> PesoMaximoAsync(int contenedorPies, CancellationToken ct = default);
 }
 
 /// <summary>Las reglas puras del recomendador, separadas de la lectura de la tabla para poder probarlas con todos los pesos.</summary>

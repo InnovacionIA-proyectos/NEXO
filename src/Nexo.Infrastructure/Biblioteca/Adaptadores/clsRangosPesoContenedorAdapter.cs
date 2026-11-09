@@ -20,6 +20,21 @@ public sealed class clsRangosPesoContenedorAdapter(
 
     public async Task<clsVehiculoDeContenedor> VehiculoParaAsync(int contenedorPies, decimal pesoKg, CancellationToken ct = default)
     {
+        var rangos = await LeerRangosAsync(ct);
+
+        return rangos.Count == 0
+            ? new clsVehiculoDeContenedor(false, null)
+            : new clsVehiculoDeContenedor(true, clsRecomendadorDeVehiculoDeContenedor.Elegir(rangos, contenedorPies, pesoKg));
+    }
+
+    public async Task<int?> PesoMaximoAsync(int contenedorPies, CancellationToken ct = default)
+    {
+        var delTamano = (await LeerRangosAsync(ct)).Where(r => r.Contenedor == contenedorPies).ToList();
+        return delTamano.Count == 0 ? null : delTamano.Max(r => r.PesoMaximo);
+    }
+
+    private async Task<IReadOnlyList<clsRangoPesoContenedorDto>> LeerRangosAsync(CancellationToken ct)
+    {
         var rangos = await cache.GetOrCreateAsync(Clave, async entrada =>
         {
             try
@@ -39,8 +54,6 @@ public sealed class clsRangosPesoContenedorAdapter(
             }
         });
 
-        return rangos!.Count == 0
-            ? new clsVehiculoDeContenedor(false, null)
-            : new clsVehiculoDeContenedor(true, clsRecomendadorDeVehiculoDeContenedor.Elegir(rangos, contenedorPies, pesoKg));
+        return rangos!;
     }
 }

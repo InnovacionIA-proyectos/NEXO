@@ -79,6 +79,7 @@ en la sección que se indica; la matriz completa de permisos es la §5.
 | `GET` | `/api/solicitudes` | Comercial, AdminTarifas, ServiciosLogisticos, LiderProceso, Admin |
 | `POST` | `/api/solicitudes` | Admin |
 | `POST` | `/api/solicitudes/resolver-catalogos` | Comercial, Admin |
+| `POST` | `/api/solicitudes/recomendar-vehiculo-contenedor` | Comercial, AdminTarifas, Admin |
 | `GET` | `/api/solicitudes/{id}` | Comercial, AdminTarifas, ServiciosLogisticos, LiderProceso, Admin |
 | `POST` | `/api/solicitudes/{id}/lineas:bulk` | Admin |
 | `GET` | `/api/solicitudes/{id}/propuesta-tarifa` | Comercial, AdminTarifas, ServiciosLogisticos, LiderProceso, Admin |
@@ -287,6 +288,7 @@ en la sección que se indica; la matriz completa de permisos es la §5.
 | `GET` | `/api/catalogos/lineas-negocio` | Todos |
 | `GET` | `/api/catalogos/municipios` | Todos |
 | `GET` | `/api/catalogos/tipos-vehiculo` | Todos |
+| `GET` | `/api/catalogos/vehiculos-nexo` | Todos |
 | `GET` | `/api/catalogos/vehiculos-cuarentena` | AdminTarifas, Admin |
 | `POST` | `/api/catalogos/vehiculos-cuarentena/{id}/descartar` | AdminTarifas, Admin |
 | `POST` | `/api/catalogos/vehiculos-cuarentena/{id}/mapear` | AdminTarifas, Admin |
@@ -1060,6 +1062,34 @@ catálogo. No crea ninguna solicitud; es el paso previo a `lineas:bulk`.
 - **Alias (S6-HU-27.2/#321)**: el `tipoVehiculo` se busca primero en el diccionario de alias (§3.19): `TB`, `T.B`, `Turbo` y `2L2` resuelven
   a la **misma** configuración (se guarda el código, `2L2`, no el texto). La `carroceria` no pasa por el diccionario. Un texto que el
   diccionario no conoce sigue naciendo en **cuarentena** (`EsCatalogoOficial = false`) hasta que alguien lo mapee en la bandeja (§3.19).
+  **Excepción**: un `tipoVehiculo` que es un código de la tabla de traducción (`GET /api/catalogos/vehiculos-nexo`: 2L3, 3S2…) cuenta como alias de sí mismo y nace **oficial** (o se promueve una configuración en cuarentena que no fue descartada),
+  siempre que la `carroceria` esté vacía o sea una de `tbl_tipos_carroceria_catalogo`; con otra carrocería nace en cuarentena como un texto libre. Lo mismo aplica a `captura-solicitudes` y a «Cambiar vehículo».
+
+#### `POST /api/solicitudes/recomendar-vehiculo-contenedor` — el vehículo de un contenedor según su tamaño y peso
+Solo lectura y **por lote** (una importación trae cientos de líneas de contenedor). Devuelve el vehículo que el costeo escogería (`tbl_rangos_peso_contenedor`: el de
+menor peso máximo que alcance para el peso). El front lo **prellena** en la línea (la persona puede cambiarlo) y lo manda como `tipoVehiculo` al crear la solicitud:
+así queda guardado en la línea y el costeo lo respeta. Si el peso cambia después, el vehículo no se recalcula.
+
+- **Roles**: `Comercial`, `AdminTarifas`, `Admin`.
+- **Body**: **array** de 1 a 5.000 elementos:
+
+| Campo | | Tipo | Restricción |
+|---|---|---|---|
+| `indice` | **requerido** | int | La posición de la línea en el archivo; se devuelve tal cual |
+| `claseContenedor` | **requerido** | string | Clase de SAP (`CNT40.HC`) o el tamaño en pies (`20`, `40`); máx. 30 |
+| `pesoKg` | **requerido** | decimal | Mayor que 0 |
+
+- **→** `200`, en el mismo orden:
+```ts
+interface RecomendacionVehiculoContenedorDto {
+  indice: number
+  tipoVehiculo: string | null        // código NEXO (3S3, 2S2…); null si el peso supera el tope, la clase no trae 20 ni 40 pies o la tabla no está disponible
+  contenedorPies: number | null      // 20 | 40; null si la clase no trae el tamaño
+  tablaDisponible: boolean           // false: la tabla no se pudo leer; el costeo usa su regla de respaldo
+  pesoMaximoContenedor: number | null // el tope más alto de ese tamaño (para «supera las N t del contenedor de 40'»)
+}
+```
+- **Errores**: `400 SIN_LINEAS` · `400 DEMASIADAS_LINEAS` · `400 PESO_INVALIDO` (el mensaje trae el `indice`) · `400 VALIDATION_ERROR`
 
 #### `POST /api/solicitudes/{id}/lineas:bulk` — carga masiva de un pliego
 - **Roles**: `Admin` (#307, decisión D5: solo Admin).
@@ -1298,6 +1328,7 @@ Qué receta se usa, en este orden:
    (`cambios`). Los números de las celdas no se envían (solo `#`) y los documentos van enmascarados. Si la receta de la IA no se puede ejecutar, se le pide corregirla **una** vez.
 4. Si la IA no está disponible (apagada, sin llave, tope diario, error o respuesta inválida) **no falla**: usa el formato guardado más parecido, o una lectura simple de la primera fila con encabezado de cada hoja
    (`"automatica"`), y `motivoSinIa` dice por qué (`IA_DESACTIVADA`, `IA_RESPUESTA_INVALIDA`, el código del proveedor…). `avisos` lo explica para mostrarlo.
+   Si la respuesta de la IA se corta por longitud (`IA_RESPUESTA_TRUNCADA`) se reintenta **una vez** pidiendo una receta más compacta; si vuelve a cortarse cae a la lectura simple y `avisos` dice que el archivo es muy grande o complejo (sugerir indicar las hojas a usar o enviarlo por partes).
 
 ```ts
 interface LecturaEstructuraDto {
@@ -1923,6 +1954,7 @@ Si `resultado = "ganada"`, realimenta la biblioteca de Tarifas Ganadas.
 #### `GET /api/cotizaciones/{id}/exportar-excel`
 - **Roles**: `Comercial`, `AdminTarifas`, `ServiciosLogisticos`, `LiderProceso`, `Admin` (`AdminBiblioteca` no entra: #307).
 - S6-HU-24.3/#320: las líneas rechazadas salen en la hoja con su ruta y la palabra «Sin costeo» en vez del precio (sin precio y **sin el motivo**), y no suman al total.
+- Columnas de los fletes: `Ruta`, `Tipología`, `Flete` y `Vehículo` (el de la línea; «—» si no tiene).
 - **→** `200` binario `.xlsx` con `Content-Disposition: attachment`.
 - **Errores**: `404 COTIZACION_NO_ENCONTRADA`
 
@@ -2582,6 +2614,7 @@ de Reglas Solo-SICETAC y Tarifas de Plaza — reemplazan el texto libre.
 | Endpoint | Fuente | → |
 |---|---|---|
 | `GET /api/catalogos/tipos-vehiculo` | `tblSAPTiposVehiculoTarifario`, tal cual (S5-HU-22.1/#288: se eliminaron los 5 casos especiales; `[]` si dbSolucionesTI no está disponible; faltan 3S2 y 2L3, decisión de negocio) | `200 TipoVehiculoDto[]` |
+| `GET /api/catalogos/vehiculos-nexo` | `tbl_mapeo_vehiculo_tarifario` (activos): los **códigos de NEXO**, con 2L3, 3S2, 2S3, 2_5, 2_7, 2L1… que SAP no tiene. Es el que debe usar el selector «Cambiar vehículo» de la Mesa | `200 VehiculoNexoDto[]` = `{ codigo, descripcion, enSap }` (`enSap`: el código también está en `tipos-vehiculo`; `descripcion` es el nombre en SICE-TAC) |
 | `GET /api/catalogos/lineas-negocio` | `tblSAPLineaNegocio` | `200 LineaNegocioDto[]` |
 | `GET /api/catalogos/clases-viaje` | `tblSAPClaseViaje` | `200 ClaseViajeDto[]` |
 | `GET /api/catalogos/clases-contenedor` | `tblSAPClaseContenedor` | `200 ClaseContenedorDto[]` |
@@ -2948,7 +2981,7 @@ tokens por persona de §3.22. La función se apaga con `Anthropic__Funciones__As
 |---|---|---|
 | `conversacion` | `{ conversacionId, mensajeId }` | Primero. `mensajeId` es el de la respuesta que se está generando |
 | `texto` | `{ delta }` | Cada trozo de la respuesta, a medida que se genera; se concatenan |
-| `herramienta` | `{ nombre, estado, fuente? }` | `estado`: `ejecutando`, `ok` o `error`. Muestra qué está consultando el asistente |
+| `herramienta` | `{ nombre, estado, fuente?, encontrado?, resumen? }` | `estado`: `ejecutando`, `ok` o `error`. Muestra qué está consultando el asistente. Al terminar en `ok`, `encontrado` dice si la fuente tenía el dato y `resumen` es **una frase corta (máx. 300 caracteres) armada por NEXO** para pintar una tarjeta (por ejemplo «Piso SICE-TAC 3S3 (Carga general, Cargado): $3.422.777 · período 202610»); sin datos es el motivo. Nunca trae el resultado completo y no viaja al modelo. Hoy lo traen el piso SICE-TAC, el aprovisionamiento, la propuesta de línea, las tarifas, los conexos y las ciudades; el campo es opcional: quien no lo use no se rompe |
 | `preferencias` | `[ { id, texto, createdAt } ]` | Después de `conversacion`, solo si la persona tiene preferencias guardadas: las que el asistente recibe en esta respuesta (para mostrar que se aplican) |
 | `accion` | `AccionAsistenteDto` | El asistente propuso un cambio (§3.24.1). Nada se ha modificado: la persona debe confirmarlo o cancelarlo |
 | `reemplazo` | `{ texto, cifrasSinOrigen[] }` | La respuesta traía cifras de dinero sin origen: lo mostrado debe sustituirse por `texto` (es lo que queda guardado) |
@@ -3081,6 +3114,7 @@ abiertos a los 6 roles.
 | **Bandeja y Mesa**: `GET /api/solicitudes` · `GET /api/solicitudes/{id}` · `GET .../propuesta-tarifa` · `/hubs/bandeja` (#307) | ✅ | | ✅ | ✅ | ✅ | ✅ |
 | `POST /api/solicitudes` (#307, D5: solo Admin) | | | | | | ✅ |
 | `POST /api/solicitudes/resolver-catalogos` | ✅ | | | | | ✅ |
+| `POST /api/solicitudes/recomendar-vehiculo-contenedor` | ✅ | | ✅ | | | ✅ |
 | `POST /api/solicitudes/{id}/lineas:bulk` (#307, D5: solo Admin) | | | | | | ✅ |
 | `POST /api/solicitudes/{id}/rechazar` | ✅ | | | | | ✅ |
 | `POST /api/solicitudes/{id}/recalcular-score` (#307, D5: solo Admin) | | | | | | ✅ |
