@@ -44,6 +44,9 @@ public sealed class clsAgregarLineaCotizacionCommandHandler(
         {
             lineaSol = await lineasSolicitud.ObtenerDeSolicitudAsync(lid, c.SolicitudId, ct)
                 ?? throw new clsValidationFailedException("LINEA_INVALIDA", "La línea de solicitud no pertenece a esta cotización.");
+            // Un flete por línea y cotización; para cambiarlo se edita.
+            if (c.Lineas.Any(l => l.LineaSolicitudId == lid))
+                throw LineaYaCosteada();
             // A una línea rechazada no se le agrega flete; si hay que costearla, primero se deshace el rechazo.
             if (lineaSol.EstadoLinea == EstadoLinea.Rechazada)
                 throw new clsConflictException("LINEA_RECHAZADA",
@@ -87,9 +90,21 @@ public sealed class clsAgregarLineaCotizacionCommandHandler(
         c.Lineas.Add(linea);
         clsCotizacionCalculos.Recalcular(c);
         auditoria.Registrar(usuarioActual.Id, "cotizaciones", c.Id, "agregar_flete", $"{{\"valor\":{command.ValorFlete}}}");
-        await uow.SaveChangesAsync(ct);
+        try
+        {
+            await uow.SaveChangesAsync(ct);
+        }
+        catch (Exception ex) when (command.LineaSolicitudId is not null && cotizaciones.EsChoqueDeLineaDuplicada(ex))
+        {
+            // Otro pedido guardó primero el flete de esta línea.
+            cotizaciones.DescartarCambiosPendientes();
+            throw LineaYaCosteada();
+        }
         return c.ToDto();
     }
+
+    private static clsConflictException LineaYaCosteada() => new("LINEA_YA_COSTEADA",
+        "La línea ya tiene un flete en esta cotización: edítelo en lugar de agregar otro.");
 
     private async Task<clsCotizacion> CargarEditableAsync(Guid id, CancellationToken ct)
     {
