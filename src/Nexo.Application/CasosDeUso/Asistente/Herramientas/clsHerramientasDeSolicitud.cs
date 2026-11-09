@@ -5,6 +5,7 @@ using Nexo.Application.Common.Abstractions;
 using Nexo.Application.Common.Dtos;
 using Nexo.Application.Common.Exceptions;
 using Nexo.Application.Common.Ports;
+using Nexo.Domain.Common;
 using Nexo.Domain.Enums;
 
 namespace Nexo.Application.CasosDeUso.Asistente.Herramientas;
@@ -38,7 +39,9 @@ public sealed class clsConsultarAprovisionamientoHerramienta(IPropuestaTarifaPor
             entrada.Texto("ciudadLevante", requerido: true)!, entrada.Texto("origen", requerido: true)!,
             entrada.Texto("configuracion"), ct, entrada.Texto("carroceria"));
 
-        if (candidato is not null) return clsResultadoHerramienta.Con(candidato, Fuente);
+        if (candidato is not null)
+            return clsResultadoHerramienta.Con(candidato, Fuente, resumen:
+                $"Aprovisionamiento SICE-TAC: {clsMoneda.Pesos(candidato.Valor)}" + (string.IsNullOrWhiteSpace(candidato.Configuracion) ? string.Empty : $" ({candidato.Configuracion})"));
 
         var motivo = await propuestas.MotivoSicetacNoUsadoAsync(ct);
         return clsResultadoHerramienta.SinDatos(Fuente, motivo ?? "No hay piso SICE-TAC para ese viaje vacío.");
@@ -86,6 +89,9 @@ public sealed class clsConsultarPropuestaLineaHerramienta(
         var linea = propuesta.Lineas.FirstOrDefault(l => l.LineaId == lineaId)
             ?? throw new clsNotFoundException("LINEA_NO_ENCONTRADA", "La línea no existe en esa solicitud.");
 
-        return clsResultadoHerramienta.Con(linea, Fuente, propuesta.Advertencias.Count > 0 ? string.Join(" ", propuesta.Advertencias) : null);
+        var resumen = linea.ValorPropuesto is { } valor
+            ? $"{linea.clsRuta}: propuesta {clsMoneda.Pesos(valor)}" + (string.IsNullOrWhiteSpace(linea.FuentePropuesta) ? string.Empty : $" ({linea.FuentePropuesta})")
+            : $"{linea.clsRuta}: sin valor propuesto";
+        return clsResultadoHerramienta.Con(linea, Fuente, propuesta.Advertencias.Count > 0 ? string.Join(" ", propuesta.Advertencias) : null, resumen);
     }
 }

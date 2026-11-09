@@ -8,8 +8,8 @@ public sealed record clsHerramientaIa(string Nombre, string Descripcion, string 
 /// <summary>Lo que el modelo pidió ejecutar. <paramref name="Id"/> lo asigna el proveedor y enlaza la petición con su resultado.</summary>
 public sealed record clsLlamadaHerramientaIa(string Id, string Nombre, JsonElement Entrada);
 
-/// <summary>Resultado de una herramienta para el modelo; <paramref name="Fuente"/> y <paramref name="Encontrado"/> no viajan al modelo, son para quien transmite la conversación.</summary>
-public sealed record clsResultadoHerramientaIa(string Contenido, bool EsError, string? Fuente = null, bool? Encontrado = null);
+/// <summary>Resultado de una herramienta para el modelo; <paramref name="Fuente"/>, <paramref name="Encontrado"/> y <paramref name="Resumen"/> no viajan al modelo, son para quien transmite la conversación.</summary>
+public sealed record clsResultadoHerramientaIa(string Contenido, bool EsError, string? Fuente = null, bool? Encontrado = null, string? Resumen = null);
 
 /// <summary><paramref name="MaxIteraciones"/> acota cuántas veces seguidas el modelo puede pedir herramientas antes de responder.</summary>
 public sealed record clsPeticionConversacionIa(

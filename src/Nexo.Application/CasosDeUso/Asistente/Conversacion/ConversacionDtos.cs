@@ -11,8 +11,11 @@ public abstract record clsEventoAsistente
 
     public sealed record Fragmento(string Delta) : clsEventoAsistente;
 
-    /// <summary><paramref name="Estado"/>: <c>ejecutando</c>, <c>ok</c> o <c>error</c>.</summary>
-    public sealed record Herramienta(string Nombre, string Estado, string? Fuente) : clsEventoAsistente;
+    /// <summary>
+    /// <paramref name="Estado"/>: <c>ejecutando</c>, <c>ok</c> o <c>error</c>. Al terminar, <paramref name="Encontrado"/> dice si la fuente tenía el dato y
+    /// <paramref name="Resumen"/> es una frase corta para mostrar (por ejemplo el piso con su configuración); nunca el resultado completo.
+    /// </summary>
+    public sealed record Herramienta(string Nombre, string Estado, string? Fuente, bool? Encontrado = null, string? Resumen = null) : clsEventoAsistente;
 
     /// <summary>La respuesta traía cifras de dinero sin origen: lo mostrado debe sustituirse por <paramref name="Texto"/>, que es lo que queda guardado.</summary>
     public sealed record Reemplazo(string Texto, IReadOnlyList<string> CifrasSinOrigen) : clsEventoAsistente;

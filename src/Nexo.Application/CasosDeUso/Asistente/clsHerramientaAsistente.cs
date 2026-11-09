@@ -5,12 +5,16 @@ using Nexo.Domain.Enums;
 
 namespace Nexo.Application.CasosDeUso.Asistente;
 
-/// <summary>Resultado de una herramienta; siempre trae la fuente del dato. Sin dato, <paramref name="Encontrado"/> es false y <paramref name="Nota"/> lo explica.</summary>
-public sealed record clsResultadoHerramienta(bool Encontrado, object? Valor, string Fuente, string? Nota = null)
+/// <summary>
+/// Resultado de una herramienta; siempre trae la fuente del dato. Sin dato, <paramref name="Encontrado"/> es false y <paramref name="Nota"/> lo explica.
+/// <paramref name="Resumen"/> es una frase corta armada por NEXO para mostrar en pantalla (viaja en el evento de herramienta, no al modelo).
+/// </summary>
+public sealed record clsResultadoHerramienta(
+    bool Encontrado, object? Valor, string Fuente, string? Nota = null, [property: System.Text.Json.Serialization.JsonIgnore] string? Resumen = null)
 {
-    public static clsResultadoHerramienta Con(object valor, string fuente, string? nota = null) => new(true, valor, fuente, nota);
+    public static clsResultadoHerramienta Con(object valor, string fuente, string? nota = null, string? resumen = null) => new(true, valor, fuente, nota, resumen);
 
-    public static clsResultadoHerramienta SinDatos(string fuente, string nota) => new(false, null, fuente, nota);
+    public static clsResultadoHerramienta SinDatos(string fuente, string nota) => new(false, null, fuente, nota, nota);
 }
 
 /// <summary>Lo que se le muestra al modelo de una herramienta: nombre, para qué sirve y la forma de su entrada (JSON Schema).</summary>
