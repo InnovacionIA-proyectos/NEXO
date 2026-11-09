@@ -413,6 +413,8 @@ public sealed class clsDiccionarioVacio : IDiccionarioClienteRepository
     public Task<bool> ClienteExisteAsync(Guid clienteId, CancellationToken ct) => Task.FromResult(false);
     public void Agregar(clsTerminoCliente termino) => throw new NotSupportedException();
     public void Eliminar(clsTerminoCliente termino) => throw new NotSupportedException();
+    public bool EsChoqueUnico(Exception error) => false;
+    public void DescartarCambiosPendientes() { }
 }
 
 /// <summary>Sin plantillas: sin cliente el handler ni las consulta, pero el constructor las pide.</summary>

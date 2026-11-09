@@ -160,7 +160,7 @@ Decidido: Cotifly **no replica** la importación; usa la de NEXO. Todas las ruta
 | 4 | `POST normalizar-valores` `{ clienteId \| clienteNit, valores[{ campo, valor }] }` | Lleva los textos libres a valores de NEXO. `campo`: `tipoVehiculo`, `carroceria`, **`lineaNegocio`**, `ciudad` |
 | 5 | `POST /api/captura-solicitudes` | Captura con las líneas ya normalizadas (§5) |
 | opc. | `PUT plantillas-mapeo` · `GET plantillas-mapeo?clienteNit=` · `DELETE plantillas-mapeo/{id}` | Recordar el mapeo confirmado para el siguiente archivo igual |
-| opc. | `GET/POST/PUT/DELETE /api/diccionario-cliente` | Diccionario de términos por cliente (lo que significa «Outbound» para ese cliente) |
+| opc. | `GET/POST/PUT/DELETE /api/diccionario-cliente` (`GET ?clienteNit=`; `POST` con `clienteId` \| `clienteNit`) | Diccionario de términos por cliente (lo que significa «Outbound» para ese cliente) |
 | alt. al 1 | `POST leer-estructura` (`multipart`: `archivo`, `clienteId` \| `clienteNit`, `instrucciones?`, `receta?`) | Para Excel de formato complejo (tabla que no empieza en la fila 1, encabezados de varias filas, origen o vehículo en las columnas, datos sueltos). La IA propone una receta de lectura y NEXO devuelve `tablas` (igual que `analizar-excel`, una por hoja o unidas), `resumen` y `dudas`. No guarda nada |
 | opc. | `PUT recetas-lectura` (`multipart`: `archivo`, `receta`, `clienteId` \| `clienteNit`, `nombre?`, `instrucciones?`) · `GET recetas-lectura?clienteNit=` · `DELETE recetas-lectura/{id}` | Guardar la receta confirmada: el siguiente archivo del cliente con el mismo formato se lee sin IA |
 

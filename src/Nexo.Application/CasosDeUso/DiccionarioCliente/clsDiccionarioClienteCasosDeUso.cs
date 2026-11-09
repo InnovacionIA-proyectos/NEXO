@@ -86,18 +86,29 @@ internal static class clsDiccionarioClienteReglas
 
 /// <summary>
 /// Los términos del diccionario. Con <paramref name="ClienteId"/> trae los de ese cliente y, por defecto, también los generales; sin él,
-/// los de todos. <paramref name="Tipo"/> = columna | unidad | valor.
+/// los de todos. <paramref name="Tipo"/> = columna | unidad | valor. En lugar del id se puede indicar <paramref name="ClienteNit"/>
+/// (manda el id): solo busca el cliente local, no lo crea; un NIT sin cliente local no tiene términos propios.
 /// </summary>
-public sealed record clsListarDiccionarioClienteQuery(Guid? ClienteId, bool IncluirGenerales, string? Tipo, string? Buscar, bool SoloActivos)
+public sealed record clsListarDiccionarioClienteQuery(
+    Guid? ClienteId, bool IncluirGenerales, string? Tipo, string? Buscar, bool SoloActivos, string? ClienteNit = null)
     : IQuery<IReadOnlyList<clsTerminoClienteDto>>;
 
-public sealed class clsListarDiccionarioClienteQueryHandler(IDiccionarioClienteRepository repositorio)
+public sealed class clsListarDiccionarioClienteQueryHandler(IDiccionarioClienteRepository repositorio, clsClienteDeImportacion clienteDeImportacion)
     : IQueryHandler<clsListarDiccionarioClienteQuery, IReadOnlyList<clsTerminoClienteDto>>
 {
     public async Task<IReadOnlyList<clsTerminoClienteDto>> Handle(clsListarDiccionarioClienteQuery query, CancellationToken ct = default)
     {
         var tipo = string.IsNullOrWhiteSpace(query.Tipo) ? null : clsDiccionarioClienteReglas.ParsearTipo(query.Tipo);
-        var filas = await repositorio.ListarAsync(query.ClienteId, query.IncluirGenerales, tipo, clsTexto.Limpiar(query.Buscar), query.SoloActivos, ct);
+
+        var clienteId = query.ClienteId;
+        if (clienteId is null && !string.IsNullOrWhiteSpace(query.ClienteNit))
+        {
+            clienteId = await clienteDeImportacion.BuscarLocalAsync(query.ClienteNit, ct);
+            // Sin cliente local no hay términos propios: se filtra por un id que no existe y quedan, si se piden, los generales.
+            clienteId ??= Guid.Empty;
+        }
+
+        var filas = await repositorio.ListarAsync(clienteId, query.IncluirGenerales, tipo, clsTexto.Limpiar(query.Buscar), query.SoloActivos, ct);
         return filas.Select(clsDiccionarioClienteReglas.ADto).ToList();
     }
 }
@@ -117,36 +128,64 @@ public sealed class clsObtenerOpcionesDiccionarioClienteQueryHandler
 // ---------------------------------------------------------------- crear
 
 /// <summary>
-/// Agrega un término. 400 si el tipo, el concepto o el contexto no son válidos; 400 CLIENTE_NO_ENCONTRADO si el cliente no existe; 409
-/// TERMINO_DUPLICADO si el cliente ya tiene ese término (normalizado) con el mismo tipo y contexto.
+/// Agrega un término. El cliente se indica con <paramref name="ClienteId"/> o con <paramref name="ClienteNit"/> (con NIT se usa el cliente
+/// local o se crea con los datos del DW); sin ninguno aplica a todos los clientes. 400 CLIENTE_AMBIGUO si vienen los dos; 400 si el tipo,
+/// el concepto o el contexto no son válidos; 400 CLIENTE_NO_ENCONTRADO si el id no existe; 400 CLIENTE_NIT_INVALIDO si el NIT no es de
+/// ningún cliente ni prospecto; 409 TERMINO_DUPLICADO si el cliente ya tiene ese término (normalizado) con el mismo tipo y contexto.
 /// </summary>
 public sealed record clsCrearTerminoClienteCommand(
-    Guid? ClienteId, string? Termino, string? Tipo, string? Concepto, string? Contexto, string? Ejemplo, bool Activo)
+    Guid? ClienteId, string? Termino, string? Tipo, string? Concepto, string? Contexto, string? Ejemplo, bool Activo, string? ClienteNit = null)
     : ICommand<clsTerminoClienteDto>;
 
 public sealed class clsCrearTerminoClienteCommandHandler(
-    IDiccionarioClienteRepository repositorio, IAuditoriaPort auditoria, ICurrentUserPort usuarioActual, IUnitOfWork uow)
+    IDiccionarioClienteRepository repositorio, IAuditoriaPort auditoria, ICurrentUserPort usuarioActual, IUnitOfWork uow,
+    clsClienteDeImportacion clienteDeImportacion)
     : ICommandHandler<clsCrearTerminoClienteCommand, clsTerminoClienteDto>
 {
-    public async Task<clsTerminoClienteDto> Handle(clsCrearTerminoClienteCommand command, CancellationToken ct = default)
+    public Task<clsTerminoClienteDto> Handle(clsCrearTerminoClienteCommand command, CancellationToken ct = default) =>
+        Crear(command, reintento: false, ct);
+
+    private async Task<clsTerminoClienteDto> Crear(clsCrearTerminoClienteCommand command, bool reintento, CancellationToken ct)
     {
         var (termino, normalizado, tipo, concepto, contexto, ejemplo) =
             clsDiccionarioClienteReglas.Validar(command.Termino, command.Tipo, command.Concepto, command.Contexto, command.Ejemplo);
 
-        if (command.ClienteId is { } clienteId && !await repositorio.ClienteExisteAsync(clienteId, ct))
-            throw new clsValidationFailedException("CLIENTE_NO_ENCONTRADO", "El cliente no existe.");
+        var conNit = !string.IsNullOrWhiteSpace(command.ClienteNit);
+        if (command.ClienteId is not null && conNit)
+            throw new clsValidationFailedException("CLIENTE_AMBIGUO", "Indica el cliente con clienteId o con clienteNit, no con los dos.");
 
-        var existente = await repositorio.BuscarDuplicadoAsync(command.ClienteId, normalizado, tipo, contexto, excluirId: null, ct);
+        Guid? clienteId = command.ClienteId;
+        if (clienteId is { } id)
+        {
+            if (!await repositorio.ClienteExisteAsync(id, ct))
+                throw new clsValidationFailedException("CLIENTE_NO_ENCONTRADO", "El cliente no existe.");
+        }
+        else if (conNit)
+            clienteId = await clienteDeImportacion.ObtenerOCrearAsync(command.ClienteNit!, ct);
+
+        var existente = await repositorio.BuscarDuplicadoAsync(clienteId, normalizado, tipo, contexto, excluirId: null, ct);
         if (existente is not null) throw clsDiccionarioClienteReglas.Duplicado(existente);
 
         var nuevo = new clsTerminoCliente
         {
-            ClienteId = command.ClienteId, Termino = termino, TerminoNormalizado = normalizado, Tipo = tipo,
+            ClienteId = clienteId, Termino = termino, TerminoNormalizado = normalizado, Tipo = tipo,
             Concepto = concepto, Contexto = contexto, Ejemplo = ejemplo, Activo = command.Activo,
         };
         repositorio.Agregar(nuevo);
         auditoria.Registrar(usuarioActual.Id, "diccionario_cliente", nuevo.Id, "crear_termino", clsDiccionarioClienteReglas.DiffJson(nuevo));
-        await uow.SaveChangesAsync(ct);
+        try
+        {
+            await uow.SaveChangesAsync(ct);
+        }
+        catch (Exception ex) when (repositorio.EsChoqueUnico(ex))
+        {
+            // Otra petición insertó primero el mismo término (o creó el mismo cliente por NIT): se vuelve a mirar con lo ya guardado.
+            repositorio.DescartarCambiosPendientes();
+            var yaGuardado = await repositorio.BuscarDuplicadoAsync(clienteId, normalizado, tipo, contexto, excluirId: null, ct);
+            if (yaGuardado is not null) throw clsDiccionarioClienteReglas.Duplicado(yaGuardado);
+            if (reintento) throw;
+            return await Crear(command, reintento: true, ct);
+        }
 
         // Con el nombre del cliente ya resuelto para la respuesta.
         var guardado = await repositorio.ObtenerAsync(nuevo.Id, ct) ?? nuevo;
@@ -191,7 +230,19 @@ public sealed class clsEditarTerminoClienteCommandHandler(
 
         auditoria.Registrar(usuarioActual.Id, "diccionario_cliente", actual.Id, "editar_termino",
             JsonSerializer.Serialize(new { antes = JsonSerializer.Deserialize<JsonElement>(antes), despues = JsonSerializer.Deserialize<JsonElement>(clsDiccionarioClienteReglas.DiffJson(actual)) }));
-        await uow.SaveChangesAsync(ct);
+        try
+        {
+            await uow.SaveChangesAsync(ct);
+        }
+        catch (Exception ex) when (repositorio.EsChoqueUnico(ex))
+        {
+            // Otra petición guardó primero el mismo término: se responde igual que si ya hubiera estado.
+            var clienteDelTermino = actual.ClienteId;
+            repositorio.DescartarCambiosPendientes();
+            var yaGuardado = await repositorio.BuscarDuplicadoAsync(clienteDelTermino, normalizado, tipo, contexto, excluirId: command.Id, ct);
+            if (yaGuardado is null) throw;
+            throw clsDiccionarioClienteReglas.Duplicado(yaGuardado);
+        }
 
         return clsDiccionarioClienteReglas.ADto(actual);
     }
