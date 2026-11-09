@@ -288,7 +288,6 @@ en la sección que se indica; la matriz completa de permisos es la §5.
 | `GET` | `/api/catalogos/municipios` | Todos |
 | `GET` | `/api/catalogos/tipos-vehiculo` | Todos |
 | `GET` | `/api/catalogos/vehiculos-nexo` | Todos |
-| `GET` | `/api/catalogos/vehiculos-nexo` | Todos |
 | `GET` | `/api/catalogos/vehiculos-cuarentena` | AdminTarifas, Admin |
 | `POST` | `/api/catalogos/vehiculos-cuarentena/{id}/descartar` | AdminTarifas, Admin |
 | `POST` | `/api/catalogos/vehiculos-cuarentena/{id}/mapear` | AdminTarifas, Admin |
