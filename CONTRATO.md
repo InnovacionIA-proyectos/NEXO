@@ -1323,6 +1323,7 @@ Qué receta se usa, en este orden:
    (`cambios`). Los números de las celdas no se envían (solo `#`) y los documentos van enmascarados. Si la receta de la IA no se puede ejecutar, se le pide corregirla **una** vez.
 4. Si la IA no está disponible (apagada, sin llave, tope diario, error o respuesta inválida) **no falla**: usa el formato guardado más parecido, o una lectura simple de la primera fila con encabezado de cada hoja
    (`"automatica"`), y `motivoSinIa` dice por qué (`IA_DESACTIVADA`, `IA_RESPUESTA_INVALIDA`, el código del proveedor…). `avisos` lo explica para mostrarlo.
+   Si la respuesta de la IA se corta por longitud (`IA_RESPUESTA_TRUNCADA`) se reintenta **una vez** pidiendo una receta más compacta; si vuelve a cortarse cae a la lectura simple y `avisos` dice que el archivo es muy grande o complejo (sugerir indicar las hojas a usar o enviarlo por partes).
 
 ```ts
 interface LecturaEstructuraDto {
