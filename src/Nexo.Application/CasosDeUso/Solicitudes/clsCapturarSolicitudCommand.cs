@@ -50,7 +50,7 @@ public sealed record clsCapturarSolicitudCommand(
 /// </summary>
 public sealed class clsCapturarSolicitudCommandHandler(
     ISolicitudesRepository solicitudes, IRutasCatalogoPort rutasCatalogo,
-    IConfiguracionesVehiculoPort vehiculosCatalogo, IAliasCatalogoPort aliasCatalogo, IClientesPort clientes, IClientesDwPort clientesDw,
+    IConfiguracionesVehiculoPort vehiculosCatalogo, IAliasCatalogoPort aliasCatalogo, IVehiculosNexoPort vehiculosNexo, IClientesPort clientes, IClientesDwPort clientesDw,
     IPropuestaTarifaPort propuestas, IAuditoriaPort auditoria, ICurrentUserPort usuarioActual,
     TimeProvider clock, IPublicadorDeMensajes publicador, IUnitOfWork uow, IServiceScopeFactory scopes)
     : ICommandHandler<clsCapturarSolicitudCommand, clsCapturaResultDto>
@@ -70,6 +70,7 @@ public sealed class clsCapturarSolicitudCommandHandler(
         var vehiculosPorClave = clsResolucionDeCatalogos.IndexarVehiculosPorClave(vehiculos);
         var aliasVehiculo = await aliasCatalogo.MapaActivoAsync(clsAliasElemento.TipoVehiculo, ct);
         var aliasContenedor = await aliasCatalogo.MapaActivoAsync(clsAliasElemento.TipoContenedor, ct);
+        var oficialidad = await Catalogos.clsOficialidadDeVehiculos.CargarAsync(vehiculosNexo, ct);
 
         var rutasCreadas = 0;
         var vehiculosCreados = 0;
@@ -100,7 +101,7 @@ public sealed class clsCapturarSolicitudCommandHandler(
                 lr.Origen, lr.Destino, rutasPorClave, rutasCatalogo, lr.OrigenMunicipioId, lr.DestinoMunicipioId);
             if (rutaCreada) rutasCreadas++;
 
-            var (vehiculo, vehiculoCreado) = clsResolucionDeCatalogos.ResolverVehiculo(lr.TipoVehiculo, lr.Carroceria, vehiculosPorClave, vehiculosCatalogo, aliasVehiculo);
+            var (vehiculo, vehiculoCreado) = clsResolucionDeCatalogos.ResolverVehiculo(lr.TipoVehiculo, lr.Carroceria, vehiculosPorClave, vehiculosCatalogo, aliasVehiculo, oficialidad);
             if (vehiculoCreado) vehiculosCreados++;
 
             var ciudadLevante = clsResolucionDeCatalogos.Limpiar(lr.CiudadLevanteContenedor);

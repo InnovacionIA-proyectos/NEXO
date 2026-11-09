@@ -287,6 +287,8 @@ en la sección que se indica; la matriz completa de permisos es la §5.
 | `GET` | `/api/catalogos/lineas-negocio` | Todos |
 | `GET` | `/api/catalogos/municipios` | Todos |
 | `GET` | `/api/catalogos/tipos-vehiculo` | Todos |
+| `GET` | `/api/catalogos/vehiculos-nexo` | Todos |
+| `GET` | `/api/catalogos/vehiculos-nexo` | Todos |
 | `GET` | `/api/catalogos/vehiculos-cuarentena` | AdminTarifas, Admin |
 | `POST` | `/api/catalogos/vehiculos-cuarentena/{id}/descartar` | AdminTarifas, Admin |
 | `POST` | `/api/catalogos/vehiculos-cuarentena/{id}/mapear` | AdminTarifas, Admin |
@@ -1055,6 +1057,8 @@ catálogo. No crea ninguna solicitud; es el paso previo a `lineas:bulk`.
 - **Alias (S6-HU-27.2/#321)**: el `tipoVehiculo` se busca primero en el diccionario de alias (§3.19): `TB`, `T.B`, `Turbo` y `2L2` resuelven
   a la **misma** configuración (se guarda el código, `2L2`, no el texto). La `carroceria` no pasa por el diccionario. Un texto que el
   diccionario no conoce sigue naciendo en **cuarentena** (`EsCatalogoOficial = false`) hasta que alguien lo mapee en la bandeja (§3.19).
+  **Excepción**: un `tipoVehiculo` que es un código de la tabla de traducción (`GET /api/catalogos/vehiculos-nexo`: 2L3, 3S2…) cuenta como alias de sí mismo y nace **oficial** (o se promueve una configuración en cuarentena que no fue descartada),
+  siempre que la `carroceria` esté vacía o sea una de `tbl_tipos_carroceria_catalogo`; con otra carrocería nace en cuarentena como un texto libre. Lo mismo aplica a `captura-solicitudes` y a «Cambiar vehículo».
 
 #### `POST /api/solicitudes/{id}/lineas:bulk` — carga masiva de un pliego
 - **Roles**: `Admin` (#307, decisión D5: solo Admin).
@@ -2577,6 +2581,7 @@ de Reglas Solo-SICETAC y Tarifas de Plaza — reemplazan el texto libre.
 | Endpoint | Fuente | → |
 |---|---|---|
 | `GET /api/catalogos/tipos-vehiculo` | `tblSAPTiposVehiculoTarifario`, tal cual (S5-HU-22.1/#288: se eliminaron los 5 casos especiales; `[]` si dbSolucionesTI no está disponible; faltan 3S2 y 2L3, decisión de negocio) | `200 TipoVehiculoDto[]` |
+| `GET /api/catalogos/vehiculos-nexo` | `tbl_mapeo_vehiculo_tarifario` (activos): los **códigos de NEXO**, con 2L3, 3S2, 2S3, 2_5, 2_7, 2L1… que SAP no tiene. Es el que debe usar el selector «Cambiar vehículo» de la Mesa | `200 VehiculoNexoDto[]` = `{ codigo, descripcion, enSap }` (`enSap`: el código también está en `tipos-vehiculo`; `descripcion` es el nombre en SICE-TAC) |
 | `GET /api/catalogos/lineas-negocio` | `tblSAPLineaNegocio` | `200 LineaNegocioDto[]` |
 | `GET /api/catalogos/clases-viaje` | `tblSAPClaseViaje` | `200 ClaseViajeDto[]` |
 | `GET /api/catalogos/clases-contenedor` | `tblSAPClaseContenedor` | `200 ClaseContenedorDto[]` |
