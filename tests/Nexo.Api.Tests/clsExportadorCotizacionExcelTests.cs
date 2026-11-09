@@ -32,13 +32,49 @@ public class clsExportadorCotizacionExcelTests
 
         using var wb = new XLWorkbook(new MemoryStream(contenido));
         var ws = wb.Worksheet("Cotización");
-        var filaEncabezado = ws.Rows().First(r => r.Cell(1).GetString() == "clsRuta");
+        var filaEncabezado = ws.Rows().First(r => r.Cell(1).GetString() == "Ruta");
         var encabezados = filaEncabezado.CellsUsed().Select(c => c.GetString()).ToList();
 
         Assert.DoesNotContain("Fuente", encabezados);
         Assert.DoesNotContain("Aprovisionamiento", encabezados);
         Assert.DoesNotContain("Retorno contenedor", encabezados);
         Assert.Contains("Flete", encabezados);
+    }
+
+    [Fact]
+    public void El_encabezado_dice_Ruta_y_trae_la_columna_Vehiculo_con_el_de_cada_linea_incluidas_las_rechazadas()
+    {
+        var cotizacion = NuevaCotizacionConUnaLinea(1_000_000m, null, null);
+        cotizacion.Lineas.First().clsLineaSolicitud = new Nexo.Domain.Solicitudes.Entidades.clsLineaSolicitud
+        {
+            clsRuta = new Nexo.Domain.Catalogos.Entidades.clsRuta { Origen = "Cali", Destino = "Barranquilla" },
+            clsConfiguracionVehiculo = new Nexo.Domain.Catalogos.Entidades.clsConfiguracionVehiculo { TipoVehiculo = "3S3" },
+        };
+        var rechazadas = new[] { new Nexo.Application.CasosDeUso.Cotizaciones.DTOs.clsLineaRechazadaInfo("Bogotá → Cali", "Contenedor", "Sin tarifa", "2S2") };
+
+        var (contenido, _) = new clsExportadorCotizacionExcelClosedXml().Generar(cotizacion, rechazadas);
+
+        using var wb = new XLWorkbook(new MemoryStream(contenido));
+        var ws = wb.Worksheet("Cotización");
+        var encabezado = ws.Rows().First(r => r.Cell(1).GetString() == "Ruta");
+        var columnaVehiculo = encabezado.CellsUsed().Single(c => c.GetString() == "Vehículo").Address.ColumnNumber;
+        Assert.DoesNotContain(ws.CellsUsed(), c => c.GetString() is "clsRuta" or "clsCliente");
+        Assert.Equal("3S3", ws.Cell(encabezado.RowNumber() + 1, columnaVehiculo).GetString());
+        Assert.Equal("2S2", ws.Cell(encabezado.RowNumber() + 2, columnaVehiculo).GetString());
+    }
+
+    [Fact]
+    public void Una_linea_sin_vehiculo_muestra_un_guion_en_esa_columna()
+    {
+        var cotizacion = NuevaCotizacionConUnaLinea(1_000_000m, null, null);
+
+        var (contenido, _) = new clsExportadorCotizacionExcelClosedXml().Generar(cotizacion);
+
+        using var wb = new XLWorkbook(new MemoryStream(contenido));
+        var ws = wb.Worksheet("Cotización");
+        var encabezado = ws.Rows().First(r => r.Cell(1).GetString() == "Ruta");
+        var columnaVehiculo = encabezado.CellsUsed().Single(c => c.GetString() == "Vehículo").Address.ColumnNumber;
+        Assert.Equal("—", ws.Cell(encabezado.RowNumber() + 1, columnaVehiculo).GetString());
     }
 
     [Fact]
@@ -49,7 +85,7 @@ public class clsExportadorCotizacionExcelTests
 
         using var wb = new XLWorkbook(new MemoryStream(contenido));
         var ws = wb.Worksheet("Cotización");
-        var filaEncabezado = ws.Rows().First(r => r.Cell(1).GetString() == "clsRuta");
+        var filaEncabezado = ws.Rows().First(r => r.Cell(1).GetString() == "Ruta");
         var columnaFlete = filaEncabezado.CellsUsed().Single(c => c.GetString() == "Flete").Address.ColumnNumber;
         var valorFlete = ws.Cell(filaEncabezado.RowNumber() + 1, columnaFlete).GetValue<decimal>();
 
@@ -64,7 +100,7 @@ public class clsExportadorCotizacionExcelTests
 
         using var wb = new XLWorkbook(new MemoryStream(contenido));
         var ws = wb.Worksheet("Cotización");
-        var filaEncabezado = ws.Rows().First(r => r.Cell(1).GetString() == "clsRuta");
+        var filaEncabezado = ws.Rows().First(r => r.Cell(1).GetString() == "Ruta");
         var columnaFlete = filaEncabezado.CellsUsed().Single(c => c.GetString() == "Flete").Address.ColumnNumber;
         var valorFlete = ws.Cell(filaEncabezado.RowNumber() + 1, columnaFlete).GetValue<decimal>();
 
