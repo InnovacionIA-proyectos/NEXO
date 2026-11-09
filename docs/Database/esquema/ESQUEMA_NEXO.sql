@@ -2,6 +2,8 @@
 -- Esquema de base de datos de NEXO (SQL Server 2019)
 -- =============================================================================
 -- Base: dbTarifario_Nexo_Pruebas   Esquema: dbo   Servidor: 10.10.40.85,1433
+-- Hoy QA todavía opera en dbInformesAutomatizados_Pruebas, esquema db_NEXO, con esta
+-- misma estructura; el corte a la base propia está pendiente (#428). Ver README («Ambientes»).
 --
 -- Este archivo es la única definición del esquema. El proyecto no usa migraciones
 -- de EF Core: se ejecuta completo, una sola vez, contra una base vacía. Un cambio de
@@ -12,7 +14,8 @@
 --   py scripts/ejecutar_schema_y_seeders.py --server 10.10.40.85,1433
 -- (crea las tablas y carga los datos iniciales; ver ../README.md).
 --
--- La aplicación lee el esquema de la variable Database__Esquema, que debe valer dbo.
+-- La aplicación lee el esquema de la variable Database__Esquema: dbo en la base propia,
+-- db_NEXO en el QA actual.
 --
 -- Orden del archivo:
 --   1. Tablas, agrupadas por módulo, cada una con un comentario de su objetivo.
@@ -119,7 +122,7 @@ CREATE TABLE [dbo].[tbl_configuraciones_vehiculo] (
 -- (tblSAPClaseContenedor). TipoElemento distingue los dos catálogos porque
 -- Codigo no es una FK — es texto, para no depender de una fila específica de
 -- tbl_configuraciones_vehiculo (esa tabla no tiene una fila "oficial" única
--- por tipo, ver ../documentacion/ORIGEN-Y-DECISIONES-SEEDER.md).
+-- por tipo, ver docs/documentacion/database/ORIGEN-Y-DECISIONES-SEEDER.md).
 CREATE TABLE [dbo].[tbl_alias_elementos] (
     [Id] uniqueidentifier NOT NULL,
     [Alias] nvarchar(100) NOT NULL,
@@ -248,8 +251,8 @@ CREATE TABLE [dbo].[tbl_municipios] (
 -- Catálogo CRUD propio de bandas de peso (kg) para el formulario de Tarifas de
 -- Plaza — reemplaza el número libre del sistema externo. Poblada
 -- inicialmente con las bandas de negocio de ../seeder/pesos.csv
--- (no por migración de EF Core). El CRUD (crear/editar/eliminar/listar) es
--- trabajo pendiente de backend, no está en este repo todavía.
+-- (no por migración de EF Core). Se administra desde /api/pesos (crear, editar,
+-- eliminar y listar).
 -- PesoMaximo NULL = banda abierta (PBV +10500).
 CREATE TABLE [dbo].[tbl_pesos] (
     [Id] int NOT NULL IDENTITY,
@@ -322,14 +325,10 @@ CREATE TABLE [dbo].[tbl_tipos_carroceria_catalogo] (
 -- ServiciosLogisticos/AdminTarifas/Admin.
 --
 -- Reestructurada para unificar en una sola tabla dos categorías
--- con dimensiones de precio distintas (antes solo tenía Nombre+ValorBase de
--- valor único): Servicios Logísticos (Almacenamiento por ciudad; ITR por
--- puerto+tipo de máquina+movimiento) y Servicios Adicionales (por ruta, o por
--- origen-destino, según el servicio). Los 10 servicios ya sembrados de valor
--- único (Cargue, Descargue, Stand-by, Candado satelital, Almacenamiento,
--- Distribución multipunto, ITR, Escolta, Reexpedición, Montacargas) siguen
--- funcionando igual: son su propia variante "genérica" dentro de esta misma
--- tabla, con 'NO APLICA' en las columnas de dimensión que no les aplican.
+-- con dimensiones de precio distintas: Servicios Logísticos (Almacenamiento por
+-- ciudad; ITR por puerto+tipo de máquina+movimiento) y Servicios Adicionales (por
+-- ruta, o por origen-destino, según el servicio). Las columnas de dimensión que no
+-- le aplican a un servicio llevan 'NO APLICA'.
 --
 -- Origen/Destino son texto plano (NO FK a tbl_municipios): cuando el nombre
 -- del Excel de costos cruza con un municipio real se guarda su nombre
@@ -497,7 +496,7 @@ CREATE TABLE [dbo].[tbl_cotizacion_lineas] (
 );
 
 -- Servicio conexo aplicado a una cotización, con la cantidad y el valor que
--- realmente se cobró (puede diferir del ValorBase del catálogo).
+-- realmente se cobró (puede diferir del costo y del precio de venta del catálogo).
 CREATE TABLE [dbo].[tbl_cotizacion_conexos] (
     [Id] uniqueidentifier NOT NULL,
     [CotizacionId] uniqueidentifier NOT NULL,
@@ -570,7 +569,7 @@ CREATE TABLE [dbo].[tbl_ajustes_vigencia_plaza] (
 
 -- Tarifa de plaza gobernada por Nexo — recrea el formulario de
 -- captura que hoy vive en un sistema externo; NO es una copia de solo lectura
--- de tblSAPTarifas (a diferencia de tbl_tarifas_sicetac).
+-- de tblSAPTarifas.
 --
 -- Origen/Destino referencian el catálogo propio de municipios
 -- (tbl_municipios). RangoPeso (PesoId, catálogo tbl_pesos) y TipoVehiculo
@@ -950,8 +949,9 @@ CREATE TABLE [dbo].[OutboxState] (
 );
 
 -- --- Libro de control de EF Core ------------------------------------------------------
--- Qué migraciones ya se aplicaron contra esta base. La mantiene EF Core solo
--- (dotnet ef / Database.Migrate) — nunca se edita a mano.
+-- Tabla heredada de cuando NEXO usaba migraciones de EF Core. Hoy no hay migraciones:
+-- el esquema se aplica con este archivo y la aplicación no usa esta tabla. Se conserva
+-- vacía por compatibilidad; no se edita a mano.
 CREATE TABLE [dbo].[__EFMigrationsHistory] (
     [MigrationId] nvarchar(150) NOT NULL,
     [ProductVersion] nvarchar(32) NOT NULL,

@@ -18,7 +18,7 @@ archivo a mano. Los Excel de negocio se guardan fuera del repositorio.
 | `reglas_solo_sicetac.csv` | `tbl_reglas_solo_sicetac` | 260 | `FLETES PLAZA.xlsx`, celdas marcadas «sice» |
 | `tarifas_plaza.csv` | `tbl_tarifas_plaza` | 107 | `FLETES PLAZA.xlsx`, hoja «Fletes puertos» |
 | `servicios_conexos.csv` | `tbl_servicios_conexos` | 1.336 | Excel de costos de conexos 2026 |
-| `alias_elementos.csv` | `tbl_alias_elementos` | 71 | Diccionario de configuraciones de vehículo de negocio |
+| `alias_elementos.csv` | `tbl_alias_elementos` | 86 | Diccionario de configuraciones de vehículo de negocio, más 15 alias de la limpieza de la bandeja (#442) |
 | `mapeo_vehiculos.csv` | `tbl_mapeo_vehiculo_tarifario` | 15 | Revisión de cada vehículo contra SICE-TAC y Plaza/SAP |
 | `rangos_peso_contenedor.csv` | `tbl_rangos_peso_contenedor` | 10 | Rangos de peso de contenedores de negocio |
 | `tipos_carroceria_catalogo.csv` | `tbl_tipos_carroceria_catalogo` | 17 | Catálogo de carrocerías del Cubicador (mismos Id) |
@@ -133,12 +133,19 @@ pero como el proyecto no usa migraciones, nunca se insertan solas.
   con el código oficial de su columna.
 - Un solo diccionario para vehículo y contenedor, con `TipoElemento` para distinguirlos.
 - `Codigo` es texto, no llave foránea. Para vehículo es el código que comparten NEXO y el Cubicador
-  (`2L2` Turbo, `C2` Sencillo, `C3` Dobletroque, `2S2` Minimula, `3S3` Tractomula); para contenedor,
-  el de `tblSAPClaseContenedor` (`CNT40.HC`, `CNT20.ST`).
+  (`2L2` Turbo, `C2` Sencillo, `C3` Dobletroque, `2S2` Minimula, `3S3` Tractomula) o cualquier otro
+  código de `tbl_mapeo_vehiculo_tarifario` (`2L3`, `3S2`, `2S3`, `CA_`, `V2`…); para contenedor, el de
+  `tblSAPClaseContenedor` (`CNT40.HC`, `CNT20.ST`).
 - `AliasNormalizado` es la clave de comparación (única): mayúsculas, sin tildes, `_` y `-` como
   espacio, con el mismo algoritmo que usa el backend al capturar.
-- 71 alias (48 de vehículo y 23 de contenedor), sin choques entre columnas. Se conservan «40» y «20»
+- 86 alias (63 de vehículo y 23 de contenedor), sin choques entre columnas. Se conservan «40» y «20»
   a secas porque así vienen en el diccionario.
+- Los últimos 15 salen de la limpieza de la bandeja de cuarentena del 2026-11-09 (#442): textos
+  reales de clientes («Tractomula 3S3», «Sencillo C2», «Camioneta»…), los códigos SAP «2» y «3»
+  (C2 y C3) y los códigos de NEXO que no están en SAP (`2L3`, `3S2`, `2S3`, `2_5`, `V2`, `V3`,
+  `V4`) como alias de sí mismos.
+- Los alias «2L3 Liviano entre 7.5 y 8 Ton/Tonel.» y «Camion dos ejes - Livianos PBV 7500-8000 Kg»
+  apuntan a `2L2`, como venían del diccionario de negocio; se dejaron así a propósito.
 
 ## Mapeo de vehículos (`mapeo_vehiculos.csv`)
 

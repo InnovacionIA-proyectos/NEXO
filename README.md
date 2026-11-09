@@ -115,7 +115,7 @@ cd cubicador && pytest
 ## Documentación adicional
 
 - [`docs/README.md`](docs/README.md) — índice de toda la documentación.
-- [`docs/Database/`](docs/Database/) — esquema, datos iniciales, script para crear la base y diccionario de datos.
+- [`docs/Database/`](docs/Database/) — esquema, datos iniciales y script para crear la base. El diccionario de datos está en [`docs/documentacion/database/`](docs/documentacion/database/).
 - [`docs/mensajeria/`](docs/mensajeria/) — topología RabbitMQ/MassTransit.
 - [`docs/decisiones/`](docs/decisiones/) — decisiones de diseño.
 - [`cubicador/README.md`](cubicador/README.md) — detalle del microservicio de cubicación.

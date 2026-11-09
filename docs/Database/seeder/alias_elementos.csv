@@ -70,3 +70,18 @@ Camión tres ejes,CAMION TRES EJES,Vehiculo,C3,true
 "x20""","X20""",Contenedor,CNT20.ST,true
 "20""","20""",Contenedor,CNT20.ST,true
 20,20,Contenedor,CNT20.ST,true
+2,2,Vehiculo,C2,true
+Sencillo C2,SENCILLO C2,Vehiculo,C2,true
+3,3,Vehiculo,C3,true
+Tractomula 3S3,TRACTOMULA 3S3,Vehiculo,3S3,true
+Tractomula 3S2,TRACTOMULA 3S2,Vehiculo,3S2,true
+3S2,3S2,Vehiculo,3S2,true
+Mini Mula 2S2,MINI MULA 2S2,Vehiculo,2S2,true
+Mini Mula 2S3,MINI MULA 2S3,Vehiculo,2S3,true
+2S3,2S3,Vehiculo,2S3,true
+Camioneta,CAMIONETA,Vehiculo,CA_,true
+2L3,2L3,Vehiculo,2L3,true
+2_5,2 5,Vehiculo,2_5,true
+V2,V2,Vehiculo,V2,true
+V3,V3,Vehiculo,V3,true
+V4,V4,Vehiculo,V4,true

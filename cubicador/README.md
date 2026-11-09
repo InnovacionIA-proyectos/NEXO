@@ -62,7 +62,7 @@ Ver:
 - El port completo del motor (`domain/motor/*`) — las 31 reglas de
   `docs/testDocumentation/REGLAS_DE_NEGOCIO.md` pasan sin ajustes.
 - El flujo completo API → Application → Infrastructure → Domain contra
-  SQLite: crear vehículo (con siembra de los 9 presets) → crear plan → agregar
+  SQLite: crear vehículo (con siembra de los 10 presets) → crear plan → agregar
   ítem → optimizar → leer resultado → ajustar manualmente una colocación. Ver
   `tests/api/test_smoke.py`.
 - Autenticación por Bearer estático rechazando llamadas sin la key.

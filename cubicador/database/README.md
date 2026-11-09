@@ -10,6 +10,22 @@ tablas está en [`../docs/database/`](../docs/database/).
 | Esquema | `dbo` |
 | Tablas | 16: catálogo, recomendación y motor 3D |
 
+## Dónde vive hoy
+
+La base propia ya está creada, pero el ambiente de QA todavía no se ha pasado a ella. Ese corte
+está pendiente en la issue #423.
+
+| Ambiente | Base | Esquema | Estado |
+|---|---|---|---|
+| QA desplegado | `dbTarifario_Nexo_Pruebas` | `dbo_cubicador` | En uso, con `CUBICADOR_DB_ESQUEMA=dbo_cubicador` explícita. Se creó con scripts anteriores; su estructura es igual a la de `esquema/ESQUEMA_CUBICADOR.sql` (solo cambian los nombres generados de algunas PK, FK e índices). |
+| Base propia (#327) | `dbCubicador_Pruebas` | `dbo` | Creada con el esquema y el catálogo de esta carpeta. La aplicación todavía no la usa. |
+| Local y CI | contenedor de `docker-compose.yml` | `dbo` | Se crea en cada arranque. |
+
+Las tablas `planes_cargue`, `items_plan_cargue`, `colocaciones_cargue` y `vehiculos_cubicacion` que
+hay en `dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba` **no son del Cubicador**: son tablas
+antiguas de NEXO con el mismo nombre (ver `docs/Database/esquema/ESQUEMA_NEXO.sql` en la raíz del
+repositorio).
+
 ## Contenido de la carpeta
 
 | Ruta | Qué es |

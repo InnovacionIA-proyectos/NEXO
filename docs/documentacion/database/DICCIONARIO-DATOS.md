@@ -1,9 +1,11 @@
 # Diccionario de datos de NEXO
 
-Qué guarda cada una de las 46 tablas de la base de NEXO (`dbTarifario_Nexo_Pruebas`, esquema `dbo`), qué significa cada columna, sus llaves e índices y de dónde salen sus datos.
+Qué guarda cada una de las 46 tablas de la base de NEXO, qué significa cada columna, sus llaves e índices y de dónde salen sus datos.
+
+> **Dónde viven:** la base propia es `dbTarifario_Nexo_Pruebas` (esquema `dbo`), pero el ambiente de QA todavía opera en `dbInformesAutomatizados_Pruebas`, esquema `db_NEXO`, con la misma estructura. El corte está pendiente en la issue #428. Detalle en [`docs/Database/README.md`](../../Database/README.md#ambientes).
 
 - **Fuente:** `docs/Database/esquema/ESQUEMA_NEXO.sql`. Tipos, nulos, valores por defecto, índices y `CHECK` corresponden a ese archivo.
-- **Esquema:** la aplicación lo lee de la variable `Database__Esquema` (`dbo`).
+- **Esquema:** la aplicación lo lee de la variable `Database__Esquema` (`dbo` en la base propia, `db_NEXO` en el QA actual).
 - **Sin migraciones:** el esquema se crea con `ESQUEMA_NEXO.sql` y los datos iniciales se cargan desde `docs/Database/seeder/` (ver `ORIGEN-Y-DECISIONES-SEEDER.md`). Las filas que el modelo declara con `HasData` (usuario de sistema, mapeo de roles del portal, parámetros del score) se insertan con `docs/Database/seeder/datos_base_nexo.sql`.
 - **Sin datos reales:** el repositorio es público; aquí solo hay estructura y significado.
 
@@ -156,6 +158,7 @@ Qué guarda cada una de las 46 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 
 **De dónde salen los datos:**
 - **Se crea al capturar una solicitud** (`clsResolucionDeCliente`): si el cliente no existe por NIT, se trae del Data Warehouse corporativo (`clsClientesDwAdapter`, solo lectura) y se copia aquí.
+- **También se crea por NIT** (`clsClienteDeImportacion`) al guardar algo propio del cliente: un término del diccionario (#435), una plantilla de mapeo o un formato de lectura (#433). El NIT tiene que existir en el DW de clientes o en el de prospectos; si no, `400 CLIENTE_NIT_INVALIDO`. Las lecturas solo buscan: no crean.
 - No hay endpoint de alta manual directa.
 - `clsDataSeeder.cs` siembra clientes de demostración solo en ambientes locales.
 
@@ -233,7 +236,7 @@ Qué guarda cada una de las 46 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 **FK entrantes:** ninguna.
 
 **De dónde salen los datos:**
-- Carga inicial: `docs/Database/seeder/alias_elementos.csv` (71 filas).
+- Carga inicial: `docs/Database/seeder/alias_elementos.csv` (86 filas: 63 de vehículo y 23 de contenedor).
 - Se amplía desde la API (`clsAliasCommands`) y desde la bandeja de normalización de vehículos.
 
 ---
@@ -266,7 +269,7 @@ Qué guarda cada una de las 46 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 **FK entrantes:** ninguna.
 
 **De dónde salen los datos:**
-- CRUD en `/api/diccionario-cliente` (`clsDiccionarioClienteCasosDeUso`).
+- CRUD en `/api/diccionario-cliente` (`clsDiccionarioClienteCasosDeUso`). El cliente se indica con `clienteId` o con `clienteNit` (#435); un término repetido para el mismo cliente, tipo y contexto responde `409 TERMINO_DUPLICADO`, también si llegan dos pedidos a la vez.
 - Carga inicial (S6-HU-33.2): `docs/Database/seeder/diccionario_cliente.csv`, 27 términos generales (`ClienteId` `NULL`). Ver `ORIGEN-Y-DECISIONES-SEEDER.md`.
 - Confirmar un mapeo de Excel **no** agrega términos aquí automáticamente.
 

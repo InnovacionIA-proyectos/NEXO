@@ -65,7 +65,7 @@ cubicador/
   infrastructure/
     persistence/
       db.py                     # engine/sesion SQLAlchemy async (esquema de CUBICADOR_DB_ESQUEMA)
-      modelos.py                 # las 5 tablas del motor 3D - DDL en docs/Database/
+      modelos.py                 # las 5 tablas del motor 3D y iaSombra - DDL en database/esquema/ESQUEMA_CUBICADOR.sql
       modelos_catalogo.py         # las 10 tablas del catalogo (S5-HU-17.2). MetaData
                                    # PROPIO: las administra el equipo de Datos, el
                                    # Cubicador no las crea ni las altera.
@@ -96,7 +96,7 @@ tests/
   api/
     test_smoke.py                    # flujo end-to-end contra SQLite
 scripts/
-  aplicar_sql.py                      # aplica los .sql de docs/Database/ (corta por GO)
+  aplicar_sql.py                      # aplica scripts .sql (corta por GO); el esquema vigente es database/esquema/ESQUEMA_CUBICADOR.sql
   verificar_mapeo_catalogo.py          # compara modelos_catalogo.py contra sys.columns
                                         # del esquema REAL. Las pruebas corren contra
                                         # SQLite y no pueden ver esa divergencia.
