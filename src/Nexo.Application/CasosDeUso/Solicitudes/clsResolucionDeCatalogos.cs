@@ -51,29 +51,69 @@ public static class clsResolucionDeCatalogos
     }
 
     /// <summary>
-    /// Busca la ruta en el diccionario cargado o la crea. Si el frontend resolvió Origen/Destino con el buscador de ciudades, los ids de
-    /// municipio se guardan en la ruta (también sobre una existente); null si la línea no los trae.
+    /// Busca la ruta en el diccionario cargado o la crea. Con los ids de municipio que el frontend resolvió con el buscador de ciudades se busca
+    /// primero por municipios y después por texto; por texto solo se completan los ids que la ruta tiene vacíos, nunca se cambian los que ya tiene
+    /// (un mismo nombre existe en varios departamentos). Una ruta nueva con id toma su nombre del municipio del catálogo
+    /// (<paramref name="municipios"/>, por id).
     /// </summary>
     public static (clsRuta clsRuta, bool Creada) ResolverRuta(
         string origen, string destino, IDictionary<string, clsRuta> rutasPorClave, IRutasCatalogoPort catalogo,
-        int? origenMunicipioId = null, int? destinoMunicipioId = null)
+        int? origenMunicipioId = null, int? destinoMunicipioId = null, IReadOnlyDictionary<int, clsMunicipio>? municipios = null)
     {
-        var clave = ClaveRuta(origen, destino);
-        if (rutasPorClave.TryGetValue(clave, out var ruta))
+        if (origenMunicipioId is not null && destinoMunicipioId is not null)
         {
-            if (origenMunicipioId is not null) ruta.OrigenMunicipioId = origenMunicipioId;
-            if (destinoMunicipioId is not null) ruta.DestinoMunicipioId = destinoMunicipioId;
+            var porMunicipios = rutasPorClave.Values.FirstOrDefault(r =>
+                r.OrigenMunicipioId == origenMunicipioId && r.DestinoMunicipioId == destinoMunicipioId);
+            if (porMunicipios is not null) return (porMunicipios, false);
+        }
+
+        var nombreOrigen = NombreDelMunicipio(origenMunicipioId, municipios) ?? Limpiar(origen)!;
+        var nombreDestino = NombreDelMunicipio(destinoMunicipioId, municipios) ?? Limpiar(destino)!;
+
+        var clave = ClaveRuta(origen, destino);
+        if (!rutasPorClave.TryGetValue(clave, out var ruta))
+            rutasPorClave.TryGetValue(ClaveRuta(nombreOrigen, nombreDestino), out ruta);
+
+        if (ruta is not null)
+        {
+            ruta.OrigenMunicipioId ??= origenMunicipioId;
+            ruta.DestinoMunicipioId ??= destinoMunicipioId;
             return (ruta, false);
         }
 
         ruta = new clsRuta
         {
-            Origen = Limpiar(origen)!, Destino = Limpiar(destino)!,
+            Origen = nombreOrigen, Destino = nombreDestino,
             OrigenMunicipioId = origenMunicipioId, DestinoMunicipioId = destinoMunicipioId,
         };
         catalogo.Agregar(ruta);
         rutasPorClave[clave] = ruta;
+        rutasPorClave[ClaveRuta(nombreOrigen, nombreDestino)] = ruta;
         return (ruta, true);
+    }
+
+    private static string? NombreDelMunicipio(int? id, IReadOnlyDictionary<int, clsMunicipio>? municipios) =>
+        id is { } i && municipios is not null && municipios.TryGetValue(i, out var m) ? Limpiar(m.Municipio) : null;
+
+    /// <summary>
+    /// Los municipios de los ids que traen las líneas, por id; null si ninguna trae ids. 400 <c>MUNICIPIO_NO_ENCONTRADO</c> si algún id no
+    /// está en el catálogo.
+    /// </summary>
+    public static async Task<IReadOnlyDictionary<int, clsMunicipio>?> CargarMunicipiosAsync(
+        IMunicipiosRepository repositorio, IEnumerable<(int Linea, int? OrigenId, int? DestinoId)> lineas, CancellationToken ct)
+    {
+        var pedidas = lineas.ToList();
+        if (pedidas.All(l => l.OrigenId is null && l.DestinoId is null)) return null;
+
+        var catalogo = (await repositorio.ListarAsync(ct)).ToDictionary(m => m.Id);
+        foreach (var (linea, origenId, destinoId) in pedidas)
+        {
+            if (origenId is { } o && !catalogo.ContainsKey(o))
+                throw new Common.Exceptions.clsValidationFailedException("MUNICIPIO_NO_ENCONTRADO", $"Línea {linea}: el municipio de origen {o} no existe en el catálogo.");
+            if (destinoId is { } d && !catalogo.ContainsKey(d))
+                throw new Common.Exceptions.clsValidationFailedException("MUNICIPIO_NO_ENCONTRADO", $"Línea {linea}: el municipio de destino {d} no existe en el catálogo.");
+        }
+        return catalogo;
     }
 
     /// <summary>
