@@ -81,16 +81,19 @@ public static class clsResolucionDeCatalogos
     /// la equivalencia con un código canónico del Cubicador la decide un humano. Antes se consulta <paramref name="aliasVehiculo"/>
     /// (<c>AliasNormalizado → código</c>): si el texto es un alias ("TB", "Turbo" → 2L2) se usa el CÓDIGO, la fila nace oficial y una fila en
     /// cuarentena con ese código y carrocería se promueve (no si alguien la descartó). La carrocería no se toca.
+    /// Un tipo que es un código de la tabla de traducción (<paramref name="oficialidad"/>) cuenta igual que un alias, pero solo con la carrocería
+    /// vacía o del catálogo: con otra, la configuración nace en cuarentena como un texto libre.
     /// </summary>
     public static (clsConfiguracionVehiculo? Vehiculo, bool Creado) ResolverVehiculo(
         string? tipoVehiculo, string? carroceria,
         IDictionary<string, clsConfiguracionVehiculo> vehiculosPorClave, IConfiguracionesVehiculoPort catalogo,
-        IReadOnlyDictionary<string, string>? aliasVehiculo = null)
+        IReadOnlyDictionary<string, string>? aliasVehiculo = null, Catalogos.clsOficialidadDeVehiculos? oficialidad = null)
     {
         if (string.IsNullOrWhiteSpace(tipoVehiculo)) return (null, false);
 
         string? codigoAlias = null;
         if (aliasVehiculo is not null && aliasVehiculo.TryGetValue(Normalizar(tipoVehiculo), out var codigo)) codigoAlias = codigo;
+        codigoAlias ??= oficialidad?.CodigoOficial(tipoVehiculo, carroceria);
         var tipo = codigoAlias ?? tipoVehiculo;
 
         var clave = ClaveVehiculo(tipo, carroceria);

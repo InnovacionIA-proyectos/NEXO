@@ -19,7 +19,7 @@ public sealed record clsResolverCatalogosDeLineasCommand(IReadOnlyList<clsResolv
 
 /// <summary>Resuelve texto libre (origen/destino/vehículo) a RutaId/ConfigVehiculoId creando lo que falte, SIN crear solicitud; alimenta a lineas:bulk, que exige estos ids ya resueltos.</summary>
 public sealed class clsResolverCatalogosDeLineasCommandHandler(
-    IRutasCatalogoPort rutasCatalogo, IConfiguracionesVehiculoPort vehiculosCatalogo, IAliasCatalogoPort aliasCatalogo, IUnitOfWork uow)
+    IRutasCatalogoPort rutasCatalogo, IConfiguracionesVehiculoPort vehiculosCatalogo, IAliasCatalogoPort aliasCatalogo, IVehiculosNexoPort vehiculosNexo, IUnitOfWork uow)
     : ICommandHandler<clsResolverCatalogosDeLineasCommand, IReadOnlyList<clsCatalogoLineaResueltoDto>>
 {
     public async Task<IReadOnlyList<clsCatalogoLineaResueltoDto>> Handle(
@@ -35,6 +35,7 @@ public sealed class clsResolverCatalogosDeLineasCommandHandler(
         var vehiculos = await vehiculosCatalogo.ListarAsync(ct);
         var vehiculosPorClave = clsResolucionDeCatalogos.IndexarVehiculosPorClave(vehiculos);
         var aliasVehiculo = await aliasCatalogo.MapaActivoAsync(clsAliasElemento.TipoVehiculo, ct);
+        var oficialidad = await Catalogos.clsOficialidadDeVehiculos.CargarAsync(vehiculosNexo, ct);
 
         var resultado = new List<clsCatalogoLineaResueltoDto>(command.Lineas.Count);
         for (var i = 0; i < command.Lineas.Count; i++)
@@ -46,7 +47,7 @@ public sealed class clsResolverCatalogosDeLineasCommandHandler(
 
             var (ruta, rutaCreada) = clsResolucionDeCatalogos.ResolverRuta(lr.Origen, lr.Destino, rutasPorClave, rutasCatalogo);
             var (vehiculo, vehiculoCreado) = clsResolucionDeCatalogos.ResolverVehiculo(
-                lr.TipoVehiculo, lr.Carroceria, vehiculosPorClave, vehiculosCatalogo, aliasVehiculo);
+                lr.TipoVehiculo, lr.Carroceria, vehiculosPorClave, vehiculosCatalogo, aliasVehiculo, oficialidad);
 
             resultado.Add(new clsCatalogoLineaResueltoDto(i, ruta.Id, vehiculo?.Id, rutaCreada, vehiculoCreado));
         }

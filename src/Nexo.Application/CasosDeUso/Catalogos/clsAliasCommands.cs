@@ -26,11 +26,14 @@ internal static class clsAliasReglas
 
     /// <summary>El código oficial (mayúscula canónica) si el diccionario lo acepta para ese tipo; null si no. Evita que un typo cree un alias hacia un tipo inexistente.</summary>
     public static async Task<string?> CodigoValidoAsync(
-        string tipo, string codigo, IAliasCatalogoPort alias, ITiposVehiculoPort tiposVehiculo, CancellationToken ct)
+        string tipo, string codigo, IAliasCatalogoPort alias, ITiposVehiculoPort tiposVehiculo, IVehiculosNexoPort vehiculosNexo, CancellationToken ct)
     {
         var validos = new List<string>(await alias.ListarCodigosAsync(tipo, ct));
         if (tipo == clsAliasElemento.TipoVehiculo)
+        {
             validos.AddRange((await tiposVehiculo.ListarAsync(ct)).Select(t => t.Codigo.Trim()));
+            validos.AddRange((await vehiculosNexo.ListarCodigosAsync(ct)).Select(c => c.Codigo.Trim()));
+        }
         else
             validos.AddRange(clsResolucionDeCatalogos.CodigosClaseContenedor);
         return validos.FirstOrDefault(v => v.Equals(codigo, StringComparison.OrdinalIgnoreCase));
@@ -75,6 +78,7 @@ public sealed record clsCrearAliasCommand(string? Tipo, string? Alias, string? C
 public sealed class clsCrearAliasCommandHandler(
     IAliasCatalogoPort alias,
     ITiposVehiculoPort tiposVehiculo,
+    IVehiculosNexoPort vehiculosNexo,
     IAuditoriaPort auditoria,
     Common.ICurrentUserPort usuarioActual,
     IUnitOfWork uow)
@@ -94,7 +98,7 @@ public sealed class clsCrearAliasCommandHandler(
         var codigoTexto = clsTexto.Limpiar(command.Codigo);
         if (codigoTexto is null || codigoTexto.Length > clsAliasReglas.MaxCodigo)
             throw new clsValidationFailedException("CODIGO_NO_RECONOCIDO", "Indica el código oficial al que apunta el alias.");
-        var codigo = await clsAliasReglas.CodigoValidoAsync(tipo, codigoTexto, alias, tiposVehiculo, ct)
+        var codigo = await clsAliasReglas.CodigoValidoAsync(tipo, codigoTexto, alias, tiposVehiculo, vehiculosNexo, ct)
             ?? throw new clsValidationFailedException("CODIGO_NO_RECONOCIDO",
                 $"'{codigoTexto}' no es un código oficial de {tipo.ToLowerInvariant()}.");
 
