@@ -98,7 +98,7 @@ foreach (var caso in casos)
     IConversacionIaPort puerto = autoprueba ? new clsModeloInfractor(caso, piso, proponer) : adaptador!;
     var handler = new clsConversarAsistenteCommandHandler(
         puerto, conversaciones, new clsHerramientasDelAsistente(todas, usuario),
-        usuario, new clsLimitesAsistente(), contexto, preferencias);
+        usuario, new clsLimitesAsistente(), contexto, preferencias, new clsSinContextoPantalla());
 
     var fila = new Dictionary<string, object?> { ["id"] = id, ["regla"] = caso.GetProperty("regla").GetString() };
     try

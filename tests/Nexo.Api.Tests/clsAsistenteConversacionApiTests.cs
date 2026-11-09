@@ -33,6 +33,8 @@ public class clsAsistenteConversacionApiTests(clsApiFixture fx) : IDisposable
     private const string Ruta = "/api/asistente/conversaciones";
 
     private readonly List<Guid> _usuarios = [];
+    private readonly List<Guid> _solicitudes = [];
+    private readonly DateTimeOffset _inicio = DateTimeOffset.UtcNow.AddMinutes(-1);
     private readonly List<WebApplicationFactory<clsProgram>> _fabricas = [];
 
     // ------------------------------------------------------------ armado
@@ -114,6 +116,8 @@ public class clsAsistenteConversacionApiTests(clsApiFixture fx) : IDisposable
     public void Dispose()
     {
         foreach (var f in _fabricas) f.Dispose();
+        var datos = new clsDatosDePrueba(fx);
+        foreach (var id in _solicitudes) datos.Eliminar(id, _inicio);
         fx.WithDb(db =>
         {
             db.UsosHerramientaAsistente.Where(h => db.ConversacionesAsistente.Any(c => c.Id == h.ConversacionId && _usuarios.Contains(c.UsuarioId))).ExecuteDelete();
@@ -123,6 +127,63 @@ public class clsAsistenteConversacionApiTests(clsApiFixture fx) : IDisposable
             db.Usuarios.Where(u => _usuarios.Contains(u.Id)).ExecuteDelete();
             return 0;
         });
+    }
+
+    // ------------------------------------------------------------ contexto de pantalla
+
+    private async Task<(Guid Solicitud, Guid Cotizacion)> SolicitudConCotizacion()
+    {
+        var admin = fx.Client();
+        var crear = await admin.PostJson("/api/solicitudes", new
+        {
+            clienteId = fx.AnyClienteId(), tipo = "spot", linea = new { tipologia = "CargaSeca", peso = 10000 },
+        });
+        var solicitud = (await crear.Json()).GetProperty("id").GetGuid();
+        _solicitudes.Add(solicitud);
+        var cotizacion = (await (await admin.PostJson("/api/cotizaciones", new { solicitudId = solicitud })).Json()).GetProperty("id").GetGuid();
+        return (solicitud, cotizacion);
+    }
+
+    [Fact]
+    public async Task El_contexto_de_pantalla_valido_llega_al_modelo_como_dato_despues_de_las_reglas()
+    {
+        var yo = NuevoUsuario();
+        var (solicitud, cotizacion) = await SolicitudConCotizacion();
+        var modelo = Modelo((_, _, _) => Dice("Listo"));
+        var c = ClienteDe(Fabrica(modelo), "AdminTarifas", yo);
+
+        var (estado, _, _) = await Enviar(c, new { mensaje = "¿Cómo va esta cotización?", contexto = new { solicitudId = solicitud, cotizacionId = cotizacion } });
+
+        Assert.Equal(HttpStatusCode.OK, estado);
+        var instrucciones = Assert.Single(modelo.Peticiones).Instrucciones;
+        Assert.StartsWith(clsInstruccionesAsistente.Texto, instrucciones);
+        Assert.Contains($"- solicitudId: {solicitud}", instrucciones);
+        Assert.Contains($"- cotizacionId: {cotizacion}", instrucciones);
+    }
+
+    [Fact]
+    public async Task Un_contexto_que_no_es_de_la_solicitud_o_no_existe_se_rechaza_antes_de_llamar_al_modelo()
+    {
+        var yo = NuevoUsuario();
+        var (solicitud, _) = await SolicitudConCotizacion();
+        var (_, cotizacionAjena) = await SolicitudConCotizacion();
+        var modelo = Modelo((_, _, _) => Dice("Listo"));
+        var c = ClienteDe(Fabrica(modelo), "AdminTarifas", yo);
+
+        var inexistente = await c.PostAsJsonAsync($"{Ruta}/mensajes", new { mensaje = "hola", contexto = new { solicitudId = Guid.NewGuid() } });
+        Assert.Equal(HttpStatusCode.NotFound, inexistente.StatusCode);
+        Assert.Equal("SOLICITUD_NO_ENCONTRADA", await inexistente.ErrorCode());
+
+        var ajena = await c.PostAsJsonAsync($"{Ruta}/mensajes", new { mensaje = "hola", contexto = new { solicitudId = solicitud, cotizacionId = cotizacionAjena } });
+        Assert.Equal(HttpStatusCode.BadRequest, ajena.StatusCode);
+        Assert.Equal("CONTEXTO_INVALIDO", await ajena.ErrorCode());
+
+        var lineaAjena = await c.PostAsJsonAsync($"{Ruta}/mensajes", new { mensaje = "hola", contexto = new { solicitudId = solicitud, lineaSolicitudId = Guid.NewGuid() } });
+        Assert.Equal(HttpStatusCode.BadRequest, lineaAjena.StatusCode);
+        Assert.Equal("CONTEXTO_INVALIDO", await lineaAjena.ErrorCode());
+
+        Assert.Empty(modelo.Peticiones);
+        Assert.Equal(0, fx.WithDb(db => db.ConversacionesAsistente.Count(x => x.UsuarioId == yo)));
     }
 
     // ------------------------------------------------------------ roles
