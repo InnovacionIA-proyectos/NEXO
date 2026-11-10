@@ -13,17 +13,17 @@ tablas está en [`../docs/database/`](../docs/database/).
 ## Dónde vive hoy
 
 La base propia ya está creada, pero el ambiente de QA todavía no se ha pasado a ella. Ese corte
-está pendiente en la issue #423.
+todavía está pendiente.
 
 | Ambiente | Base | Esquema | Estado |
 |---|---|---|---|
 | QA desplegado | `dbTarifario_Nexo_Pruebas` | `dbo_cubicador` | En uso, con `CUBICADOR_DB_ESQUEMA=dbo_cubicador` explícita. Se creó con scripts anteriores; su estructura es igual a la de `esquema/ESQUEMA_CUBICADOR.sql` (solo cambian los nombres generados de algunas PK, FK e índices). |
-| Base propia (#327) | `dbCubicador_Pruebas` | `dbo` | Creada con el esquema y el catálogo de esta carpeta. La aplicación todavía no la usa. |
+| Base propia | `dbCubicador_Pruebas` | `dbo` | Creada con el esquema y el catálogo de esta carpeta. La aplicación todavía no la usa. |
 | Local y CI | contenedor de `docker-compose.yml` | `dbo` | Se crea en cada arranque. |
 
 Las tablas `planes_cargue`, `items_plan_cargue`, `colocaciones_cargue` y `vehiculos_cubicacion` que
 hay en `dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba` **no son del Cubicador**: son tablas
-antiguas de NEXO con el mismo nombre (ver `docs/Database/esquema/ESQUEMA_NEXO.sql` en la raíz del
+antiguas de NEXO con el mismo nombre (ver `database/esquema/ESQUEMA_NEXO.sql` en la raíz del
 repositorio).
 
 ## Contenido de la carpeta
@@ -72,8 +72,9 @@ Opciones:
 |---|---|
 | `--solo-schema` | Solo crea las tablas. |
 | `--solo-datos` | Solo carga los CSV, sobre tablas ya creadas. Se puede repetir: los Id son fijos, así que solo inserta las filas que faltan y no modifica las existentes. |
+| `--base <nombre>` | Base destino. Por defecto, `dbCubicador_Pruebas`. |
 
-Para usar otra base, cambie `NOMBRE_BD` al inicio de `scripts/ejecutar_schema_y_seeders.py`.
+Para usar otra base, use `--base`. El esquema es siempre `dbo`: el `.sql` lo trae escrito.
 
 ## Conectar la aplicación
 

@@ -4,7 +4,7 @@ Al modelo se le pasan **los numeros ya calculados** y se le pide redactarlos, no
 recalcularlos: la aritmetica es del motor y esto solo la cuenta en espanol.
 
 Lo que sale es de nivel C del ADR
-(`docs/decisiones/ia-claude-seguridad-y-datos.md`, seccion 2): codigos de
+(`docs/decisiones/DECISIONES-NEXO.md`, D-10, punto 2): codigos de
 vehiculo y de carroceria del catalogo, y las medidas y pesos de la carga.
 
 **Ninguna tarifa, ni el valor de la mercancia, ni nada comercial**, que son

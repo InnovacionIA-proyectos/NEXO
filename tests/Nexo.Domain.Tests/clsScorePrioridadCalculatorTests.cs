@@ -89,8 +89,8 @@ public class clsScorePrioridadCalculatorTests
     }
 
     /// <summary>
-    /// Issue #172/#173: el total ERA exclusivamente la urgencia (defecto documentado en
-    /// docs/decisiones/score-prioridad-4-pesos-vs-solo-urgencia.md) - ahora es la suma
+    /// El total ERA exclusivamente la urgencia (defecto documentado en
+    /// docs/decisiones/DECISIONES-NEXO.md, D-04) - ahora es la suma
     /// ponderada de los 4 componentes, con los pesos de clsParametrosScore.
     /// </summary>
     [Fact]

@@ -4,7 +4,7 @@ namespace Nexo.Application.Tests.Biblioteca;
 
 /// <summary>
 /// Con qué código se busca cada vehículo de NEXO en SICE-TAC y en Plaza/SAP. Las filas del mapeo se leen del mismo CSV con el que se carga la
-/// tabla (<c>docs/Database/seeder/mapeo_vehiculos.csv</c>), así que la prueba cubre los 15 vehículos reales y avisa si el archivo cambia.
+/// tabla (<c>database/seeder/mapeo_vehiculos.csv</c>), así que la prueba cubre los 15 vehículos reales y avisa si el archivo cambia.
 /// </summary>
 public class clsCodigosDeVehiculoTests
 {
@@ -33,7 +33,7 @@ public class clsCodigosDeVehiculoTests
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
         while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "Nexo.Clean.sln"))) dir = dir.Parent;
-        var ruta = Path.Combine(dir!.FullName, "docs", "Database", "seeder", "mapeo_vehiculos.csv");
+        var ruta = Path.Combine(dir!.FullName, "database", "seeder", "mapeo_vehiculos.csv");
 
         return File.ReadAllLines(ruta).Skip(1).Where(l => !string.IsNullOrWhiteSpace(l)).Select(l =>
         {

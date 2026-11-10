@@ -3,7 +3,7 @@
 -- =============================================================================
 -- Base: dbTarifario_Nexo_Pruebas   Esquema: dbo   Servidor: 10.10.40.85,1433
 -- Hoy QA todavía opera en dbInformesAutomatizados_Pruebas, esquema db_NEXO, con esta
--- misma estructura; el corte a la base propia está pendiente (#428). Ver README («Ambientes»).
+-- misma estructura; el paso de QA a la base propia está pendiente. Ver README («Ambientes»).
 --
 -- Este archivo es la única definición del esquema. El proyecto no usa migraciones
 -- de EF Core: se ejecuta completo, una sola vez, contra una base vacía. Un cambio de
@@ -94,7 +94,7 @@ CREATE TABLE [dbo].[tbl_rutas] (
     [Id] uniqueidentifier NOT NULL,
     [Origen] nvarchar(150) NOT NULL,
     -- Código DANE real del Origen/Destino (FK a tbl_municipios), NULL en
-    -- rutas creadas antes de esta issue o cuyo texto no resolvió contra el catálogo.
+    -- rutas creadas antes de que se guardara el municipio o cuyo texto no resolvió contra el catálogo.
     [OrigenMunicipioId] int NULL,
     [Destino] nvarchar(150) NOT NULL,
     [DestinoMunicipioId] int NULL,
@@ -122,7 +122,7 @@ CREATE TABLE [dbo].[tbl_configuraciones_vehiculo] (
 -- (tblSAPClaseContenedor). TipoElemento distingue los dos catálogos porque
 -- Codigo no es una FK — es texto, para no depender de una fila específica de
 -- tbl_configuraciones_vehiculo (esa tabla no tiene una fila "oficial" única
--- por tipo, ver docs/documentacion/database/ORIGEN-Y-DECISIONES-SEEDER.md).
+-- por tipo, ver docs/database/ORIGEN-Y-DECISIONES-SEEDER.md).
 CREATE TABLE [dbo].[tbl_alias_elementos] (
     [Id] uniqueidentifier NOT NULL,
     [Alias] nvarchar(100) NOT NULL,

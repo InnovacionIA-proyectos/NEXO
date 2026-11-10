@@ -268,7 +268,7 @@ async def _procesar(mensaje: aio_pika.IncomingMessage, publisher: RabbitMqEvento
                 # con geometria, metricas, incidencias) - no solo
                 # el conteo de antes. Reusa el mismo DTO que ya arma el GET sincrono
                 # (`ResultadoPlanDto`), medido en docs/decisiones/
-                # medicion-evento-enriquecido-plan-cargue.md ANTES de escribir esto.
+                # DECISIONES-NEXO.md (D-09) ANTES de escribir esto.
                 payload = ResultadoPlanDto.model_validate(resultado).model_dump(mode="json", by_alias=True)
                 await publisher.publicar_plan_generado(plan_id, payload)
             await mensaje.ack()

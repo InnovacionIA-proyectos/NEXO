@@ -1,7 +1,7 @@
 # Base de datos de NEXO
 
 Definición de la base de datos de NEXO y sus datos iniciales. La documentación de las tablas está
-en [`docs/documentacion/database/`](../documentacion/database/).
+en [`docs/database/`](../docs/database/).
 
 | | |
 |---|---|
@@ -13,12 +13,12 @@ en [`docs/documentacion/database/`](../documentacion/database/).
 ## Ambientes
 
 La base propia ya está creada, pero el ambiente de QA todavía no se ha pasado a ella. El corte
-está pendiente en la issue #428. Mientras tanto conviven estas bases:
+todavía está pendiente. Mientras tanto conviven estas bases:
 
 | Ambiente | Base | Esquema | Estado |
 |---|---|---|---|
-| QA desplegado | `dbInformesAutomatizados_Pruebas` | `db_NEXO` | En uso (`Database__Esquema=db_NEXO`). Estructura igual a `esquema/ESQUEMA_NEXO.sql`, salvo 8 llaves foráneas que se quitaron a mano en septiembre (las recupera la #428). |
-| Base propia (#326) | `dbTarifario_Nexo_Pruebas` | `dbo` | Creada con el esquema y los datos de esta carpeta. Al día con el esquema desde el 2026-11-09 (46 tablas, 44 llaves foráneas, 64 índices del esquema, 86 alias). Todavía sin uso: la aplicación pasa a ella con la #428. |
+| QA desplegado | `dbInformesAutomatizados_Pruebas` | `db_NEXO` | En uso (`Database__Esquema=db_NEXO`). Estructura igual a `esquema/ESQUEMA_NEXO.sql`, salvo 8 llaves foráneas que se quitaron a mano en septiembre y que se recrean al pasar a la base propia. |
+| Base propia | `dbTarifario_Nexo_Pruebas` | `dbo` | Creada con el esquema y los datos de esta carpeta. Al día con el esquema desde el 2026-11-09 (46 tablas, 44 llaves foráneas, 64 índices del esquema, 86 alias y 28 configuraciones oficiales de vehículo). Todavía sin uso: la aplicación pasará a ella cuando se haga el cambio de QA. |
 | Local y CI | la que indique `ConnectionStrings__Nexo` | el de `Database__Esquema` | `docker-compose.ci.yml` usa `db_NEXO`. |
 
 Este archivo, el esquema y los datos iniciales describen la base propia (`dbo`). Los cambios de
@@ -36,8 +36,8 @@ estructura se aplican también, con su `ALTER`, en la base de QA.
 
 | Documento | Qué es |
 |---|---|
-| [`DICCIONARIO-DATOS.md`](../documentacion/database/DICCIONARIO-DATOS.md) | Cada tabla: para qué sirve, sus columnas, llaves e índices y de dónde salen sus datos. |
-| [`ORIGEN-Y-DECISIONES-SEEDER.md`](../documentacion/database/ORIGEN-Y-DECISIONES-SEEDER.md) | De dónde sale cada dato inicial y qué reglas se aplicaron. |
+| [`DICCIONARIO-DATOS.md`](../docs/database/DICCIONARIO-DATOS.md) | Cada tabla: para qué sirve, sus columnas, llaves e índices y de dónde salen sus datos. |
+| [`ORIGEN-Y-DECISIONES-SEEDER.md`](../docs/database/ORIGEN-Y-DECISIONES-SEEDER.md) | De dónde sale cada dato inicial y qué reglas se aplicaron. |
 
 ## Requisitos
 
@@ -48,7 +48,7 @@ estructura se aplican también, con su `ALTER`, en la base de QA.
 
 ## Crear la base
 
-Se hace una sola vez, contra una base vacía. Desde `docs/Database/`:
+Se hace una sola vez, contra una base vacía. Desde `database/`:
 
 ```bash
 py scripts/ejecutar_schema_y_seeders.py --server 10.10.40.85,1433
@@ -62,11 +62,12 @@ El script:
    parámetros del score.
 3. Carga los CSV de `seeder/` en el orden de sus llaves foráneas: municipios, bandas de peso, reglas
    Solo-SICETAC, tarifas de plaza, servicios conexos, alias, mapeo de vehículos, rangos de peso de
-   contenedor, catálogo de carrocerías y los términos generales del diccionario del cliente.
+   contenedor, catálogo de carrocerías, configuraciones oficiales de vehículo y los términos
+   generales del diccionario del cliente.
 
 Las tablas de solicitudes, cotizaciones y demás historial quedan vacías. Las tablas que la
-aplicación llena sola (rutas, configuraciones de vehículo, clientes, usuarios) se completan al
-usarla.
+aplicación llena sola (rutas, clientes, usuarios y las configuraciones de vehículo que no son
+las oficiales) se completan al usarla.
 
 Opciones:
 
@@ -74,8 +75,9 @@ Opciones:
 |---|---|
 | `--solo-schema` | Solo crea las tablas. |
 | `--solo-datos` | Solo carga los datos iniciales, sobre tablas ya creadas. Se puede repetir: `datos_base_nexo.sql` inserta solo lo que falta y cada CSV se carga solo si su tabla está vacía. |
+| `--base <nombre>` | Base destino. Por defecto, `dbTarifario_Nexo_Pruebas`. |
 
-Para usar otra base, cambie `NOMBRE_BD` al inicio de `scripts/ejecutar_schema_y_seeders.py`. Para
+Para usar otra base, use `--base`. Para
 usar otro esquema no basta con eso: los `.sql` traen `[dbo]` escrito, así que hay que reemplazarlo
 en `esquema/ESQUEMA_NEXO.sql` y `seeder/datos_base_nexo.sql`, y cambiar `NOMBRE_ESQUEMA_SQL` en el
 script.
@@ -86,7 +88,7 @@ aplicación.
 
 **Precios de venta de los servicios conexos.** No se versionan: `servicios_conexos.csv` trae la
 columna `PrecioVenta` vacía. Si existe `seeder/servicios_conexos_precios.local.csv` (archivo local,
-ignorado por git), el script lo carga en su lugar. Ver [`ORIGEN-Y-DECISIONES-SEEDER.md`](../documentacion/database/ORIGEN-Y-DECISIONES-SEEDER.md).
+ignorado por git), el script lo carga en su lugar. Ver [`ORIGEN-Y-DECISIONES-SEEDER.md`](../docs/database/ORIGEN-Y-DECISIONES-SEEDER.md).
 ## Conectar la aplicación
 
 La aplicación lee dos variables de entorno:
@@ -102,7 +104,7 @@ El usuario de la aplicación solo necesita leer y escribir datos (`db_datareader
 ## Cambiar un catálogo inicial
 
 Se edita el CSV correspondiente de `seeder/` (o `datos_base_nexo.sql`) y se documenta el cambio en
-[`ORIGEN-Y-DECISIONES-SEEDER.md`](../documentacion/database/ORIGEN-Y-DECISIONES-SEEDER.md). Esto solo afecta a las bases que se creen después;
+[`ORIGEN-Y-DECISIONES-SEEDER.md`](../docs/database/ORIGEN-Y-DECISIONES-SEEDER.md). Esto solo afecta a las bases que se creen después;
 en una base en uso, el catálogo se modifica desde la aplicación o con un script puntual.
 
 Los CSV van en UTF-8 sin BOM y con las columnas en el mismo orden que su tabla en

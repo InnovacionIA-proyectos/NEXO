@@ -1,355 +1,243 @@
 # Cubicador
 
-Microservicio propio y contenerizado que vive dentro de este mismo repo
-(`NEXO/cubicador/`), como carpeta separada — no es parte de la solución
-.NET (`Nexo.Clean.sln`), ni comparte proceso ni base de datos con el
-backend C#. Construido para portar el motor de cubicación a Python como
-servicio contenerizado, con paridad automatizada con los 26 casos dorados
-en CI: trae **completo** el cubicador que
-originalmente vivía en `cabinaFletes` (C#) — el cubicador rápido (evaluador
-SICCE por criterios/veto, **retirado en S5-HU-17.6**) y el motor de
-bin-packing 3D (planes de cargue, optimización, ajuste manual) — con su propia
-persistencia, y una suite que
-prueba en cada build que el port sigue produciendo exactamente lo mismo que
-el motor C# original.
+Microservicio en Python que vive en este mismo repositorio (`cubicador/`), como carpeta separada: no es parte de la solución
+.NET (`Nexo.Clean.sln`) ni comparte proceso con el backend de NEXO. Es dueño del dominio de cubicación y tiene su propia base
+de datos en SQL Server.
 
-Desde S5-HU-17 hay un **tercer motor**: la selección de flota
-(`domain/motor/seleccion_flota.py`), que lee el catálogo de la base y
-responde qué vehículos hacen falta para una carga, en qué cantidad y con qué
-mercancía en cada uno. Reemplaza al cubicador rápido, que comparaba contra
-nueve arquetipos quemados y decidía por volumen puro; ese módulo y su endpoint
-`POST /api/cubicacion` ya se retiraron (S5-HU-17.4), y el módulo del cubicador
-rápido con ellos (S5-HU-17.6): lo reemplaza `POST /recomendaciones`, que además
-persiste su corrida.
+Tiene dos motores:
 
-No es un servicio de cómputo sin estado: es dueño de todo el dominio
-Cubicación — vehículos, planes de cargue, ítems, colocaciones y parámetros —
-con su propia persistencia en SQL Server. NEXO lo consume
-vía REST (operaciones simples) y RabbitMQ (operaciones pesadas: optimizar,
-crear plan desde línea).
+- **Selección de flota** (`domain/motor/seleccion_flota.py`). Lee el catálogo de la base y responde qué vehículos hacen falta
+  para una carga, en qué cantidad y con qué mercancía en cada uno. La flota puede ser mixta. Se expone en
+  `POST /recomendaciones`, que además guarda cada corrida. Reemplazó al cubicador rápido heredado de `cabinaFletes`, que
+  comparaba contra nueve arquetipos fijos y decidía solo por volumen; ese módulo y su endpoint `POST /api/cubicacion` ya no
+  existen.
+- **Bin-packing 3D** (`domain/motor/motor.py`): planes de cargue, optimización y ajuste manual. Es un port del motor C# de
+  `cabinaFletes`, con una suite de paridad que compara en cada build su salida contra la del motor original en los 26 casos
+  dorados.
 
-**Nota sobre el puente hacia NEXO** (actualizado 2026-09-02): el endpoint que
-NEXO expone para "crear plan desde línea" (`GET /api/lineas-solicitud/{id}
-/cubicacion`) ya está implementado y verificado en el NEXO real
-(`LineasSolicitudCubicacionController`, ver
-`docs/testDocumentation/PRUEBAS_DE_INTEGRACION.md` sección 2.9). Hubo un
-primer intento en una rama vieja del repo de NEXO (`cubicador`) que nunca se
-mezcló y quedó descolgada — ese diseño es el que se portó a la
-implementación actual. La comunicación NEXO→Cubicador sigue siendo por
-colas (RabbitMQ/MassTransit) para las operaciones pesadas; este es el único
-endpoint REST, en sentido inverso (Cubicador→NEXO), y es deliberadamente
-así — es una consulta de solo lectura puntual, no encaja en el patrón de
-eventos.
+NEXO se comunica con el servicio por RabbitMQ para todo lo del plan de cargue y por HTTP para las recomendaciones y la
+administración de catálogos. El servicio solo llama a NEXO para leer las posiciones de una línea de solicitud. Ver
+«Cómo se conecta con NEXO» más abajo.
 
-Ver:
-- [`CONTRATO.md`](./CONTRATO.md) — API REST, eventos de RabbitMQ, DTOs, errores, autenticación: todo lo necesario para conectar backend o frontend contra este servicio.
-- [`docs/ARQUITECTURA.md`](./docs/ARQUITECTURA.md) — capas, estructura de carpetas, cómo se traduce Clean Architecture a Python.
-- [`docs/DECISIONES_TECNICAS.md`](./docs/DECISIONES_TECNICAS.md) — registro de cada decisión tomada y por qué.
-- [`docs/DEUDA_DIFERIDA_3D.md`](./docs/DEUDA_DIFERIDA_3D.md) — qué quedó pendiente por no tocar el motor 3D, con lo que cuesta cada punto.
-- [`docs/testDocumentation/`](./docs/testDocumentation/) — documentación completa de los tests: las 31 reglas de negocio portadas desde cabinaFletes y las pruebas de integración/Docker.
+Documentación:
+
+- [`CONTRATO.md`](./CONTRATO.md): API REST, mensajes de RabbitMQ, DTOs, errores y autenticación.
+- [`docs/ARQUITECTURA.md`](./docs/ARQUITECTURA.md): capas, estructura de carpetas y cómo se traduce la arquitectura de NEXO a
+  Python.
+- [`docs/DECISIONES_TECNICAS.md`](./docs/DECISIONES_TECNICAS.md): registro de decisiones y su porqué.
+- [`docs/HOJA-DE-RUTA-CUBICADOR.md`](./docs/HOJA-DE-RUTA-CUBICADOR.md): especificación funcional del contrato de
+  recomendaciones y de los catálogos.
+- [`docs/DEUDA_DIFERIDA_3D.md`](./docs/DEUDA_DIFERIDA_3D.md): lo que quedó pendiente por no tocar el motor 3D, con su costo.
+- [`database/README.md`](./database/README.md): la base de datos, cómo se crea y cómo se conecta la aplicación.
+- [`docs/testDocumentation/`](./docs/testDocumentation/): las 31 reglas de negocio portadas de `cabinaFletes` y las pruebas de
+  integración con Docker.
 
 ## Stack
 
 - **Python 3.14**
-- **FastAPI** — API síncrona (`/recomendaciones`, los seis CRUD de catálogo, `/api/planes-cargue`)
-- **SQLAlchemy 2.0 (async)** — persistencia propia; `DATABASE_URL` apunta a SQLite en las pruebas o a SQL Server en QA y produccion (mismo codigo, solo cambia la URL). el esquema lo gobierna `database/esquema/ESQUEMA_CUBICADOR.sql` (ver `database/README.md`), no `create_all`
-- **aio-pika (RabbitMQ)** — worker consumidor separado, para `optimizar` y `crear-desde-línea`
-- **pytest** — 245 pruebas: 33 de reglas de negocio del motor (28 casos dorados de `MotorCubicacion3DTests.cs` + 5 de apilamiento multi-soporte) + **27 de paridad cross-motor** (los mismos casos, comparados contra la salida real del motor C#, no contra un valor transcrito a mano) + 4 de humo end-to-end de la API + 12 de regresión del worker (los 9 comandos por cola + el puente desde línea) + 4 del vigilante de timeouts + 2 del registro de algoritmos intercambiables + 2 de la alerta al equipo cuando un mensaje cae a `cubicacion.dlq` + **19 guardas de los 3 bugs de QA encontrados** (mensaje malformado que atascaba el worker, ítem sin SKU, borrado de plan optimizado) + **19 de la migración a SQL Server** (8 del esquema y la separación de los dos `MetaData` + 11 de la lectura del catálogo) + **39 del motor de selección de flota** (22 del algoritmo, 8 de DBLF y 9 del circuito completo contra SQLite) + **23 del contrato único** (19 de `POST /recomendaciones`, reconsulta, catálogos y llave por sistema de punta a punta por ASGI + 4 de la forma de los eventos de catálogo que consume NEXO) + **11 del puente desde línea** (el fallback silencioso muerto y el diccionario de compatibilidad) + **31 de los CRUD de catálogo** (concurrencia optimista, borrados bloqueados por referencias, borrado lógico de una mercancía con recomendaciones, dominancia al guardar un vehículo y el par normalizado de las reglas)
+- **FastAPI**: la API (`/recomendaciones`, los catálogos, `/api/planes-cargue`).
+- **SQLAlchemy 2.0 (async)**: persistencia. `DATABASE_URL` apunta a SQL Server en QA y producción, y a SQLite en las pruebas y
+  en el arranque local sin Docker. En SQL Server el esquema lo gobierna `database/esquema/ESQUEMA_CUBICADOR.sql`, que se aplica
+  a mano; la aplicación no crea ni altera tablas ahí.
+- **aio-pika (RabbitMQ)**: el worker que consume los comandos de NEXO y publica los eventos.
+- **pytest**: la suite corre contra SQLite en memoria. Cubre las reglas de negocio del motor 3D y su paridad con el motor C#, el
+  motor de selección de flota, el contrato de `/recomendaciones` y de los catálogos, el worker (los comandos por cola, los
+  reintentos, la cola de error y el vigilante de timeouts), el puente desde línea, los eventos que consume NEXO y la IA
+  (explicación y modo sombra).
 
-## Estado actual (léelo antes de asumir que algo funciona)
+## Estado actual
 
-**Verificado con pytest (sin Docker):**
-- El port completo del motor (`domain/motor/*`) — las 31 reglas de
-  `docs/testDocumentation/REGLAS_DE_NEGOCIO.md` pasan sin ajustes.
-- El flujo completo API → Application → Infrastructure → Domain contra
-  SQLite: crear vehículo (con siembra de los 10 presets) → crear plan → agregar
-  ítem → optimizar → leer resultado → ajustar manualmente una colocación. Ver
-  `tests/api/test_smoke.py`.
-- Autenticación por Bearer estático rechazando llamadas sin la key.
-- **El motor de selección de flota** (S5-HU-17.3): el circuito completo
-  adaptador → puerto → caso de uso → motor contra SQLite, más el algoritmo con
-  un catálogo calcado del real. Ver `tests/domain/test_seleccion_flota.py`,
-  `tests/domain/test_dblf.py` y `tests/application/test_recomendar_flota.py`.
+**Verificado con pytest, sin Docker:**
 
-**Verificado contra el catálogo REAL de QA (`dbo_cubicador`, no un sustituto):**
-- Las **31 mercancías del catálogo resuelven**, una por una. Las dos cuya
-  carrocería principal no tiene vehículo asignado (`CARGA_CONTENERIZADA` y
-  `VIDRIO_PLANO`) caen a su carrocería de respaldo y vuelven marcadas como
-  condicionadas.
-- Los siete escenarios del contrato: flota mixta, carga heterogénea en un
-  vehículo, reparto por incompatibilidad, condicionada, refrigerada,
-  extradimensionado y `SUPERA_K_MAX`.
-- El mapeo de las 10 tablas del catálogo cuadra columna por columna contra
-  `sys.columns` — `scripts/verificar_mapeo_catalogo.py`.
-- El empaque de DBLF iguala la rejilla óptima en 20 combinaciones de vehículo
-  y bulto — `scripts/medir_empaque_dblf.py`.
+- El port del motor 3D (`domain/motor/*`): las 31 reglas de
+  [`REGLAS_DE_NEGOCIO.md`](./docs/testDocumentation/REGLAS_DE_NEGOCIO.md) pasan sin ajustes.
+- El flujo API → aplicación → infraestructura → dominio contra SQLite: crear vehículo (con la siembra de los 10 presets), crear
+  plan, agregar ítem, optimizar, leer el resultado y ajustar una colocación (`tests/api/test_smoke.py`).
+- La autenticación por llave, incluida la llave por sistema de `/recomendaciones`.
+- El motor de selección de flota: el circuito completo adaptador → puerto → caso de uso → motor contra SQLite, y el algoritmo
+  con un catálogo calcado del real (`tests/domain/test_seleccion_flota.py`, `tests/domain/test_dblf.py`,
+  `tests/application/test_recomendar_flota.py`).
 
-**Verificado con Docker Compose real (SQL Server + api + worker propios, conectados al RabbitMQ compartido de NEXO):**
-- El mismo flujo de arriba, pero contra **SQL Server real** via `docker
-  compose up -d` (con healthcheck: `api`/`worker` esperan a que `db` esté
-  `healthy` antes de arrancar - sin eso, arrancaban antes de que la base
-  terminara su init y se caían). RabbitMQ ya no es un contenedor de este
-  compose — ver `docs/DECISIONES_TECNICAS.md` #9.
-- **El flujo asíncrono end-to-end, vía HTTP real**: `POST /{id}/optimizar`
-  responde `202` de inmediato con el plan en `procesando`; el `worker` (otro
-  contenedor) consume el mensaje de `cubicador.optimizar`, corre
-  `optimizar_plan` contra la base y publica `plan-de-cargue.generado` -
-  confirmado con `GET /resultado` que el plan quedó persistido como
-  `optimizado` (puntaje `75.1`), no solo que el evento se emitió.
-- **Reintentos + Dead-Letter Queue**: un mensaje que provoca un error
-  inesperado se reintenta 3 veces (contador `x-intentos` en la cabecera,
-  visible en los logs del worker) y, al agotarse, se publica en
-  `cubicacion.dlq` para inspección manual — confirmado con la consola de
-  administración de RabbitMQ (`http://localhost:15672`). Un error de negocio
-  (`AppException`, ej. plan inexistente) en cambio **no reintenta**: se
-  marca/reporta una sola vez, como corresponde (reintentar dará siempre el
-  mismo resultado).
-- **Vigilante de timeout**: un plan que quedó en `procesando` (ej. el worker
-  se detiene a mitad de proceso) recibe un `cubicacion.rechazada` con
-  `codigo: "TIMEOUT_PROCESAMIENTO"` y queda marcado `error` al pasar el límite
-  configurado (`CUBICADOR_TIMEOUT_PROCESANDO_MINUTOS`) — confirmado forzando el
-  escenario (worker detenido, plan en `procesando`, se corrió
-  `_revisar_timeouts` con el límite cumplido) y viendo el plan pasar a `error`
-  vía `GET /{id}`. El rechazo se publica **antes** de marcar el plan, para que
-  un broker caído se reintente en el ciclo siguiente en lugar de perderse — ver
-  CONTRATO.md 6.4.
-- Un bug real que solo apareció probando con datos reales: `metricas.puntaje`
-  en `GET /resultado` siempre daba 0 porque `obtener_resultado` no
-  reconstruía `resultado.puntaje` desde el plan persistido antes de pedirle
-  las métricas al motor (el original en NEXO sí lo hace explícito:
-  `resultado.Puntaje = plan.Puntaje`). Corregido en
-  `application/plan_cargue/resultado.py`.
-- Otro bug encontrado al reconstruir el stack: al servicio `api` le faltaba
-  la variable `CUBICADOR_RABBITMQ_URL` en `docker-compose.yml` (solo la
-  tenía `worker`) — sin ella, `api` intentaba conectarse a `localhost:5672`
-  dentro de su propio contenedor y fallaba al arrancar. Corregido.
+**Verificado contra el catálogo real de QA:**
 
-- `infrastructure/clientes/nexo_client.py` (el puente hacia `GET
-  /api/lineas-solicitud/{id}/cubicacion`): el endpoint ya existe en NEXO
-  (rama `cubicador`) y se verificó ejecutando este cliente real contra la
-  API de NEXO en Docker Compose (SQL Server real, datos sembrados) — parseo
-  correcto de `posiciones`/`origen`/`destino`, incluida una línea sin
-  `Dimensiones` (lista vacía), y `None` en una línea inexistente (404). Ver
-  docs/DECISIONES_TECNICAS.md #8.
-- **`crear_plan_desde_linea` de punta a punta**, con ambos stacks de Docker
-  reales corriendo a la vez (NEXO + Cubicador): `POST /desde-linea/{id}` →
-  worker consume → llama a NEXO real → crea plan/flota → `GET
-  /por-linea/{id}` y `GET /{id}/resultado` confirman `optimizado` con las 2
-  unidades cargadas. Encontró un bug real: el worker leía
-  `cuerpo["lineaSolicitudId"]` del mensaje, pero el router lo publica
-  anidado en `cuerpo["solicitud"]["lineaSolicitudId"]` — `KeyError` en cada
-  intento, terminaba en `cubicacion.dlq` a los 3 intentos. Corregido en
-  `worker/main.py`.
+- Las 31 mercancías del catálogo resuelven una por una. Las dos cuya carrocería principal no tiene vehículo asignado
+  (`CARGA_CONTENERIZADA` y `VIDRIO_PLANO`) caen a su carrocería de respaldo y vuelven marcadas como condicionadas.
+- Los siete escenarios del contrato: flota mixta, carga heterogénea en un vehículo, reparto por incompatibilidad, condicionada,
+  refrigerada, extradimensionado y `SUPERA_K_MAX`.
+- El mapeo de las 10 tablas del catálogo y de las recomendaciones cuadra columna por columna contra `sys.columns`
+  (`scripts/verificar_mapeo_catalogo.py`).
+- El empaque de DBLF iguala la rejilla óptima en 20 combinaciones de vehículo y bulto (`scripts/medir_empaque_dblf.py`).
 
-**Cambios al traer este servicio de su repo standalone a `NEXO/cubicador/`**
-(validados contra los criterios de cierre del port):
-- Los 26 casos dorados de `cabinaFletes/src/CabinaFletes.Tests/MotorCubicacion3DTests.cs`
-  ya estaban portados 1:1 (mismo nombre/orden) en `tests/domain/test_motor.py`
-  — confirmado, no hubo que tocar nada del motor.
-- `Dockerfile` no tenía `HEALTHCHECK` propio (solo existía a nivel de
-  `docker-compose.yml`) — agregado.
-- La fábrica de algoritmos (`domain/motor/motor.py`) era un `if/else` cerrado
-  a `ffd`/`bfd`; ahora es un registro abierto
-  (`domain/motor/optimizadores.py::registrar_optimizador`/
-  `obtener_optimizador`/`algoritmos_disponibles`) para poder evaluar un motor
-  alternativo en paralelo sin tocar `motor.py` — ver
-  `tests/domain/test_optimizadores_registro.py`.
-- **Otro bug de arranque en frío**: `api`/`worker` a veces se caían con
-  `AMQPConnectionError: Connection refused` aun con `depends_on: condition:
-  service_healthy` correcto — el healthcheck de RabbitMQ puede dar "sano" un
-  instante antes de que el puerto AMQP acepte conexiones de verdad. Corregido
-  con reintentos en la conexión inicial (`infrastructure/mensajeria/
-  rabbitmq.py::conectar_con_reintentos`, entonces 5 intentos / 2s — subido
-  después a 30/2s, ver el bullet de unificación con NEXO más abajo).
-  Reproducido a propósito (`down -v` + `up`) para confirmar que ya no tumba
-  el contenedor.
-- **Swagger no mandaba el Bearer**: `verificar_api_key` usaba un `Header()`
-  crudo llamado `authorization`; sin un esquema de seguridad real, Swagger UI
-  no lo exponía de forma confiable (confirmado con un usuario real: el campo
-  se llenaba en la UI pero el request nunca llevaba el header, visto en el
-  Network tab). Cambiado a `fastapi.security.HTTPBearer` — ahora Swagger
-  muestra el botón "Authorize" real.
+**Verificado con Docker Compose (SQL Server, api y worker propios, conectados al RabbitMQ compartido de NEXO):**
 
-**Paridad automatizada contra el motor C# real:**
-- `herramientas/generador_casos_dorados/` — harness .NET que referencia el
-  `.csproj` real de `cabinaFletes` (sin modificarlo) y corre los 26 casos de
-  `MotorCubicacion3DTests.cs` contra el motor C# de verdad, grabando su
-  salida en `tests/paridad/fixtures_dorados/*.json`.
-- `tests/paridad/test_paridad_casos_dorados.py` — compara el motor Python
-  contra esos 26 JSON en cada `pytest` (CI incluido). **Resultado: 26/26
-  coinciden exacto**, sin haber tenido que ajustar el port. Falla el build
-  con el esperado/obtenido exactos si algún caso deja de coincidir — ver
-  `docs/DECISIONES_TECNICAS.md` #3 (la decisión de no construir esto se
-  revirtió después).
+- El mismo flujo de arriba contra SQL Server real. `api` y `worker` esperan a que `db` esté sano y a que `db-init` haya creado
+  la base y las tablas.
+- **El flujo asíncrono de punta a punta:** `POST /api/planes-cargue/{id}/optimizar` responde `202` con el plan en `procesando`;
+  el worker consume el mensaje de la cola `cubicador.optimizar`, optimiza contra la base y publica `plan-de-cargue.generado`. Se
+  confirmó con `GET /resultado` que el plan quedó persistido como `optimizado`, no solo que el evento salió.
+- **Reintentos y cola de error:** un mensaje que provoca un error inesperado se intenta tres veces en total (contador
+  `x-intentos` en la cabecera) y después se publica en `cubicacion.dlq`, con alerta por correo. Un error de negocio
+  (`AppException`, por ejemplo un plan inexistente) no se reintenta: se reporta una sola vez, porque reintentar daría el mismo
+  resultado.
+- **Vigilante de timeouts:** un plan que se queda en `procesando` (por ejemplo, porque el worker se detuvo a mitad de proceso)
+  recibe un `cubicacion.rechazada` con `TIMEOUT_PROCESAMIENTO` y queda en `error` al pasar el límite
+  (`CUBICADOR_TIMEOUT_PROCESANDO_MINUTOS`). El rechazo se publica antes de marcar el plan, para que un broker caído se reintente
+  en el ciclo siguiente en lugar de perderse ([`CONTRATO.md`](./CONTRATO.md), sección 6.4).
+- **El puente desde línea** (`crear_desde_linea`), con los dos stacks de Docker a la vez: `POST /desde-linea/{id}` → worker →
+  `GET /api/lineas-solicitud/{id}/cubicacion` en NEXO → flota armada y optimizada, confirmada con `GET /por-linea/{id}` y
+  `GET /{id}/resultado` ([`PRUEBAS_DE_INTEGRACION.md`](./docs/testDocumentation/PRUEBAS_DE_INTEGRACION.md), secciones 2.6 y
+  2.9).
 
-**Unificación de RabbitMQ con el broker compartido de NEXO (2026-08-27):**
-- Este servicio ya NO trae su propio contenedor RabbitMQ — `api`/`worker` se
-  conectan al `rabbit` del `docker-compose.yml` raíz de NEXO enganchándose
-  a su red Docker por nombre externo. La base de
-  datos es SQL Server. Ver `docs/DECISIONES_TECNICAS.md` #9
-  (documenta por qué se revirtió la decisión original de un broker propio) y
-  la sección "Puesta en marcha" más abajo (ahora requiere levantar el
-  `rabbit` de NEXO antes que este stack).
-- Al no poder haber `depends_on` entre proyectos Compose distintos, se subió
-  el margen de `conectar_con_reintentos()` de 5 intentos/2s a **30/2s** —
-  verificado forzando el peor caso (arrancar este stack antes que el `rabbit`
-  de NEXO): conectó en el intento 4 de 30 una vez el broker quedó listo.
-- Verificado de punta a punta: mensaje publicado → consumido → confirmado vía
-  el broker compartido (RabbitMQ: `publish=1, ack=1`), sin colisión de
-  nombres con la topología MassTransit de NEXO (`cubicador.eventos`/
-  `cubicador.optimizar`/`cubicacion.dlq` no se cruzan con `CostearLinea`,
-  `AutoCosteoSolicitado`, etc. — ver `docs/mensajeria/TOPOLOGIA.md` en la
-  raíz de NEXO).
+Bugs que solo aparecieron probando con el stack real, ya corregidos:
 
-**Alerta al equipo + prueba E2E por cola (2026-08-27, mismo día):**
-- `infrastructure/alertas/correo.py::alertar_mensaje_en_dlq` — al caer un
-  mensaje en `cubicacion.dlq` tras agotar los 3 reintentos, además del log ya
-  existente, ahora se envía un correo al equipo técnico (mismo mecanismo que
-  la alerta equivalente de NEXO, #13). 2 pruebas nuevas
-  (`tests/worker/test_mover_a_dlq.py`) cubren la conexión worker→alerta y que
-  degrada sin romper el worker si falta configuración de SMTP.
-- `scripts/ci_docker_smoke.py::flujo_resultado_por_cola` — el criterio
-  "trabajo publicado → resultado recibido por cola" (antes solo verificado a
-  mano, sección 2.3) ahora corre en cada push/PR: se suscribe a
-  `plan-de-cargue.generado` con una cola de prueba propia ANTES de disparar
-  `optimizar`, y confirma que el evento real llega por ahí, no solo que el
-  efecto quedó en la base de datos.
+- `metricas.puntaje` de `GET /resultado` siempre daba 0, porque `obtener_resultado` no reconstruía el puntaje desde el plan
+  persistido (`application/plan_cargue/resultado.py`).
+- Al servicio `api` le faltaba `CUBICADOR_RABBITMQ_URL` en `docker-compose.yml` e intentaba conectarse a `localhost:5672`
+  dentro de su propio contenedor.
+- El worker leía `lineaSolicitudId` en la raíz del mensaje y no dentro de `solicitud`: cada `crear_desde_linea` terminaba en la
+  cola de error (`worker/main.py`).
+- `api` y `worker` se caían a veces al arrancar en frío con `AMQPConnectionError`, porque el healthcheck de RabbitMQ puede dar
+  sano un instante antes de que el puerto AMQP acepte conexiones. La conexión inicial reintenta 30 veces cada 2 segundos
+  (`infrastructure/mensajeria/rabbitmq.py`, `conectar_con_reintentos`), margen que también cubre levantar este stack antes que
+  el `rabbit` de NEXO.
+- Swagger no mandaba el Bearer: la autenticación usaba un `Header()` crudo. Ahora usa `fastapi.security.HTTPBearer` y Swagger
+  muestra el botón *Authorize*.
 
-**Endpoint de NEXO para `crear_desde_linea` — implementado y verificado
-(2026-09-02):** el bullet de arriba (`infrastructure/clientes/nexo_client.py`
-verificado "contra la API de NEXO... rama `cubicador`") describía una
-verificación contra una rama que **nunca se mezcló a `QA`** — quedó
-descolgada antes de la reorganización del código por feature. `GET
-/api/lineas-solicitud/{id}/cubicacion` no existía en ningún checkout real de
-NEXO hasta ahora. Se portó el diseño de esa rama vieja (adaptado a la
-estructura actual: CQRS por feature, no por capa) al NEXO real:
-`LineasSolicitudCubicacionController` + `ObtenerCubicacionLineaQuery` +
-`LineaSolicitudCubicacionAdapter`, con autenticación de servicio-a-servicio
-dedicada (`CubicadorApiKeyAuthenticationHandler`, esquema `CubicadorApiKey`
-separado de la sesión del portal). `LineaSolicitud.Dimensiones` ya capturaba
-las posiciones desde antes — no hizo falta ningún cambio de captura, solo el
-endpoint. Verificado con 6 tests de integración HTTP contra SQL Server real
-(200/404/401 en sus tres variantes) y con una corrida real de punta a punta
-cruzando los dos stacks en Docker: `POST /desde-linea/{id}` → RabbitMQ →
-worker → `GET .../cubicacion` (200) → plan armado con el vehículo sugerido
-por el cubicador rápido → optimizado, 3/3 unidades cargadas. Detalle
-completo en `cubicador/CONTRATO.md` sección 7.
+**Paridad automatizada contra el motor C#:**
+
+- `herramientas/generador_casos_dorados/` es un harness .NET que referencia el `.csproj` real de `cabinaFletes` (sin
+  modificarlo), corre los 26 casos de `MotorCubicacion3DTests.cs` contra el motor C# y graba su salida en
+  `tests/paridad/fixtures_dorados/*.json`.
+- `tests/paridad/test_paridad_casos_dorados.py` compara el motor Python contra esos 26 archivos en cada `pytest`, CI incluido.
+  Coinciden los 26 sin haber ajustado el port. Si un caso deja de coincidir, el build falla con el valor esperado y el obtenido
+  ([`DECISIONES_TECNICAS.md`](./docs/DECISIONES_TECNICAS.md) #3).
+
+**RabbitMQ compartido con NEXO.** Este servicio no trae su propio RabbitMQ: `api` y `worker` se conectan al `rabbit` del
+`docker-compose.yml` de la raíz, enganchándose a su red Docker (`nexo_internal`) por nombre externo
+([`DECISIONES_TECNICAS.md`](./docs/DECISIONES_TECNICAS.md) #9). Los nombres de exchange y colas (`cubicador.eventos`,
+`cubicador.optimizar`, `cubicacion.dlq`) no chocan con la topología de MassTransit de NEXO
+([`TOPOLOGIA.md`](../docs/mensajeria/TOPOLOGIA.md)).
 
 ## CI
 
-`.github/workflows/_cubicador-pruebas.yml` (raíz del repo NEXO, con
-`paths: ['cubicador/**']` para no disparar en cambios del backend C#), dos
-jobs en cada push/PR a `QA`/`main`:
+`.github/workflows/_cubicador-pruebas.yml` (en la raíz del repositorio) es un workflow reutilizable. Lo llaman
+`ci-cd-cubicador-api.yml` y `ci-cd-cubicador-worker.yml` en cada push y pull request a `main` y `DEPLOY` que toque
+`cubicador/**` (sin contar `cubicador/docs/**` ni los `.md`), el `docker-compose.yml` de la raíz o `build/Dockerfile.rabbit`.
+Tiene dos jobs:
 
-- **`unit-tests`** — instala dependencias y corre `pytest` (70 pruebas contra
-  SQLite en memoria, sin infraestructura externa).
-- **`docker-smoke`** — levanta primero el `rabbit` compartido de NEXO
-  (`docker compose -f ../docker-compose.yml up -d --wait rabbit`) y luego el
-  stack propio (`docker compose up -d --build --wait`: SQL Server + api +
-  worker), y corre `scripts/ci_docker_smoke.py`, que automatiza el flujo de
-  las secciones 2.2-2.4 de `docs/testDocumentation/PRUEBAS_DE_INTEGRACION.md`:
-  `POST /optimizar` → 202 → espera a que el worker lo procese → `optimizado`
-  con `metricas.puntaje == plan.puntaje` (regresión del bug real ya
-  corregido); el resultado recibido **por cola**, no solo por HTTP
-  (`plan-de-cargue.generado`, sección 2.3 — antes solo verificado a mano); y
-  un mensaje con `tipo` inválido → 3 reintentos → cae en `cubicacion.dlq`.
-  Falla el job (exit ≠ 0) si el flujo real no llega al resultado esperado, no
-  solo si el código no compila/importa.
+- **`unit-tests`**: instala dependencias y corre `pytest -v` contra SQLite en memoria, sin infraestructura externa.
+- **`docker-smoke`**: levanta el `rabbit` compartido de NEXO y luego el stack propio (SQL Server, `db-init`, api y worker).
+  Después:
+  - corre `tests/infrastructure/test_plan_cargue_repo_contra_sqlserver.py` dentro del contenedor `api`, contra el SQL Server del
+    stack: SQLite acepta SQL que SQL Server rechaza, y esta es la única prueba que lo detecta;
+  - corre `scripts/ci_docker_smoke.py`, que automatiza las secciones 2.2 a 2.4 de
+    [`PRUEBAS_DE_INTEGRACION.md`](./docs/testDocumentation/PRUEBAS_DE_INTEGRACION.md): `POST /optimizar` → `202` → el worker lo
+    procesa → `optimizado` con `metricas.puntaje == plan.puntaje`; el resultado recibido por la cola
+    (`plan-de-cargue.generado`), no solo por HTTP; y un mensaje con `tipo` inválido que agota los intentos y cae en
+    `cubicacion.dlq`.
+
+  El job falla si el flujo real no llega al resultado esperado, no solo si el código no compila.
 
 **Todavía sin verificar automáticamente:**
-- El vigilante de timeout (`docs/DECISIONES_TECNICAS.md` #10): requiere
-  detener el contenedor `worker` a mitad de un mensaje, lo que acopla el
-  script a la topología interna del compose de una forma que no valía la
-  pena para CI — sigue siendo procedimiento manual (ver
-  `docs/testDocumentation/PRUEBAS_DE_INTEGRACION.md` sección 2.4).
-- `crear_plan_desde_linea` de punta a punta contra un NEXO real: verificado
-  manualmente (ver el bullet fechado 2026-09-02 más abajo), pero el job de
-  CI no levanta el repo NEXO — sigue sin automatizarse.
+
+- El vigilante de timeouts: exige detener el contenedor `worker` a mitad de un mensaje, lo que ataría el script a la topología
+  interna del compose. Sigue siendo un procedimiento manual
+  ([`PRUEBAS_DE_INTEGRACION.md`](./docs/testDocumentation/PRUEBAS_DE_INTEGRACION.md), sección 2.4).
+- `crear_desde_linea` contra un NEXO real: se verificó a mano, pero el job de CI no levanta NEXO.
 
 ## Puesta en marcha
 
-**Local, sin Docker (desarrollo rápido, SQLite):**
+**Con Docker Compose (api, worker y SQL Server propios, RabbitMQ compartido de NEXO).** Es la forma recomendada.
+
+Primero el `rabbit` de NEXO, desde la raíz del repositorio:
 
 ```bash
-python -m venv .venv && source .venv/Scripts/activate   # o .venv/bin/activate en Linux/Mac
-pip install -r requirements.txt
-export CUBICADOR_API_KEY=dev-key   # o el equivalente en PowerShell/cmd
-uvicorn api.main:app --reload
-curl http://localhost:8000/health
+cp .env.example .env                 # si no existe; como mínimo, RABBITMQ_PASSWORD
+docker compose up -d --wait rabbit   # solo el broker, no todo NEXO
 ```
 
-**Con Docker Compose (api + worker + SQL Server propios, RabbitMQ compartido de NEXO):**
-
-Requiere el `rabbit` de NEXO ya corriendo (ver `docs/DECISIONES_TECNICAS.md`
-#9) — desde la raíz del repo:
+Luego el stack del Cubicador, desde `cubicador/`:
 
 ```bash
-cd ..   # raíz de NEXO
-cp .env.example .env   # si no existe ya; completar RABBITMQ_PASSWORD como mínimo
-docker compose up -d --wait rabbit   # solo el broker, no todo NEXO (rabbit no depende de db/api)
-cd cubicador
-```
-
-Y luego el stack propio de Cubicador:
-
-```bash
-cp .env.example .env   # completar MSSQL_SA_PASSWORD, RABBITMQ_USER/PASSWORD (= los del .env raíz de NEXO), CUBICADOR_API_KEY, NEXO_CALLBACK_API_KEY, NEXO_BASE_URL
+cp .env.example .env
 docker compose up -d --build --wait
 curl http://localhost:8081/health
 ```
 
-El contenedor sigue escuchando en el puerto 8000 puertas adentro, pero se
-publica en el host en el **8081** por defecto (`CUBICADOR_HOST_PORT` en
-`.env`) — a propósito, para no chocar con el 8080 donde corre el backend
-.NET de NEXO. Si 8081 tampoco sirve, cambiá `CUBICADOR_HOST_PORT=8082`.
+El compose exige en `.env`: `MSSQL_SA_PASSWORD`, `RABBITMQ_USER` y `RABBITMQ_PASSWORD` (los mismos del `.env` de la raíz),
+`CUBICADOR_API_KEY`, `NEXO_BASE_URL` y `NEXO_CALLBACK_API_KEY`. `CUBICADOR_API_KEY_NEXO` y `CUBICADOR_API_KEY_COTIFLY` son
+opcionales para levantar el stack, pero sin ellas `/recomendaciones` responde `401` a todo.
 
-Swagger interactivo en `http://localhost:8081/docs` — botón "Authorize"
-arriba a la derecha, pega ahí tu `CUBICADOR_API_KEY` (sin la palabra
-"Bearer", Swagger la agrega sola) y queda aplicado a todos los endpoints.
-También hay un contrato OpenAPI ya exportado en
-[`docs/openapi.json`](./docs/openapi.json) (importable en Postman/Insomnia o
-para generar un cliente), y una guía corta de integración en
-[`CONTRATO.md`](./CONTRATO.md).
+- `db-init` crea la base `dbCubicador_Pruebas`, el esquema (`CUBICADOR_DB_ESQUEMA`, `dbo` por defecto) y las 16 tablas de
+  `database/esquema/ESQUEMA_CUBICADOR.sql`, si no existen. El catálogo queda vacío: hasta sembrarlo, `/recomendaciones` no
+  encuentra mercancías. Para cargar un catálogo mínimo de desarrollo:
 
-**Correr las pruebas:**
+  ```bash
+  docker compose exec api python scripts/preparar_catalogo_local.py
+  ```
+
+  El script se niega a correr contra un host que no sea local. El catálogo inicial completo se carga con
+  `database/scripts/ejecutar_schema_y_seeders.py` ([`database/README.md`](./database/README.md)).
+- La API escucha en el puerto 8000 dentro del contenedor y se publica en el host en el **8081** (`CUBICADOR_HOST_PORT`), para no
+  chocar con el 8080 del backend de NEXO. SQL Server queda en el host en el 1434.
+- Swagger en `http://localhost:8081/docs`: en *Authorize* se pega la llave sin la palabra `Bearer` y queda aplicada a todos los
+  endpoints. El contrato OpenAPI exportado está en [`docs/openapi.json`](./docs/openapi.json).
+
+**Local, sin Docker (SQLite):**
 
 ```bash
-pip install -r requirements.txt   # incluye pytest/pytest-asyncio
+python -m venv .venv && source .venv/Scripts/activate   # .venv/bin/activate en Linux o Mac
+pip install -r requirements.txt
+export CUBICADOR_API_KEY=dev-key
+export CUBICADOR_RABBITMQ_URL=amqp://<usuario>:<clave>@localhost:5672/
+uvicorn api.main:app --reload
+curl http://localhost:8000/health
+```
+
+- La API necesita un RabbitMQ al arrancar: el `rabbit` de NEXO publica el 5672 en el host. Sin broker, deja de intentar tras
+  unos 60 segundos y no arranca.
+- Sin `DATABASE_URL` usa `./cubicador.db` (SQLite) y crea solo las tablas de `infrastructure/persistence/modelos.py` (motor 3D,
+  medidas estándar e `iaSombra`). Las del catálogo y las recomendaciones no se crean, así que en este modo funcionan
+  `/api/planes-cargue` y `/medidas-estandar`, pero no `/recomendaciones` ni los CRUD de catálogo.
+
+**Variables de entorno.** La lista completa, comentada, está en [`.env.example`](./.env.example). En Dokploy, las aplicaciones
+`cubicador-api` y `cubicador-worker` se configuran con la plantilla de [`.env.dokploy`](../.env.dokploy) de la raíz. Las
+principales:
+
+| Variable | Para qué |
+|---|---|
+| `DATABASE_URL`, `CUBICADOR_DB_ESQUEMA` | Base y esquema ([`database/README.md`](./database/README.md)). Dentro del compose, `DATABASE_URL` la arma el propio compose. |
+| `CUBICADOR_RABBITMQ_URL` | Broker. El compose la arma con `RABBITMQ_USER` y `RABBITMQ_PASSWORD`. |
+| `CUBICADOR_API_KEY`, `CUBICADOR_API_KEY_NEXO`, `CUBICADOR_API_KEY_COTIFLY` | Llaves de entrada ([`CONTRATO.md`](./CONTRATO.md), sección 5). |
+| `NEXO_BASE_URL`, `NEXO_CALLBACK_API_KEY` | Llamada a NEXO del puente desde línea. La llave es igual a `Cubicador3D__InboundApiKey` de NEXO. |
+| `IA_SOMBRA_HABILITADA`, `ANTHROPIC_API_KEY`, `ANTHROPIC_*`, `IA_SOMBRA_*` | Explicación de la recomendación y modo sombra. Solo los usa `api`; nacen apagados. |
+| `CUBICADOR_TIMEOUT_PROCESANDO_MINUTOS`, `CUBICADOR_INTERVALO_VIGILANTE_SEGUNDOS` | Vigilante de timeouts. Solo los usa `worker`. |
+| `ALERTAS_SMTP_*`, `ALERTAS_EQUIPO_TECNICO` | Correo al caer un mensaje en `cubicacion.dlq`. Solo los usa `worker`; opcionales. |
+
+**Correr las pruebas**, desde `cubicador/`:
+
+```bash
+pip install -r requirements.txt   # incluye pytest y pytest-asyncio
 pytest
 ```
 
 ## Cómo se conecta con NEXO
 
-- **NEXO → este servicio**: NEXO **no llama** a la API REST de este
-  servicio (ver `CONTRATO.md` sección 1.1). `optimizar`/`crear-desde-línea`
-  van por RabbitMQ (202 inmediato del lado Cubicador, resultado por
-  polling). La API REST de este servicio es para un frontend que la
-  consuma directo, no para NEXO — autenticación `Authorization: Bearer
-  <CUBICADOR_API_KEY>`.
-- **Este servicio → NEXO**: un único endpoint de solo lectura, en sentido
-  inverso, que NEXO ya expone (`GET /api/lineas-solicitud/{id}/cubicacion`,
-  `LineasSolicitudCubicacionController`) para el puente Mesa de Costeo →
-  Cubicador (`crear_desde_linea`). Autenticación de servicio-a-servicio
-  dedicada: `Authorization: Bearer <NEXO_CALLBACK_API_KEY>` (debe ser
-  idéntica a `Cubicador3D__InboundApiKey` del `.env` de NEXO). Implementado
-  y verificado de punta a punta — ver `CONTRATO.md` sección 7 y
-  `docs/testDocumentation/PRUEBAS_DE_INTEGRACION.md` sección 2.9.
-- Siguen sin compartir red Docker ni base de datos entre sí como norma —
-  cada uno tiene su propio `docker-compose.yml` y todo cruce es por
-  RabbitMQ (compartido, ver "Puesta en marcha") o por este único endpoint
-  HTTP puntual, nunca por tabla compartida.
+- **NEXO → este servicio, por cola.** Toda escritura del plan de cargue y de los vehículos del motor 3D llega como un comando en
+  `cubicacion.solicitada` (crear, optimizar o borrar planes, ítems, colocaciones y vehículos). El worker responde con eventos, y
+  NEXO sirve las lecturas desde su propia proyección ([`CUBICACION.md`](../docs/mensajeria/CUBICACION.md)).
+- **NEXO → este servicio, por HTTP.** `POST` y `GET /recomendaciones` y `GET /recomendaciones/explicacion`, con la llave de NEXO
+  (`Cubicador3D:RecomendacionesApiKey` = `CUBICADOR_API_KEY_NEXO`), y el reenvío de los CRUD de catálogo que hace el portal, con
+  la llave genérica (`Cubicador3D:OutboundApiKey` = `CUBICADOR_API_KEY`).
+- **Este servicio → NEXO.** Un único endpoint de solo lectura, `GET /api/lineas-solicitud/{id}/cubicacion`, para el puente Mesa
+  de Costeo → plan 3D (`crear_desde_linea`). Usa `NEXO_CALLBACK_API_KEY`, que debe ser igual a `Cubicador3D__InboundApiKey` en
+  NEXO ([`CONTRATO.md`](./CONTRATO.md), sección 7).
+- Ningún navegador llama a este servicio: no tiene CORS.
+- No comparten base de datos: cada uno tiene la suya y todo cruce es por RabbitMQ o por las llamadas HTTP de arriba.
 
-## Alcance explícitamente fuera de esta primera versión
+## Fuera de alcance
 
-- **Actualización**: la paridad automatizada cross-motor que decía "no se
-  construye" ya se construyó — ver la sección "Estado actual" más arriba y
-  `tests/paridad/`. `docs/DECISIONES_TECNICAS.md` #3 documenta por qué se
-  revirtió esa decisión (un requisito posterior la pidió explícitamente
-  como criterio de liberación).
-- `POST /api/cubicacion/costear` (cubicar + estimar flete) — no se migró en
-  NEXO tampoco: depende de un método de Biblioteca (`EstimarFleteAsync`) que
-  nunca se migró a su puerto. Gap pre-existente, ajeno al Cubicador.
-- Frontend del Cubicador 3D — sigue pendiente aparte, en ningún repo todavía.
-- "Comunicación solo por colas" (decisión técnica del port) — hoy el
-  servicio sigue siendo REST para todo lo que no es `optimizar`/
-  `crear-desde-línea`. Ver nota al inicio de este README.
+- `POST /api/cubicacion/costear` (cubicar y estimar flete): no se migró en NEXO, porque depende de un método de Biblioteca
+  (`EstimarFleteAsync`) que nunca se migró a su puerto. Es un hueco previo, ajeno al Cubicador.
+- Unificar los dos catálogos de vehículos (el de la selección de flota y el del motor 3D): hoy los cruza un diccionario de
+  compatibilidad ([`DEUDA_DIFERIDA_3D.md`](./docs/DEUDA_DIFERIDA_3D.md)).

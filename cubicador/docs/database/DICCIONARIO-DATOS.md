@@ -2,7 +2,7 @@
 
 Las 16 tablas del Cubicador: para qué sirve cada una, de dónde salen sus datos y qué guarda cada columna. Tipos, nulos y valores por defecto corresponden a `cubicador/database/esquema/ESQUEMA_CUBICADOR.sql`.
 
-> **Dónde viven:** la base propia es `dbCubicador_Pruebas` (esquema `dbo`), pero el ambiente de QA todavía opera en `dbTarifario_Nexo_Pruebas`, esquema `dbo_cubicador`, con la misma estructura. El corte está pendiente en la issue #423. Detalle en [`cubicador/database/README.md`](../../database/README.md#dónde-vive-hoy).
+> **Dónde viven:** la base propia es `dbCubicador_Pruebas` (esquema `dbo`), pero el ambiente de QA todavía opera en `dbTarifario_Nexo_Pruebas`, esquema `dbo_cubicador`, con la misma estructura. El paso de QA a la base propia todavía está pendiente. Detalle en [`cubicador/database/README.md`](../../database/README.md#dónde-vive-hoy).
 
 **Origen de cada columna:**
 
@@ -180,7 +180,7 @@ NEXO y Cotifly no consultan esta base directamente: piden las recomendaciones a 
 
 **Datos:** Sin seeder. La escribe el motor en cada recomendación que piden NEXO o Cotifly.
 
-> La interpretación de descripciones de mercancía (#368) y la explicación de la recomendación en lenguaje natural (#369, #419) **no guardan nada en la base**, por decisión de diseño: se calculan al pedirlas. Por eso tampoco se registran sus tokens; el tope diario de IA solo suma los de `iaSombra`.
+> La interpretación de descripciones de mercancía y la explicación de la recomendación en lenguaje natural **no guardan nada en la base**, por decisión de diseño: se calculan al pedirlas. Por eso tampoco se registran sus tokens; el tope diario de IA solo suma los de `iaSombra`.
 
 | Columna | Tipo | Nulo | Por defecto | Origen | Descripción |
 |---|---|---|---|---|---|

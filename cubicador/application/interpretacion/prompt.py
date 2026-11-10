@@ -1,7 +1,7 @@
 """Instrucciones, mensaje y esquema de salida de la interpretacion.
 
 Lo que sale hacia el modelo es de **nivel C** del ADR de IA
-(`docs/decisiones/ia-claude-seguridad-y-datos.md`, seccion 2): el catalogo de
+(`docs/decisiones/DECISIONES-NEXO.md`, D-10, punto 2): el catalogo de
 tipos de mercancia y la descripcion libre de la carga, que el ADR nombra
 explicitamente como "descripciones de mercancia sin datos de personas".
 

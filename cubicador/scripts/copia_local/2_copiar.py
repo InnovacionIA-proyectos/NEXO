@@ -2,7 +2,7 @@
 
 Que hace, en orden:
   1. Crea la base y el esquema en el contenedor local, si no existen.
-  2. Aplica docs/Database/ESQUEMA_NEXO.sql, que es el DDL oficial del proyecto.
+  2. Aplica database/esquema/ESQUEMA_NEXO.sql, que es el DDL oficial del proyecto.
   3. Copia los datos tabla por tabla, con las llaves foraneas desactivadas.
   4. Reactiva las llaves y verifica el conteo de filas contra el origen.
 
@@ -23,7 +23,7 @@ import time
 sys.path.insert(0, os.path.dirname(__file__))
 import _conexion as cx  # noqa: E402
 
-DDL = os.path.join(cx.RAIZ, "docs", "Database", "ESQUEMA_NEXO.sql")
+DDL = os.path.join(cx.RAIZ, "database", "esquema", "ESQUEMA_NEXO.sql")
 LOTE = 500
 
 # Tablas que no vale la pena copiar: respaldos y bitacoras que solo hacen ruido.

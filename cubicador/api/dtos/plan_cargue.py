@@ -1,4 +1,4 @@
-"""DTOs HTTP del Cubicador 3D / Plan de Cargue - ver CONTRATO.md seccion 3.2."""
+"""DTOs HTTP del Cubicador 3D / Plan de Cargue - ver CONTRATO.md seccion 3.3."""
 
 from __future__ import annotations
 

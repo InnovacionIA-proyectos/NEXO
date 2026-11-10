@@ -96,7 +96,7 @@ uno de los 6 roles de Nexo. Errores con forma consistente:
 ```
 
 Referencia completa de endpoints en [`CONTRATO.md`](CONTRATO.md). Permisos
-por rol en [`docs/documentacion/ROLES_Y_PERMISOS.md`](docs/documentacion/ROLES_Y_PERMISOS.md).
+por rol y funcionamiento completo en [`docs/funcionamiento/FUNCIONAMIENTO-NEXO.md`](docs/funcionamiento/FUNCIONAMIENTO-NEXO.md).
 
 ## Testing
 
@@ -115,7 +115,9 @@ cd cubicador && pytest
 ## Documentación adicional
 
 - [`docs/README.md`](docs/README.md) — índice de toda la documentación.
-- [`docs/Database/`](docs/Database/) — esquema, datos iniciales y script para crear la base. El diccionario de datos está en [`docs/documentacion/database/`](docs/documentacion/database/).
+- [`docs/funcionamiento/FUNCIONAMIENTO-NEXO.md`](docs/funcionamiento/FUNCIONAMIENTO-NEXO.md) — cómo funciona NEXO de punta a punta.
+- [`tests/README.md`](tests/README.md) — cómo correr las pruebas.
+- [`database/`](database/) — esquema, datos iniciales y script para crear la base. El diccionario de datos está en [`docs/database/`](docs/database/).
 - [`docs/mensajeria/`](docs/mensajeria/) — topología RabbitMQ/MassTransit.
-- [`docs/decisiones/`](docs/decisiones/) — decisiones de diseño.
+- [`docs/decisiones/DECISIONES-NEXO.md`](docs/decisiones/DECISIONES-NEXO.md) — decisiones técnicas.
 - [`cubicador/README.md`](cubicador/README.md) — detalle del microservicio de cubicación.

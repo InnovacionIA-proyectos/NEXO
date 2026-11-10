@@ -3,7 +3,7 @@
 -- =============================================================================
 -- Base: dbCubicador_Pruebas   Esquema: dbo   Servidor: 10.10.40.85,1433
 -- Hoy QA todavía opera en dbTarifario_Nexo_Pruebas, esquema dbo_cubicador, con esta
--- misma estructura; el corte a la base propia está pendiente (#423). Ver README.
+-- misma estructura; el paso de QA a la base propia está pendiente. Ver README.
 --
 -- Este archivo es la única definición del esquema. No hay migraciones: se ejecuta
 -- completo, una sola vez, contra una base vacía. Un cambio de estructura se hace

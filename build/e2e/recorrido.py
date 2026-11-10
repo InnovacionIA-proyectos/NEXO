@@ -251,7 +251,7 @@ def _item_de_prueba(sku, secuencia):
 def probar_comandos_escritura_plan_cargue():
     """
     Un test por cada uno de los 9 comandos de escritura del plan
-    de cargue (docs/mensajeria/CUBICACION.md sección 6) contra RabbitMQ real y ambas bases
+    de cargue (docs/mensajeria/CUBICACION.md sección 3) contra RabbitMQ real y ambas bases
     reales (NEXO y Cubicador) — nada de mocks, cada paso confirma el efecto releyendo la
     proyección local, nunca el 202 solo.
 

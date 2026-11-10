@@ -8,7 +8,7 @@ sirve para comparar cualquier candidato y se prueba sin correr nada.
 Cada tasa se entrega como `{aciertos, total, tasa}` para que el denominador nunca
 quede implicito: "acierto 80 %" sin saber sobre cuantos casos no dice nada.
 
-Definiciones (ver `docs/ia/ESTUDIO-CUBICADOR-IA.md`):
+Definiciones (ver `evaluacion-ia/cubicador/ESTUDIO-CUBICADOR-IA.md`):
 
   acierto del vehiculo   la flota propuesta es una de las flotas correctas del caso.
   flota minima           la cantidad de vehiculos propuesta es la minima correcta.

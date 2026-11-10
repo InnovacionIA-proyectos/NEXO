@@ -174,7 +174,7 @@ más de 100 MB. Se extrajo en su lugar una **muestra representativa de 151 filas
 
 No se encontraron rutas en bucle (`ORIGEN=DESTINO`), valores nulos/en cero, ni
 horas en cero en la tabla completa — a diferencia de `tblSAPTarifas` (ver
-`../../../docs/tarifas-plaza-provisionales/README.md`), esta tabla no tiene ese tipo de
+el dataset de tarifas de plaza provisionales, retirado del repositorio y disponible en el historial de git), esta tabla no tiene ese tipo de
 suciedad.
 
 ## `tblSAPTarifas` y `tblSAPTarifasLog` — completas, no muestreadas
@@ -190,7 +190,7 @@ aplicar la corrección local** `AjusteVigenciaPlaza` (mecanismo de Nexo que
 sobre-escribe vigencias puntuales conocidas como mal cargadas). Decisión explícita
 del negocio: quien consuma este extracto debe saber que algunas vigencias aquí
 pueden estar mal cargadas en el origen (SAP), tal como se documentó en
-`../../../docs/tarifas-plaza-provisionales/README.md` (95,8% de `tblSAPTarifas` completa
+el dataset de tarifas de plaza provisionales, retirado del repositorio (95,8% de `tblSAPTarifas` completa
 está vencida a la fecha de hoy).
 
 **Pendiente de confirmar con negocio** (no se pudo resolver solo con el código):
