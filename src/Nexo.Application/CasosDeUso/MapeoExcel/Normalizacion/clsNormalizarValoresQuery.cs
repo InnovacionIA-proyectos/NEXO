@@ -123,7 +123,7 @@ public sealed class clsNormalizarValoresQueryHandler(
         if (pendientes.Count == 0)
             motivoSinIa = "SIN_PENDIENTES";
         else if (!ia.Habilitada(clsFuncionIa.ImportacionExcel))
-            motivoSinIa = "IA_NO_DISPONIBLE";
+            motivoSinIa = clsMotivosSinIa.Desactivada;
         else
         {
             try

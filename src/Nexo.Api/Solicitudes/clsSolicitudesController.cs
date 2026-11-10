@@ -23,7 +23,8 @@ public class clsSolicitudesController(
     ICommandHandler<clsCargarLineasBulkCommand, Guid> cargarLineas,
     ICommandHandler<clsRechazarSolicitudCommand, Unit> rechazar,
     ICommandHandler<clsRecalcularScoreCommand, clsDesgloseScoreDto> recalcular,
-    ICommandHandler<clsResolverCatalogosDeLineasCommand, IReadOnlyList<clsCatalogoLineaResueltoDto>> resolverCatalogos)
+    ICommandHandler<clsResolverCatalogosDeLineasCommand, IReadOnlyList<clsCatalogoLineaResueltoDto>> resolverCatalogos,
+    IQueryHandler<clsRecomendarVehiculoContenedorQuery, IReadOnlyList<clsRecomendacionVehiculoContenedorDto>> recomendarVehiculoContenedor)
     : ControllerBase
 {
     /// <summary>
@@ -70,9 +71,23 @@ public class clsSolicitudesController(
     public async Task<ActionResult<IReadOnlyList<clsCatalogoLineaResueltoDto>>> ResolverCatalogos(
         [FromBody] List<clsResolverCatalogoLineaRequest> req, CancellationToken ct = default)
     {
-        var lineas = req.Select(lr => new clsResolverCatalogoLineaInput(lr.Origen, lr.Destino, lr.TipoVehiculo, lr.Carroceria)).ToList();
+        var lineas = req.Select(lr => new clsResolverCatalogoLineaInput(lr.Origen, lr.Destino, lr.TipoVehiculo, lr.Carroceria, lr.OrigenMunicipioId, lr.DestinoMunicipioId)).ToList();
         return Ok(await resolverCatalogos.Handle(new clsResolverCatalogosDeLineasCommand(lineas), ct));
     }
+
+    /// <summary>
+    /// El vehículo que el costeo escogería para cada contenedor según su tamaño y peso (<c>tbl_rangos_peso_contenedor</c>), por lote y en el mismo orden.
+    /// Solo lectura: el front lo prellena en la línea y lo manda como <c>tipoVehiculo</c> al crear la solicitud. <c>tipoVehiculo</c> va en null si el peso
+    /// supera el tope del tamaño (<c>pesoMaximoContenedor</c> trae el tope más alto) o si la tabla no está disponible.
+    /// </summary>
+    [HttpPost("recomendar-vehiculo-contenedor")]
+    [Authorize(Roles = "Comercial,AdminTarifas,Admin")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<IReadOnlyList<clsRecomendacionVehiculoContenedorDto>>> RecomendarVehiculoContenedor(
+        [FromBody] List<clsRecomendarVehiculoContenedorRequest> req, CancellationToken ct = default)
+        => Ok(await recomendarVehiculoContenedor.Handle(
+            new clsRecomendarVehiculoContenedorQuery(req.Select(l => new clsRecomendacionVehiculoContenedorInput(l.Indice, l.ClaseContenedor, l.PesoKg)).ToList()), ct));
 
     /// <summary>Carga masiva de líneas de un pliego de licitación. Responde 202 con el identificador del trabajo: las líneas quedan guardadas y el costeo corre en segundo plano. 409 si la solicitud no admite más líneas.</summary>
     [HttpPost("{id:guid}/lineas:bulk")]

@@ -115,6 +115,19 @@ public class clsRangosPesoContenedorTests(clsApiFixture fx) : IDisposable
         Assert.NotEqual("3S3", r.TipoVehiculo);
     }
 
+    [Fact]
+    public async Task El_tope_de_un_tamano_es_el_peso_maximo_mas_alto_de_sus_rangos_activos()
+    {
+        Asegurar(20, "3S3", 30_000);
+        var esperado = fx.WithDb(db => db.RangosPesoContenedor.Where(r => r.Contenedor == 20 && r.Activo).Max(r => r.PesoMaximo));
+
+        var tope = await Adaptador().PesoMaximoAsync(20);
+
+        Assert.Equal(esperado, tope);
+        Assert.True(tope >= 30_000);
+        Assert.Null(await Adaptador().PesoMaximoAsync(99));
+    }
+
     private sealed class clsAlcancesQueFallan : IServiceScopeFactory
     {
         public int Intentos { get; private set; }

@@ -51,29 +51,73 @@ public static class clsResolucionDeCatalogos
     }
 
     /// <summary>
-    /// Busca la ruta en el diccionario cargado o la crea. Si el frontend resolvió Origen/Destino con el buscador de ciudades, los ids de
-    /// municipio se guardan en la ruta (también sobre una existente); null si la línea no los trae.
+    /// Busca la ruta en el diccionario cargado o la crea. Con los ids de municipio que el frontend resolvió con el buscador de ciudades se busca
+    /// primero por municipios y después por texto; por texto solo se completan los ids que la ruta tiene vacíos, nunca se cambian los que ya tiene
+    /// (un mismo nombre existe en varios departamentos). Una ruta nueva con id toma su nombre del municipio del catálogo
+    /// (<paramref name="municipios"/>, por id).
     /// </summary>
     public static (clsRuta clsRuta, bool Creada) ResolverRuta(
         string origen, string destino, IDictionary<string, clsRuta> rutasPorClave, IRutasCatalogoPort catalogo,
-        int? origenMunicipioId = null, int? destinoMunicipioId = null)
+        int? origenMunicipioId = null, int? destinoMunicipioId = null, IReadOnlyDictionary<int, clsMunicipio>? municipios = null)
     {
+        var nombreOrigen = NombreDelMunicipio(origenMunicipioId, municipios) ?? Limpiar(origen)!;
+        var nombreDestino = NombreDelMunicipio(destinoMunicipioId, municipios) ?? Limpiar(destino)!;
         var clave = ClaveRuta(origen, destino);
-        if (rutasPorClave.TryGetValue(clave, out var ruta))
+
+        if (origenMunicipioId is not null && destinoMunicipioId is not null)
         {
-            if (origenMunicipioId is not null) ruta.OrigenMunicipioId = origenMunicipioId;
-            if (destinoMunicipioId is not null) ruta.DestinoMunicipioId = destinoMunicipioId;
+            // Pueden existir varias rutas con los mismos municipios: gana la que coincide por texto y, si ninguna, la más antigua.
+            var porMunicipios = rutasPorClave.Values.Distinct()
+                .Where(r => r.OrigenMunicipioId == origenMunicipioId && r.DestinoMunicipioId == destinoMunicipioId)
+                .OrderByDescending(r => ClaveRuta(r.Origen, r.Destino) == clave || ClaveRuta(r.Origen, r.Destino) == ClaveRuta(nombreOrigen, nombreDestino))
+                .ThenBy(r => r.CreatedAt).ThenBy(r => r.Id)
+                .FirstOrDefault();
+            if (porMunicipios is not null) return (porMunicipios, false);
+        }
+
+        if (!rutasPorClave.TryGetValue(clave, out var ruta))
+            rutasPorClave.TryGetValue(ClaveRuta(nombreOrigen, nombreDestino), out ruta);
+
+        if (ruta is not null)
+        {
+            ruta.OrigenMunicipioId ??= origenMunicipioId;
+            ruta.DestinoMunicipioId ??= destinoMunicipioId;
             return (ruta, false);
         }
 
         ruta = new clsRuta
         {
-            Origen = Limpiar(origen)!, Destino = Limpiar(destino)!,
+            Origen = nombreOrigen, Destino = nombreDestino,
             OrigenMunicipioId = origenMunicipioId, DestinoMunicipioId = destinoMunicipioId,
         };
         catalogo.Agregar(ruta);
         rutasPorClave[clave] = ruta;
+        rutasPorClave[ClaveRuta(nombreOrigen, nombreDestino)] = ruta;
         return (ruta, true);
+    }
+
+    private static string? NombreDelMunicipio(int? id, IReadOnlyDictionary<int, clsMunicipio>? municipios) =>
+        id is { } i && municipios is not null && municipios.TryGetValue(i, out var m) ? Limpiar(m.Municipio) : null;
+
+    /// <summary>
+    /// Los municipios de los ids que traen las líneas, por id; null si ninguna trae ids. 400 <c>MUNICIPIO_NO_ENCONTRADO</c> si algún id no
+    /// está en el catálogo.
+    /// </summary>
+    public static async Task<IReadOnlyDictionary<int, clsMunicipio>?> CargarMunicipiosAsync(
+        IMunicipiosRepository repositorio, IEnumerable<(int Linea, int? OrigenId, int? DestinoId)> lineas, CancellationToken ct)
+    {
+        var pedidas = lineas.ToList();
+        if (pedidas.All(l => l.OrigenId is null && l.DestinoId is null)) return null;
+
+        var catalogo = (await repositorio.ListarAsync(ct)).ToDictionary(m => m.Id);
+        foreach (var (linea, origenId, destinoId) in pedidas)
+        {
+            if (origenId is { } o && !catalogo.ContainsKey(o))
+                throw new Common.Exceptions.clsValidationFailedException("MUNICIPIO_NO_ENCONTRADO", $"Línea {linea}: el municipio de origen {o} no existe en el catálogo.");
+            if (destinoId is { } d && !catalogo.ContainsKey(d))
+                throw new Common.Exceptions.clsValidationFailedException("MUNICIPIO_NO_ENCONTRADO", $"Línea {linea}: el municipio de destino {d} no existe en el catálogo.");
+        }
+        return catalogo;
     }
 
     /// <summary>
@@ -81,16 +125,19 @@ public static class clsResolucionDeCatalogos
     /// la equivalencia con un código canónico del Cubicador la decide un humano. Antes se consulta <paramref name="aliasVehiculo"/>
     /// (<c>AliasNormalizado → código</c>): si el texto es un alias ("TB", "Turbo" → 2L2) se usa el CÓDIGO, la fila nace oficial y una fila en
     /// cuarentena con ese código y carrocería se promueve (no si alguien la descartó). La carrocería no se toca.
+    /// Un tipo que es un código de la tabla de traducción (<paramref name="oficialidad"/>) cuenta igual que un alias, pero solo con la carrocería
+    /// vacía o del catálogo: con otra, la configuración nace en cuarentena como un texto libre.
     /// </summary>
     public static (clsConfiguracionVehiculo? Vehiculo, bool Creado) ResolverVehiculo(
         string? tipoVehiculo, string? carroceria,
         IDictionary<string, clsConfiguracionVehiculo> vehiculosPorClave, IConfiguracionesVehiculoPort catalogo,
-        IReadOnlyDictionary<string, string>? aliasVehiculo = null)
+        IReadOnlyDictionary<string, string>? aliasVehiculo = null, Catalogos.clsOficialidadDeVehiculos? oficialidad = null)
     {
         if (string.IsNullOrWhiteSpace(tipoVehiculo)) return (null, false);
 
         string? codigoAlias = null;
         if (aliasVehiculo is not null && aliasVehiculo.TryGetValue(Normalizar(tipoVehiculo), out var codigo)) codigoAlias = codigo;
+        codigoAlias ??= oficialidad?.CodigoOficial(tipoVehiculo, carroceria);
         var tipo = codigoAlias ?? tipoVehiculo;
 
         var clave = ClaveVehiculo(tipo, carroceria);

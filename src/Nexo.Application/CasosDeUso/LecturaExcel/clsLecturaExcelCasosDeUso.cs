@@ -73,6 +73,9 @@ public sealed class clsLeerEstructuraCommandHandler(
     IAsistenteIaPort ia, ICurrentUserPort usuarioActual, IUnitOfWork uow, TimeProvider reloj)
     : ICommandHandler<clsLeerEstructuraCommand, clsLecturaEstructuraDto>
 {
+    /// <summary>Tope de salida de la receta; incluye lo que el modelo razona antes de responder.</summary>
+    private const int MaxTokensSalidaReceta = 16_000;
+
     private sealed record Propuesta(clsRecetaLectura? Receta, string? Resumen, IReadOnlyList<string> Dudas, string? Motivo, IReadOnlyList<string> Avisos);
 
     public async Task<clsLecturaEstructuraDto> Handle(clsLeerEstructuraCommand command, CancellationToken ct = default)
@@ -144,7 +147,9 @@ public sealed class clsLeerEstructuraCommandHandler(
                 {
                     receta = clsRecetaPorDefecto.Generar(hojas);
                     origen = "automatica";
-                    avisos.Add("La IA no está disponible: se hizo una lectura simple (una tabla por hoja, con el primer encabezado que se encontró). Revísala y ajústala.");
+                    avisos.Add(motivoSinIa == clsMotivosSinIa.RespuestaTruncada
+                        ? "El archivo es muy grande o complejo para que la IA lo describa de una vez: se hizo una lectura simple (una tabla por hoja). Indica en las instrucciones qué hojas usar o envía el archivo por partes."
+                        : "La IA no está disponible: se hizo una lectura simple (una tabla por hoja, con el primer encabezado que se encontró). Revísala y ajústala.");
                 }
             }
         }
@@ -183,7 +188,7 @@ public sealed class clsLeerEstructuraCommandHandler(
         IReadOnlyList<clsHojaCruda> hojas, string? instrucciones, clsRecetaLectura? recetaBase, string? instruccionesGuardadas,
         clsCambiosDeFormatoDto? cambios, CancellationToken ct)
     {
-        if (!ia.Habilitada(clsFuncionIa.ImportacionExcel)) return new(null, null, [], "IA_NO_DISPONIBLE", []);
+        if (!ia.Habilitada(clsFuncionIa.ImportacionExcel)) return new(null, null, [], clsMotivosSinIa.Desactivada, []);
 
         var cambiosTexto = cambios is null ? null : (IReadOnlyList<string>)
             [.. cambios.Faltan.Select(t => $"ya no aparece «{t}»"), .. cambios.Nuevos.Select(t => $"nuevo «{t}»")];
@@ -193,14 +198,24 @@ public sealed class clsLeerEstructuraCommandHandler(
         };
 
         var avisos = new List<string>();
-        for (var intento = 0; intento < 2; intento++)
+        var corregida = false;
+        var compactada = false;
+        while (true)
         {
             clsRespuestaIa respuesta;
             try
             {
                 respuesta = await ia.CompletarAsync(new clsPeticionIa(
                     clsFuncionIa.ImportacionExcel, clsPromptReceta.Instrucciones(), mensajes, clsPromptReceta.EsquemaDeSalida(),
-                    MaxTokensSalida: 8000, UsuarioId: usuarioActual.Id), ct);
+                    MaxTokensSalida: MaxTokensSalidaReceta, UsuarioId: usuarioActual.Id), ct);
+            }
+            catch (clsServiceUnavailableException ex) when (ex.Code == clsMotivosSinIa.RespuestaTruncada && !compactada)
+            {
+                // Se cortó por longitud: un solo reintento pidiendo la receta más compacta.
+                compactada = true;
+                mensajes[^1] = mensajes[^1] with { Contenido = mensajes[^1].Contenido + "\n\n" + clsPromptReceta.NotaCompacta };
+                avisos.Add("La primera respuesta de la IA se cortó por ser demasiado larga y se le pidió una receta más compacta.");
+                continue;
             }
             catch (clsServiceUnavailableException ex)
             {
@@ -215,12 +230,13 @@ public sealed class clsLeerEstructuraCommandHandler(
             if (validacion.Valida) return new(interpretada.Value.Receta, interpretada.Value.Resumen, interpretada.Value.Dudas, null, avisos);
 
             // Un solo intento de corrección: se le devuelven los errores concretos de lo que propuso.
+            if (corregida) return new(null, null, [], "IA_RESPUESTA_INVALIDA", avisos);
+            corregida = true;
             mensajes.Add(new clsMensajeIa(clsMensajeIa.RolAsistente, texto));
             mensajes.Add(new clsMensajeIa(clsMensajeIa.RolUsuario,
                 "La receta tiene errores y no se puede ejecutar: " + string.Join(" ", validacion.Errores.Take(5)) + " Devuelve la receta corregida con el mismo formato."));
             avisos.Add("La primera propuesta de la IA tenía errores y se le pidió corregirla.");
         }
-        return new(null, null, [], "IA_RESPUESTA_INVALIDA", avisos);
     }
 }
 

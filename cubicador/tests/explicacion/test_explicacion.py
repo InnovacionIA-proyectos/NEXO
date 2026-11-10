@@ -97,6 +97,46 @@ def test_las_cifras_permitidas_salen_de_lo_que_se_le_mando():
         assert any(D(str(v[campo])) == p for p in permitidas), campo
 
 
+# ------------------------------------- las cifras que el motor escribe en sus textos (#441)
+
+async def test_la_cifra_de_una_advertencia_no_descarta_la_explicacion():
+    """El fallo de #441, que dejaba `explicacion` en null siempre.
+
+    La advertencia entra al mensaje y las INSTRUCCIONES piden nombrarla en una
+    frase, asi que el modelo escribe su cifra. Mientras no estuvo declarada,
+    `verificar` la tomaba por inventada y descartaba el texto entero: con el
+    umbral de llenado en 75 %, cualquier carga que lo cruzara se quedaba sin
+    explicacion.
+    """
+    from dataclasses import replace
+    r = replace(_con_numeros(), advertencias=("Vehiculo(s) 1 por debajo del 75% de llenado.",))
+
+    e = await _servicio(_json("El furgon queda por debajo del 75% de llenado, asi que va holgado.")).explicar(r)
+
+    assert e is not None
+
+
+async def test_la_cifra_del_motivo_sin_seleccion_tampoco_la_descarta():
+    """Mismo caso para el otro texto que escribe el motor y viaja en el mensaje."""
+    from dataclasses import replace
+    r = replace(_con_numeros(), motivo_sin_seleccion="Ninguna combinacion de hasta 4 vehiculos acomoda la carga.")
+
+    e = await _servicio(_json("No hubo combinacion de hasta 4 vehiculos que acomodara la carga.")).explicar(r)
+
+    assert e is not None
+
+
+async def test_declarar_esas_cifras_no_abre_la_puerta_a_las_demas():
+    """La garantia sigue en pie: una cifra que no esta ni en los campos ni en
+    los textos del motor descarta la explicacion igual que antes."""
+    from dataclasses import replace
+    r = replace(_con_numeros(), advertencias=("Vehiculo(s) 1 por debajo del 75% de llenado.",))
+
+    e = await _servicio(_json("El furgon queda al 93 % de su volumen.")).explicar(r)
+
+    assert e is None
+
+
 async def test_los_ordinales_de_la_redaccion_son_validos():
     """"el segundo camion", "los 2 vehiculos": cifras normales que no salen de
     ningun campo."""

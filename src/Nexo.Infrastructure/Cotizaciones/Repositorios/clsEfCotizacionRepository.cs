@@ -5,6 +5,7 @@ using Nexo.Domain.Cotizaciones.Entidades;
 using Nexo.Domain.Enums;
 using Nexo.Domain.Solicitudes.Entidades;
 using Nexo.Infrastructure.Persistence;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 
 namespace Nexo.Infrastructure.Cotizaciones.Repositorios;
@@ -29,6 +30,7 @@ public sealed class clsEfCotizacionRepository(clsNexoDbContext db) : ICotizacion
     public Task<clsCotizacion?> ObtenerParaExportarAsync(Expression<Func<clsCotizacion, bool>> filtro, CancellationToken ct) =>
         db.Cotizaciones.AsNoTracking()
             .Include(x => x.Lineas).ThenInclude(l => l.clsLineaSolicitud).ThenInclude(ls => ls!.clsRuta)
+            .Include(x => x.Lineas).ThenInclude(l => l.clsLineaSolicitud).ThenInclude(ls => ls!.clsConfiguracionVehiculo)
             .Include(x => x.Conexos).ThenInclude(x => x.clsServicioConexo)
             .Include(x => x.clsSolicitud).ThenInclude(s => s!.clsCliente)
             .FirstOrDefaultAsync(filtro, ct);
@@ -45,4 +47,14 @@ public sealed class clsEfCotizacionRepository(clsNexoDbContext db) : ICotizacion
     }
 
     public void Agregar(clsCotizacion cotizacion) => db.Cotizaciones.Add(cotizacion);
+
+    /// <summary>Índice único filtrado de <c>tbl_cotizacion_lineas</c> (CotizacionId, LineaSolicitudId).</summary>
+    public const string IndiceLineaUnica = "IX_cotizacion_lineas_Cotizacion_LineaSolicitud";
+
+    // 2601 y 2627: violación de índice o restricción única; el mensaje trae el nombre del índice.
+    public bool EsChoqueDeLineaDuplicada(Exception error) =>
+        error is DbUpdateException { InnerException: SqlException { Number: 2601 or 2627 } sql }
+        && sql.Message.Contains(IndiceLineaUnica, StringComparison.OrdinalIgnoreCase);
+
+    public void DescartarCambiosPendientes() => db.ChangeTracker.Clear();
 }

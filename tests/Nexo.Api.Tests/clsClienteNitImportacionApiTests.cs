@@ -256,4 +256,135 @@ public class clsClienteNitImportacionApiTests(clsApiFixture fx)
         }
         finally { Limpiar(nit, marca); }
     }
+
+    // ---------------------------------------------------------------- diccionario por cliente
+
+    private const string RutaDiccionario = "/api/diccionario-cliente";
+
+    private static object Termino(string termino, string? nit = null, Guid? clienteId = null) =>
+        new { clienteId, clienteNit = nit, termino, tipo = "valor", concepto = "Nacional", contexto = "lineaNegocio" };
+
+    private void LimpiarConDiccionario(string nit, string marca)
+    {
+        Db(db => db.TerminosCliente.Where(t => t.Termino.StartsWith(marca)).ExecuteDelete());
+        Limpiar(nit, marca);
+    }
+
+    [Fact]
+    public async Task Crear_un_termino_con_el_NIT_de_un_cliente_del_DW_crea_el_cliente_una_vez_y_se_lista_por_NIT()
+    {
+        var nit = NitUnico();
+        var marca = Marca();
+        using var fabrica = Fabrica(new ClientesDwFalso(new clsClienteDwDto("BP-414", nit, $"{marca} Real SAS")), new ProspectosDwFalso());
+        using var c = Comercial(fabrica);
+        try
+        {
+            var primero = await c.PostAsJsonAsync(RutaDiccionario, Termino($"{marca} OUTBOUND", ConFormato(nit)));
+            Assert.Equal(HttpStatusCode.Created, primero.StatusCode);
+            var dto = await primero.Json();
+            var clienteId = dto.GetProperty("clienteId").GetGuid();
+            Assert.Equal($"{marca} Real SAS", dto.GetProperty("clienteNombre").GetString());
+
+            var segundo = await c.PostAsJsonAsync(RutaDiccionario, Termino($"{marca} INBOUND", nit));
+            Assert.Equal(clienteId, (await segundo.Json()).GetProperty("clienteId").GetGuid());
+            Assert.Equal(1, ClientesConNit(nit));
+
+            foreach (var formato in new[] { nit, ConFormato(nit) })
+            {
+                var lista = await (await c.GetAsync($"{RutaDiccionario}?clienteNit={Uri.EscapeDataString(formato)}&incluirGenerales=false&q={marca}")).Json();
+                Assert.Equal(2, lista.GetArrayLength());
+                Assert.All(lista.EnumerateArray(), t => Assert.Equal(clienteId, t.GetProperty("clienteId").GetGuid()));
+            }
+        }
+        finally { LimpiarConDiccionario(nit, marca); }
+    }
+
+    [Fact]
+    public async Task Crear_un_termino_con_el_NIT_de_un_cliente_local_usa_ese_cliente()
+    {
+        var nit = NitUnico();
+        var marca = Marca();
+        var local = new clsCliente { Nombre = $"{marca} Local", Nit = nit, RazonSocial = $"{marca} Local" };
+        Db(db => { db.Clientes.Add(local); db.SaveChanges(); });
+        using var fabrica = Fabrica(new ClientesDwFalso(), new ProspectosDwFalso());
+        using var c = Comercial(fabrica);
+        try
+        {
+            var resp = await c.PostAsJsonAsync(RutaDiccionario, Termino($"{marca} OUTBOUND", ConFormato(nit)));
+
+            Assert.Equal(HttpStatusCode.Created, resp.StatusCode);
+            Assert.Equal(local.Id, (await resp.Json()).GetProperty("clienteId").GetGuid());
+            Assert.Equal(1, ClientesConNit(nit));
+        }
+        finally { LimpiarConDiccionario(nit, marca); }
+    }
+
+    [Fact]
+    public async Task Un_NIT_que_no_es_de_nadie_o_el_id_con_el_NIT_a_la_vez_es_400_y_no_crea_nada()
+    {
+        var nit = NitUnico();
+        var marca = Marca();
+        using var fabrica = Fabrica(new ClientesDwFalso(), new ProspectosDwFalso());
+        using var c = Comercial(fabrica);
+        try
+        {
+            var desconocido = await c.PostAsJsonAsync(RutaDiccionario, Termino($"{marca} uno", nit));
+            Assert.Equal(HttpStatusCode.BadRequest, desconocido.StatusCode);
+            Assert.Equal("CLIENTE_NIT_INVALIDO", await desconocido.ErrorCode());
+
+            var ambiguo = await c.PostAsJsonAsync(RutaDiccionario, Termino($"{marca} dos", nit, clienteId: Guid.NewGuid()));
+            Assert.Equal(HttpStatusCode.BadRequest, ambiguo.StatusCode);
+            Assert.Equal("CLIENTE_AMBIGUO", await ambiguo.ErrorCode());
+
+            Assert.Equal(0, ClientesConNit(nit));
+            Assert.Equal(0, fx.WithDb(db => db.TerminosCliente.Count(t => t.Termino.StartsWith(marca))));
+        }
+        finally { LimpiarConDiccionario(nit, marca); }
+    }
+
+    [Fact]
+    public async Task Listar_por_un_NIT_sin_cliente_local_no_crea_nada_y_solo_trae_los_generales_que_se_piden()
+    {
+        var nit = NitUnico();
+        var marca = Marca();
+        using var fabrica = Fabrica(new ClientesDwFalso(new clsClienteDwDto("BP-415", nit, $"{marca} Real")), new ProspectosDwFalso());
+        using var c = Comercial(fabrica);
+        try
+        {
+            Assert.Equal(HttpStatusCode.Created, (await c.PostAsJsonAsync(RutaDiccionario, Termino($"{marca} general"))).StatusCode);
+
+            var conGenerales = await (await c.GetAsync($"{RutaDiccionario}?clienteNit={nit}&q={marca}")).Json();
+            Assert.Equal($"{marca} general", Assert.Single(conGenerales.EnumerateArray()).GetProperty("termino").GetString());
+
+            var sinGenerales = await (await c.GetAsync($"{RutaDiccionario}?clienteNit={nit}&incluirGenerales=false&q={marca}")).Json();
+            Assert.Equal(0, sinGenerales.GetArrayLength());
+
+            Assert.Equal(0, ClientesConNit(nit));
+        }
+        finally { LimpiarConDiccionario(nit, marca); }
+    }
+
+    [Fact]
+    public async Task Cuando_el_mismo_termino_llega_varias_veces_a_la_vez_gana_uno_y_el_resto_recibe_409()
+    {
+        var nit = NitUnico();
+        var marca = Marca();
+        using var fabrica = Fabrica(new ClientesDwFalso(new clsClienteDwDto("BP-416", nit, $"{marca} Real")), new ProspectosDwFalso());
+        using var c = Comercial(fabrica);
+        try
+        {
+            var respuestas = await Task.WhenAll(Enumerable.Range(0, 8)
+                .Select(_ => Task.Run(() => c.PostAsJsonAsync(RutaDiccionario, Termino($"{marca} OUTBOUND", nit)))));
+
+            var estados = respuestas.Select(r => r.StatusCode).ToList();
+            Assert.Single(estados, HttpStatusCode.Created);
+            Assert.All(estados.Where(s => s != HttpStatusCode.Created), s => Assert.Equal(HttpStatusCode.Conflict, s));
+            foreach (var r in respuestas.Where(r => r.StatusCode == HttpStatusCode.Conflict))
+                Assert.Equal("TERMINO_DUPLICADO", await r.ErrorCode());
+
+            Assert.Equal(1, ClientesConNit(nit));
+            Assert.Equal(1, fx.WithDb(db => db.TerminosCliente.Count(t => t.Termino.StartsWith(marca))));
+        }
+        finally { LimpiarConDiccionario(nit, marca); }
+    }
 }

@@ -7,4 +7,4 @@ namespace Nexo.Application.CasosDeUso.Cotizaciones.DTOs;
 public record clsLineaRechazoDto(Guid LineaSolicitudId, string EstadoLinea, string? MotivoRechazo, DateTimeOffset? RechazadaAt);
 
 /// <summary>Una línea rechazada de una solicitud, para armar el Excel ("Sin costeo") y el correo de entrega (con su motivo).</summary>
-public record clsLineaRechazadaInfo(string Ruta, string? Tipologia, string Motivo);
+public record clsLineaRechazadaInfo(string Ruta, string? Tipologia, string Motivo, string? Vehiculo = null);

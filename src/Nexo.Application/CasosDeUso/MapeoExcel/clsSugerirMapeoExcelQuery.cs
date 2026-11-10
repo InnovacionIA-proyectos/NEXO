@@ -73,7 +73,7 @@ public sealed class clsSugerirMapeoExcelQueryHandler(
         if (resueltas.Count == encabezados.Count)
             motivoSinIa = "DICCIONARIO_COMPLETO";
         else if (!ia.Habilitada(clsFuncionIa.ImportacionExcel))
-            motivoSinIa = "IA_NO_DISPONIBLE";
+            motivoSinIa = clsMotivosSinIa.Desactivada;
         else
         {
             try

@@ -750,7 +750,7 @@ Qué guarda cada una de las 46 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 | `CreatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de creación (auditoría) |
 | `UpdatedAt` | `datetimeoffset` | No | `sysdatetimeoffset` | Fecha de última modificación (auditoría) |
 
-**Llaves e índices:** PK `PK_cotizacion_lineas` (Id); Índice `IX_cotizacion_lineas_CotizacionId` (CotizacionId); Índice `IX_cotizacion_lineas_LineaSolicitudId` (LineaSolicitudId).
+**Llaves e índices:** PK `PK_cotizacion_lineas` (Id); Índice `IX_cotizacion_lineas_CotizacionId` (CotizacionId); Índice `IX_cotizacion_lineas_LineaSolicitudId` (LineaSolicitudId); Índice único filtrado `IX_cotizacion_lineas_Cotizacion_LineaSolicitud` (CotizacionId, LineaSolicitudId) donde `LineaSolicitudId` no es nulo: un flete por línea de solicitud en cada cotización.
 
 **FK salientes:** `CotizacionId` → `tbl_cotizaciones.Id` (ON DELETE CASCADE); `LineaSolicitudId` → `tbl_lineas_solicitud.Id` (NO ACTION).  
 **FK entrantes:** `tbl_cotizacion_conexos.CotizacionLineaId` (NO ACTION).

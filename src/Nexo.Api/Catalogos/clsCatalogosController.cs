@@ -17,6 +17,7 @@ namespace Nexo.Api.Catalogos;
 public class clsCatalogosController(
     IQueryHandler<clsListarTiposVehiculoQuery, IReadOnlyList<clsTipoVehiculoDto>> tiposVehiculo,
     IQueryHandler<clsListarLineasNegocioQuery, IReadOnlyList<clsLineaNegocioDto>> lineasNegocio,
+    IQueryHandler<clsListarVehiculosNexoQuery, IReadOnlyList<clsVehiculoNexoDto>> vehiculosNexo,
     IQueryHandler<clsListarClasesViajeQuery, IReadOnlyList<clsClaseViajeDto>> clasesViaje,
     IQueryHandler<clsListarClasesContenedorQuery, IReadOnlyList<clsClaseContenedorDto>> clasesContenedor,
     IQueryHandler<clsListarMunicipiosQuery, IReadOnlyList<clsMunicipioDto>> municipios)
@@ -28,6 +29,16 @@ public class clsCatalogosController(
     [EnableRateLimiting(clsRateLimitingExtensions.PoliticaListadosEstandar)]
     public async Task<ActionResult<IReadOnlyList<clsTipoVehiculoDto>>> TiposVehiculo(CancellationToken ct = default)
         => Ok(await tiposVehiculo.Handle(new clsListarTiposVehiculoQuery(), ct));
+
+    /// <summary>
+    /// Códigos de vehículo de NEXO (tbl_mapeo_vehiculo_tarifario, activos) para el selector «Cambiar vehículo» de la Mesa de Costeo: <c>enSap</c> dice si el
+    /// código también está en <c>GET tipos-vehiculo</c> (SAP), que es el que usan Reglas Solo-SICETAC y Tarifas de Plaza.
+    /// </summary>
+    [HttpGet("vehiculos-nexo")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [EnableRateLimiting(clsRateLimitingExtensions.PoliticaListadosEstandar)]
+    public async Task<ActionResult<IReadOnlyList<clsVehiculoNexoDto>>> VehiculosNexo(CancellationToken ct = default)
+        => Ok(await vehiculosNexo.Handle(new clsListarVehiculosNexoQuery(), ct));
 
     /// <summary>Catálogo de línea de negocio (tblSAPLineaNegocio).</summary>
     [HttpGet("lineas-negocio")]

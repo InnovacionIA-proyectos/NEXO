@@ -79,6 +79,7 @@ en la sección que se indica; la matriz completa de permisos es la §5.
 | `GET` | `/api/solicitudes` | Comercial, AdminTarifas, ServiciosLogisticos, LiderProceso, Admin |
 | `POST` | `/api/solicitudes` | Admin |
 | `POST` | `/api/solicitudes/resolver-catalogos` | Comercial, Admin |
+| `POST` | `/api/solicitudes/recomendar-vehiculo-contenedor` | Comercial, AdminTarifas, Admin |
 | `GET` | `/api/solicitudes/{id}` | Comercial, AdminTarifas, ServiciosLogisticos, LiderProceso, Admin |
 | `POST` | `/api/solicitudes/{id}/lineas:bulk` | Admin |
 | `GET` | `/api/solicitudes/{id}/propuesta-tarifa` | Comercial, AdminTarifas, ServiciosLogisticos, LiderProceso, Admin |
@@ -287,6 +288,7 @@ en la sección que se indica; la matriz completa de permisos es la §5.
 | `GET` | `/api/catalogos/lineas-negocio` | Todos |
 | `GET` | `/api/catalogos/municipios` | Todos |
 | `GET` | `/api/catalogos/tipos-vehiculo` | Todos |
+| `GET` | `/api/catalogos/vehiculos-nexo` | Todos |
 | `GET` | `/api/catalogos/vehiculos-cuarentena` | AdminTarifas, Admin |
 | `POST` | `/api/catalogos/vehiculos-cuarentena/{id}/descartar` | AdminTarifas, Admin |
 | `POST` | `/api/catalogos/vehiculos-cuarentena/{id}/mapear` | AdminTarifas, Admin |
@@ -1049,12 +1051,45 @@ catálogo. No crea ninguna solicitud; es el paso previo a `lineas:bulk`.
 | `destino` | **requerido** | string | máx. 150 |
 | `tipoVehiculo` | *opcional* | string | máx. 100 |
 | `carroceria` | *opcional* | string | máx. 100 |
+| `origenMunicipioId` | *opcional* | int | `id` de `tbl_municipios` (el de `GET .../ciudades`, no el código DANE) del origen |
+| `destinoMunicipioId` | *opcional* | int | ídem para el destino |
 
-- **→** `200 CatalogoLineaResueltoDto[]`
-- **Errores**: `400 SIN_LINEAS` (array vacío)
+- **→** `200 CatalogoLineaResueltoDto[]`, en el mismo orden y con el mismo `indice` de las líneas enviadas
+- **Errores**: `400 SIN_LINEAS` (array vacío) · `400 MUNICIPIO_NO_ENCONTRADO` (un id que no está en el catálogo; el mensaje dice la línea)
+- **Municipios**: con los dos ids la ruta se busca **primero por municipios** y después por texto. Por texto solo se **completan** los ids que la ruta tiene vacíos; **nunca se cambian** los que ya tiene
+  (un mismo nombre existe en varios departamentos: si el texto coincide con una ruta de otro municipio se reutiliza esa ruta tal cual). Una ruta **nueva** con id toma su nombre del municipio del catálogo, no del texto.
+  La misma regla aplica a `POST /api/captura-solicitudes` (`origenMunicipioId`/`destinoMunicipioId` de cada línea). `lineas:bulk` no cambia: recibe la ruta ya resuelta.
 - **Alias (S6-HU-27.2/#321)**: el `tipoVehiculo` se busca primero en el diccionario de alias (§3.19): `TB`, `T.B`, `Turbo` y `2L2` resuelven
   a la **misma** configuración (se guarda el código, `2L2`, no el texto). La `carroceria` no pasa por el diccionario. Un texto que el
   diccionario no conoce sigue naciendo en **cuarentena** (`EsCatalogoOficial = false`) hasta que alguien lo mapee en la bandeja (§3.19).
+  **Excepción**: un `tipoVehiculo` que es un código de la tabla de traducción (`GET /api/catalogos/vehiculos-nexo`: 2L3, 3S2…) cuenta como alias de sí mismo y nace **oficial** (o se promueve una configuración en cuarentena que no fue descartada),
+  siempre que la `carroceria` esté vacía o sea una de `tbl_tipos_carroceria_catalogo`; con otra carrocería nace en cuarentena como un texto libre. Lo mismo aplica a `captura-solicitudes` y a «Cambiar vehículo».
+
+#### `POST /api/solicitudes/recomendar-vehiculo-contenedor` — el vehículo de un contenedor según su tamaño y peso
+Solo lectura y **por lote** (una importación trae cientos de líneas de contenedor). Devuelve el vehículo que el costeo escogería (`tbl_rangos_peso_contenedor`: el de
+menor peso máximo que alcance para el peso). El front lo **prellena** en la línea (la persona puede cambiarlo) y lo manda como `tipoVehiculo` al crear la solicitud:
+así queda guardado en la línea y el costeo lo respeta. Si el peso cambia después, el vehículo no se recalcula.
+
+- **Roles**: `Comercial`, `AdminTarifas`, `Admin`.
+- **Body**: **array** de 1 a 5.000 elementos:
+
+| Campo | | Tipo | Restricción |
+|---|---|---|---|
+| `indice` | **requerido** | int | La posición de la línea en el archivo; se devuelve tal cual |
+| `claseContenedor` | **requerido** | string | Clase de SAP (`CNT40.HC`) o el tamaño en pies (`20`, `40`); máx. 30 |
+| `pesoKg` | **requerido** | decimal | Mayor que 0 |
+
+- **→** `200`, en el mismo orden:
+```ts
+interface RecomendacionVehiculoContenedorDto {
+  indice: number
+  tipoVehiculo: string | null        // código NEXO (3S3, 2S2…); null si el peso supera el tope, la clase no trae 20 ni 40 pies o la tabla no está disponible
+  contenedorPies: number | null      // 20 | 40; null si la clase no trae el tamaño
+  tablaDisponible: boolean           // false: la tabla no se pudo leer; el costeo usa su regla de respaldo
+  pesoMaximoContenedor: number | null // el tope más alto de ese tamaño (para «supera las N t del contenedor de 40'»)
+}
+```
+- **Errores**: `400 SIN_LINEAS` · `400 DEMASIADAS_LINEAS` · `400 PESO_INVALIDO` (el mensaje trae el `indice`) · `400 VALIDATION_ERROR`
 
 #### `POST /api/solicitudes/{id}/lineas:bulk` — carga masiva de un pliego
 - **Roles**: `Admin` (#307, decisión D5: solo Admin).
@@ -1171,7 +1206,7 @@ Cómo se arma, en este orden:
    lo demás se descarta y esa columna queda sin propuesta. La respuesta siempre trae **una entrada por columna**, en el orden del archivo.
 
 **Si la IA no está disponible el flujo manual sigue**: responde `200` igual, con lo que resolvió el diccionario, `iaUsada = false` y el motivo en
-`motivoSinIa` (`IA_NO_DISPONIBLE` si no hay llave o la función está apagada, o el código `IA_*` del error del proveedor). Un **tope diario superado
+`motivoSinIa` (`IA_DESACTIVADA` si no hay llave o la IA o la función están apagadas en el ambiente: no hubo llamada; `IA_NO_DISPONIBLE`, `IA_TIEMPO_AGOTADO`, `IA_LIMITE_PROVEEDOR`… si el proveedor falló). Un **tope diario superado
 no se esconde**: responde `429 IA_TOPE_DIARIO` (§3.22 si el módulo de IA está desplegado). Cada llamada a la IA queda registrada en `tbl_ia_uso`.
 
 | Body | | Tipo | Restricción |
@@ -1184,7 +1219,7 @@ no se esconde**: responde `429 IA_TOPE_DIARIO` (§3.22 si el módulo de IA está
 ```ts
 interface SugerenciaMapeoDto {
   iaUsada: boolean
-  motivoSinIa: string | null        // PLANTILLA_RECONOCIDA | DICCIONARIO_COMPLETO | IA_NO_DISPONIBLE | IA_* ; null si la IA participó
+  motivoSinIa: string | null        // PLANTILLA_RECONOCIDA | DICCIONARIO_COMPLETO | IA_DESACTIVADA | IA_* ; null si la IA participó
   columnas: ColumnaMapeadaDto[]     // una por columna, en el orden del archivo
   dudas: string[]                   // lo que el usuario debería mirar (máx. 10)
   plantillaId: string | null        // la plantilla guardada que se reconoció; null si no hubo
@@ -1292,7 +1327,8 @@ Qué receta se usa, en este orden:
 3. En cualquier otro caso se le pide la receta a la IA (`"ia"`), con la receta enviada o con el formato guardado **parecido** (≥ 50 %) como punto de partida, las instrucciones que la persona dio al guardarlo y lo que cambió
    (`cambios`). Los números de las celdas no se envían (solo `#`) y los documentos van enmascarados. Si la receta de la IA no se puede ejecutar, se le pide corregirla **una** vez.
 4. Si la IA no está disponible (apagada, sin llave, tope diario, error o respuesta inválida) **no falla**: usa el formato guardado más parecido, o una lectura simple de la primera fila con encabezado de cada hoja
-   (`"automatica"`), y `motivoSinIa` dice por qué (`IA_NO_DISPONIBLE`, `IA_RESPUESTA_INVALIDA`, el código del proveedor…). `avisos` lo explica para mostrarlo.
+   (`"automatica"`), y `motivoSinIa` dice por qué (`IA_DESACTIVADA`, `IA_RESPUESTA_INVALIDA`, el código del proveedor…). `avisos` lo explica para mostrarlo.
+   Si la respuesta de la IA se corta por longitud (`IA_RESPUESTA_TRUNCADA`) se reintenta **una vez** pidiendo una receta más compacta; si vuelve a cortarse cae a la lectura simple y `avisos` dice que el archivo es muy grande o complejo (sugerir indicar las hojas a usar o enviarlo por partes).
 
 ```ts
 interface LecturaEstructuraDto {
@@ -1301,7 +1337,7 @@ interface LecturaEstructuraDto {
   similitud: number | null            // 0..1 con el formato guardado que se usó o se tomó de base
   recetaGuardadaId: string | null
   iaUsada: boolean
-  motivoSinIa: string | null          // 'RECETA_GUARDADA' | 'SIN_INSTRUCCION' | 'IA_NO_DISPONIBLE' | 'IA_RESPUESTA_INVALIDA' | código del proveedor | null
+  motivoSinIa: string | null          // 'RECETA_GUARDADA' | 'SIN_INSTRUCCION' | 'IA_DESACTIVADA' | 'IA_RESPUESTA_INVALIDA' | código del proveedor | null
   receta: RecetaLectura               // la que se ejecutó: se reenvía en `receta` para ajustarla o guardarla
   resumen: string | null              // cómo entendió el archivo la IA, en lenguaje sencillo
   dudas: string[]                     // preguntas que la persona puede responder con una instrucción
@@ -1447,8 +1483,8 @@ Cómo se resuelve, en este orden:
 4. **Lo que siga sin resolverse** no se inventa: se envía tal cual al capturar y la captura lo trata como siempre (un vehículo nuevo cae en la **cuarentena** de §3.19; una ciudad
    queda como texto). Un resultado `ia` es una **propuesta**: para que no se repita se confirma creando el alias (`POST /api/catalogos/alias`) o el término del diccionario.
 
-Si la IA no está disponible el flujo manual sigue: responde `200` con lo que resolvieron las reglas, `iaUsada = false` y `motivoSinIa` (`IA_NO_DISPONIBLE` o el código `IA_*` del
-proveedor; `SIN_PENDIENTES` si las reglas resolvieron todo o lo que falta no tiene dónde elegir). Un **tope diario superado no se esconde**: `429 IA_TOPE_DIARIO`. Usa la función
+Si la IA no está disponible el flujo manual sigue: responde `200` con lo que resolvieron las reglas, `iaUsada = false` y `motivoSinIa` (`IA_DESACTIVADA` si está apagada, o el código `IA_*` del
+proveedor si falló; `SIN_PENDIENTES` si las reglas resolvieron todo o lo que falta no tiene dónde elegir). Un **tope diario superado no se esconde**: `429 IA_TOPE_DIARIO`. Usa la función
 `ImportacionExcel`; cada llamada queda registrada en `tbl_ia_uso`.
 
 | Body | | Tipo | Restricción |
@@ -1460,7 +1496,7 @@ proveedor; `SIN_PENDIENTES` si las reglas resolvieron todo o lo que falta no tie
 ```ts
 interface ResultadoNormalizacionDto {
   iaUsada: boolean
-  motivoSinIa: string | null        // SIN_PENDIENTES | IA_NO_DISPONIBLE | IA_* ; null si la IA participó
+  motivoSinIa: string | null        // SIN_PENDIENTES | IA_DESACTIVADA | IA_* ; null si la IA participó
   totalDistintos: number            // distintos por campo y texto normalizado (lo que se resolvió una vez)
   valores: ValorNormalizadoDto[]    // uno por texto distinto recibido (campo + texto tal como llegó), en el orden recibido
 }
@@ -1745,12 +1781,14 @@ línea (no confía en lo que diga el navegador) y valida:
   **o** si `valorFlete` coincide con el histórico de la propuesta de esa línea
   (ventana de 3 meses). Si no viene de ninguna de las dos → `409 HISTORICA_VENCIDA`.
 
+- Una línea de solicitud tiene **un solo flete por cotización**: agregarle otro responde `409 LINEA_YA_COSTEADA` (para cambiarlo, `PUT .../lineas/{lineaSolicitudId}`). También aplica a dos pedidos simultáneos: gana uno y el otro recibe el 409. Los fletes sin `lineaSolicitudId` no tienen ese límite.
+
 - **→** `200 CotizacionDto`
-- **Errores**: `400 FUENTE_INVALIDA` · `400 LINEA_INVALIDA` · `400 FLETE_BAJO_PISO_SICETAC` · `404 COTIZACION_NO_ENCONTRADA` · `409 COTIZACION_NO_EDITABLE` · `409 HISTORICA_VENCIDA`
+- **Errores**: `400 FUENTE_INVALIDA` · `400 LINEA_INVALIDA` · `400 FLETE_BAJO_PISO_SICETAC` · `404 COTIZACION_NO_ENCONTRADA` · `409 COTIZACION_NO_EDITABLE` · `409 LINEA_RECHAZADA` · `409 LINEA_YA_COSTEADA` · `409 HISTORICA_VENCIDA`
 
 #### `PUT /api/cotizaciones/{id}/lineas/{lineaSolicitudId}` — editar un flete
 S5-HU-20.1/#286; **S6-HU-26.1/#30: de cualquier fuente**. Modifica **la misma fila** de la cotización: `POST .../lineas` siempre
-agrega una nueva, así que editar con él duplicaría la línea e inflaría el total. La ruta
+agrega una nueva, así que sobre una línea que ya tiene flete responde `409 LINEA_YA_COSTEADA`: para cambiarlo se usa este `PUT`. La ruta
 usa el id de la línea del **pliego** (`lineaSolicitudId`, el mismo que manda el POST), no
 el de la fila de la cotización.
 
@@ -1916,6 +1954,7 @@ Si `resultado = "ganada"`, realimenta la biblioteca de Tarifas Ganadas.
 #### `GET /api/cotizaciones/{id}/exportar-excel`
 - **Roles**: `Comercial`, `AdminTarifas`, `ServiciosLogisticos`, `LiderProceso`, `Admin` (`AdminBiblioteca` no entra: #307).
 - S6-HU-24.3/#320: las líneas rechazadas salen en la hoja con su ruta y la palabra «Sin costeo» en vez del precio (sin precio y **sin el motivo**), y no suman al total.
+- Columnas de los fletes: `Ruta`, `Tipología`, `Flete` y `Vehículo` (el de la línea; «—» si no tiene).
 - **→** `200` binario `.xlsx` con `Content-Disposition: attachment`.
 - **Errores**: `404 COTIZACION_NO_ENCONTRADA`
 
@@ -2575,6 +2614,7 @@ de Reglas Solo-SICETAC y Tarifas de Plaza — reemplazan el texto libre.
 | Endpoint | Fuente | → |
 |---|---|---|
 | `GET /api/catalogos/tipos-vehiculo` | `tblSAPTiposVehiculoTarifario`, tal cual (S5-HU-22.1/#288: se eliminaron los 5 casos especiales; `[]` si dbSolucionesTI no está disponible; faltan 3S2 y 2L3, decisión de negocio) | `200 TipoVehiculoDto[]` |
+| `GET /api/catalogos/vehiculos-nexo` | `tbl_mapeo_vehiculo_tarifario` (activos): los **códigos de NEXO**, con 2L3, 3S2, 2S3, 2_5, 2_7, 2L1… que SAP no tiene. Es el que debe usar el selector «Cambiar vehículo» de la Mesa | `200 VehiculoNexoDto[]` = `{ codigo, descripcion, enSap }` (`enSap`: el código también está en `tipos-vehiculo`; `descripcion` es el nombre en SICE-TAC) |
 | `GET /api/catalogos/lineas-negocio` | `tblSAPLineaNegocio` | `200 LineaNegocioDto[]` |
 | `GET /api/catalogos/clases-viaje` | `tblSAPClaseViaje` | `200 ClaseViajeDto[]` |
 | `GET /api/catalogos/clases-contenedor` | `tblSAPClaseContenedor` | `200 ClaseContenedorDto[]` |
@@ -2644,7 +2684,9 @@ que es **propio de un cliente** (y las columnas y unidades de sus archivos). Tre
 | `unidad` | Una unidad que usa el cliente | La unidad canónica: `kg` o `t` | no se usa |
 | `valor` | Un valor de una columna categórica | El valor de NEXO (por ejemplo `2_7`) | **obligatorio**: el campo al que pertenece (`tipoVehiculo`, `carroceria`, `tipologia`, `lineaNegocio`, `claseViaje`, `claseContenedor`, `codigoTipoMercancia`) |
 
-`clienteId` en `null` significa que el término aplica a **todos** los clientes. El `concepto` de un `valor` **no se valida contra el
+`clienteId` en `null` significa que el término aplica a **todos** los clientes. Los clientes del Data Warehouse no traen `clienteId` en `GET /api/solicitudes/clientes`:
+para ellos se manda el **`clienteNit`** (con o sin puntos y dígito de verificación) en lugar del id, igual que en las plantillas de mapeo (§3.3).
+El `concepto` de un `valor` **no se valida contra el
 catálogo oficial**: un cliente puede usar un valor que el catálogo no tiene (el Turbo de un cliente es `2_7`, que no está en
 `GET /api/catalogos/tipos-vehiculo`). Un término no se repite para el mismo cliente, tipo y contexto, sin distinguir mayúsculas,
 tildes ni espacios (`409 TERMINO_DUPLICADO`).
@@ -2671,7 +2713,8 @@ interface TerminoClienteDto {
 | Query | | Tipo | Restricción |
 |---|---|---|---|
 | `clienteId` | opcional | Guid | Trae los de ese cliente y, por defecto, también los generales; sin él, los de todos los clientes |
-| `incluirGenerales` | opcional | bool | Por defecto `true`; con `false` y `clienteId`, omite los generales |
+| `clienteNit` | opcional | string | Máx. 30. Lo mismo que `clienteId` para un cliente que se identifica por NIT; si vienen los dos manda `clienteId`. Solo **busca** el cliente local: no lo crea, y un NIT sin cliente local no tiene términos propios (quedan solo los generales, si se piden) |
+| `incluirGenerales` | opcional | bool | Por defecto `true`; con `false` y `clienteId` o `clienteNit`, omite los generales |
 | `tipo` | opcional | string | `columna`, `unidad` o `valor` |
 | `q` | opcional | string | Busca en el término y en el concepto |
 | `soloActivos` | opcional | bool | Por defecto `false` |
@@ -2686,6 +2729,7 @@ interface TerminoClienteDto {
 | Campo | | Tipo | Restricción |
 |---|---|---|---|
 | `clienteId` | solo en `POST`, opcional | Guid | `null` = todos los clientes. No cambia al editar (para pasar un término a otro cliente se borra y se crea) |
+| `clienteNit` | solo en `POST`, opcional | string | Máx. 30. El cliente por NIT, **en lugar de** `clienteId` (los dos a la vez: `400 CLIENTE_AMBIGUO`). Si no tiene cliente local se crea con los datos del DW (clientes y, si no está, prospectos); un NIT en blanco cuenta como no enviado |
 | `termino` | **requerido** | string | máx. 200 |
 | `tipo` | **requerido** | string | `columna` \| `unidad` \| `valor` |
 | `concepto` | **requerido** | string | máx. 100; según el tipo (tabla de arriba) |
@@ -2695,7 +2739,8 @@ interface TerminoClienteDto {
 
 - **→** `201 TerminoClienteDto` (`POST`) · `200 TerminoClienteDto` (`PUT`, reemplaza los campos editables)
 - **Errores**: `400 TERMINO_REQUERIDO` · `400 TIPO_TERMINO_INVALIDO` · `400 CONCEPTO_REQUERIDO` · `400 CAMPO_DESTINO_INVALIDO` · `400 UNIDAD_INVALIDA` ·
-  `400 CONTEXTO_INVALIDO` · `400 CONTEXTO_NO_APLICA` · `400 EJEMPLO_MUY_LARGO` · `400 CLIENTE_NO_ENCONTRADO` · `409 TERMINO_DUPLICADO` · `404 TERMINO_NO_ENCONTRADO` (`PUT`)
+  `400 CONTEXTO_INVALIDO` · `400 CONTEXTO_NO_APLICA` · `400 EJEMPLO_MUY_LARGO` · `400 CLIENTE_NO_ENCONTRADO` · `400 CLIENTE_NIT_INVALIDO` (el NIT no es de ningún cliente ni prospecto) ·
+  `400 CLIENTE_AMBIGUO` (`clienteId` y `clienteNit` a la vez) · `409 TERMINO_DUPLICADO` (también cuando dos peticiones crean o editan el mismo término a la vez) · `404 TERMINO_NO_ENCONTRADO` (`PUT`)
 
 #### `DELETE /api/diccionario-cliente/{id}`
 - **→** `204`
@@ -2824,6 +2869,7 @@ con lo ya registrado. Al superarlo, la función responde `429 IA_TOPE_DIARIO` co
 función se enciende por separado (`503 IA_FUNCION_DESHABILITADA` si está apagada). Los demás `503` del proveedor son
 `IA_TIEMPO_AGOTADO`, `IA_LIMITE_PROVEEDOR`, `IA_NO_DISPONIBLE`, `IA_CREDENCIAL_INVALIDA`, `IA_PETICION_RECHAZADA`, `IA_RECHAZADA`,
 `IA_RESPUESTA_TRUNCADA` e `IA_RESPUESTA_INVALIDA`.
+Cada llamada espera por defecto 30 s por intento y reintenta una vez (`Anthropic__TimeoutSegundos`, `Anthropic__MaxReintentos`): como máximo ~60 s antes de rendirse.
 
 #### `GET /api/ia/uso/gasto`
 Gasto por mes y por función, del mes más reciente al más antiguo.
@@ -2926,21 +2972,24 @@ tokens por persona de §3.22. La función se apaga con `Anthropic__Funciones__As
 
 #### `POST /api/asistente/conversaciones/mensajes`
 - **Roles**: AdminTarifas, Admin.
-- **Body**: `{ conversacionId?: Guid, mensaje: string }`. Sin `conversacionId` empieza una conversación nueva.
+- **Body**: `{ conversacionId?: Guid, mensaje: string, contexto?: { solicitudId: Guid, cotizacionId?: Guid, lineaSolicitudId?: Guid } }`. Sin `conversacionId` empieza una conversación nueva.
+- **`contexto`** (opcional): lo que la persona tiene abierto en pantalla. El asistente lo recibe como dato, después de sus reglas, y lo usa cuando la persona dice «esta línea» o «esta cotización», sin pedirle los identificadores ni gastar el límite de caracteres del mensaje.
+  Se valida con los permisos de quien pregunta antes de llamar al modelo y **no se guarda**: se manda en cada mensaje que lo necesite.
 - **→** `200 text/event-stream`. Cada evento es `event: <nombre>` + `data: <JSON en una línea>`:
 
 | Evento | `data` | Cuándo |
 |---|---|---|
 | `conversacion` | `{ conversacionId, mensajeId }` | Primero. `mensajeId` es el de la respuesta que se está generando |
 | `texto` | `{ delta }` | Cada trozo de la respuesta, a medida que se genera; se concatenan |
-| `herramienta` | `{ nombre, estado, fuente? }` | `estado`: `ejecutando`, `ok` o `error`. Muestra qué está consultando el asistente |
+| `herramienta` | `{ nombre, estado, fuente?, encontrado?, resumen? }` | `estado`: `ejecutando`, `ok` o `error`. Muestra qué está consultando el asistente. Al terminar en `ok`, `encontrado` dice si la fuente tenía el dato y `resumen` es **una frase corta (máx. 300 caracteres) armada por NEXO** para pintar una tarjeta (por ejemplo «Piso SICE-TAC 3S3 (Carga general, Cargado): $3.422.777 · período 202610»); sin datos es el motivo. Nunca trae el resultado completo y no viaja al modelo. Hoy lo traen el piso SICE-TAC, el aprovisionamiento, la propuesta de línea, las tarifas, los conexos y las ciudades; el campo es opcional: quien no lo use no se rompe |
 | `preferencias` | `[ { id, texto, createdAt } ]` | Después de `conversacion`, solo si la persona tiene preferencias guardadas: las que el asistente recibe en esta respuesta (para mostrar que se aplican) |
 | `accion` | `AccionAsistenteDto` | El asistente propuso un cambio (§3.24.1). Nada se ha modificado: la persona debe confirmarlo o cancelarlo |
 | `reemplazo` | `{ texto, cifrasSinOrigen[] }` | La respuesta traía cifras de dinero sin origen: lo mostrado debe sustituirse por `texto` (es lo que queda guardado) |
 | `fin` | `{ conversacionId, mensajeId, estado }` | Último en el caso normal. `estado`: `completo` o `descartado` |
 | `error` | `{ codigo, mensaje }` | Último si la respuesta se cortó a mitad (lo ya mostrado queda como `incompleto`): `IA_NO_DISPONIBLE`, `IA_TIEMPO_AGOTADO`, `IA_LIMITE_PROVEEDOR`, `IA_RECHAZADA`, `IA_RESPUESTA_TRUNCADA`, `ASISTENTE_DEMASIADAS_CONSULTAS`, `ASISTENTE_ERROR` |
 
-- **Errores antes de abrir el flujo** (respuesta HTTP normal): `400 MENSAJE_REQUERIDO` · `400 MENSAJE_DEMASIADO_LARGO` ·
+- **Errores antes de abrir el flujo** (respuesta HTTP normal): `400 MENSAJE_REQUERIDO` · `400 MENSAJE_DEMASIADO_LARGO` · `400 CONTEXTO_INVALIDO` (la cotización o la línea no son de esa solicitud, o falta `solicitudId`) ·
+  `403 SOLICITUD_AJENA` · `404 SOLICITUD_NO_ENCONTRADA` · `404 COTIZACION_NO_ENCONTRADA` ·
   `403 CONVERSACION_AJENA` · `404 CONVERSACION_NO_ENCONTRADA` · `429 ASISTENTE_LIMITE_TURNOS` (`details: { maxTurnos }`; hay que empezar
   otra conversación) · `429 IA_TOPE_DIARIO` · `503 IA_APAGADA` / `IA_NO_CONFIGURADA` / `IA_FUNCION_DESHABILITADA`.
 - El navegador no puede usar `EventSource` (es solo `GET`): se lee el cuerpo con `fetch` y su `ReadableStream`. Si el cliente cierra la
@@ -2988,7 +3037,7 @@ terminó: es la auditoría de la escritura.
 interface AccionAsistenteDto {
   id: Guid; conversacionId: Guid; mensajeId: Guid
   tipo: "agregar_flete" | "editar_flete" | "agregar_conexos" | "rechazar_linea" | "cambiar_vehiculo" | "guardar_preferencia"
-  resumen: string                       // lo que se le muestra a la persona para decidir
+  resumen: string                       // lo que se le muestra a la persona para decidir; nombra la ruta y el vehículo de la línea («Cali → Barranquilla · Turbo»), no sus identificadores
   parametros: object                    // exactamente lo que se aplicaría
   estado: "pendiente" | "ejecutando" | "ejecutada" | "fallida" | "cancelada" | "vencida"
   venceAt: string; resueltaAt: string | null
@@ -3065,6 +3114,7 @@ abiertos a los 6 roles.
 | **Bandeja y Mesa**: `GET /api/solicitudes` · `GET /api/solicitudes/{id}` · `GET .../propuesta-tarifa` · `/hubs/bandeja` (#307) | ✅ | | ✅ | ✅ | ✅ | ✅ |
 | `POST /api/solicitudes` (#307, D5: solo Admin) | | | | | | ✅ |
 | `POST /api/solicitudes/resolver-catalogos` | ✅ | | | | | ✅ |
+| `POST /api/solicitudes/recomendar-vehiculo-contenedor` | ✅ | | ✅ | | | ✅ |
 | `POST /api/solicitudes/{id}/lineas:bulk` (#307, D5: solo Admin) | | | | | | ✅ |
 | `POST /api/solicitudes/{id}/rechazar` | ✅ | | | | | ✅ |
 | `POST /api/solicitudes/{id}/recalcular-score` (#307, D5: solo Admin) | | | | | | ✅ |

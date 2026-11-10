@@ -57,6 +57,17 @@ def _cifras(texto: str) -> list[tuple[str, Decimal]]:
     return halladas
 
 
+def valores_del_texto(texto: str) -> list[Decimal]:
+    """Las cifras de un texto, leidas con la misma gramatica que usa `verificar`.
+
+    La usa `prompt.cifras_permitidas` para declarar las cifras que el motor
+    escribio en sus propios textos (las advertencias y el motivo). Comparten
+    lector a proposito: si una cifra se extrae aqui, `verificar` la va a leer
+    igual alla, y ninguna se cuela por una diferencia de formato.
+    """
+    return [valor for _, valor in _cifras(texto)]
+
+
 def _a_decimal(crudo: str) -> Decimal:
     """`1.234,5` -> 1234.5 y `1,234.5` -> 1234.5.
 

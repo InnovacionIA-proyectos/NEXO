@@ -30,6 +30,7 @@ public sealed class clsCambiarVehiculoLineaCommandHandler(
     ILineasSolicitudPort lineasSolicitud,
     IConfiguracionesVehiculoPort vehiculos,
     IAliasCatalogoPort alias,
+    IVehiculosNexoPort vehiculosNexo,
     IPropuestaTarifaPort propuestas,
     IAuditoriaPort auditoria,
     Common.ICurrentUserPort usuarioActual,
@@ -113,12 +114,13 @@ public sealed class clsCambiarVehiculoLineaCommandHandler(
         var mapa = await alias.MapaActivoAsync(clsAliasElemento.TipoVehiculo, ct);
         var todos = await vehiculos.ListarAsync(ct);
         var porClave = clsResolucionDeCatalogos.IndexarVehiculosPorClave(todos);
+        var oficialidad = await Catalogos.clsOficialidadDeVehiculos.CargarAsync(vehiculosNexo, ct);
 
         // Con alias: igual que la captura (puede crear la fila oficial o promover una en cuarentena). Sin alias: tiene que ser una
         // configuración oficial que ya exista — acá no se crea nada en cuarentena.
-        if (mapa.ContainsKey(clsResolucionDeCatalogos.Normalizar(texto)))
+        if (mapa.ContainsKey(clsResolucionDeCatalogos.Normalizar(texto)) || oficialidad.CodigoOficial(texto, command.Carroceria) is not null)
         {
-            var (resuelto, _) = clsResolucionDeCatalogos.ResolverVehiculo(texto, command.Carroceria, porClave, vehiculos, mapa);
+            var (resuelto, _) = clsResolucionDeCatalogos.ResolverVehiculo(texto, command.Carroceria, porClave, vehiculos, mapa, oficialidad);
             if (resuelto!.Descartada)
                 throw new clsConflictException("VEHICULO_NO_OFICIAL", "Esa configuración de vehículo fue descartada.");
             return resuelto;

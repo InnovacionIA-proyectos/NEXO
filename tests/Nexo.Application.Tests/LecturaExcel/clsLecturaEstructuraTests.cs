@@ -254,7 +254,7 @@ public class clsLecturaEstructuraTests
 
         Assert.Equal("automatica", r.OrigenReceta);
         Assert.False(r.IaUsada);
-        Assert.Equal("IA_NO_DISPONIBLE", r.MotivoSinIa);
+        Assert.Equal("IA_DESACTIVADA", r.MotivoSinIa);
         Assert.NotEmpty(r.Tablas);
         Assert.Contains(r.Avisos, a => a.Contains("lectura simple"));
     }
@@ -269,7 +269,7 @@ public class clsLecturaEstructuraTests
         var r = await Lector(Formato(TitulosB)).Handle(Leer(Cliente));
 
         Assert.Equal("guardada", r.OrigenReceta);
-        Assert.Equal("IA_NO_DISPONIBLE", r.MotivoSinIa);
+        Assert.Equal("IA_DESACTIVADA", r.MotivoSinIa);
         Assert.Contains(r.Avisos, a => a.Contains("formato cambió"));
     }
 
@@ -294,6 +294,48 @@ public class clsLecturaEstructuraTests
 
         Assert.Equal("automatica", r.OrigenReceta);
         Assert.Equal("IA_RESPUESTA_INVALIDA", r.MotivoSinIa);
+    }
+
+    private void LaIaSeCorta(int veces)
+    {
+        var llamadas = 0;
+        _ia.Setup(i => i.CompletarAsync(It.IsAny<clsPeticionIa>(), It.IsAny<CancellationToken>()))
+            .Returns((clsPeticionIa p, CancellationToken _) =>
+            {
+                _peticiones.Add(p);
+                if (++llamadas <= veces)
+                    throw new clsIaRespuestaNoUtilException("IA_RESPUESTA_TRUNCADA", "La respuesta del modelo quedó incompleta.", new clsUsoDeTokens("modelo-de-prueba", 10, 16_000, 0, 0));
+                var texto = RespuestaIa(RecetaA());
+                return Task.FromResult(new clsRespuestaIa(texto, texto, "modelo-de-prueba", 10, 5, TimeSpan.FromMilliseconds(1)));
+            });
+    }
+
+    [Fact]
+    public async Task Si_la_respuesta_se_corta_se_reintenta_una_vez_pidiendo_una_receta_mas_compacta()
+    {
+        LaIaSeCorta(veces: 1);
+
+        var r = await Lector(Formato(TitulosA)).Handle(Leer(Cliente));
+
+        Assert.Equal("ia", r.OrigenReceta);
+        Assert.Equal(2, _peticiones.Count);
+        Assert.All(_peticiones, p => Assert.Equal(16_000, p.MaxTokensSalida));
+        Assert.Contains("se cortó por ser demasiado larga", _peticiones[1].Mensajes[^1].Contenido);
+        Assert.Contains(r.Avisos, a => a.Contains("se cortó"));
+    }
+
+    [Fact]
+    public async Task Si_se_corta_dos_veces_cae_a_la_lectura_simple_con_un_aviso_claro()
+    {
+        LaIaSeCorta(veces: 2);
+
+        var r = await Lector(Formato(TitulosA)).Handle(Leer(Cliente));
+
+        Assert.Equal("automatica", r.OrigenReceta);
+        Assert.Equal("IA_RESPUESTA_TRUNCADA", r.MotivoSinIa);
+        Assert.Equal(2, _peticiones.Count);
+        Assert.Contains(r.Avisos, a => a.Contains("muy grande o complejo"));
+        Assert.DoesNotContain(r.Avisos, a => a.Contains("no está disponible"));
     }
 
     [Fact]

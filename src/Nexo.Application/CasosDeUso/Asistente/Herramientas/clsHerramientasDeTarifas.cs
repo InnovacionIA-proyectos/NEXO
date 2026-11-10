@@ -53,7 +53,8 @@ public sealed class clsConsultarPisoSicetacHerramienta(IPropuestaTarifaPort prop
             origen, destino, entrada.Texto("vehiculo"), entrada.Enumeracion<TipologiaCarga>("tipologia"), entrada.Texto("carroceria"), ct);
 
         if (piso is not null)
-            return clsResultadoHerramienta.Con(piso, $"SICE-TAC (DWSice), periodo {piso.Periodo}");
+            return clsResultadoHerramienta.Con(piso, $"SICE-TAC (DWSice), periodo {piso.Periodo}", resumen:
+                $"Piso SICE-TAC {piso.Configuracion} ({piso.TipoCarga}, {piso.CondicionCarga}): {clsMoneda.Pesos(piso.ValorPiso)} · período {piso.Periodo}");
 
         var motivo = await propuestas.MotivoSicetacNoUsadoAsync(ct);
         return clsResultadoHerramienta.SinDatos("SICE-TAC (DWSice)", motivo ?? "No hay piso SICE-TAC vigente para esa ruta y configuración.");
@@ -97,7 +98,8 @@ public abstract class clsHerramientaSapBase : clsHerramientaBase
         var items = resultado.Items.Select(Resumir).ToList();
         return clsResultadoHerramienta.Con(
             new clsListadoAsistente<clsTarifaSapAsistenteDto>(resultado.Total, items), Fuente,
-            resultado.Total > items.Count ? $"Se muestran {items.Count} de {resultado.Total}; afina los filtros para ver otras." : null);
+            resultado.Total > items.Count ? $"Se muestran {items.Count} de {resultado.Total}; afina los filtros para ver otras." : null,
+            resumen: $"{resultado.Total} tarifa(s) encontradas en {Fuente}");
     }
 
     private static clsTarifaSapAsistenteDto Resumir(clsSapTarifaHistoricoItemDto t) => new(
@@ -190,7 +192,8 @@ public sealed class clsConsultarTarifaPlazaNexoHerramienta(IQueryHandler<clsList
 
         return clsResultadoHerramienta.Con(
             new clsListadoAsistente<clsTarifaPlazaNexoAsistenteDto>(coinciden.Count, items), Fuente,
-            coinciden.Count > items.Count ? $"Se muestran {items.Count} de {coinciden.Count}; afina los filtros para ver otras." : null);
+            coinciden.Count > items.Count ? $"Se muestran {items.Count} de {coinciden.Count}; afina los filtros para ver otras." : null,
+            resumen: $"{coinciden.Count} tarifa(s) de plaza de NEXO encontradas");
     }
 
     /// <summary>Coincidencia sin tildes ni mayúsculas, como el resto de comparaciones de texto del sistema.</summary>

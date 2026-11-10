@@ -41,6 +41,7 @@ public sealed class clsMapearVehiculoCuarentenaCommandHandler(
     IConfiguracionesVehiculoPort vehiculos,
     IAliasCatalogoPort alias,
     ITiposVehiculoPort tiposVehiculo,
+    IVehiculosNexoPort vehiculosNexo,
     IAuditoriaPort auditoria,
     Common.ICurrentUserPort usuarioActual,
     IUnitOfWork uow)
@@ -58,7 +59,7 @@ public sealed class clsMapearVehiculoCuarentenaCommandHandler(
         var codigoTexto = clsTexto.Limpiar(command.Codigo);
         if (codigoTexto is null || codigoTexto.Length > clsAliasReglas.MaxCodigo)
             throw new clsValidationFailedException("CODIGO_NO_RECONOCIDO", "Indica el código oficial al que se mapea.");
-        var codigo = await clsAliasReglas.CodigoValidoAsync(clsAliasElemento.TipoVehiculo, codigoTexto, alias, tiposVehiculo, ct)
+        var codigo = await clsAliasReglas.CodigoValidoAsync(clsAliasElemento.TipoVehiculo, codigoTexto, alias, tiposVehiculo, vehiculosNexo, ct)
             ?? throw new clsValidationFailedException("CODIGO_NO_RECONOCIDO", $"'{codigoTexto}' no es un código oficial de vehículo.");
 
         var texto = clsTexto.Limpiar(v.TipoVehiculo)!;

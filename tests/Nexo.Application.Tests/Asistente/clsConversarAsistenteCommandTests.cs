@@ -55,6 +55,7 @@ public class clsConversarAsistenteCommandTests
 
     private readonly clsRepositorioConversacionesEnMemoria _repo = new();
     private readonly clsRepositorioPreferenciasEnMemoria _preferencias = new();
+    private readonly Mock<IResolutorContextoPantalla> _pantalla = new();
     private readonly Mock<ICurrentUserPort> _usuario = new();
     private readonly clsLimitesAsistente _limites = new();
     private clsModeloGuionado _modelo = null!;
@@ -77,7 +78,7 @@ public class clsConversarAsistenteCommandTests
             ? herramientas
             : [new clsHerramientaDePrueba("consultar_piso_sicetac", _ => Task.FromResult(PisoPorDefecto))];
         return new clsConversarAsistenteCommandHandler(
-            _modelo, _repo, new clsHerramientasDelAsistente(todas, _usuario.Object), _usuario.Object, _limites, new clsContextoConversacionAsistente(), _preferencias);
+            _modelo, _repo, new clsHerramientasDelAsistente(todas, _usuario.Object), _usuario.Object, _limites, new clsContextoConversacionAsistente(), _preferencias, _pantalla.Object);
     }
 
     private static async IAsyncEnumerable<clsEventoConversacionIa> Eventos(params clsEventoConversacionIa[] eventos)
@@ -248,6 +249,55 @@ public class clsConversarAsistenteCommandTests
     }
 
     // ------------------------------------------------------------------ herramientas y auditoría
+
+    private async Task<clsEventoAsistente.Herramienta> TerminadaCon(Func<JsonElement, Task<clsResultadoHerramienta>> herramienta)
+    {
+        var h = Handler((_, ejecutar, ct) => Eventos2(ejecutar, ct), new clsHerramientaDePrueba("consultar_piso_sicetac", herramienta));
+        var eventos = await Conversar(h, "¿cuál es el piso?");
+        return eventos.OfType<clsEventoAsistente.Herramienta>().Last();
+    }
+
+    [Fact]
+    public async Task El_evento_de_herramienta_trae_si_se_encontro_y_el_resumen_pero_el_modelo_no_ve_el_resumen()
+    {
+        var terminada = await TerminadaCon(_ => Task.FromResult(clsResultadoHerramienta.Con(
+            new { valorPiso = 2_900_000m }, "SICE-TAC (DWSice), periodo 202610", resumen: "Piso SICE-TAC 3S3: $2.900.000")));
+
+        Assert.Equal(("ok", true, "Piso SICE-TAC 3S3: $2.900.000"), (terminada.Estado, terminada.Encontrado, terminada.Resumen));
+        Assert.DoesNotContain("Piso SICE-TAC 3S3", Assert.Single(_repo.Herramientas).Salida);
+        Assert.DoesNotContain("resumen", Assert.Single(_repo.Herramientas).Salida, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task El_evento_de_ejecutando_no_trae_resumen()
+    {
+        var h = Handler((_, ejecutar, ct) => Eventos2(ejecutar, ct));
+
+        var eventos = await Conversar(h, "piso");
+
+        var ejecutando = eventos.OfType<clsEventoAsistente.Herramienta>().First();
+        Assert.Equal(("ejecutando", null, null), (ejecutando.Estado, ejecutando.Encontrado, ejecutando.Resumen));
+    }
+
+    [Fact]
+    public async Task Sin_datos_el_resumen_es_el_motivo_y_encontrado_es_false()
+    {
+        var terminada = await TerminadaCon(_ => Task.FromResult(clsResultadoHerramienta.SinDatos("SICE-TAC (DWSice)", "No hay piso vigente para esa ruta.")));
+
+        Assert.Equal(("ok", false, "No hay piso vigente para esa ruta."), (terminada.Estado, terminada.Encontrado, terminada.Resumen));
+    }
+
+    [Fact]
+    public async Task Un_resumen_largo_se_acota_a_300_caracteres_y_una_herramienta_con_error_no_trae_resumen()
+    {
+        var largo = await TerminadaCon(_ => Task.FromResult(clsResultadoHerramienta.Con(new { }, "fuente", resumen: new string('x', 500))));
+        Assert.Equal(300, largo.Resumen!.Length);
+        Assert.EndsWith("…", largo.Resumen);
+
+        _repo.Herramientas.Clear();
+        var fallida = await TerminadaCon(_ => throw new Nexo.Application.Common.Exceptions.clsValidationFailedException("X", "Entrada inválida."));
+        Assert.Equal(("error", null), (fallida.Estado, fallida.Resumen));
+    }
 
     [Fact]
     public async Task Cada_herramienta_usada_queda_auditada_con_entrada_salida_fuente_y_resultado_y_sus_eventos_se_transmiten()

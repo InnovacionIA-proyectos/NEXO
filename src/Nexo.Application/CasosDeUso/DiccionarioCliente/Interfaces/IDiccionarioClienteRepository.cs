@@ -24,4 +24,10 @@ public interface IDiccionarioClienteRepository
 
     void Agregar(clsTerminoCliente termino);
     void Eliminar(clsTerminoCliente termino);
+
+    /// <summary>Si el error de guardado es una violación de un índice único (otra petición insertó primero la misma combinación).</summary>
+    bool EsChoqueUnico(Exception error);
+
+    /// <summary>Descarta lo pendiente de guardar para poder volver a consultar tras un choque.</summary>
+    void DescartarCambiosPendientes();
 }

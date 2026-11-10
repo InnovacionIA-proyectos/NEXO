@@ -16,7 +16,8 @@ namespace Nexo.Application.CasosDeUso.Asistente.Conversacion;
 /// Un mensaje del usuario al asistente; sin <paramref name="ConversacionId"/> empieza una conversación. Todo lo que puede fallar
 /// antes de responder falla antes de devolver la secuencia, para que sea un error HTTP normal.
 /// </summary>
-public sealed record clsConversarAsistenteCommand(Guid? ConversacionId, string? Mensaje) : ICommand<IAsyncEnumerable<clsEventoAsistente>>;
+public sealed record clsConversarAsistenteCommand(Guid? ConversacionId, string? Mensaje, clsContextoPantalla? Contexto = null)
+    : ICommand<IAsyncEnumerable<clsEventoAsistente>>;
 
 public sealed class clsConversarAsistenteCommandHandler(
     IConversacionIaPort ia,
@@ -25,7 +26,8 @@ public sealed class clsConversarAsistenteCommandHandler(
     ICurrentUserPort usuario,
     clsLimitesAsistente limites,
     clsContextoConversacionAsistente contexto,
-    IPreferenciasAsistenteRepository preferencias)
+    IPreferenciasAsistenteRepository preferencias,
+    IResolutorContextoPantalla pantalla)
     : ICommandHandler<clsConversarAsistenteCommand, IAsyncEnumerable<clsEventoAsistente>>
 {
     private const int LargoDelTitulo = 60;
@@ -55,6 +57,8 @@ public sealed class clsConversarAsistenteCommandHandler(
                 $"La conversación llegó a su límite de {limites.MaxTurnosEfectivo} mensajes. Empieza una nueva.",
                 new { maxTurnos = limites.MaxTurnosEfectivo });
 
+        var textoDePantalla = command.Contexto is null ? null : await pantalla.ResolverAsync(command.Contexto, ct);
+
         await ia.VerificarAsync(clsFuncionIa.AsistenteCotizacion, usuario.Id, ct);
 
         var previos = conversacion is null ? [] : await conversaciones.MensajesAsync(conversacion.Id, ct);
@@ -63,7 +67,7 @@ public sealed class clsConversarAsistenteCommandHandler(
         contexto.ConversacionId = conversacion.Id;
         contexto.MensajeId = respuestaId;
 
-        return Transmitir(conversacion.Id, respuestaId, pregunta, previos, ct);
+        return Transmitir(conversacion.Id, respuestaId, pregunta, previos, textoDePantalla, ct);
     }
 
     private static string Titulo(string pregunta)
@@ -73,7 +77,7 @@ public sealed class clsConversarAsistenteCommandHandler(
     }
 
     private async IAsyncEnumerable<clsEventoAsistente> Transmitir(
-        Guid conversacionId, Guid respuestaId, string pregunta, IReadOnlyList<clsMensajeAsistente> previos,
+        Guid conversacionId, Guid respuestaId, string pregunta, IReadOnlyList<clsMensajeAsistente> previos, string? textoDePantalla,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
         var respuesta = new StringBuilder();
@@ -98,8 +102,11 @@ public sealed class clsConversarAsistenteCommandHandler(
                 .Select(d => new clsHerramientaIa(d.Nombre, d.Descripcion, d.EsquemaEntrada.GetRawText()))
                 .ToList();
 
+            var instrucciones = clsInstruccionesAsistente.ConPreferencias(guardadas.Select(p => p.Texto).ToList());
+            if (textoDePantalla is not null) instrucciones += "\n\n" + textoDePantalla;
+
             var peticion = new clsPeticionConversacionIa(
-                clsFuncionIa.AsistenteCotizacion, clsInstruccionesAsistente.ConPreferencias(guardadas.Select(p => p.Texto).ToList()), historial, definiciones,
+                clsFuncionIa.AsistenteCotizacion, instrucciones, historial, definiciones,
                 limites.MaxIteracionesEfectivo, limites.MaxTokensRespuestaEfectivo, usuario.Id);
 
             string? motivo = null;
@@ -141,7 +148,7 @@ public sealed class clsConversarAsistenteCommandHandler(
                             break;
                         case clsEventoConversacionIa.HerramientaTerminada f:
                             yield return new clsEventoAsistente.Herramienta(
-                                f.Llamada.Nombre, f.Resultado.EsError ? "error" : "ok", f.Resultado.Fuente);
+                                f.Llamada.Nombre, f.Resultado.EsError ? "error" : "ok", f.Resultado.Fuente, f.Resultado.Encontrado, f.Resultado.Resumen);
                             while (_accionesPropuestas.TryDequeue(out var accionId))
                                 if (await conversaciones.ObtenerAccionAsync(accionId, CancellationToken.None) is { } propuesta)
                                     yield return new clsEventoAsistente.Accion(clsAccionAsistenteDto.De(propuesta));
@@ -240,7 +247,16 @@ public sealed class clsConversarAsistenteCommandHandler(
             Resultado = resultado, LatenciaMs = (int)Math.Min(reloj.ElapsedMilliseconds, int.MaxValue),
         }, CancellationToken.None);
 
-        return new clsResultadoHerramientaIa(contenido, EsError: leido is null, leido?.Fuente, leido?.Encontrado);
+        return new clsResultadoHerramientaIa(contenido, EsError: leido is null, leido?.Fuente, leido?.Encontrado, Acotar(leido?.Resumen));
+    }
+
+    private const int MaxCaracteresResumen = 300;
+
+    private static string? Acotar(string? resumen)
+    {
+        var limpio = resumen?.ReplaceLineEndings(" ").Trim();
+        if (string.IsNullOrEmpty(limpio)) return null;
+        return limpio.Length <= MaxCaracteresResumen ? limpio : limpio[..(MaxCaracteresResumen - 1)] + "…";
     }
 
     private async Task<IReadOnlyList<string>> CifrasSinOrigenAsync(

@@ -1,5 +1,7 @@
 using Nexo.Application.CasosDeUso.DiccionarioCliente;
 using Nexo.Application.CasosDeUso.DiccionarioCliente.Interfaces;
+using Nexo.Application.CasosDeUso.Solicitudes;
+using Nexo.Application.CasosDeUso.Solicitudes.Interfaces;
 using Nexo.Application.Common;
 using Nexo.Application.Common.Abstractions;
 using Nexo.Application.Common.Exceptions;
@@ -21,6 +23,10 @@ public class clsDiccionarioClienteTests
     private readonly Mock<IAuditoriaPort> _auditoria = new();
     private readonly Mock<ICurrentUserPort> _usuario = new();
     private readonly Mock<IUnitOfWork> _uow = new();
+    private readonly Mock<IClientesPort> _clientes = new();
+    private readonly Mock<IClientesDwPort> _dw = new();
+    private readonly Mock<IProspectosDwPort> _prospectos = new();
+    private readonly List<clsCliente> _clientesAgregados = [];
 
     public clsDiccionarioClienteTests()
     {
@@ -28,11 +34,23 @@ public class clsDiccionarioClienteTests
         _repo.Setup(r => r.ClienteExisteAsync(ClienteId, It.IsAny<CancellationToken>())).ReturnsAsync(true);
         _repo.Setup(r => r.BuscarDuplicadoAsync(It.IsAny<Guid?>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((clsTerminoCliente?)null);
+        _clientes.Setup(c => c.Agregar(It.IsAny<clsCliente>())).Callback<clsCliente>(_clientesAgregados.Add);
+        _dw.SetupGet(d => d.Configurado).Returns(true);
+        _dw.Setup(d => d.ListarAsync(It.IsAny<CancellationToken>())).ReturnsAsync([]);
+        _prospectos.SetupGet(p => p.Configurado).Returns(true);
+        _prospectos.Setup(p => p.ListarAsync(It.IsAny<CancellationToken>())).ReturnsAsync([]);
+        _repo.Setup(r => r.EsChoqueUnico(It.IsAny<Exception>())).Returns(false);
     }
 
-    private clsCrearTerminoClienteCommandHandler Crear() => new(_repo.Object, _auditoria.Object, _usuario.Object, _uow.Object);
+    private clsClienteDeImportacion Importacion() => new(_clientes.Object, _dw.Object, _prospectos.Object);
+    private clsCrearTerminoClienteCommandHandler Crear() => new(_repo.Object, _auditoria.Object, _usuario.Object, _uow.Object, Importacion());
     private clsEditarTerminoClienteCommandHandler Editar() =>
         new(_repo.Object, _auditoria.Object, _usuario.Object, _uow.Object, TimeProvider.System);
+
+    private void ClienteLocal(string nit, Guid id) =>
+        _clientes.Setup(c => c.ObtenerPorNitAsync(nit, It.IsAny<CancellationToken>())).ReturnsAsync(new clsCliente { Id = id, Nombre = "Local", Nit = nit });
+
+    private static readonly Exception ChoqueUnico = new InvalidOperationException("índice único");
 
     private static clsCrearTerminoClienteCommand Comando(
         string? termino = "CIUDAD ORIGEN", string? tipo = "columna", string? concepto = "origen", string? contexto = null,
@@ -153,6 +171,137 @@ public class clsDiccionarioClienteTests
         _uow.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 
+    // ---------------------------------------------------------------- crear: el cliente por NIT
+
+    [Fact]
+    public async Task Con_el_NIT_de_un_cliente_local_el_termino_queda_de_ese_cliente()
+    {
+        var local = Guid.NewGuid();
+        ClienteLocal("900123456", local);
+        clsTerminoCliente? guardado = null;
+        _repo.Setup(r => r.Agregar(It.IsAny<clsTerminoCliente>())).Callback<clsTerminoCliente>(t => guardado = t);
+
+        await Crear().Handle(Comando() with { ClienteId = null, ClienteNit = "900.123.456-7" });
+
+        Assert.Equal(local, guardado!.ClienteId);
+        Assert.Empty(_clientesAgregados);
+        _repo.Verify(r => r.ClienteExisteAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Con_el_NIT_de_un_cliente_del_DW_sin_cliente_local_lo_crea_y_el_termino_queda_de_ese_cliente()
+    {
+        _dw.Setup(d => d.ListarAsync(It.IsAny<CancellationToken>())).ReturnsAsync([new clsClienteDwDto("BP1", "900123456", "Real SAS")]);
+        clsTerminoCliente? guardado = null;
+        _repo.Setup(r => r.Agregar(It.IsAny<clsTerminoCliente>())).Callback<clsTerminoCliente>(t => guardado = t);
+
+        await Crear().Handle(Comando() with { ClienteId = null, ClienteNit = "900123456" });
+
+        var creado = Assert.Single(_clientesAgregados);
+        Assert.Equal(("Real SAS", "900123456"), (creado.Nombre, creado.Nit));
+        Assert.Equal(creado.Id, guardado!.ClienteId);
+        _uow.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Un_NIT_que_no_es_de_ningun_cliente_ni_prospecto_se_rechaza_sin_guardar()
+    {
+        var ex = await Assert.ThrowsAsync<clsValidationFailedException>(
+            () => Crear().Handle(Comando() with { ClienteId = null, ClienteNit = "999888777" }));
+
+        Assert.Equal("CLIENTE_NIT_INVALIDO", ex.Code);
+        Assert.Empty(_clientesAgregados);
+        _uow.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Mandar_el_id_y_el_NIT_a_la_vez_es_CLIENTE_AMBIGUO()
+    {
+        var ex = await Assert.ThrowsAsync<clsValidationFailedException>(
+            () => Crear().Handle(Comando() with { ClienteNit = "900123456" }));
+
+        Assert.Equal("CLIENTE_AMBIGUO", ex.Code);
+        _clientes.Verify(c => c.ObtenerPorNitAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        _uow.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task Un_NIT_en_blanco_cuenta_como_no_enviado_y_el_termino_es_general(string nit)
+    {
+        clsTerminoCliente? guardado = null;
+        _repo.Setup(r => r.Agregar(It.IsAny<clsTerminoCliente>())).Callback<clsTerminoCliente>(t => guardado = t);
+
+        await Crear().Handle(Comando() with { ClienteId = null, ClienteNit = nit });
+
+        Assert.Null(guardado!.ClienteId);
+        _clientes.Verify(c => c.ObtenerPorNitAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    // ---------------------------------------------------------------- crear: dos peticiones a la vez
+
+    [Fact]
+    public async Task Si_otra_peticion_guardo_primero_el_mismo_termino_es_409_y_no_un_error_del_servidor()
+    {
+        var yaGuardado = new clsTerminoCliente { ClienteId = ClienteId, Termino = "Ciudad Origen", Tipo = "columna", Concepto = "origen" };
+        _repo.SetupSequence(r => r.BuscarDuplicadoAsync(ClienteId, "CIUDAD ORIGEN", "columna", null, null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((clsTerminoCliente?)null)
+            .ReturnsAsync(yaGuardado);
+        _uow.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).ThrowsAsync(ChoqueUnico);
+        _repo.Setup(r => r.EsChoqueUnico(ChoqueUnico)).Returns(true);
+
+        var ex = await Assert.ThrowsAsync<clsConflictException>(() => Crear().Handle(Comando()));
+
+        Assert.Equal("TERMINO_DUPLICADO", ex.Code);
+        _repo.Verify(r => r.DescartarCambiosPendientes(), Times.Once);
+        _uow.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Si_el_choque_fue_por_el_mismo_cliente_creado_a_la_vez_se_reintenta_con_el_cliente_ya_guardado()
+    {
+        _dw.Setup(d => d.ListarAsync(It.IsAny<CancellationToken>())).ReturnsAsync([new clsClienteDwDto("BP1", "900123456", "Real SAS")]);
+        var local = Guid.NewGuid();
+        _clientes.SetupSequence(c => c.ObtenerPorNitAsync("900123456", It.IsAny<CancellationToken>()))
+            .ReturnsAsync((clsCliente?)null)
+            .ReturnsAsync(new clsCliente { Id = local, Nombre = "Real SAS", Nit = "900123456" });
+        _uow.SetupSequence(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).ThrowsAsync(ChoqueUnico).ReturnsAsync(1);
+        _repo.Setup(r => r.EsChoqueUnico(ChoqueUnico)).Returns(true);
+        var guardados = new List<clsTerminoCliente>();
+        _repo.Setup(r => r.Agregar(It.IsAny<clsTerminoCliente>())).Callback<clsTerminoCliente>(guardados.Add);
+
+        await Crear().Handle(Comando() with { ClienteId = null, ClienteNit = "900123456" });
+
+        Assert.Equal(local, guardados[^1].ClienteId);
+        _repo.Verify(r => r.DescartarCambiosPendientes(), Times.Once);
+        _uow.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Exactly(2));
+    }
+
+    [Fact]
+    public async Task Un_choque_que_no_se_explica_ni_con_el_reintento_se_propaga()
+    {
+        _uow.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).ThrowsAsync(ChoqueUnico);
+        _repo.Setup(r => r.EsChoqueUnico(ChoqueUnico)).Returns(true);
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => Crear().Handle(Comando()));
+
+        Assert.Same(ChoqueUnico, ex);
+        _uow.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Exactly(2));
+    }
+
+    [Fact]
+    public async Task Un_error_de_guardado_que_no_es_un_choque_unico_no_se_traduce()
+    {
+        var otro = new InvalidOperationException("otro");
+        _uow.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).ThrowsAsync(otro);
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => Crear().Handle(Comando()));
+
+        Assert.Same(otro, ex);
+        _repo.Verify(r => r.DescartarCambiosPendientes(), Times.Never);
+    }
+
     // ---------------------------------------------------------------- editar
 
     private static clsTerminoCliente Existente() => new()
@@ -202,6 +351,25 @@ public class clsDiccionarioClienteTests
         Assert.Equal("TERMINO_DUPLICADO", ex.Code);
     }
 
+    [Fact]
+    public async Task Editar_con_un_choque_de_otra_peticion_es_409_TERMINO_DUPLICADO()
+    {
+        var actual = Existente();
+        _repo.Setup(r => r.ObtenerAsync(actual.Id, It.IsAny<CancellationToken>())).ReturnsAsync(actual);
+        var otro = new clsTerminoCliente { ClienteId = ClienteId, Termino = "TON", Tipo = "columna", Concepto = "peso" };
+        _repo.SetupSequence(r => r.BuscarDuplicadoAsync(ClienteId, "TON", "columna", null, actual.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((clsTerminoCliente?)null)
+            .ReturnsAsync(otro);
+        _uow.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).ThrowsAsync(ChoqueUnico);
+        _repo.Setup(r => r.EsChoqueUnico(ChoqueUnico)).Returns(true);
+
+        var ex = await Assert.ThrowsAsync<clsConflictException>(
+            () => Editar().Handle(new clsEditarTerminoClienteCommand(actual.Id, "TON", "columna", "peso", null, null, true)));
+
+        Assert.Equal("TERMINO_DUPLICADO", ex.Code);
+        _repo.Verify(r => r.DescartarCambiosPendientes(), Times.Once);
+    }
+
     // ---------------------------------------------------------------- eliminar y listar
 
     [Fact]
@@ -223,7 +391,7 @@ public class clsDiccionarioClienteTests
     [Fact]
     public async Task Listar_con_un_tipo_invalido_es_400_y_con_uno_valido_lo_normaliza()
     {
-        var manejador = new clsListarDiccionarioClienteQueryHandler(_repo.Object);
+        var manejador = new clsListarDiccionarioClienteQueryHandler(_repo.Object, Importacion());
         _repo.Setup(r => r.ListarAsync(It.IsAny<Guid?>(), It.IsAny<bool>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
 
@@ -233,6 +401,37 @@ public class clsDiccionarioClienteTests
 
         await manejador.Handle(new clsListarDiccionarioClienteQuery(ClienteId, true, "COLUMNA", "  peso ", true));
         _repo.Verify(r => r.ListarAsync(ClienteId, true, "columna", "peso", true, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Listar_por_NIT_filtra_por_el_cliente_local_y_el_id_manda_sobre_el_NIT()
+    {
+        var manejador = new clsListarDiccionarioClienteQueryHandler(_repo.Object, Importacion());
+        var local = Guid.NewGuid();
+        ClienteLocal("900123456", local);
+        _repo.Setup(r => r.ListarAsync(It.IsAny<Guid?>(), It.IsAny<bool>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+
+        await manejador.Handle(new clsListarDiccionarioClienteQuery(null, true, null, null, false, "900.123.456-7"));
+        _repo.Verify(r => r.ListarAsync(local, true, null, null, false, It.IsAny<CancellationToken>()), Times.Once);
+
+        await manejador.Handle(new clsListarDiccionarioClienteQuery(ClienteId, true, null, null, false, "900123456"));
+        _repo.Verify(r => r.ListarAsync(ClienteId, true, null, null, false, It.IsAny<CancellationToken>()), Times.Once);
+        _clientes.Verify(c => c.ObtenerPorNitAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Listar_por_un_NIT_sin_cliente_local_no_crea_nada_y_no_trae_terminos_de_ningun_cliente()
+    {
+        var manejador = new clsListarDiccionarioClienteQueryHandler(_repo.Object, Importacion());
+        _repo.Setup(r => r.ListarAsync(It.IsAny<Guid?>(), It.IsAny<bool>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+
+        await manejador.Handle(new clsListarDiccionarioClienteQuery(null, true, null, null, false, "111222333"));
+
+        // El id vacío no pertenece a ningún cliente: quedan solo los generales (los de todos los clientes no se piden).
+        _repo.Verify(r => r.ListarAsync(Guid.Empty, true, null, null, false, It.IsAny<CancellationToken>()), Times.Once);
+        Assert.Empty(_clientesAgregados);
     }
 
     [Fact]

@@ -7,8 +7,9 @@ using Nexo.Domain.Catalogos.Entidades;
 
 namespace Nexo.Application.CasosDeUso.Solicitudes;
 
-/// <summary>Una línea del formulario de texto libre, antes de tener RutaId/ConfigVehiculoId.</summary>
-public sealed record clsResolverCatalogoLineaInput(string Origen, string Destino, string? TipoVehiculo, string? Carroceria);
+/// <summary>Una línea del formulario de texto libre, antes de tener RutaId/ConfigVehiculoId. Los ids de municipio (de <c>tbl_municipios</c>) son opcionales.</summary>
+public sealed record clsResolverCatalogoLineaInput(
+    string Origen, string Destino, string? TipoVehiculo, string? Carroceria, int? OrigenMunicipioId = null, int? DestinoMunicipioId = null);
 
 /// <summary>Los IDs resueltos para una línea, en el mismo orden en que se enviaron.</summary>
 public sealed record clsCatalogoLineaResueltoDto(
@@ -19,7 +20,8 @@ public sealed record clsResolverCatalogosDeLineasCommand(IReadOnlyList<clsResolv
 
 /// <summary>Resuelve texto libre (origen/destino/vehículo) a RutaId/ConfigVehiculoId creando lo que falte, SIN crear solicitud; alimenta a lineas:bulk, que exige estos ids ya resueltos.</summary>
 public sealed class clsResolverCatalogosDeLineasCommandHandler(
-    IRutasCatalogoPort rutasCatalogo, IConfiguracionesVehiculoPort vehiculosCatalogo, IAliasCatalogoPort aliasCatalogo, IUnitOfWork uow)
+    IRutasCatalogoPort rutasCatalogo, IConfiguracionesVehiculoPort vehiculosCatalogo, IAliasCatalogoPort aliasCatalogo,
+    IVehiculosNexoPort vehiculosNexo, IMunicipiosRepository municipiosCatalogo, IUnitOfWork uow)
     : ICommandHandler<clsResolverCatalogosDeLineasCommand, IReadOnlyList<clsCatalogoLineaResueltoDto>>
 {
     public async Task<IReadOnlyList<clsCatalogoLineaResueltoDto>> Handle(
@@ -35,6 +37,10 @@ public sealed class clsResolverCatalogosDeLineasCommandHandler(
         var vehiculos = await vehiculosCatalogo.ListarAsync(ct);
         var vehiculosPorClave = clsResolucionDeCatalogos.IndexarVehiculosPorClave(vehiculos);
         var aliasVehiculo = await aliasCatalogo.MapaActivoAsync(clsAliasElemento.TipoVehiculo, ct);
+        var oficialidad = await Catalogos.clsOficialidadDeVehiculos.CargarAsync(vehiculosNexo, ct);
+
+        var municipios = await clsResolucionDeCatalogos.CargarMunicipiosAsync(
+            municipiosCatalogo, command.Lineas.Select((l, i) => (i + 1, l.OrigenMunicipioId, l.DestinoMunicipioId)), ct);
 
         var resultado = new List<clsCatalogoLineaResueltoDto>(command.Lineas.Count);
         for (var i = 0; i < command.Lineas.Count; i++)
@@ -44,9 +50,10 @@ public sealed class clsResolverCatalogosDeLineasCommandHandler(
                 throw new clsValidationFailedException(
                     "ORIGEN_DESTINO_REQUERIDOS", $"La línea {i + 1} necesita origen y destino.");
 
-            var (ruta, rutaCreada) = clsResolucionDeCatalogos.ResolverRuta(lr.Origen, lr.Destino, rutasPorClave, rutasCatalogo);
+            var (ruta, rutaCreada) = clsResolucionDeCatalogos.ResolverRuta(
+                lr.Origen, lr.Destino, rutasPorClave, rutasCatalogo, lr.OrigenMunicipioId, lr.DestinoMunicipioId, municipios);
             var (vehiculo, vehiculoCreado) = clsResolucionDeCatalogos.ResolverVehiculo(
-                lr.TipoVehiculo, lr.Carroceria, vehiculosPorClave, vehiculosCatalogo, aliasVehiculo);
+                lr.TipoVehiculo, lr.Carroceria, vehiculosPorClave, vehiculosCatalogo, aliasVehiculo, oficialidad);
 
             resultado.Add(new clsCatalogoLineaResueltoDto(i, ruta.Id, vehiculo?.Id, rutaCreada, vehiculoCreado));
         }
