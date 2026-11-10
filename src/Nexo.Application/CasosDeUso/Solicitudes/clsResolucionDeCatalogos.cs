@@ -60,17 +60,21 @@ public static class clsResolucionDeCatalogos
         string origen, string destino, IDictionary<string, clsRuta> rutasPorClave, IRutasCatalogoPort catalogo,
         int? origenMunicipioId = null, int? destinoMunicipioId = null, IReadOnlyDictionary<int, clsMunicipio>? municipios = null)
     {
+        var nombreOrigen = NombreDelMunicipio(origenMunicipioId, municipios) ?? Limpiar(origen)!;
+        var nombreDestino = NombreDelMunicipio(destinoMunicipioId, municipios) ?? Limpiar(destino)!;
+        var clave = ClaveRuta(origen, destino);
+
         if (origenMunicipioId is not null && destinoMunicipioId is not null)
         {
-            var porMunicipios = rutasPorClave.Values.FirstOrDefault(r =>
-                r.OrigenMunicipioId == origenMunicipioId && r.DestinoMunicipioId == destinoMunicipioId);
+            // Pueden existir varias rutas con los mismos municipios: gana la que coincide por texto y, si ninguna, la más antigua.
+            var porMunicipios = rutasPorClave.Values.Distinct()
+                .Where(r => r.OrigenMunicipioId == origenMunicipioId && r.DestinoMunicipioId == destinoMunicipioId)
+                .OrderByDescending(r => ClaveRuta(r.Origen, r.Destino) == clave || ClaveRuta(r.Origen, r.Destino) == ClaveRuta(nombreOrigen, nombreDestino))
+                .ThenBy(r => r.CreatedAt).ThenBy(r => r.Id)
+                .FirstOrDefault();
             if (porMunicipios is not null) return (porMunicipios, false);
         }
 
-        var nombreOrigen = NombreDelMunicipio(origenMunicipioId, municipios) ?? Limpiar(origen)!;
-        var nombreDestino = NombreDelMunicipio(destinoMunicipioId, municipios) ?? Limpiar(destino)!;
-
-        var clave = ClaveRuta(origen, destino);
         if (!rutasPorClave.TryGetValue(clave, out var ruta))
             rutasPorClave.TryGetValue(ClaveRuta(nombreOrigen, nombreDestino), out ruta);
 

@@ -63,6 +63,37 @@ public class clsRutaConMunicipiosTests
     }
 
     [Fact]
+    public void Con_varias_rutas_de_los_mismos_municipios_gana_la_que_coincide_por_texto()
+    {
+        var basura = Enumerable.Range(0, 5).Select(i => new clsRuta
+        {
+            Origen = $"Origen0 (paralela-{i})", Destino = $"Destino0 (paralela-{i})",
+            OrigenMunicipioId = Cartagena.Id, DestinoMunicipioId = Uribia.Id, CreatedAt = DateTimeOffset.UtcNow.AddDays(-30 - i),
+        }).ToList();
+        var buena = new clsRuta { Origen = "Cartagena de Indias", Destino = "Uribia", OrigenMunicipioId = Cartagena.Id, DestinoMunicipioId = Uribia.Id, CreatedAt = DateTimeOffset.UtcNow };
+        var porClave = Indexar([.. basura, buena]);
+
+        var (ruta, creada) = clsResolucionDeCatalogos.ResolverRuta(
+            "CARTAGENA DE INDIAS", "uribia", porClave, _catalogo.Object, Cartagena.Id, Uribia.Id, Catalogo);
+
+        Assert.False(creada);
+        Assert.Same(buena, ruta);
+    }
+
+    [Fact]
+    public void Con_varias_rutas_de_los_mismos_municipios_y_ninguna_por_texto_gana_la_mas_antigua_siempre()
+    {
+        var vieja = new clsRuta { Origen = "Cartagena Bolivar", Destino = "Uribia", OrigenMunicipioId = Cartagena.Id, DestinoMunicipioId = Uribia.Id, CreatedAt = DateTimeOffset.UtcNow.AddDays(-90) };
+        var nueva = new clsRuta { Origen = "Cartagena D.T.", Destino = "Uribia", OrigenMunicipioId = Cartagena.Id, DestinoMunicipioId = Uribia.Id, CreatedAt = DateTimeOffset.UtcNow };
+
+        var (primera, _) = clsResolucionDeCatalogos.ResolverRuta("Cartagena", "Uribia", Indexar(nueva, vieja), _catalogo.Object, Cartagena.Id, Uribia.Id);
+        var (segunda, _) = clsResolucionDeCatalogos.ResolverRuta("Cartagena", "Uribia", Indexar(vieja, nueva), _catalogo.Object, Cartagena.Id, Uribia.Id);
+
+        Assert.Same(vieja, primera);
+        Assert.Same(vieja, segunda);
+    }
+
+    [Fact]
     public void Una_ruta_existente_por_texto_sin_municipios_los_completa()
     {
         var existente = new clsRuta { Origen = "CARTAGENA DE INDIAS", Destino = "URIBIA" };
