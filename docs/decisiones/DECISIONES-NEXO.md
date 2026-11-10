@@ -689,8 +689,9 @@ segundos) y no aplica en modo sombra, porque la IA corre aparte. Los criterios c
 
 Para encenderlo: en Dokploy, app `cubicador-api`, configurar `IA_SOMBRA_HABILITADA=true`, `ANTHROPIC_API_KEY` y, si la llave
 es de organización, `ANTHROPIC_WORKSPACE_ID`; redesplegar y comprobar que una recomendación pedida desde NEXO deja una fila
-con `Estado = OK` (detalle en [`ROTACION-LLAVE-ANTHROPIC.md`](../despliegue/ROTACION-LLAVE-ANTHROPIC.md), sección 8). Si el
-Cubicador pasa a su base propia antes de cerrar la ventana, las filas recolectadas se copian a la tabla `iaSombra` de esa base.
+con `Estado = OK` (detalle en [`ROTACION-LLAVE-ANTHROPIC.md`](../despliegue/ROTACION-LLAVE-ANTHROPIC.md), sección 8). El
+traslado del Cubicador a su base propia (S7-HU-31.3, #423) es en limpio y no copia las filas de `iaSombra`: si ocurre antes
+de cerrar la ventana, la ventana vuelve a empezar en la base nueva, con las mismas condiciones de cierre.
 
 Al cerrar la ventana se completa esta tabla con las consultas del estudio (sección 7), de solo lectura:
 

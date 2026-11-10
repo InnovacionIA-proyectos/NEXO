@@ -43,7 +43,7 @@ from .optimizar import ParametrosOptimizacionInput, optimizar_plan
 # Codigo canonico del catalogo -> nombre del preset del motor 3D.
 #
 # **Es deuda, no diseno.** Existe porque hay DOS catalogos de vehiculos: el de
-# `dbo_cubicador.vehiculos`, que alimenta al motor de seleccion, y el de
+# `vehiculos` del catalogo, que alimenta al motor de seleccion, y el de
 # `vehiculos_cubicacion`, que es el del motor 3D y se siembra POR NOMBRE.
 # Unificarlos es el primer punto de `docs/DEUDA_DIFERIDA_3D.md`; mientras tanto,
 # este diccionario es el unico lugar donde se cruzan.

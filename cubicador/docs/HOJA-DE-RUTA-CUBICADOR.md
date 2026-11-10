@@ -613,6 +613,7 @@ Es una sesión de una o dos horas, y es el **camino crítico** de todo lo demás
 
 **Arquitectura**
 - **SQL Server 2019**, en el esquema `dbo_cubicador` de `dbTarifario_Nexo_Pruebas` (compartido con Cotifly), con **scripts `.sql` versionados** para el esquema.
+  *Desde S7-HU-31.3 (#423) el Cubicador usa su base propia, `dbCubicador_Pruebas`, esquema `dbo`.*
 - El 3D se migra tal cual, para no tener dos motores de base adentro del Cubicador.
 - El puente usa un diccionario de compatibilidad `CodigoVehiculo` → preset viejo.
 - Un solo contrato, **corte coordinado**, sin endpoint de transición.

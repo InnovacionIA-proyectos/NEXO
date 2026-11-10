@@ -68,7 +68,7 @@ Los Excel de negocio se guardan fuera del repositorio.
 
 | Clave | Valor | Motivo |
 |---|---|---|
-| `k_max` | 25 | Con 10 se rechazaban cargas con solución (600 piezas de 1 m necesitan 13 vehículos). Con 25 el cálculo tarda centésimas de segundo; con 100 tardaría casi 10 s. **Ojo:** en QA (`dbo_cubicador`) sigue en 10, porque la carga del catálogo no modifica filas que ya existen. Hay que cambiarlo desde la administración del catálogo. |
+| `k_max` | 25 | Con 10 se rechazaban cargas con solución (600 piezas de 1 m necesitan 13 vehículos). Con 25 el cálculo tarda centésimas de segundo; con 100 tardaría casi 10 s. En la base compartida anterior estaba en 10; QA tiene 25 desde el traslado a la base propia (#423), que se cargó en limpio con este seeder. |
 | `factor_vol_util` | 0.90 | |
 | `usar_alternativa` | `solo_respaldo` | |
 | `umbral_alerta_llenado` | 0.75 | |

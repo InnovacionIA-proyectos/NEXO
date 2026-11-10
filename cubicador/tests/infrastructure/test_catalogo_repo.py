@@ -1,7 +1,7 @@
 """S5-HU-17.2: el adaptador de catalogo y las reglas de sus entidades.
 
 Las pruebas corren contra SQLite en memoria, como el resto de la suite. Los
-datos imitan lo que hay en `dbo_cubicador`: el override de capacidad del
+datos imitan el catalogo real de QA: el override de capacidad del
 `3S3 + FURGON`, una mercancia con carroceria secundaria, y una regla de
 incompatibilidad real.
 """

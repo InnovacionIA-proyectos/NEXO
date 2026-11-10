@@ -1,9 +1,11 @@
 """S5-HU-17.1/17.2: el esquema del `MetaData`, que si se rompe no falla —
 hace algo peor en silencio.
 
-Tiene que estar puesto contra SQL Server (si no, las tablas caen en `dbo`,
-compartido con Cotifly) y tiene que estar en None contra SQLite, que no
-soporta esquemas: declararlo ahi rompe toda la suite.
+Contra SQL Server tiene que estar puesto: por defecto `dbo`, el de la base
+propia del Cubicador (S7-HU-31.3, #423), y `CUBICADOR_DB_ESQUEMA` lo cambia.
+Contra SQLite tiene que estar en None, porque no soporta esquemas: declararlo
+ahi rompe toda la suite. Y `db.py` y `modelos_catalogo.py` lo resuelven cada
+uno por su lado, asi que tienen que coincidir siempre.
 
 Y los modelos del catalogo tienen que mantener su `MetaData` propio, separado
 del de `modelos.py`: son dos juegos de tablas con dueños distintos, y
@@ -43,39 +45,77 @@ def test_sqlite_no_declara_esquema(monkeypatch):
     assert db.Base.metadata.schema is None
 
 
+_URL_MSSQL = "mssql+aioodbc://u:p@host:1433/base?driver=ODBC+Driver+18+for+SQL+Server"
+
+
 def test_sqlite_ignora_la_variable_de_esquema(monkeypatch):
     """Aunque CUBICADOR_DB_ESQUEMA este puesta, contra SQLite no aplica."""
-    db = _recargar_db(monkeypatch, "sqlite+aiosqlite:///:memory:", "dbo_cubicador")
+    db = _recargar_db(monkeypatch, "sqlite+aiosqlite:///:memory:", "otro_esquema")
     assert db.ESQUEMA is None
 
 
-def test_sqlserver_declara_el_esquema(monkeypatch):
-    db = _recargar_db(
-        monkeypatch,
-        "mssql+aioodbc://u:p@host:1433/base?driver=ODBC+Driver+18+for+SQL+Server",
-        "dbo_cubicador")
-    assert db.ESQUEMA == "dbo_cubicador"
-    assert db.Base.metadata.schema == "dbo_cubicador"
+def test_sqlserver_declara_el_esquema_de_la_variable(monkeypatch):
+    """Un valor distinto del default: asi se ve que la variable gana."""
+    db = _recargar_db(monkeypatch, _URL_MSSQL, "otro_esquema")
+    assert db.ESQUEMA == "otro_esquema"
+    assert db.Base.metadata.schema == "otro_esquema"
 
 
-def test_sqlserver_cae_a_dbo_cubicador_por_defecto(monkeypatch):
-    """Sin la variable, el default NO debe ser `dbo`: ahi vive Cotifly."""
-    db = _recargar_db(
-        monkeypatch,
-        "mssql+aioodbc://u:p@host:1433/base?driver=ODBC+Driver+18+for+SQL+Server")
-    assert db.ESQUEMA == "dbo_cubicador"
+def test_sqlserver_cae_a_dbo_por_defecto(monkeypatch):
+    """Sin la variable, `dbo`: el esquema de la base propia `dbCubicador_Pruebas`."""
+    db = _recargar_db(monkeypatch, _URL_MSSQL)
+    assert db.ESQUEMA == "dbo"
+    assert db.Base.metadata.schema == "dbo"
+
+
+def test_sqlserver_variable_vacia_cae_a_dbo(monkeypatch):
+    """`CUBICADOR_DB_ESQUEMA=` (definida pero vacia) cuenta como no definida.
+    Sin esto el esquema quedaria en "" y no en el default."""
+    db = _recargar_db(monkeypatch, _URL_MSSQL, "")
+    assert db.ESQUEMA == "dbo"
+    assert db.Base.metadata.schema == "dbo"
+
+
+@pytest.mark.parametrize("valor, esperado", [
+    (None, "dbo"),
+    ("", "dbo"),
+    ("otro_esquema", "otro_esquema"),
+])
+def test_el_catalogo_resuelve_el_mismo_esquema_que_db(valor, esperado):
+    """`modelos_catalogo.py` resuelve el esquema por su cuenta, con la misma
+    regla que `db.py`. Si alguien cambia uno y olvida el otro, el catalogo y
+    las tablas del motor 3D quedarian en esquemas distintos.
+
+    Corre en un proceso aparte: recargar `modelos_catalogo` dentro de la suite
+    dejaria a los repositorios apuntando a las clases viejas.
+    """
+    import subprocess
+
+    entorno = {k: v for k, v in os.environ.items() if k != "CUBICADOR_DB_ESQUEMA"}
+    entorno["DATABASE_URL"] = _URL_MSSQL
+    if valor is not None:
+        entorno["CUBICADOR_DB_ESQUEMA"] = valor
+    codigo = (
+        "from infrastructure.persistence import db, modelos_catalogo as mc; "
+        "print(repr(db.ESQUEMA), repr(mc.ESQUEMA), repr(mc.BaseCatalogo.metadata.schema), sep='|')"
+    )
+    proceso = subprocess.run(
+        [sys.executable, "-c", codigo], cwd=RAIZ, env=entorno,
+        capture_output=True, text=True, timeout=60,
+    )
+    assert proceso.returncode == 0, proceso.stderr
+    salida = proceso.stdout.strip().split("|")
+    esperado = repr(esperado)
+
+    assert salida == [esperado, esperado, esperado]
 
 
 def test_crear_tablas_no_hace_nada_contra_sqlserver(monkeypatch):
     """El esquema de SQL Server lo gobierna `database/esquema/ESQUEMA_CUBICADOR.sql`:
-    `create_all` ahi crearia tablas fuera de esa fuente de verdad, en un
-    esquema que ademas se comparte con Cotifly."""
+    `create_all` ahi crearia tablas fuera de esa fuente de verdad."""
     import asyncio
 
-    db = _recargar_db(
-        monkeypatch,
-        "mssql+aioodbc://u:p@host:1433/base?driver=ODBC+Driver+18+for+SQL+Server",
-        "dbo_cubicador")
+    db = _recargar_db(monkeypatch, _URL_MSSQL)
     # Si intentara conectar, esto explotaria: no hay servidor en `host`.
     asyncio.run(db.crear_tablas())
 

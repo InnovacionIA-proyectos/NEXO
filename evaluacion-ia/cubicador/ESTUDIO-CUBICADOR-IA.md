@@ -111,16 +111,16 @@ Medida sobre la **semilla sintética** (22 casos, 50 repeticiones), en un equipo
 
 ## 7. Modo sombra: las mismas métricas con tráfico real
 
-Con `IA_SOMBRA_HABILITADA=true` el Cubicador compara, en segundo plano, cada recomendación del motor con la de Claude y deja una fila en `dbo_cubicador.iaSombra` (ver [ROTACION-LLAVE-ANTHROPIC.md](../../docs/despliegue/ROTACION-LLAVE-ANTHROPIC.md), sección 8). La respuesta al usuario no cambia ni se retrasa. El modelo **no ve** lo que respondió el motor.
+Con `IA_SOMBRA_HABILITADA=true` el Cubicador compara, en segundo plano, cada recomendación del motor con la de Claude y deja una fila en `dbo.iaSombra` de `dbCubicador_Pruebas` (ver [ROTACION-LLAVE-ANTHROPIC.md](../../docs/despliegue/ROTACION-LLAVE-ANTHROPIC.md), sección 8). La respuesta al usuario no cambia ni se retrasa. El modelo **no ve** lo que respondió el motor.
 
 Cada fila ya trae las cuentas de este documento, calculadas con el mismo criterio que `metricas.py`: acuerdo en la flota exacta y en la configuración, cantidad de vehículos, y el respeto de peso, volumen y unidades **recalculado con el catálogo** (no lo que el modelo dijo). Lo que no está en la tabla es la decisión humana correcta: esta medición dice cuánto se parece el modelo al motor, no cuánto acierta. Para eso sigue haciendo falta el dataset validado de §3.
 
-Consultas de solo lectura (cambiar `dbo_cubicador` si el esquema es otro):
+Consultas de solo lectura, contra `dbCubicador_Pruebas` (cambiar `dbo` si el esquema es otro):
 
 ```sql
 -- Qué pasó con cada intento
 SELECT Estado, COUNT(*) AS intentos
-FROM [dbo_cubicador].[iaSombra]
+FROM [dbo].[iaSombra]
 GROUP BY Estado
 ORDER BY intentos DESC;
 
@@ -133,7 +133,7 @@ SELECT
     AVG(CASE WHEN CantidadIa = CantidadMotor THEN 1.0 ELSE 0.0 END) AS misma_cantidad,
     AVG(CASE WHEN CantidadIa > CantidadMotor THEN 1.0 ELSE 0.0 END) AS ia_pide_mas,
     AVG(CASE WHEN CantidadIa < CantidadMotor THEN 1.0 ELSE 0.0 END) AS ia_pide_menos
-FROM [dbo_cubicador].[iaSombra]
+FROM [dbo].[iaSombra]
 WHERE Estado = N'OK';
 
 -- Seguridad: cuántas veces lo que propuso el modelo no se puede cargar
@@ -141,14 +141,14 @@ SELECT
     SUM(CASE WHEN IaRespetaPeso = 0 THEN 1 ELSE 0 END) AS excede_peso,
     SUM(CASE WHEN IaRespetaVolumen = 0 THEN 1 ELSE 0 END) AS excede_volumen,
     SUM(CASE WHEN IaConservaUnidades = 0 THEN 1 ELSE 0 END) AS pierde_o_repite_unidades
-FROM [dbo_cubicador].[iaSombra]
+FROM [dbo].[iaSombra]
 WHERE Estado = N'OK';
 
 -- Latencia del modelo (ms)
 SELECT DISTINCT
     PERCENTILE_CONT(0.50) WITHIN GROUP (ORDER BY LatenciaIaMs) OVER () AS p50_ms,
     PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY LatenciaIaMs) OVER () AS p95_ms
-FROM [dbo_cubicador].[iaSombra]
+FROM [dbo].[iaSombra]
 WHERE Estado = N'OK';
 
 -- Costo por cubicación. Los precios son USD por millón de tokens: poner los vigentes del modelo.
@@ -158,7 +158,7 @@ SELECT
     COUNT(*) AS llamadas,
     SUM(TokensEntrada * @precio_entrada + TokensSalida * @precio_salida) / 1000000.0 AS usd_total,
     SUM(TokensEntrada * @precio_entrada + TokensSalida * @precio_salida) / 1000000.0 / NULLIF(COUNT(*), 0) AS usd_por_cubicacion
-FROM [dbo_cubicador].[iaSombra]
+FROM [dbo].[iaSombra]
 WHERE TokensEntrada > 0;
 ```
 

@@ -27,7 +27,7 @@ Correr:
     ./.venv/Scripts/python.exe cubicador/scripts/medir_empaque_dblf.py
 
 No toca la base: las medidas de los vehiculos estan abajo, tomadas de
-`dbo_cubicador.vehiculos`.
+la tabla `vehiculos` del catalogo de QA.
 """
 
 from __future__ import annotations

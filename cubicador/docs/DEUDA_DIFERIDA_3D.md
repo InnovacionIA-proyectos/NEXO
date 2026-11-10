@@ -16,7 +16,7 @@ se sostiene con un diccionario y una convención.**
 
 | | Catálogo de selección | Catálogo del 3D |
 |---|---|---|
-| Tabla | `dbo_cubicador.vehiculos` | `dbo_cubicador.vehiculos_cubicacion` |
+| Tabla | `vehiculos` (catálogo) | `vehiculos_cubicacion` |
 | Quién lo administra | el equipo de Datos, más los CRUD de S5-HU-17.5 | se siembra por código, editable por API |
 | Identidad | `CodigoVehiculo` (`2L2`, `C2`, `C3`, `2S2`, `3S3`) | el **nombre** (`"Turbo con estacas"`) |
 | Qué guarda | medidas útiles en cm, capacidad por carrocería | medidas internas en mm, tara, puerta y ejes |
