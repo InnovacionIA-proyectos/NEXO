@@ -134,7 +134,7 @@ class IParametrosCubicacionRepository(Protocol):
 class ICatalogoRepository(Protocol):
     """Lectura del catalogo que administra el equipo de Datos (S5-HU-17.2).
 
-    **Solo lee.** Las 10 tablas de `dbo_cubicador` las crea y mantiene el equipo
+    **Solo lee.** Las 10 tablas del catalogo las crea y mantiene el equipo
     de Datos con sus propios scripts; el Cubicador las consume. Las escrituras
     que si le corresponden son las de los CRUD (S5-HU-17.5) y las de
     recomendaciones, que son append-only y tienen su propio puerto.

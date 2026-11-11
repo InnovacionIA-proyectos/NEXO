@@ -97,7 +97,7 @@ services:
       context: .
       dockerfile: Dockerfile
     environment:
-      # Apunta al SQL Server LOCAL de este compose, no a la base compartida.
+      # Apunta al SQL Server LOCAL de este compose, no a la base de QA.
       # `sa` solo existe aca: en QA/produccion se define DATABASE_URL entera
       # como variable de entorno (ver .env.dokploy).
       DATABASE_URL: mssql+aioodbc://sa:${MSSQL_SA_PASSWORD}@db:1433/dbCubicador_Pruebas?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes
@@ -147,7 +147,7 @@ services:
       context: .
       dockerfile: Dockerfile.worker
     environment:
-      # Apunta al SQL Server LOCAL de este compose, no a la base compartida.
+      # Apunta al SQL Server LOCAL de este compose, no a la base de QA.
       # `sa` solo existe aca: en QA/produccion se define DATABASE_URL entera
       # como variable de entorno (ver .env.dokploy).
       DATABASE_URL: mssql+aioodbc://sa:${MSSQL_SA_PASSWORD}@db:1433/dbCubicador_Pruebas?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes

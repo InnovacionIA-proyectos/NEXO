@@ -1,6 +1,6 @@
 """Motor de seleccion de flota (S5-HU-17.3).
 
-El catalogo de estas pruebas replica el REAL de `dbo_cubicador`: los 5
+El catalogo de estas pruebas replica el REAL de QA: los 5
 vehiculos con sus medidas y capacidades de QA, el override
 `3S3 + FURGON = 30.000 kg`, y la regla de incompatibilidad entre fertilizante
 y alimentos. Si el catalogo real cambia, `scripts/verificar_mapeo_catalogo.py`

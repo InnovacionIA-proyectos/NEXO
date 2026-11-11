@@ -1,8 +1,8 @@
 """Configuracion de SQLAlchemy async.
 
-Motor: **SQL Server** (S5-HU-17.1). El Cubicador no tiene base propia: vive en
-el esquema `dbo_cubicador` de `dbTarifario_Nexo_Pruebas`, que comparte con
-Cotifly (`dbo_cotifly`). NEXO no esta ahi - usa su propia base.
+Motor: **SQL Server** (S5-HU-17.1). Por defecto apunta a la base propia del
+Cubicador, `dbCubicador_Pruebas`, esquema `dbo`, que QA usa desde el traslado
+de S7-HU-31.3 (#423). Ver `database/README.md`, «Dónde vive hoy».
 
 `DATABASE_URL` sigue cayendo a SQLite en memoria cuando no esta definida, que
 es lo que usan las pruebas. El esquema SOLO se aplica contra SQL Server: SQLite
@@ -31,12 +31,13 @@ DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite+aiosqlite:///./cubicador.d
 _es_sqlite = DATABASE_URL.startswith("sqlite")
 _es_mssql = DATABASE_URL.startswith("mssql")
 
-# Esquema de TODAS las tablas del Cubicador. Sin esto caerian en `dbo`, que
-# esta compartido con Cotifly.
+# Esquema de TODAS las tablas del Cubicador. Por defecto `dbo`, el de su base
+# propia; `CUBICADOR_DB_ESQUEMA` lo cambia (definida pero vacia cuenta como no
+# definida). Lo lee tambien `modelos_catalogo.py`, con la misma regla.
 #
 # Queda en None fuera de SQL Server: SQLite no soporta esquemas y un
 # `MetaData(schema=...)` ahi hace fallar cualquier consulta de la suite.
-ESQUEMA = os.environ.get("CUBICADOR_DB_ESQUEMA", "dbo_cubicador") if _es_mssql else None
+ESQUEMA = (os.environ.get("CUBICADOR_DB_ESQUEMA") or "dbo") if _es_mssql else None
 
 # SQLite ":memory:" crea una base NUEVA por conexion - con StaticPool se
 # reusa una sola conexion para toda la app (solo aplica a este caso; en
@@ -66,9 +67,8 @@ async def crear_tablas() -> None:
     - `create_all` crea tablas nuevas pero NUNCA altera una existente, asi que
       una columna agregada al modelo despues del primer arranque se ignora en
       silencio.
-    - El esquema `dbo_cubicador` se comparte con Cotifly dentro de la misma
-      base: lo que toca la estructura se revisa y se aplica a mano, no en el
-      arranque de un contenedor.
+    - Lo que toca la estructura de una base de QA se revisa y se aplica a
+      mano, no en el arranque de un contenedor.
 
     Las pruebas corren contra SQLite en memoria, donde no hay scripts de por
     medio, asi que ahi sigue siendo la forma correcta de armar el esquema.

@@ -124,7 +124,7 @@ scripts/
                                           # (se niega a correr contra un host remoto;
                                           # --recrear lo rehace cuando cambia el modelo)
   verificar_integracion_mssql.py        # humo end-to-end contra SQL Server real
-  verificar_aislamiento.sql              # confirma que no tocamos dbo ni dbo_cotifly
+  verificar_aislamiento.sql              # base propia lista y usuario con lo justo (solo lectura y escritura)
 database/esquema/ESQUEMA_CUBICADOR.sql  # DDL único (16 tablas: catálogo, recomendación y motor 3D), se aplica a mano
 database/seeder/                        # CSV del catálogo, cargados por database/scripts/ejecutar_schema_y_seeders.py
 docker-compose.yml                    # api + worker + SQL Server local (RabbitMQ es el compartido de NEXO, ver DECISIONES_TECNICAS.md #9)

@@ -1,7 +1,7 @@
 """Adaptador de persistencia de recomendaciones (S5-HU-17.4).
 
 Implementa `IRecomendacionRepository` sobre las tres tablas de recomendacion de
-`dbo_cubicador`. **Append-only**: solo inserta y lee. No hay un solo `UPDATE`
+la base del Cubicador. **Append-only**: solo inserta y lee. No hay un solo `UPDATE`
 ni `DELETE` en este archivo, y es a proposito - ver el docstring del puerto.
 
 Los ids se generan aca con `uuid4` y no se dejan al `newid()` de la base: el

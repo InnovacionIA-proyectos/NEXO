@@ -2,7 +2,7 @@
 
 Las 16 tablas del Cubicador: para qué sirve cada una, de dónde salen sus datos y qué guarda cada columna. Tipos, nulos y valores por defecto corresponden a `cubicador/database/esquema/ESQUEMA_CUBICADOR.sql`.
 
-> **Dónde viven:** la base propia es `dbCubicador_Pruebas` (esquema `dbo`), pero el ambiente de QA todavía opera en `dbTarifario_Nexo_Pruebas`, esquema `dbo_cubicador`, con la misma estructura. El paso de QA a la base propia todavía está pendiente. Detalle en [`cubicador/database/README.md`](../../database/README.md#dónde-vive-hoy).
+> **Dónde viven:** en la base propia `dbCubicador_Pruebas`, esquema `dbo`, que QA usa desde el traslado de S7-HU-31.3 (#423). Detalle en [`cubicador/database/README.md`](../../database/README.md#dónde-vive-hoy).
 
 **Origen de cada columna:**
 
@@ -465,4 +465,4 @@ Además de las llaves primarias y foráneas, el esquema tiene estas reglas (`ESQ
 
 Índices de consulta: `IX_tiposMercancia_IdCategoria`, `IX_relacionVehiculosCarroceria_IdCarroceria`, `IX_recomendaciones_Linea_Origen`, `IX_recomendacionVehiculo_IdLineaSolicitud_OrigenSistema`, `IX_recomendacionVehiculo_IdRecomendacion`, `IX_recomendacionVehiculoMercancia_IdRecomendacionVehiculo`, `IX_iaSombra_IdRecomendacion`, `IX_iaSombra_CreatedAt` (incluye los tokens, para el tope diario) y los `ix_*` del motor 3D por línea de solicitud y por plan.
 
-> En QA (`dbo_cubicador`) los índices del motor 3D llevan el prefijo `ix_dbo_cubicador_` y algunas PK y FK tienen nombres generados por SQL Server. La estructura es la misma.
+> En la base compartida anterior (`dbo_cubicador`, sin uso desde el traslado) los índices del motor 3D llevaban el prefijo `ix_dbo_cubicador_` y algunas PK y FK tenían nombres generados por SQL Server. La estructura era la misma.

@@ -1,6 +1,6 @@
 """Compara los modelos de `modelos_catalogo.py` contra el esquema REAL (S5-HU-17.2).
 
-Las 10 tablas de `dbo_cubicador` las administra el equipo de Datos, no este
+Las 10 tablas del catalogo del Cubicador las administra el equipo de Datos, no este
 repo: nada en el codigo las crea ni las altera, asi que un cambio suyo en la
 base no rompe ninguna prueba hasta que algo falla en produccion. Este script es
 el que lo detecta.
@@ -57,7 +57,7 @@ def _conexion_desde_env() -> dict[str, object]:
         "user": urllib.parse.unquote(p.username or ""),
         "password": urllib.parse.unquote(p.password or ""),
         "database": (p.path or "/").lstrip("/"),
-        "esquema": os.environ.get("CUBICADOR_DB_ESQUEMA", "dbo_cubicador"),
+        "esquema": os.environ.get("CUBICADOR_DB_ESQUEMA") or "dbo",
     }
 
 

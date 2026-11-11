@@ -280,7 +280,13 @@ compartida eran pruebas y no se copia. El esquema se comparó contra la base rea
 (columnas, valores por defecto, CHECK, llaves e índices) y el catálogo quedó idéntico
 al de QA. El esquema quedó en **un solo archivo**, `database/esquema/ESQUEMA_CUBICADOR.sql`
 (16 tablas), y el seeder en `database/seeder/`. QA sigue en la base compartida hasta el
-cambio de configuración y de esquema por defecto (S6-HU-31.3, #423).
+cambio de configuración y de esquema por defecto (S7-HU-31.3, #423).
+
+**Actualizado en S7-HU-31.3 (#423, 2026-11-10)**: el esquema por defecto del código pasa a `dbo` y
+QA pasa a `dbCubicador_Pruebas.dbo`, en la misma ventana que NEXO (#428). `CUBICADOR_DB_ESQUEMA` ya
+coincide con el valor por defecto. El traslado es en limpio, solo con el catálogo: tampoco se copia
+`iaSombra`, así que la ventana de medición del modo sombra empieza de nuevo en la base propia (ver el
+acta en `docs/decisiones/DECISIONES-NEXO.md`). La base compartida queda como respaldo.
 
 **Decisión vigente**: RabbitMQ SÍ se comparte: `api`
 y `worker` se conectan al `rabbit` del `docker-compose.yml` raíz de NEXO
@@ -676,11 +682,14 @@ contrato que programan dos equipos de afuera.
 
 Es la confusión más fácil de este servicio y conviene tenerla escrita.
 
+> *Desde S7-HU-31.3 (#423) QA usa la base propia `dbCubicador_Pruebas`, esquema `dbo`, y la columna de QA de esta tabla
+> describe la base compartida anterior. Vigente: `cubicador/database/README.md`, «Dónde vive hoy».*
+
 | | **QA corporativo** | **Local del `docker-compose`** |
 |---|---|---|
 | Host | `10.10.40.85:1433` | `127.0.0.1:1434` (servicio `db`) |
-| Base | `dbTarifario_Nexo_Pruebas` | `dbTarifario_Nexo_Pruebas` (mismo nombre, otro servidor) |
-| Esquema | `dbo_cubicador`, **compartido con `dbo_cotifly`** | `dbo_cubicador`, solo |
+| Base | `dbTarifario_Nexo_Pruebas` | `dbCubicador_Pruebas` (otro servidor) |
+| Esquema | `dbo_cubicador`, **compartido con `dbo_cotifly`** | `dbo`, solo (`${CUBICADOR_DB_ESQUEMA:-dbo}` en el compose) |
 | Quién lo administra | el equipo de Datos | este repo |
 | Qué lo llena | `sqlcmd` del equipo de Datos + `cubicador/database/esquema/ESQUEMA_CUBICADOR.sql` | `cubicador/database/esquema/ESQUEMA_CUBICADOR.sql` + `scripts/preparar_catalogo_local.py` |
 

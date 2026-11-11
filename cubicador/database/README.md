@@ -12,13 +12,14 @@ tablas está en [`../docs/database/`](../docs/database/).
 
 ## Dónde vive hoy
 
-La base propia ya está creada, pero el ambiente de QA todavía no se ha pasado a ella. Ese corte
-todavía está pendiente.
+QA usa la base propia desde el traslado de S7-HU-31.3 (#423), hecho junto con el de NEXO (#428).
+El traslado fue en limpio: solo el catálogo inicial. Las filas de `iaSombra` no se copiaron, así que
+la medición del modo sombra empezó de nuevo en la base propia.
 
 | Ambiente | Base | Esquema | Estado |
 |---|---|---|---|
-| QA desplegado | `dbTarifario_Nexo_Pruebas` | `dbo_cubicador` | En uso, con `CUBICADOR_DB_ESQUEMA=dbo_cubicador` explícita. Se creó con scripts anteriores; su estructura es igual a la de `esquema/ESQUEMA_CUBICADOR.sql` (solo cambian los nombres generados de algunas PK, FK e índices). |
-| Base propia | `dbCubicador_Pruebas` | `dbo` | Creada con el esquema y el catálogo de esta carpeta. La aplicación todavía no la usa. |
+| QA desplegado | `dbCubicador_Pruebas` | `dbo` | En uso, con el usuario `userCubicador`. Creada con el esquema y el catálogo de esta carpeta. |
+| Base compartida anterior | `dbTarifario_Nexo_Pruebas` | `dbo_cubicador` | Sin uso desde el traslado. Queda como respaldo hasta que se decida retirarla. |
 | Local y CI | contenedor de `docker-compose.yml` | `dbo` | Se crea en cada arranque. |
 
 Las tablas `planes_cargue`, `items_plan_cargue`, `colocaciones_cargue` y `vehiculos_cubicacion` que
@@ -33,6 +34,9 @@ repositorio).
 | `esquema/ESQUEMA_CUBICADOR.sql` | DDL de las 16 tablas: columnas, llaves, `CHECK` e índices. Es la única definición del esquema. |
 | `seeder/` | Catálogo inicial: 7 CSV, uno por tabla. |
 | `scripts/ejecutar_schema_y_seeders.py` | Crea las tablas y carga los CSV en una base vacía. |
+
+Para comprobar que la base propia está lista y que `userCubicador` tiene solo lo que necesita, está
+`cubicador/scripts/verificar_aislamiento.sql`.
 
 ## Documentación
 
@@ -83,7 +87,7 @@ La aplicación (API y worker) lee dos variables de entorno:
 | Variable | Valor |
 |---|---|
 | `DATABASE_URL` | `mssql+aioodbc://<usuario>:<clave>@10.10.40.85:1433/dbCubicador_Pruebas?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes` |
-| `CUBICADOR_DB_ESQUEMA` | `dbo`. Es obligatoria: si falta, la aplicación usa `dbo_cubicador`. |
+| `CUBICADOR_DB_ESQUEMA` | `dbo`, que es también el valor por defecto: si falta o está vacía, la aplicación usa `dbo`. Hay que definirla solo cuando la base usa otro esquema (ver «Dónde vive hoy»). |
 
 Si la clave tiene `@ : / # ?`, debe ir codificada (`urllib.parse.quote_plus`).
 

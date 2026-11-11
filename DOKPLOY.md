@@ -42,8 +42,8 @@ nunca se suben valores reales.
 **`cubicador-api` y `cubicador-worker`**
 - `DATABASE_URL` con el formato `mssql+aioodbc://<usuario>:<clave>@10.10.40.85:1433/<base>?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes`.
   Si la clave trae `@ : / # ?`, va codificada.
-- `CUBICADOR_DB_ESQUEMA` es **obligatoria**: si falta, el Cubicador usa `dbo_cubicador`. Va con el esquema de la base que se
-  use (ver `cubicador/database/README.md`).
+- `CUBICADOR_DB_ESQUEMA`: si falta o está vacía, el Cubicador usa `dbo`, el de su base propia. Hay que definirla solo cuando
+  la base usa otro esquema, y va con el de la base que se use (ver `cubicador/database/README.md`, «Dónde vive hoy»).
 - `CUBICADOR_API_KEY_NEXO` y `CUBICADOR_API_KEY_COTIFLY`: una llave por sistema para `POST /recomendaciones`. La de Cotifly la
   genera Cotifly y es distinta de la de NEXO.
 - Modo sombra de la IA (`IA_SOMBRA_HABILITADA`, `ANTHROPIC_*`): nace apagado. Ver la guía de la llave de Anthropic, sección 8.
