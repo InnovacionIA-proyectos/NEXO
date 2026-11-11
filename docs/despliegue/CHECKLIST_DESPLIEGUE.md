@@ -1,125 +1,126 @@
-# Checklist de despliegue
+# Checklist de despliegue en un ambiente nuevo
 
-Interruptores de producción que exigen una confirmación explícita antes de
-encenderse — cada uno documenta QUÉ hace falta, A QUÉ evidencia está
-enlazado, y DE QUIÉN es la decisión. Ninguno se ejecuta desde este checklist:
-es la referencia que usa quien SÍ va a encenderlo.
+Lo que hay que configurar y comprobar antes de abrir NEXO y el Cubicador en un ambiente nuevo, por ejemplo producción. Cada
+punto dice qué hay que hacer, con qué evidencia y quién lo decide. La lista completa de variables por aplicación está en
+[`.env.dokploy`](../../.env.dokploy) y el procedimiento de Dokploy en [`DOKPLOY.md`](../../DOKPLOY.md). Aquí solo van los
+interruptores que, si se omiten, dejan una función apagada, abierta de más o apuntando al lugar equivocado.
+
+Un punto que no tiene evidencia o responsable no está listo: se deja pendiente, no se enciende.
+
+| # | Punto | Si se omite |
+|---|---|---|
+| 1 | Compuerta de paridad del plan de cargue | La optimización del plan de cargue responde `503 CUBICACION_EN_VERIFICACION`. |
+| 2 | Llaves entre NEXO y el Cubicador | Las llamadas entre servicios fallan con `401`, o el ambiente queda con llaves de QA. |
+| 3 | Inteligencia artificial | Se envían datos a un proveedor externo sin las aprobaciones requeridas. |
+| 4 | Base de datos y colas | La aplicación no arranca o lee y escribe en el esquema equivocado. |
 
 ---
 
 ## 1. Compuerta de paridad del plan de cargue
 
-> ✅ **ENCENDIDA en Dokploy (ambiente DEPLOY) el
-> 2026-09-14.** Autorizado por Kevin Cano (@kcano-ux). Ver "Encendido
-> confirmado" al final de esta sección para la evidencia y los valores
-> exactos que se configuraron.
+**Qué es.** La optimización del plan de cargue (`POST /api/planes-cargue/{id}/optimizar`) solo se publica al Cubicador si está
+comprobado que su motor da los mismos resultados que el motor original. Por defecto la compuerta está **cerrada**: responde
+`503 CUBICACION_EN_VERIFICACION` sin publicar nada. La regla está en el dominio (`CompuertaDeParidad`) y la configuración la lee
+`clsParidadCubicadorAdapter`.
 
-**Estado por defecto del código: CERRADA.** `POST /api/planes-cargue/{id}/optimizar`
-responde `503 CUBICACION_EN_VERIFICACION` sin publicar nada a la cola —
-fail-closed, sin fallback al PoC original (no operativo). La regla vive en
-`Domain.PlanDeCargue.Reglas.CompuertaDeParidad` y la lee
-`ParidadCubicadorAdapter` desde configuración.
+**Qué hay que hacer.**
 
-### Qué hace falta para encenderla
+1. Correr la suite de paridad sobre **el mismo commit que se va a desplegar**:
 
-Las **tres** claves siguientes, juntas, en la configuración de NEXO
-(`appsettings.{Environment}.json` o variables de entorno
-`Cubicacion__*`):
+   ```bash
+   docker run --rm -v "<ruta a cubicador/>:/app" -w /app python:3.14-slim \
+     bash -c "pip install -q -r requirements.txt && pytest tests/paridad -v"
+   ```
 
-| Clave | Qué es | Ejemplo |
+   El resultado esperado es 27 pruebas aprobadas: los 26 casos dorados de `cubicador/tests/paridad/test_paridad_casos_dorados.py`
+   más la que confirma que son exactamente 26. La misma suite corre en el CI dentro de `_cubicador-pruebas.yml`, así que la
+   corrida verde de ese commit también sirve como evidencia.
+2. Configurar las **tres** variables juntas en la aplicación `nexo-api`:
+
+   | Variable | Valor |
+   |---|---|
+   | `Cubicacion__ParidadVerificada` | `true` |
+   | `Cubicacion__ParidadEvidencia` | El SHA del commit verificado o la URL de la corrida del CI |
+   | `Cubicacion__ParidadFecha` | La fecha de la corrida (no la de la configuración), por ejemplo `2026-09-14` |
+
+   Con `ParidadVerificada=true` y sin las otras dos, la compuerta sigue cerrada y el log muestra una advertencia. Es a propósito:
+   encenderla exige dejar escrito contra qué evidencia se encendió.
+3. Redesplegar y comprobar: crear un plan de demostración (`POST /api/planes-cargue/demo`), optimizarlo y verificar que responde
+   `202` y que `GET /api/planes-cargue/{id}` termina en estado `optimizado`.
+
+**Evidencia.** La corrida de la suite (salida o enlace) del commit desplegado. La evidencia de un ambiente no sirve para otro
+si el código cambió.
+
+**Quién decide.** El responsable técnico del Cubicador.
+
+**Referencia.** En QA se encendió el 2026-09-14 con el commit `82fb52ba73083b7d94ea07d42a4774a2b9b8e1e3` (27 de 27).
+
+## 2. Llaves entre NEXO y el Cubicador
+
+**Qué es.** NEXO y el Cubicador se llaman entre sí con llaves (Bearer), no desde el navegador. Cada ambiente tiene que tener las
+suyas: nunca se reutilizan las de QA.
+
+**Qué hay que hacer.** Generar valores nuevos y configurarlos en pares:
+
+| En `nexo-api` | En el Cubicador | Para qué |
 |---|---|---|
-| `Cubicacion:ParidadVerificada` | El interruptor (`true`/`false`) | `true` |
-| `Cubicacion:ParidadEvidencia` | A QUÉ corrida de paridad se refiere — la URL de la corrida verde de `cubicador-ci.yml` (job de paridad) o el commit/SHA que la confirmó | `https://github.com/.../actions/runs/12345` |
-| `Cubicacion:ParidadFecha` | CUÁNDO se confirmó (fecha, no de "cuándo se configuró") | `2026-09-16` |
+| `Cubicador3D__RecomendacionesApiKey` | `CUBICADOR_API_KEY_NEXO` en `cubicador-api` | NEXO pide la recomendación de vehículo (`/recomendaciones`) |
+| `Cubicador3D__OutboundApiKey` | `CUBICADOR_API_KEY` en `cubicador-api` | NEXO administra los catálogos del Cubicador |
+| `Cubicador3D__InboundApiKey` | `NEXO_CALLBACK_API_KEY` en `cubicador-api` y `cubicador-worker` | El Cubicador llama de vuelta a NEXO |
 
-**Las tres son obligatorias a la vez.** `ParidadVerificada=true` sin las
-otras dos deja la compuerta CERRADA igual — a propósito, para que encenderla
-sea más que voltear un booleano: exige dejar dicho contra qué evidencia se
-prendió (`ParidadCubicadorAdapter` incluso deja un `LogWarning` si detecta
-esta configuración a medias).
+- `CUBICADOR_API_KEY_COTIFLY` la genera Cotifly y tiene que ser distinta de la de NEXO.
+- El Cubicador **no** tiene CORS a propósito: ningún navegador lo llama directamente. No se define ninguna variable de CORS en
+  sus aplicaciones. El CORS de NEXO (`Cors__OrigenesPermitidos`) sí es obligatorio y solo incluye el dominio del portal.
 
-### A qué evidencia está enlazado
+**Evidencia.** Con cada par configurado, una llamada de NEXO al Cubicador responde (por ejemplo, una cubicación desde la Mesa) y
+una llave de QA responde `401` en el ambiente nuevo.
 
-**Hotspot H5** ("paridad automatizada") — el criterio de cierre
-es **26/26** casos dorados coincidiendo exacto entre el motor C# original y
-el motor Python de Cubicador (`cubicador/tests/paridad/
-test_paridad_casos_dorados.py`).
+**Quién decide.** Quien administra el despliegue del ambiente.
 
-> ⚠️ **Corrección**: esta sección decía que la suite corre en
-> `cubicador-ci.yml`. Ese workflow **ya no existe** — fue retirado.
-> Hoy la misma suite corre dentro de `_cubicador-pruebas.yml` (workflow
-> reusable, job "Pruebas unitarias y de integracion (pytest)"), invocado por
-> `ci-cd-cubicador-api.yml` y `ci-cd-cubicador-worker.yml` en cada push/PR
-> que toque `cubicador/`.
+## 3. Inteligencia artificial
 
-La primera corrida ya había dado 26/26 (ver `cubicador/docs/
-DECISIONES_TECNICAS.md` sección 3 y `cubicador/README.md`).
+**Qué es.** NEXO y el Cubicador pueden llamar a Claude (importación de Excel, asistente de cotización, modo sombra del
+Cubicador). Las condiciones de uso están en la decisión
+[D-10](../decisiones/DECISIONES-NEXO.md#d-10), que todavía tiene aprobaciones pendientes.
 
-### De quién es la decisión
+**Qué hay que hacer.**
 
-**Kevin Cano (@kcano-ux).** Ninguna otra iniciativa de este repo enciende esta
-compuerta por defecto — el cierre de CORS y rotación de claves de Cubicador
-(sección 2) explícitamente la dejó enlazada, sin ejecutar.
+- Mientras la D-10 no esté aprobada para ese ambiente, las funciones quedan **apagadas**:
+  `Anthropic__Funciones__ImportacionExcel`, `__AsistenteCotizacion` y `__ApoyoCubicador` en `false`, e
+  `IA_SOMBRA_HABILITADA=false` en el Cubicador. Sin IA, la importación sigue funcionando con las reglas (diccionario, alias,
+  catálogos y DANE).
+- Cuando se aprueben, crear una *workspace* y una llave por servicio, con su límite de gasto, siguiendo
+  [`ROTACION-LLAVE-ANTHROPIC.md`](ROTACION-LLAVE-ANTHROPIC.md).
 
-### Encendido confirmado (2026-09-14)
+**Evidencia.** Las aprobaciones del punto 9 de la D-10 y, al encender, la verificación de salida a `api.anthropic.com` de la guía
+de la llave.
 
-**Autorizado por Kevin Cano (@kcano-ux)** para el ambiente Dokploy
-"DEPLOY"
-(`http://nexodeploy-backend-lkcbu5-b5dba3-10-10-40-17.sslip.io`).
+**Quién decide.** Cada aprobación tiene su responsable en la D-10 (datos, cuenta de Anthropic, jurídico, infraestructura y
+producto).
 
-**Evidencia**: no se usó una corrida de GitHub Actions (no había una
-enlazada — ver el aviso de arriba sobre `cubicador-ci.yml`). En su lugar se
-corrió la MISMA suite (`pytest tests/paridad -v`) en un contenedor efímero
-`python:3.14-slim`, contra el código real de `cubicador/` en el estado
-exacto del commit desplegado:
+## 4. Base de datos y colas
 
-- **Commit**: `82fb52ba73083b7d94ea07d42a4774a2b9b8e1e3` (rama
-  `DEPLOY`)
-- **Fecha de la corrida**: 2026-09-14
-- **Resultado**: `27 passed in 3.60s` — los 26 casos dorados
-  (`test_paridad_colisiones[01..05]`, `test_paridad_orientaciones[06..09]`,
-  `test_paridad_caso_10` a `test_paridad_caso_26`) más
-  `test_hay_exactamente_26_fixtures_dorados` (confirma que no falta ni sobra
-  ningún fixture). Salida completa registrada en
-  `docs/archivo/VERIFICACION_NEXO_CUBICADOR_2026-09-14.md`, sección 8.
+**Qué hay que hacer.**
 
-**Valores configurados en Dokploy** (app de la API de NEXO,
-`Cubicacion__*`, con doble guion bajo — Dokploy despliega por Dockerfile,
-sin interpolación de `docker-compose.yml`):
+- **NEXO:** `ConnectionStrings__Nexo` y `Database__Esquema` apuntando a la base y al esquema del ambiente. `Database__Esquema` es
+  obligatoria: sin ella la aplicación no arranca. `Database__SeedOnStartup=false`, porque el seeder de arranque carga datos
+  ficticios de demostración.
+- **Cubicador:** `DATABASE_URL` y `CUBICADOR_DB_ESQUEMA` en la API y en el worker, con los mismos valores. El Cubicador no valida
+  estas variables al arrancar: si falta `DATABASE_URL` arranca contra un SQLite local que se pierde en cada despliegue. Hay que
+  comprobarlo con `/health` y con los logs.
+- **Esquema y catálogos:** se crean con los scripts de `database/` (NEXO) y `cubicador/database/` (Cubicador). La aplicación no
+  crea tablas.
+- **Colas:** si el ambiente reemplaza a otro, vaciar las colas de RabbitMQ antes de cambiar de base, para que ningún mensaje
+  pendiente se procese contra datos que no existen. NEXO y el Cubicador se cambian juntos, porque cada uno guarda Id del otro.
 
-```
-Cubicacion__ParidadVerificada=true
-Cubicacion__ParidadEvidencia=82fb52ba73083b7d94ea07d42a4774a2b9b8e1e3
-Cubicacion__ParidadFecha=2026-09-14
-```
+**Evidencia.** `GET /health` de NEXO y del Cubicador en 200, y una solicitud de prueba que se costea de punta a punta.
+
+**Quién decide.** Quien administra el despliegue del ambiente.
 
 ---
 
-## 2. Cierre de CORS y rotación de claves de Cubicador
+## Cómo agregar un punto
 
-Ya ejecutado — se deja acá como registro, no como pendiente:
-
-- `CUBICADOR_CORS_ORIGENES` retirada por completo (código + `.env`/
-  `.env.example`/`docker-compose.yml`). Confirmado antes de
-  retirarla: el visor 3D en `administracion_embarqa_nexo` cerrado y
-  verificado en QA, ningún navegador llama a Cubicador directo.
-- `CUBICADOR_API_KEY` y el par `NEXO_CALLBACK_API_KEY`/
-  `Cubicador3D__InboundApiKey` rotados. El valor que estuvo
-  expuesto en el bundle público del portal queda inválido.
-
-**Pendiente de quien tenga acceso al ambiente real (fuera de este repo)**:
-aplicar el valor nuevo de `CUBICADOR_API_KEY` en el despliegue de producción
-de Cubicador y confirmar ahí — no solo en `.env` local — que el valor viejo
-ya no autentica ninguna llamada. Este checklist no tiene acceso a esa
-infraestructura para verificarlo por sí mismo.
-
----
-
-## Cómo agregar un nuevo interruptor a este checklist
-
-Cada entrada nueva debe responder las mismas tres preguntas que la de
-arriba: **qué** claves/pasos hacen falta, **a qué evidencia** está enlazado
-(un test, una corrida de CI, una confirmación de negocio), y **de quién** es
-la decisión de ejecutarlo. Si no se puede responder alguna de las tres
-todavía, no está listo para encenderse — se documenta como pendiente, no
-como checklist.
+Cada punto nuevo responde las mismas tres preguntas: **qué** hay que configurar o hacer, **con qué evidencia** se comprueba
+(una prueba, una corrida del CI, una confirmación de negocio) y **quién** decide encenderlo. Si alguna no tiene respuesta
+todavía, el punto queda como pendiente.

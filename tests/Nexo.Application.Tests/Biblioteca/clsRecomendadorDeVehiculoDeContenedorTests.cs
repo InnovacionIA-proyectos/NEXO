@@ -4,7 +4,7 @@ namespace Nexo.Application.Tests.Biblioteca;
 
 /// <summary>
 /// El vehículo que lleva un contenedor de 20 o 40 pies según su peso. Los rangos se leen del mismo CSV con el que se carga
-/// <c>tbl_rangos_peso_contenedor</c> (<c>docs/Database/seeder/rangos_peso_contenedor.csv</c>), así que la prueba cubre los 10 rangos reales y avisa si
+/// <c>tbl_rangos_peso_contenedor</c> (<c>database/seeder/rangos_peso_contenedor.csv</c>), así que la prueba cubre los 10 rangos reales y avisa si
 /// el archivo cambia. Incluye los pesos cuyo vehículo cambia respecto de los rangos de SAP que se usaban antes.
 /// </summary>
 public class clsRecomendadorDeVehiculoDeContenedorTests
@@ -13,7 +13,7 @@ public class clsRecomendadorDeVehiculoDeContenedorTests
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
         while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "Nexo.Clean.sln"))) dir = dir.Parent;
-        var ruta = Path.Combine(dir!.FullName, "docs", "Database", "seeder", "rangos_peso_contenedor.csv");
+        var ruta = Path.Combine(dir!.FullName, "database", "seeder", "rangos_peso_contenedor.csv");
 
         return File.ReadAllLines(ruta).Skip(1).Where(l => !string.IsNullOrWhiteSpace(l)).Select(l =>
         {

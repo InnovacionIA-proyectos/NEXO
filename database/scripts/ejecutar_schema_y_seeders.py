@@ -4,7 +4,7 @@
 Aplica esquema/ESQUEMA_NEXO.sql, después seeder/datos_base_nexo.sql y por último
 los CSV de seeder/ en el orden que exigen las llaves foráneas.
 
-Uso (desde docs/Database/):
+Uso (desde database/):
     py scripts/ejecutar_schema_y_seeders.py --server <host[,puerto]> [--solo-schema] [--solo-datos]
 
     --solo-schema  solo crea las tablas
@@ -28,14 +28,14 @@ import sys
 import tempfile
 from pathlib import Path
 
-CARPETA = Path(__file__).parent          # docs/Database/scripts/
-DATABASE = CARPETA.parent                # docs/Database/
+CARPETA = Path(__file__).parent          # database/scripts/
+DATABASE = CARPETA.parent                # database/
 ESQUEMA_SQL = DATABASE / "esquema" / "ESQUEMA_NEXO.sql"
 SEEDER = DATABASE / "seeder"
 DATOS_BASE_SQL = SEEDER / "datos_base_nexo.sql"
 TAMANO_LOTE = 200
 
-# Base y esquema destino. Para otro ambiente, cambiar NOMBRE_BD.
+# Base y esquema destino por defecto. Para otra base, usar --base (o cambiar NOMBRE_BD).
 NOMBRE_BD = "dbTarifario_Nexo_Pruebas"
 NOMBRE_ESQUEMA_SQL = "dbo"
 
@@ -53,6 +53,7 @@ CARGAS = [
     ("mapeo_vehiculos.csv", "tbl_mapeo_vehiculo_tarifario"),
     ("rangos_peso_contenedor.csv", "tbl_rangos_peso_contenedor"),
     ("tipos_carroceria_catalogo.csv", "tbl_tipos_carroceria_catalogo"),
+    ("configuraciones_vehiculo_oficiales.csv", "tbl_configuraciones_vehiculo"),
     ("diccionario_cliente.csv", "tbl_diccionario_cliente"),
 ]
 PRECIOS_LOCAL = "servicios_conexos_precios.local.csv"
@@ -172,5 +173,7 @@ if __name__ == "__main__":
     ap.add_argument("--server", required=True, help="host[,puerto] del SQL Server")
     ap.add_argument("--solo-schema", action="store_true", help="solo aplica ESQUEMA_NEXO.sql")
     ap.add_argument("--solo-datos", action="store_true", help="solo carga los datos iniciales (las tablas ya existen)")
+    ap.add_argument("--base", default=NOMBRE_BD, help=f"base destino (por defecto {NOMBRE_BD})")
     ARGS = ap.parse_args()
+    NOMBRE_BD = ARGS.base
     main()

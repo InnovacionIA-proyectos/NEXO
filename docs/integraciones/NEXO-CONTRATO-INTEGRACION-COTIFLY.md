@@ -7,7 +7,7 @@ orden, qué mandar, qué se recibe, qué decisiones de negocio ya están tomadas
 > endpoint (todas las restricciones y errores) está en [`CONTRATO.md`](../../CONTRATO.md); si algo no coincide, **manda `CONTRATO.md`**. La parte
 > del Cubicador (llave, URL, formato de la recomendación) tiene su guía propia: [`COTIFLY-COMO-CONECTARSE-AL-CUBICADOR.md`](./COTIFLY-COMO-CONECTARSE-AL-CUBICADOR.md).
 
-Verificado el **2026-11-04** contra el código de la rama `QA` y contra respuestas reales de la API. Reemplaza a los documentos anteriores de Cotifly (captura de solicitudes y conexión de la recomendación), ya retirados del repositorio.
+Verificado el **2026-11-10** contra el código (controladores de `src/Nexo.Api` y DTOs de `src/Nexo.Application`).
 
 ---
 
@@ -27,8 +27,8 @@ Verificado el **2026-11-04** contra el código de la rama `QA` y contra respuest
 
 - **(A) Cubicador directo.** La recomendación de vehículo se pide **directo al Cubicador** con la llave propia de Cotifly (decidido). Detalle en la guía del Cubicador.
 - **(B) NEXO.** Todo lo demás. NEXO **no llama a Cotifly**: no hay webhooks ni callbacks; Cotifly consulta cuando lo necesita.
-- NEXO también expone la recomendación como **proxy** (`POST/GET /api/cubicacion`, §4.2). Sirve a quien no quiera hablar con el Cubicador, pero esas recomendaciones quedan guardadas
-  con origen `NEXO`, no `COTIFLY`.
+- NEXO también expone la recomendación como **proxy** (`POST/GET /api/cubicacion`, §4.2). Sirve a quien no quiera hablar con el Cubicador, pero NEXO llama con su propia llave y
+  el Cubicador saca el origen de la llave: esas recomendaciones quedan guardadas con origen `NEXO`, no `COTIFLY`.
 
 ## 2. Conectarse a NEXO
 
@@ -54,17 +54,18 @@ Siempre el mismo formato; **se ramifica por `code`**, nunca por `message`:
 | HTTP | `code` | Qué hacer |
 |---|---|---|
 | `400` | `VALIDATION_ERROR` | Falló la forma del body/query. `details` trae `{ "Campo": ["mensaje"] }` |
-| `400` | un código de negocio (§9) | Corregir lo que mandó Cotifly |
+| `400` | un código de negocio (§9) | Corregir lo que mandó Cotifly. Incluye `DWCUBOS_NO_CONFIGURADO`: se mandó `clienteBp` en un ambiente sin el DW de clientes |
 | `401` | `SESION_INVALIDA` | Falta el header, no es numérico o el id no existe en el portal |
 | `403` | `SIN_PERMISO_CABINA_FLETES` | La persona existe pero su rol no puede hacer eso |
+| `403` | `SOLICITUD_AJENA` | Un Comercial abrió una solicitud que creó otra persona |
 | `404` | específico (`SOLICITUD_NO_ENCONTRADA`…) | El recurso no existe |
-| `409` | específico | Conflicto de estado (p. ej. `COTIZACION_CERRADA`) |
+| `409` | específico | Conflicto de estado (p. ej. `COTIZACION_CERRADA`, `SOLICITUD_DESCARTADA`) |
 | `429` | `DEMASIADAS_SOLICITUDES` | Reintentar tras `Retry-After` (30 s). `IA_TOPE_DIARIO` = la persona agotó su cupo diario de IA |
-| `503` | específico (`CUBICADOR_NO_DISPONIBLE`, `DWCUBOS_NO_CONFIGURADO`…) | Fuente externa caída o sin configurar: reintentar más tarde |
+| `503` | específico (`CUBICADOR_NO_DISPONIBLE`, `CUBICACION_RAPIDA_NO_CONFIGURADA`…) | Fuente externa caída o sin configurar: reintentar más tarde |
 
 ## 3. Catálogos y búsquedas (para armar el formulario)
 
-Todas son `GET`, JSON. Salvo `clientes` (Comercial/Admin), las abre cualquier rol válido.
+Todas son `GET`, JSON. Salvo `clientes` y `aprovisionamiento` (Comercial/Admin), las abre cualquier rol válido.
 
 | Endpoint | Para qué | Respuesta |
 |---|---|---|
@@ -74,36 +75,39 @@ Todas son `GET`, JSON. Salvo `clientes` (Comercial/Admin), las abre cualquier ro
 | `/api/captura-solicitudes/municipios` | Catálogo completo (~3.800 filas): cargarlo una vez | `MunicipioDto[]` |
 | `/api/catalogos/tipos-vehiculo`, `/clases-contenedor`, `/clases-viaje`, `/lineas-negocio` | Valores válidos de cada lista | ver `CONTRATO.md` §3.19 |
 | `/api/catalogos/alias/resolver?tipo=vehiculo&texto=T.MULA` | ¿NEXO reconoce este texto? | `{ texto, tipoElemento, reconocido, codigo, alias }`. `reconocido: false` = caería en cuarentena. `tipo` = `vehiculo` o `contenedor` |
-| `/api/captura-solicitudes/aprovisionamiento?levante=&origen=&carroceria=` | Estimar el viaje vacío de levante (solo informativo) | `{ candidato }` (puede ser `null`). Faltan `levante`/`origen` → `400 PARAMETROS_REQUERIDOS` |
+| `/api/captura-solicitudes/aprovisionamiento?levante=&origen=&configuracion=&carroceria=` | Estimar el viaje vacío de levante (solo informativo; al costear, la línea calcula el suyo) | `{ candidato }` (puede ser `null` si no hay piso para esa ruta). `configuracion` y `carroceria` son opcionales. Faltan `levante`/`origen` → `400 PARAMETROS_REQUERIDOS` |
 
 ## 4. Recomendación de vehículo
 
 ### 4.1 Directo al Cubicador (el camino decidido)
 
-`POST {Cubicador}/recomendaciones` con `Authorization: Bearer <llave de Cotifly>` y `origenSistema: "COTIFLY"`. La llave sale en el servidor de Cotifly, nunca en el navegador, y debe ser
-**distinta** de la de NEXO. Todo el detalle (request, los tres resultados `ASIGNADO` / `SIN_SELECCION_AUTOMATICA` / `condicionada`, errores y reconsulta) está en
+`POST {Cubicador}/recomendaciones` con `Authorization: Bearer <llave de Cotifly>`. El Cubicador saca el origen (`COTIFLY`) de la llave; `origenSistema` en el body es opcional,
+pero si se manda y no coincide con la llave responde `401`. La llave vive en el servidor de Cotifly, nunca en el navegador, y debe ser **distinta** de la de NEXO. Todo el detalle
+(request, los tres resultados `ASIGNADO` / `SIN_SELECCION_AUTOMATICA` / `condicionada`, errores y reconsulta) está en
 [`COTIFLY-COMO-CONECTARSE-AL-CUBICADOR.md`](./COTIFLY-COMO-CONECTARSE-AL-CUBICADOR.md). De cada camión de `vehiculos[]` salen los datos de la línea de captura (§5.1).
 
-**Explicación en lenguaje natural** (S6-HU-35.4): `GET {Cubicador}/recomendaciones/explicacion?idLineaSolicitud=&origenSistema=`. Es opcional y **siempre responde `200`**
-con `{ "explicacion": texto | null }`. Se pide **después** de mostrar los números (el modelo tarda varios segundos).
+**Explicación en lenguaje natural:** `GET {Cubicador}/recomendaciones/explicacion?idLineaSolicitud=&origenSistema=`. Es opcional: responde `200` con
+`{ "explicacion": texto | null }`, y `null` cuando la IA no está configurada o falla. Si la línea no tiene recomendación responde `404 RECOMENDACION_NO_ENCONTRADA`, como la
+reconsulta. Se pide **después** de mostrar los números (el modelo tarda varios segundos).
 
 ### 4.2 A través de NEXO (proxy)
 
 | Endpoint | Roles | Qué hace |
 |---|---|---|
-| `POST /api/cubicacion` | Comercial, AdminBiblioteca, AdminTarifas, Admin | Crea la recomendación en el Cubicador con la llave de NEXO. Body: `{ idLineaSolicitud, mercancias[{ codigoMercancia, cantidad, largoCm, anchoCm, altoCm, pesoKg }], claseViajeSeleccionada? }` |
-| `GET /api/cubicacion?idLineaSolicitud=&origenSistema=` | los mismos | Reconsulta la última corrida. `404 RECOMENDACION_NO_ENCONTRADA` si no hay |
-| `GET /api/cubicacion/explicacion?idLineaSolicitud=&origenSistema=` | los mismos | La explicación. **Siempre `200`**, `{ "explicacion": null }` si el Cubicador está caído, sin configurar, sin respuesta o sin texto |
+| `POST /api/cubicacion` | Comercial, AdminBiblioteca, AdminTarifas, Admin | Crea la recomendación en el Cubicador con la llave de NEXO. Body: `{ idLineaSolicitud, mercancias[{ codigoMercancia, cantidad, largoCm, anchoCm, altoCm, pesoKg }], claseViajeSeleccionada? }`. Sin mercancías → `400 MERCANCIAS_REQUERIDAS` |
+| `GET /api/cubicacion?idLineaSolicitud=&origenSistema=` | los mismos | Reconsulta la última corrida. Faltan parámetros → `400 PARAMETROS_REQUERIDOS`; sin recomendación → `404 RECOMENDACION_NO_ENCONTRADA` |
+| `GET /api/cubicacion/explicacion?idLineaSolicitud=&origenSistema=` | los mismos | La explicación. Responde `200` con `{ "explicacion": null }` ante cualquier fallo del Cubicador (caído, sin configurar, sin recomendación o sin texto). Solo faltar un parámetro da `400 PARAMETROS_REQUERIDOS` |
 
 `pesoKg` es **por unidad**. `SIN_SELECCION_AUTOMATICA` y `condicionada` son resultados `200`, no errores. Errores `400` del Cubicador pasan con su mismo código
-(`MERCANCIA_DESCONOCIDA`, `DIMENSIONES_INVALIDAS`, `CUBICACION_DEMASIADO_GRANDE`…); los `503` son `CUBICADOR_NO_DISPONIBLE`, `CUBICADOR_CREDENCIAL_INVALIDA`, `CUBICADOR_ERROR`
-o `CUBICACION_RAPIDA_NO_CONFIGURADA`.
+(`MERCANCIA_DESCONOCIDA`, `MERCANCIA_NO_CUBICABLE`, `CUBICACION_DEMASIADO_GRANDE`…); los `503` son `CUBICADOR_NO_DISPONIBLE`, `CUBICADOR_CREDENCIAL_INVALIDA`, `CUBICADOR_ERROR`,
+`CUBICADOR_RESPUESTA_VACIA` o `CUBICACION_RAPIDA_NO_CONFIGURADA`. El proxy no valida las medidas: una medida, un peso o una cantidad que no sean mayores que cero el Cubicador
+los rechaza con `422`, y NEXO lo devuelve como `503 CUBICADOR_ERROR`. Conviene validarlos antes de llamar.
 
 ## 5. Capturar la solicitud — `POST /api/captura-solicitudes`
 
 Rol **Comercial** o Admin. Crea la solicitud con N líneas y deja los fletes costeados (o pendientes). Respuesta `201` con `Location: /api/solicitudes/{id}`.
 
-### 5.1 Una línea por camión (decidido, #217)
+### 5.1 Una línea por camión (decidido)
 
 Cuando el Cubicador recomienda varios camiones, Cotifly manda **una línea por camión**:
 
@@ -112,15 +116,17 @@ Cuando el Cubicador recomienda varios camiones, Cotifly manda **una línea por c
 | `origen` / `destino` | Los de la ruta. Mandar también `origenMunicipioId` / `destinoMunicipioId` (§3): sin ellos el costeo no resuelve el municipio. Una ruta que ya existe solo recibe los ids que tenía vacíos: nunca se le cambia un municipio |
 | `tipoVehiculo` | El `codigoVehiculo` del camión (`2L2`, `C2`, `3S3`…) |
 | `carroceria` | El `codigoCarroceria` del camión (`FURGON`, `ESTACAS`…) |
-| `peso` | El `pesoTotalKg` **de ese camión**, en kg, **incluyendo la tara** (§8) |
+| `peso` | El `pesoTotalKg` **de ese camión**, en kg, **incluyendo la tara** (§8). Si no viene, NEXO toma la suma de las posiciones; sin ninguno de los dos, `400 PESO_REQUERIDO` |
 | `idRecomendacionVehiculo` | El de **ese** camión (texto, máx. 64) |
 | `grupoRutaId` | Un GUID **que genera Cotifly**, igual en todas las líneas de la misma recomendación y ruta; `null` en una línea suelta. NEXO lo guarda, nunca lo genera |
 | `claseViaje` | `Contenedor`, `Cupo`, `Carga suelta` o `Extradimensionado` (§8: Cupo sin vehículo queda pendiente) |
 | `lineaNegocio` | **Una de seis** (§8) o vacío |
-| `posiciones[]` | Opcional. Cada una con `largoCm`, `anchoCm`, `altoCm`, **`pesoKg` por unidad (obligatorio)**, `cantidad` (1–10.000), `descripcion`, `codigoTipoMercancia` |
+| `posiciones[]` | Opcional, máx. 200. Cada una con `largoCm`, `anchoCm`, `altoCm`, **`pesoKg` por unidad (obligatorio)**, `cantidad` (1–10.000), `descripcion`, `codigoTipoMercancia` |
+| `horasCargue` / `horasDescargue` | Opcionales, 0–240. Solo cuentan si vienen **las dos**; si falta una, la línea usa las de la cabecera (o 1 + 1 si es una devolución de contenedor) |
 
-Cabecera de la solicitud: `clienteId` **o** `clienteBp` (uno de los dos; con el DW configurado se usa `clienteBp` del resultado de §3), `tipo` (`spot` | `licitacion`), `deadline`,
-`valorEstimado`, `referencia`, `notas` (máx. 2000), `horasCargue`/`horasDescargue` (0–240, **mandar las dos o ninguna**; por defecto 4 + 4; 1 + 1 si la línea es una devolución de contenedor).
+Cabecera de la solicitud: `clienteId` **o** `clienteBp` (uno de los dos; con el DW configurado se usa `clienteBp` del resultado de §3), `tipo` (`spot` | `licitacion`), `modalidad`
+(opcional; un valor no reconocido da `400 ENUM_INVALIDO`), `deadline`, `valorEstimado`, `referencia`, `notas` (máx. 2000) y `horasCargue`/`horasDescargue` (0–240, 4 cada una
+por defecto), que aplican a las líneas que no traen las suyas.
 
 ```json
 POST /api/captura-solicitudes
@@ -186,10 +192,12 @@ Decidido: Cotifly **no replica** la importación; usa la de NEXO. Todas las ruta
 | `GET /api/cotizaciones/{id}` | los mismos | La cotización por id |
 | `GET /api/cotizaciones/{id}/exportar-excel` | los mismos | Excel de la cotización (con el valor de **venta** de los conexos) |
 
-> Los roles de lectura **no incluyen AdminBiblioteca**. Un Comercial ve solo las solicitudes que él creó (aislamiento por creador).
+> Los roles de lectura **no incluyen AdminBiblioteca**. Un Comercial solo ve en la bandeja las solicitudes que él creó, y `GET /api/solicitudes/{id}` de una ajena responde
+> `403 SOLICITUD_AJENA` (aislamiento por creador).
 
-**Lo que Cotifly lee de cada línea** (campos nuevos al final del objeto, opcionales): `numeroLinea`, `estadoLinea` (`porCostear` | `autoResuelta` | `revisada` | `rechazada`), `motivoPendiente`,
-`motivoRechazo`, `lineaNegocio`, `claseViaje`, `claseContenedor`, `origenMunicipioId`/`destinoMunicipioId`, `grupoRutaId`, `idRecomendacionVehiculo`, `tieneReglaSoloSicetac`.
+**Lo que Cotifly lee de cada línea** (campos opcionales al final del objeto): `numeroLinea`, `estadoLinea` (`porCostear` | `autoResuelta` | `revisada` | `rechazada`), `motivoPendiente`,
+`motivoRechazo`, `lineaNegocio` y `claseViaje` (con minúscula inicial: `puertoAInterior`, `cargaSuelta`…), `claseContenedor` (solo en clase de viaje `contenedor`),
+`origenMunicipioId`/`destinoMunicipioId`, `grupoRutaId`, `idRecomendacionVehiculo`, `valorMercancia`, `tieneReglaSoloSicetac`.
 Una línea **`rechazada`** no tiene flete ni suma al total: Cotifly **no** debe dejar la cotización «pendiente» por ella. Una línea `porCostear` trae el porqué en `motivoPendiente`.
 
 > ⚠️ **Nombres con prefijo `cls` en el JSON de lectura** (discrepancia conocida, `CONTRATO.md` §7): el texto de la ruta viaja como **`clsRuta`** (no `ruta`) en las líneas de
@@ -216,10 +224,10 @@ Cada conexo de la cotización trae **dos valores**, y no son lo mismo:
 |---|---|
 | **Peso** | `peso` es el total que se transporta **incluyendo la tara**, siempre en **kg**; NEXO no suma ni resta tara. Con `posiciones[]`, la suma `cantidad × pesoKg` no puede superar `peso` (tolerancia 1 %): si lo supera, `400 PESO_INCONSISTENTE`. `peso` mayor que la suma (la tara) es válido |
 | **`pesoKg` de una posición** | Es el de **una unidad**, no el total de la posición (NEXO y el Cubicador lo multiplican por `cantidad`) |
-| **Línea sin vehículo** | Solo vale para **Cupo**: queda `porCostear`, sin precio, con el motivo «Línea sin vehículo: requiere consulta completa» y la resuelve el Administrador de Tarifas. Contenedor, Carga suelta y Extradimensionado deducen o exigen el vehículo. **Mandar el vehículo siempre que se tenga** |
+| **Línea sin vehículo** | Solo vale para **Cupo** (o una línea sin clase de viaje): queda `porCostear`, sin precio, con el motivo «Línea sin vehículo: requiere consulta completa» y la resuelve el Administrador de Tarifas. Contenedor, Carga suelta y Extradimensionado deducen o exigen el vehículo. **Mandar el vehículo siempre que se tenga** |
 | **Línea de negocio** | Exactamente seis: `Nacional`, `Puerto a interior`, `Interior a puerto`, `Devolución de contenedor`, `Andino`, `Licitaciones` (también como `puertoAInterior`, mayúsculas o con guiones). Vacío = sin línea. **Cualquier otro texto → `400 LINEA_NEGOCIO_INVALIDO`** con el número de línea y el valor recibido (antes se perdía en silencio) |
 | **Códigos del Cubicador** | Un código desconocido **no se rechaza**: nace en cuarentena y un humano decide. El `tipoVehiculo` pasa antes por los alias; la `carroceria` no |
-| **Horas** | Cargado: 4 + 4 por defecto; devolución de contenedor: 1 + 1. Los tramos vacíos (retorno del contenedor, levante en otra ciudad) los suma NEXO aparte, 1 + 1, y no se mandan |
+| **Horas** | Cargado: 4 + 4 por defecto; devolución de contenedor: 1 + 1. Las horas propias de una línea solo cuentan si vienen las dos. Los tramos vacíos (retorno del contenedor, levante en otra ciudad) los suma NEXO aparte, 1 + 1, y no se mandan |
 | **Clase de contenedor** | Se resuelve por alias (`40 HC`, `40HC` → `CNT40.HC`; `20 STD` → `CNT20.ST`); si no está, se guarda como texto libre (máx. 20) |
 | **Posiciones** | Opcionales. Máx. 200 por línea y 10.000 unidades en total (`400 CUBICACION_DEMASIADO_GRANDE`) |
 | **Orden de líneas** | NEXO numera por el orden del arreglo; Cotifly no manda número |
@@ -230,14 +238,15 @@ Cada conexo de la cotización trae **dos valores**, y no son lo mismo:
 | `code` | Dónde | Qué significa |
 |---|---|---|
 | `CLIENTE_REQUERIDO`, `CLIENTE_INVALIDO`, `CLIENTE_BP_INVALIDO` | captura | Falta el cliente, no existe o el BP no está en el catálogo del DW |
-| `DWCUBOS_NO_CONFIGURADO` | captura | Se mandó `clienteBp` y el DW de clientes no está configurado en el ambiente |
-| `CLIENTE_NIT_INVALIDO` | plantillas | El NIT no es de ningún cliente ni prospecto |
+| `DWCUBOS_NO_CONFIGURADO` (400) | captura | Se mandó `clienteBp` y el DW de clientes no está configurado en el ambiente |
+| `CLIENTE_NIT_INVALIDO` | plantillas, recetas | El NIT no es de ningún cliente ni prospecto |
 | `LINEA_INCOMPLETA`, `PESO_REQUERIDO`, `PESO_INCONSISTENTE` | captura | Falta origen/destino, falta el peso o las posiciones suman más que `peso` |
+| `CUBICACION_DEMASIADO_GRANDE` | captura | Las posiciones de una línea suman más de 10.000 unidades |
 | `LINEA_NEGOCIO_INVALIDO` | captura | La línea de negocio no es una de las seis |
-| `ENUM_INVALIDO` | captura | Un valor de lista no reconocido (`tipo`, `modalidad`, `tipologia`) |
-| `CUBICACION_DEMASIADO_GRANDE`, `MERCANCIA_DESCONOCIDA`, `DIMENSIONES_INVALIDAS` | recomendación | Los manda el Cubicador tal cual |
+| `ENUM_INVALIDO` | captura | `modalidad` no reconocida. Un `tipo` distinto de `spot`/`licitacion` da `VALIDATION_ERROR`; una `tipologia` no reconocida se ignora |
+| `MERCANCIAS_REQUERIDAS`, `CUBICACION_DEMASIADO_GRANDE`, `MERCANCIA_DESCONOCIDA`, `MERCANCIA_NO_CUBICABLE` | recomendación | Los manda el Cubicador tal cual |
 | `RECOMENDACION_NO_ENCONTRADA` (404) | reconsulta | El Cubicador no tiene recomendación para esa línea: «todavía no hay», no una caída |
-| `SOLICITUD_NO_ENCONTRADA` (404), `SOLICITUD_DESCARTADA` (409) | lectura | La solicitud no existe o fue descartada |
+| `SOLICITUD_NO_ENCONTRADA` (404), `SOLICITUD_AJENA` (403), `SOLICITUD_DESCARTADA` (409) | lectura | La solicitud no existe, es de otro Comercial o fue descartada |
 | `IA_TOPE_DIARIO` (429) | importación | La persona agotó su cupo diario de IA |
 | `ARCHIVO_REQUERIDO`, `FORMATO_NO_SOPORTADO`, `EXCEL_INVALIDO`, `EXCEL_SIN_DATOS` | `analizar-excel`, `leer-estructura` | Problemas con el archivo |
 | `RECETA_INVALIDA`, `RECETA_REQUERIDA`, `RECETA_SIN_FILAS`, `INSTRUCCIONES_DEMASIADO_LARGAS` | `leer-estructura`, `PUT recetas-lectura` | La receta o las instrucciones no sirven; el mensaje dice qué |

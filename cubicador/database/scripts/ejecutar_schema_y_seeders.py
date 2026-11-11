@@ -29,7 +29,7 @@ ESQUEMA_SQL = DATABASE / "esquema" / "ESQUEMA_CUBICADOR.sql"
 SEEDER = DATABASE / "seeder"
 TAMANO_LOTE = 100
 
-# Base y esquema destino. Para otro ambiente, cambiar NOMBRE_BD.
+# Base y esquema destino por defecto. Para otra base, usar --base (o cambiar NOMBRE_BD).
 NOMBRE_BD = "dbCubicador_Pruebas"
 NOMBRE_ESQUEMA_SQL = "dbo"  # esquema SQL dentro de la base (ESQUEMA_SQL es la ruta del archivo .sql)
 
@@ -150,11 +150,14 @@ def cargar_csv(server, archivo):
 
 
 def main():
+    global NOMBRE_BD
     ap = argparse.ArgumentParser()
     ap.add_argument("--server", required=True, help="host[,puerto] del SQL Server 2019")
     ap.add_argument("--solo-schema", action="store_true", help="solo aplica ESQUEMA_CUBICADOR.sql")
     ap.add_argument("--solo-datos", action="store_true", help="solo carga los CSV (la base ya existe)")
+    ap.add_argument("--base", default=NOMBRE_BD, help=f"base destino (por defecto {NOMBRE_BD})")
     args = ap.parse_args()
+    NOMBRE_BD = args.base
 
     if not args.solo_datos:
         aplicar_schema(args.server)

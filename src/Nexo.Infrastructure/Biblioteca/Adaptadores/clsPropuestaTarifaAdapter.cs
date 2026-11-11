@@ -287,7 +287,7 @@ public sealed class clsPropuestaTarifaAdapter : IPropuestaTarifaPort, IPropuesta
             ClaseContenedorEstricta: esDevolucion);
 
         // El camino "oficial" (ITarifarioSapPort) exige match exacto de ClaseContenedor/peso/vehículo sin fallback; si no encuentra nada (oficial null o su Tarifa null)
-        // se reintenta con el selector tolerante del camino "Solo SICE-TAC" antes de rendirse (ver docs/decisiones/matching-sicetac-oficial-vs-solo-sicetac.md).
+        // se reintenta con el selector tolerante del camino "Solo SICE-TAC" antes de rendirse (ver docs/decisiones/DECISIONES-NEXO.md, D-02).
         // Orden de fuentes de plaza: oficial SAP -> tolerante SAP (por zona) -> propia de NEXO (tbl_tarifas_plaza); gana la primera VIGENTE.
         // Se sigue buscando una vigente en las tres: una vencida de "oficial" no debe impedir hallarla en las otras, y solo queda como referencia si ninguna fuente trae una vigente.
         clsCandidatoTarifaDto? plazaVigente = oficial?.Vencida == false ? oficial.Tarifa : null;

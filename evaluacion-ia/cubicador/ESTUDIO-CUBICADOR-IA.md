@@ -1,6 +1,6 @@
 # Estudio comparativo del Cubicador: motor actual contra IA
 
-S6-HU-35.1 (#366). Define cómo se mide si la IA mejora al Cubicador, con qué datos y contra qué punto de partida. La decisión de hasta dónde ampliar su alcance se toma después, con estos números (#370).
+Define cómo se mide si la IA mejora al Cubicador, con qué datos y contra qué punto de partida. La decisión de hasta dónde ampliar su alcance se toma después, con estos números y está en la decisión D-11 de [`DECISIONES-NEXO.md`](../../docs/decisiones/DECISIONES-NEXO.md#d-11).
 
 ## 1. Qué se compara
 
@@ -8,11 +8,11 @@ El Cubicador recomienda qué vehículos y cuántos hacen falta para una carga (`
 
 La IA no lo reemplaza. Se evalúa como un candidato que recibe **la misma carga y el mismo catálogo** y responde en **la misma forma** (qué vehículos y qué lleva cada uno). Lo que se mide es si, corriendo en modo sombra, acierta tanto como el motor y si aporta algo que el motor no hace (entender descripciones libres de mercancía y explicar el resultado).
 
-| Etapa | Qué hace la IA | Qué se mide | Issue |
-|---|---|---|---|
-| A. Misma decisión | Recomienda flota con la carga ya estructurada | Las cinco métricas de este documento | #367 |
-| B. Interpretar | Lee la descripción de la mercancía y la vuelve tipo, cantidad y medidas | Acierto del tipo y de las medidas, y que todo pase por las validaciones del motor | #368 |
-| C. Explicar | Cuenta por qué salió ese vehículo | Revisión humana con rúbrica (no es un número) | #369 |
+| Etapa | Qué hace la IA | Qué se mide |
+|---|---|---|
+| A. Misma decisión | Recomienda flota con la carga ya estructurada | Las cinco métricas de este documento |
+| B. Interpretar | Lee la descripción de la mercancía y la vuelve tipo, cantidad y medidas | Acierto del tipo y de las medidas, y que todo pase por las validaciones del motor |
+| C. Explicar | Cuenta por qué salió ese vehículo | Revisión humana con rúbrica (no es un número) |
 
 Este documento fija las métricas de la etapa A y la línea base del motor. Las etapas B y C reusan el mismo dataset y agregan sus propios casos.
 
@@ -30,7 +30,7 @@ Cada tasa se reporta con su denominador (`aciertos/total`): un porcentaje sin el
 
 Además se mide si **asignó o no** como el experto (por ejemplo, una pieza de 13 m debe terminar en `SIN_SELECCION_AUTOMATICA`/`EXTRADIMENSIONADO` y no en un camión).
 
-**Cómo se leen.** El respeto de capacidad es una condición, no una nota: un candidato con una sola violación no puede pasar a producción, sin importar su acierto. Los umbrales del go/no-go los fija #370; el criterio de partida es que la IA no quede por debajo del motor en acierto del vehículo ni en flota mínima, y que su p95 y su costo sean aceptables para quien espera la recomendación.
+**Cómo se leen.** El respeto de capacidad es una condición, no una nota: un candidato con una sola violación no puede pasar a producción, sin importar su acierto. Los umbrales del go/no-go los fija la decisión D-11; el criterio de partida es que la IA no quede por debajo del motor en acierto del vehículo ni en flota mínima, y que su p95 y su costo sean aceptables para quien espera la recomendación.
 
 ## 3. El dataset dorado
 
@@ -62,7 +62,7 @@ El criterio de la issue pide cargas reales. Salen de las líneas de solicitud qu
 
 - Mismo dato y mismo catálogo para todos los candidatos. Hoy el catálogo es el de QA calcado (`catalogo_qa.py`: 5 vehículos, 9 tipos de mercancía). Si el catálogo real cambia, la línea base deja de ser comparable y se vuelve a medir.
 - Cada caso se corre varias veces (50 en la línea base); la exactitud se toma de la primera corrida y la latencia y el costo de todas.
-- La **latencia del motor se mide en proceso**, sin HTTP ni base de datos. La latencia que vive el usuario (NEXO llama al Cubicador por HTTP con un tope de 15 s) se mide aparte, en modo sombra (#367), para el motor y para la IA con el mismo borde.
+- La **latencia del motor se mide en proceso**, sin HTTP ni base de datos. La latencia que vive el usuario (NEXO llama al Cubicador por HTTP con un tope de 15 s) se mide aparte, en modo sombra, para el motor y para la IA con el mismo borde.
 - Para los modelos (Sonnet 4.6 y 5.5, esfuerzos `low`/`medium`/`high`) se reporta cada combinación por separado.
 - La herramienta no se ejecuta en el CI: se corre bajo demanda y no toca base de datos ni red.
 
@@ -97,7 +97,7 @@ Medida sobre la **semilla sintética** (22 casos, 50 repeticiones), en un equipo
 
 **Lo que esta medición no ve.**
 
-- «Respeto de capacidad y volumen» compara sumas de peso y de volumen. No verifica que las piezas quepan físicamente en el piso (eso es lo que hace el empaque 3D del motor). Una propuesta puede pasar esta verificación y aun así no entrar. Para la IA eso se cubre pasando siempre su respuesta por las validaciones del motor (#368).
+- «Respeto de capacidad y volumen» compara sumas de peso y de volumen. No verifica que las piezas quepan físicamente en el piso (eso es lo que hace el empaque 3D del motor). Una propuesta puede pasar esta verificación y aun así no entrar. Para la IA eso se cubre pasando siempre su respuesta por las validaciones del motor.
 - Hay una sola mercancía por caso en la mayoría; las cargas heterogéneas grandes están poco representadas hasta que lleguen las reales.
 
 ## 6. Qué queda pendiente para cerrar la issue
@@ -111,7 +111,7 @@ Medida sobre la **semilla sintética** (22 casos, 50 repeticiones), en un equipo
 
 ## 7. Modo sombra: las mismas métricas con tráfico real
 
-Con `IA_SOMBRA_HABILITADA=true` el Cubicador compara, en segundo plano, cada recomendación del motor con la de Claude y deja una fila en `dbo_cubicador.iaSombra` (ver [ROTACION-LLAVE-ANTHROPIC.md](../despliegue/ROTACION-LLAVE-ANTHROPIC.md) §7). La respuesta al usuario no cambia ni se retrasa. El modelo **no ve** lo que respondió el motor.
+Con `IA_SOMBRA_HABILITADA=true` el Cubicador compara, en segundo plano, cada recomendación del motor con la de Claude y deja una fila en `dbo_cubicador.iaSombra` (ver [ROTACION-LLAVE-ANTHROPIC.md](../../docs/despliegue/ROTACION-LLAVE-ANTHROPIC.md), sección 8). La respuesta al usuario no cambia ni se retrasa. El modelo **no ve** lo que respondió el motor.
 
 Cada fila ya trae las cuentas de este documento, calculadas con el mismo criterio que `metricas.py`: acuerdo en la flota exacta y en la configuración, cantidad de vehículos, y el respeto de peso, volumen y unidades **recalculado con el catálogo** (no lo que el modelo dijo). Lo que no está en la tabla es la decisión humana correcta: esta medición dice cuánto se parece el modelo al motor, no cuánto acierta. Para eso sigue haciendo falta el dataset validado de §3.
 
@@ -166,4 +166,4 @@ La latencia es la del modelo (su propia llamada), no la de la API del Cubicador:
 
 ## 8. La IA contra el dataset dorado
 
-Con `evaluacion-ia/cubicador/evaluar_ia.py` la IA del modo sombra (mismo prompt, mismo esquema y misma validación que en producción) se midió sobre los mismos 22 casos y con las mismas métricas de la sección 5. Iguala al motor en todo menos en flota mínima (95 %): en el caso S-19 propone una Minimula donde hacen falta dos, y lo repite en cada corrida. Es justo el acomodo en el piso que se describe en la sección 5. Informe: `evaluacion-ia/cubicador/informe_ia_semilla.md`. La decisión que sale de aquí está en [`ACTA-DECISION-IA-CUBICADOR.md`](ACTA-DECISION-IA-CUBICADOR.md).
+Con `evaluacion-ia/cubicador/evaluar_ia.py` la IA del modo sombra (mismo prompt, mismo esquema y misma validación que en producción) se midió sobre los mismos 22 casos y con las mismas métricas de la sección 5. Iguala al motor en todo menos en flota mínima (95 %): en el caso S-19 propone una Minimula donde hacen falta dos, y lo repite en cada corrida. Es justo el acomodo en el piso que se describe en la sección 5. Informe: `evaluacion-ia/cubicador/informe_ia_semilla.md`. La decisión que sale de aquí está en la decisión D-11 de [`DECISIONES-NEXO.md`](../../docs/decisiones/DECISIONES-NEXO.md#d-11).

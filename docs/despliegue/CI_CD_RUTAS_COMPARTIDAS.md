@@ -6,7 +6,7 @@ cambios que puedan afectarlo — nunca por "cualquier cambio del repo". Este
 documento es la referencia de qué ruta dispara qué pipeline, y la convención a
 seguir cuando se agrega código nuevo.
 
-## Los 5 archivos
+## Los archivos de `.github/workflows/`
 
 | Archivo | Dispara | Se dispara solo |
 |---|---|---|
@@ -15,6 +15,7 @@ seguir cuando se agrega código nuevo.
 | `ci-cd-cubicador-worker.yml` | Servicio Cubicador-Worker | Sí — mismos paths que el del API, ver abajo |
 | `ci-cd-rabbitmq.yml` | RabbitMQ | Sí (paths propios) |
 | `_cubicador-pruebas.yml` | (nada — reusable) | Llamado por los 2 de Cubicador |
+| `add-to-project-nexo.yml` | Ningún servicio: agrega las issues nuevas o etiquetadas al tablero «Seguimiento Nexo» | Sí, al abrir o etiquetar una issue (no por cambios de código) |
 
 `_cubicador-pruebas.yml` no tiene disparador propio (`on: workflow_call`
 únicamente) — existe para que `ci-cd-cubicador-api.yml` y

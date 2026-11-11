@@ -132,7 +132,7 @@ cual): `CubicaciónSolicitada`, `PlanDeCargueGenerado`, `CubicaciónRechazada`.
 (`PlanDeCargueAjustado`, nombrado originalmente acá como reservado, nunca se
 implementó — ver la actualización siguiente.)
 
-**Actualización (ver ADR-ajuste-manual-async.md del lado de NEXO)**: el
+**Actualización (ver `docs/decisiones/DECISIONES-NEXO.md`, D-08, del lado de NEXO)**: el
 razonamiento de arriba ("el ajuste manual NO va por cola") sigue siendo
 válido para la API SÍNCRONA de Cubicador (`PATCH /{id}/colocaciones/{id}`,
 que no cambió) — pero NEXO, para no exponer Cubicador directo al navegador,
@@ -426,7 +426,7 @@ esquema del motor 3D aplicado contra SQL Server 2019 real, y la api
 arrancando y sirviendo el catálogo de vehículos desde ahí.
 
 **Cómo se gobierna el esquema** — *decidido en S5-HU-17.2 (2026-10-09),
-reemplaza a Alembic*: con **scripts `.sql` versionados** en `docs/Database/`,
+reemplaza a Alembic*: con **scripts `.sql` versionados** (hoy en `cubicador/database/`),
 aplicados con `scripts/aplicar_sql.py`. La propuesta original era Alembic con
 `--autogenerate` desde los modelos, y se retiró al probarla: su autogenerado
 lee la base **entera**, no solo nuestro esquema, y como `dbo_cubicador` vive en
@@ -519,7 +519,7 @@ ContratoCubicacionTests.cs` en NEXO, y la verificación E2E documentada en
 publicado por NEXO con el sobre real llegó al worker, se desenvolvió
 correctamente y se procesó igual que uno sin sobre — sin este cambio fallaba
 con `KeyError: 'tipo'` (documentado con la traza real en
-`NEXO/docs/mensajeria/CUBICACION.md` #4, incluido un bug que ese mismo
+`NEXO/docs/mensajeria/CUBICACION.md` (sección 5), incluido un bug que ese mismo
 `KeyError` exponía en el manejo de error de `_mover_a_dlq`, ya corregido de
 paso al aplicar el mismo desenvuelto ahí).
 
@@ -682,7 +682,7 @@ Es la confusión más fácil de este servicio y conviene tenerla escrita.
 | Base | `dbTarifario_Nexo_Pruebas` | `dbTarifario_Nexo_Pruebas` (mismo nombre, otro servidor) |
 | Esquema | `dbo_cubicador`, **compartido con `dbo_cotifly`** | `dbo_cubicador`, solo |
 | Quién lo administra | el equipo de Datos | este repo |
-| Qué lo llena | `sqlcmd` del equipo de Datos + `docs/Database/*.sql` | `docs/Database/*.sql` + `scripts/preparar_catalogo_local.py` |
+| Qué lo llena | `sqlcmd` del equipo de Datos + `cubicador/database/esquema/ESQUEMA_CUBICADOR.sql` | `cubicador/database/esquema/ESQUEMA_CUBICADOR.sql` + `scripts/preparar_catalogo_local.py` |
 
 El `.env` apunta a **QA** — lo usan pytest contra base real y los scripts de
 verificación. El `docker-compose.yml` arma su propia `DATABASE_URL` apuntando al
@@ -1036,8 +1036,8 @@ el default, y la fila aparece solo cuando alguien la edita con
 Se llegó a escribir un script de migración y se descartó. Insertar la fila
 habría puesto una segunda fuente de verdad por encima del default, y desde ahí
 un cambio en el código quedaría tapado en silencio por un dato que nadie pidió.
-Queda en su lugar una **comprobación** antes de desplegar —ver el orden de
-despliegue en `docs/304-QUE-DEBEN-HACER-FRONT-Y-BACK.md`—, porque si alguien
+Queda en su lugar una **comprobación** antes de desplegar —el orden de
+despliegue quedó en el historial de git (`docs/304-QUE-DEBEN-HACER-FRONT-Y-BACK.md`)—, porque si alguien
 edita el umbral por el CRUD antes del despliegue, esa fila mandaría sobre el
 default y el valor viejo seguiría en pie.
 

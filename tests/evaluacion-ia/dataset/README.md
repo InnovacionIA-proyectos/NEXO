@@ -94,7 +94,7 @@ Ningún Excel real entra al repositorio ni se le envía a Claude (decisión de s
 importa para medir el mapeo (encabezados exactos, filas de título, celdas combinadas, columnas vacías y el tipo de dato de cada columna)
 y cambian todo lo demás:
 
-- **Ciudades**: por ciudades colombianas del catálogo (`docs/Database/seeder/municipios.csv`); la misma ciudad siempre por la misma dentro
+- **Ciudades**: por ciudades colombianas del catálogo (`database/seeder/municipios.csv`); la misma ciudad siempre por la misma dentro
   del caso, conservando sufijos («-DTAI») y prefijos («AEROPUERTO»). También dentro de otros textos de la hoja.
 - **Departamento**: el de la ciudad nueva.
 - **Rutas de varias paradas**: cada ciudad por su reemplazo, con el mismo separador.

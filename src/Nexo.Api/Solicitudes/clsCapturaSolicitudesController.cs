@@ -162,7 +162,7 @@ public class clsCapturaSolicitudesController(
         [FromQuery] string? departamento, [FromQuery] string? q, CancellationToken ct = default)
         => Ok(await buscarCiudades.Handle(new clsBuscarCiudadesQuery(departamento, q), ct));
 
-    /// <summary>Catálogo completo de municipios (~3.800 filas, sin paginar ni filtrar) para cargarse una vez en el cliente. La tabla se crea y puebla por script (docs/Database/ESQUEMA_NEXO.sql), no por migración.</summary>
+    /// <summary>Catálogo completo de municipios (~3.800 filas, sin paginar ni filtrar) para cargarse una vez en el cliente. La tabla se crea y puebla por script (database/esquema/ESQUEMA_NEXO.sql), no por migración.</summary>
     [HttpGet("municipios")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyList<clsMunicipioDto>>> Municipios(CancellationToken ct = default)

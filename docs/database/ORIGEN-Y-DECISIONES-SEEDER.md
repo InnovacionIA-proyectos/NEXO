@@ -1,6 +1,6 @@
 # Origen y decisiones del seeder
 
-De dónde sale cada dato inicial de NEXO (`docs/Database/seeder/`) y qué reglas se aplicaron. Qué guarda
+De dónde sale cada dato inicial de NEXO (`database/seeder/`) y qué reglas se aplicaron. Qué guarda
 cada tabla está en `DICCIONARIO-DATOS.md`.
 
 Los datos iniciales se calcularon una vez, con consultas directas a las fuentes, y quedaron
@@ -18,10 +18,11 @@ archivo a mano. Los Excel de negocio se guardan fuera del repositorio.
 | `reglas_solo_sicetac.csv` | `tbl_reglas_solo_sicetac` | 260 | `FLETES PLAZA.xlsx`, celdas marcadas «sice» |
 | `tarifas_plaza.csv` | `tbl_tarifas_plaza` | 107 | `FLETES PLAZA.xlsx`, hoja «Fletes puertos» |
 | `servicios_conexos.csv` | `tbl_servicios_conexos` | 1.336 | Excel de costos de conexos 2026 |
-| `alias_elementos.csv` | `tbl_alias_elementos` | 71 | Diccionario de configuraciones de vehículo de negocio |
+| `alias_elementos.csv` | `tbl_alias_elementos` | 86 | Diccionario de configuraciones de vehículo de negocio, más 15 alias de la limpieza de la bandeja de cuarentena |
 | `mapeo_vehiculos.csv` | `tbl_mapeo_vehiculo_tarifario` | 15 | Revisión de cada vehículo contra SICE-TAC y Plaza/SAP |
 | `rangos_peso_contenedor.csv` | `tbl_rangos_peso_contenedor` | 10 | Rangos de peso de contenedores de negocio |
 | `tipos_carroceria_catalogo.csv` | `tbl_tipos_carroceria_catalogo` | 17 | Catálogo de carrocerías del Cubicador (mismos Id) |
+| `configuraciones_vehiculo_oficiales.csv` | `tbl_configuraciones_vehiculo` | 28 | Configuraciones oficiales (vehículo + carrocería) que había en QA el 2026-11-09 |
 | `diccionario_cliente.csv` | `tbl_diccionario_cliente` | 27 | Encabezados y valores de un Excel de licitación (términos generales) |
 
 ## Datos base (`datos_base_nexo.sql`)
@@ -116,9 +117,9 @@ pero como el proyecto no usa migraciones, nunca se insertan solas.
   porque juntos determinan el precio del ITR.
 - `Unidad`: «Por estiba» para Almacenamiento e ITR y «Por unidad» para los demás.
 - `PrecioVenta` va vacío en el repositorio: los precios de venta no se versionan. Para cargarlos,
-  se genera en local `servicios_conexos_precios.local.csv` (con
-  `generar_precios_venta_local.py`, que lee los Excel de precios); el script de carga lo usa en
-  lugar de `servicios_conexos.csv` si existe. Un servicio sin precio de venta cotiza con su costo.
+  se genera en local `servicios_conexos_precios.local.csv` a partir de los Excel de precios (con un
+  script local que no se versiona, porque esos Excel no van al repositorio); el script de carga lo
+  usa en lugar de `servicios_conexos.csv` si existe. Un servicio sin precio de venta cotiza con su costo.
 
 | Tipo | Columnas del Excel → tabla |
 |---|---|
@@ -133,12 +134,19 @@ pero como el proyecto no usa migraciones, nunca se insertan solas.
   con el código oficial de su columna.
 - Un solo diccionario para vehículo y contenedor, con `TipoElemento` para distinguirlos.
 - `Codigo` es texto, no llave foránea. Para vehículo es el código que comparten NEXO y el Cubicador
-  (`2L2` Turbo, `C2` Sencillo, `C3` Dobletroque, `2S2` Minimula, `3S3` Tractomula); para contenedor,
-  el de `tblSAPClaseContenedor` (`CNT40.HC`, `CNT20.ST`).
+  (`2L2` Turbo, `C2` Sencillo, `C3` Dobletroque, `2S2` Minimula, `3S3` Tractomula) o cualquier otro
+  código de `tbl_mapeo_vehiculo_tarifario` (`2L3`, `3S2`, `2S3`, `CA_`, `V2`…); para contenedor, el de
+  `tblSAPClaseContenedor` (`CNT40.HC`, `CNT20.ST`).
 - `AliasNormalizado` es la clave de comparación (única): mayúsculas, sin tildes, `_` y `-` como
   espacio, con el mismo algoritmo que usa el backend al capturar.
-- 71 alias (48 de vehículo y 23 de contenedor), sin choques entre columnas. Se conservan «40» y «20»
+- 86 alias (63 de vehículo y 23 de contenedor), sin choques entre columnas. Se conservan «40» y «20»
   a secas porque así vienen en el diccionario.
+- Los últimos 15 salen de la limpieza de la bandeja de cuarentena del 2026-11-09: textos
+  reales de clientes («Tractomula 3S3», «Sencillo C2», «Camioneta»…), los códigos SAP «2» y «3»
+  (C2 y C3) y los códigos de NEXO que no están en SAP (`2L3`, `3S2`, `2S3`, `2_5`, `V2`, `V3`,
+  `V4`) como alias de sí mismos.
+- Los alias «2L3 Liviano entre 7.5 y 8 Ton/Tonel.» y «Camion dos ejes - Livianos PBV 7500-8000 Kg»
+  apuntan a `2L2`, como venían del diccionario de negocio; se dejaron así a propósito.
 
 ## Mapeo de vehículos (`mapeo_vehiculos.csv`)
 
@@ -191,12 +199,26 @@ código equivocado no encuentra filas.
 - El Cubicador no reenvía las carrocerías que ya existen, así que una base nueva la necesita
   cargada desde el inicio. Son las 17 del seeder del Cubicador, con los mismos Id.
 
+## Configuraciones oficiales de vehículo (`configuraciones_vehiculo_oficiales.csv`)
+
+- Son las parejas vehículo + carrocería que ya estaban confirmadas como oficiales
+  (`EsCatalogoOficial = 1`) en QA el 2026-11-09: 28 en total, para 2L2, 2S2, 3S3, C2 y C3, una de
+  ellas sin carrocería por cada vehículo.
+- Hacen falta en una base nueva porque `normalizar-valores` arma su lista de carrocerías válidas a
+  partir de ellas (`clsNormalizarValoresQuery`): sin ninguna, no reconoce las carrocerías de un Excel.
+- Se limpiaron al copiarlas: las variantes de escritura se unificaron al código del catálogo de
+  carrocerías («Furgón», «Furgón Refrigerado», «Cama baja» pasan a `FURGON`, `FURGON_REFRIGERADO` y
+  `CAMA_BAJA`), se quitó el texto libre de `RangoPeso` y se dejaron fuera las 48 filas repetidas de
+  «2S2» sin carrocería y la carrocería «ESTIBAS», que no está en el catálogo.
+- El Id lo genera la carga. Las demás configuraciones (las que no son oficiales) las sigue creando la
+  aplicación al capturar.
+
 ## Diccionario del cliente (`diccionario_cliente.csv`)
 
 Vocabulario que usa un cliente en sus Excel y a qué corresponde en NEXO. Al importar un Excel sin
 plantilla, NEXO resuelve primero con el diccionario y solo le pregunta a la IA lo que falta.
 
-- **Fuente:** un solo Excel de licitación, el que en el dataset dorado (#353) es el cliente D
+- **Fuente:** un solo Excel de licitación, el que en el conjunto de prueba de la IA de importación es el cliente D
   (hojas «Formulario Oferta Nacional» e «Impo y Expo»). Se hizo con un solo Excel a propósito,
   como primera carga.
 - **Todos los términos son generales** (`ClienteId` vacío). El cliente de ese Excel no existe en
@@ -236,8 +258,8 @@ Lo que se dejó fuera y por qué:
 
 ## Tablas sin datos iniciales
 
-- **Las llena la aplicación al trabajar:** `tbl_rutas` y `tbl_configuraciones_vehiculo` (al capturar
-  solicitudes), `tbl_clientes` (copia local del DW al cotizar), `tbl_usuarios` (al entrar desde el
+- **Las llena la aplicación al trabajar:** `tbl_rutas` y las configuraciones de vehículo no oficiales
+  de `tbl_configuraciones_vehiculo` (al capturar solicitudes), `tbl_clientes` (copia local del DW al cotizar), `tbl_usuarios` (al entrar desde el
   portal), `tbl_cadena_priorizacion` (al arrancar), `tbl_tipos_mercancia_catalogo` (eventos del
   Cubicador) y `tbl_vehiculos_cubicacion` (planes de cargue).
 - **Historial de operación:** solicitudes, cotizaciones, auditoría, tarifas históricas, planes de

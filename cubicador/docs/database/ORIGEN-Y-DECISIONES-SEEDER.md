@@ -20,8 +20,9 @@ Los Excel de negocio se guardan fuera del repositorio.
 
 - 5 vehículos: Turbo 2L2, Sencillo C2, Dobletroque C3, Minimula 2S2 y Tractomula 3S3.
 - Medidas en centímetros.
-- `AlturaMaximaReglamentariaCm` es el límite legal de altura del tipo de vehículo: 230 cm
-  (2L2), 240 cm (C2) y 260 cm (C3, 2S2 y 3S3). No depende de la carrocería.
+- `AlturaMaximaReglamentariaCm` guarda el **alto útil de carga** del vehículo: 230 cm (2L2),
+  240 cm (C2) y 260 cm (C3, 2S2 y 3S3). Pese al nombre, no es el límite legal de altura. No
+  depende de la carrocería.
 - Un vehículo no se repite para expresar otra capacidad: esa diferencia va en
   `relacionVehiculosCarroceria`.
 
@@ -67,7 +68,7 @@ Los Excel de negocio se guardan fuera del repositorio.
 
 | Clave | Valor | Motivo |
 |---|---|---|
-| `k_max` | 25 | Con 10 se rechazaban cargas con solución (600 piezas de 1 m necesitan 13 vehículos). Con 25 el cálculo tarda centésimas de segundo; con 100 tardaría casi 10 s. |
+| `k_max` | 25 | Con 10 se rechazaban cargas con solución (600 piezas de 1 m necesitan 13 vehículos). Con 25 el cálculo tarda centésimas de segundo; con 100 tardaría casi 10 s. **Ojo:** en QA (`dbo_cubicador`) sigue en 10, porque la carga del catálogo no modifica filas que ya existen. Hay que cambiarlo desde la administración del catálogo. |
 | `factor_vol_util` | 0.90 | |
 | `usar_alternativa` | `solo_respaldo` | |
 | `umbral_alerta_llenado` | 0.75 | |
@@ -78,9 +79,14 @@ Los Excel de negocio se guardan fuera del repositorio.
 - **Tractomula 3S3 con Furgón o sus variantes: 30.000 kg en vez de 34.000.** Es la única
   excepción de capacidad del Excel. Se registra en `relacionVehiculosCarroceria` con
   `UsaCapacidadMaximaDelVehiculo = false` y `CapacidadMaximaEspecifica = 30000`.
-- **Carrocerías sin vehículo asignado:** Cama baja, Portacontenedores, Tanque, Tolva, Volco,
-  Grúa y Niñera están en el catálogo pero no en `relacionVehiculosCarroceria`. Se asignan
-  desde la administración de la aplicación cuando haya un emparejamiento confirmado.
+- **Carrocerías sin vehículo asignado (11):** Cama baja, Portacontenedores, Tanque, Tolva,
+  Volco, Grúa, Niñera, Planchón, Portavidrios, Contenedor seco y Contenedor refrigerado están en
+  el catálogo pero no en `relacionVehiculosCarroceria`. Se asignan desde la administración de la
+  aplicación cuando haya un emparejamiento confirmado. Mientras tanto, algunas mercancías no
+  pueden recibir vehículo por su carrocería principal (VIDRIO_PLANO, CARGA_CONTENERIZADA) y seis
+  tienen como alternativa CONTENEDOR_REFRIGERADO, que tampoco tiene vehículo.
+- **Categorías sin mercancías:** CARBURANTE, QUIMICO_OXIDANTE y QUIMICO_CORROSIVO no tienen
+  ninguna mercancía, así que 2 de las 3 reglas de incompatibilidad hoy nunca se aplican.
 
 ## Id de las filas
 
@@ -117,4 +123,6 @@ el mismo Id, así que:
   respuesta de negocio.
 - Dimensiones y capacidad de los contenedores de 20 y 40 pies.
 - Reglas de incompatibilidad adicionales a las 3 actuales.
-- Con qué vehículos se emparejan las 7 carrocerías sin asignar.
+- Con qué vehículos se emparejan las 11 carrocerías sin asignar (sobre todo Contenedor
+  refrigerado y Portavidrios).
+- Qué mercancías pertenecen a las 3 categorías vacías.

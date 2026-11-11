@@ -47,7 +47,7 @@ ORDER BY s.name;
 
 -- 4 ------------------------------------------------------------------------
 -- Permisos efectivos sobre la base actual. Hacen falta los de DDL para
--- aplicar los scripts de docs/Database/ (crean y alteran tablas).
+-- aplicar cubicador/database/esquema/ESQUEMA_CUBICADOR.sql (crea y altera tablas).
 SELECT
     permission_name          AS permiso,
     'presente'               AS estado

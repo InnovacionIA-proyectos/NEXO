@@ -12,7 +12,7 @@ using Nexo.Infrastructure.Persistence;
 namespace Nexo.Api.Tests.PlanDeCargue;
 
 /// <summary>
-/// #304 contra la API y la base reales (necesita docs/Database/304_rechazo_cubicacion_por_linea.sql aplicado): el rechazo que
+/// #304 contra la API y la base reales (necesita database/esquema/ESQUEMA_NEXO.sql (tabla tbl_rechazos_cubicacion_linea) aplicado): el rechazo que
 /// el worker del Cubicador reporta para "crear plan desde línea" queda guardado por línea y el front lo lee en
 /// <c>GET /api/planes-cargue/por-linea/{lineaId}/estado</c>. Antes ese motivo solo se escribía en el log y el front sondeaba
 /// para siempre.

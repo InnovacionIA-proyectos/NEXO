@@ -1,10 +1,12 @@
 # Diccionario de datos de NEXO
 
-Qué guarda cada una de las 46 tablas de la base de NEXO (`dbTarifario_Nexo_Pruebas`, esquema `dbo`), qué significa cada columna, sus llaves e índices y de dónde salen sus datos.
+Qué guarda cada una de las 46 tablas de la base de NEXO, qué significa cada columna, sus llaves e índices y de dónde salen sus datos.
 
-- **Fuente:** `docs/Database/esquema/ESQUEMA_NEXO.sql`. Tipos, nulos, valores por defecto, índices y `CHECK` corresponden a ese archivo.
-- **Esquema:** la aplicación lo lee de la variable `Database__Esquema` (`dbo`).
-- **Sin migraciones:** el esquema se crea con `ESQUEMA_NEXO.sql` y los datos iniciales se cargan desde `docs/Database/seeder/` (ver `ORIGEN-Y-DECISIONES-SEEDER.md`). Las filas que el modelo declara con `HasData` (usuario de sistema, mapeo de roles del portal, parámetros del score) se insertan con `docs/Database/seeder/datos_base_nexo.sql`.
+> **Dónde viven:** la base propia es `dbTarifario_Nexo_Pruebas` (esquema `dbo`), pero el ambiente de QA todavía opera en `dbInformesAutomatizados_Pruebas`, esquema `db_NEXO`, con la misma estructura. El paso de QA a la base propia todavía está pendiente. Detalle en [`database/README.md`](../../database/README.md#ambientes).
+
+- **Fuente:** `database/esquema/ESQUEMA_NEXO.sql`. Tipos, nulos, valores por defecto, índices y `CHECK` corresponden a ese archivo.
+- **Esquema:** la aplicación lo lee de la variable `Database__Esquema` (`dbo` en la base propia, `db_NEXO` en el QA actual).
+- **Sin migraciones:** el esquema se crea con `ESQUEMA_NEXO.sql` y los datos iniciales se cargan desde `database/seeder/` (ver `ORIGEN-Y-DECISIONES-SEEDER.md`). Las filas que el modelo declara con `HasData` (usuario de sistema, mapeo de roles del portal, parámetros del score) se insertan con `database/seeder/datos_base_nexo.sql`.
 - **Sin datos reales:** el repositorio es público; aquí solo hay estructura y significado.
 
 ---
@@ -22,60 +24,60 @@ Qué guarda cada una de las 46 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 6. [`tbl_alias_elementos`](#6-tbl_alias_elementos)
 7. [`tbl_diccionario_cliente`](#7-tbl_diccionario_cliente)
 8. [`tbl_plantillas_mapeo_cliente`](#8-tbl_plantillas_mapeo_cliente)
-   - bis. [`tbl_recetas_lectura_cliente`](#8-bis-tbl_recetas_lectura_cliente)
-9. [`tbl_mapeo_vehiculo_tarifario`](#9-tbl_mapeo_vehiculo_tarifario)
-10. [`tbl_rangos_peso_contenedor`](#10-tbl_rangos_peso_contenedor)
-11. [`tbl_municipios`](#11-tbl_municipios)
-12. [`tbl_pesos`](#12-tbl_pesos)
-13. [`tbl_vehiculos_cubicacion`](#13-tbl_vehiculos_cubicacion)
-14. [`tbl_tipos_mercancia_catalogo`](#14-tbl_tipos_mercancia_catalogo)
-15. [`tbl_tipos_carroceria_catalogo`](#15-tbl_tipos_carroceria_catalogo)
-16. [`tbl_servicios_conexos`](#16-tbl_servicios_conexos)
+9. [`tbl_recetas_lectura_cliente`](#9-tbl_recetas_lectura_cliente)
+10. [`tbl_mapeo_vehiculo_tarifario`](#10-tbl_mapeo_vehiculo_tarifario)
+11. [`tbl_rangos_peso_contenedor`](#11-tbl_rangos_peso_contenedor)
+12. [`tbl_municipios`](#12-tbl_municipios)
+13. [`tbl_pesos`](#13-tbl_pesos)
+14. [`tbl_vehiculos_cubicacion`](#14-tbl_vehiculos_cubicacion)
+15. [`tbl_tipos_mercancia_catalogo`](#15-tbl_tipos_mercancia_catalogo)
+16. [`tbl_tipos_carroceria_catalogo`](#16-tbl_tipos_carroceria_catalogo)
+17. [`tbl_servicios_conexos`](#17-tbl_servicios_conexos)
 
 **C. Solicitudes y costeo**
-17. [`tbl_solicitudes`](#17-tbl_solicitudes)
-18. [`tbl_lineas_solicitud`](#18-tbl_lineas_solicitud)
-19. [`tbl_lineas_pendientes_de_costeo`](#19-tbl_lineas_pendientes_de_costeo)
-20. [`tbl_trabajos_auto_costeo`](#20-tbl_trabajos_auto_costeo)
+18. [`tbl_solicitudes`](#18-tbl_solicitudes)
+19. [`tbl_lineas_solicitud`](#19-tbl_lineas_solicitud)
+20. [`tbl_lineas_pendientes_de_costeo`](#20-tbl_lineas_pendientes_de_costeo)
+21. [`tbl_trabajos_auto_costeo`](#21-tbl_trabajos_auto_costeo)
 
 **D. Cotizaciones**
-21. [`tbl_cotizaciones`](#21-tbl_cotizaciones)
-22. [`tbl_cotizacion_lineas`](#22-tbl_cotizacion_lineas)
-23. [`tbl_cotizacion_conexos`](#23-tbl_cotizacion_conexos)
+22. [`tbl_cotizaciones`](#22-tbl_cotizaciones)
+23. [`tbl_cotizacion_lineas`](#23-tbl_cotizacion_lineas)
+24. [`tbl_cotizacion_conexos`](#24-tbl_cotizacion_conexos)
 
 **E. Biblioteca de tarifas**
-24. [`tbl_tarifas_historicas`](#24-tbl_tarifas_historicas)
-25. [`tbl_reglas_solo_sicetac`](#25-tbl_reglas_solo_sicetac)
-26. [`tbl_ajustes_vigencia_plaza`](#26-tbl_ajustes_vigencia_plaza)
-27. [`tbl_tarifas_plaza`](#27-tbl_tarifas_plaza)
-28. [`tbl_tarifas_plaza_historico`](#28-tbl_tarifas_plaza_historico)
+25. [`tbl_tarifas_historicas`](#25-tbl_tarifas_historicas)
+26. [`tbl_reglas_solo_sicetac`](#26-tbl_reglas_solo_sicetac)
+27. [`tbl_ajustes_vigencia_plaza`](#27-tbl_ajustes_vigencia_plaza)
+28. [`tbl_tarifas_plaza`](#28-tbl_tarifas_plaza)
+29. [`tbl_tarifas_plaza_historico`](#29-tbl_tarifas_plaza_historico)
 
 **F. Priorización**
-29. [`tbl_cadena_priorizacion`](#29-tbl_cadena_priorizacion)
-30. [`tbl_parametros_score`](#30-tbl_parametros_score)
+30. [`tbl_cadena_priorizacion`](#30-tbl_cadena_priorizacion)
+31. [`tbl_parametros_score`](#31-tbl_parametros_score)
 
 **G. Plan de cargue (cubicación 3D)**
-31. [`tbl_planes_cargue`](#31-tbl_planes_cargue)
-32. [`tbl_rechazos_cubicacion_linea`](#32-tbl_rechazos_cubicacion_linea)
-33. [`tbl_items_plan_cargue`](#33-tbl_items_plan_cargue)
-34. [`tbl_colocaciones_cargue`](#34-tbl_colocaciones_cargue)
+32. [`tbl_planes_cargue`](#32-tbl_planes_cargue)
+33. [`tbl_rechazos_cubicacion_linea`](#33-tbl_rechazos_cubicacion_linea)
+34. [`tbl_items_plan_cargue`](#34-tbl_items_plan_cargue)
+35. [`tbl_colocaciones_cargue`](#35-tbl_colocaciones_cargue)
 
 **H. Auditoría**
-35. [`tbl_audit_log`](#35-tbl_audit_log)
+36. [`tbl_audit_log`](#36-tbl_audit_log)
 
 **I. Inteligencia artificial**
-36. [`tbl_ia_uso`](#36-tbl_ia_uso)
-37. [`tbl_asistente_conversaciones`](#37-tbl_asistente_conversaciones)
-38. [`tbl_asistente_mensajes`](#38-tbl_asistente_mensajes)
-39. [`tbl_asistente_herramientas_uso`](#39-tbl_asistente_herramientas_uso)
-40. [`tbl_asistente_acciones`](#40-tbl_asistente_acciones)
-41. [`tbl_asistente_preferencias`](#41-tbl_asistente_preferencias)
+37. [`tbl_ia_uso`](#37-tbl_ia_uso)
+38. [`tbl_asistente_conversaciones`](#38-tbl_asistente_conversaciones)
+39. [`tbl_asistente_mensajes`](#39-tbl_asistente_mensajes)
+40. [`tbl_asistente_herramientas_uso`](#40-tbl_asistente_herramientas_uso)
+41. [`tbl_asistente_acciones`](#41-tbl_asistente_acciones)
+42. [`tbl_asistente_preferencias`](#42-tbl_asistente_preferencias)
 
 **J. Mensajería e infraestructura**
-42. [`InboxState`](#42-inboxstate)
-43. [`OutboxMessage`](#43-outboxmessage)
-44. [`OutboxState`](#44-outboxstate)
-45. [`__EFMigrationsHistory`](#45-__efmigrationshistory)
+43. [`InboxState`](#43-inboxstate)
+44. [`OutboxMessage`](#44-outboxmessage)
+45. [`OutboxState`](#45-outboxstate)
+46. [`__EFMigrationsHistory`](#46-__efmigrationshistory)
 
 **[Apéndice: enums](#apéndice-enums)**
 
@@ -105,7 +107,7 @@ Qué guarda cada una de las 46 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 
 **De dónde salen los datos:**
 - **Automático en el primer ingreso:** `clsResolverIdentidadPortalAdapter` crea la fila la primera vez que una persona entra por el portal, con el rol que resulte de `tbl_mapeo_rol_portal`.
-- **Usuario de sistema** (`Sistema (placeholder)`, rol `Admin`): declarado en el modelo (`HasData` en `clsNexoDbContext`) para que las FK tengan a quién apuntar en procesos sin persona. Como el proyecto no usa migraciones, en una base nueva **no se crea solo**: lo inserta `docs/Database/seeder/datos_base_nexo.sql`.
+- **Usuario de sistema** (`Sistema (placeholder)`, rol `Admin`): declarado en el modelo (`HasData` en `clsNexoDbContext`) para que las FK tengan a quién apuntar en procesos sin persona. Como el proyecto no usa migraciones, en una base nueva **no se crea solo**: lo inserta `database/seeder/datos_base_nexo.sql`.
 - `clsDataSeeder.cs` siembra usuarios de demostración solo en ambientes locales (`Database__SeedOnStartup`, siempre `false` en producción).
 
 ---
@@ -128,7 +130,7 @@ Qué guarda cada una de las 46 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 **FK entrantes:** ninguna.
 
 **De dónde salen los datos:**
-- Declarado en el modelo (`HasData` en `clsNexoDbContext`): 9 filas (3 por texto y 6 por id de portal, del 48 al 53). Como el proyecto no usa migraciones, en una base nueva **no se crean solas**: las inserta `docs/Database/seeder/datos_base_nexo.sql`.
+- Declarado en el modelo (`HasData` en `clsNexoDbContext`): 9 filas (3 por texto y 6 por id de portal, del 48 al 53). Como el proyecto no usa migraciones, en una base nueva **no se crean solas**: las inserta `database/seeder/datos_base_nexo.sql`.
 - No hay endpoint para editarla.
 
 ---
@@ -156,6 +158,7 @@ Qué guarda cada una de las 46 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 
 **De dónde salen los datos:**
 - **Se crea al capturar una solicitud** (`clsResolucionDeCliente`): si el cliente no existe por NIT, se trae del Data Warehouse corporativo (`clsClientesDwAdapter`, solo lectura) y se copia aquí.
+- **También se crea por NIT** (`clsClienteDeImportacion`) al guardar algo propio del cliente: un término del diccionario, una plantilla de mapeo o un formato de lectura de Excel. El NIT tiene que existir en el DW de clientes o en el de prospectos; si no, `400 CLIENTE_NIT_INVALIDO`. Las lecturas solo buscan: no crean.
 - No hay endpoint de alta manual directa.
 - `clsDataSeeder.cs` siembra clientes de demostración solo en ambientes locales.
 
@@ -209,6 +212,7 @@ Qué guarda cada una de las 46 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 **De dónde salen los datos:**
 - **Se crea al capturar una solicitud** (`clsResolucionDeCatalogos`) si el vehículo no existe; si el texto no calza con el catálogo oficial queda con `EsCatalogoOficial = 0`.
 - La bandeja de normalización (`clsBandejaVehiculosCommands`) la corrige, la descarta o crea un alias.
+- Carga inicial: `database/seeder/configuraciones_vehiculo_oficiales.csv` (28 configuraciones oficiales: 2L2, 2S2, 3S3, C2 y C3 con sus carrocerías). `normalizar-valores` arma con ellas su lista de carrocerías válidas.
 - `clsDataSeeder.cs` siembra filas de demostración solo en ambientes locales.
 
 ---
@@ -233,7 +237,7 @@ Qué guarda cada una de las 46 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 **FK entrantes:** ninguna.
 
 **De dónde salen los datos:**
-- Carga inicial: `docs/Database/seeder/alias_elementos.csv` (71 filas).
+- Carga inicial: `database/seeder/alias_elementos.csv` (86 filas: 63 de vehículo y 23 de contenedor).
 - Se amplía desde la API (`clsAliasCommands`) y desde la bandeja de normalización de vehículos.
 
 ---
@@ -266,8 +270,8 @@ Qué guarda cada una de las 46 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 **FK entrantes:** ninguna.
 
 **De dónde salen los datos:**
-- CRUD en `/api/diccionario-cliente` (`clsDiccionarioClienteCasosDeUso`).
-- Carga inicial (S6-HU-33.2): `docs/Database/seeder/diccionario_cliente.csv`, 27 términos generales (`ClienteId` `NULL`). Ver `ORIGEN-Y-DECISIONES-SEEDER.md`.
+- CRUD en `/api/diccionario-cliente` (`clsDiccionarioClienteCasosDeUso`). El cliente se indica con `clienteId` o con `clienteNit`; un término repetido para el mismo cliente, tipo y contexto responde `409 TERMINO_DUPLICADO`, también si llegan dos pedidos a la vez.
+- Carga inicial: `database/seeder/diccionario_cliente.csv`, 27 términos generales (`ClienteId` `NULL`). Ver `ORIGEN-Y-DECISIONES-SEEDER.md`.
 - Confirmar un mapeo de Excel **no** agrega términos aquí automáticamente.
 
 ---
@@ -301,7 +305,7 @@ Qué guarda cada una de las 46 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 
 ---
 
-## 8 bis. `tbl_recetas_lectura_cliente`
+## 9. `tbl_recetas_lectura_cliente`
 
 **Entidad:** `clsRecetaLecturaCliente` — **Para qué sirve:** Cómo leer el Excel de un cliente: dónde están los encabezados y los datos de cada hoja, cómo se despivotan las tablas cruzadas y qué hojas se usan. La IA propone la receta y la persona la confirma sobre una vista previa. Un archivo nuevo del cliente con un formato parecido (≥ 85 % de los títulos de la parte alta) se lee con la receta guardada sin llamar a la IA; si el formato cambia, la receta y las instrucciones sirven de contexto a la IA.
 
@@ -333,7 +337,7 @@ Qué guarda cada una de las 46 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 
 ---
 
-## 9. `tbl_mapeo_vehiculo_tarifario`
+## 10. `tbl_mapeo_vehiculo_tarifario`
 
 **Entidad:** `clsMapeoVehiculoTarifario` — **Para qué sirve:** Código con el que se busca cada tipo de vehículo de NEXO en cada fuente de tarifa. SICE-TAC y Plaza/SAP nombran el mismo vehículo con códigos distintos; antes NEXO usaba el mismo código para todo y, si no encontraba filas, tomaba el vehículo más barato de la ruta sin avisar. Es global, no por cliente, y parte del `TipoVehiculo` ya resuelto por `tbl_alias_elementos`.
 
@@ -356,13 +360,13 @@ Qué guarda cada una de las 46 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 **FK entrantes:** `tbl_rangos_peso_contenedor.TipoVehiculo` (NO ACTION).
 
 **De dónde salen los datos:**
-- Carga inicial: `docs/Database/seeder/mapeo_vehiculos.csv` (15 filas, 8 con código de plaza).
+- Carga inicial: `database/seeder/mapeo_vehiculos.csv` (15 filas, 8 con código de plaza).
 - Decisiones: Sencillo `C2` -> `2` en SICE-TAC y en plaza; Turbo `2L1`/`2L2`/`2L3` -> `2L2` en plaza (en SICE-TAC cada uno conserva su código); Dobletroque `C3` -> `3` en SICE-TAC y `C3` en plaza.
 - Pendiente: el seeder de `tbl_tarifas_plaza` usa `3S2` y `2L3`, que no coinciden con `CodigoPlazaSap` de esos dos vehículos.
 
 ---
 
-## 10. `tbl_rangos_peso_contenedor`
+## 11. `tbl_rangos_peso_contenedor`
 
 **Entidad:** `clsRangoPesoContenedor` — **Para qué sirve:** Qué vehículo lleva un contenedor de 20 o 40 pies según su peso. Reemplazará la lectura de las tablas de SAP `tblRangoPeso`/`tblContenedorRangoPeso`. Regla: entre las filas del tamaño de contenedor, la de menor `PesoMaximo` que alcance para el peso; por encima del tope más alto ningún vehículo aplica.
 
@@ -386,12 +390,12 @@ Qué guarda cada una de las 46 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 **FK entrantes:** ninguna.
 
 **De dónde salen los datos:**
-- Carga inicial: `docs/Database/seeder/rangos_peso_contenedor.csv` (10 filas: 5 de 40 pies y 5 de 20 pies). Se carga después de `tbl_mapeo_vehiculo_tarifario`, porque su `TipoVehiculo` apunta ahí.
+- Carga inicial: `database/seeder/rangos_peso_contenedor.csv` (10 filas: 5 de 40 pies y 5 de 20 pies). Se carga después de `tbl_mapeo_vehiculo_tarifario`, porque su `TipoVehiculo` apunta ahí.
 - La fila del camión de dos ejes en 40 pies, sin tope de peso en el documento original, se descartó.
 
 ---
 
-## 11. `tbl_municipios`
+## 12. `tbl_municipios`
 
 **Entidad:** `clsMunicipio` — **Para qué sirve:** Catálogo propio de municipios (Colombia, Venezuela, Ecuador) para el desplegable de Origen/Destino en la captura. Foto fija, sin sincronización periódica.
 
@@ -411,12 +415,12 @@ Qué guarda cada una de las 46 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 **FK entrantes:** `tbl_rutas.OrigenMunicipioId` (NO ACTION); `tbl_rutas.DestinoMunicipioId` (NO ACTION); `tbl_tarifas_plaza.OrigenMunicipioId` (NO ACTION); `tbl_tarifas_plaza.DestinoMunicipioId` (NO ACTION).
 
 **De dónde salen los datos:**
-- Carga única: `docs/Database/seeder/municipios.csv` (3.804 filas), calculado una vez cruzando `tblSAPDANE`, `tblZonasTarificacionRelacion` y `tblSAPTarifas`/`tblSAPTarifasLog` de `dbSolucionesTI`.
+- Carga única: `database/seeder/municipios.csv` (3.804 filas), calculado una vez cruzando `tblSAPDANE`, `tblZonasTarificacionRelacion` y `tblSAPTarifas`/`tblSAPTarifasLog` de `dbSolucionesTI`.
 - Se lee con `GET /api/captura-solicitudes/municipios`. No hay CRUD.
 
 ---
 
-## 12. `tbl_pesos`
+## 13. `tbl_pesos`
 
 **Entidad:** `clsRangoPeso` — **Para qué sirve:** Catálogo de bandas de peso (kg) para el formulario de Tarifas de Plaza. No es un catálogo cerrado: se pueden agregar bandas.
 
@@ -432,12 +436,12 @@ Qué guarda cada una de las 46 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 **FK entrantes:** `tbl_tarifas_plaza.PesoId` (NO ACTION).
 
 **De dónde salen los datos:**
-- Carga inicial: `docs/Database/seeder/pesos.csv` (8 bandas).
+- Carga inicial: `database/seeder/pesos.csv` (8 bandas).
 - CRUD en `/api/pesos` (`clsCrearRangoPesoCommand`, `clsEditarRangoPesoCommand`).
 
 ---
 
-## 13. `tbl_vehiculos_cubicacion`
+## 14. `tbl_vehiculos_cubicacion`
 
 **Entidad:** `clsVehiculoCubicacion` — **Para qué sirve:** Dimensiones y capacidad físicas de un vehículo para el plan de cargue (cubicación 3D). Es distinto de `tbl_configuraciones_vehiculo`, que es solo el catálogo comercial.
 
@@ -471,7 +475,7 @@ Qué guarda cada una de las 46 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 
 ---
 
-## 14. `tbl_tipos_mercancia_catalogo`
+## 15. `tbl_tipos_mercancia_catalogo`
 
 **Entidad:** `clsTipoMercanciaCatalogo` — **Para qué sirve:** Proyección local del catálogo de tipos de mercancía del Cubicador, mantenida por eventos. `Id` es el texto que asigna el Cubicador y viaja como `idTipoMercancia` por toda la captura (§3.14 de `CONTRATO.md`).
 
@@ -505,7 +509,7 @@ Qué guarda cada una de las 46 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 
 ---
 
-## 15. `tbl_tipos_carroceria_catalogo`
+## 16. `tbl_tipos_carroceria_catalogo`
 
 **Entidad:** `clsTipoCarroceriaCatalogo` — **Para qué sirve:** Proyección local del catálogo de tipos de carrocería del Cubicador, mantenida por eventos.
 
@@ -528,7 +532,7 @@ Qué guarda cada una de las 46 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 
 ---
 
-## 16. `tbl_servicios_conexos`
+## 17. `tbl_servicios_conexos`
 
 **Entidad:** `clsServicioConexo` — **Para qué sirve:** Catálogo de servicios adicionales al flete (cargue, descargue, ITR, almacenamiento, acompañamiento vehicular, etc.). Reestructurada para unificar dos categorías con dimensiones de precio distintas; las dimensiones que no aplican a un servicio llevan `NO APLICA`.
 
@@ -558,14 +562,14 @@ Qué guarda cada una de las 46 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 **FK entrantes:** `tbl_cotizacion_conexos.ServicioConexoId` (NO ACTION).
 
 **De dónde salen los datos:**
-- Carga inicial: `docs/Database/seeder/servicios_conexos.csv` (1.336 filas).
+- Carga inicial: `database/seeder/servicios_conexos.csv` (1.336 filas).
 - CRUD e importación desde Excel en `/api/servicios-conexos`; cada cambio queda en `tbl_audit_log`.
 
 ---
 
 # C. Solicitudes y costeo
 
-## 17. `tbl_solicitudes`
+## 18. `tbl_solicitudes`
 
 **Entidad:** `clsSolicitud` — **Para qué sirve:** Cabecera de una solicitud de flete (spot o licitación) de un cliente, con el puntaje que la prioriza en la bandeja.
 
@@ -598,7 +602,7 @@ Qué guarda cada una de las 46 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 
 ---
 
-## 18. `tbl_lineas_solicitud`
+## 19. `tbl_lineas_solicitud`
 
 **Entidad:** `clsLineaSolicitud` — **Para qué sirve:** Cada línea de carga de una solicitud: ruta, vehículo, peso y condiciones. Es la unidad que se costea o se cubica.
 
@@ -646,7 +650,7 @@ Qué guarda cada una de las 46 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 
 ---
 
-## 19. `tbl_lineas_pendientes_de_costeo`
+## 20. `tbl_lineas_pendientes_de_costeo`
 
 **Entidad:** `clsLineaPendienteDeCosteo` — **Para qué sirve:** Líneas que el auto-costeo de un Excel no pudo resolver solo, con el motivo, para que alguien las resuelva. Un solo sitio para el motivo, para que no haya dos versiones que se contradigan.
 
@@ -672,7 +676,7 @@ Qué guarda cada una de las 46 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 
 ---
 
-## 20. `tbl_trabajos_auto_costeo`
+## 21. `tbl_trabajos_auto_costeo`
 
 **Entidad:** `clsEstadoAutoCosteo` — **Para qué sirve:** Estado de la saga de MassTransit que auto-costea un Excel capturado: cuántas líneas se resolvieron y cuántas quedaron pendientes. Vive en esta base porque es la respuesta que consulta el cliente sobre su trabajo y un reinicio no puede borrarla.
 
@@ -704,7 +708,7 @@ Qué guarda cada una de las 46 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 
 # D. Cotizaciones
 
-## 21. `tbl_cotizaciones`
+## 22. `tbl_cotizaciones`
 
 **Entidad:** `clsCotizacion` — **Para qué sirve:** Cabecera de la cotización de una solicitud: estado, resultado y total.
 
@@ -734,7 +738,7 @@ Qué guarda cada una de las 46 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 
 ---
 
-## 22. `tbl_cotizacion_lineas`
+## 23. `tbl_cotizacion_lineas`
 
 **Entidad:** `clsCotizacionLinea` — **Para qué sirve:** Valor del flete cotizado para una línea de solicitud y de dónde salió.
 
@@ -760,7 +764,7 @@ Qué guarda cada una de las 46 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 
 ---
 
-## 23. `tbl_cotizacion_conexos`
+## 24. `tbl_cotizacion_conexos`
 
 **Entidad:** `clsCotizacionConexo` — **Para qué sirve:** Servicio conexo aplicado a una línea de la cotización, con la cantidad, su costo y su precio de venta guardados al momento de agregarlo.
 
@@ -790,7 +794,7 @@ Qué guarda cada una de las 46 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 
 # E. Biblioteca de tarifas
 
-## 24. `tbl_tarifas_historicas`
+## 25. `tbl_tarifas_historicas`
 
 **Entidad:** `clsTarifaHistorica` — **Para qué sirve:** Lo que realmente se cobró en cotizaciones ganadas ("Tarifas Ganadas"), para proponer tarifa por precedente.
 
@@ -817,7 +821,7 @@ Qué guarda cada una de las 46 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 
 ---
 
-## 25. `tbl_reglas_solo_sicetac`
+## 26. `tbl_reglas_solo_sicetac`
 
 **Entidad:** `clsReglaSoloSicetac` — **Para qué sirve:** Ruta + vehículo donde la propuesta se resuelve SOLO con el piso SICE-TAC (no se compara con plaza ni histórico). Decisión manual de AdminTarifas/Admin, única por combinación.
 
@@ -837,12 +841,12 @@ Qué guarda cada una de las 46 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 **FK entrantes:** ninguna.
 
 **De dónde salen los datos:**
-- Carga inicial: `docs/Database/seeder/reglas_solo_sicetac.csv` (260 filas).
+- Carga inicial: `database/seeder/reglas_solo_sicetac.csv` (260 filas).
 - CRUD e importación desde Excel en `/api/reglas-solo-sicetac`.
 
 ---
 
-## 26. `tbl_ajustes_vigencia_plaza`
+## 27. `tbl_ajustes_vigencia_plaza`
 
 **Entidad:** `clsAjusteVigenciaPlaza` — **Para qué sirve:** Corrección local de la vigencia de una tarifa de plaza de SAP (`dbSolucionesTI.tblSAPTarifas`, de solo lectura). Una por tarifa.
 
@@ -867,7 +871,7 @@ Qué guarda cada una de las 46 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 
 ---
 
-## 27. `tbl_tarifas_plaza`
+## 28. `tbl_tarifas_plaza`
 
 **Entidad:** `clsTarifaPlaza` — **Para qué sirve:** Tarifa de plaza gobernada por NEXO: recrea el formulario de captura del sistema externo. No es una copia de `tblSAPTarifas`. Única por sus 7 dimensiones; `Valor`, `Vigencia` y `DetallesTarifa` son lo que cambia con el tiempo.
 
@@ -896,13 +900,13 @@ Qué guarda cada una de las 46 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 **Trigger:** `TRG_tarifas_plaza_historico` (`AFTER UPDATE`): si cambió `Valor`, `Vigencia` o `DetallesTarifa`, copia la fila anterior completa a `tbl_tarifas_plaza_historico`. Opera sobre todas las filas de la sentencia.
 
 **De dónde salen los datos:**
-- Carga inicial: `docs/Database/seeder/tarifas_plaza.csv` (107 filas).
+- Carga inicial: `database/seeder/tarifas_plaza.csv` (107 filas).
 - CRUD en `/api/tarifas-plaza` (`clsCrearTarifaPlazaCommand`); cada cambio queda en `tbl_audit_log`.
 - El trigger `TRG_tarifas_plaza_historico` archiva el valor anterior en cada actualización de `Valor`, `Vigencia` o `DetallesTarifa`.
 
 ---
 
-## 28. `tbl_tarifas_plaza_historico`
+## 29. `tbl_tarifas_plaza_historico`
 
 **Entidad:** `clsTarifaPlazaHistorico` — **Para qué sirve:** Foto del valor ANTERIOR de una tarifa de plaza cada vez que se actualiza (como `tblSAPTarifasLog` para `tblSAPTarifas`).
 
@@ -936,7 +940,7 @@ Qué guarda cada una de las 46 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 
 # F. Priorización
 
-## 29. `tbl_cadena_priorizacion`
+## 30. `tbl_cadena_priorizacion`
 
 **Entidad:** `clsEstadoPriorizacion` — **Para qué sirve:** Estado de la saga de MassTransit que rearma el puntaje de una solicitud cuando cambian sus datos o pasa el tiempo. El reloj vive en el broker, así que escalar el API no lo duplica.
 
@@ -962,7 +966,7 @@ Qué guarda cada una de las 46 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 
 ---
 
-## 30. `tbl_parametros_score`
+## 31. `tbl_parametros_score`
 
 **Entidad:** `clsParametrosScore` — **Para qué sirve:** Fila única con los pesos y constantes de la fórmula del puntaje de prioridad.
 
@@ -989,14 +993,14 @@ Qué guarda cada una de las 46 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 **FK entrantes:** ninguna.
 
 **De dónde salen los datos:**
-- La fila se declara en el modelo (`HasData` en `clsNexoDbContext`, valores por defecto de `clsParametrosScore`). Como el proyecto no usa migraciones, en una base nueva **no se crea sola**: la inserta `docs/Database/seeder/datos_base_nexo.sql`.
+- La fila se declara en el modelo (`HasData` en `clsNexoDbContext`, valores por defecto de `clsParametrosScore`). Como el proyecto no usa migraciones, en una base nueva **no se crea sola**: la inserta `database/seeder/datos_base_nexo.sql`.
 - Se lee y se edita en `/api/priorizacion/parametros` (solo Admin); un cambio dispara el recálculo de puntajes.
 
 ---
 
 # G. Plan de cargue (cubicación 3D)
 
-## 31. `tbl_planes_cargue`
+## 32. `tbl_planes_cargue`
 
 **Entidad:** `clsPlanCargue` — **Para qué sirve:** Un plan de cargue optimizado para un vehículo: estrategia, algoritmo, utilización lograda e incidencias.
 
@@ -1032,7 +1036,7 @@ Qué guarda cada una de las 46 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 
 ---
 
-## 32. `tbl_rechazos_cubicacion_linea`
+## 33. `tbl_rechazos_cubicacion_linea`
 
 **Entidad:** `clsRechazoCubicacionLinea` — **Para qué sirve:** por qué el Cubicador rechazó "crear plan desde línea" para una línea. Una fila por línea: un rechazo nuevo reemplaza al anterior y pedir el plan otra vez la borra.
 
@@ -1053,7 +1057,7 @@ Qué guarda cada una de las 46 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 
 ---
 
-## 33. `tbl_items_plan_cargue`
+## 34. `tbl_items_plan_cargue`
 
 **Entidad:** `clsItemPlanCargue` — **Para qué sirve:** Mercancía a cargar dentro de un plan: dimensiones, peso y reglas físicas que el algoritmo debe respetar.
 
@@ -1098,7 +1102,7 @@ Qué guarda cada una de las 46 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 
 ---
 
-## 34. `tbl_colocaciones_cargue`
+## 35. `tbl_colocaciones_cargue`
 
 **Entidad:** `clsColocacionCargue` — **Para qué sirve:** Dónde quedó cada unidad de un ítem dentro del vehículo (posición, orientación, secuencia), o por qué se rechazó.
 
@@ -1141,7 +1145,7 @@ Qué guarda cada una de las 46 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 
 # H. Auditoría
 
-## 35. `tbl_audit_log`
+## 36. `tbl_audit_log`
 
 **Entidad:** `clsAuditLog` — **Para qué sirve:** Rastro de solo inserción: quién cambió qué y cuándo, sobre cualquier entidad.
 
@@ -1167,7 +1171,7 @@ Qué guarda cada una de las 46 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 
 # I. Inteligencia artificial
 
-## 36. `tbl_ia_uso`
+## 37. `tbl_ia_uso`
 
 **Entidad:** `clsUsoIa` — **Para qué sirve:** Una fila por cada llamada a un modelo de lenguaje (Claude), con éxito o con error. Sirve para el gasto por función y por mes, el tope por usuario y por día, y la auditoría. **No guarda el contenido enviado ni la respuesta** (regla de seguridad de la IA): solo cifras y resultado.
 
@@ -1198,7 +1202,7 @@ Qué guarda cada una de las 46 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 
 ---
 
-## 37. `tbl_asistente_conversaciones`
+## 38. `tbl_asistente_conversaciones`
 
 **Entidad:** `clsConversacionAsistente` — **Para qué sirve:** Una conversación con el asistente de cotización, de quien la inicia. Sus mensajes van en `tbl_asistente_mensajes`.
 
@@ -1222,7 +1226,7 @@ Qué guarda cada una de las 46 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 
 ---
 
-## 38. `tbl_asistente_mensajes`
+## 39. `tbl_asistente_mensajes`
 
 **Entidad:** `clsMensajeAsistente` — **Para qué sirve:** Los mensajes de cada conversación, en orden.
 
@@ -1247,7 +1251,7 @@ Qué guarda cada una de las 46 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 
 ---
 
-## 39. `tbl_asistente_herramientas_uso`
+## 40. `tbl_asistente_herramientas_uso`
 
 **Entidad:** `clsUsoHerramientaAsistente` — **Para qué sirve:** Una fila por cada herramienta que usó el asistente para responder: qué consultó, qué obtuvo y de qué fuente. Es la prueba de dónde salió cada valor que mostró.
 
@@ -1276,7 +1280,7 @@ Qué guarda cada una de las 46 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 
 ---
 
-## 40. `tbl_asistente_acciones`
+## 41. `tbl_asistente_acciones`
 
 **Entidad:** `clsAccionAsistente` — **Para qué sirve:** Cambios que el asistente propone y la persona confirma o cancela: agregar o editar un flete, agregar conexos, rechazar una línea, cambiar el vehículo o guardar una preferencia. El asistente nunca escribe por su cuenta; cada fila es también la auditoría del cambio.
 
@@ -1307,7 +1311,7 @@ Qué guarda cada una de las 46 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 
 ---
 
-## 41. `tbl_asistente_preferencias`
+## 42. `tbl_asistente_preferencias`
 
 **Entidad:** `clsPreferenciaAsistente` — **Para qué sirve:** Reglas y preferencias propias de cada persona para el asistente. El asistente las recibe al inicio de sus conversaciones y nunca reemplazan las reglas del sistema.
 
@@ -1332,7 +1336,7 @@ Qué guarda cada una de las 46 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 
 # J. Mensajería e infraestructura
 
-## 42. `InboxState`
+## 43. `InboxState`
 
 **Entidad:** (MassTransit, `AddInboxStateEntity`) — **Para qué sirve:** Deduplicación de mensajes entrantes por consumidor: evita procesar dos veces un mensaje que el broker reentrega. Vive en esta base porque la atomicidad depende de guardar el mensaje y los datos en la misma transacción.
 
@@ -1360,7 +1364,7 @@ Qué guarda cada una de las 46 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 
 ---
 
-## 43. `OutboxMessage`
+## 44. `OutboxMessage`
 
 **Entidad:** (MassTransit, `AddOutboxMessageEntity`) — **Para qué sirve:** Cola transaccional de mensajes salientes: se escriben en la misma transacción del caso de uso y un proceso aparte los publica al broker.
 
@@ -1398,7 +1402,7 @@ Qué guarda cada una de las 46 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 
 ---
 
-## 44. `OutboxState`
+## 45. `OutboxState`
 
 **Entidad:** (MassTransit, `AddOutboxStateEntity`) — **Para qué sirve:** Un outbox por unidad lógica de trabajo (por ejemplo una saga): agrupa y ordena sus `OutboxMessage`.
 
@@ -1421,7 +1425,7 @@ Qué guarda cada una de las 46 tablas de la base de NEXO (`dbTarifario_Nexo_Prue
 
 ---
 
-## 45. `__EFMigrationsHistory`
+## 46. `__EFMigrationsHistory`
 
 **Entidad:** (EF Core) — **Para qué sirve:** Libro de control de EF Core. El proyecto no usa migraciones (el esquema es `ESQUEMA_NEXO.sql`), pero la tabla existe en la base y el script la crea para que EF no intente migrar.
 

@@ -20,7 +20,7 @@ public class clsAsistenteConversacionesController(
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
-    /// <summary>Envía un mensaje y recibe la respuesta como <c>text/event-stream</c> (ver CONTRATO.md §3.23.1).</summary>
+    /// <summary>Envía un mensaje y recibe la respuesta como <c>text/event-stream</c> (ver CONTRATO.md §3.24).</summary>
     [HttpPost("mensajes")]
     [EnableRateLimiting(clsRateLimitingExtensions.PoliticaListadosEstandar)]
     [ProducesResponseType(StatusCodes.Status200OK)]
