@@ -2,6 +2,7 @@
 -- Esquema de base de datos del Cubicador (SQL Server 2019)
 -- =============================================================================
 -- Base: dbCubicador_Pruebas   Esquema: dbo   Servidor: 10.10.40.85,1433
+-- QA opera en esta base desde el traslado de S7-HU-31.3 (#423). Ver README.
 --
 -- Este archivo es la única definición del esquema. No hay migraciones: se ejecuta
 -- completo, una sola vez, contra una base vacía. Un cambio de estructura se hace
@@ -36,7 +37,8 @@
 -- 2S2, Tractomula 3S3). Medidas en centímetros. CodigoVehiculo es único porque se
 -- usa para cruzar con SICE-TAC y el tarifario; si un vehículo carga distinto según
 -- la carrocería, eso se define en relacionVehiculosCarroceria.
--- AlturaMaximaReglamentariaCm es el límite legal de altura del tipo de vehículo; el
+-- AlturaMaximaReglamentariaCm guarda el ALTO ÚTIL DE CARGA del vehículo (230, 240 o
+-- 260 cm en el catálogo inicial); pese al nombre, no es el límite legal de altura. El
 -- valor por defecto (440 cm) solo aplica si se crea un vehículo sin ese dato.
 CREATE TABLE [dbo].[vehiculos] (
     [Id] uniqueidentifier NOT NULL DEFAULT (newid()),
@@ -355,7 +357,8 @@ CREATE TABLE dbo.parametros_cubicacion (
 GO
 
 -- Vehículos del motor 3D, con medidas internas en milímetros. Los predefinidos
--- (es_preset = 1) los crea la aplicación al arrancar si no existen.
+-- (es_preset = 1) los crea la aplicación en la primera consulta que los necesita
+-- (por ejemplo GET /api/planes-cargue/vehiculos), no al arrancar.
 CREATE TABLE dbo.vehiculos_cubicacion (
     id VARCHAR(36) NOT NULL,
     nombre VARCHAR(100) NOT NULL,

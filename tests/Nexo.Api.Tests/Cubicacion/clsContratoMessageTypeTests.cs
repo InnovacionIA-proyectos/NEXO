@@ -169,10 +169,12 @@ public class clsContratoMessageTypeTests
         // gasta los 3 reintentos y termina en la DLQ — en silencio, sin que nada avise
         // que el par se desincronizó.
         //
-        // Contención, NO igualdad: el worker despacha ADEMÁS `crear_desde_linea`, que
-        // hoy solo publica la propia API de Cubicador (a NEXO le falta ese endpoint —
-        // ver docs/mensajeria/CUBICACION.md §8.2). Que el worker sepa hacer de más es
-        // legítimo; que NEXO publique algo que el worker no entiende, no.
+        // Contención, NO igualdad: hoy los dos conjuntos coinciden (NEXO también publica
+        // `crear_desde_linea`, desde POST /api/planes-cargue/desde-linea/{lineaId}; ver
+        // docs/mensajeria/CUBICACION.md, sección 3), pero el worker puede aprender un tipo
+        // antes de que NEXO lo publique, o despachar uno que solo publica la propia API de
+        // Cubicador. Que el worker sepa hacer de más es legítimo; que NEXO publique algo
+        // que el worker no entiende, no.
         var sinDespachar = TiposQueNexoPublica().Except(TiposQueCubicadorDespacha()).ToList();
 
         Assert.True(

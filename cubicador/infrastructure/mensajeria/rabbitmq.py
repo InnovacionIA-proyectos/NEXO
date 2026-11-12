@@ -15,7 +15,7 @@ para que ese consumer los pueda deserializar. `cubicacion.solicitada` NO
 lleva sobre cuando lo publica Cubicador (nadie mas lo consume) - pero SI
 puede llegar envuelto cuando lo publica NEXO, y el worker lo desenvuelve con
 un fallback transparente (ver worker/main.py::_procesar). Ver NEXO/docs/
-mensajeria/CUBICACION.md #1/#4 para el detalle completo del porque.
+mensajeria/CUBICACION.md secciones 2 y 5 para el detalle completo del porque.
 """
 
 from __future__ import annotations
@@ -43,7 +43,7 @@ _NAMESPACE_MENSAJES_NEXO = "Nexo.Mensajes.Cubicacion"
 def _sobre_masstransit(tipo_csharp: str, payload: dict[str, Any]) -> dict[str, Any]:
     """Envuelve `payload` en el "sobre" minimo que un IConsumer<T> real de
     MassTransit necesita para deserializarlo (ver NEXO/docs/mensajeria/
-    CUBICACION.md #1/#4) - solo hace falta para los eventos que SI consume
+    CUBICACION.md secciones 2 y 5) - solo hace falta para los eventos que SI consume
     NEXO (`plan-de-cargue.generado`/`cubicacion.rechazada`), no para
     `cubicacion.solicitada` (Cubicador-a-Cubicador, nadie mas lo lee).
     Verificado contra un IConsumer<T> real: MassTransit acepta este sobre

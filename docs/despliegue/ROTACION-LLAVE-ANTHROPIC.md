@@ -1,6 +1,6 @@
 # Llave de Anthropic: configuración, verificación de salida y rotación
 
-Guía operativa de la llave con la que NEXO llama a Claude. Las decisiones de fondo (la llave solo en el servidor, qué datos salen) están en [`docs/decisiones/ia-claude-seguridad-y-datos.md`](../decisiones/ia-claude-seguridad-y-datos.md); aquí van los pasos.
+Guía operativa de la llave con la que NEXO llama a Claude. Las decisiones de fondo (la llave solo en el servidor, qué datos salen) están en [`docs/decisiones/DECISIONES-NEXO.md`, D-10](../decisiones/DECISIONES-NEXO.md#d-10); aquí van los pasos.
 
 ## 1. Reglas
 
@@ -35,7 +35,7 @@ Los hace quien administra la cuenta; no se pueden hacer desde el repositorio.
 | `Anthropic__Habilitada` | `true` | Interruptor general: `false` apaga toda la IA aunque haya llave y funciones encendidas. |
 | `Anthropic__LimiteTokensPorUsuarioDia` | `500000` | Tope de tokens por persona y por día (hora de Colombia). `0` lo desactiva. Al superarlo, `429 IA_TOPE_DIARIO`. |
 | `Anthropic__Model` | `claude-sonnet-5-5` | Configuración, no código. `claude-sonnet-5` y `claude-sonnet-4-6` también funcionan con esta cuenta. |
-| `Anthropic__Effort` | `high` | `low`, `medium`, `high`, `xhigh` o `max`. |
+| `Anthropic__Effort` | `medium` | Es el valor por defecto: en la evaluación del mapeo de Excel acertó igual que `high` y gasta menos. Admite `low`, `medium`, `high`, `xhigh` o `max`, y lo comparten todas las funciones de NEXO. |
 | `Anthropic__Funciones__ImportacionExcel` / `AsistenteCotizacion` / `ApoyoCubicador` | `false` | Cada función se enciende por separado, solo cuando esté aprobada en el ADR. `ImportacionExcel` habilita la sugerencia de mapeo de columnas (`POST /api/captura-solicitudes/sugerir-mapeo`) y la normalización de textos libres (`POST /api/captura-solicitudes/normalizar-valores`); con ella apagada esos endpoints siguen respondiendo con lo que resuelven las reglas (diccionario del cliente, alias, catálogos y DANE). |
 
 Las demás (`RazonamientoAdaptativo`, `TimeoutSegundos`, `MaxReintentos`, `MaxTokensSalida`) tienen valores por defecto y solo se agregan para cambiarlos. Un cambio de variables exige redesplegar la app.
@@ -87,7 +87,7 @@ Rutinaria (sugerido cada 90 días) y de inmediato si la llave pudo exponerse.
 4. Revisar el uso del período en la consola y en NEXO (`GET /api/ia/uso/gasto`, solo Admin, y la tabla `tbl_ia_uso` por usuario y función) para ver qué función y qué usuario la consumieron.
 5. Si la llave estuvo en un archivo versionado, retirarla del historial y tratarla como comprometida aunque ya se haya revocado.
 
-## 7. Cubicador: modo sombra (llave y límite propios)
+## 8. Cubicador: modo sombra (llave y límite propios)
 
 El servicio Python del Cubicador usa su **propia llave, en su propia *workspace*** (por ejemplo `cubicador-api`), con su propio límite de gasto mensual: no se reutiliza la de NEXO, así que se puede revocar, rotar y acotar por separado. Los pasos 1 a 4 de §3 se repiten para esa *workspace*.
 
@@ -103,6 +103,6 @@ En Dokploy, app `cubicador-api` (pestaña Environment). Nada de esto va al repos
 | `IA_SOMBRA_TOPE_TOKENS_DIA` | `1000000` | Tope de tokens (entrada + salida) por día, hora de Colombia; al alcanzarlo no se compara hasta el día siguiente. `0` lo desactiva. Va **además** del límite mensual de la *workspace*, que es el que de verdad corta el gasto. |
 | `IA_SOMBRA_TIMEOUT_SEGUNDOS`, `IA_SOMBRA_MAX_CONCURRENTES`, `IA_SOMBRA_MAX_PENDIENTES`, `IA_SOMBRA_MAX_TOKENS_SALIDA` | `60`, `2`, `20`, `4096` | Solo para cambiarlos. Con más comparaciones esperando que `MAX_PENDIENTES`, las nuevas se descartan: la API nunca se encola detrás del modelo. |
 
-**Antes de encenderlo** tiene que existir la tabla `iaSombra` en el esquema del Cubicador. Su definición está en `cubicador/database/esquema/ESQUEMA_CUBICADOR.sql`; ya existe en la base actual de QA (`dbTarifario_Nexo_Pruebas.dbo_cubicador`) y en la base propia (`dbCubicador_Pruebas.dbo`). Cada comparación, o intento que falla, deja una fila con el motivo en `Estado`; el contenido enviado al modelo no se guarda.
+**Antes de encenderlo** tiene que existir la tabla `iaSombra` en el esquema del Cubicador. Su definición está en `cubicador/database/esquema/ESQUEMA_CUBICADOR.sql`; existe en la base de QA, `dbCubicador_Pruebas.dbo`. Las filas recolectadas en la base compartida anterior no se copiaron en el traslado (#423): la medición empezó de nuevo. Cada comparación, o intento que falla, deja una fila con el motivo en `Estado`; el contenido enviado al modelo no se guarda.
 
 **Apagarlo** es poner `IA_SOMBRA_HABILITADA=false` (o vaciar la llave) y redesplegar `cubicador-api`; la respuesta al usuario es la misma encendido o apagado. **Verificar la salida** a `api.anthropic.com` desde el contenedor con §5a y §5b (la imagen del Cubicador no trae `curl`: usar `python -c` con `httpx`, o probar desde el contenedor de NEXO que sí lo trae).

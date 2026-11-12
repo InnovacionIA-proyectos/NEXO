@@ -1,6 +1,6 @@
 # Evaluación del Cubicador: motor actual contra IA
 
-Mide el motor de selección de flota (`cubicador/domain/motor/seleccion_flota.py`) contra un dataset dorado, para tener la línea base con la que se compara la IA. El diseño del estudio, las métricas y los resultados están en [`docs/ia/ESTUDIO-CUBICADOR-IA.md`](../../docs/ia/ESTUDIO-CUBICADOR-IA.md).
+Mide el motor de selección de flota (`cubicador/domain/motor/seleccion_flota.py`) contra un dataset dorado, para tener la línea base con la que se compara la IA. El diseño del estudio, las métricas y los resultados están en [`ESTUDIO-CUBICADOR-IA.md`](ESTUDIO-CUBICADOR-IA.md).
 
 **No es parte del servicio ni del CI**: está fuera de `cubicador/` a propósito (un cambio aquí no redespliega el Cubicador) y no toca base de datos. Corre el motor real, sin reescribirlo. Solo `evaluar_ia.py` y `evaluar_interpretacion.py` llaman al modelo (con tope de llamadas y tokens).
 
@@ -37,7 +37,7 @@ python evaluacion-ia/cubicador/evaluar_ia.py --salida-md evaluacion-ia/cubicador
 python evaluacion-ia/cubicador/evaluar_ia.py --solo S-19 --repeticiones 3
 ```
 
-Necesita `ANTHROPIC_API_KEY` (y `ANTHROPIC_WORKSPACE_ID` si la llave es de organización) en el entorno o en `cubicador/.env`, y las dependencias de `cubicador/requirements.txt`. La corrida completa son 22 llamadas, unos US$0,24. La decisión que salió de esta medición está en [`docs/ia/ACTA-DECISION-IA-CUBICADOR.md`](../../docs/ia/ACTA-DECISION-IA-CUBICADOR.md).
+Necesita `ANTHROPIC_API_KEY` (y `ANTHROPIC_WORKSPACE_ID` si la llave es de organización) en el entorno o en `cubicador/.env`, y las dependencias de `cubicador/requirements.txt`. La corrida completa son 22 llamadas, unos US$0,24. La decisión que salió de esta medición está en la decisión D-11 de [`DECISIONES-NEXO.md`](../../docs/decisiones/DECISIONES-NEXO.md#d-11).
 
 ## Dataset real
 
@@ -91,7 +91,7 @@ ahí**, así que ese tope no lo detiene: hace falta uno propio.
 Y el de la consola, que es el único que corta de verdad, hoy no se puede poner
 por servicio: con una llave de organización, un límite ahí también frenaría a
 NEXO. Por eso el ADR pide una *workspace* por servicio
-(`docs/decisiones/ia-claude-seguridad-y-datos.md`, §8).
+(`docs/decisiones/DECISIONES-NEXO.md`, D-10, punto 1).
 
 ### Por qué ponerlos aunque el costo sea mínimo
 

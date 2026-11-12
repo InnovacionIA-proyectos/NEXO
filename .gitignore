@@ -40,13 +40,7 @@ Thumbs.db
 .DS_Store
 
 # Documentos de trabajo local, no se versionan
-docs/documentacion/analisis-dw-sap-baseline-cubicador.md
-docs/pruebas/captura-prueba-rutas-reales.xlsx
 docs/diccionario-datos-nexo.md
-docs/pruebas/ejemplo_licitacion.xlsx
-docs/documentacion/hallazgos-requisitos-estudio-bd.md
-docs/documentacion/hallazgos-requisitos.md
-docs/Database/propuesta-bd-nexo.md
 
 # Histórico oficial de SICE-TAC (excels ~100-180 MB c/u) — cada archivo supera
 # el límite de 100 MB de GitHub. Pendiente: manifiesto + almacenamiento externo
@@ -61,8 +55,7 @@ analitica/00-fuentes/historico-sicetac/*.xlsx
 # nunca al repo público. Se guardan solo en local; de aquí leen el dataset de evaluación de la IA y la
 # generación de precios de venta.
 docs/docs_raw/
-docs/documentacion/RANGOS-PESO-CONTENEDORES-NORMALIZADO.xlsx
-docs/Database/seeder/Libro1.xlsx
+database/seeder/Libro1.xlsx
 
 # Archivos temporales de Office (se crean mientras un Excel/Word está abierto)
 ~$*
@@ -74,5 +67,5 @@ docs/tbl*.csv
 tests/evaluacion-ia/dataset/fuentes.local.json
 
 # Precios de venta (S6-HU-38/#407): nunca al repo público. El CSV con precios se genera
-# en local con docs/Database/seeder/generar_precios_venta_local.py
-docs/Database/seeder/*.local.csv
+# en local a partir de los Excel de precios (script local, no versionado).
+database/seeder/*.local.csv

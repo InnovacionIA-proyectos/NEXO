@@ -1,4 +1,4 @@
-"""Aplica un script .sql contra dbo_cubicador, partiendo por GO.
+"""Aplica un script .sql contra la base de `DATABASE_URL`, partiendo por GO.
 
 pymssql no entiende `GO` (no es SQL, es separador de lotes de las herramientas
 de Microsoft), asi que hay que partir el archivo y mandar cada lote aparte.

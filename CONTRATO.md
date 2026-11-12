@@ -19,8 +19,8 @@ Development**.
 
 ## 0. Cómo consumir este contrato (frontend e integraciones)
 
-Última verificación: **2026-11-04**. Las rutas y los roles se contrastaron con los controllers de la rama `QA`; los nombres de campo marcados con ⚠️ salen de la
-**respuesta real** de la API, no del código fuente. Lo que sirve a **Cotifly** está reunido en un solo documento:
+Última verificación: **2026-11-10**. Las rutas, los roles, los DTOs y los códigos de error se contrastaron con el código actual (controllers,
+DTOs de Application y excepciones de los casos de uso); los nombres de campo marcados con ⚠️ se confirmaron además contra la **respuesta real** de la API. Lo que sirve a **Cotifly** está reunido en un solo documento:
 [`docs/integraciones/NEXO-CONTRATO-INTEGRACION-COTIFLY.md`](docs/integraciones/NEXO-CONTRATO-INTEGRACION-COTIFLY.md).
 
 ### 0.1 Lo mínimo para llamar a NEXO
@@ -368,7 +368,7 @@ en la sección que se indica; la matriz completa de permisos es la §5.
 
 | Método | Ruta | Roles |
 |---|---|---|
-| `HUB` | `/hubs/bandeja` | Todos |
+| `HUB` | `/hubs/bandeja` | Comercial, AdminTarifas, ServiciosLogisticos, LiderProceso, Admin |
 | `HUB` | `/hubs/plan-cargue` | Todos |
 | `HUB` | `/hubs/trabajos` | Todos |
 
@@ -390,7 +390,7 @@ X-Portal-clsUsuario-Id: 10123
 > (`clsIdentidadPortalAuthenticationHandler.HeaderIdUsuario`) espera hoy
 > **`X-Portal-clsUsuario-Id`**. El contrato acordado con el portal
 > ([README §1](docs/contrato-integracion/README.md#1-identidad),
-> [ADR-001](docs/contrato-integracion/ADR-001-identidad-sin-token.md),
+> [decisión D-12](docs/decisiones/DECISIONES-NEXO.md#d-12),
 > [`openapi.yaml`](docs/contrato-integracion/openapi.yaml)), los e2e
 > (`build/e2e/recorrido.py`) y los scripts de QA usan **`X-Portal-Usuario-Id`**.
 > Todo indica que el renombrado masivo con prefijo `cls` alcanzó también esta
@@ -438,7 +438,7 @@ portal **no** sirve en este endpoint.
 
 Un usuario tiene exactamente uno. `Admin` está incluido en todos los endpoints
 restringidos. La matriz completa está en la [sección 5](#5-matriz-de-permisos) y
-en [`docs/documentacion/ROLES_Y_PERMISOS.md`](docs/documentacion/ROLES_Y_PERMISOS.md).
+en [`docs/funcionamiento/FUNCIONAMIENTO-NEXO.md`](docs/funcionamiento/FUNCIONAMIENTO-NEXO.md#2-acceso-roles-y-permisos), sección 2.
 
 ### 1.4 Formato de error (siempre el mismo)
 
@@ -458,6 +458,7 @@ interface ApiError {
 | `401` | `SESION_INVALIDA` | Sin identidad válida del portal |
 | `401` | `NO_AUTORIZADO` | Bearer de servicio inválido (solo §1.2) |
 | `403` | `SIN_PERMISO_CABINA_FLETES` | Identidad válida, rol insuficiente |
+| `403` | específico (`SOLICITUD_AJENA`, `CONVERSACION_AJENA`, `ACCION_AJENA`, `HERRAMIENTA_NO_PERMITIDA`) | El rol sí entra al endpoint, pero el recurso es de otra persona o la herramienta no está permitida para ese rol |
 | `404` | específico del recurso | No existe |
 | `409` | específico, o `CONFLICTO_CONCURRENCIA` | Conflicto de estado o edición simultánea (RowVersion) |
 | `429` | `DEMASIADAS_SOLICITUDES` | Rate limit (§1.8), con header `Retry-After: 30` |
@@ -536,11 +537,10 @@ rango da `400 VALIDATION_ERROR`.
 | `GET /api/planes-cargue` | `page`, `pageSize` | 1, 50 | 200 |
 | `GET /api/biblioteca-sicetac` | `page`, `top` | 1, 50 | `top` 500 |
 | `GET /api/biblioteca-sap-plaza` | `page`, `top` | 1, 50 | 500 |
-| `GET /api/biblioteca-sap-historico` | `page`, `top` (#312) | 1, 50 | `top` 500 |
+| `GET /api/biblioteca-sap-historico` | `page`, `top` | 1, 50 | `top` 500 (efectivo 200, ver §3.6) |
 | `GET /api/reglas-solo-sicetac` | no pagina | — | — |
 
-Contexto de la decisión: `docs/decisiones/paginacion-endpoints-listado.md` y
-`docs/decisiones/timeout-biblioteca-sicetac.md`.
+Contexto de la decisión: [D-05](docs/decisiones/DECISIONES-NEXO.md#d-05) y [D-06](docs/decisiones/DECISIONES-NEXO.md#d-06).
 
 ### 1.8 Rate limiting
 
@@ -550,7 +550,7 @@ exceder: `429 DEMASIADAS_SOLICITUDES` + `Retry-After: 30`.
 | Política | Endpoints | Límite |
 |---|---|---|
 | Estricta (ventana deslizante) | `GET /api/biblioteca-sicetac`, `GET /api/biblioteca-sap-plaza` | 20/min por rol; 60/min para `Admin` y `AdminTarifas` |
-| Estándar (ventana fija) | `GET` de `solicitudes`, `planes-cargue`, `vehiculos`, `tarifas-historicas`, `reglas-solo-sicetac`, `biblioteca-sap-historico` | 120/min por rol |
+| Estándar (ventana fija) | `GET` de `solicitudes`, `planes-cargue`, `vehiculos`, `tarifas-historicas`, `reglas-solo-sicetac`, `biblioteca-sap-historico`, `pesos`, `tarifas-plaza` y `diccionario-cliente`; todos los `GET` de `/api/catalogos/*` (incluidos `alias`, `alias/resolver` y `vehiculos-cuarentena`); `POST /api/asistente/conversaciones/mensajes` y `POST /api/asistente/herramientas/{nombre}` | 120/min por rol |
 
 El resto de endpoints no tiene rate limit.
 
@@ -562,16 +562,19 @@ petición más grande la corta el servidor antes de llegar al endpoint.
 | Endpoint | Campo | Extensiones | Si falta el archivo |
 |---|---|---|---|
 | `POST /api/captura-solicitudes/analizar-excel` | `archivo` | `.xlsx`, `.xlsm` | `400 ARCHIVO_REQUERIDO` |
-| ~~`POST /api/tarifas-sicetac/importar`~~ (retirado en #179) | — | — | — |
+| `POST /api/captura-solicitudes/leer-estructura` | `archivo` (+ campos de texto) | `.xlsx`, `.xlsm` | `400 VALIDATION_ERROR` (ver nota) |
+| `PUT /api/captura-solicitudes/recetas-lectura` | `archivo` (+ campos de texto) | `.xlsx`, `.xlsm` | `400 VALIDATION_ERROR` (ver nota) |
 | `POST /api/reglas-solo-sicetac/importar-excel` | `archivo` | `.xlsx`, `.xlsm` | `400 VALIDATION_ERROR` (ver nota) |
 | `POST /api/servicios-conexos/importar-excel` | `archivo` | `.xlsx`, `.xlsm` | `400 VALIDATION_ERROR` (ver nota) |
+| `POST /api/tarifas-plaza/importar-excel` | `archivo` | `.xlsx`, `.xlsm` | `400 VALIDATION_ERROR` (ver nota) |
 | `POST /api/cotizaciones/{id}/entregar` | `formato` (opcional) | PDF, sin validación de extensión | se entrega sin adjunto |
 
 Extensión no permitida → `400 FORMATO_NO_SOPORTADO`. Archivo vacío (0 bytes) →
 `400 ARCHIVO_REQUERIDO`.
 
-> Nota: en reglas-solo-sicetac y servicios-conexos el parámetro `archivo` está
-> declarado no anulable, así que si falta el campo el framework responde
+> Nota: en reglas-solo-sicetac, servicios-conexos y tarifas-plaza el parámetro
+> `archivo` está declarado no anulable, y en `leer-estructura` y `recetas-lectura`
+> es `[Required]`, así que si falta el campo el framework responde
 > `400 VALIDATION_ERROR` con `details.archivo` antes de llegar a la validación
 > propia. Con el campo presente pero vacío sí responde `ARCHIVO_REQUERIDO`.
 
@@ -591,7 +594,9 @@ consulta con `GET /api/trabajos/{id}` (pliegos) o `GET /api/planes-cargue/{id}`
 | `/hubs/bandeja` | `Suscribir()` (sin parámetro) | `"bandeja"` | `{ motivo, en }` — no trae datos: vuelve a consultar `GET /api/solicitudes` |
 | `/hubs/plan-cargue` | `Suscribir(planCargueId: Guid)` | `"avance"` | `AvisoPlanCargueDto` |
 
-Los tres exigen la misma identidad y rol que el resto del API (§1.1) y tienen
+Los tres exigen la misma identidad que el resto del API (§1.1). `/hubs/trabajos` y
+`/hubs/plan-cargue` aceptan cualquiera de los 6 roles; `/hubs/bandeja` tiene los
+mismos roles que la Bandeja (`AdminBiblioteca` no entra). Todos tienen
 `Desuscribir(...)` con la misma firma. Ninguno reenvía lo perdido mientras el
 cliente estuvo desconectado. Detalle:
 [README §5](docs/contrato-integracion/README.md#5-avisos-en-vivo).
@@ -642,7 +647,8 @@ interface TrabajoAceptadoDto { trabajoId: UUID; estado: "Pendiente"; consultarEn
 interface LineaSolicitudDto {
   id: UUID; rutaId: UUID | null; configVehiculoId: UUID | null
   tipologia: TipologiaCarga | null; peso: Decimal | null; valorMercancia: Decimal | null
-  estadoLinea: "PorCostear" | "AutoResuelta" | "Revisada"
+  estadoLinea: "PorCostear" | "AutoResuelta" | "Revisada" | "Rechazada"
+  motivoPendiente: string | null                 // por qué sigue PorCostear; null si no está pendiente
 }
 interface SolicitudDto {
   id: UUID; clienteId: UUID; clienteNombre: string | null
@@ -650,7 +656,7 @@ interface SolicitudDto {
   deadline: FechaISO | null; probabilidadCierre: Decimal | null; valorEstimado: Decimal | null
   scorePrioridad: Decimal; estado: "Pendiente" | "EnCosteo" | "Entregada" | "Descartada"
   createdAt: FechaISO; lineas: LineaSolicitudDto[]
-  notas: string | null                           // observaciones comerciales (#227)
+  notas: string | null                           // observaciones comerciales
 }
 interface BandejaItemDto {                       // fila de GET /api/solicitudes
   id: UUID; clsCliente: string; tipo: string; estado: string   // ⚠️ el campo viaja como `clsCliente`, no `cliente` (§7 #5)
@@ -658,8 +664,8 @@ interface BandejaItemDto {                       // fila de GET /api/solicitudes
   lineas: number; fleteTotal: Decimal | null; lineasSinFlete: number
   fechaCaptura: FechaISO
   atencion: "pendiente" | "automatico" | "administrador" | string
-  vigencia: "vigente" | "vencida"                // S5-HU-23.1/#289: por Fecha Límite (deadline), no por antigüedad de la captura; sin deadline = "vigente"
-  resultado: "SinDefinir" | "Ganada" | "Perdida" | null // S5-HU-23.1/#289: de la cotización; null si no hay. Con varias: la que tenga resultado distinto de SinDefinir (la más reciente), si no la más reciente
+  vigencia: "vigente" | "vencida"                // por Fecha Límite (deadline), no por antigüedad de la captura; sin deadline = "vigente"
+  resultado: "SinDefinir" | "Ganada" | "Perdida" | null // de la cotización; null si no hay. Con varias: la que tenga resultado distinto de SinDefinir (la más reciente), si no la más reciente
 }
 interface DesgloseScoreDto { total: number; urgencia: number; valor: number; probabilidad: number; tipo: number }
 interface CatalogoLineaResueltoDto {             // respuesta de resolver-catalogos
@@ -671,7 +677,7 @@ interface CatalogoLineaResueltoDto {             // respuesta de resolver-catalo
 interface PosicionCargaDto {                     // pieza/bulto, dimensiones en CENTÍMETROS
   descripcion: string | null; cantidad: number
   largoCm: Decimal; anchoCm: Decimal; altoCm: Decimal; pesoKg: Decimal | null
-  codigoTipoMercancia: string | null             // S5-HU-18.2/#274: código (no uuid) de tbl_tipos_mercancia; null = tipo desconocido, sin default
+  codigoTipoMercancia: string | null             // código (no uuid) de tbl_tipos_mercancia; null = tipo desconocido, sin default
 }
 interface PisoSicetacDto {
   id: UUID; valorPiso: Decimal; valorHora: Decimal | null; horasPactadas: Decimal | null
@@ -683,29 +689,28 @@ interface LineaCosteoDto {
   lineaId: UUID; rutaId: UUID | null; clsRuta: string | null; tipologia: TipologiaCarga | null   // ⚠️ viaja como `clsRuta`, no `ruta` (§7 #6)
   peso: Decimal | null; tipoVehiculo: string | null; carroceria: string | null
   posiciones: PosicionCargaDto[]
-  pisoSicetac: PisoSicetacDto | null // #300: null también cuando el período más reciente cargado en DWSice NO es el del mes actual (ver avisoSicetac)
+  pisoSicetac: PisoSicetacDto | null // null también cuando el período más reciente cargado en DWSice NO es el del mes actual (ver avisoSicetac)
   historicas: HistoricaSugeridaDto[]
-  horasCargue: Decimal | null; horasDescargue: Decimal | null   // #251, horas EFECTIVAS con las que se costeó
-  grupoRutaId: UUID | null         // S5-HU-18.3/#275: agrupa las líneas de una misma carga heterogénea.
+  horasCargue: Decimal | null; horasDescargue: Decimal | null   // horas EFECTIVAS con las que se costeó
+  grupoRutaId: UUID | null         // agrupa las líneas de una misma carga heterogénea.
                                    // Lo pone QUIEN CREA las líneas del grupo (Cotifly o el portal); NEXO lo guarda tal cual.
-  idRecomendacionVehiculo: string | null  // S5-HU-18.2/#274: recomendación del Cubicador usada para esta línea
-  valorMercancia: Decimal | null   // S5-HU-20.1/#286: lo capturado en la línea (clsLineaSolicitud.ValorMercancia); null si no se capturó
-  tieneReglaSoloSicetac: boolean   // S6-HU-26.1/#30: la ruta (por DANE) y el vehículo de la línea tienen regla Solo-SICE → su flete NO se puede editar (PUT responde 409 FLETE_SOLO_SICETAC): no ofrecer "Editar flete"
-  // ---- campos nuevos, AL FINAL y opcionales (no rompen a quien ya lee el DTO) ----
-  estadoLinea: "porCostear" | "autoResuelta" | "revisada" | "rechazada" | null  // S6-HU-24.1/#309 (minúscula inicial); "rechazada" desde S6-HU-24.3/#320
-  motivoPendiente: string | null    // S6-HU-24.1/#309: por qué sigue en porCostear (consulta completa, línea sin vehículo, SICE-TAC que no es del mes actual...); null si no está pendiente
-  lineaNegocio: string | null       // S6-HU-29.1/#311: "puertoAInterior" | "interiorAPuerto" | "nacional" | "devolucionContenedor" | "andino" | "licitaciones" (minúscula inicial); null si la línea no la trae
-  claseViaje: string | null         // S6-HU-29.1/#311: "contenedor" | "cupo" | "cargaSuelta" | "extradimensionado"; null si no
-  claseContenedor: string | null    // S6-HU-29.1/#311: tal como se capturó (CNT20.IT...). NULL salvo que claseViaje sea "contenedor"
-  origenMunicipioId: number | null  // S6-HU-29.1/#311: id de tbl_municipios (el de GET /ciudades); null si la ruta no resolvió municipio
+  idRecomendacionVehiculo: string | null  // recomendación del Cubicador usada para esta línea
+  valorMercancia: Decimal | null   // lo capturado en la línea; null si no se capturó
+  numeroLinea: number | null       // orden de la línea en el arreglo de la captura (1, 2, 3...); null en líneas capturadas antes de que existiera la numeración. El GET ya las devuelve ORDENADAS por este campo
+  tieneReglaSoloSicetac: boolean   // la ruta (por DANE) y el vehículo de la línea tienen regla Solo-SICE → su flete NO se puede editar (PUT responde 409 FLETE_SOLO_SICETAC): no ofrecer "Editar flete"
+  estadoLinea: "porCostear" | "autoResuelta" | "revisada" | "rechazada" | null  // minúscula inicial
+  motivoPendiente: string | null    // por qué sigue en porCostear (consulta completa, línea sin vehículo, SICE-TAC que no es del mes actual...); null si no está pendiente
+  lineaNegocio: string | null       // "puertoAInterior" | "interiorAPuerto" | "nacional" | "devolucionContenedor" | "andino" | "licitaciones" (minúscula inicial); null si la línea no la trae
+  claseViaje: string | null         // "contenedor" | "cupo" | "cargaSuelta" | "extradimensionado"; null si no
+  claseContenedor: string | null    // tal como se capturó (CNT20.IT...). NULL salvo que claseViaje sea "contenedor"
+  origenMunicipioId: number | null  // id de tbl_municipios (el de GET /ciudades); null si la ruta no resolvió municipio
   destinoMunicipioId: number | null
-  motivoRechazo: string | null      // S6-HU-24.3/#320: por qué se rechazó la línea (máx. 500); null si no está rechazada. Una línea rechazada NO tiene flete, no suma al total y no cuenta como pendiente
-  numeroLinea: number | null       // S5-HU-20.5/#297: orden de la línea en el arreglo de la captura (1, 2, 3...); null en líneas capturadas antes de S5-HU-18.3. El GET ya las devuelve ORDENADAS por este campo
+  motivoRechazo: string | null      // por qué se rechazó la línea (máx. 500); null si no está rechazada. Una línea rechazada NO tiene flete, no suma al total y no cuenta como pendiente
 }
 interface TiemposLogisticosDto { horasCargue: Decimal; horasDescargue: Decimal }
 interface SolicitudCosteoDto {
   solicitud: SolicitudDto; tiempos: TiemposLogisticosDto; lineas: LineaCosteoDto[]
-  // #300: aviso visible cuando alguna línea quedó sin piso porque el período SICE-TAC más reciente cargado NO es el del mes y año
+  // aviso visible cuando alguna línea quedó sin piso porque el período SICE-TAC más reciente cargado NO es el del mes y año
   // actuales (p. ej. "SICE-TAC no se usa: el período más reciente cargado es 202609 y el del mes actual es 202610 (sin mes de gracia)."). null = el piso se usa con normalidad
   avisoSicetac: string | null
 }
@@ -723,12 +728,12 @@ interface MunicipioDto { // catálogo completo, ~3.800 filas — id numérico, e
 interface CandidatoTarifaDto {
   fuente: string; valor: Decimal; detalle: string; criterio: string; coincidencias: number
   advertencia: string | null // no-nulo cuando NO es un match exacto — mostrar al usuario antes de confirmar
-  tablaOrigen: "SAP" | "NEXO" // S5-HU-19.1/#281: "SAP" = tabla externa (tblSAPTarifas/tblSAPTarifasLog/DWSice), "NEXO" = tabla propia (tbl_tarifas_plaza/tbl_tarifas_plaza_historico)
-  // S5-HU-20.1/#286: SOLO el candidato `sicetac` los trae (plaza e histórico vienen null). Invariante: valorPisoBase + valorTiemposLogisticos == valor.
+  tablaOrigen: "SAP" | "NEXO" // "SAP" = tabla externa (tblSAPTarifas/tblSAPTarifasLog/DWSice), "NEXO" = tabla propia (tbl_tarifas_plaza/tbl_tarifas_plaza_historico)
+  // SOLO el candidato `sicetac` los trae (plaza e histórico vienen null). Invariante: valorPisoBase + valorTiemposLogisticos == valor.
   // Se calculan en el servidor con las horas REALES de la línea; el front no debe reconstruirlos (la tabla "Tarifas SICE-TAC" es catálogo crudo, con horas por defecto).
   valorPisoBase: Decimal | null          // el piso de la fila de DWSice, sin horas logísticas
   valorTiemposLogisticos: Decimal | null // lo que suman las horas logísticas (valor − piso base; sirve también con el valorSiceConHora de respaldo)
-  configuracion: string | null           // #300: configuración SICE-TAC de la fila (2L2, C2, 3S3...) — solo el candidato `sicetac` (y los de tramo vacío) la traen
+  configuracion: string | null           // configuración SICE-TAC de la fila (2L2, C2, 3S3...) — solo el candidato `sicetac` (y los de tramo vacío) la traen
   vehiculoRelajado: boolean              // true = la línea pide un vehículo y la fuente no tiene tarifas de ese vehículo en la ruta: el valor es de otro vehículo. Se muestra como referencia (con `advertencia`), no entra al recomendado ni puede gobernar solo
 }
 interface AprovisionamientoDto { candidato: CandidatoTarifaDto | null }
@@ -741,17 +746,17 @@ interface CotizacionConexoDto {
   id: UUID; cotizacionLineaId: UUID; servicioConexoId: UUID | null; nombre: string | null; categoria: string
   cantidad: Decimal
   valorAplicado: Decimal            // el COSTO del conexo (uso interno; nunca va al cliente ni al correo/Excel de la cotización)
-  precioVentaUnitario: Decimal      // S6-HU-38.2/#408: precio de venta de UNA unidad, fijado al agregar el conexo (el de la biblioteca o, si no tenía, su costo)
+  precioVentaUnitario: Decimal      // precio de venta de UNA unidad, fijado al agregar el conexo (el de la biblioteca o, si no tenía, su costo)
   valorVenta: Decimal               // lo que se cotiza: precioVentaUnitario × cantidad, a 2 decimales. Nunca null. El `total` suma este valor, no el costo
-  origen: "individual" | "general" // S5-HU-18/#262: cómo se agregó — "general" = el usuario pidió agregarlo a todas las líneas de una vez (igual crea una fila por línea)
-  servicio: ServicioConexoDto | null // S5-HU-18/#262: el servicio completo (dimensiones incluidas), para no tener que bajar el catálogo completo
+  origen: "individual" | "general" // cómo se agregó — "general" = el usuario pidió agregarlo a todas las líneas de una vez (igual crea una fila por línea)
+  servicio: ServicioConexoDto | null // el servicio completo (dimensiones incluidas), para no tener que bajar el catálogo completo
 }
 interface CotizacionDto {
   id: UUID; solicitudId: UUID; estado: "Borrador" | "Entregada"
   resultado: "SinDefinir" | "Ganada" | "Perdida"; total: Decimal; entregadaAt: FechaISO | null
   lineas: CotizacionLineaDto[]; conexos: CotizacionConexoDto[]
   esAutoCosteo: boolean
-  // S5-HU-20.1/#286: última vez que se agregó/quitó un conexo DESPUÉS de entregar (null si nunca). NO mueve estado ni entregadaAt: el SLA y las métricas siguen midiendo la entrega original.
+  // última vez que se agregó/quitó un conexo DESPUÉS de entregar (null si nunca). NO mueve estado ni entregadaAt: el SLA y las métricas siguen midiendo la entrega original.
   modificadaTrasEntregaAt: FechaISO | null
 }
 interface AplicarPropuestasResultDto { cotizacion: CotizacionDto; agregadas: number }
@@ -761,8 +766,9 @@ interface PropuestaLineaDto {
   sicetac: CandidatoTarifaDto | null; plaza: CandidatoTarifaDto | null; historicoSap: CandidatoTarifaDto | null
   valorPropuesto: Decimal | null; fuentePropuesta: string | null; justificacion: string
   retornoContenedor: CandidatoTarifaDto | null // piso SICE-TAC de VIAJE VACÍO (destino → ciudad de devolución), 1h+1h, misma configuración y misma unidad de transporte (carrocería) que la línea; fuente "retorno_contenedor"
+  vencida: boolean // true = no hay plaza vigente en ninguna fuente y `plaza` es una tarifa vencida que se muestra solo como referencia
   aprovisionamientoContenedor: CandidatoTarifaDto | null // igual, del levante (ciudad de levante → origen de la línea); fuente "aprovisionamiento_contenedor"
-  modoDecision: "SoloSicetac" | "PlazaVigenteMayor" | "ConsultaCompleta" // camino de decisión del flete principal: Solo SICE-TAC, plaza vigente mayor o proceso completo (ver FLUJO-DECISION-TARIFA.md)
+  modoDecision: "SoloSicetac" | "PlazaVigenteMayor" | "ConsultaCompleta" // camino de decisión del flete principal: Solo SICE-TAC, plaza vigente mayor o proceso completo (ver docs/funcionamiento/FUNCIONAMIENTO-NEXO.md, sección 6)
   autocosteable: boolean // true = hay valorPropuesto y ningún motivoPendiente: el flete se guarda solo (en cualquiera de los tres caminos). false = la línea queda pendiente
   motivoPendiente: string | null // motivo con el que la línea NO se guarda sola aunque haya valor: "Línea sin vehículo: requiere consulta completa", "SICE-TAC no se usa: el período más reciente cargado es AAAAMM y el del mes actual es AAAAMM (sin mes de gracia)...", o "No se encontró piso SICE-TAC de viaje vacío para el retorno/levante del contenedor...". null = sin motivo
 }
@@ -808,20 +814,12 @@ interface ServicioConexoDto {
   id: UUID; codigoServicio: string; tipoServicio: string
   origen: string; destino: string; puerto: string; ruta: string; tipoMaquina: string // "NO APLICA" si no aplica a este servicio
   costoUnitario: Decimal; unidad: string; vigencia: Fecha; categoria: string; activo: boolean
-  precioVenta: Decimal | null       // S6-HU-38.2/#408: precio al cliente con su margen. null = sin precio de venta: al cotizar el servicio se usa su costo
+  precioVenta: Decimal | null       // precio al cliente con su margen. null = sin precio de venta: al cotizar el servicio se usa su costo
 }
 interface ImportarServiciosResultDto {
   filas: number; creadas: number; actualizadas: number; duplicadas: number; invalidas: number
-  errores: string[] // S5-HU-19/#261: detalle "Fila N: motivo" de cada fila inválida, máx. 20
+  errores: string[] // detalle "Fila N: motivo" de cada fila inválida, máx. 20
 }
-
-interface TarifaSicetacDto {
-  id: UUID; periodo: number; origenDane: string; destinoDane: string; nombreRuta: string | null
-  configuracion: string; tipoCarga: string; unidadTransporte: string; condicionCarga: "Cargado" | "Vacio"
-  valorPiso: Decimal; valorHora: Decimal | null; horasPactadas: Decimal | null
-}
-interface ImportResumenDto { procesadas: number; insertadas: number; actualizadas: number; rechazadas: number; errores: string[]; sinRutaLocal: number }
-interface ImportacionDto { id: UUID; usuario: string | null; detalle: string | null; fecha: FechaISO }
 
 interface BibliotecaItemDto {
   id: UUID; ruta: string | null; vehiculo: string | null; tipologia: TipologiaCarga | null
@@ -829,7 +827,7 @@ interface BibliotecaItemDto {
 }
 
 interface CumplimientoDto {
-  desde: FechaISO | null; hasta: FechaISO | null // S5-HU-21.1/#287: eco del filtro (null = sin límite), igual que KpisPilotoDto
+  desde: FechaISO | null; hasta: FechaISO | null // eco del filtro (null = sin límite), igual que KpisPilotoDto
   totalSolicitudes: number; pendientes: number; enCosteo: number; entregadas: number; descartadas: number
   licitacionesTotal: number; licitacionesPerdidas: number; porcentajeLicitacionesPerdidas: number
   entregadasConDeadline: number; entregadasATiempo: number; cumplimientoSla: number
@@ -841,7 +839,7 @@ interface KpisPilotoDto {
   pliegosBajo10Minutos: number; porcentajePliegosBajo10Minutos: number | null
   totalLineas: number; lineasAutoCosteadas: number; porcentajeLineasAutoCosteadas: number | null
   cotizacionesEmitidas: number; lineasConFleteManual: number
-  tamano: "1-10" | "11-100" | "+100" | null // S5-HU-21.1/#287: eco del corte por tamaño aplicado al tiempo de costeo; null = todos
+  tamano: "1-10" | "11-100" | "+100" | null // eco del corte por tamaño aplicado al tiempo de costeo; null = todos
 }
 
 interface ParametrosScoreDto {
@@ -865,7 +863,7 @@ interface PlanCargueDto {
 }
 interface AvisoPlanCargueDto { planCargueId: UUID; estado: string; puntaje: Decimal; motivo: string | null }
 interface PlanFlotaItemDto { id: UUID; numeroVehiculo: number; totalVehiculos: number; unidadesCargadas: number; unidadesTotales: number }
-interface EstadoCubicacionLineaDto { // #304
+interface EstadoCubicacionLineaDto {
   estado: "procesando" | "listo" | "rechazado"  // rechazado manda sobre una flota vieja: el rechazo es del ÚLTIMO intento
   codigo: string | null; mensaje: string | null   // solo si rechazado: el código y el mensaje del Cubicador tal cual (FLOTA_INSUFICIENTE, VEHICULO_SIN_PRESET, ERROR_INTERNO...)
   rechazadoAt: FechaISO | null
@@ -880,9 +878,9 @@ interface VehiculoCubicacionDto {
   esPreset: boolean
 }
 interface LineaParaCubicacionDto { lineaId: UUID; posiciones: PosicionCargaDto[]; origen: string | null; destino: string | null }
-// posiciones[].codigoTipoMercancia viaja igual que en PosicionCargaDto (arriba) — null en líneas capturadas antes de S5-HU-18.2/#274.
+// posiciones[].codigoTipoMercancia viaja igual que en PosicionCargaDto (arriba) — null en líneas capturadas sin tipo de mercancía.
 
-// S5-HU-18.1/#273: espejo 1:1 de POST/GET /recomendaciones del Cubicador
+// Espejo 1:1 de POST/GET /recomendaciones del Cubicador
 // (cubicador/CONTRATO.md §3.1). Ver §3.14 más abajo para el detalle operativo.
 interface MercanciaSolicitadaInput {
   codigoMercancia: string; cantidad: number           // >= 1
@@ -893,9 +891,9 @@ interface CrearRecomendacionInput {
   claseViajeSeleccionada: string | null
 }
 interface MercanciaDeVehiculoDto { indicePosicion: number | null; idTipoMercancia: string; codigoMercancia: string; cantidad: number; pesoKg: Decimal; volumenM3: Decimal }
-// S5-HU-17.8: UNA FILA POR POSICION del request, no por codigo. Dos filas del mismo
-// camion pueden compartir codigoMercancia: quien agrupe por codigo tiene que sumar.
-// null al reconsultar una corrida anterior al cambio.
+// UNA FILA POR POSICIÓN del request, no por código. Dos filas del mismo camión pueden
+// compartir codigoMercancia: quien agrupe por código tiene que sumar.
+// indicePosicion es null al reconsultar una corrida guardada antes de que existiera.
 interface VehiculoRecomendadoDto {               // TODOS obligatorios y nunca null cuando resultado = "ASIGNADO"
   idRecomendacionVehiculo: string; numeroVehiculo: number
   codigoVehiculo: string; nombreVehiculo: string; codigoCarroceria: string
@@ -919,7 +917,7 @@ interface RecomendacionDto {
 // IDs en MAYÚSCULAS (uniqueidentifier de SQL Server). Las decimales viajan como
 // números JSON (no strings): 2 decimales en dinero/volumen, 1 en porcentajes.
 
-interface TipoVehiculoDto { codigo: string; descripcion: string; esCatalogoOficial: boolean } // false = los 5 casos especiales sin código SAP (§3.19)
+interface TipoVehiculoDto { codigo: string; descripcion: string; esCatalogoOficial: boolean } // esCatalogoOficial se conserva por compatibilidad y siempre es true
 interface LineaNegocioDto { id: number; descripcion: string }
 interface ClaseViajeDto { id: number; descripcion: string }
 interface ClaseContenedorDto { id: number; descripcion: string; tamanoContenedor: number | null; pesoInfCnt: number | null; pesoSupCnt: number | null }
@@ -958,30 +956,29 @@ Formato de cada endpoint:
 ### 3.2 Bandeja y solicitudes — `/api/solicitudes`
 
 #### `GET /api/solicitudes` — Bandeja Priorizada
-- **Roles**: `Comercial`, `AdminTarifas`, `ServiciosLogisticos`, `LiderProceso`, `Admin` (`AdminBiblioteca` no entra: #307). Rate limit estándar.
+- **Roles**: `Comercial`, `AdminTarifas`, `ServiciosLogisticos`, `LiderProceso`, `Admin` (`AdminBiblioteca` no entra). Rate limit estándar.
 
 | Query | | Tipo | Restricción |
 |---|---|---|---|
 | `estado` | *opcional* | string | `EstadoSolicitud` |
 | `atencion` | *opcional* | string | `pendientes` \| `automatico` \| `administrador` \| `atendidas` \| `todas`. Sin filtros → cola de pendientes (ver abajo) |
 | `desde`, `hasta` | *opcional* | fecha ISO | rango de fecha de captura |
-| `vigencia` | *opcional* | string | `vigente` \| `vencida`. S5-HU-23.1/#289: se mide contra la **Fecha Límite** (`deadline`) vs. "ahora"; una solicitud **sin deadline cuenta como vigente**. Antes: "capturada hace menos de 7 días" |
-| `resultado` | *opcional* | string | S5-HU-23.1/#289 (HU-B25). `esperando` \| `ganada` \| `perdida`. Valor desconocido → `400 RESULTADO_INVALIDO` |
+| `vigencia` | *opcional* | string | `vigente` \| `vencida`. Se mide contra la **Fecha Límite** (`deadline`) vs. "ahora"; una solicitud **sin deadline cuenta como vigente** |
+| `resultado` | *opcional* | string | `esperando` \| `ganada` \| `perdida`. Valor desconocido → `400 RESULTADO_INVALIDO` |
 | `orderBy` | *opcional* | string | ignorado: siempre ordena por score |
 | `page` | *opcional* | int | ≥ 1, def. 1 |
 | `pageSize` | *opcional* | int | 1–200, def. 50 |
 
 **La misma consulta sirve a todos los roles.** Para `Comercial` se limita **antes** a las solicitudes
-que él mismo creó (aislamiento de #199 / S4-HU-19.1); el resto de los roles ve todo. Los filtros de
+que él mismo creó; el resto de los roles ve todo. Los filtros de
 abajo operan sobre ese universo, así que un Comercial nunca ve filas de otro.
 
-**`atencion=pendientes` (la cola de trabajo del Administrador de Tarifas)** —
-S5-HU-23.1/#289— suma a las solicitudes con alguna línea **sin flete** las que tienen **todas las
-líneas con flete y alguna `Revisada`** por el Administrador de Fletes pero que todavía no se
-entregan (antes no salían en ninguna cola). No es una categoría nueva: esa solicitud **sigue**
-apareciendo en `administrador`/`atendidas`. No aplica a `automatico` (el auto-costeo tiene su
-propio atajo, S4-HU-15.6). Con estado `Pendiente`/`EnCosteo` implícito, al pasar a `Entregada`
-deja de salir en Pendientes.
+**`atencion=pendientes` (la cola de trabajo del Administrador de Tarifas)** suma a las
+solicitudes con alguna línea **sin flete** las que tienen **todas las líneas con flete y alguna
+`Revisada`** por el Administrador de Tarifas pero que todavía no se entregan. No es una
+categoría nueva: esa solicitud **sigue** apareciendo en `administrador`/`atendidas`. No aplica a
+`automatico` (el auto-costeo tiene su propio atajo). Con estado `Pendiente`/`EnCosteo`
+implícito, al pasar a `Entregada` deja de salir en Pendientes.
 
 **`resultado`** — al marcar Ganada/Perdida la solicitud pasa a `Entregada` y sale de Pendientes;
 esta es la forma de seguirla. **No se mezcla en Pendientes.**
@@ -996,17 +993,17 @@ esta es la forma de seguirla. **No se mezcla en Pendientes.**
 - **Errores**: `400 RESULTADO_INVALIDO`
 
 #### `GET /api/solicitudes/{id}` — abrir solicitud (costeo pre-armado)
-- **Roles**: `Comercial`, `AdminTarifas`, `ServiciosLogisticos`, `LiderProceso`, `Admin` (`AdminBiblioteca` no entra: #307).
+- **Roles**: `Comercial`, `AdminTarifas`, `ServiciosLogisticos`, `LiderProceso`, `Admin` (`AdminBiblioteca` no entra).
 - **→** `200 SolicitudCosteoDto`
-- **Orden de `lineas` (S5-HU-20.5/#297)**: estable. Por `numeroLinea` ascendente (las líneas viejas, sin
-  número, al final), luego por fecha de creación y luego por `id`. Antes no se ordenaba y el orden podía
-  cambiar entre consultas. **NEXO numera por el orden del arreglo** con que se capturó la solicitud
+- **Orden de `lineas`**: estable. Por `numeroLinea` ascendente (las líneas viejas, sin
+  número, al final), luego por fecha de creación y luego por `id`. **NEXO numera por el orden del arreglo** con que se capturó la solicitud
   (`lineas[0]` → 1, `lineas[1]` → 2...): no existe —ni se agrega— un campo "orden" de entrada, y Cotifly no
   manda un número. Varios camiones de la misma ruta (`grupoRutaId`) conservan el orden en que se enviaron.
-- **Errores**: `404 SOLICITUD_NO_ENCONTRADA` · `409 SOLICITUD_DESCARTADA`
+- **Aislamiento**: un `Comercial` solo abre las solicitudes que él creó; la de otro responde `403 SOLICITUD_AJENA`.
+- **Errores**: `403 SOLICITUD_AJENA` · `404 SOLICITUD_NO_ENCONTRADA` · `409 SOLICITUD_DESCARTADA`
 
 #### `POST /api/solicitudes` — alta spot (o cabecera de licitación)
-- **Roles**: `Admin` (S6-HU-25.1/#307, decisión D5: `AdminBiblioteca` ya no entra).
+- **Roles**: solo `Admin`.
 
 | Body | | Tipo | Restricción |
 |---|---|---|---|
@@ -1030,19 +1027,19 @@ esta es la forma de seguirla. **No se mezcla en Pendientes.**
 | `tipologia` | *opcional* | string | `TipologiaCarga` |
 | `peso` | *opcional* | decimal | 0–999999.99 kg |
 | `valorMercancia` | *opcional* | decimal | monetario |
-| `horasCargue` | *opcional* | decimal | S5-HU-17/#263. 0–240. Antes se descartaba en silencio |
-| `horasDescargue` | *opcional* | decimal | S5-HU-17/#263. 0–240. Antes se descartaba en silencio |
-| `grupoRutaId` | *opcional* | UUID | S5-HU-18.3/#275. Lo pone **quien crea las líneas del grupo** (Cotifly, o el portal al crear una línea por camión recomendado) — NEXO solo lo guarda tal cual, nunca lo genera |
+| `horasCargue` | *opcional* | decimal | 0–240 |
+| `horasDescargue` | *opcional* | decimal | 0–240 |
+| `grupoRutaId` | *opcional* | UUID | Lo pone **quien crea las líneas del grupo** (Cotifly, o el portal al crear una línea por camión recomendado) — NEXO solo lo guarda tal cual, nunca lo genera |
 
 Sin horas propias, la línea usa las de la solicitud (`CondicionesServicio`, 4h+4h
-si nunca se guardaron condiciones) — mismo criterio que `clsCapturaLineaRequest`
-(§3.3, S4-HU-15.5/#251).
+si nunca se guardaron condiciones) — mismo criterio que la captura de una línea
+(§3.3).
 
 #### `POST /api/solicitudes/resolver-catalogos`
 Resuelve texto libre a `rutaId`/`configVehiculoId`, creando lo que falte en el
 catálogo. No crea ninguna solicitud; es el paso previo a `lineas:bulk`.
 
-- **Roles**: `Comercial`, `Admin`. (#307: `AdminBiblioteca` ya no entra.)
+- **Roles**: `Comercial`, `Admin`.
 - **Body**: **array** (no objeto) de al menos 1 elemento:
 
 | Campo | | Tipo | Restricción |
@@ -1059,7 +1056,7 @@ catálogo. No crea ninguna solicitud; es el paso previo a `lineas:bulk`.
 - **Municipios**: con los dos ids la ruta se busca **primero por municipios** y después por texto. Por texto solo se **completan** los ids que la ruta tiene vacíos; **nunca se cambian** los que ya tiene
   (un mismo nombre existe en varios departamentos: si el texto coincide con una ruta de otro municipio se reutiliza esa ruta tal cual). Una ruta **nueva** con id toma su nombre del municipio del catálogo, no del texto.
   La misma regla aplica a `POST /api/captura-solicitudes` (`origenMunicipioId`/`destinoMunicipioId` de cada línea). `lineas:bulk` no cambia: recibe la ruta ya resuelta.
-- **Alias (S6-HU-27.2/#321)**: el `tipoVehiculo` se busca primero en el diccionario de alias (§3.19): `TB`, `T.B`, `Turbo` y `2L2` resuelven
+- **Alias**: el `tipoVehiculo` se busca primero en el diccionario de alias (§3.19): `TB`, `T.B`, `Turbo` y `2L2` resuelven
   a la **misma** configuración (se guarda el código, `2L2`, no el texto). La `carroceria` no pasa por el diccionario. Un texto que el
   diccionario no conoce sigue naciendo en **cuarentena** (`EsCatalogoOficial = false`) hasta que alguien lo mapee en la bandeja (§3.19).
   **Excepción**: un `tipoVehiculo` que es un código de la tabla de traducción (`GET /api/catalogos/vehiculos-nexo`: 2L3, 3S2…) cuenta como alias de sí mismo y nace **oficial** (o se promueve una configuración en cuarentena que no fue descartada),
@@ -1092,13 +1089,13 @@ interface RecomendacionVehiculoContenedorDto {
 - **Errores**: `400 SIN_LINEAS` · `400 DEMASIADAS_LINEAS` · `400 PESO_INVALIDO` (el mensaje trae el `indice`) · `400 VALIDATION_ERROR`
 
 #### `POST /api/solicitudes/{id}/lineas:bulk` — carga masiva de un pliego
-- **Roles**: `Admin` (#307, decisión D5: solo Admin).
+- **Roles**: solo `Admin`.
 - **Body**: `{ lineas: LineaBulk[] }`, **requerido**, mínimo 1 línea.
 - **→** `202 TrabajoAceptadoDto`. El costeo corre en segundo plano (§1.10).
 - **Errores**: `404 SOLICITUD_NO_ENCONTRADA` · `409 SOLICITUD_NO_EDITABLE`
 
 #### `POST /api/solicitudes/{id}/rechazar`
-- **Roles**: `Comercial`, `Admin`. (#307: `AdminBiblioteca` ya no entra.)
+- **Roles**: `Comercial`, `Admin`. El `Comercial` solo puede rechazar las solicitudes que él creó.
 
 | Body | | Tipo | Restricción |
 |---|---|---|---|
@@ -1106,16 +1103,16 @@ interface RecomendacionVehiculoContenedorDto {
 | `comentario` | *opcional* | string | máx. 500 |
 
 - **→** `204`
-- **Errores**: `404 SOLICITUD_NO_ENCONTRADA` · `409 SOLICITUD_YA_DESCARTADA`
+- **Errores**: `403 SOLICITUD_AJENA` · `404 SOLICITUD_NO_ENCONTRADA` · `409 SOLICITUD_YA_DESCARTADA`
 
 #### `POST /api/solicitudes/{id}/recalcular-score`
-- **Roles**: `Admin` (#307, decisión D5: solo Admin). Sin body.
+- **Roles**: solo `Admin`. Sin body.
 - **→** `200 DesgloseScoreDto`
 - **Errores**: `404 SOLICITUD_NO_ENCONTRADA`
 
 #### `GET /api/solicitudes/{id}/propuesta-tarifa`
 Compara plaza (SAP y propia), SICE-TAC e histórico (SAP y propio) y propone el valor del flete por línea con el flujo de
-`docs/documentacion/FLUJO-DECISION-TARIFA.md`: Solo SICE-TAC (regla y piso), plaza vigente mayor que el piso, o proceso completo
+`docs/funcionamiento/FUNCIONAMIENTO-NEXO.md` (sección 6): Solo SICE-TAC (regla y piso), plaza vigente mayor que el piso, o proceso completo
 (recomendado = el valor más alto). No persiste nada.
 
 **Cuándo se guarda solo.** El flete se guarda solo —al capturar, al costear una línea en segundo plano y con `aplicar-propuestas`—
@@ -1134,45 +1131,43 @@ una línea de contenedor, unidad PORTACONTENEDORES). Si la línea los pide y no 
 **Devolución de contenedor.** El flete principal se busca con viaje VACÍO y 1 h + 1 h por defecto; la plaza SAP solo cuenta si coincide
 con la línea en consolidado, exclusivo y clase de contenedor.
 
-S5-HU-19.1/#281: **orden de fuentes de plaza/histórico** — SAP oficial (match
+**Orden de fuentes de plaza/histórico** — SAP oficial (match
 exacto) → SAP tolerante (por zona) → propia de NEXO (`tbl_tarifas_plaza`/
 `tbl_tarifas_plaza_historico`), ganando la primera VIGENTE (externa primero).
-Una plaza SAP vencida ya NO detiene la búsqueda: se sigue intentando SAP
-tolerante y luego la propia antes de rendirse a la vencida como referencia.
-`plaza`/`historicoSap` llevan `tablaOrigen` ("SAP" | "NEXO") para saber de
-cuál de las dos vino el candidato ganador.
+Una plaza SAP vencida no detiene la búsqueda: se sigue intentando SAP
+tolerante y luego la propia antes de rendirse a la vencida como referencia
+(`vencida = true`). `plaza`/`historicoSap` llevan `tablaOrigen` ("SAP" | "NEXO")
+para saber de cuál de las dos vino el candidato ganador.
 
-**SICE-TAC solo del mes y año actuales (#300).** El piso SICE-TAC se usa únicamente si su período (AAAAMM)
+**SICE-TAC solo del mes y año actuales.** El piso SICE-TAC se usa únicamente si su período (AAAAMM)
 es el del mes y año actuales **en hora de Colombia**, **sin mes de gracia**: el día 1 del mes siguiente el
-período anterior ya no sirve. Antes se tomaba el período más alto cargado en DWSice sin compararlo con hoy.
-Si no es el actual, `sicetac` sale `null`, la línea queda en `modoDecision = "ConsultaCompleta"` (sin piso nunca
+período anterior ya no sirve. Si no es el actual, `sicetac` sale `null`, la línea queda en `modoDecision = "ConsultaCompleta"` (sin piso nunca
 hay modo automático), la `justificacion` empieza por el motivo y `motivoPendiente` lo trae — el usuario lo ve
 en la Mesa. Lo mismo aplica al piso de la Mesa (`pisoSicetac` null + `avisoSicetac`) y al aprovisionamiento.
 `POST .../aplicar-propuestas` **no** aplica una línea con `motivoPendiente`: sin piso contra el cual validar,
 guardar el flete sería guardarlo sin validar.
 
-**Tramos vacíos con 1 h + 1 h (#300).** Todo tramo vacío se calcula como piso SICE-TAC de viaje VACÍO con
+**Tramos vacíos con 1 h + 1 h.** Todo tramo vacío se calcula como piso SICE-TAC de viaje VACÍO con
 1 h de cargue + 1 h de descargue (`clsResolucionHorasLinea.HorasTramoVacio`): el **retorno del contenedor**
 (`retornoContenedor`, destino de la línea → `ciudadDevolucionContenedor`) y el **levante en otra ciudad**
 (`GET /api/captura-solicitudes/aprovisionamiento`). Las horas son **por tramo**: el viaje cargado conserva las
-de la línea (4 + 4 por defecto) y marcar `retornaContenedor` ya **no** las cambia. Las horas de los tramos
+de la línea (4 + 4 por defecto) y marcar `retornaContenedor` **no** las cambia. Las horas de los tramos
 vacíos son una constante de negocio, no un campo de la línea.
 
-- **Roles**: `Comercial`, `AdminTarifas`, `ServiciosLogisticos`, `LiderProceso`, `Admin` (`AdminBiblioteca` no entra: #307) (es la Mesa de Costeo).
+- **Roles**: `Comercial`, `AdminTarifas`, `ServiciosLogisticos`, `LiderProceso`, `Admin` (es la Mesa de Costeo; `AdminBiblioteca` no entra). A diferencia de `GET /api/solicitudes/{id}`, no valida que la solicitud sea del `Comercial` que consulta.
 - **→** `200 PropuestaSolicitudDto`
 - **Errores**: `404 SOLICITUD_NO_ENCONTRADA` · `404 LINEA_NO_ENCONTRADA`
 
 ### 3.3 Captura de solicitudes — `/api/captura-solicitudes`
 
-**Roles (S5-HU-22.1/#288)**: ya **no** están a nivel de controller. Un `[Authorize(Roles)]` de
-método no reemplaza el de la clase —se combinan con AND—, así que con `Comercial,Admin` en la
-clase, `GET .../ciudades` devolvía `403` al rol de Biblioteca (hoy `AdminBiblioteca`, que sí gestiona servicios en
-Biblioteca) y el campo se quedaba sin sugerencias. Ahora:
+**Roles**: se declaran endpoint por endpoint, no a nivel de controller (un `[Authorize(Roles)]` de
+método no reemplaza el de la clase: se combinan con AND, y las búsquedas de ciudades deben quedar
+abiertas a todos los roles):
 
 | Endpoint | Roles |
 |---|---|
 | `POST analizar-excel`, `POST leer-estructura`, `POST sugerir-mapeo`, `POST aplicar-mapeo`, `POST normalizar-valores`, `PUT/GET/DELETE plantillas-mapeo`, `PUT/GET/DELETE recetas-lectura`, `POST /` (capturar) | `Comercial`, `Admin` |
-| `GET aprovisionamiento`, `GET clientes` | `Comercial`, `Admin` (revisado caso por caso: se mantienen) |
+| `GET aprovisionamiento`, `GET clientes` | `Comercial`, `Admin` |
 | `GET departamentos`, `GET ciudades`, `GET municipios` | **cualquier rol válido de Nexo** (hay que estar autenticado; sin sesión → `401`) |
 
 #### `POST /api/captura-solicitudes/analizar-excel`
@@ -1274,7 +1269,7 @@ Un cliente tiene una sola plantilla por conjunto de encabezados: guardar otra ve
 Las columnas se guardan con una **versión** (`{ "version": 1, "columnas": [...] }`): una versión que el código no conoce se trata como plantilla vieja.
 
 **Decisiones**
-- **Con plantilla manda la plantilla**: no se consulta el diccionario. Confirmar un mapeo **no agrega** los encabezados al diccionario del cliente (el diccionario lo mantienen Datos y Comercial con su propio CRUD;
+- **Con plantilla manda la plantilla**: no se consulta el diccionario. Confirmar un mapeo **no agrega** los encabezados al diccionario del cliente (el diccionario se mantiene con su propio CRUD, §3.19.1;
   una sola confirmación podría contaminarlo con un término ambiguo). Editar el diccionario **no invalida** las plantillas: son lo que el usuario confirmó para ese formato exacto.
 - **Que haya plantilla solo evita llamar a la IA.** `aplicar-mapeo` corre igual, con todas sus validaciones (peso, ciudades, catálogos) y los errores por fila.
 - **Quién la confirmó**: crear, reemplazar y borrar quedan en `tbl_audit_log` (entidad `plantilla_mapeo_cliente`) con el usuario que lo hizo.
@@ -1541,7 +1536,7 @@ Casos:
 #### `POST /api/captura-solicitudes` — crear solicitud completa
 Resuelve o crea rutas y vehículos a partir del texto libre de las líneas.
 
-**Línea de Cupo sin vehículo (S5-HU-20.5/#297).** Una línea sin `tipoVehiculo` se acepta, pero si su
+**Línea de Cupo sin vehículo.** Una línea sin `tipoVehiculo` se acepta, pero si su
 `claseViaje` es **Cupo** (o no trae `claseViaje`) **no se autocostea**: sin vehículo el motor busca el piso
 SICE-TAC sin filtro y toma el menor valor, y la plaza cae al "mayor valor vigente" solo con una advertencia
 — un precio bajo que nadie revisa. Queda `estadoLinea = "PorCostear"` sin ningún flete, con
@@ -1550,7 +1545,7 @@ SICE-TAC sin filtro y toma el menor valor, y la plaza cae al "mayor valor vigent
 `motivoPendiente` y los candidatos como **referencia**: el Administrador de Tarifas elige o ingresa el valor
 (nunca bajo el piso). Una línea a la que luego se le pone vehículo se costea normalmente.
 **No aplica** a Contenedor (el vehículo se deduce por peso y clase de contenedor), ni a Carga suelta, ni a
-Extradimensionado (decidido por Sara: solo Cupo).
+Extradimensionado (decisión de negocio: solo Cupo).
 
 **Normalización de nombres.** `origen`, `destino`, `tipoVehiculo` y `carroceria` se comparan sin tildes y con
 `_` y `-` equivalentes a espacio, así que "Bogotá"/"Bogota" o "Furgon Refrigerado"/"FURGON_REFRIGERADO"
@@ -1575,32 +1570,32 @@ tal como llegó (limpio de espacios).
 |---|---|---|---|
 | `origen` | **requerido** | string | máx. 150 |
 | `destino` | **requerido** | string | máx. 150 |
-| `origenMunicipioId` | *opcional* | int | S5-HU-16.1/#254. `id` elegido en `GET /ciudades` para `origen` — sin esto la línea no resuelve municipio y el motor de costeo (#255/#256) no aplica para ella |
+| `origenMunicipioId` | *opcional* | int | `id` elegido en `GET /ciudades` para `origen` — sin esto la ruta se resuelve solo por texto y el costeo no puede comparar por código DANE para esa línea |
 | `destinoMunicipioId` | *opcional* | int | ídem, para `destino` |
 | `peso` | **condicional** | decimal | 0–999999.99 kg. **Requerido (> 0) si las posiciones no traen peso** |
 | `tipoVehiculo` | *opcional* | string | máx. 100 |
 | `carroceria` | *opcional* | string | máx. 100 |
 | `tipologia` | *opcional* | string | `TipologiaCarga` |
-| `lineaNegocio` | *opcional* | string | máx. 100. Una de las seis: `Nacional`, `Puerto a interior`, `Interior a puerto`, `Devolución de contenedor`, `Andino`, `Licitaciones` (también como `puertoAInterior`, mayúsculas o con guiones). Vacío = sin línea de negocio. **Cualquier otro texto es `400 LINEA_NEGOCIO_INVALIDO`** (con el número de línea y el valor recibido; antes se guardaba en blanco sin avisar). `normalizar-valores` traduce el texto del cliente al valor de NEXO |
+| `lineaNegocio` | *opcional* | string | máx. 100. Una de las seis: `Nacional`, `Puerto a interior`, `Interior a puerto`, `Devolución de contenedor`, `Andino`, `Licitaciones` (también como `puertoAInterior`, mayúsculas o con guiones). Vacío = sin línea de negocio. **Cualquier otro texto es `400 LINEA_NEGOCIO_INVALIDO`** (con el número de línea y el valor recibido). `normalizar-valores` traduce el texto del cliente al valor de NEXO |
 | `claseViaje` | *opcional* | string | máx. 50 |
 | `claseContenedor` | *opcional* | string | máx. 20 |
-| `exclusivo`, `consolidado`, `retornaContenedor`, `levanteContenedorDiferente` | *opcional* | boolean | #300: `retornaContenedor` agrega el tramo vacío de retorno (1 h + 1 h, aparte) y **ya no cambia las horas de la línea** (RN-03) |
-| `horasCargue`, `horasDescargue` | *opcional* | decimal | 0–240. S4-HU-15.5/#251. Hay que mandar **las dos** para que se respeten; si falta una, aplica el default. Default: **4 + 4** (o las de la solicitud); **1 + 1** si la línea ES una devolución de contenedor (`lineaNegocio` = devolución). #300 |
+| `exclusivo`, `consolidado`, `retornaContenedor`, `levanteContenedorDiferente` | *opcional* | boolean | `retornaContenedor` agrega el tramo vacío de retorno (1 h + 1 h, aparte) y **no cambia las horas de la línea** |
+| `horasCargue`, `horasDescargue` | *opcional* | decimal | 0–240. Hay que mandar **las dos** para que se respeten; si falta una, aplica el default. Default: **4 + 4** (o las de la solicitud); **1 + 1** si la línea ES una devolución de contenedor (`lineaNegocio` = devolución) |
 | `ciudadDevolucionContenedor` | *opcional* | string | máx. 150 |
 | `ciudadLevanteContenedor` | *opcional* | string | máx. 150 |
 | `valorAprovisionamiento` | *opcional* | decimal | monetario. Se ignora: el aprovisionamiento lo calcula el servidor con la ciudad de levante (`ciudadLevanteContenedor`) |
 | `valorMercancia` | *opcional* | decimal | monetario |
 | `posiciones` | *opcional* | array | máx. 200 por línea |
-| `grupoRutaId` | *opcional* | UUID | S5-HU-18.3/#275. Agrupa las líneas de una misma carga heterogénea. Lo pone **quien crea las líneas del grupo** (Cotifly, o el portal al crear una línea por camión); null solo en la línea suelta |
-| `idRecomendacionVehiculo` | *opcional* | string | máx. 64. S5-HU-18.2/#274. `idRecomendacionVehiculo` de `POST /api/cubicacion` (§1.2) si esta línea se capturó a partir de una cubicación |
+| `grupoRutaId` | *opcional* | UUID | Agrupa las líneas de una misma carga heterogénea. Lo pone **quien crea las líneas del grupo** (Cotifly, o el portal al crear una línea por camión); null solo en la línea suelta |
+| `idRecomendacionVehiculo` | *opcional* | string | máx. 64. `idRecomendacionVehiculo` de `POST /api/cubicacion` (§3.14) si esta línea se capturó a partir de una cubicación |
 
 | Cada posición | | Tipo | Restricción |
 |---|---|---|---|
 | `largoCm`, `anchoCm`, `altoCm` | **requerido** | decimal | 0.1–999999 |
-| `cantidad` | *opcional* | int | 1–**10000**, def. 1 (#304: antes 100000; el Cubicador corta en 10.000 unidades por petición) |
+| `cantidad` | *opcional* | int | 1–**10000**, def. 1 (el Cubicador corta en 10.000 unidades por petición) |
 | `descripcion` | *opcional* | string | máx. 200 |
-| `pesoKg` | **requerido** | decimal | 0.01–999999.99. **Peso de UNA unidad, no el total de la posición** (el motor hace `pesoKg × cantidad`: mandar el total lo multiplica dos veces). #304: antes era opcional; ahora es obligatorio en cada posición (una línea **sin** posiciones se sigue capturando solo con su `peso`) |
-| `codigoTipoMercancia` | *opcional* | string | máx. 40. S5-HU-18.2/#274. Código (no uuid) de `tbl_tipos_mercancia` — null = tipo desconocido, sin default asignado |
+| `pesoKg` | **requerido** | decimal | 0.01–999999.99. **Peso de UNA unidad, no el total de la posición** (el motor hace `pesoKg × cantidad`: mandar el total lo multiplica dos veces). Obligatorio en cada posición (una línea **sin** posiciones se captura solo con su `peso`) |
+| `codigoTipoMercancia` | *opcional* | string | máx. 40. Código (no uuid) de `tbl_tipos_mercancia` — null = tipo desconocido, sin default asignado |
 
 Regla de peso: el peso de la línea es `peso` si viene; si no, la suma de
 `cantidad × pesoKg` de las posiciones. Debe ser > 0. Si vienen ambos, el `peso`
@@ -1608,7 +1603,7 @@ total debe ser **mayor o igual** a la suma de las posiciones (la diferencia es l
 tara); solo se rechaza (`400 PESO_INCONSISTENTE`) cuando las posiciones suman **más**
 que el peso total, con una tolerancia del 1 % por redondeos.
 
-**Peso con tara (S6-HU-28.1/#308).** El `peso` de la línea es el peso **total que se transporta, INCLUYENDO la tara** (embalaje,
+**Peso con tara.** El `peso` de la línea es el peso **total que se transporta, INCLUYENDO la tara** (embalaje,
 estibas, contenedor vacío...). **Nexo no la suma ni la resta**: la escribe quien captura (el Comercial, o Cotifly) dentro de `peso`, y
 siempre en **kilogramos** (el backend nunca recibe toneladas; la conversión de unidades es del front). Qué peso usa cada cosa:
 
@@ -1627,32 +1622,30 @@ Ejemplo: `peso` 1000 con una posición de 100 kg → `201`; posiciones que suman
 `POST /api/solicitudes/{id}/lineas:bulk` no valida la suma.
 
 - **→** `201 CapturaResultDto`, header `Location: /api/solicitudes/{id}`
-- **Errores**: `400 LINEA_NEGOCIO_INVALIDO` · `400 CLIENTE_REQUERIDO` · `400 CLIENTE_INVALIDO` · `400 CLIENTE_BP_INVALIDO` · `400 DWCUBOS_NO_CONFIGURADO` (se usó `clienteBp` y el DW no está configurado en el ambiente) · `400 ENUM_INVALIDO` · `400 LINEA_INCOMPLETA` · `400 PESO_REQUERIDO` · `400 PESO_INCONSISTENTE` · `400 CUBICACION_DEMASIADO_GRANDE` (#304: más de 10.000 unidades en las posiciones de una línea). Una posición sin `pesoKg`, con `pesoKg` 0 o con `cantidad` > 10000 sale como `400 VALIDATION_ERROR` (validación de campos)
+- **Errores**: `400 LINEA_NEGOCIO_INVALIDO` · `400 CLIENTE_REQUERIDO` · `400 CLIENTE_INVALIDO` · `400 CLIENTE_BP_INVALIDO` · `400 DWCUBOS_NO_CONFIGURADO` (se usó `clienteBp` y el DW no está configurado en el ambiente) · `400 ENUM_INVALIDO` · `400 LINEA_INCOMPLETA` · `400 PESO_REQUERIDO` · `400 PESO_INCONSISTENTE` · `400 CUBICACION_DEMASIADO_GRANDE` (más de 10.000 unidades en las posiciones de una línea). Una posición sin `pesoKg`, con `pesoKg` 0 o con `cantidad` > 10000 sale como `400 VALIDATION_ERROR` (validación de campos)
 
-**Preguntas del contrato de captura (S6-HU-29.3/#313).** Tres preguntas del informe del front de Nexo, con su respuesta:
+**Tres reglas de la captura que conviene tener claras:**
 
-*A. `grupoRutaId`: ¿lo manda el front de Nexo o va null?* **Lo manda quien crea las líneas del grupo — también el front de Nexo.** Si
-parte una carga en varios camiones, genera **un GUID por recomendación** y lo pone **igual en todas las líneas de ese grupo** (una
-línea por camión, #217). Va `null` solo en una línea suelta: un único camión, o una línea que no pasó por la cubicación. NEXO lo guarda
-tal cual y **nunca lo genera**. (El texto anterior, "lo pone siempre Cotifly", era un resto de cuando solo Cotifly agrupaba.)
+*A. `grupoRutaId`.* **Lo manda quien crea las líneas del grupo, también el front de NEXO.** Si parte una carga en varios camiones,
+genera **un GUID por recomendación** y lo pone **igual en todas las líneas de ese grupo** (una línea por camión). Va `null` solo en
+una línea suelta: un único camión, o una línea que no pasó por la cubicación. NEXO lo guarda tal cual y **nunca lo genera**.
 
 *B. Posiciones por camión: la recomendación trae cantidad, código, `pesoKg` y volumen, pero no medidas.* **Se arman con `indicePosicion`.**
 Cada fila de `vehiculos[].mercancias[]` trae `indicePosicion` (base 0): el índice de la posición **en el arreglo `mercancias` del request
-con que se pidió la recomendación** (S5-HU-17.8). El front toma esa posición de su propia lista — que sí tiene `largoCm`, `anchoCm`,
-`altoCm`, `descripcion` y `codigoTipoMercancia` — y arma la posición del camión con la `cantidad` **de esa fila** (las unidades que van
-en ese camión) y el `pesoKg` **unitario** de la posición original. No se agrupa por `codigoMercancia`: dos posiciones del mismo tipo
-llegan como dos filas con índices distintos, y dos filas de un mismo camión pueden compartir código. Una recomendación guardada **antes**
-de 17.8 trae `indicePosicion = null`: no hay forma de saber a qué posición corresponde una fila, así que hay que **volver a pedir la
-recomendación** (se guarda como corrida nueva; la anterior no se toca).
+con que se pidió la recomendación**. El front toma esa posición de su propia lista —que sí tiene `largoCm`, `anchoCm`, `altoCm`,
+`descripcion` y `codigoTipoMercancia`— y arma la posición del camión con la `cantidad` **de esa fila** (las unidades que van en ese
+camión) y el `pesoKg` **unitario** de la posición original. No se agrupa por `codigoMercancia`: dos posiciones del mismo tipo llegan
+como dos filas con índices distintos, y dos filas de un mismo camión pueden compartir código. Una recomendación guardada antes de que
+existiera este campo trae `indicePosicion = null`: no hay forma de saber a qué posición corresponde una fila, así que hay que **volver
+a pedir la recomendación** (se guarda como corrida nueva; la anterior no se toca).
 
-*C. Clase de contenedor de Extradimensionado (D10).* **Opcional y sin validar** (la opción recomendada). S6-HU-27.2/#321: si el texto está en
-el diccionario de alias de contenedor (`40 HC`, `40HC`, `20 STD`... → `CNT40.HC`, `CNT20.ST`) se guarda el código; si no, el backend la guarda como
-texto libre (máx. 20 caracteres) y **no la compara con el catálogo**: los nombres provisionales del front (`CNT20.FT`, `CNT20.OP`,
-`CNT40.FT`, `CNT40.OP`) se aceptan tal cual. Riesgo conocido: si algún día se valida contra el catálogo real (`CNT20.IT`, `RE`, `ST` y
-`CNT40.HC`, `RE`), esos nombres provisionales se rechazarían; eso exigirá una issue propia y migrar los datos. Por ahora la
-`claseContenedor` de una línea de Extradimensionado **no se expone** en `GET /api/solicitudes/{id}` (sale `null` salvo clase de viaje
-`contenedor`, S6-HU-29.1), y los nombres provisionales **no filtran nada al costear**: el motor solo filtra por una clase que resuelve
-contra el catálogo real, y esos nombres no existen en él.
+*C. Clase de contenedor de Extradimensionado.* **Opcional y sin validar.** Si el texto está en el diccionario de alias de contenedor
+(`40 HC`, `40HC`, `20 STD`... → `CNT40.HC`, `CNT20.ST`) se guarda el código; si no, el backend la guarda como texto libre (máx. 20
+caracteres) y **no la compara con el catálogo**: los nombres provisionales del front (`CNT20.FT`, `CNT20.OP`, `CNT40.FT`, `CNT40.OP`)
+se aceptan tal cual. Riesgo conocido: si algún día se valida contra el catálogo real (`CNT20.IT`, `RE`, `ST` y `CNT40.HC`, `RE`), esos
+nombres provisionales se rechazarían y habría que migrar los datos. La `claseContenedor` de una línea de Extradimensionado **no se
+expone** en `GET /api/solicitudes/{id}` (sale `null` salvo clase de viaje `contenedor`), y los nombres provisionales **no filtran nada
+al costear**: el motor solo filtra por una clase que resuelve contra el catálogo real, y esos nombres no existen en él.
 
 #### `GET /api/captura-solicitudes/aprovisionamiento`
 Estimación del piso SICE-TAC del viaje vacío (levante → origen del cargue), con **1 h + 1 h** (2 h en total) y solo con el período
@@ -1681,23 +1674,14 @@ municipio, se busca por el texto del nombre de la ruta de SICE-TAC; una ciudad q
   reales; sin él, en la tabla local.
 
 #### `GET /api/captura-solicitudes/departamentos`
-Departamentos de Colombia con municipio en el catálogo propio
-(`tbl_municipios`, S5-HU-16.1). **Cambio de fuente**: hasta esta issue
-resolvía contra `tblSAPDANE` en vivo, filtrado a ciudades "costeables" en el
-tarifario SAP; ahora es `tbl_municipios` (más amplio — incluye municipios sin
-tarifa SAP cargada, que de todas formas pueden costear por SICE-TAC).
+Departamentos de Colombia con municipio en el catálogo propio (`tbl_municipios`). Incluye departamentos con municipios sin
+tarifa SAP cargada, que de todas formas pueden costear por SICE-TAC.
 - **→** `200 string[]`, ordenados.
 
 #### `GET /api/captura-solicitudes/ciudades`
-Búsqueda de ciudades para Origen/Destino, filtrable por `departamento` y/o
-`q` (texto, sin tildes ni mayúsculas). **Cambio de forma (S5-HU-16.1/#254),
-ruptura**: antes devolvía `{ municipio, departamento }`; ahora devuelve la
-fila completa de `tbl_municipios`, con los datos que #255/#256 necesitan
-para dejar de comparar por texto en el motor de costeo. El frontend debe
-capturar `id` y enviarlo como `origenMunicipioId`/`destinoMunicipioId` al
-crear la solicitud (ver tabla de línea en `POST /api/captura-solicitudes`
-arriba) — sin eso, la línea queda sin municipio resuelto y #255/#256 no
-aplican para ella (cae al comportamiento de siempre, sin error).
+Búsqueda de ciudades para Origen/Destino, filtrable por `departamento` y/o `q` (texto, sin tildes ni mayúsculas). Devuelve la fila
+completa de `tbl_municipios`. El frontend debe capturar `id` y enviarlo como `origenMunicipioId`/`destinoMunicipioId` al crear la
+solicitud (ver tabla de línea en `POST /api/captura-solicitudes` arriba); sin eso, la ruta se resuelve solo por texto (sin error).
 
 | Query | | Tipo | Restricción |
 |---|---|---|---|
@@ -1710,18 +1694,14 @@ aplican para ella (cae al comportamiento de siempre, sin error).
   Tarifario SAP) vienen `null` cuando el municipio no tiene movimiento
   comercial conocido — no es un error, el municipio sigue siendo válido
   para SICE-TAC.
-- 8 ciudades que existían en el catálogo anterior ya no aparecen: eran
-  zonas agregadas sin código DANE propio (Valle de Aburrá, Urabá, Oriente
-  antioqueño) o localidades sub-municipales sin fila propia en
-  `tbl_municipios` (Don Matías, Catambuco, Doradal, Bolombolo, Chibolo).
+- No aparecen las zonas agregadas sin código DANE propio (Valle de Aburrá, Urabá, Oriente antioqueño) ni las localidades
+  sub-municipales sin fila propia en `tbl_municipios` (Don Matías, Catambuco, Doradal, Bolombolo, Chibolo).
 
 #### `GET /api/captura-solicitudes/municipios`
-Catálogo completo de municipios (S4-HU-09.1), todas las columnas — para
+Catálogo completo de municipios, todas las columnas — para
 poblar el desplegable de Origen/Destino. ~3.800 filas sin paginar ni
 filtrar: se carga una sola vez y queda en memoria del front, no se consulta
-en cada tecleo. Mismo catálogo que `GET /api/catalogos/municipios` (§3.19),
-expuesto también ahí porque ese otro controller no está limitado a
-Comercial/Admin.
+en cada tecleo. Mismo catálogo que `GET /api/catalogos/municipios` (§3.19).
 - **→** `200 MunicipioDto[]`
 
 ### 3.4 Cotizaciones — `/api/cotizaciones`
@@ -1734,17 +1714,17 @@ Comercial/Admin.
 - **Errores**: `400 SOLICITUD_INVALIDA`
 
 #### `GET /api/cotizaciones/{id}`
-- **Roles**: `Comercial`, `AdminTarifas`, `ServiciosLogisticos`, `LiderProceso`, `Admin` (`AdminBiblioteca` no entra: #307).
+- **Roles**: `Comercial`, `AdminTarifas`, `ServiciosLogisticos`, `LiderProceso`, `Admin` (`AdminBiblioteca` no entra).
 - **→** `200 CotizacionDto`
 - **Errores**: `404 COTIZACION_NO_ENCONTRADA`
 
 #### `GET /api/cotizaciones/por-solicitud/{solicitudId}` — la cotización que ya existe
-S5-HU-20.1/#286. **Nunca crea nada** (a diferencia de `POST /api/cotizaciones`, que es
+**Nunca crea nada** (a diferencia de `POST /api/cotizaciones`, que es
 "crear o recuperar" y tiene efecto secundario). Mesa de Costeo la consulta al abrir
 para saber si ya hay una cotización —p. ej. la auto-costeada al capturar— sin tener que
 disparar el POST.
 
-- **Roles**: `Comercial`, `AdminTarifas`, `ServiciosLogisticos`, `LiderProceso`, `Admin` (`AdminBiblioteca` no entra: #307).
+- **Roles**: `Comercial`, `AdminTarifas`, `ServiciosLogisticos`, `LiderProceso`, `Admin` (`AdminBiblioteca` no entra).
 - **→** `200 CotizacionDto` · `204 No Content` si la solicitud no tiene cotización (o no existe).
 - Elige igual que el POST: si la solicitud ya está `Entregada`, su cotización `Entregada`;
   si no, el borrador en curso. GET y POST nunca apuntan a cotizaciones distintas.
@@ -1771,7 +1751,7 @@ contenedor. Se saltan las líneas sin valor propuesto, las que traen `motivoPend
 | `lineaSolicitudId` | *opcional* | UUID | debe pertenecer a la solicitud |
 | `valorRetornoContenedor` | *opcional* | decimal | monetario; suma al total aparte |
 
-S5-HU-19.3/#283 — con `lineaSolicitudId`, el servidor recalcula la propuesta de esa
+Con `lineaSolicitudId`, el servidor recalcula la propuesta de esa
 línea (no confía en lo que diga el navegador) y valida:
 
 - **Nunca bajo el piso SICE-TAC**, con cualquier `fuente` (tarifario, histórica o
@@ -1787,7 +1767,7 @@ línea (no confía en lo que diga el navegador) y valida:
 - **Errores**: `400 FUENTE_INVALIDA` · `400 LINEA_INVALIDA` · `400 FLETE_BAJO_PISO_SICETAC` · `404 COTIZACION_NO_ENCONTRADA` · `409 COTIZACION_NO_EDITABLE` · `409 LINEA_RECHAZADA` · `409 LINEA_YA_COSTEADA` · `409 HISTORICA_VENCIDA`
 
 #### `PUT /api/cotizaciones/{id}/lineas/{lineaSolicitudId}` — editar un flete
-S5-HU-20.1/#286; **S6-HU-26.1/#30: de cualquier fuente**. Modifica **la misma fila** de la cotización: `POST .../lineas` siempre
+Edita el flete **de cualquier fuente**. Modifica **la misma fila** de la cotización: `POST .../lineas` siempre
 agrega una nueva, así que sobre una línea que ya tiene flete responde `409 LINEA_YA_COSTEADA`: para cambiarlo se usa este `PUT`. La ruta
 usa el id de la línea del **pliego** (`lineaSolicitudId`, el mismo que manda el POST), no
 el de la fila de la cotización.
@@ -1798,33 +1778,31 @@ el de la fila de la cotización.
 |---|---|---|---|
 | `valorFlete` | **requerido** | decimal | 0.01–9999999999999.99 |
 | `valorRetornoContenedor` | *opcional* | decimal | monetario. Si se omite no se toca el que tenía |
-| `confirmarSinPiso` | *opcional* | boolean | #30. Def. `false`. `true` = guardar aunque **no se haya podido verificar** el piso SICE-TAC (ver abajo). No salta un valor bajo un piso que SÍ se encontró |
+| `confirmarSinPiso` | *opcional* | boolean | Def. `false`. `true` = guardar aunque **no se haya podido verificar** el piso SICE-TAC (ver abajo). No salta un valor bajo un piso que SÍ se encontró |
 
-No recibe `fuente`. Reglas (#30):
+No recibe `fuente`. Reglas:
 
 - **Cualquier fuente se edita** (`manual`, `tarifario`/plaza, `sicetac`, `historica`): una tarifa se corrige en su sitio, sin tener que
-  reemplazarla eligiendo otro candidato. Antes solo la `manual` (`409 FLETE_NO_EDITABLE`, código que ya no existe).
+  reemplazarla eligiendo otro candidato.
 - **Con regla Solo-SICE no se edita**: si la ruta (por código DANE) y el vehículo de la línea tienen regla en `tbl_reglas_solo_sicetac`,
   el flete lo fija el piso y responde **`409 FLETE_SOLO_SICETAC`** (también para un flete manual). Misma definición que usa el motor
   de propuesta; la Mesa la expone como `tieneReglaSoloSicetac` en cada línea de `GET /api/solicitudes/{id}`.
-- **Al guardar, la fuente pasa a `Manual`** (decisión D4): el valor ya no sale de su fuente original sino de una persona.
+- **Al guardar, la fuente pasa a `Manual`**: el valor ya no sale de su fuente original sino de una persona.
 - **Auditoría** (`editar_flete`): guarda `valorAnterior` y `fuenteAnterior`, `valorNuevo` y `fuenteNueva`, y `confirmadoSinPiso`.
-- **Nunca bajo el piso SICE-TAC** (`400 FLETE_BAJO_PISO_SICETAC`, mismo cálculo del servidor que al agregar, #283).
+- **Nunca bajo el piso SICE-TAC** (`400 FLETE_BAJO_PISO_SICETAC`, mismo cálculo del servidor que al agregar).
 - **Si el piso no se puede verificar, no se guarda en silencio** (`409 PISO_SICETAC_NO_VERIFICABLE`): la ruta no tiene fila en DWSice, el
-  período más reciente cargado no es el del mes actual (#300), o la consulta falló. El mensaje dice la causa cuando es el período. Quien
-  edita decide: reintenta con `confirmarSinPiso = true` y queda registrado en la auditoría. Antes (#283) esta validación simplemente se
-  saltaba y cualquier valor entraba sin aviso.
+  período más reciente cargado no es el del mes actual, o la consulta falló. El mensaje dice la causa cuando es el período. Quien
+  edita decide: reintenta con `confirmarSinPiso = true` y queda registrado en la auditoría.
 - Solo cotización `Borrador`.
 
 - **→** `200 CotizacionDto` (misma cantidad de líneas, total recalculado)
 - **Errores**: `400 VALIDATION_ERROR` · `400 FLETE_BAJO_PISO_SICETAC` · `404 COTIZACION_NO_ENCONTRADA` · `404 LINEA_NO_ENCONTRADA` · `409 COTIZACION_NO_EDITABLE` · `409 FLETE_SOLO_SICETAC` · `409 PISO_SICETAC_NO_VERIFICABLE`
 
-> `POST .../lineas` (agregar) **no cambió**: sin piso verificable sigue guardando el valor sin aviso. Está documentado con una prueba y
-> pendiente de decidir (sección 9 del documento de issues, "flete manual sin piso").
+> `POST .../lineas` (agregar) no tiene esta confirmación: sin piso verificable guarda el valor sin aviso. Es un comportamiento
+> conocido, cubierto por una prueba y pendiente de decisión de negocio.
 
 #### `POST /api/cotizaciones/{id}/lineas/{lineaSolicitudId}/rechazo` — rechazar una línea con motivo
-S6-HU-24.3/#320. Para entregar el resto de la cotización sin que una línea que no se puede costear la frene. Antes solo existía rechazar la
-solicitud completa. La línea queda `rechazada`, **sin flete, sin sumar al total** y se considera resuelta para entregar.
+Para entregar el resto de la cotización sin que una línea que no se puede costear la frene. La línea queda `rechazada`, **sin flete, sin sumar al total** y se considera resuelta para entregar.
 
 - **Roles**: `AdminTarifas`, `Admin`.
 
@@ -1841,7 +1819,7 @@ solicitud completa. La línea queda `rechazada`, **sin flete, sin sumar al total
 - **Errores**: `400 MOTIVO_RECHAZO_REQUERIDO` · `404 COTIZACION_NO_ENCONTRADA` · `404 LINEA_NO_ENCONTRADA` · `409 COTIZACION_NO_EDITABLE` · `409 LINEA_YA_RECHAZADA` · `409 LINEA_CON_FLETE`
 
 #### `DELETE /api/cotizaciones/{id}/lineas/{lineaSolicitudId}/rechazo` — deshacer el rechazo
-S6-HU-24.3/#320. Solo mientras la cotización **no esté entregada** (entregada → `409 COTIZACION_NO_EDITABLE`): la línea vuelve a `porCostear`
+Solo mientras la cotización **no esté entregada** (entregada → `409 COTIZACION_NO_EDITABLE`): la línea vuelve a `porCostear`
 (hay que costearla) y el motivo, quién y cuándo se limpian; el rechazo anterior queda en la auditoría.
 
 - **Roles**: `AdminTarifas`, `Admin`.
@@ -1849,7 +1827,7 @@ S6-HU-24.3/#320. Solo mientras la cotización **no esté entregada** (entregada 
 - **Errores**: `404 COTIZACION_NO_ENCONTRADA` · `404 LINEA_NO_ENCONTRADA` · `409 COTIZACION_NO_EDITABLE` · `409 LINEA_NO_RECHAZADA`
 
 #### `PUT /api/cotizaciones/{id}/lineas/{lineaSolicitudId}/vehiculo` — cambiar el vehículo de una línea
-S6-HU-27.3/#322 (decisión D9). Antes el vehículo de la línea solo se escribía al crearla. Solo con la cotización en Borrador.
+Solo con la cotización en Borrador. El selector de la Mesa debe ofrecer los códigos de `GET /api/catalogos/vehiculos-nexo`.
 
 - **Roles**: `AdminTarifas`, `Admin`.
 
@@ -1867,35 +1845,34 @@ S6-HU-27.3/#322 (decisión D9). Antes el vehículo de la línea solo se escribí
 - **Errores**: `400 VEHICULO_REQUERIDO` (ninguno de los dos, o los dos) · `400 VEHICULO_NO_RECONOCIDO` · `404 COTIZACION_NO_ENCONTRADA` · `404 LINEA_NO_ENCONTRADA` · `404 VEHICULO_NO_ENCONTRADO` · `409 COTIZACION_NO_EDITABLE` · `409 LINEA_RECHAZADA` · `409 VEHICULO_NO_OFICIAL`
 
 #### `POST /api/cotizaciones/{id}/conexos` — agregar servicios conexos
-S5-HU-20.1/#286 (HU-B23): se admite mientras la cotización **no tenga resultado**
+Se admite mientras la cotización **no tenga resultado**
 (`resultado == "SinDefinir"`), o sea `Borrador` **o `Entregada`** — un servicio omitido se
 descubre justo después de entregar. `Ganada`/`Perdida` → `409 COTIZACION_CERRADA`.
 Sobre una cotización `Entregada` deja `modificadaTrasEntregaAt` (sin tocar `estado` ni
 `entregadaAt`) y, si quien lo hace **no** es quien creó la solicitud, le llega un correo
-"Cotización actualizada" (ver [README §5.5](docs/contrato-integracion/README.md)). Sobre un
+"Cotización actualizada" (ver [README §8](docs/contrato-integracion/README.md#8-cambiar-los-servicios-conexos-de-una-cotización-entregada)). Sobre un
 `Borrador`, o si el actor es el mismo creador, no se envía nada.
 
-- **Roles**: `Comercial`, `AdminTarifas`, `Admin`. (S5-HU-20.1: se agregó `AdminTarifas`.)
+- **Roles**: `Comercial`, `AdminTarifas`, `Admin`.
 - **Body**: `{ items: [...] }` **requerido**, mínimo 1.
 
 | Cada item | | Tipo | Restricción |
 |---|---|---|---|
-| `lineaId` | **requerido** | UUID | id de la línea DE LA COTIZACIÓN (no de la solicitud) a la que aplica — S4-HU-15.4/#250, ya no existe el conexo "general" sin línea |
+| `lineaId` | **requerido** | UUID | id de la línea DE LA COTIZACIÓN (no de la solicitud) a la que aplica; no existe un conexo "general" sin línea |
 | `servicioConexoId` | **requerido** | UUID | servicio existente y activo |
 | `cantidad` | *opcional* | decimal | 0.01–999999.99, máx. 2 decimales, def. 1 |
 | `valorAplicado` | *opcional* | decimal | monetario. Es el **costo** del conexo; si falta: `costoUnitario × cantidad`. **No cambia lo que se cotiza** |
-| `origen` | *opcional* | string | S5-HU-18/#262. `individual` (def.) \| `general` — si el usuario pidió agregarlo a TODAS las líneas de una vez (igual manda un item por línea) |
+| `origen` | *opcional* | string | `individual` (def.) \| `general` — si el usuario pidió agregarlo a TODAS las líneas de una vez (igual manda un item por línea) |
 
-- **Lo que se cotiza** (S6-HU-38.2/#408): el conexo guarda `precioVentaUnitario` = `precioVenta` del servicio o, si no tiene, su `costoUnitario`; `valorVenta = precioVentaUnitario × cantidad` y `total` suma el `valorVenta`. El precio
+- **Lo que se cotiza**: el conexo guarda `precioVentaUnitario` = `precioVenta` del servicio o, si no tiene, su `costoUnitario`; `valorVenta = precioVentaUnitario × cantidad` y `total` suma el `valorVenta`. El precio
   queda **fijo**: si después cambia la biblioteca, el conexo no cambia. El valor de venta **no se escribe a mano**: sale siempre de la biblioteca.
 - **→** `200 CotizacionDto`
 - **Errores**: `400 SERVICIO_INVALIDO` · `400 SERVICIO_INACTIVO` · `400 LINEA_INVALIDA` · `400 CANTIDAD_INVALIDA` · `400 ORIGEN_INVALIDO` · `404 COTIZACION_NO_ENCONTRADA` · `409 COTIZACION_CERRADA`
 
 #### `PATCH /api/cotizaciones/{id}/conexos/{conexoId}` — corregir un conexo
-S5-HU-18/#262: antes solo existía el POST (siempre crea una fila nueva); un error
-de cantidad no se podía deshacer, solo compensar agregando otra fila.
+Corrige la cantidad (o el costo) de un conexo ya agregado, sobre la misma fila (el POST siempre crea una fila nueva).
 
-- **Roles**: `Comercial`, `Admin`. Solo en cotización `Borrador` (S5-HU-20.1 no extendió este endpoint a `Entregada`: solo agregar y quitar).
+- **Roles**: `Comercial`, `Admin`. Solo en cotización `Borrador` (con la cotización `Entregada` solo se puede agregar y quitar).
 
 | Body | | Tipo | Restricción |
 |---|---|---|---|
@@ -1908,25 +1885,25 @@ Al cambiar la cantidad, `valorVenta` se recalcula con el `precioVentaUnitario` q
 - **Errores**: `400 CANTIDAD_INVALIDA` · `400 VALOR_REQUERIDO` (sin servicio para recalcular y sin `valorAplicado`) · `404 COTIZACION_NO_ENCONTRADA` · `404 CONEXO_NO_ENCONTRADO` · `409 COTIZACION_NO_EDITABLE`
 
 #### `DELETE /api/cotizaciones/{id}/conexos/{conexoId}` — quitar un conexo
-S5-HU-18/#262. S5-HU-20.1/#286 (HU-B24): igual que agregar, se admite mientras la cotización
+Igual que agregar, se admite mientras la cotización
 no tenga resultado (`Borrador` o `Entregada`); `Ganada`/`Perdida` → `409 COTIZACION_CERRADA`.
 Tras la entrega deja `modificadaTrasEntregaAt` y avisa al creador de la solicitud si el
 actor es otra persona.
 
-- **Roles**: `Comercial`, `AdminTarifas`, `Admin`. (S5-HU-20.1: se agregó `AdminTarifas`.)
+- **Roles**: `Comercial`, `AdminTarifas`, `Admin`.
 - **→** `200 CotizacionDto` (el conexo ya no aparece en `conexos`, `total` recalculado)
 - **Errores**: `404 COTIZACION_NO_ENCONTRADA` · `404 CONEXO_NO_ENCONTRADO` (inexistente o de otra cotización) · `409 COTIZACION_CERRADA`
 
 #### `POST /api/cotizaciones/{id}/entregar`
 Marca la entrega y envía la cotización por correo al comercial responsable
 (el correo es asíncrono, ver
-[README §5.3](docs/contrato-integracion/README.md#53-entregar-una-cotización-ya-no-espera-al-correo)).
+[README §7](docs/contrato-integracion/README.md#7-entregar-una-cotización)).
 
 - **Roles**: `AdminTarifas`, `Admin`. (`Comercial` **no**.)
 - **Body**: `multipart/form-data`, campo `formato` *opcional* (PDF, máx. 10 MB).
   Se puede enviar la petición sin cuerpo.
-- S5-HU-19.3/#283: no se entrega mientras queden líneas del pliego `PorCostear` —
-  todas deben estar `AutoResuelta`, `Revisada` o `Rechazada` (S6-HU-24.3/#320: una
+- No se entrega mientras queden líneas del pliego `PorCostear`:
+  todas deben estar `AutoResuelta`, `Revisada` o `Rechazada` (una
   línea rechazada con motivo cuenta como resuelta). `COTIZACION_SIN_FLETE` sigue
   cubriendo el caso de cero líneas en la cotización, **salvo** que alguna esté rechazada:
   con todas las líneas rechazadas sí se entrega (la cotización queda en $0 y el correo
@@ -1936,11 +1913,12 @@ Marca la entrega y envía la cotización por correo al comercial responsable
 
 #### `POST /api/cotizaciones/{id}/resultado` — ganada/perdida
 Si `resultado = "ganada"`, realimenta la biblioteca de Tarifas Ganadas.
-**Siempre hay que entregar primero** (`/entregar`).
+**Hay que entregar primero** (`/entregar`); la única excepción es una cotización autocosteada (`esAutoCosteo = true`),
+que se puede marcar desde `Borrador` porque nadie la entrega a mano (en ese caso no sale correo ni PDF). Marcar otra vez el
+mismo resultado no repite efectos; cambiar de `Ganada` a `Perdida` (o al revés) responde `409 RESULTADO_YA_DEFINIDO`.
 
-- **Roles**: `Comercial`, `Admin` (#213 — decidir si una cotización se ganó
-  o se perdió es criterio del Comercial dueño del negocio; ni AdminTarifas
-  ni AdminBiblioteca tienen este permiso).
+- **Roles**: `Comercial`, `Admin` (decidir si una cotización se ganó o se perdió es criterio del Comercial dueño del
+  negocio; ni AdminTarifas ni AdminBiblioteca tienen este permiso). El front solo muestra el botón al `Admin`.
 
 | Body | | Tipo | Restricción |
 |---|---|---|---|
@@ -1952,8 +1930,8 @@ Si `resultado = "ganada"`, realimenta la biblioteca de Tarifas Ganadas.
 - **Errores**: `400 RESULTADO_INVALIDO` · `404 COTIZACION_NO_ENCONTRADA` · `409 COTIZACION_NO_ENTREGADA` · `409 RESULTADO_YA_DEFINIDO` · `409 SOLICITUD_NO_TRANSICIONABLE`
 
 #### `GET /api/cotizaciones/{id}/exportar-excel`
-- **Roles**: `Comercial`, `AdminTarifas`, `ServiciosLogisticos`, `LiderProceso`, `Admin` (`AdminBiblioteca` no entra: #307).
-- S6-HU-24.3/#320: las líneas rechazadas salen en la hoja con su ruta y la palabra «Sin costeo» en vez del precio (sin precio y **sin el motivo**), y no suman al total.
+- **Roles**: `Comercial`, `AdminTarifas`, `ServiciosLogisticos`, `LiderProceso`, `Admin` (`AdminBiblioteca` no entra).
+- Las líneas rechazadas salen en la hoja con su ruta y la palabra «Sin costeo» en vez del precio (sin precio y **sin el motivo**), y no suman al total.
 - Columnas de los fletes: `Ruta`, `Tipología`, `Flete` y `Vehículo` (el de la línea; «—» si no tiene).
 - **→** `200` binario `.xlsx` con `Content-Disposition: attachment`.
 - **Errores**: `404 COTIZACION_NO_ENCONTRADA`
@@ -1983,7 +1961,7 @@ Si `resultado = "ganada"`, realimenta la biblioteca de Tarifas Ganadas.
 ### 3.6 Biblioteca histórico SAP (solo lectura) — `/api/biblioteca-sap-historico`
 
 #### `GET /api/biblioteca-sap-historico`
-- **Roles**: Todos. Rate limit estándar. **Pagina (S6-HU-29.2/#312)**: `page` desde 1 y `top` como tamaño de página; `total` es el total
+- **Roles**: Todos. Rate limit estándar. **Pagina**: `page` desde 1 y `top` como tamaño de página; `total` es el total
   **sin paginar** y el orden es estable (vigencia, fecha de creación e id, todos descendentes), así que `page=2` devuelve filas
   distintas a `page=1`. Sin `page` responde la primera página, como siempre.
 
@@ -1994,7 +1972,7 @@ Si `resultado = "ganada"`, realimenta la biblioteca de Tarifas Ganadas.
 | `tipoVehiculo`, `tipoCarroseria` | *opcional* | string | código SAP (de `/filtros`) |
 | `claseViaje` | *opcional* | **int** | código numérico (de `/filtros`) |
 | `top` | *opcional* | int | 1–500, def. 50 (tamaño de página). **El tamaño efectivo máximo es 200**: un `top` mayor se reduce a 200 (igual que en `biblioteca-sap-plaza`); calcular las páginas con ese tope |
-| `page` | *opcional* | int | ≥ 1, def. 1 (#312) |
+| `page` | *opcional* | int | ≥ 1, def. 1 |
 
 - **→** `200 SapHistoricoResultDto`
 
@@ -2012,7 +1990,7 @@ Si `resultado = "ganada"`, realimenta la biblioteca de Tarifas Ganadas.
 - **Roles**: Todos. **→** `200 SapHistoricoFiltrosDto`
 
 #### Ajuste local de vigencia (no toca SAP)
-**Roles de los tres**: `AdminTarifas`, `AdminBiblioteca`, `Admin`. (#307: se agregó `AdminBiblioteca`.)
+**Roles de los tres**: `AdminTarifas`, `AdminBiblioteca`, `Admin`.
 
 ##### `PATCH /api/biblioteca-sap-plaza/{tarifaId}/vigencia`
 `tarifaId` es **entero**.
@@ -2048,7 +2026,7 @@ Quita el ajuste; la tarifa vuelve a regirse por la vigencia de SAP.
 
 ### 3.8 Reglas Solo-SICETAC — `/api/reglas-solo-sicetac`
 
-**Todo el controller**: `AdminTarifas`, `AdminBiblioteca`, `Admin` (#307: se agregó `AdminBiblioteca`).
+**Todo el controller**: `AdminTarifas`, `AdminBiblioteca`, `Admin`.
 
 #### `GET /api/reglas-solo-sicetac`
 - Rate limit estándar. **→** `200 ReglaSoloSicetacDto[]`
@@ -2079,9 +2057,9 @@ Columnas: Origen, Destino, Tipo de vehículo.
 - **Body**: `multipart/form-data`, campo `archivo` **requerido** (§1.9).
 - **→** `200 ImportarReglasResultDto`
 - **Errores**: `400 ARCHIVO_REQUERIDO` · `400 FORMATO_NO_SOPORTADO` · `400 EXCEL_INVALIDO` · `400 EXCEL_SIN_DATOS`
-- S5-HU-22.1/#288: una regla que **ya existe** se cuenta como `duplicadas` aunque su código de
-  vehículo no esté en el catálogo de SAP (hay reglas con `3S2`/`2L3`, que SAP no trae). Antes
-  se contaban como `invalidas`. El catálogo solo se exige a las reglas que se van a crear.
+- Una regla que **ya existe** se cuenta como `duplicadas` aunque su código de
+  vehículo no esté en el catálogo de SAP (hay reglas con `3S2`/`2L3`, que SAP no trae).
+  El catálogo solo se exige a las reglas que se van a crear.
 
 #### `GET /api/reglas-solo-sicetac/plantilla-excel`
 Plantilla de Excel vacía para la carga masiva, con las 3 columnas de `importar-excel` (`ORIGEN`, `DESTINO`, `TIPO VEHICULO`).
@@ -2089,7 +2067,7 @@ Plantilla de Excel vacía para la carga masiva, con las 3 columnas de `importar-
 - **→** `200`, archivo `.xlsx`
 
 #### `GET /api/reglas-solo-sicetac/exportar-excel`
-S5-HU-22.1/#288. Descarga las reglas ya cargadas, con las **mismas 3 columnas que acepta
+Descarga las reglas ya cargadas, con las **mismas 3 columnas que acepta
 `importar-excel`** (`ORIGEN`, `DESTINO`, `TIPO VEHICULO`) y los valores tal como están
 guardados (código DANE como **texto**, para no perder el cero inicial de `05001000`). El
 archivo se puede editar y reimportar: las reglas que ya existen se reportan como `duplicadas`
@@ -2099,9 +2077,8 @@ archivo se puede editar y reimportar: las reglas que ya existen se reportan como
 
 ### 3.9 Servicios conexos — `/api/servicios-conexos`
 
-> Reestructurado en S4-HU-15.1/#223: tarifas variables por ciudad/ruta/puerto en vez de
-> un valor único genérico — reemplaza por completo el `nombre`/`reglaCobro`/`valorBase`/
-> `vigenteHasta` que documentaba esta sección antes (esa forma ya no existe en el código).
+> Cada servicio tiene tarifas variables por ciudad, ruta, puerto o tipo de máquina (las seis dimensiones de abajo), no un
+> valor único genérico.
 
 #### `GET /api/servicios-conexos`
 - **Roles**: Todos.
@@ -2150,10 +2127,10 @@ importa el orden ni si falta alguna columna opcional). Hace **upsert** por las 6
 dimensiones (código, origen, destino, puerto, ruta, tipo de máquina): una fila cuya
 combinación ya existe ACTUALIZA ese servicio en vez de crear uno nuevo — así el mismo
 archivo sirve para exportar, editar y recargar. La comparación de esa llave ignora
-mayúsculas y la forma Unicode de composición de tildes (S5-HU-19/#261); sigue
+mayúsculas y la forma Unicode de composición de tildes; sigue
 distinguiendo acentos (`café` ≠ `cafe`).
 
-**Precio de venta** (S6-HU-38.2/#408): una columna cuyo encabezado contiene «VENTA» (`PRECIO VENTA`, `VALOR VENTA`) es el precio de venta y **no** se toma como costo, aunque diga «VALOR». Un archivo sin esa
+**Precio de venta**: una columna cuyo encabezado contiene «VENTA» (`PRECIO VENTA`, `VALOR VENTA`) es el precio de venta y **no** se toma como costo, aunque diga «VALOR». Un archivo sin esa
 columna, o con la celda vacía, **no borra** el precio de venta que ya tenga el servicio (para borrarlo se usa el PATCH). Un precio ilegible, negativo o de más de 16 dígitos enteros invalida solo esa fila.
 
 Una fila inválida (campo obligatorio vacío, texto que excede el máximo de su columna,
@@ -2164,11 +2141,11 @@ de las filas se sigue procesando.
 - **Roles**: `ServiciosLogisticos`, `AdminTarifas`, `Admin`.
 - **Body**: `multipart/form-data`, campo `archivo` **requerido** (§1.9).
 - **→** `200 ImportarServiciosResultDto`
-- **Errores**: `400 ARCHIVO_REQUERIDO` · `400 FORMATO_NO_SOPORTADO` · `400 EXCEL_INVALIDO` · `400 EXCEL_SIN_DATOS` · `400 SERVICIO_DUPLICADO` (choque residual contra la base, no detectado en memoria — caso raro, ver nota de #261 abajo)
+- **Errores**: `400 ARCHIVO_REQUERIDO` · `400 FORMATO_NO_SOPORTADO` · `400 EXCEL_INVALIDO` · `400 EXCEL_SIN_DATOS` · `400 SERVICIO_DUPLICADO` (choque residual contra la base, no detectado en memoria; caso raro)
 
 #### `GET /api/servicios-conexos/exportar-excel`
 Descarga el catálogo a Excel con las mismas 13 columnas (incluye `PRECIO VENTA`, justo después de `COSTO UNITARIO`) que lee el importador — el mismo
-archivo sirve para editar y reimportar como actualización. S5-HU-19/#261: admite los
+archivo sirve para editar y reimportar como actualización. Admite los
 mismos filtros que el listado.
 
 - **Roles**: Todos.
@@ -2182,7 +2159,7 @@ mismos filtros que el listado.
 
 #### `GET /api/servicios-conexos/plantilla-excel/{tipo}`
 Plantilla de Excel descargable por tipo de servicio — cada una trae SOLO las columnas
-que ese tipo necesita (S5-HU-19/#261, corrige #249: antes las 4 traían las mismas 12); todas incluyen `PRECIO VENTA` después de `COSTO UNITARIO`.
+que ese tipo necesita; todas incluyen `PRECIO VENTA` después de `COSTO UNITARIO`.
 Sin fila de datos de ejemplo cargable: la fila 2 solo pre-llena las columnas
 verdaderamente fijas de ese tipo (p. ej. `unidad`/`categoria`); subida sin editar, no
 crea ningún registro.
@@ -2214,34 +2191,17 @@ crea ningún registro.
 | Búsqueda | viene `q`, `mercancia`, `vigencia` u `origen` (y no `ruta`/`vehiculo`) | `200 Pagina<BibliotecaItemDto>` |
 | Recientes | sin filtros | `200 BibliotecaItemDto[]` |
 
-### 3.11 Tarifas SICE-TAC (caché local) — `/api/tarifas-sicetac`
+### 3.11 Tarifas SICE-TAC (retirada) — `/api/tarifas-sicetac`
 
-> **⚠️ Retirado (#179).** Esta sección se conserva solo como historia: **ninguna de estas rutas existe hoy** (la caché local de SICE-TAC se
-> reemplazó por la lectura directa de DWSice; ver §3.5 `/api/biblioteca-sicetac`). Llamarlas devuelve `404`.
-
-#### `GET /api/tarifas-sicetac`
-- **Roles**: Todos.
-- **Query**, todos *opcionales*: `origen`, `destino`, `config`, `tipoCarga`,
-  `unidad`, `condicion` (string) y `periodo` (int).
-- **→** `200 TarifaSicetacDto[]`
-
-#### `POST /api/tarifas-sicetac/importar`
-Upsert idempotente del Excel SICE-TAC.
-
-- **Roles**: **retirado en #179: este endpoint ya no existe** (la caché local SICE-TAC se reemplazó por la lectura directa de DWSice).
-- **Body**: `multipart/form-data`, campo `archivo` **requerido** (§1.9).
-- **→** `200 ImportResumenDto`
-- **Errores**: `400 ARCHIVO_REQUERIDO` · `400 FORMATO_NO_SOPORTADO` · `400 EXCEL_INVALIDO` · `400 EXCEL_VACIO` · `400 EXCEL_COLUMNAS`
-
-#### `GET /api/tarifas-sicetac/importaciones`
-- **Roles**: Todos. **→** `200 ImportacionDto[]`
+La caché local de SICE-TAC ya no existe: ninguna ruta de `/api/tarifas-sicetac` está en el código (responden `404`). SICE-TAC se
+consulta en vivo desde DWSice con `GET /api/biblioteca-sicetac` (§3.5). El número de sección se conserva para no mover los demás.
 
 ### 3.12 Métricas — `/api/metricas`
 
 **Todo el controller**: `LiderProceso`, `AdminTarifas`, `Admin`.
 
 #### `GET /api/metricas/cumplimiento`
-Tarjetas de la cola y Cumplimiento SLA. S5-HU-21.1/#287: un **solo filtro `desde`/`hasta`**,
+Tarjetas de la cola y Cumplimiento SLA. Un **solo filtro `desde`/`hasta`**,
 compartido con `kpis-piloto`.
 
 | Query | | Tipo | Restricción |
@@ -2262,7 +2222,7 @@ Qué filtra cada cosa:
 - **Licitaciones** (`licitacionesTotal`, `licitacionesPerdidas`, `porcentajeLicitacionesPerdidas`)
   → **sin filtro** (el Tablero ni siquiera las muestra).
 
-Sin `desde`/`hasta` el resultado es idéntico al de antes (acumulado histórico). La respuesta
+Sin `desde`/`hasta` el resultado es el acumulado histórico. La respuesta
 repite el filtro en `desde`/`hasta`.
 
 - **→** `200 CumplimientoDto`
@@ -2274,9 +2234,9 @@ cotizaciones emitidas y líneas con flete manual.
 | Query | | Tipo | Restricción |
 |---|---|---|---|
 | `desde`, `hasta` | *opcional* | fecha ISO | sin filtro, corre sobre todo el histórico. Filtran las sagas por `SolicitadoEn` |
-| `tamano` | *opcional* | string | S5-HU-21.1/#287. `1-10` \| `11-100` \| `+100`, por total de líneas del pliego. Sin él, todos. Un `+` sin codificar llega como espacio y se acepta igual (`%2B100` es lo correcto) |
+| `tamano` | *opcional* | string | `1-10` \| `11-100` \| `+100`, por total de líneas del pliego. Sin él, todos. Un `+` sin codificar llega como espacio y se acepta igual (`%2B100` es lo correcto) |
 
-**Tiempo de costeo (S5-HU-21.1/#287)** — `pliegosResueltos`, `tiempoPromedioResolucionMinutos`,
+**Tiempo de costeo** — `pliegosResueltos`, `tiempoPromedioResolucionMinutos`,
 `tiempoMedianoResolucionMinutos`, `pliegosBajo10Minutos`, `porcentajePliegosBajo10Minutos`
 (≤ 10 min). Mide el ciclo **completo**, no cuánto tardó el robot en revisar todo:
 
@@ -2287,8 +2247,8 @@ cotizaciones emitidas y líneas con flete manual.
 - El tiempo **no** es proporcional al número de líneas (se procesan en paralelo): por eso se
   corta por tamaño en vez de dividir por línea. El tramo `1-10` coincide con el umbral de
   costeo síncrono (`UmbralCosteoDiferido = 10`).
-- Desde S5-HU-19.3 (`409 COTIZACION_CON_LINEAS_PENDIENTES`) `EntregadaAt` significa pliego completo. Las entregas anteriores a ese cambio
-  pudieron salir con líneas pendientes y subestimar el tiempo.
+- Como `entregar` exige que no queden líneas pendientes (`409 COTIZACION_CON_LINEAS_PENDIENTES`), `EntregadaAt` significa pliego completo.
+  Las entregas anteriores a esa regla pudieron salir con líneas pendientes y subestimar el tiempo.
 - `tamano` solo recorta el tiempo de costeo; las otras tarjetas del endpoint no cambian.
 
 - **→** `200 KpisPilotoDto`
@@ -2298,7 +2258,7 @@ cotizaciones emitidas y líneas con flete manual.
 
 **Todo el controller**: solo `Admin`. Cambiar esto reordena la bandeja de todo
 el mundo (ver
-[README §5.1](docs/contrato-integracion/README.md#51-recalibrar-la-priorización)).
+[README §6](docs/contrato-integracion/README.md#6-recalibrar-la-priorización)).
 
 #### `GET /api/priorizacion/parametros`
 - **→** `200 ParametrosScoreDto`
@@ -2316,19 +2276,16 @@ el mundo (ver
 
 ### 3.14 Cubicación — `/api/cubicacion`
 
-S5-HU-18.1/#273: consume el contrato nuevo del Cubicador
-(`POST/GET /recomendaciones`, cubicador/CONTRATO.md §3.1) — reemplaza por
-completo al viejo `POST /api/cubicacion` (cálculo sin persistencia, matrices
-por unidad). **No hay convivencia de los dos contratos**: el Cubicador retiró
-su `POST /api/cubicacion` en el mismo corte. Es la única llamada HTTP síncrona
-de NEXO hacia el Cubicador — ver `ICubicacionRapidaPort` para el porqué.
+Consume el contrato de recomendaciones del Cubicador (`POST/GET /recomendaciones`,
+cubicador/CONTRATO.md §3.1). Junto con la explicación y los catálogos (§3.14.1), es
+una de las llamadas HTTP síncronas de NEXO hacia el Cubicador; los planes de cargue
+(§3.15) van por cola.
 
 #### `POST /api/cubicacion` — crear recomendación
-Pide al Cubicador una recomendación de flota para una línea. A diferencia del
-contrato viejo, **SÍ persiste** del lado del Cubicador (append-only: cada
+Pide al Cubicador una recomendación de flota para una línea. **Persiste** del lado del Cubicador (append-only: cada
 corrida queda guardada, reconsultable con el GET de abajo).
 
-- **Roles**: `Comercial`, `AdminBiblioteca`, `AdminTarifas`, `Admin` (#300 agregó `AdminTarifas`; #307: `AdminBiblioteca` conserva este permiso).
+- **Roles**: `Comercial`, `AdminBiblioteca`, `AdminTarifas`, `Admin` (el front no le muestra el Cubicador a `AdminBiblioteca`, pero el backend se lo permite).
 - `usuarioId` del contrato del Cubicador lo pone NEXO automáticamente (el id
   del usuario autenticado) — no es un campo del body.
 
@@ -2340,7 +2297,7 @@ corrida queda guardada, reconsultable con el GET de abajo).
 
 | Cada mercancía | | Tipo | Restricción |
 |---|---|---|---|
-| `codigoMercancia` | **requerido** | string | el `codigoMercancia` (NO el id) de `GET /tipos-mercancia` del Cubicador. S5-HU-17.7: antes era `idTipoMercancia`. Se acepta en cualquier caja |
+| `codigoMercancia` | **requerido** | string | el `codigoMercancia` (NO el id) de `GET /tipos-mercancia` del Cubicador. Se acepta en mayúsculas o minúsculas |
 | `cantidad` | **requerido** | int | ≥ 1 |
 | `largoCm`, `anchoCm`, `altoCm`, `pesoKg` | **requerido** | decimal | > 0, por unidad |
 
@@ -2353,13 +2310,12 @@ corrida queda guardada, reconsultable con el GET de abajo).
   `503 CUBICACION_RAPIDA_NO_CONFIGURADA` · `503 CUBICADOR_NO_DISPONIBLE` ·
   `503 CUBICADOR_RESPUESTA_VACIA` · `503 CUBICADOR_CREDENCIAL_INVALIDA` ·
   `503 CUBICADOR_ERROR`. Los códigos 400 son los que manda el Cubicador tal
-  cual (catálogo existente, sección 2.6 de su hoja de ruta) — NEXO no los
-  reemplaza por uno propio.
+  cual (ver cubicador/CONTRATO.md) — NEXO no los reemplaza por uno propio.
 
 #### `GET /api/cubicacion` — reconsultar
 La última recomendación de una línea.
 
-- **Roles**: `Comercial`, `AdminBiblioteca`, `AdminTarifas`, `Admin` (#300, #307).
+- **Roles**: `Comercial`, `AdminBiblioteca`, `AdminTarifas`, `Admin`.
 
 | Query | | Tipo | Restricción |
 |---|---|---|---|
@@ -2367,12 +2323,11 @@ La última recomendación de una línea.
 | `origenSistema` | **requerido** | string | `NEXO` \| `COTIFLY`. NO se infiere — un mismo código de línea puede existir en los dos sistemas, como rutas distintas |
 
 - **→** `200 RecomendacionDto`
-- **Errores**: `400 PARAMETROS_REQUERIDOS` · **`404 RECOMENDACION_NO_ENCONTRADA`** (S6-HU-29.2/#312: el Cubicador no tiene una
-  recomendación para esa línea; antes salía como `503 CUBICADOR_ERROR` y el front no podía distinguir "todavía no hay" de una caída) ·
-  mismos 503 que el POST. El `503` queda solo para fallas reales del Cubicador.
+- **Errores**: `400 PARAMETROS_REQUERIDOS` · **`404 RECOMENDACION_NO_ENCONTRADA`** (el Cubicador no tiene una
+  recomendación para esa línea: "todavía no hay", no es una caída) · mismos 503 que el POST. El `503` queda solo para fallas reales del Cubicador.
 
 #### `GET /api/cubicacion/explicacion` — por qué se eligió esa flota
-S6-HU-35.6/#419: reenvía al Cubicador su `GET /recomendaciones/explicacion` (S6-HU-35.4/#369) con la llave de NEXO (`Cubicador3D:RecomendacionesApiKey`) y devuelve el texto en lenguaje
+Reenvía al Cubicador su `GET /recomendaciones/explicacion` con la llave de NEXO (`Cubicador3D:RecomendacionesApiKey`) y devuelve el texto en lenguaje
 natural que explica la recomendación. El portal **no** habla con el Cubicador: solo con esta ruta. **Se pide DESPUÉS de pintar los números** de la recomendación; el modelo tarda varios segundos.
 
 - **Roles**: los mismos que `GET /api/cubicacion` — `Comercial`, `AdminBiblioteca`, `AdminTarifas`, `Admin`.
@@ -2388,8 +2343,8 @@ natural que explica la recomendación. El portal **no** habla con el Cubicador: 
 - **Errores**: `400 PARAMETROS_REQUERIDOS` (falta `idLineaSolicitud` u `origenSistema`) · `401` · `403`.
 - **Tiempo de espera propio**: `Cubicador3D:ExplicacionTimeoutSegundos` (def. 30, entre 5 y 120), mayor que el de la recomendación (`Cubicador3D:OutboundTimeoutSegundos`, def. 15) porque el texto lo escribe un modelo.
 - **Por aquí no pasa ninguna tarifa ni valor comercial**: NEXO solo reenvía el texto que el Cubicador ya verificó contra las cifras del motor.
-- **Despliegue**: la ruta depende del endpoint del Cubicador (S6-HU-35.4). Puede desplegarse antes que el Cubicador (responde `explicacion: null` mientras no exista: el 404 del Cubicador se trata como «sin explicación»),
-  pero el texto solo aparece cuando el Cubicador con S6-HU-35.4 está desplegado y tiene configurada su llave del modelo.
+- **Despliegue**: la ruta depende del endpoint de explicación del Cubicador. Si ese endpoint no existe en el ambiente, responde `explicacion: null`
+  (el 404 del Cubicador se trata como «sin explicación»); el texto solo aparece cuando el Cubicador lo tiene desplegado y con su llave del modelo configurada.
 
 #### `GET /api/lineas-solicitud/{id}/cubicacion` — solo servicio a servicio
 - **Auth**: `Authorization: Bearer <clave de servicio>` (§1.2). No acepta la
@@ -2400,7 +2355,7 @@ natural que explica la recomendación. El portal **no** habla con el Cubicador: 
 
 ### 3.14.1 Passthrough de catálogo del Cubicador
 
-S5-HU-18.6/#278: seis controllers delgados que espejan los seis CRUD de
+Seis controllers delgados que espejan los seis CRUD de
 catálogo del Cubicador (cubicador/CONTRATO.md §3.2) y aplican el rol — el
 portal nunca llama directo al Cubicador (no hay CORS, la llave terminaría en
 el bundle, y ese Bearer autoriza un backend, no una persona). **No es un
@@ -2448,7 +2403,7 @@ usuario **autenticado**, nunca el que mande el cliente en el body.
 Todas las escrituras van por cola hacia el Cubicador y responden **202**. Todas
 las lecturas van contra la proyección local de NEXO; ninguna llama al Cubicador.
 
-- **Roles de escritura**: `Comercial`, `AdminTarifas`, `Admin` (#310: se agregó `AdminTarifas`; #307: `AdminBiblioteca` ya no está).
+- **Roles de escritura**: `Comercial`, `AdminTarifas`, `Admin`.
 - **Roles de lectura**: Todos.
 
 #### `POST /api/planes-cargue` — crear plan
@@ -2474,14 +2429,13 @@ Puente Mesa de Costeo → 3D: el Cubicador arma la flota a partir de las
 posiciones de la línea. Sin body. No pasa por la compuerta de paridad.
 
 - **→** `202 ComandoAceptadoDto` (`correlationId` = `lineaId`). Sondear con
-  `GET /api/planes-cargue/por-linea/{lineaId}/estado` (#304: dice si el Cubicador rechazó el pedido; la lista de
+  `GET /api/planes-cargue/por-linea/{lineaId}/estado` (dice si el Cubicador rechazó el pedido; la lista de
   `.../por-linea/{lineaId}` no puede decirlo). Volver a pedir el plan borra el rechazo del intento anterior.
-- **Errores**: `404 LINEA_SOLICITUD_NO_ENCONTRADA` · `400 PESO_NO_DECLARADO` (#304)
-- **`PESO_NO_DECLARADO` (#304)**: el puente del Cubicador ya no inventa 1 kg para una posición sin peso (el peso decide la
+- **Errores**: `404 LINEA_SOLICITUD_NO_ENCONTRADA` · `400 PESO_NO_DECLARADO`
+- **`PESO_NO_DECLARADO`**: el puente del Cubicador no inventa un peso para una posición sin peso (el peso decide la
   capacidad del vehículo). NEXO lo valida **antes de encolar**, con el mismo código y mensaje del Cubicador, y responde `400`
-  con las posiciones que faltan — sin publicar nada. El cero cuenta como no declarado. Antes ese rechazo nacía en el worker
-  después del `202` y solo quedaba en el log (el front sondeaba para siempre). Se alcanza solo con líneas capturadas antes
-  de #304 (la captura ya exige `pesoKg`) o creadas por otro camino.
+  con las posiciones que faltan, sin publicar nada. El cero cuenta como no declarado. Solo se alcanza con líneas capturadas
+  antes de que la captura exigiera `pesoKg` o creadas por otro camino.
 
 #### `POST /api/planes-cargue/{id}/optimizar`
 - **Body** *opcional* (se puede omitir entero):
@@ -2549,7 +2503,7 @@ Todos los campos *opcionales*: `x`, `y`, `z` (decimal), `orientacionIndice`
 | `GET /api/planes-cargue` | `page` (≥1, def. 1), `pageSize` (1–200, def. 50) | `200 Pagina<PlanCargueDto>` | — (rate limit estándar) |
 | `GET /api/planes-cargue/{id}` | — | `200 PlanCargueDto` | `404 PLAN_CARGUE_NO_ENCONTRADO` |
 | `GET /api/planes-cargue/por-linea/{lineaId}` | — | `200 PlanFlotaItemDto[]` (vacío mientras el Cubicador procesa; nunca 404). **No avisa un rechazo**: vacío es "procesando" o "rechazado" — usar `/estado` | — |
-| `GET /api/planes-cargue/por-linea/{lineaId}/estado` | — | `200 EstadoCubicacionLineaDto` (#304): `procesando` · `listo` · `rechazado` con `codigo`/`mensaje` del Cubicador; nunca 404 | — |
+| `GET /api/planes-cargue/por-linea/{lineaId}/estado` | — | `200 EstadoCubicacionLineaDto`: `procesando` · `listo` · `rechazado` con `codigo`/`mensaje` del Cubicador; nunca 404 | — |
 | `GET /api/planes-cargue/{id}/resultado` | — | `200 ResultadoPlanDto` (ítems, colocaciones, métricas, incidencias) | `404 PLAN_CARGUE_NO_ENCONTRADO` · `404 VEHICULO_NO_ENCONTRADO` |
 | `GET /api/planes-cargue/{id}/flota` | — | `200 PlanFlotaItemDto[]` | — |
 | `GET /api/planes-cargue/{id}/metricas` | — | `200 MetricasCubicacion` o `200 null` si nunca se optimizó | `404 PLAN_CARGUE_NO_ENCONTRADO` |
@@ -2568,7 +2522,7 @@ el primer vehículo de una flota multi-vehículo.
 - **→** `200 Pagina<VehiculoCubicacionDto>`
 
 #### `POST /api/vehiculos` — alta/edición (por cola)
-- **Roles**: `Comercial`, `AdminTarifas`, `Admin` (#310 agregó `AdminTarifas`; #307 quitó `AdminBiblioteca`). `DELETE` sigue solo para `Admin`.
+- **Roles**: `Comercial`, `AdminTarifas`, `Admin`. `DELETE` es solo para `Admin`.
 
 | Body | | Tipo | Restricción |
 |---|---|---|---|
@@ -2607,29 +2561,28 @@ Cubicador rechaza el vehículo. Envíalas siempre.
 
 ### 3.19 Catálogos — `/api/catalogos`
 
-Catálogos oficiales de solo lectura (S4-HU-09/S4-HU-10) para los desplegables
+Catálogos oficiales de solo lectura para los desplegables
 de Reglas Solo-SICETAC y Tarifas de Plaza — reemplazan el texto libre.
 **Los catálogos de solo lectura**: los 6 roles (solo requiere sesión válida). Los alias y la bandeja de vehículos están más abajo.
 
 | Endpoint | Fuente | → |
 |---|---|---|
-| `GET /api/catalogos/tipos-vehiculo` | `tblSAPTiposVehiculoTarifario`, tal cual (S5-HU-22.1/#288: se eliminaron los 5 casos especiales; `[]` si dbSolucionesTI no está disponible; faltan 3S2 y 2L3, decisión de negocio) | `200 TipoVehiculoDto[]` |
+| `GET /api/catalogos/tipos-vehiculo` | `tblSAPTiposVehiculoTarifario`, tal cual (`[]` si dbSolucionesTI no está disponible; no trae 3S2 ni 2L3, que SAP no tiene: para esos códigos está `vehiculos-nexo`) | `200 TipoVehiculoDto[]` |
 | `GET /api/catalogos/vehiculos-nexo` | `tbl_mapeo_vehiculo_tarifario` (activos): los **códigos de NEXO**, con 2L3, 3S2, 2S3, 2_5, 2_7, 2L1… que SAP no tiene. Es el que debe usar el selector «Cambiar vehículo» de la Mesa | `200 VehiculoNexoDto[]` = `{ codigo, descripcion, enSap }` (`enSap`: el código también está en `tipos-vehiculo`; `descripcion` es el nombre en SICE-TAC) |
 | `GET /api/catalogos/lineas-negocio` | `tblSAPLineaNegocio` | `200 LineaNegocioDto[]` |
 | `GET /api/catalogos/clases-viaje` | `tblSAPClaseViaje` | `200 ClaseViajeDto[]` |
 | `GET /api/catalogos/clases-contenedor` | `tblSAPClaseContenedor` | `200 ClaseContenedorDto[]` |
 | `GET /api/catalogos/municipios` | Catálogo propio de municipios (`tbl_municipios`) | `200 MunicipioDto[]` |
 
-`GET /api/catalogos/municipios` (S4-HU-10.2/#242): resuelve `origenMunicipioId`/
+`GET /api/catalogos/municipios` resuelve `origenMunicipioId`/
 `destinoMunicipioId` para el formulario de Tarifas de Plaza (§3.21) — es el
 mismo id que trae `TarifaPlazaDto.origenMunicipioId`/`destinoMunicipioId`.
 ~3.800 filas sin paginar ni filtrar: se carga una sola vez y queda en
 memoria del front, no se consulta en cada tecleo. Mismo catálogo que
-`GET /api/captura-solicitudes/municipios` (§3.3), expuesto acá también
-porque ese otro controller es solo `Comercial`/`Admin` y `AdminTarifas`
-también lo necesita.
+`GET /api/captura-solicitudes/municipios` (§3.3); los dos están abiertos a
+los 6 roles.
 
-#### Diccionario de alias — S6-HU-27.2/#321
+#### Diccionario de alias
 
 Una sola tabla (`tbl_alias_elementos`) para dos catálogos, distinguidos por `tipoElemento`: `Vehiculo` (código = `2L2`, `C2`, `C3`, `2S2`, `3S3`…) y
 `Contenedor` (código = `CNT40.HC`, `CNT20.ST`…). Un alias es un texto libre que la gente escribe (`TB`, `T.B`, `Turbo`, `40HC`) y su código oficial. El texto
@@ -2652,9 +2605,9 @@ interface ResolverAliasDto { texto: string; tipoElemento: string; reconocido: bo
   para ese tipo o del catálogo (`tblSAPTiposVehiculoTarifario` para vehículos; las clases de contenedor de SAP). **Errores**: `400 CODIGO_NO_RECONOCIDO` ·
   `400 ALIAS_REQUERIDO` · `400 TIPO_ALIAS_INVALIDO` · `409 ALIAS_DUPLICADO` (el texto normalizado ya existe, en cualquier tipo).
 - En la captura: el `tipoVehiculo` resuelve por alias (el código es lo que se guarda y la fila nace **oficial**); la `carroceria` no pasa por el diccionario;
-  la clase de contenedor resuelve por alias y, si no, como antes (código real de SAP dentro del texto, o texto libre ≤ 20). Un vehículo desconocido sigue yendo a cuarentena.
+  la clase de contenedor resuelve por alias y, si no, por el código real de SAP dentro del texto o como texto libre (≤ 20). Un vehículo desconocido sigue yendo a cuarentena.
 
-#### Bandeja de normalización de vehículos — S6-HU-27.3/#322
+#### Bandeja de normalización de vehículos
 
 Las configuraciones de vehículo que la captura creó en **cuarentena** (`EsCatalogoOficial = false`) porque nadie sabía a qué código corresponden. Un humano las
 **mapea** a un código (queda un alias, así el mismo texto no vuelve a caer en cuarentena) o las **descarta**. Ambas salen de la lista; ninguna borra la fila
@@ -2668,7 +2621,7 @@ Las configuraciones de vehículo que la captura creó en **cuarentena** (`EsCata
 
 - `mapear` crea el alias del **tipo de vehículo** de la fila (la carrocería no entra). Si ese texto ya apuntaba al mismo código no crea otro (`aliasCreado: false`).
   **Errores**: `400 CODIGO_NO_RECONOCIDO` · `404 VEHICULO_NO_ENCONTRADO` · `409 VEHICULO_NO_ESTA_EN_CUARENTENA` (ya es oficial) · `409 VEHICULO_YA_DESCARTADO` · `409 ALIAS_DUPLICADO` (el texto ya apunta a otro código).
-- `descartar` marca `Descartada = true` (columna nueva de `tbl_configuraciones_vehiculo`). **Errores**: `404 VEHICULO_NO_ENCONTRADO` · `409 VEHICULO_NO_ESTA_EN_CUARENTENA` · `409 VEHICULO_YA_DESCARTADO`.
+- `descartar` marca `Descartada = true` en `tbl_configuraciones_vehiculo`. **Errores**: `404 VEHICULO_NO_ENCONTRADO` · `409 VEHICULO_NO_ESTA_EN_CUARENTENA` · `409 VEHICULO_YA_DESCARTADO`.
 
 ### 3.19.1 Diccionario de términos por cliente — `/api/diccionario-cliente`
 
@@ -2684,7 +2637,7 @@ que es **propio de un cliente** (y las columnas y unidades de sus archivos). Tre
 | `unidad` | Una unidad que usa el cliente | La unidad canónica: `kg` o `t` | no se usa |
 | `valor` | Un valor de una columna categórica | El valor de NEXO (por ejemplo `2_7`) | **obligatorio**: el campo al que pertenece (`tipoVehiculo`, `carroceria`, `tipologia`, `lineaNegocio`, `claseViaje`, `claseContenedor`, `codigoTipoMercancia`) |
 
-`clienteId` en `null` significa que el término aplica a **todos** los clientes. Los clientes del Data Warehouse no traen `clienteId` en `GET /api/solicitudes/clientes`:
+`clienteId` en `null` significa que el término aplica a **todos** los clientes. Los clientes del Data Warehouse no traen `clienteId` en `GET /api/captura-solicitudes/clientes`:
 para ellos se manda el **`clienteNit`** (con o sin puntos y dígito de verificación) en lugar del id, igual que en las plantillas de mapeo (§3.3).
 El `concepto` de un `valor` **no se valida contra el
 catálogo oficial**: un cliente puede usar un valor que el catálogo no tiene (el Turbo de un cliente es `2_7`, que no está en
@@ -2707,7 +2660,7 @@ interface TerminoClienteDto {
 }
 ```
 
-- **Roles**: leer (`GET`) lo puede cualquier rol válido (la importación lo consulta); crear, editar y borrar, `AdminBiblioteca`, `AdminTarifas` y `Admin`.
+- **Roles**: leer (`GET`) lo puede cualquier rol válido (la importación lo consulta); crear, editar y borrar, `Comercial`, `AdminBiblioteca`, `AdminTarifas` y `Admin`.
 
 #### `GET /api/diccionario-cliente`
 | Query | | Tipo | Restricción |
@@ -2748,10 +2701,10 @@ interface TerminoClienteDto {
 
 ### 3.20 Rangos de peso — `/api/pesos`
 
-Bandas de peso (kg) propias de Nexo para Tarifas de Plaza (S4-HU-10.1) — **no
+Bandas de peso (kg) propias de Nexo para Tarifas de Plaza — **no
 es un catálogo cerrado**, se pueden agregar bandas nuevas con el tiempo.
 `pesoMaximo = null` es una banda abierta (p. ej. "+10500 kg").
-**Todo el controller**: `AdminTarifas`, `AdminBiblioteca`, `Admin` (#307: se agregó `AdminBiblioteca`).
+**Todo el controller**: `AdminTarifas`, `AdminBiblioteca`, `Admin`.
 
 #### `GET /api/pesos`
 - **→** `200 RangoPesoDto[]`
@@ -2776,14 +2729,13 @@ Mismo body y errores que crear, más `404 RANGO_PESO_NO_ENCONTRADO`.
 
 ### 3.21 Tarifas de plaza — `/api/tarifas-plaza`
 
-CRUD de tarifas de plaza gobernadas por Nexo (S4-HU-10.2) — recrea el
-formulario de captura que hoy vive en un sistema externo, con carga/descarga
+CRUD de tarifas de plaza gobernadas por Nexo (las que no están en SAP), con carga/descarga
 masiva por Excel. `zonaOrigen`/`zonaDestino` se resuelven solos desde el
 catálogo de municipios al elegir `origenMunicipioId`/`destinoMunicipioId`.
 Al menos uno de `pesoId`/`tipoVehiculo` es obligatorio — **no son mutuamente
 excluyentes**: las tarifas de contenedor traen ambos (el tipo de vehículo se
 deriva de la banda de peso), las nacionales solo `tipoVehiculo`.
-**Todo el controller**: `AdminTarifas`, `AdminBiblioteca`, `Admin` (#307: se agregó `AdminBiblioteca`).
+**Todo el controller**: `AdminTarifas`, `AdminBiblioteca`, `Admin`.
 
 #### `GET /api/tarifas-plaza`
 - **→** `200 TarifaPlazaDto[]`
@@ -2801,10 +2753,10 @@ deriva de la banda de peso), las nacionales solo `tipoVehiculo`.
 | `tipoVehiculo` | *opcional* | string | ver regla de arriba |
 | `valor` | **requerido** | decimal | > 0 |
 | `vigencia` | **requerido** | fecha | |
-| `detallesTarifa` | *opcional* | string | máx. 2000. S6-HU-29.2/#312: vacío o null se guarda como texto vacío (antes `400 TARIFA_PLAZA_INVALIDA`). Al guardar como plaza desde la Mesa no hay un detalle que escribir; **la pantalla de Tarifas Plaza lo sigue exigiendo** (lo hace el front) y la carga por Excel también |
+| `detallesTarifa` | *opcional* | string | máx. 2000. Vacío o null se guarda como texto vacío. Al guardar como plaza desde la Mesa no hay un detalle que escribir; **la pantalla de Tarifas Plaza lo sigue exigiendo** (lo hace el front) y la carga por Excel también |
 
 - **→** `201 TarifaPlazaDto`, header `Location: /api/tarifas-plaza/{id}`
-- **Errores**: `400 TARIFA_PLAZA_INVALIDA` · `400 MUNICIPIO_INVALIDO` · `400 RANGO_PESO_INVALIDO` · `409 TARIFA_PLAZA_DUPLICADA` (misma combinación exacta de las 7 dimensiones)
+- **Errores**: `400 TARIFA_PLAZA_INVALIDA` · `400 LINEA_NEGOCIO_INVALIDA` · `400 CLASE_VIAJE_INVALIDA` (no existen en el catálogo de SAP) · `400 MUNICIPIO_INVALIDO` · `400 RANGO_PESO_INVALIDO` · `409 TARIFA_PLAZA_DUPLICADA` (misma combinación exacta de las 7 dimensiones)
 
 #### `PUT /api/tarifas-plaza/{id}` — editar
 Mismo body y errores que crear, más `404 TARIFA_PLAZA_NO_ENCONTRADA`. Editar
@@ -2821,10 +2773,10 @@ Upsert por línea de negocio + clase de viaje + origen + destino + clase de
 contenedor + rango de peso + tipo de vehículo (las 7 dimensiones).
 
 Columnas obligatorias: `LINEA DE NEGOCIO`, `CLASE DE VIAJE`, `ORIGEN`, `DESTINO`, `VALOR`,
-`VIGENCIA`, `DETALLES`. Opcionales: `CLASE CONTENEDOR`, `RANGO PESO`, `TIPO VEHICULO` y,
-desde S5-HU-22.1/#288, `DEPARTAMENTO ORIGEN` y `DEPARTAMENTO DESTINO`.
+`VIGENCIA`, `DETALLES`. Opcionales: `CLASE CONTENEDOR`, `RANGO PESO`, `TIPO VEHICULO`,
+`DEPARTAMENTO ORIGEN` y `DEPARTAMENTO DESTINO`.
 
-**`VIGENCIA` (S5-HU-22.1/#288).** Se lee sin depender de la cultura del servidor. Se acepta, en
+**`VIGENCIA`.** Se lee sin depender de la cultura del servidor. Se acepta, en
 este orden: fecha nativa de Excel; **serial de Excel** (una fecha en una celda con formato
 *General* es el número de días desde 1899-12-30: `46315` = `2026-10-20`; solo se acepta entre
 1970 y 2099); texto `dd/MM/yyyy`, `d/M/yyyy`, `yyyy-MM-dd`, `MM/dd/yyyy` (ante `05/10/2026`
@@ -2836,7 +2788,7 @@ nuevo con fecha: usar `clsLectorFechasExcel`.
 repiten entre departamentos (`ARMENIA` en Antioquia y Quindío). Con la columna llena, el
 municipio se busca por **nombre + departamento** (ambos sin tildes ni mayúsculas); si el par no
 existe, la fila se rechaza con `'Armenia' no existe en el departamento 'X'`. Con la columna
-ausente o la celda vacía, igual que antes: el primero de la lista (Colombia primero, y a
+ausente o la celda vacía: el primero de la lista (Colombia primero, y a
 igualdad el de menor `id`). `exportar-excel` ya las trae para que exportar → reimportar no
 mueva una ciudad repetida al primer departamento.
 
@@ -2848,8 +2800,8 @@ mueva una ciudad repetida al primer departamento.
 #### `GET /api/tarifas-plaza/exportar-excel`
 Descarga el catálogo completo — el mismo archivo sirve de plantilla para
 `importar-excel`. Columnas: `LINEA DE NEGOCIO`, `CLASE DE VIAJE`, `ORIGEN`, `DESTINO`,
-`CLASE CONTENEDOR`, `RANGO PESO`, `TIPO VEHICULO`, `VALOR`, `VIGENCIA`, `DETALLES` y, desde
-S5-HU-22.1/#288, `DEPARTAMENTO ORIGEN` y `DEPARTAMENTO DESTINO` (al final).
+`CLASE CONTENEDOR`, `RANGO PESO`, `TIPO VEHICULO`, `VALOR`, `VIGENCIA`, `DETALLES`, `DEPARTAMENTO ORIGEN`
+y `DEPARTAMENTO DESTINO` (al final).
 - **→** `200`, archivo `.xlsx` (`Content-Type` de Excel)
 
 ---
@@ -2905,7 +2857,7 @@ identidad de quien llama**: el rol decide qué herramientas hay disponibles y la
 `Comercial` solo ve propuestas de solicitudes que él creó). Ninguna escribe. El valor de una tarifa solo sale de una herramienta, y siempre
 con su `fuente`; si no hay dato, `encontrado` es `false` y `nota` dice por qué.
 
-El asistente (HU-36.2) usa estas mismas herramientas en el servidor; estos endpoints existen para listarlas y para probarlas sin pasar por
+El asistente de cotización (§3.24) usa estas mismas herramientas en el servidor; estos endpoints existen para listarlas y para probarlas sin pasar por
 el modelo. Quien llama necesita sesión; no requieren que la función de IA esté encendida porque no llaman al modelo.
 
 #### `GET /api/asistente/herramientas`
@@ -2930,7 +2882,7 @@ interface ResultadoHerramientaDto {
   nota: string | null               // por qué no hay dato, o que el resultado es una muestra ("Se muestran 10 de 87")
 }
 ```
-- **Errores**: `400 HERRAMIENTA_DESCONOCIDA` · `400 HERRAMIENTA_ENTRADA_INVALIDA` · `403 HERRAMIENTA_NO_PERMITIDA` (el rol no puede usarla) ·
+- **Errores**: `400 HERRAMIENTA_DESCONOCIDA` · `400 HERRAMIENTA_ENTRADA_INVALIDA` · `400 ASISTENTE_SIN_CONVERSACION` (una herramienta `proponer_*` llamada fuera de una conversación) · `403 HERRAMIENTA_NO_PERMITIDA` (el rol no puede usarla) ·
   `403 SOLICITUD_AJENA` · `404 SOLICITUD_NO_ENCONTRADA` · `404 LINEA_NO_ENCONTRADA`
 
 | Herramienta | Envuelve | Roles | Entrada |
@@ -3029,7 +2981,8 @@ rol, así que **las reglas del dominio mandan**: `409 FLETE_SOLO_SICETAC`, `400 
 nunca confirma sin piso (`confirmarSinPiso` no se usa). Si el dominio rechaza el cambio, la acción queda `fallida` con el código y el motivo, no
 se modifica nada, la respuesta es ese mismo error y la conversación agrega un mensaje del asistente que lo explica.
 
-Una acción vence a los 30 minutos (`Asistente__VigenciaAccionMinutos`), se confirma una sola vez (también con confirmaciones simultáneas) y solo
+El asistente propone como máximo 3 cambios por respuesta (`Asistente__MaxAccionesPorRespuesta`); una propuesta de
+más se rechaza con `DEMASIADAS_ACCIONES` y no crea ninguna acción. Una acción vence a los 30 minutos (`Asistente__VigenciaAccionMinutos`), se confirma una sola vez (también con confirmaciones simultáneas) y solo
 la confirma o cancela quien tiene la conversación (ni siquiera el Admin). Cada acción queda guardada con sus parámetros, quién, cuándo y cómo
 terminó: es la auditoría de la escritura.
 
@@ -3103,47 +3056,57 @@ separados: [README §5](docs/contrato-integracion/README.md#5-avisos-en-vivo).
 
 ## 5. Matriz de permisos
 
-✅ = permitido. Fuente: los atributos `[Authorize(Roles=...)]` de
-`src/Nexo.Api/*/cls*Controller.cs`. Los `GET` que no aparecen aquí están
-abiertos a los 6 roles.
+✅ = permitido. Fuente: los atributos `[Authorize(Roles=...)]` de los controllers y hubs de
+`src/Nexo.Api` (los de la clase y los del método se combinan: hay que cumplir los dos). Los `GET` que
+no aparecen aquí están abiertos a los 6 roles. `GET /health` es anónimo y
+`GET /api/lineas-solicitud/{id}/cubicacion` es solo servicio a servicio (§1.2).
 
 | Operación | Com | AdmBib | AdmTar | ServLog | Líder | Admin |
 |---|:-:|:-:|:-:|:-:|:-:|:-:|
 | `POST /api/captura-solicitudes/analizar-excel` · `POST .../leer-estructura` · `PUT/GET/DELETE .../recetas-lectura` · `POST .../sugerir-mapeo` · `POST .../aplicar-mapeo` · `POST .../normalizar-valores` · `PUT/GET/DELETE .../plantillas-mapeo` · `POST /api/captura-solicitudes` · `GET aprovisionamiento` · `GET clientes` | ✅ | | | | | ✅ |
-| `GET /api/captura-solicitudes/ciudades` · `departamentos` · `municipios` (S5-HU-22.1: cualquier rol válido) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Bandeja y Mesa**: `GET /api/solicitudes` · `GET /api/solicitudes/{id}` · `GET .../propuesta-tarifa` · `/hubs/bandeja` (#307) | ✅ | | ✅ | ✅ | ✅ | ✅ |
-| `POST /api/solicitudes` (#307, D5: solo Admin) | | | | | | ✅ |
+| `GET /api/captura-solicitudes/ciudades` · `departamentos` · `municipios` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Bandeja y Mesa**: `GET /api/solicitudes` · `GET /api/solicitudes/{id}` · `GET .../propuesta-tarifa` · `/hubs/bandeja` | ✅ | | ✅ | ✅ | ✅ | ✅ |
+| `POST /api/solicitudes` | | | | | | ✅ |
 | `POST /api/solicitudes/resolver-catalogos` | ✅ | | | | | ✅ |
 | `POST /api/solicitudes/recomendar-vehiculo-contenedor` | ✅ | | ✅ | | | ✅ |
-| `POST /api/solicitudes/{id}/lineas:bulk` (#307, D5: solo Admin) | | | | | | ✅ |
+| `POST /api/solicitudes/{id}/lineas:bulk` | | | | | | ✅ |
 | `POST /api/solicitudes/{id}/rechazar` | ✅ | | | | | ✅ |
-| `POST /api/solicitudes/{id}/recalcular-score` (#307, D5: solo Admin) | | | | | | ✅ |
-| `POST /api/cubicacion` · `GET /api/cubicacion` · `GET /api/cubicacion/explicacion` (#300 + AdminTarifas; #307: AdminBiblioteca lo conserva) | ✅ | ✅ | ✅ | | | ✅ |
-| **Cotizaciones, lecturas**: `GET /api/cotizaciones/{id}` · `por-solicitud/{id}` · `exportar-excel` (#307) | ✅ | | ✅ | ✅ | ✅ | ✅ |
+| `POST /api/solicitudes/{id}/recalcular-score` | | | | | | ✅ |
+| `POST /api/cubicacion` · `GET /api/cubicacion` · `GET /api/cubicacion/explicacion` | ✅ | ✅ | ✅ | | | ✅ |
+| **Cotizaciones, lecturas**: `GET /api/cotizaciones/{id}` · `por-solicitud/{id}` · `exportar-excel` | ✅ | | ✅ | ✅ | ✅ | ✅ |
 | `POST /api/cotizaciones` · `aplicar-propuestas` | ✅ | | ✅ | | | ✅ |
 | `POST /api/cotizaciones/{id}/resultado` | ✅ | | | | | ✅ |
 | `POST /api/cotizaciones/{id}/lineas` · `PUT .../lineas/{lineaSolicitudId}` · `entregar` | | | ✅ | | | ✅ |
-| `POST/DELETE /api/cotizaciones/{id}/lineas/{lineaSolicitudId}/rechazo` (S6-HU-24.3/#320) · `PUT .../lineas/{lineaSolicitudId}/vehiculo` (S6-HU-27.3/#322) | | | ✅ | | | ✅ |
-| `POST/DELETE /api/cotizaciones/{id}/conexos` (S5-HU-20.1: + AdminTarifas) | ✅ | | ✅ | | | ✅ |
+| `POST/DELETE /api/cotizaciones/{id}/lineas/{lineaSolicitudId}/rechazo` · `PUT .../lineas/{lineaSolicitudId}/vehiculo` | | | ✅ | | | ✅ |
+| `POST /api/cotizaciones/{id}/conexos` · `DELETE .../conexos/{conexoId}` | ✅ | | ✅ | | | ✅ |
 | `PATCH /api/cotizaciones/{id}/conexos/{conexoId}` | ✅ | | | | | ✅ |
-| `GET /api/catalogos/alias` · `GET /api/catalogos/alias/resolver` (S6-HU-27.2/#321: cualquier rol válido) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `POST /api/catalogos/alias` (#321) · bandeja `/api/catalogos/vehiculos-cuarentena` (listar, `mapear`, `descartar`) (#322) | | | ✅ | | | ✅ |
+| `GET /api/catalogos/alias` · `GET /api/catalogos/alias/resolver` (y el resto de `GET /api/catalogos/*` salvo la bandeja) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `POST /api/catalogos/alias` · bandeja `/api/catalogos/vehiculos-cuarentena` (listar, `mapear`, `descartar`) | | | ✅ | | | ✅ |
 | Vigencia plaza SAP (`PATCH`, `POST masivo`, `DELETE`) | | ✅ | ✅ | | | ✅ |
-| `/api/reglas-solo-sicetac` (todo, incluido `GET` y `exportar-excel`) (#307: + AdminBiblioteca) | | ✅ | ✅ | | | ✅ |
+| `/api/reglas-solo-sicetac` (todo, incluidos `GET`, `plantilla-excel` y `exportar-excel`) | | ✅ | ✅ | | | ✅ |
 | `POST/PATCH /api/servicios-conexos`, `importar-excel` | | | ✅ | ✅ | | ✅ |
 | `/api/metricas/*` | | | ✅ | | ✅ | ✅ |
 | `/api/priorizacion/parametros` (`GET` y `PUT`) | | | | | | ✅ |
-| Escrituras de `/api/planes-cargue` (9 endpoints) (#310: + AdminTarifas; #307: sin AdminBiblioteca) | ✅ | | ✅ | | | ✅ |
-| `POST /api/vehiculos` (#310: + AdminTarifas; #307: sin AdminBiblioteca) | ✅ | | ✅ | | | ✅ |
+| `GET /api/ia/uso/gasto` | | | | | | ✅ |
+| Escrituras de `/api/planes-cargue` (9 endpoints) | ✅ | | ✅ | | | ✅ |
+| `POST /api/vehiculos` | ✅ | | ✅ | | | ✅ |
 | `DELETE /api/vehiculos/{id}` | | | | | | ✅ |
-| `/api/pesos` (todo, incluido `GET`) (#307: + AdminBiblioteca) | | ✅ | ✅ | | | ✅ |
+| `/api/pesos` (todo, incluido `GET`) | | ✅ | ✅ | | | ✅ |
 | `POST/PUT/DELETE /api/diccionario-cliente` (§3.19.1; `GET` es de todos) | ✅ | ✅ | ✅ | | | ✅ |
-| `/api/tarifas-plaza` (todo, incluido `GET`) (#307: + AdminBiblioteca) | | ✅ | ✅ | | | ✅ |
-| Escrituras de los 6 passthrough de catálogo (§3.14.1) | | | ✅ | | | ✅ |
+| `/api/tarifas-plaza` (todo, incluido `GET`) | | ✅ | ✅ | | | ✅ |
+| Escrituras de los 6 passthrough de catálogo del Cubicador, incluido `republicar-catalogo` (§3.14.1) | | | ✅ | | | ✅ |
 | `/api/asistente/herramientas`: el endpoint es de cualquier rol; cada herramienta repite los roles de la consulta que envuelve (§3.23) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `/api/asistente/conversaciones` (conversar y leer las propias; el Admin además lee cualquiera) (§3.24) | | | ✅ | | | ✅ |
 | `/api/asistente/acciones/{id}/confirmar` y `/cancelar` (solo quien tiene la conversación) (§3.24.1) | | | ✅ | | | ✅ |
 | `/api/asistente/preferencias` (`GET`, `DELETE`; cada persona solo las suyas) (§3.24.2) | | | ✅ | | | ✅ |
+| `/hubs/trabajos` · `/hubs/plan-cargue` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+
+**Aislamiento del Comercial.** Además del rol, la Bandeja solo le devuelve al `Comercial` las solicitudes que él creó, y
+`GET /api/solicitudes/{id}` y `POST .../rechazar` responden `403 SOLICITUD_AJENA` si la solicitud es de otro.
+`GET .../propuesta-tarifa` y los endpoints de cotización no lo validan.
+
+**`capacidades` de `GET /api/sesion/actual`.** Son una ayuda para pintar la pantalla; la autorización real es la de esta matriz.
+Hoy el front usa su propia tabla de permisos.
 
 ---
 
@@ -3157,7 +3120,7 @@ TipoSolicitud          Spot · Licitacion
 ModalidadSolicitud     Importacion · Exportacion · Nacional · Extradimensionada · CargaGeneral
 EstadoSolicitud        Pendiente · EnCosteo · Entregada · Descartada
 TipologiaCarga         Contenedor · CargaSuelta · GranelSolido · GranelLiquido · Alimentos · Refrigerados · CargaSeca
-EstadoLinea            PorCostear · AutoResuelta · Revisada
+EstadoLinea            PorCostear · AutoResuelta · Revisada · Rechazada
 TipoPendienteDeCosteo  Tecnica · Manual
 CondicionCarga         Cargado · Vacio
 FuenteFlete            Sicetac · Historica · Manual · Tarifario
@@ -3181,10 +3144,10 @@ comportamiento real del código.
 |---|---|---|---|---|
 | 1 | Header de identidad | `X-Portal-clsUsuario-Id` | `X-Portal-Usuario-Id` | Frontend, e2e y scripts de QA reciben `401` en todo |
 | 2 | `CatalogoLineaResueltoDto` | `clsVehiculoCreado` | `vehiculoCreado` | Nombre de campo JSON en `resolver-catalogos` |
-| 3 | Ítem de plan de cargue | `clsCliente` | `cliente` | Nombre de campo JSON en `items` e `items/importar` |
-| 4 | `importar-excel` de reglas y servicios | sin archivo → `400 VALIDATION_ERROR` | `400 ARCHIVO_REQUERIDO` | Código de error distinto al de los otros uploads |
+| 3 | Ítem de plan de cargue | `clsCliente` | `cliente` | Nombre de campo JSON en `items` e `items/importar` y en los ítems que devuelven `GET .../resultado` y `.../exportar` |
+| 4 | `importar-excel` de reglas, servicios y tarifas de plaza; `leer-estructura` y `PUT recetas-lectura` | sin el campo `archivo` → `400 VALIDATION_ERROR` | `400 ARCHIVO_REQUERIDO` | Código de error distinto al de `analizar-excel` (§1.9) |
 | 5 | `BandejaItemDto` (`GET /api/solicitudes`) | `clsCliente` | `cliente` | Nombre de campo JSON de cada fila de la bandeja. Verificado contra la respuesta real (2026-11-04) |
 | 6 | `LineaCosteoDto` (`GET /api/solicitudes/{id}`) y `PropuestaLineaDto` (`.../propuesta-tarifa`) | `clsRuta` | `ruta` | Nombre de campo JSON del texto de la ruta. Verificado contra la respuesta real (2026-11-04) |
 
-Los seis parecen efecto del renombrado masivo con prefijo `cls`. **Quien consume la API debe leer los nombres que figuran en la columna «Hoy (código)»**:
+Los números 1, 2, 3, 5 y 6 parecen efecto del renombrado masivo con prefijo `cls`. **Quien consume la API debe leer los nombres que figuran en la columna «Hoy (código)»**:
 este documento los describe tal como viajan. Cuando se corrija el código se avisará aquí y en `docs/integraciones/` para que el cambio no rompa a nadie.

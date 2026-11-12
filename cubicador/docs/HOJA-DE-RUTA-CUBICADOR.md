@@ -347,7 +347,7 @@ arranquen en paralelo, no en secuencia.
 - ✅ Tipos neutrales: `modelos.py` ya no usaba ninguno específico de Postgres, así que no hubo nada que cambiar.
 - ✅ Manejo de excepciones: las menciones a `ForeignKeyViolationError` eran comentarios, no código. Hoy no queda ninguna referencia a `asyncpg` ni `psycopg` en el repo.
 - ✅ `docker-compose.yml`: servicio `db` en `mcr.microsoft.com/mssql/server:2019-latest`, con healthcheck propio y volumen separado (`db_data` conserva los datos de PostgreSQL hasta migrarlos).
-- ✅ Los **scripts `.sql` de `docs/Database/`** reemplazan a `Base.metadata.create_all`, que nunca hace `ALTER`. Se aplican con `scripts/aplicar_sql.py`.
+- ✅ Los **scripts `.sql` versionados** (hoy en `cubicador/database/`) reemplazan a `Base.metadata.create_all`, que nunca hace `ALTER`. Se aplican con `scripts/aplicar_sql.py`.
 - ✅ La batería de `testDocumentation/PRUEBAS_DE_INTEGRACION.md` corrió contra SQL Server 2019 real: 9 de 9.
 
 **Modelo** — ✅ hecho en S5-HU-17.2, con tres convenciones revisadas
@@ -613,6 +613,7 @@ Es una sesión de una o dos horas, y es el **camino crítico** de todo lo demás
 
 **Arquitectura**
 - **SQL Server 2019**, en el esquema `dbo_cubicador` de `dbTarifario_Nexo_Pruebas` (compartido con Cotifly), con **scripts `.sql` versionados** para el esquema.
+  *Desde S7-HU-31.3 (#423) el Cubicador usa su base propia, `dbCubicador_Pruebas`, esquema `dbo`.*
 - El 3D se migra tal cual, para no tener dos motores de base adentro del Cubicador.
 - El puente usa un diccionario de compatibilidad `CodigoVehiculo` → preset viejo.
 - Un solo contrato, **corte coordinado**, sin endpoint de transición.
@@ -623,7 +624,7 @@ Es una sesión de una o dos horas, y es el **camino crítico** de todo lo demás
 - Vehículos no reconocidos en NEXO se crean **en cuarentena**, fuera de los desplegables.
 - Las recomendaciones de **los dos** orígenes se persisten; NEXO también guarda el id.
 - `fragil` y `rotacion_libre` entran como columnas nullable ahora; los datos llegan después.
-- **Scripts `.sql` versionados** en `docs/Database/` como fuente de verdad del esquema, aplicados con `scripts/aplicar_sql.py`. Decisión revisada en S5-HU-17.2 a pedido del equipo de Datos: la propuesta original era Alembic con `--autogenerate`, pero su autogenerado lee la base **entera**, y como `dbo_cubicador` vive en la misma base que `dbo_cotifly`, la primera corrida propuso 36 `drop_table` contra tablas de Cotifly. `create_all` tampoco sirve porque **nunca hace `ALTER`**. El DDL explícito es además lo que ya usan NEXO y Cotifly, así que el equipo de Datos revisa un solo formato.
+- **Scripts `.sql` versionados** (hoy en `cubicador/database/`) como fuente de verdad del esquema, aplicados con `scripts/aplicar_sql.py`. Decisión revisada en S5-HU-17.2 a pedido del equipo de Datos: la propuesta original era Alembic con `--autogenerate`, pero su autogenerado lee la base **entera**, y como `dbo_cubicador` vive en la misma base que `dbo_cotifly`, la primera corrida propuso 36 `drop_table` contra tablas de Cotifly. `create_all` tampoco sirve porque **nunca hace `ALTER`**. El DDL explícito es además lo que ya usan NEXO y Cotifly, así que el equipo de Datos revisa un solo formato.
 - Los CRUD viven en el **backend del Cubicador**; el portal de NEXO los consume por **passthrough**, que es donde están los usuarios y los roles. El navegador nunca llama al Cubicador.
 - Los **códigos canónicos de vehículo son del Cubicador**; NEXO converge hacia ellos vía la cuarentena. No se heredan los duplicados de `tbl_configuraciones_vehiculo`.
 - **`GrupoRutaId`** como columna nueva en `tbl_lineas_solicitud`, puesta por Cotifly y solo guardada por NEXO. No se parte la tabla.

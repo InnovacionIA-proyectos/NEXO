@@ -5,22 +5,33 @@ openapi: 3.0.3
 # Alcance deliberado: solo lo que el contrato define — identidad, trabajos pesados
 # y la forma de error. El resto del API (cotizaciones, biblioteca, conexos) no
 # entra aquí: son endpoints de negocio, no puntos de acuerdo entre equipos, y
-# meterlos convertiría este archivo en una copia desactualizada del código.
+# meterlos convertiría este archivo en una copia desactualizada del código. Su
+# detalle está en CONTRATO.md, en la raíz del repositorio.
+#
+# La versión es la misma que la de README.md.
 
 info:
-  title: Nexo (Nexo) — contrato de integración con el portal
-  version: 1.3.0
+  title: NEXO — contrato de integración con el portal
+  version: 1.7.0
   description: |
-    Nexo no tiene inicio de sesión propio. La identidad la aporta la sesión del
+    NEXO no tiene inicio de sesión propio. La identidad la aporta la sesión del
     portal de la Administración; el backend resuelve los permisos contra la tabla
-    de usuarios de la administración, nunca contra lo que afirme el navegador.
+    de usuarios y roles de la administración, nunca contra lo que afirme el
+    navegador.
 
-    Ver README.md para el contrato completo y ADR-001 para la decisión de
+    Los avisos en vivo van por SignalR y no se describen aquí. Son tres hubs, con
+    la misma identidad que el API:
+
+    - `/hubs/trabajos`: avance de un trabajo. `Suscribir(trabajoId)`, evento `avance`.
+    - `/hubs/bandeja`: la Bandeja Priorizada cambió. `Suscribir()`, evento `bandeja`.
+    - `/hubs/plan-cargue`: desenlace de un plan de cargue. `Suscribir(planCargueId)`, evento `avance`.
+
+    Ver README.md para el contrato completo y la decisión D-12 de docs/decisiones/DECISIONES-NEXO.md para la decisión de
     identidad sin firma.
 
 servers:
   - url: /api
-    description: Raíz del API de Nexo
+    description: Raíz del API de NEXO
 
 tags:
   - name: sesion
@@ -39,27 +50,31 @@ paths:
       summary: Quién llama y qué puede hacer
       description: |
         Resuelve la identidad contra la tabla de la administración y devuelve el
-        rol efectivo en Nexo más las capacidades de ese rol.
+        rol efectivo en NEXO más las capacidades de ese rol.
 
         Se llama al entrar al módulo. No crea sesión: cada petición posterior
         vuelve a validarse por su cuenta.
       responses:
         '200':
-          description: Identidad válida con permiso sobre Nexo
+          description: Identidad válida con uno de los seis roles de NEXO
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/SesionActual'
         '401':
           description: |
-            Sin identidad utilizable. El identificador no llegó o no existe en la
-            tabla. El frontend devuelve a la persona al portal; no existe una
-            pantalla de acceso propia de Nexo.
+            `SESION_INVALIDA`. Sin identidad utilizable: el encabezado no llegó, no
+            es un número o el identificador no existe en la tabla. Siempre el mismo
+            mensaje, para no revelar si el identificador existe. El frontend
+            devuelve a la persona al portal; no existe una pantalla de acceso propia
+            de NEXO.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ApiError' }
         '403':
-          description: La persona existe pero no tiene permiso sobre Nexo
+          description: |
+            `SIN_PERMISO_CABINA_FLETES`. La persona existe, pero ninguno de sus roles
+            del portal se traduce a un rol de NEXO.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ApiError' }
@@ -69,12 +84,16 @@ paths:
       tags: [trabajos]
       summary: Cargar las líneas de un pliego
       description: |
-        Aquí está el patrón, no el endpoint. Toda operación pesada de Nexo responde
+        Aquí está el patrón, no el endpoint. Una operación pesada de NEXO responde
         así: acepta, devuelve un identificador y se va a trabajar a la cola. El
         resultado nunca viaja en esta respuesta.
 
-        Es el único endpoint de negocio que aparece en este archivo, y aparece
-        porque el patrón es un punto de acuerdo entre equipos. Los demás no lo son.
+        Las líneas quedan guardadas y el trabajo queda registrado en la misma
+        transacción, así que el identificador se puede consultar desde que el
+        cliente recibe el 202.
+
+        Solo el rol Admin. Es el único endpoint de negocio que aparece en este
+        archivo, y aparece porque el patrón es un punto de acuerdo entre equipos.
       parameters:
         - name: id
           in: path
@@ -91,8 +110,23 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ApiError' }
+        '401':
+          description: Sin identidad utilizable
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
         '403':
           description: El rol no admite esta operación
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+        '404':
+          description: La solicitud no existe
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+        '409':
+          description: La solicitud no admite más líneas
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ApiError' }
@@ -123,16 +157,10 @@ paths:
               schema: { $ref: '#/components/schemas/ApiError' }
         '404':
           description: |
-            No existe un trabajo con ese identificador.
-
-            OJO: hay una ventana breve, justo después del 202, en la que este endpoint
-            responde 404 para un identificador que SÍ es válido. El 202 entrega el
-            identificador dentro de la transacción, pero el trabajo se crea cuando el
-            mensaje se consume, y eso ocurre después del commit.
-
-            El frontend debe tratar un 404 en los primeros segundos como "aceptado, aún
-            no arranca", no como identificador inválido. Está anotado para cerrarse
-            persistiendo el trabajo en la misma transacción del 202.
+            `TRABAJO_NO_ENCONTRADO`. No existe un trabajo con ese identificador. Un
+            identificador recién devuelto por un 202 no cae aquí: el trabajo se
+            registra en la misma transacción que lo acepta y se consulta en estado
+            Pendiente.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ApiError' }
@@ -150,9 +178,15 @@ components:
 
         No viaja firmado y no se verifica contra el portal: es una afirmación del
         cliente. Por eso el backend jamás acepta permisos ni roles enviados desde
-        el navegador — los resuelve él mismo contra la tabla.
+        el navegador: los resuelve él mismo contra la tabla.
 
-        Riesgo asumido y sus condiciones de revisión en ADR-001. El día que el
+        Discrepancia abierta: el backend hoy lee el encabezado
+        `X-Portal-clsUsuario-Id` (constante `HeaderIdUsuario` de
+        `clsIdentidadPortalAuthenticationHandler`). Mientras no se corrija el
+        código, un cliente que envíe `X-Portal-Usuario-Id` recibe 401. Ver
+        CONTRATO.md §7.
+
+        Riesgo asumido y sus condiciones de revisión en la decisión D-12 (docs/decisiones/DECISIONES-NEXO.md). El día que el
         portal emita un token, este esquema se reemplaza por `Authorization` y
         nada más de la cadena cambia.
 
@@ -160,7 +194,7 @@ components:
 
     RolNexo:
       type: string
-      description: Los seis roles de Nexo. El catálogo del portal se traduce a estos en el servidor.
+      description: Los seis roles de NEXO. El catálogo del portal se traduce a estos en el servidor.
       enum:
         - AdminBiblioteca
         - LiderProceso
@@ -175,40 +209,43 @@ components:
       properties:
         id:
           type: integer
-          description: Identificador de la persona en la administración
+          format: int64
+          description: Identificador de la persona en el portal, el mismo del encabezado
           example: 10123
         nombre:
           type: string
-          description: Leído de la tabla, no de lo que envió el navegador
-          example: dguerra
+          description: Leído de la tabla del portal, no de lo que envió el navegador
+          example: Usuario de ejemplo
         rol:
           $ref: '#/components/schemas/RolNexo'
         capacidades:
           type: array
           description: |
             Para que el frontend decida qué pinta, no qué permite. La autorización
-            se aplica siempre en el backend; ocultar un botón no protege nada.
+            se aplica siempre en el backend; ocultar un botón no protege nada. El
+            rol Admin recibe `["*"]`.
           items: { type: string }
-          example: [verBiblioteca, ajustarVigencia, verTablero]
+          example: [verBiblioteca, ajustarVigencia, editarReglasSoloSicetac, gestionarCotizacion, editarServiciosConexos]
 
     EstadoTrabajoValor:
       type: string
       description: |
+        Pendiente es lo que informa el 202: el trabajo existe pero todavía no
+        arrancó.
+
         Parcial no es un error: es un pliego donde algunas líneas quedaron pendientes
         con su motivo mientras el resto avanzó. Es el desenlace normal cuando alguna
-        línea necesita que una persona agregue la tarifa.
+        línea necesita que una persona agregue la tarifa, y también el cierre cuando
+        vence la ventana automática del trabajo.
 
-        Completado significa que el servicio resolvió TODO por su cuenta. Fallido queda
-        reservado para cuando se rompe el servicio mismo, no para cuando simplemente no
-        había tarifa.
-
-        Pendiente es lo que informa el 202: el trabajo fue aceptado pero todavía no
-        arrancó. VER LA NOTA DEL 404 en el endpoint de consulta.
+        Completado significa que el servicio resolvió TODO por su cuenta. Fallido
+        queda reservado para cuando se rompe el servicio mismo, no para cuando
+        simplemente no había tarifa; hoy ningún camino del código lleva a ese estado.
       enum: [Pendiente, Procesando, Completado, Parcial, Fallido]
 
     TrabajoAceptado:
       type: object
-      description: Respuesta de toda operación pesada. Vuelve antes de hacer el trabajo.
+      description: Respuesta de una operación pesada. Vuelve antes de hacer el trabajo.
       required: [trabajoId, estado, consultarEn]
       properties:
         trabajoId:
@@ -226,12 +263,14 @@ components:
         Los pendientes vienen desglosados porque son dos cosas con ciclos de vida
         opuestos, y la pantalla dice cosas distintas con cada una.
 
-        `pendientesTecnicas` se reintenta y se resuelve solo. `requierenTarifaManual`
-        espera al Administrador de Tarifas y NO se reintenta: nada va a cambiar hasta
-        que esa persona actúe. Ahí no hay reloj, porque puede tener otros pliegos
-        delante y eso no es algo que un timeout deba resolver.
+        `pendientesTecnicas` son líneas donde una fuente falló y que agotaron sus
+        reintentos automáticos. `requierenTarifaManual` espera al Administrador de
+        Tarifas y NO se reintenta: nada va a cambiar hasta que esa persona actúe. Ahí
+        no hay reloj, porque puede tener otros pliegos delante y eso no es algo que
+        un timeout deba resolver.
 
         `pendientes` es la suma, para quien solo quiera un número.
+      required: [resueltas, pendientes, pendientesTecnicas, requierenTarifaManual]
       properties:
         total:
           type: integer
@@ -242,34 +281,45 @@ components:
         pendientes: { type: integer, example: 3 }
         pendientesTecnicas:
           type: integer
-          description: Una fuente falló. Se reintenta.
+          description: Una fuente falló y la línea agotó sus reintentos.
           example: 1
         requierenTarifaManual:
           type: integer
           description: No hay tarifa válida. Espera al Administrador de Tarifas.
           example: 2
 
-    EsperaDeTarifa:
+    TipoPendiente:
+      type: string
+      description: |
+        Tecnica: una fuente falló y la línea agotó sus reintentos; el motivo trae el
+        error real. Manual: no hay tarifa válida y la línea espera al Administrador
+        de Tarifas.
+      enum: [Tecnica, Manual]
+
+    PendienteDeCosteo:
       type: object
       description: |
-        Una línea concreta que espera a que el Administrador de Tarifas actúe.
+        Una línea concreta que quedó sin costear.
 
         Es lo que hace útil el aviso. Un contador dice "3 pendientes" y nadie sabe qué
-        hacer; esto dice qué línea y qué le falta, con lo que el comercial sabe a quién
-        ir a buscar y el administrador sabe qué cargar.
+        hacer; esto dice qué línea, de qué tipo y qué le falta, con lo que el
+        comercial sabe a quién ir a buscar y el administrador sabe qué cargar.
 
-        No lleva vencimiento a propósito: esta espera depende de una persona.
-      required: [lineaId, motivo, esperandoDesde]
+        No lleva vencimiento a propósito: la espera de tipo Manual depende de una
+        persona.
+      required: [lineaId, tipo, motivo, pendienteDesde]
       properties:
         lineaId: { type: string, format: uuid }
+        tipo:
+          $ref: '#/components/schemas/TipoPendiente'
         motivo:
           type: string
           example: No hay tarifa de plaza vigente para la ruta.
-        esperandoDesde: { type: string, format: date-time }
+        pendienteDesde: { type: string, format: date-time }
 
     EstadoTrabajo:
       type: object
-      required: [trabajoId, estado]
+      required: [trabajoId, estado, avance, solicitadoEn, pendientes, secuencia]
       properties:
         trabajoId:
           type: string
@@ -283,12 +333,13 @@ components:
           type: string
           format: date-time
           nullable: true
-        esperandoTarifa:
+        pendientes:
           type: array
           description: |
-            Las líneas que esperan intervención humana, con su motivo. Vacío cuando no
-            hay ninguna.
-          items: { $ref: '#/components/schemas/EsperaDeTarifa' }
+            Las líneas que siguen sin resolver, con su tipo y su motivo, en el orden
+            en que quedaron pendientes. Vacío cuando no hay ninguna. No viaja en los
+            avisos del hub: solo en esta consulta.
+          items: { $ref: '#/components/schemas/PendienteDeCosteo' }
         secuencia:
           type: integer
           description: |

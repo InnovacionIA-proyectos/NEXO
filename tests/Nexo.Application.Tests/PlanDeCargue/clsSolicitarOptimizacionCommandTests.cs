@@ -90,7 +90,7 @@ public class clsSolicitarOptimizacionCommandTests
     [Fact]
     public async Task Publica_antes_de_guardar()
     {
-        // El Outbox exige este orden — confirmado en runtime (docs/mensajeria/CUBICACION.md #5):
+        // El Outbox exige este orden — confirmado en runtime (docs/mensajeria/CUBICACION.md, sección 3):
         // si se guarda antes de publicar, el mensaje no se entrega.
         PlanListo();
         var orden = new List<string>();

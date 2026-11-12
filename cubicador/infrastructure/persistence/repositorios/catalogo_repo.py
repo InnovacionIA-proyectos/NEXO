@@ -1,7 +1,7 @@
 """Adaptador de lectura del catalogo (S5-HU-17.2).
 
 Implementa `ICatalogoRepository` leyendo las tablas que el equipo de Datos
-administra en `dbo_cubicador`. **No escribe nada**: ni siembra, ni corrige, ni
+administra en la base del Cubicador. **No escribe nada**: ni siembra, ni corrige, ni
 crea filas que falten. Si el catalogo esta vacio o incompleto, eso se resuelve
 del lado de ellos, no silenciandolo aca.
 

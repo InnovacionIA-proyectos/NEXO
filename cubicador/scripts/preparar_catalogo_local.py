@@ -12,7 +12,7 @@ pocas mercancias representativas: una de furgon, una refrigerada, una de
 plataforma y un par incompatible entre si.
 
 Guarda: **se niega a correr contra cualquier host que no sea local.** El
-catalogo de QA es de otro equipo y comparte base con Cotifly; este script crea
+catalogo de QA lo administra el equipo de Datos; este script crea
 tablas, asi que apuntarlo por error a QA es exactamente lo que no puede pasar.
 
 Correr (dentro del contenedor, que es el que tiene el driver ODBC):
@@ -52,8 +52,8 @@ def _verificar_que_es_local(url: str) -> str:
     if host not in _HOSTS_LOCALES:
         raise SystemExit(
             f"NEGADO: DATABASE_URL apunta a '{host}', que no es una base local.\n"
-            "Este script CREA TABLAS. El catalogo de QA lo administra el equipo de Datos\n"
-            "y su base la comparte Cotifly: no se toca desde aca.\n"
+            "Este script CREA TABLAS. El catalogo de QA lo administra el equipo de Datos:\n"
+            "no se toca desde aca.\n"
             f"Hosts permitidos: {', '.join(sorted(_HOSTS_LOCALES))}."
         )
     return host

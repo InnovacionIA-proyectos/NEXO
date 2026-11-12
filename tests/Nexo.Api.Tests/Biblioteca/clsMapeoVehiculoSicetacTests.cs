@@ -109,7 +109,7 @@ public sealed class clsBaseDeSicetacDePrueba : IDisposable
 /// <summary>
 /// El mapeo de vehículos aplicado al piso SICE-TAC, con el motor real y un DWSice de mentira. El caso que lo motivó: el Sencillo es <c>C2</c> en
 /// NEXO y <c>2</c> en SICE-TAC; al buscarlo como <c>C2</c> no había filas y el motor, sin avisar, tomaba el vehículo más barato de la ruta
-/// (la camioneta <c>CA_</c>). La prueba usa la tabla de mapeo real con su carga inicial (<c>docs/Database/377_mapeo_vehiculo_tarifario.sql</c>).
+/// (la camioneta <c>CA_</c>). La prueba usa la tabla de mapeo real con su carga inicial (<c>database/seeder/mapeo_vehiculos.csv</c>).
 /// </summary>
 [Collection("api")]
 public class clsMapeoVehiculoSicetacTests(clsApiFixture fx) : IDisposable

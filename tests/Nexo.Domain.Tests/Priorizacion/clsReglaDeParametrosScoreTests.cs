@@ -8,7 +8,7 @@ namespace Nexo.Domain.Tests.Priorizacion;
 /// verificaba, porque tampoco había forma de editarlos. Al abrir el endpoint de
 /// recalibración eso deja de ser un comentario.
 ///
-/// Desde el fix de issue #173 (ver docs/decisiones/score-prioridad-4-pesos-vs-solo-urgencia.md)
+/// Desde la decisión D-04 (ver docs/decisiones/DECISIONES-NEXO.md)
 /// los 4 pesos SÍ entran en el total: <see cref="clsScorePrioridadCalculator"/> calcula
 /// total = PesoUrgencia·urgencia + PesoValor·valor + PesoProbabilidad·probabilidad + PesoTipo·tipo.
 /// Esta regla ya no valida una configuración dormida: cambiar un peso ahora mueve el

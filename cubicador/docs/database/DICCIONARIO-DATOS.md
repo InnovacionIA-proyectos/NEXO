@@ -1,6 +1,8 @@
 # Diccionario de datos del Cubicador
 
-Las 16 tablas de la base `dbCubicador_Pruebas` (esquema `dbo`): para qué sirve cada una, de dónde salen sus datos y qué guarda cada columna. Tipos, nulos y valores por defecto corresponden a `cubicador/database/esquema/ESQUEMA_CUBICADOR.sql`.
+Las 16 tablas del Cubicador: para qué sirve cada una, de dónde salen sus datos y qué guarda cada columna. Tipos, nulos y valores por defecto corresponden a `cubicador/database/esquema/ESQUEMA_CUBICADOR.sql`.
+
+> **Dónde viven:** en la base propia `dbCubicador_Pruebas`, esquema `dbo`, que QA usa desde el traslado de S7-HU-31.3 (#423). Detalle en [`cubicador/database/README.md`](../../database/README.md#dónde-vive-hoy).
 
 **Origen de cada columna:**
 
@@ -49,7 +51,7 @@ NEXO y Cotifly no consultan esta base directamente: piden las recomendaciones a 
 | `NombreVehiculo` | nvarchar(120) | No |  | Seeder | Nombre legible (Turbo 2L2, Sencillo C2...). |
 | `LargoCm` | decimal(9,2) | No |  | Seeder | Largo útil de carga, en centímetros. |
 | `AnchoCm` | decimal(9,2) | No |  | Seeder | Ancho útil de carga, en centímetros. |
-| `AlturaMaximaReglamentariaCm` | decimal(9,2) | No | `440` | Seeder | Límite legal de altura del tipo de vehículo, en centímetros. No depende de la carrocería. |
+| `AlturaMaximaReglamentariaCm` | decimal(9,2) | No | `440` | Seeder | **Alto útil de carga** del vehículo, en centímetros (230, 240 o 260 en el catálogo inicial). Pese al nombre, no es el límite legal de altura. El valor por defecto solo aplica si se crea un vehículo sin ese dato. |
 | `CapacidadMaxima` | decimal(18,2) | No |  | Seeder | Capacidad de carga en kilos. Una carrocería puede reducirla (ver `relacionVehiculosCarroceria`). |
 | `Activo` | bit | No | `1` | Seeder | Si el motor lo tiene en cuenta. |
 | `CreadoPor` | nvarchar(100) | No |  | Aplicación | Quién creó el registro. En los datos iniciales, `seeder`. |
@@ -178,6 +180,8 @@ NEXO y Cotifly no consultan esta base directamente: piden las recomendaciones a 
 
 **Datos:** Sin seeder. La escribe el motor en cada recomendación que piden NEXO o Cotifly.
 
+> La interpretación de descripciones de mercancía y la explicación de la recomendación en lenguaje natural **no guardan nada en la base**, por decisión de diseño: se calculan al pedirlas. Por eso tampoco se registran sus tokens; el tope diario de IA solo suma los de `iaSombra`.
+
 | Columna | Tipo | Nulo | Por defecto | Origen | Descripción |
 |---|---|---|---|---|---|
 | `Id` | uniqueidentifier | No | nuevo GUID | Motor | Identificador. |
@@ -252,7 +256,7 @@ NEXO y Cotifly no consultan esta base directamente: piden las recomendaciones a 
 | `IdRecomendacion` | nvarchar(36) | No |  | Aplicación | Recomendación comparada (`recomendaciones`, sin llave foránea). |
 | `IdLineaSolicitud` | nvarchar(100) | No |  | Aplicación | Línea de solicitud. |
 | `OrigenSistema` | nvarchar(20) | No |  | Aplicación | NEXO o COTIFLY. |
-| `Estado` | nvarchar(40) | No |  | Aplicación | Resultado de la comparación o motivo por el que no se pudo comparar. |
+| `Estado` | nvarchar(40) | No |  | Aplicación | Resultado de la comparación o motivo por el que no se pudo comparar: `OK` o un código `IA_*` (por ejemplo `IA_TIEMPO_AGOTADO`, `IA_RESPUESTA_INVALIDA`). |
 | `Modelo` | nvarchar(100) | Sí |  | Aplicación | Modelo de lenguaje usado. |
 | `Esfuerzo` | nvarchar(10) | Sí |  | Aplicación | Nivel de esfuerzo configurado para el modelo. |
 | `ResultadoMotor` | nvarchar(40) | No |  | Aplicación | Resultado de la recomendación del motor. |
@@ -284,11 +288,11 @@ NEXO y Cotifly no consultan esta base directamente: piden las recomendaciones a 
 
 **Utilidad:** Límites generales de las piezas que acepta el motor 3D.
 
-**Datos:** Sin seeder. Se administra desde la aplicación.
+**Datos:** Sin seeder. Se administra desde la aplicación. Es una **fila única** (`id = 1`): la aplicación siempre lee y escribe esa fila. Si la tabla está vacía, como hoy en las dos bases, la aplicación usa sus valores por defecto (largo 1220, ancho 240, alto 260 y peso 34.000).
 
 | Columna | Tipo | Nulo | Por defecto | Origen | Descripción |
 |---|---|---|---|---|---|
-| `id` | int | No | autoincremental | Aplicación | Identificador numérico (autoincremental). |
+| `id` | int | No | `IDENTITY` | Aplicación | Identificador. Aunque la columna es `IDENTITY`, solo se usa la fila `1`. |
 | `largo_max_cm` | float | No |  | Aplicación | Largo máximo de una pieza, en centímetros. |
 | `ancho_max_cm` | float | No |  | Aplicación | Ancho máximo de una pieza, en centímetros. |
 | `alto_max_cm` | float | No |  | Aplicación | Alto máximo de una pieza, en centímetros. |
@@ -334,10 +338,10 @@ NEXO y Cotifly no consultan esta base directamente: piden las recomendaciones a 
 | `vehiculo_id` | varchar(36) | No |  | Motor | Vehículo usado (`vehiculos_cubicacion`). |
 | `linea_solicitud_id` | varchar(36) | Sí |  | Motor | Línea de solicitud asociada, si la hay. |
 | `numero_vehiculo` | int | No |  | Motor | Número del vehículo cuando la carga usa varios. |
-| `estado` | varchar(20) | No |  | Motor | Estado del cálculo. |
+| `estado` | varchar(20) | No |  | Motor | Estado del cálculo. La aplicación lo crea en `borrador`. |
 | `estrategia` | varchar(40) | No |  | Motor | Estrategia de acomodo usada. |
 | `ponderaciones_json` | varchar(max) | Sí |  | Motor | Pesos de los criterios de la estrategia, en JSON. |
-| `algoritmo` | varchar(10) | No |  | Motor | Algoritmo de acomodo usado. |
+| `algoritmo` | varchar(10) | No |  | Motor | Algoritmo de acomodo usado. Por defecto en la aplicación: `bfd`. |
 | `semilla` | int | Sí |  | Motor | Semilla del cálculo, para poder repetirlo igual. |
 | `peso_total_kg` | float | No |  | Motor | Peso total cargado, en kilos. |
 | `volumen_utilizado_m3` | float | No |  | Motor | Volumen ocupado, en metros cúbicos. |
@@ -433,7 +437,32 @@ recomendaciones ── recomendacionVehiculo ── recomendacionVehiculoMercanc
                         ├── vehiculos
                         └── TiposCarroceria
 
-vehiculos_cubicacion ── planes_cargue ── items_plan_cargue ── colocaciones_cargue
+vehiculos_cubicacion ── planes_cargue ──┬── items_plan_cargue ── colocaciones_cargue
+                                        └── colocaciones_cargue (también apunta al plan)
 
 parametrosMotor, parametros_cubicacion e iaSombra no tienen llaves foráneas.
 ```
+
+## Restricciones e índices
+
+Además de las llaves primarias y foráneas, el esquema tiene estas reglas (`ESQUEMA_CUBICADOR.sql`):
+
+| Tabla | Restricción | Qué asegura |
+|---|---|---|
+| `vehiculos` | `UQ_vehiculos_CodigoVehiculo` | Un solo vehículo por código. |
+| `TiposCarroceria` | `UQ_TiposCarroceria_CodigoCarroceria` | Un solo registro por código de carrocería. |
+| `categoriaMercancia` | `UQ_categoriaMercancia_NombreCategoria` | Nombres de categoría únicos. |
+| `tiposMercancia` | `UQ_tiposMercancia_CodigoMercancia` | Un solo registro por código de mercancía. |
+| `tiposMercancia` | `CHECK` (carrocería secundaria) | La secundaria es distinta de la principal, y solo puede ser condicionada si existe. |
+| `relacionVehiculosCarroceria` | `UQ_relacionVehiculosCarroceria_Par` | Cada par vehículo-carrocería una sola vez. |
+| `relacionVehiculosCarroceria` | `CHECK` (capacidad) | Si no usa la capacidad del vehículo, la capacidad específica es mayor que cero. |
+| `relacionVehiculosCarroceria` | FK a `vehiculos` con `ON DELETE CASCADE` | Borrar un vehículo borra sus relaciones. |
+| `reglasIncompatibilidad` | `CK_reglasIncompatibilidad_CategoriasDistintas`, `UQ_reglasIncompatibilidad_Par` | Dos categorías distintas, y cada par una sola vez. |
+| `parametrosMotor` | `UQ_parametrosMotor_Clave` | Una sola fila por parámetro. |
+| `recomendacionVehiculo` | `CK_..._OrigenSistema`, `CK_..._Resultado` | `OrigenSistema` es `NEXO` o `COTIFLY`; `Resultado` es `ASIGNADO` o `SIN_SELECCION_AUTOMATICA`. |
+| `recomendacionVehiculoMercancia` | FK a `recomendacionVehiculo` con `ON DELETE CASCADE` | Borrar un vehículo recomendado borra sus mercancías. |
+| `iaSombra` | `CK_iaSombra_OrigenSistema`, `CK_iaSombra_FlotaMotor`, `CK_iaSombra_FlotaIa`, `CK_iaSombra_Violaciones` | Origen válido, y las columnas JSON contienen JSON válido. |
+
+Índices de consulta: `IX_tiposMercancia_IdCategoria`, `IX_relacionVehiculosCarroceria_IdCarroceria`, `IX_recomendaciones_Linea_Origen`, `IX_recomendacionVehiculo_IdLineaSolicitud_OrigenSistema`, `IX_recomendacionVehiculo_IdRecomendacion`, `IX_recomendacionVehiculoMercancia_IdRecomendacionVehiculo`, `IX_iaSombra_IdRecomendacion`, `IX_iaSombra_CreatedAt` (incluye los tokens, para el tope diario) y los `ix_*` del motor 3D por línea de solicitud y por plan.
+
+> En la base compartida anterior (`dbo_cubicador`, sin uso desde el traslado) los índices del motor 3D llevaban el prefijo `ix_dbo_cubicador_` y algunas PK y FK tenían nombres generados por SQL Server. La estructura era la misma.

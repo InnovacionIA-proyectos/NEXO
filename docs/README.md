@@ -1,52 +1,44 @@
 # Documentación de NEXO
 
-Punto de entrada a `docs/`. Para qué es el proyecto y cómo se levanta, ver el [`README.md`](../README.md) de la raíz; para el despliegue en Dokploy, [`DOKPLOY.md`](../DOKPLOY.md).
+Punto de entrada a `docs/`. Para qué es el proyecto y cómo se levanta, ver el [`README.md`](../README.md) de la raíz; para el
+despliegue en Dokploy, [`DOKPLOY.md`](../DOKPLOY.md).
 
-## Contrato de la API
+## Cómo funciona NEXO
 
 | Documento | Qué contiene |
 |---|---|
-| [`CONTRATO.md`](../CONTRATO.md) | Referencia endpoint por endpoint: header de identidad, roles, parámetros, respuestas y errores. Su §0 es la guía de consumo para el frontend |
-| [`contrato-integracion/`](contrato-integracion/) | Por qué la identidad del portal viaja sin token (ADR-001), trabajos pesados, avisos en vivo, `openapi.yaml` y escenarios |
+| [`funcionamiento/FUNCIONAMIENTO-NEXO.md`](funcionamiento/FUNCIONAMIENTO-NEXO.md) | NEXO de punta a punta: roles y permisos, pantallas, captura, priorización, costeo, cotización, vehículos, Biblioteca, cubicación, asistente, métricas y notificaciones |
+| [`funcionamiento/`](funcionamiento/) | También el documento de entendimiento de negocio (Word) |
+| [`decisiones/DECISIONES-NEXO.md`](decisiones/DECISIONES-NEXO.md) | Las decisiones técnicas ya tomadas, cada una con su problema, decisión, verificación y cuándo revisarla |
+
+## API e integraciones
+
+| Documento | Qué contiene |
+|---|---|
+| [`CONTRATO.md`](../CONTRATO.md) | Referencia endpoint por endpoint: identidad, roles, parámetros, respuestas y errores. Su §0 es la guía de consumo para el front |
+| [`contrato-integracion/`](contrato-integracion/) | Contrato con el portal: identidad sin token, roles, trabajos pesados, avisos en vivo, errores, `openapi.yaml` y escenarios |
 | [`integraciones/`](integraciones/) | Integración de Cotifly con NEXO y con el Cubicador |
+| [`mensajeria/`](mensajeria/) | Topología de RabbitMQ y contrato de mensajes con el Cubicador |
 
-## Negocio y reglas
-
-| Documento | Qué contiene |
-|---|---|
-| [`documentacion/ROLES_Y_PERMISOS.md`](documentacion/ROLES_Y_PERMISOS.md) | Los seis roles y qué puede hacer cada uno |
-| [`documentacion/FLUJO-DECISION-TARIFA.md`](documentacion/FLUJO-DECISION-TARIFA.md) y [`costeo/`](costeo/) | Cómo se decide el flete: Solo SICE-TAC, plaza vigente o proceso completo, con sus escenarios |
-| [`documentacion/REGLAS-CAPTURA-POR-LINEA-DE-NEGOCIO.md`](documentacion/REGLAS-CAPTURA-POR-LINEA-DE-NEGOCIO.md) | Qué campos exige la captura según la línea de negocio y la clase de viaje |
-| [`documentacion/MAPA-FUNCIONAL-NEXO.md`](documentacion/MAPA-FUNCIONAL-NEXO.md) | Mapa funcional por módulo y rol |
-| [`tarifas-plaza-provisionales/`](tarifas-plaza-provisionales/) | Dataset de tarifas de plaza provisionales validado por negocio |
-
-## Datos y base de datos
+## Base de datos
 
 | Documento | Qué contiene |
 |---|---|
-| [`Database/`](Database/) | Esquema (`esquema/ESQUEMA_NEXO.sql`), datos iniciales (`seeder/`) y el script que crea la base |
-| [`documentacion/database/`](documentacion/database/) | Diccionario de datos y origen de los datos iniciales |
-
-## Mensajería e IA
-
-| Documento | Qué contiene |
-|---|---|
-| [`mensajeria/`](mensajeria/) | Topología RabbitMQ/MassTransit y el puente con el Cubicador |
-| [`ia/`](ia/) | Alcance de la IA en el Cubicador y estudio comparativo |
-| [`decisiones/ia-claude-seguridad-y-datos.md`](decisiones/ia-claude-seguridad-y-datos.md) | Llave, datos que salen y modelo para usar Claude |
-| [`despliegue/ROTACION-LLAVE-ANTHROPIC.md`](despliegue/ROTACION-LLAVE-ANTHROPIC.md) | Configuración, verificación y rotación de la llave de Anthropic |
+| [`../database/`](../database/) | Esquema (`esquema/ESQUEMA_NEXO.sql`), datos iniciales (`seeder/`) y el script que crea la base |
+| [`database/`](database/) | Diccionario de datos y origen de los datos iniciales |
 
 ## Despliegue y pruebas
 
 | Documento | Qué contiene |
 |---|---|
-| [`despliegue/`](despliegue/) | Checklist de despliegue y convención de rutas de CI/CD |
-| [`pruebas/`](pruebas/) | Pruebas locales contra la base real, datos de prueba y ejemplos de costeo |
+| [`despliegue/CHECKLIST_DESPLIEGUE.md`](despliegue/CHECKLIST_DESPLIEGUE.md) | Qué configurar antes de abrir un ambiente nuevo (producción) |
+| [`despliegue/ROTACION-LLAVE-ANTHROPIC.md`](despliegue/ROTACION-LLAVE-ANTHROPIC.md) | Configuración, verificación y rotación de la llave de Anthropic |
+| [`despliegue/CI_CD_RUTAS_COMPARTIDAS.md`](despliegue/CI_CD_RUTAS_COMPARTIDAS.md) | Qué cambios disparan cada pipeline de CI/CD |
+| [`../tests/README.md`](../tests/README.md) | Cómo correr las pruebas contra la base real y cómo se manejan los datos de prueba |
 
-## Decisiones de diseño
+## Fuera de `docs/`
 
-[`decisiones/`](decisiones/) reúne las decisiones técnicas ya tomadas (paginación, score de prioridad, matching SICE-TAC, plaza SAP, mapeo de vehículos, plan de cargue). Cada archivo explica el problema, la decisión y su motivo.
-
-## Histórico
-
-[`archivo/`](archivo/) y [`304-QUE-DEBEN-HACER-FRONT-Y-BACK.md`](304-QUE-DEBEN-HACER-FRONT-Y-BACK.md) se conservan como referencia de trabajos ya cerrados.
+| Documento | Qué contiene |
+|---|---|
+| [`../cubicador/README.md`](../cubicador/README.md) | El Cubicador: qué hace, cómo se levanta y su documentación |
+| [`../evaluacion-ia/cubicador/`](../evaluacion-ia/cubicador/) | Evaluación de la IA en el Cubicador: estudio, scripts e informes |

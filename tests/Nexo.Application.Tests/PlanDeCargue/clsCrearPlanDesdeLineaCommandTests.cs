@@ -139,7 +139,7 @@ public class clsCrearPlanDesdeLineaCommandTests
     [Fact]
     public async Task Publica_antes_de_guardar()
     {
-        // El Outbox exige este orden — ver docs/mensajeria/CUBICACION.md #5.
+        // El Outbox exige este orden — ver docs/mensajeria/CUBICACION.md, sección 3.
         LineaExiste();
         var orden = new List<string>();
         _cubicacion.Setup(c => c.PublicarComandoAsync(

@@ -10,6 +10,23 @@ tablas está en [`../docs/database/`](../docs/database/).
 | Esquema | `dbo` |
 | Tablas | 16: catálogo, recomendación y motor 3D |
 
+## Dónde vive hoy
+
+QA usa la base propia desde el traslado de S7-HU-31.3 (#423), hecho junto con el de NEXO (#428).
+El traslado fue en limpio: solo el catálogo inicial. Las filas de `iaSombra` no se copiaron, así que
+la medición del modo sombra empezó de nuevo en la base propia.
+
+| Ambiente | Base | Esquema | Estado |
+|---|---|---|---|
+| QA desplegado | `dbCubicador_Pruebas` | `dbo` | En uso, con el usuario `userCubicador`. Creada con el esquema y el catálogo de esta carpeta. |
+| Base compartida anterior | `dbTarifario_Nexo_Pruebas` | `dbo_cubicador` | Sin uso desde el traslado. Queda como respaldo hasta que se decida retirarla. |
+| Local y CI | contenedor de `docker-compose.yml` | `dbo` | Se crea en cada arranque. |
+
+Las tablas `planes_cargue`, `items_plan_cargue`, `colocaciones_cargue` y `vehiculos_cubicacion` que
+hay en `dbInformesAutomatizados_Pruebas.dbo_NEXO_prueba` **no son del Cubicador**: son tablas
+antiguas de NEXO con el mismo nombre (ver `database/esquema/ESQUEMA_NEXO.sql` en la raíz del
+repositorio).
+
 ## Contenido de la carpeta
 
 | Ruta | Qué es |
@@ -17,6 +34,9 @@ tablas está en [`../docs/database/`](../docs/database/).
 | `esquema/ESQUEMA_CUBICADOR.sql` | DDL de las 16 tablas: columnas, llaves, `CHECK` e índices. Es la única definición del esquema. |
 | `seeder/` | Catálogo inicial: 7 CSV, uno por tabla. |
 | `scripts/ejecutar_schema_y_seeders.py` | Crea las tablas y carga los CSV en una base vacía. |
+
+Para comprobar que la base propia está lista y que `userCubicador` tiene solo lo que necesita, está
+`cubicador/scripts/verificar_aislamiento.sql`.
 
 ## Documentación
 
@@ -56,8 +76,9 @@ Opciones:
 |---|---|
 | `--solo-schema` | Solo crea las tablas. |
 | `--solo-datos` | Solo carga los CSV, sobre tablas ya creadas. Se puede repetir: los Id son fijos, así que solo inserta las filas que faltan y no modifica las existentes. |
+| `--base <nombre>` | Base destino. Por defecto, `dbCubicador_Pruebas`. |
 
-Para usar otra base, cambie `NOMBRE_BD` al inicio de `scripts/ejecutar_schema_y_seeders.py`.
+Para usar otra base, use `--base`. El esquema es siempre `dbo`: el `.sql` lo trae escrito.
 
 ## Conectar la aplicación
 
@@ -66,7 +87,7 @@ La aplicación (API y worker) lee dos variables de entorno:
 | Variable | Valor |
 |---|---|
 | `DATABASE_URL` | `mssql+aioodbc://<usuario>:<clave>@10.10.40.85:1433/dbCubicador_Pruebas?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes` |
-| `CUBICADOR_DB_ESQUEMA` | `dbo`. Es obligatoria: si falta, la aplicación usa `dbo_cubicador`. |
+| `CUBICADOR_DB_ESQUEMA` | `dbo`, que es también el valor por defecto: si falta o está vacía, la aplicación usa `dbo`. Hay que definirla solo cuando la base usa otro esquema (ver «Dónde vive hoy»). |
 
 Si la clave tiene `@ : / # ?`, debe ir codificada (`urllib.parse.quote_plus`).
 

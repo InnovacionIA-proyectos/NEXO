@@ -1,4 +1,4 @@
-"""Mapeo de las 10 tablas de `dbo_cubicador` (S5-HU-17.2).
+"""Mapeo de las 10 tablas del catalogo del Cubicador (S5-HU-17.2).
 
 Estas tablas **las crea y las siembra el equipo de Datos** con sus propios
 scripts. Mapearlas aca no las convierte en tablas que el Cubicador cree o
@@ -40,10 +40,11 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
-# Mismo criterio que db.py: el esquema solo se declara contra SQL Server, para
-# que las pruebas contra SQLite (que no soporta esquemas) sigan funcionando.
+# Misma regla que db.py, y tienen que coincidir: por defecto `dbo` (vacia cuenta
+# como no definida), y solo contra SQL Server, para que las pruebas contra
+# SQLite (que no soporta esquemas) sigan funcionando.
 _ES_MSSQL = os.environ.get("DATABASE_URL", "").startswith("mssql")
-ESQUEMA = os.environ.get("CUBICADOR_DB_ESQUEMA", "dbo_cubicador") if _ES_MSSQL else None
+ESQUEMA = (os.environ.get("CUBICADOR_DB_ESQUEMA") or "dbo") if _ES_MSSQL else None
 
 
 class BaseCatalogo(DeclarativeBase):

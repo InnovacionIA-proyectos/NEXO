@@ -5,7 +5,7 @@
 Cada carga real queda como un caso con la decision que tomo la persona (el vehiculo de cada
 linea) **como etiqueta candidata**, no como verdad: `etiquetaValidada` nace en `false` y el
 evaluador ignora esos casos hasta que un experto de operaciones los revise (ver
-`docs/ia/ESTUDIO-CUBICADOR-IA.md`, seccion "Como se arma el dataset dorado").
+`evaluacion-ia/cubicador/ESTUDIO-CUBICADOR-IA.md`, seccion "Como se arma el dataset dorado").
 
 Por que no se da la decision registrada por buena sin mas:
   - si la linea traia la recomendacion del motor, la persona pudo aceptarla sin pensarla, y

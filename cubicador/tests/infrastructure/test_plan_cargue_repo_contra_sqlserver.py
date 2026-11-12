@@ -84,13 +84,13 @@ async def sesion():
         await motor.dispose()
         _falta(f"SQL Server no alcanzable: {type(exc).__name__}: {exc}")
 
-    # Esquema propio y desechable: no toca nada de dbo_cubicador.
+    # Esquema propio y desechable: no toca las tablas reales del Cubicador.
     async with motor.begin() as c:
         await c.execute(text(
             f"IF SCHEMA_ID('{_ESQUEMA}') IS NULL EXEC('CREATE SCHEMA {_ESQUEMA}')"))
 
     # Por NOMBRE y no por clave: contra SQL Server el metadata lleva esquema
-    # (`dbo_cubicador.planes_cargue`) y contra SQLite no, asi que la clave
+    # (`dbo.planes_cargue`) y contra SQLite no, asi que la clave
     # cambia segun donde corra. Y el esquema original se guarda para dejarlo
     # como estaba: estas tablas las comparte el resto de la suite.
     # `vehiculos_cubicacion` entra porque `planes_cargue` la referencia por
