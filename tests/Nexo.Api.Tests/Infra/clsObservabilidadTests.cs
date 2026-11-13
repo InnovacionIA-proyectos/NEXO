@@ -44,4 +44,17 @@ public class clsObservabilidadTests
         Assert.Equal(ActivityStatusCode.Unset, tramos[0].Status);
         Assert.Equal(ActivityStatusCode.Error, tramos[1].Status);
     }
+
+    [Theory]
+    [InlineData(ActivityKind.Client, false)]   // SQL/HTTP suelto: sondeo en segundo plano
+    [InlineData(ActivityKind.Server, true)]
+    [InlineData(ActivityKind.Consumer, true)]
+    [InlineData(ActivityKind.Internal, true)]
+    public void Solo_se_descartan_las_trazas_que_empiezan_en_una_llamada_saliente(ActivityKind tipo, bool seTraza)
+    {
+        var decision = new clsSinSondeos().ShouldSample(
+            new OpenTelemetry.Trace.SamplingParameters(default, ActivityTraceId.CreateRandom(), "x", tipo)).Decision;
+
+        Assert.Equal(seTraza, decision == OpenTelemetry.Trace.SamplingDecision.RecordAndSample);
+    }
 }

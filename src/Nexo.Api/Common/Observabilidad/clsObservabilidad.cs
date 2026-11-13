@@ -37,6 +37,7 @@ public static class clsObservabilidad
                 serviceVersion: typeof(clsObservabilidad).Assembly.GetName().Version?.ToString()))
             .WithTracing(t => t
                 .AddSource(CapaDeAplicacion.Name, "MassTransit")
+                .SetSampler(new ParentBasedSampler(new clsSinSondeos()))
                 // La sonda de salud llega cada 30 s: trazarla tapa las peticiones reales.
                 .AddAspNetCoreInstrumentation(o => o.Filter = ctx => !ctx.Request.Path.StartsWithSegments("/health"))
                 .AddHttpClientInstrumentation()
@@ -139,6 +140,16 @@ public static class clsObservabilidad
             throw;
         }
     }
+}
+
+/// <summary>
+/// Descarta las trazas que empiezan en una llamada saliente (SQL o HTTP sin petición ni mensaje que la origine): son los sondeos
+/// periódicos del outbox de MassTransit y de los servicios en segundo plano, que en Jaeger tapan las peticiones reales.
+/// </summary>
+public sealed class clsSinSondeos : Sampler
+{
+    public override SamplingResult ShouldSample(in SamplingParameters p)
+        => new(p.Kind == ActivityKind.Client ? SamplingDecision.Drop : SamplingDecision.RecordAndSample);
 }
 
 internal sealed class clsCommandHandlerTrazado<TCommand, TResult>(

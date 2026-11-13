@@ -94,7 +94,7 @@ def configurar(servicio: str, app: Any = None) -> None:
     # job en Prometheus = "nexo/<servicio>" (namespace/servicio), la convencion del servidor de monitoreo.
     recurso = Resource.create({"service.name": servicio, "service.namespace": "nexo"})
 
-    trazas = TracerProvider(resource=recurso)
+    trazas = TracerProvider(resource=recurso, sampler=sin_sondeos())
     trazas.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
     trace.set_tracer_provider(trazas)
 
@@ -119,6 +119,22 @@ def configurar(servicio: str, app: Any = None) -> None:
         # La sonda de salud llega cada pocos segundos: trazarla tapa las peticiones reales.
         # Sin los tramos internos "http receive"/"http send" de ASGI: tres por peticion que no dicen nada.
         FastAPIInstrumentor.instrument_app(app, excluded_urls="health", exclude_spans=["receive", "send"])
+
+
+def sin_sondeos() -> Any:
+    """Muestreador que descarta las trazas que empiezan en una llamada saliente (SQL o
+    HTTP sin peticion ni mensaje que la origine): son las consultas periodicas del
+    vigilante, que en Jaeger tapan las cubicaciones reales."""
+    from opentelemetry.sdk.trace.sampling import Decision, ParentBased, Sampler, SamplingResult
+
+    class _SinSondeos(Sampler):
+        def should_sample(self, parent_context, trace_id, name, kind=None, attributes=None, links=None, trace_state=None):
+            return SamplingResult(Decision.DROP if kind == SpanKind.CLIENT else Decision.RECORD_AND_SAMPLE, attributes)
+
+        def get_description(self) -> str:
+            return "SinSondeos"
+
+    return ParentBased(root=_SinSondeos())
 
 
 def cabeceras_de_traza() -> dict[str, str]:

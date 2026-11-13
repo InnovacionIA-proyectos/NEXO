@@ -37,7 +37,7 @@ DE_USUARIOS = ACCESOS + ' | Usuario!="anónimo"'
 
 ENLACES = [
     {"title": "Trazas en Jaeger", "type": "link", "icon": "external link", "targetBlank": True,
-     "url": "http://10.10.40.252:16686/search?service=nexo-api"},
+     "url": "http://10.10.40.252:16686/search?service=nexo-api&lookback=custom&limit=20&start=${__from}000&end=${__to}000"},
     {"title": "Tableros del servidor", "type": "dashboards", "tags": ["servidor-tbsodiseo"],
      "asDropdown": True, "includeVars": False, "keepTime": True},
 ]

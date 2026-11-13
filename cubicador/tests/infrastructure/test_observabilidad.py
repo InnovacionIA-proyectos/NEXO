@@ -16,6 +16,17 @@ class _Mensaje:
 
 
 @pytest.mark.sin_base
+def test_no_se_trazan_las_consultas_sueltas_del_vigilante():
+    tracer = TracerProvider(sampler=observabilidad.sin_sondeos()).get_tracer("prueba")
+
+    with tracer.start_as_current_span("SELECT", kind=trace.SpanKind.CLIENT) as suelta:
+        assert not suelta.is_recording()
+    with tracer.start_as_current_span("mensaje", kind=trace.SpanKind.CONSUMER) as raiz:
+        with tracer.start_as_current_span("SELECT", kind=trace.SpanKind.CLIENT) as hija:
+            assert raiz.is_recording() and hija.is_recording()
+
+
+@pytest.mark.sin_base
 def test_el_worker_continua_la_traza_de_quien_publico():
     trace.set_tracer_provider(TracerProvider())
 
