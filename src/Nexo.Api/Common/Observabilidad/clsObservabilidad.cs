@@ -40,7 +40,9 @@ public static class clsObservabilidad
                 .SetSampler(new ParentBasedSampler(new clsSinSondeos()))
                 // La sonda de salud llega cada 30 s: trazarla tapa las peticiones reales.
                 .AddAspNetCoreInstrumentation(o => o.Filter = ctx => !ctx.Request.Path.StartsWithSegments("/health"))
-                .AddHttpClientInstrumentation()
+                // El tramo se llama "GET" a secas: con el destino se ve a quién se llamó sin abrirlo. Solo el host, no la ruta (lleva ids).
+                .AddHttpClientInstrumentation(o => o.EnrichWithHttpRequestMessage =
+                    (tramo, peticion) => tramo.DisplayName = $"{peticion.Method} {peticion.RequestUri?.Host}")
                 .AddSqlClientInstrumentation())
             .WithMetrics(m => m
                 .AddAspNetCoreInstrumentation()

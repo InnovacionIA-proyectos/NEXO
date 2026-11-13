@@ -121,7 +121,7 @@ y Jaeger; las apps no necesitan nada más que dos variables en su pestaña **Env
 - **Seguir una petición:** cada línea de log de una petición trae el id de traza (`traza ...`). Con ese id se abre en Jaeger el
   recorrido completo: petición HTTP → caso de uso → SQL y llamadas a otros servicios → mensaje en RabbitMQ → worker del Cubicador →
   respuesta de vuelta a NEXO.
-- **RabbitMQ:** la imagen ya trae encendido el plugin `rabbitmq_prometheus`. Para verlo en Grafana falta publicar el puerto `15692`
-  de `nexo-rabbit` en Dokploy y añadir ese destino al colector del servidor de monitoreo.
+- **RabbitMQ:** la imagen ya trae encendido el plugin `rabbitmq_prometheus`. En Dokploy, `nexo-rabbit` tiene un dominio
+  apuntando a su puerto `15692`; el colector del servidor de monitoreo lee de ahí `/metrics` y `/metrics/detailed` (tablero 6).
 - Tableros y alertas de NEXO: carpeta **NEXO** de Grafana. Sus fuentes están en
   [`docs/despliegue/observabilidad/`](docs/despliegue/observabilidad/).

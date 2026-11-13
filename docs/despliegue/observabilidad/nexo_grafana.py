@@ -21,8 +21,17 @@ from tableros_base import *
 
 TAG, CARPETA = "nexo", "nexo"
 JA, JC, JW = 'job="nexo/nexo-api"', 'job="nexo/cubicador-api"', 'job="nexo/cubicador-worker"'
+JR, JRC = 'job="nexo/rabbitmq"', 'job="nexo/rabbitmq-colas"'
+# Colas donde es normal que se queden mensajes sin consumidor: las de error.
+COLAS_DE_ERROR = 'queue=~".*_error|.*_skipped|.*dlq.*"'
+COLAS_DE_TRABAJO = 'queue!~".*_error|.*_skipped|.*dlq.*"'
+RABBIT_VIVO = f'min(up{{{JR}}}) or vector(0)'
+RABBIT_ALARMAS = f'sum({{__name__=~"rabbitmq_alarms_.+",{JR}}}) or vector(0)'
+COLA_MAS_LLENA = f'max(rabbitmq_detailed_queue_messages_ready{{{JRC},{COLAS_DE_TRABAJO}}}) or vector(0)'
+COLAS_SIN_CONSUMIDOR = f'count(rabbitmq_detailed_queue_consumers{{{JRC},{COLAS_DE_TRABAJO}}} == 0) or vector(0)'
 SONDA = 'probe_success{job="integrations/blackbox/nexo-api"}'
-SIN_HEALTH = 'http_route!~"/?health.*|/?hubs.*"'
+# Los preflight OPTIONS del navegador no son peticiones de un usuario.
+SIN_HEALTH = 'http_route!~"/?health.*|/?hubs.*",http_request_method!="OPTIONS"'
 PET = f'http_server_request_duration_seconds_count{{{JA},{SIN_HEALTH}}}'
 BUCKETS = f'http_server_request_duration_seconds_bucket{{{JA},{SIN_HEALTH}}}'
 TASA_5XX = (f'(sum(rate(http_server_request_duration_seconds_count{{{JA},{SIN_HEALTH},http_response_status_code=~"5.."}}[5m])) or vector(0))'
@@ -32,7 +41,7 @@ P95_CUBICACION = f'histogram_quantile(0.95, sum by (le) (rate(cubicador_mensaje_
 FALLOS_MT = f'{{__name__=~"messaging_masstransit_consume_fault.*_total",{JA}}}'
 CONSUMOS_MT = f'{{__name__=~"messaging_masstransit_consume(_ea)?_total",{JA}}}'
 # Lineas "resumen de peticion" que escribe nexo-api (clsObservabilidad.UseResumenDePeticion).
-ACCESOS = '{service_name="nexo-api"} | scope_name="Nexo.Api.Peticion"'
+ACCESOS = '{service_name="nexo-api"} | scope_name="Nexo.Api.Peticion" | Metodo!="OPTIONS"'
 DE_USUARIOS = ACCESOS + ' | Usuario!="anónimo"'
 
 ENLACES = [
@@ -70,7 +79,7 @@ def con_loki(panel, instantaneo=True):
 
 
 def accion(ruta, metodo="POST"):
-    """Peticiones exitosas a una ruta de negocio. Las llaves de {id} van como '.' para no escaparlas."""
+    """Peticiones exitosas a una ruta de negocio. Los {id:guid} de la ruta van como '[^/]+'."""
     return (f'http_server_request_duration_seconds_count{{{JA},http_request_method="{metodo}",'
             f'http_route=~"/?{ruta}",http_response_status_code=~"2.."}}')
 
@@ -148,9 +157,9 @@ def negocio():
     P.append(fila("Totales del periodo", y)); y += 1
     tarjetas = [
         ("Solicitudes creadas", total(accion("api/(captura-)?solicitudes")), "Solicitudes de cotización registradas (manuales o desde Excel)."),
-        ("Excel analizados", total(accion("api/captura-solicitudes/analizar-excel")), "Archivos de clientes leídos para capturar solicitudes."),
-        ("Cotizaciones entregadas", total(accion("api/cotizaciones/.id./entregar")), "Cotizaciones que se enviaron al cliente."),
-        ("Solicitudes rechazadas", total(accion("api/solicitudes/.id./rechazar")), "Solicitudes descartadas por el equipo."),
+        ("Excel analizados", total(accion("api/captura-solicitudes/(analizar-excel|leer-estructura)")), "Archivos de clientes leídos para capturar solicitudes."),
+        ("Cotizaciones entregadas", total(accion("api/cotizaciones/[^/]+/entregar")), "Cotizaciones que se enviaron al cliente."),
+        ("Solicitudes rechazadas", total(accion("api/solicitudes/[^/]+/rechazar")), "Solicitudes descartadas por el equipo."),
         ("Planes de cargue calculados", f'round(sum(increase(cubicador_mensajes_total{{{JW},tipo="optimizar",resultado="ok"}}[$__range])) or vector(0))',
          "Optimizaciones 3D que el Cubicador terminó bien."),
         ("Mensajes al asistente (IA)", total(accion("api/asistente/conversaciones/mensajes")), "Preguntas hechas al asistente de cotización."),
@@ -162,9 +171,11 @@ def negocio():
     P.append(fila("Ritmo de trabajo", y)); y += 1
     P.append(serie("Acciones por hora", [
         (f'sum(increase({accion("api/(captura-)?solicitudes")}[1h]))', "Solicitudes creadas"),
-        (f'sum(increase({accion("api/cotizaciones/.id./entregar")}[1h]))', "Cotizaciones entregadas"),
-        (f'sum(increase({accion("api/cotizaciones/.id./lineas.*", "P.*")}[1h]))', "Líneas costeadas a mano"),
-        (f'sum(increase({accion("api/planes-cargue/.id./optimizar")}[1h]))', "Planes de cargue pedidos")], 0, y, 12, 8, ayuda(
+        (f'sum(increase({accion("api/cotizaciones/[^/]+/entregar")}[1h]))', "Cotizaciones entregadas"),
+        (f'sum(increase({accion("api/cotizaciones/[^/]+/lineas.*", "P.*")}[1h]))', "Líneas costeadas a mano"),
+        (f'sum(increase({accion("api/planes-cargue/[^/]+/optimizar")}[1h]))', "Planes de cargue pedidos"),
+        (f'sum(increase({accion("api/cotizaciones")}[1h]))', "Cotizaciones creadas"),
+        (f'sum(increase({accion("api/cubicacion")}[1h]))', "Recomendaciones de vehículo (IA)")], 0, y, 12, 8, ayuda(
         "Cuántas acciones de cada tipo se hacen por hora.", "Muestra las horas pico y si el uso crece o cae.",
         "Una caída a cero en horario laboral con la API arriba merece una llamada al equipo comercial."), barras_tiempo=True))
     P.append(serie("Costeo automático: mensajes procesados y fallidos", [
@@ -305,12 +316,75 @@ def usuarios():
     return P
 
 
+# ── 6. RabbitMQ ──────────────────────────────────────────────────────────────
+def rabbitmq():
+    P, y = [], 0
+    P.append(texto("## NEXO — RabbitMQ (colas y mensajes)\nRabbitMQ es el buzón por donde NEXO y el Cubicador se pasan el trabajo. Si se cae o una cola "
+                   "se llena, las cotizaciones dejan de costearse solas y los planes de cargue se quedan en 'procesando'. " + LEYENDA, 0, y, 24, 3)); y += 3
+    P.append(fila("Estado", y)); y += 1
+    P.append(marca("rabbit", stat("RabbitMQ", RABBIT_VIVO, 0, y, 4, 4, ayuda(
+        "Si el servidor de monitoreo logra leer las métricas de RabbitMQ.", "Sin RabbitMQ no hay costeo automático ni planes de cargue.",
+        "Revisar el servicio nexo-rabbit en Dokploy."), mapeos=VIVO, th=umbrales((ROJO, None), (VERDE, 1)))))
+    P.append(marca("rabbit-alarmas", stat("Alarmas activas", RABBIT_ALARMAS, 4, y, 4, 4, ayuda(
+        "Alarmas de memoria, disco o archivos abiertos de RabbitMQ.", "Con una alarma activa RabbitMQ deja de aceptar mensajes nuevos.",
+        "Ver la fila 'Recursos' y liberar memoria o disco en el servidor."), th=TH_CERO_MALO, decimales=0)))
+    P.append(marca("rabbit-cola", stat("Cola más llena (mensajes en espera)", COLA_MAS_LLENA, 8, y, 4, 4, ayuda(
+        "Cuántos mensajes esperan en la cola con más trabajo acumulado.", "Una cola que crece es trabajo que entra más rápido de lo que se atiende.",
+        "Ver abajo cuál cola es y si su consumidor está vivo."), th=umbrales((VERDE, None), (AMARILLO, 50), (ROJO, 200)), decimales=0)))
+    P.append(marca("rabbit-consumidor", stat("Colas sin quien las atienda", COLAS_SIN_CONSUMIDOR, 12, y, 4, 4, ayuda(
+        "Colas de trabajo que no tienen ningún consumidor conectado.", "Lo que llegue a esas colas se queda esperando indefinidamente.",
+        "Ver abajo cuáles son y reiniciar el servicio que las atiende (API de NEXO o worker del Cubicador)."), th=TH_CERO_MALO, decimales=0)))
+    P.append(stat("Mensajes en colas de error", f'sum(rabbitmq_detailed_queue_messages{{{JRC},{COLAS_DE_ERROR}}}) or vector(0)', 16, y, 4, 4, ayuda(
+        "Mensajes que fallaron y quedaron guardados en las colas de error.", "Cada uno es un trabajo que no se hizo y que nadie va a reintentar solo.",
+        "Revisar el mensaje en la consola de RabbitMQ y la traza en Jaeger."), th=umbrales((VERDE, None), (AMARILLO, 1)), decimales=0))
+    P.append(stat("Conexiones", f'max(rabbitmq_connections{{{JR}}})', 20, y, 4, 4, ayuda(
+        "Servicios conectados a RabbitMQ.", "Lo normal es un número estable; una caída indica un servicio desconectado.",
+        "Comparar con los servicios vivos en el tablero 1."), th=TH_AZUL, decimales=0, color_modo="value")); y += 4
+    P.append(fila("Flujo de mensajes", y)); y += 1
+    P.append(serie("Mensajes por minuto", [
+        (f'sum(rate(rabbitmq_global_messages_received_total{{{JR}}}[5m])) * 60', "Publicados"),
+        (f'sum(rate(rabbitmq_global_messages_delivered_total{{{JR}}}[5m])) * 60', "Entregados"),
+        (f'sum(rate(rabbitmq_global_messages_acknowledged_total{{{JR}}}[5m])) * 60', "Confirmados"),
+        (f'sum(rate(rabbitmq_global_messages_redelivered_total{{{JR}}}[5m])) * 60', "Reentregados")], 0, y, 12, 8, ayuda(
+        "Mensajes que entran a RabbitMQ, los que se entregan a un servicio y los que ese servicio confirma.",
+        "Publicados y confirmados deben ir parejos; los reentregados son reintentos.",
+        "Si se publica y no se confirma, ver las colas de abajo.")))
+    P.append(serie("Mensajes sin destino", [
+        (f'sum(increase(rabbitmq_global_messages_unroutable_dropped_total{{{JR}}}[15m]))', "Descartados"),
+        (f'sum(increase(rabbitmq_global_messages_unroutable_returned_total{{{JR}}}[15m]))', "Devueltos")], 12, y, 12, 8, ayuda(
+        "Mensajes publicados que ninguna cola recibe, así que RabbitMQ los descarta.",
+        "Si alguien debía enterarse de ese mensaje, no se enteró. Si nadie lo esperaba, es solo ruido.",
+        "Buscar qué tipo de mensaje se publica sin cola asociada."), barras_tiempo=True)); y += 8
+    P.append(fila("Colas", y)); y += 1
+    P.append(serie("Mensajes en espera por cola", [
+        (f'rabbitmq_detailed_queue_messages{{{JRC},{COLAS_DE_TRABAJO}}} > 0', "{{queue}}")], 0, y, 12, 9, ayuda(
+        "Las colas de trabajo que tienen mensajes pendientes; las vacías no aparecen.", "Señala exactamente qué proceso se está atrasando.",
+        "Una línea que sube sin bajar: revisar el servicio que consume esa cola.")))
+    P.append(serie("Mensajes en colas de error", [
+        (f'rabbitmq_detailed_queue_messages{{{JRC},{COLAS_DE_ERROR}}} > 0', "{{queue}}")], 12, y, 6, 9, ayuda(
+        "Mensajes fallidos guardados, por cola de error.", "Dice qué proceso es el que está fallando.", "Ver el tablero 4 y la traza del mensaje.")))
+    P.append(serie("Colas sin quien las atienda", [
+        (f'rabbitmq_detailed_queue_consumers{{{JRC},{COLAS_DE_TRABAJO}}} == 0', "{{queue}}")], 18, y, 6, 9, ayuda(
+        "Colas de trabajo sin consumidor; si todo está bien este panel sale vacío.", "Dice qué servicio se desconectó.",
+        "Reiniciar el servicio que atiende esa cola."))); y += 9
+    P.append(fila("Recursos de RabbitMQ", y)); y += 1
+    P.append(serie("Memoria usada frente al límite", [
+        (f'max(rabbitmq_process_resident_memory_bytes{{{JR}}}) / max(rabbitmq_resident_memory_limit_bytes{{{JR}}})', "Memoria")], 0, y, 12, 7, ayuda(
+        "Qué parte de su límite de memoria usa RabbitMQ.", "Al llegar al límite RabbitMQ bloquea a quienes publican.",
+        "Si pasa de 80 %, buscar colas acumuladas."), unidad="percentunit", maximo=1))
+    P.append(serie("Disco disponible", [(f'max(rabbitmq_disk_space_available_bytes{{{JR}}})', "Disponible")], 12, y, 12, 7, ayuda(
+        "Espacio libre en el disco donde RabbitMQ guarda los mensajes.", "Sin disco RabbitMQ deja de aceptar mensajes.",
+        "Liberar espacio en el nodo del clúster."), unidad="bytes")); y += 7
+    return P
+
+
 TABLEROS = [
     ("nexo-resumen", "1. Resumen de salud de NEXO", "Estado de NEXO y del Cubicador de un vistazo.", resumen, "now-24h"),
     ("nexo-negocio", "2. Actividad del negocio", "Solicitudes, cotizaciones, planes de cargue y servicios externos.", negocio, "now-24h"),
     ("nexo-api", "3. Rendimiento y errores de la API", "Rutas, dependencias, salud del proceso y logs.", api, "now-6h"),
     ("nexo-cubicador", "4. Cubicador y mensajería", "Worker, colas y API del Cubicador.", cubicador, "now-6h"),
     ("nexo-usuarios", "5. Usuarios y actividad reciente", "Quién usa NEXO y qué hace.", usuarios, "now-24h"),
+    ("nexo-rabbitmq", "6. RabbitMQ (colas y mensajes)", "Estado del bus de mensajes, colas y recursos.", rabbitmq, "now-6h"),
 ]
 
 
@@ -371,6 +445,17 @@ def reglas():
         regla("nexo-correo-fallando", "NEXO con envíos de correo fallando",
               f'sum(increase(http_client_request_duration_seconds_count{{{JA},server_address=~".*mailsender.*",http_response_status_code!~"2.."}}[15m])) or vector(0)',
               "gt", 0, "5m", "media", "correo", "Hay cotizaciones cuyo correo falló en los últimos 15 minutos.", ventana=1800),
+        regla("nexo-rabbit-caido", "RabbitMQ de NEXO no responde", RABBIT_VIVO, "lt", 1, "3m", "critica", "rabbit",
+              "El servidor de monitoreo no logra leer RabbitMQ hace 3 minutos: sin él no hay costeo automático ni planes de cargue.",
+              servicio="nexo-rabbitmq", sin_datos="Alerting", ventana=300),
+        regla("nexo-rabbit-alarma", "RabbitMQ con alarma de memoria o disco", RABBIT_ALARMAS, "gt", 0, "1m", "critica", "rabbit-alarmas",
+              "RabbitMQ activó una alarma de recursos y está bloqueando la publicación de mensajes.", servicio="nexo-rabbitmq", ventana=300),
+        regla("nexo-rabbit-cola-acumulada", "RabbitMQ acumulando mensajes en una cola (preventiva)", COLA_MAS_LLENA, "gt", 50, "10m", "media", "rabbit-cola",
+              "Una cola de trabajo lleva 10 minutos con más de 50 mensajes en espera: el trabajo entra más rápido de lo que se atiende.",
+              servicio="nexo-rabbitmq", ventana=900),
+        regla("nexo-rabbit-sin-consumidor", "RabbitMQ con una cola sin quien la atienda (preventiva)", COLAS_SIN_CONSUMIDOR, "gt", 0, "5m", "alta", "rabbit-consumidor",
+              "Una cola de trabajo lleva 5 minutos sin consumidor: lo que llegue a ella se queda esperando. Ver cuál en el tablero 6.",
+              servicio="nexo-rabbitmq", ventana=600),
     ]
 
 
@@ -398,7 +483,7 @@ def publicar(sobrescribir):
         codigo, texto_ = llamar("POST", "/api/dashboards/db", {
             "dashboard": tablero(uid, titulo, desc, armar, rango), "folderUid": CARPETA, "overwrite": sobrescribir,
             "message": "Publicado por nexo_grafana.py"})
-        if codigo == 412 and not sobrescribir:
+        if codigo in (409, 412) and not sobrescribir:
             print(f"tablero {uid}: ya existe, no se toca")
         else:
             fallos += codigo != 200

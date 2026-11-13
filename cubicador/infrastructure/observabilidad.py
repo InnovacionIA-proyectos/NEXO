@@ -112,7 +112,15 @@ def configurar(servicio: str, app: Any = None) -> None:
     # skip_dep_check: el instrumentador declara soporte hasta SQLAlchemy 2.0 y se niega con la 2.1
     # instalada, pero solo usa los eventos del motor, que no cambiaron (verificado: salen los tramos SQL).
     SQLAlchemyInstrumentor().instrument(engine=engine.sync_engine, skip_dep_check=True)
-    HTTPXClientInstrumentor().instrument()
+    # El tramo se llama "POST" a secas: con el destino se ve a quien se llamo sin abrirlo.
+    def nombrar(tramo: Any, peticion: Any) -> None:
+        if tramo.is_recording():
+            tramo.update_name(f"{peticion.method.decode()} {peticion.url.host}")
+
+    async def nombrar_async(tramo: Any, peticion: Any) -> None:
+        nombrar(tramo, peticion)
+
+    HTTPXClientInstrumentor().instrument(request_hook=nombrar, async_request_hook=nombrar_async)
     if app is not None:
         from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 
