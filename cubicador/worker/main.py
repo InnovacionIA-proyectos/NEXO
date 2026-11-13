@@ -52,6 +52,7 @@ from application.plan_cargue.desde_linea import crear_plan_desde_linea
 from application.plan_cargue.optimizar import ParametrosOptimizacionInput, optimizar_plan
 from application.plan_cargue.resultado import obtener_resultado
 from domain.motor.dominio import PonderacionesCombinada
+from infrastructure import observabilidad
 from infrastructure.alertas.correo import alertar_mensaje_en_dlq
 from infrastructure.clientes.nexo_client import NexoLineaSolicitudClient
 from infrastructure.mensajeria.rabbitmq import EXCHANGE, RabbitMqEventosPublisher, conectar_con_reintentos
@@ -216,6 +217,15 @@ async def _ejecutar_solicitud(
 
 
 async def _procesar(mensaje: aio_pika.IncomingMessage, publisher: RabbitMqEventosPublisher) -> None:
+    # Todo el procesamiento queda dentro de un tramo que sigue la traza de quien publico
+    # el mensaje (NEXO o la API del Cubicador): en Jaeger se ve el recorrido completo.
+    with observabilidad.tramo_de_consumo(mensaje, COLA) as traza:
+        await _procesar_mensaje(mensaje, publisher, traza)
+
+
+async def _procesar_mensaje(
+    mensaje: aio_pika.IncomingMessage, publisher: RabbitMqEventosPublisher, traza: dict,
+) -> None:
     # TODO lo que corre antes del `try` de mas abajo va dentro de esta
     # guarda. Ahi no habia ningun manejador de errores, asi que
     # cualquier fallo -body ilegible, JSON que no es un objeto, falta
@@ -243,10 +253,18 @@ async def _procesar(mensaje: aio_pika.IncomingMessage, publisher: RabbitMqEvento
         correlation_id = cuerpo.get("correlationId")
         intentos_previos = int((mensaje.headers or {}).get("x-intentos", 0))
     except Exception as exc:  # noqa: BLE001 - mensaje ilegible: nunca reintentable
+        traza["resultado"] = "ilegible"
         logger.exception("Mensaje ilegible, va directo a %s sin reintentar.", COLA_DLQ)
         await _mover_a_dlq(mensaje, publisher, "desconocido", f"Mensaje ilegible: {exc}", 0)
         await mensaje.ack()
         return
+
+    traza.update(
+        tipo=str(cuerpo.get("tipo", "desconocido")), plan_id=cuerpo.get("planId"),
+        correlacion=correlation_id, intento=intentos_previos + 1)
+    logger.info(
+        "Procesando '%s' (plan %s, correlacion %s, intento %d/%d).",
+        traza["tipo"], traza["plan_id"], correlation_id, intentos_previos + 1, MAX_INTENTOS)
 
     async with SessionLocal() as sesion:
         planes = SqlPlanCargueRepository(sesion)
@@ -272,6 +290,8 @@ async def _procesar(mensaje: aio_pika.IncomingMessage, publisher: RabbitMqEvento
                 payload = ResultadoPlanDto.model_validate(resultado).model_dump(mode="json", by_alias=True)
                 await publisher.publicar_plan_generado(plan_id, payload)
             await mensaje.ack()
+            traza["resultado"] = "ok"
+            logger.info("Mensaje '%s' procesado (plan %s).", traza["tipo"], plan_id)
         except AppException as exc:
             # Error de negocio (validacion, no encontrado, etc.): no tiene sentido
             # reintentar, es el mismo resultado siempre. `marcar_error` es un no-op
@@ -279,6 +299,10 @@ async def _procesar(mensaje: aio_pika.IncomingMessage, publisher: RabbitMqEvento
             # (p.ej. "guardar_vehiculo", o "crear_plan"/"crear_desde_linea" fallando
             # antes de crear nada) - por eso se llama igual para los 9 tipos, sin
             # bifurcar por tipo (antes solo cubria "optimizar").
+            traza.update(resultado="rechazado", codigo_rechazo=exc.codigo)
+            logger.warning(
+                "Mensaje '%s' rechazado por regla de negocio (plan %s): %s - %s",
+                traza["tipo"], traza["plan_id"], exc.codigo, exc.mensaje)
             try:
                 await sesion.rollback()
                 await planes.marcar_error(cuerpo.get("planId"), exc.mensaje)
@@ -288,7 +312,10 @@ async def _procesar(mensaje: aio_pika.IncomingMessage, publisher: RabbitMqEvento
             finally:
                 await mensaje.ack()
         except Exception as exc:  # noqa: BLE001 - fallo inesperado (bug, DB caida, etc.)
-            logger.exception("Fallo procesando mensaje (intento %d/%d)", intentos_previos + 1, MAX_INTENTOS)
+            traza["resultado"] = "dlq" if intentos_previos + 1 >= MAX_INTENTOS else "reintento"
+            logger.exception(
+                "Fallo procesando '%s' (plan %s, correlacion %s, intento %d/%d)",
+                traza["tipo"], traza["plan_id"], correlation_id, intentos_previos + 1, MAX_INTENTOS)
             try:
                 # La sesion puede haber quedado INUTILIZABLE: si el fallo fue durante
                 # un flush (p.ej. IntegrityError por llave foranea al insertar un item contra
@@ -425,7 +452,7 @@ async def _vigilante_de_timeouts(publisher: RabbitMqEventosPublisher) -> None:
 
 
 async def main() -> None:
-    logging.basicConfig(level=logging.INFO)
+    observabilidad.configurar("cubicador-worker")
     await crear_tablas()
 
     publisher = RabbitMqEventosPublisher(RABBITMQ_URL)

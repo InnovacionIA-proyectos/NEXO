@@ -104,3 +104,24 @@ Igual que NEXO: el esquema y el catálogo inicial se crean una sola vez con `cub
 y los CSV de `cubicador/database/seeder/`, usando `cubicador/database/scripts/ejecutar_schema_y_seeders.py`. Ver
 [`cubicador/database/README.md`](cubicador/database/README.md). La app solo lee y escribe datos: el usuario de la aplicación
 necesita `db_datareader` y `db_datawriter`.
+
+## 6. Observabilidad
+
+`nexo-api`, `cubicador-api` y `cubicador-worker` envían trazas, métricas y logs por OTLP al servidor de monitoreo
+(`10.10.40.252`: Grafana en el puerto 3000, Jaeger en el 16686). El colector de ese servidor (Alloy) reparte a Prometheus, Loki
+y Jaeger; las apps no necesitan nada más que dos variables en su pestaña **Environment**:
+
+| App | `OTEL_EXPORTER_OTLP_ENDPOINT` | `OTEL_RESOURCE_ATTRIBUTES` |
+|---|---|---|
+| `nexo-api` | `http://10.10.40.252:4317` (gRPC) | `deployment.environment.name=qa` |
+| `cubicador-api` y `cubicador-worker` | `http://10.10.40.252:4318` (HTTP) | `deployment.environment.name=qa` |
+
+- Sin `OTEL_EXPORTER_OTLP_ENDPOINT` no se exporta nada y la app se comporta igual: la variable es el interruptor.
+- Cada servicio aparece en Grafana como `nexo/<servicio>` (`nexo/nexo-api`, `nexo/cubicador-api`, `nexo/cubicador-worker`).
+- **Seguir una petición:** cada línea de log de una petición trae el id de traza (`traza ...`). Con ese id se abre en Jaeger el
+  recorrido completo: petición HTTP → caso de uso → SQL y llamadas a otros servicios → mensaje en RabbitMQ → worker del Cubicador →
+  respuesta de vuelta a NEXO.
+- **RabbitMQ:** la imagen ya trae encendido el plugin `rabbitmq_prometheus`. Para verlo en Grafana falta publicar el puerto `15692`
+  de `nexo-rabbit` en Dokploy y añadir ese destino al colector del servidor de monitoreo.
+- Tableros y alertas de NEXO: carpeta **NEXO** de Grafana. Sus fuentes están en
+  [`docs/despliegue/observabilidad/`](docs/despliegue/observabilidad/).

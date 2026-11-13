@@ -16,6 +16,7 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Nexo.Api.Common.Auth;
 using Nexo.Api.Common.Errors;
 using Nexo.Api.Common.Middleware;
+using Nexo.Api.Common.Observabilidad;
 using Nexo.Api.Common.RateLimiting;
 using Nexo.Api.Bandeja;
 using Nexo.Api.PlanDeCargue;
@@ -62,7 +63,8 @@ builder.Configuration.AddJsonFile(
 builder.Logging.AddSimpleConsole(o =>
 {
     o.SingleLine = true;
-    o.TimestampFormat = "HH:mm:ss ";
+    // Con fecha: un log de consola se lee días después, y solo la hora no dice de cuándo es.
+    o.TimestampFormat = "yyyy-MM-dd HH:mm:ss ";
 });
 
 // --------------------------------------------------------------- Infraestructura + Application (Cotizaciones)
@@ -102,6 +104,9 @@ builder.Services.AddSingleton(builder.Configuration.GetSection("Asistente").Get<
 builder.Services.AddAsistenteUseCases();
 // Arma la cadena de priorización al arrancar y se va. No tiene reloj: el reloj vive en la saga, dentro del broker.
 builder.Services.AddHostedService<clsArranqueDeLaCadenaHostedService>();
+
+// Después de TODOS los Add*UseCases: envuelve los handlers ya registrados (ver clsObservabilidad).
+builder.AddObservabilidad();
 
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddHttpContextAccessor();
@@ -240,6 +245,8 @@ else
     app.UseHsts();
 }
 
+// Antes del manejador de errores: así el resumen de la petición ve el código HTTP final, también cuando hubo excepción.
+app.UseResumenDePeticion();
 app.UseMiddleware<clsErrorHandlingMiddleware>();
 app.UseCors(ClientesCors);
 app.UseAuthentication();

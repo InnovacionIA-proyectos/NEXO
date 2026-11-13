@@ -21,6 +21,7 @@ from sqlalchemy.orm.exc import StaleDataError
 from api.dependencias import cerrar_publisher, cerrar_servicio_sombra, iniciar_publisher
 from api.routers import catalogo, planes_cargue, recomendaciones
 from application.excepciones import AppException, ConflictException, NotFoundException, ServiceUnavailableException, ValidationFailedException
+from infrastructure import observabilidad
 from infrastructure.persistence.db import crear_tablas
 
 _STATUS_POR_EXCEPCION = {
@@ -54,6 +55,8 @@ app = FastAPI(
     ),
     lifespan=lifespan,
 )
+
+observabilidad.configurar("cubicador-api", app)
 
 app.include_router(recomendaciones.router)
 app.include_router(catalogo.router)

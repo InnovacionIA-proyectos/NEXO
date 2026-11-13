@@ -29,6 +29,8 @@ from typing import Any
 
 import aio_pika
 
+from infrastructure import observabilidad
+
 EXCHANGE = "cubicador.eventos"
 logger = logging.getLogger("cubicador.rabbitmq")
 
@@ -105,21 +107,24 @@ class RabbitMqEventosPublisher:
 
     async def _publicar(self, routing_key: str, payload: dict[str, Any]) -> None:
         assert self._exchange is not None, "Llamar a conectar() antes de publicar."
-        mensaje = aio_pika.Message(
-            body=json.dumps(payload).encode("utf-8"),
-            content_type="application/json",
-            delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
-        )
-        await self._exchange.publish(mensaje, routing_key=routing_key)
+        with observabilidad.tramo_de_publicacion(routing_key) as traza:
+            mensaje = aio_pika.Message(
+                body=json.dumps(payload).encode("utf-8"),
+                content_type="application/json",
+                delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
+                headers=traza,
+            )
+            await self._exchange.publish(mensaje, routing_key=routing_key)
 
     async def publicar_crudo(self, routing_key: str, body: bytes, headers: dict[str, Any] | None = None) -> None:
         """Republica un mensaje tal cual (usado por el worker para reintentos y DLQ - ver worker/main.py)."""
         assert self._exchange is not None, "Llamar a conectar() antes de publicar."
-        mensaje = aio_pika.Message(
-            body=body, content_type="application/json",
-            delivery_mode=aio_pika.DeliveryMode.PERSISTENT, headers=headers or {},
-        )
-        await self._exchange.publish(mensaje, routing_key=routing_key)
+        with observabilidad.tramo_de_publicacion(routing_key) as traza:
+            mensaje = aio_pika.Message(
+                body=body, content_type="application/json",
+                delivery_mode=aio_pika.DeliveryMode.PERSISTENT, headers={**traza, **(headers or {})},
+            )
+            await self._exchange.publish(mensaje, routing_key=routing_key)
 
     async def publicar_cubicacion_solicitada(self, plan_id: str, tipo: str, solicitud: dict[str, Any]) -> None:
         await self._publicar("cubicacion.solicitada", {
